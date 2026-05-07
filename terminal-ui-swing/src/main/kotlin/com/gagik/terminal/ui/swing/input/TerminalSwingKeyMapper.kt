@@ -1,4 +1,4 @@
-package com.gagik.terminal.ui.swing
+package com.gagik.terminal.ui.swing.input
 
 import com.gagik.terminal.input.event.TerminalKey
 import com.gagik.terminal.input.event.TerminalKeyEvent
@@ -11,7 +11,7 @@ import java.awt.event.KeyEvent
  * Printable text is emitted from `KEY_TYPED` events. Navigation, function, and
  * control/meta modified printable keys are emitted from `KEY_PRESSED` events.
  */
-object TerminalSwingKeyMapper {
+internal object TerminalSwingKeyMapper {
     /**
      * Converts a `KEY_PRESSED` event to terminal input when the event should
      * not be handled by the later `KEY_TYPED` event.

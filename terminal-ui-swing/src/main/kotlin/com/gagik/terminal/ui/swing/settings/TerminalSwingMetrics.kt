@@ -1,4 +1,4 @@
-package com.gagik.terminal.ui.swing
+package com.gagik.terminal.ui.swing.settings
 
 import java.awt.FontMetrics
 
@@ -13,7 +13,7 @@ import java.awt.FontMetrics
  * @property overlineY overline y offset inside a cell in pixels.
  * @property cursorStrokeWidth stroke width for bar and underline cursors.
  */
-data class TerminalSwingMetrics(
+internal data class TerminalSwingMetrics(
     val cellWidth: Int,
     val cellHeight: Int,
     val baseline: Int,

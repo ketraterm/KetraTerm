@@ -63,6 +63,8 @@ Keep these boundaries intact:
 - Swing UI displays and interacts. It must not import IntelliJ APIs, contain
   PTY-specific code, parse terminal output, or know whether bytes come from PTY,
   SSH, tests, or another transport.
+  It may use `terminal-input` event vocabulary but must send encoded intent
+  through `TerminalSession` rather than writing host bytes directly.
 - Swing demo hosts. It may start PTY sessions and create windows, but reusable
   rendering and input behavior still belong in `terminal-ui-swing`.
 - PTY hosts. It starts local pseudo-terminal processes and exposes them through

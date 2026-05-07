@@ -1,4 +1,4 @@
-package com.gagik.terminal.ui.swing
+package com.gagik.terminal.ui.swing.settings
 
 import com.gagik.terminal.render.api.TerminalRenderAttrs
 import com.gagik.terminal.render.api.TerminalRenderColorKind

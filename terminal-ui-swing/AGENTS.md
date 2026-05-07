@@ -7,6 +7,18 @@ transport produced the byte stream.
 This module is the shared UI foundation for standalone desktop usage, IDE
 integration, and other Swing hosts.
 
+## Package Layout
+
+- `com.gagik.terminal.ui.swing.api`: public host-facing Swing component APIs.
+- `com.gagik.terminal.ui.swing.settings`: public immutable settings and palette
+  snapshots, plus internal frozen metrics.
+- `com.gagik.terminal.ui.swing.input`: Swing-to-terminal input event adapters.
+- `com.gagik.terminal.ui.swing.render`: Java2D painters and renderer-local
+  primitive caches.
+
+Keep reusable public surfaces narrow. Implementation packages should stay
+internal unless hosts genuinely need the type as part of the UI contract.
+
 ## Responsibilities
 
 `terminal-ui-swing` owns:
@@ -32,6 +44,7 @@ interfaces rather than assembling internal painting/cursor pieces themselves.
 `terminal-ui-swing` may depend on:
 
 - `terminal-session`
+- `terminal-input`
 - `terminal-render-api`
 - `terminal-render-cache`
 

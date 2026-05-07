@@ -74,9 +74,10 @@ playbooks in [`docs/agent-skills.md`](docs/agent-skills.md).
 - Transport connectors own byte-stream I/O threads. `TerminalSession` owns
   parser/core synchronization, response draining, and ordering between UI input
   bytes and terminal response bytes.
-- Swing UI consumes `TerminalSession`, `terminal-render-api`, and
-  `terminal-render-cache`. It must stay independent of IntelliJ APIs and PTY
-  specifics; host applications choose and wire transports outside the UI module.
+- Swing UI consumes `TerminalSession`, `terminal-input` event vocabulary,
+  `terminal-render-api`, and `terminal-render-cache`. It must stay independent
+  of IntelliJ APIs and PTY specifics; host applications choose and wire
+  transports outside the UI module.
 
 ## Behavioral notes
 

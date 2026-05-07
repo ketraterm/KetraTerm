@@ -1,4 +1,4 @@
-package com.gagik.terminal.ui.swing
+package com.gagik.terminal.ui.swing.input
 
 import com.gagik.terminal.input.event.TerminalKey
 import com.gagik.terminal.input.event.TerminalModifiers

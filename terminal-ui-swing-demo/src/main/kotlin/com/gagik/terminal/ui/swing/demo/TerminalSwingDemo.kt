@@ -4,8 +4,8 @@ import com.gagik.terminal.pty.TerminalPtyEventListener
 import com.gagik.terminal.pty.TerminalPtyOptions
 import com.gagik.terminal.pty.TerminalPtySessions
 import com.gagik.terminal.session.TerminalSession
-import com.gagik.terminal.ui.swing.TerminalSwingSettings
-import com.gagik.terminal.ui.swing.TerminalSwingTerminal
+import com.gagik.terminal.ui.swing.api.TerminalSwingTerminal
+import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
 import java.awt.BorderLayout
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent

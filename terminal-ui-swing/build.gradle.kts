@@ -1,4 +1,5 @@
 plugins {
+    id("java-library")
     kotlin("jvm")
 }
 
@@ -10,7 +11,8 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":terminal-session"))
+    api(project(":terminal-session"))
+    implementation(project(":terminal-input"))
     implementation(project(":terminal-render-api"))
     implementation(project(":terminal-render-cache"))
 
