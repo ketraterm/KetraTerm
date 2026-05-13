@@ -1,7 +1,7 @@
 package com.gagik.terminal.render.api
 
 /**
- * Short-lived primitive view of the terminal's visible render state.
+ * Short-lived primitive view of the terminal's render state for one viewport.
  *
  * A frame exposes stable public render encodings, not core internal storage.
  * Consumers should copy rows into caller-owned primitive arrays during the
@@ -19,6 +19,19 @@ interface TerminalRenderFrame {
     val rows: Int
 
     /**
+     * Number of retained off-screen history lines available in this frame.
+     */
+    val historySize: Int
+        get() = 0
+
+    /**
+     * Clamped scrollback offset used by this frame, in lines from the live
+     * bottom viewport. Zero means the frame is pinned to the newest output.
+     */
+    val scrollbackOffset: Int
+        get() = 0
+
+    /**
      * Monotonic generation that changes on any visually relevant mutation.
      *
      * Consumers can use this as a cheap "anything changed?" check. Callers must
@@ -28,11 +41,12 @@ interface TerminalRenderFrame {
     val frameGeneration: Long
 
     /**
-     * Generation that changes when the visible row mapping or shape changes.
+     * Generation that changes when terminal-owned row mapping or shape changes.
      *
      * Resize, full reset, scrolling, buffer switches, and reflow should advance
-     * this value. When it changes, renderers should conservatively recopy all
-     * visible rows.
+     * this value. Caller-requested scrollback offset changes are reported via
+     * [scrollbackOffset]; render caches should include that value in their own
+     * row-copy invalidation key.
      */
     val structureGeneration: Long
 

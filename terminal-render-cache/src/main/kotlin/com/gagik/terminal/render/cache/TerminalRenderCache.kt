@@ -37,6 +37,18 @@ class TerminalRenderCache(
         private set
 
     /**
+     * Retained history lines reported by the most recent frame.
+     */
+    var historySize: Int = 0
+        private set
+
+    /**
+     * Resolved scrollback offset copied by the most recent frame.
+     */
+    var scrollbackOffset: Int = 0
+        private set
+
+    /**
      * Copied row code words. See [TerminalRenderFrame.copyLine].
      */
     var codeWords: Array<IntArray> = emptyIntRows()
@@ -125,7 +137,7 @@ class TerminalRenderCache(
         private set
 
     /**
-     * Whether the most recent [updateFrom] call changed the cursor generation.
+     * Whether the most recent [updateFrom] call changed the cursor state.
      */
     var cursorChangedOnLastUpdate: Boolean = false
         private set
@@ -205,8 +217,24 @@ class TerminalRenderCache(
      * @param reader source of the short-lived render frame.
      */
     fun updateFrom(reader: TerminalRenderFrameReader) {
+        updateFrom(reader, scrollbackOffset = 0)
+    }
+
+    /**
+     * Copies changed rows and cursor state for a caller-owned scrollback
+     * viewport.
+     *
+     * [scrollbackOffset] is requested in lines from the live bottom viewport.
+     * The reader clamps it to available history; this cache stores the resolved
+     * value reported by the frame and treats changes to it as row-mapping
+     * changes even when line generations happen to match.
+     *
+     * @param reader source of the short-lived render frame.
+     * @param scrollbackOffset requested lines above the live bottom viewport.
+     */
+    fun updateFrom(reader: TerminalRenderFrameReader, scrollbackOffset: Int) {
         assertOwnership()
-        reader.readRenderFrame { frame ->
+        reader.readRenderFrame(scrollbackOffset) { frame ->
             resizedOnLastUpdate = false
 
             if (columns != frame.columns || rows != frame.rows) {
@@ -218,7 +246,8 @@ class TerminalRenderCache(
             dirtyRows.fill(false)
             cursorChangedOnLastUpdate = false
 
-            val structureChanged = structureGeneration != frame.structureGeneration
+            val viewportChanged = this.scrollbackOffset != frame.scrollbackOffset
+            val structureChanged = structureGeneration != frame.structureGeneration || viewportChanged
             if (structureChanged) {
                 clearAllClusters()
             }
@@ -262,11 +291,13 @@ class TerminalRenderCache(
 
             val oldCursor = cursor
             val newCursor = frame.cursor
-            if (oldCursor?.generation != newCursor.generation) {
+            if (oldCursor != newCursor) {
                 cursorChangedOnLastUpdate = true
             }
 
             cursor = newCursor
+            historySize = frame.historySize
+            this.scrollbackOffset = frame.scrollbackOffset
             frameGeneration = frame.frameGeneration
             structureGeneration = frame.structureGeneration
         }
@@ -291,6 +322,8 @@ class TerminalRenderCache(
         dirtyRows = BooleanArray(newRows)
 
         cursor = null
+        historySize = 0
+        scrollbackOffset = 0
         frameGeneration = UNINITIALIZED_GENERATION
         structureGeneration = UNINITIALIZED_GENERATION
         activeBuffer = TerminalRenderBufferKind.PRIMARY
