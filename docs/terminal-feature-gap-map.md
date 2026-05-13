@@ -443,7 +443,11 @@ professional emulator needs explicit contracts for it.
 - `TODO(host)`: double-width glyph display, emoji presentation, and ambiguous
   width presentation must match core width decisions.
 - `TODO(host)`: text selection and clipboard integration.
-- `TODO(host)`: scrollback viewport separate from active cursor viewport.
+- `DONE(render-api/core/cache/session)`: caller-owned scrollback viewport
+  offsets can be requested per render-frame read, clamped by core, copied by
+  the primitive render cache, and forwarded through session synchronization.
+- `TODO(host)`: UI scrollback controls, scrollbar policy, selection behavior
+  while scrolled, and auto-follow/offset-retention policy.
 - `TODO(host)`: accessibility/export APIs.
 - `TODO(host)`: performance benchmarks for large scrollback, resize, and dense
   SGR streams.

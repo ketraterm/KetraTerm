@@ -208,8 +208,12 @@ class TerminalSession(
      * while a renderer copies primitive row data.
      */
     override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+        readRenderFrame(scrollbackOffset = 0, consumer = consumer)
+    }
+
+    override fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
         synchronized(mutationLock) {
-            renderReader.readRenderFrame(consumer)
+            renderReader.readRenderFrame(scrollbackOffset, consumer)
         }
     }
 

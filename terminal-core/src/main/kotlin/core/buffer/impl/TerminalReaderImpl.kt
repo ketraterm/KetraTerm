@@ -17,7 +17,7 @@ internal class TerminalReaderImpl(
 	override val cursorCol: Int get() = state.cursor.col
 	override val cursorRow: Int get() = state.cursor.row
 	override val historySize: Int
-		get() = (state.ring.size - height).coerceAtLeast(0)
+		get() = state.historySize
 
 	override fun getLine(row: Int): TerminalLineApi {
 		if (!state.dimensions.isValidRow(row)) return VoidLine

@@ -34,13 +34,23 @@ class TerminalRenderPublisher(
      * Reads from [reader], updates back buffer, publishes as new front.
      */
     fun updateAndPublish(reader: TerminalRenderFrameReader) {
+        updateAndPublish(reader, scrollbackOffset = 0)
+    }
+
+    /**
+     * Called from render worker thread only.
+     *
+     * [scrollbackOffset] is caller-owned viewport state in lines above the live
+     * bottom viewport. The source reader clamps it before rows are copied.
+     */
+    fun updateAndPublish(reader: TerminalRenderFrameReader, scrollbackOffset: Int) {
         val back = synchronized(publishLock) { buffers[backIndex] }
 
         // The selected back buffer is render-worker-exclusive here because the
         // session coalesces dirty notifications to at most one queued render
         // task, and session resize shares the same terminal mutation lock used
         // by the render frame reader.
-        back.updateFrom(reader)
+        back.updateFrom(reader, scrollbackOffset)
 
         synchronized(publishLock) {
             val oldFront = frontIndex

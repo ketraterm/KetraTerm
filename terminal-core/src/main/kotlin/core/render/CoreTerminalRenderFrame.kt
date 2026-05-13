@@ -12,13 +12,16 @@ internal class CoreTerminalRenderFrame(
     private val attrTranslator = RenderAttrTranslator()
     private val clusterScratch = RenderClusterScratch()
     private var isValid: Boolean = false
+    private var resolvedScrollbackOffset: Int = 0
 
-    internal fun <T> use(block: () -> T): T {
+    internal fun <T> use(scrollbackOffset: Int, block: () -> T): T {
+        resolvedScrollbackOffset = state.clampScrollbackOffset(scrollbackOffset)
         isValid = true
         try {
             return block()
         } finally {
             isValid = false
+            resolvedScrollbackOffset = 0
         }
     }
 
@@ -36,6 +39,18 @@ internal class CoreTerminalRenderFrame(
         get() {
             checkValid()
             return state.dimensions.height
+        }
+
+    override val historySize: Int
+        get() {
+            checkValid()
+            return state.historySize
+        }
+
+    override val scrollbackOffset: Int
+        get() {
+            checkValid()
+            return resolvedScrollbackOffset
         }
 
     override val frameGeneration: Long
@@ -66,7 +81,7 @@ internal class CoreTerminalRenderFrame(
             return TerminalRenderCursor(
                 column = state.cursor.col,
                 row = state.cursor.row,
-                visible = state.modes.isCursorVisible,
+                visible = state.modes.isCursorVisible && resolvedScrollbackOffset == 0,
                 blinking = state.modes.isCursorBlinking,
                 shape = TerminalRenderCursorShape.BLOCK,
                 generation = state.cursorGeneration,
@@ -131,7 +146,7 @@ internal class CoreTerminalRenderFrame(
     }
 
     private fun visibleLineAt(row: Int) =
-        state.ring[state.resolveRingIndex(row)]
+        state.ring[state.resolveScrollbackRingIndex(row, resolvedScrollbackOffset)]
 
     private fun checkRow(row: Int) {
         require(row in 0 until rows) {

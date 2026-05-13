@@ -239,6 +239,29 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `readRenderFrame forwards caller owned scrollback offset`() {
+        val terminal = TerminalBuffers.create(width = 10, height = 3)
+        val connector = MockConnector()
+        val renderReader = OffsetRecordingRenderReader()
+        val session = TerminalSession(
+            terminal = terminal,
+            publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+            renderReader = renderReader,
+            responseReader = terminal,
+            connector = connector,
+            parser = RecordingParser(),
+            inputEncoder = NoOpInputEncoder,
+        )
+
+        session.readRenderFrame(scrollbackOffset = 4) { frame ->
+            assertEquals(4, frame.scrollbackOffset)
+        }
+
+        assertEquals(4, renderReader.lastOffset)
+        session.close()
+    }
+
+    @Test
     fun `notifyRenderDirty coalesces renders while worker is busy`() {
         val terminal = TerminalBuffers.create(width = 10, height = 3)
         val connector = MockConnector()
@@ -617,6 +640,58 @@ class TerminalSessionTest {
         fun releaseFirstRead() {
             releaseFirstRead.countDown()
         }
+    }
+
+    private class OffsetRecordingRenderReader : TerminalRenderFrameReader {
+        var lastOffset: Int = -1
+            private set
+
+        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+            readRenderFrame(scrollbackOffset = 0, consumer = consumer)
+        }
+
+        override fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
+            lastOffset = scrollbackOffset
+            consumer.accept(OffsetRenderFrame(scrollbackOffset))
+        }
+    }
+
+    private class OffsetRenderFrame(
+        override val scrollbackOffset: Int,
+    ) : TerminalRenderFrame {
+        override val columns: Int = 10
+        override val rows: Int = 3
+        override val historySize: Int = 10
+        override val frameGeneration: Long = 1
+        override val structureGeneration: Long = 1
+        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
+        override val cursor: TerminalRenderCursor = TerminalRenderCursor(
+            column = 0,
+            row = 0,
+            visible = scrollbackOffset == 0,
+            blinking = false,
+            shape = TerminalRenderCursorShape.BLOCK,
+            generation = 1,
+        )
+
+        override fun lineGeneration(row: Int): Long = 1
+
+        override fun lineWrapped(row: Int): Boolean = false
+
+        override fun copyLine(
+            row: Int,
+            codeWords: IntArray,
+            codeOffset: Int,
+            attrWords: LongArray,
+            attrOffset: Int,
+            flags: IntArray,
+            flagOffset: Int,
+            extraAttrWords: LongArray?,
+            extraAttrOffset: Int,
+            hyperlinkIds: IntArray?,
+            hyperlinkOffset: Int,
+            clusterSink: TerminalRenderClusterSink?,
+        ) = Unit
     }
 
     private object SimpleRenderFrame : TerminalRenderFrame {

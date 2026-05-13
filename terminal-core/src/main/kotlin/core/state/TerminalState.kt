@@ -122,9 +122,20 @@ internal class TerminalState(
 
     val isFullViewportScroll: Boolean
         get() = activeBuffer.isFullViewportScroll(dimensions.height)
+    val historySize: Int
+        get() = (activeBuffer.ring.size - dimensions.height).coerceAtLeast(0)
 
     fun resolveRingIndex(viewportRow: Int): Int =
-        (activeBuffer.ring.size - dimensions.height).coerceAtLeast(0) + viewportRow
+        liveViewportTopIndex() + viewportRow
+
+    fun clampScrollbackOffset(scrollbackOffset: Int): Int =
+        scrollbackOffset.coerceIn(0, historySize)
+
+    fun resolveScrollbackRingIndex(viewportRow: Int, scrollbackOffset: Int): Int =
+        liveViewportTopIndex() - clampScrollbackOffset(scrollbackOffset) + viewportRow
+
+    private fun liveViewportTopIndex(): Int =
+        (activeBuffer.ring.size - dimensions.height).coerceAtLeast(0)
 
     // Convenience helpers.
 

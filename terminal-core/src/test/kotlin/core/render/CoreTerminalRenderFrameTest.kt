@@ -233,6 +233,40 @@ class CoreTerminalRenderFrameTest {
     }
 
     @Test
+    fun `scrollback offset maps render rows without mutating live viewport`() {
+        val buffer = TerminalBuffer(initialWidth = 4, initialHeight = 3, maxHistory = 5)
+        val reader = buffer as TerminalRenderFrameReader
+        repeat(6) { buffer.writeLogicalLine("L$it") }
+
+        reader.readRenderFrame(scrollbackOffset = 2) { frame ->
+            assertAll(
+                { assertEquals(4, frame.historySize) },
+                { assertEquals(2, frame.scrollbackOffset) },
+                { assertFalse(frame.cursor.visible) },
+                { assertEquals("L2", rowText(frame, 0)) },
+                { assertEquals("L3", rowText(frame, 1)) },
+                { assertEquals("L4", rowText(frame, 2)) },
+            )
+        }
+
+        reader.readRenderFrame(scrollbackOffset = Int.MAX_VALUE) { frame ->
+            assertAll(
+                { assertEquals(frame.historySize, frame.scrollbackOffset) },
+                { assertEquals("L0", rowText(frame, 0)) },
+            )
+        }
+
+        reader.readRenderFrame { frame ->
+            assertAll(
+                { assertEquals(0, frame.scrollbackOffset) },
+                { assertTrue(frame.cursor.visible) },
+                { assertEquals("L4", rowText(frame, 0)) },
+                { assertEquals("L5", rowText(frame, 1)) },
+            )
+        }
+    }
+
+    @Test
     fun `active buffer reports alternate after switch`() {
         val buffer = TerminalBuffer(initialWidth = 2, initialHeight = 1)
         val reader = buffer as TerminalRenderFrameReader
@@ -272,26 +306,40 @@ class CoreTerminalRenderFrameTest {
 
     private fun copyRow(
         frame: com.gagik.terminal.render.api.TerminalRenderFrame,
+        row: Int = 0,
         clusterSink: ((Int, String) -> Unit)? = null,
     ): CopiedRow {
-        val row = CopiedRow(frame.columns)
+        val copied = CopiedRow(frame.columns)
         frame.copyLine(
-            row = 0,
-            codeWords = row.codeWords,
-            attrWords = row.attrWords,
-            flags = row.flags,
-            extraAttrWords = row.extraAttrWords,
-            hyperlinkIds = row.hyperlinkIds,
+            row = row,
+            codeWords = copied.codeWords,
+            attrWords = copied.attrWords,
+            flags = copied.flags,
+            extraAttrWords = copied.extraAttrWords,
+            hyperlinkIds = copied.hyperlinkIds,
             clusterSink = if (clusterSink == null) {
                 null
             } else {
                 com.gagik.terminal.render.api.TerminalRenderClusterSink(clusterSink)
             },
         )
-        row.flags.forEach {
+        copied.flags.forEach {
             assertTrue(TerminalRenderCellFlags.isValidCombination(it), "invalid flag combination: $it")
         }
-        return row
+        return copied
+    }
+
+    private fun rowText(frame: com.gagik.terminal.render.api.TerminalRenderFrame, row: Int): String {
+        return copyRow(frame, row).codeWords
+            .map { if (it == 0) ' ' else it.toChar() }
+            .joinToString("")
+            .trimEnd()
+    }
+
+    private fun TerminalBuffer.writeLogicalLine(text: String) {
+        writeText(text)
+        carriageReturn()
+        newLine()
     }
 
     private class CopiedRow(columns: Int) {

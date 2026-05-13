@@ -83,6 +83,23 @@ class TerminalRenderPublisherTest {
         assertEquals("12345", publisher.current()?.rowText(0))
     }
 
+    @Test
+    fun `updateAndPublish forwards scrollback offset to cache update`() {
+        val publisher = TerminalRenderPublisher(3, 1)
+        val frame = OffsetRecordingFrame()
+
+        publisher.updateAndPublish(frame, scrollbackOffset = 2)
+
+        val front = publisher.current()
+        assertAll(
+            { assertEquals(2, frame.lastRequestedOffset) },
+            { assertEquals(2, front?.scrollbackOffset) },
+            { assertEquals(4, front?.historySize) },
+            { assertEquals("old", front?.rowText(0)) },
+            { assertFalse(front?.cursor?.visible == true) },
+        )
+    }
+
     private fun TerminalRenderCache.rowText(row: Int): String =
         codeWords[row].map { if (it == 0) ' ' else it.toChar() }.joinToString("")
 
@@ -121,6 +138,66 @@ class TerminalRenderPublisherTest {
         }
 
         override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+            consumer.accept(this)
+        }
+    }
+
+    private class OffsetRecordingFrame : TerminalRenderFrame, TerminalRenderFrameReader {
+        private var resolvedOffset: Int = 0
+
+        var lastRequestedOffset: Int = -1
+            private set
+
+        override val columns: Int = 3
+        override val rows: Int = 1
+        override val historySize: Int = 4
+        override val scrollbackOffset: Int
+            get() = resolvedOffset
+        override val frameGeneration: Long = 1L
+        override val structureGeneration: Long = 1L
+        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
+        override val cursor: TerminalRenderCursor
+            get() = TerminalRenderCursor(
+                column = 0,
+                row = 0,
+                visible = resolvedOffset == 0,
+                blinking = false,
+                shape = TerminalRenderCursorShape.BLOCK,
+                generation = 1L,
+            )
+
+        override fun lineGeneration(row: Int): Long = 1L
+
+        override fun lineWrapped(row: Int): Boolean = false
+
+        override fun copyLine(
+            row: Int,
+            codeWords: IntArray,
+            codeOffset: Int,
+            attrWords: LongArray,
+            attrOffset: Int,
+            flags: IntArray,
+            flagOffset: Int,
+            extraAttrWords: LongArray?,
+            extraAttrOffset: Int,
+            hyperlinkIds: IntArray?,
+            hyperlinkOffset: Int,
+            clusterSink: TerminalRenderClusterSink?
+        ) {
+            val text = if (resolvedOffset == 0) "new" else "old"
+            for (i in 0 until columns) {
+                codeWords[codeOffset + i] = text[i].code
+                flags[flagOffset + i] = TerminalRenderCellFlags.CODEPOINT
+            }
+        }
+
+        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+            readRenderFrame(scrollbackOffset = 0, consumer = consumer)
+        }
+
+        override fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
+            lastRequestedOffset = scrollbackOffset
+            resolvedOffset = scrollbackOffset.coerceIn(0, historySize)
             consumer.accept(this)
         }
     }
