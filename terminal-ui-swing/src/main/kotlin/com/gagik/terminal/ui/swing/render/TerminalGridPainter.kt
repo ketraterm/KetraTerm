@@ -9,6 +9,7 @@ import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.font.FontRenderContext
+import java.awt.geom.Point2D
 
 /**
  * Java2D renderer for cached primitive terminal frames.
@@ -22,6 +23,7 @@ internal class TerminalGridPainter {
     private val fontCache = TerminalFontCache()
     private val complexTextLayouts = TerminalComplexTextLayoutCache()
     private val textRun = TerminalTextRunBuffer(INITIAL_TEXT_RUN_CAPACITY)
+    private val glyphPosition = Point2D.Float()
 
     /**
      * Clears [width] x [height] with the terminal default background.
@@ -140,10 +142,11 @@ internal class TerminalGridPainter {
                 cache = cache,
                 palette = palette,
                 metrics = metrics,
-                row = row,
-                startColumn = column,
-                baselineY = baselineY,
-            )
+                    row = row,
+                    startColumn = column,
+                    baselineY = baselineY,
+                    fontRenderContext = fontRenderContext,
+                )
         }
     }
 
@@ -155,6 +158,7 @@ internal class TerminalGridPainter {
         row: Int,
         startColumn: Int,
         baselineY: Int,
+        fontRenderContext: FontRenderContext,
     ): Int {
         val flagsRow = cache.flags[row]
         val attrRow = cache.attrWords[row]
@@ -188,7 +192,7 @@ internal class TerminalGridPainter {
 
         g.font = fontCache.font(fontStyle)
         g.color = colorCache.color(foreground)
-        drawAsciiRun(g, metrics, startColumn, baselineY)
+        drawAsciiRun(g, metrics, startColumn, baselineY, fontRenderContext)
         paintDecorations(g, palette, attr, extraAttr, foreground, startColumn, column, row, metrics)
         return column
     }
@@ -364,6 +368,7 @@ internal class TerminalGridPainter {
         metrics: TerminalSwingMetrics,
         startColumn: Int,
         baselineY: Int,
+        fontRenderContext: FontRenderContext,
     ) {
         val expectedWidth = textRun.length * metrics.cellWidth
         val measuredWidth = g.fontMetrics.charsWidth(textRun.chars, 0, textRun.length)
@@ -372,17 +377,22 @@ internal class TerminalGridPainter {
             return
         }
 
-        var index = 0
-        while (index < textRun.length) {
-            g.drawChars(
-                textRun.chars,
-                index,
-                1,
-                (startColumn + index) * metrics.cellWidth,
-                baselineY,
-            )
-            index++
+        val glyphVector = g.font.layoutGlyphVector(
+            fontRenderContext,
+            textRun.chars,
+            0,
+            textRun.length,
+            Font.LAYOUT_LEFT_TO_RIGHT,
+        )
+        val glyphCount = glyphVector.numGlyphs
+        var glyph = 0
+        while (glyph <= glyphCount) {
+            glyphPosition.x = glyph * metrics.cellWidth.toFloat()
+            glyphPosition.y = 0f
+            glyphVector.setGlyphPosition(glyph, glyphPosition)
+            glyph++
         }
+        g.drawGlyphVector(glyphVector, (startColumn * metrics.cellWidth).toFloat(), baselineY.toFloat())
     }
 
     private fun drawComplexCluster(
