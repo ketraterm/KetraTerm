@@ -110,6 +110,7 @@ internal class TerminalFontCache {
             }
         }
 
+        styleResolvedTextFonts[text] = primary
         return primary
     }
 

@@ -85,4 +85,45 @@ class TerminalFontCacheTest {
         assertEquals(fallback.family, plain.family)
         assertEquals(fallback.family, bold.family)
     }
+
+    @Test
+    fun `fontForText caches missing glyph resolution to primary font`() {
+        val primary = Font(Font.MONOSPACED, Font.PLAIN, 14)
+        val missing = String(Character.toChars(0x10FFFF))
+
+        assumeTrue(primary.canDisplayUpTo(missing) >= 0)
+
+        val cache = TerminalFontCache()
+        cache.update(primary, emptyList(), useSystemFallbackFonts = false)
+
+        val resolved = cache.fontForText(missing, Font.PLAIN)
+
+        assertSame(primary, resolved)
+        assertSame(primary, cache.resolvedFontCache(Font.PLAIN)[missing])
+    }
+
+    @Test
+    fun `fontForText caches missing glyph resolution per style`() {
+        val primary = Font(Font.MONOSPACED, Font.PLAIN, 14)
+        val missing = String(Character.toChars(0x10FFFF))
+
+        assumeTrue(primary.canDisplayUpTo(missing) >= 0)
+
+        val cache = TerminalFontCache()
+        cache.update(primary, emptyList(), useSystemFallbackFonts = false)
+
+        val resolved = cache.fontForText(missing, Font.BOLD)
+
+        assertEquals(Font.BOLD, resolved.style)
+        assertSame(resolved, cache.resolvedFontCache(Font.BOLD)[missing])
+        assertNull(cache.resolvedFontCache(Font.PLAIN)[missing])
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun TerminalFontCache.resolvedFontCache(style: Int): Map<String, Font> {
+        val field = TerminalFontCache::class.java.getDeclaredField("resolvedTextFonts")
+        field.isAccessible = true
+        val caches = field.get(this) as Array<HashMap<String, Font>>
+        return caches[style and (Font.BOLD or Font.ITALIC)]
+    }
 }
