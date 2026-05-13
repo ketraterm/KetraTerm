@@ -93,6 +93,10 @@ The renderer should operate in terms of:
 
 Avoid `drawString` once per cell.
 
+ASCII and simple text must stay on the allocation-conscious run path. Complex
+non-ASCII cells and grapheme clusters may use a slower Java2D shaping path such
+as `TextLayout`, but that path must remain isolated from ASCII rendering.
+
 Avoid per-cell allocation of:
 
 - `Color`
@@ -153,13 +157,16 @@ The color model must explicitly define:
 
 ASCII must have a fast path.
 
-Font fallback must be cached and resolved by runs where possible.
+Font fallback must be cached and resolved by runs where possible. Configured
+host fallback fonts should be tried before any system-font scan. If system-font
+fallback is enabled, scanning must be cached and must not run inside the ASCII
+hot path.
 
 Simple text should render as contiguous runs grouped by compatible font,
 foreground color, and style.
 
-Complex clusters may use a slower fallback path, but that path must not pollute
-the ASCII/simple-text hot path.
+Complex clusters may use a slower fallback/shaping path, but that path must not
+pollute the ASCII/simple-text hot path.
 
 ## Threading Contract
 
