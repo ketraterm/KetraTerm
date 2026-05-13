@@ -1,4 +1,5 @@
 plugins {
+    id("java-library")
     kotlin("jvm")
 }
 
@@ -10,14 +11,14 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":terminal-core"))
-    implementation(project(":terminal-parser"))
-    implementation(project(":terminal-integration"))
-    implementation(project(":terminal-input"))
+    api(project(":terminal-core"))
+    api(project(":terminal-parser"))
+    api(project(":terminal-integration"))
+    api(project(":terminal-input"))
+    api(project(":terminal-render-api"))
+    api(project(":terminal-render-cache"))
+    api(project(":terminal-transport-api"))
     implementation(project(":terminal-protocol"))
-    implementation(project(":terminal-render-api"))
-    implementation(project(":terminal-render-cache"))
-    implementation(project(":terminal-transport-api"))
 
     testImplementation(project(":terminal-testkit"))
     testImplementation(kotlin("test"))

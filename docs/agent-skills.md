@@ -15,6 +15,7 @@ Available skills:
 - `.agents/skills/terminal-unicode-text/SKILL.md`
 - `.agents/skills/terminal-test-suite/SKILL.md`
 - `.agents/skills/terminal-gap-map/SKILL.md`
+- `.agents/skills/terminal-ui-rendering/SKILL.md`
 
 `AGENTS.md` and module-level `AGENTS.md` files remain the always-read project
 context. The skill packages are task-specific playbooks.

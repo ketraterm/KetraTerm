@@ -20,12 +20,23 @@ The project is split into strict layers:
   APIs.
 - `terminal-input`: host-bound input encoding for keyboard, paste, focus, and
   future mouse reports.
+- `terminal-render-api`: dependency-free primitive render frame, cursor, cell,
+  cluster, and attribute vocabulary.
+- `terminal-render-cache`: renderer-side cache that copies primitive render
+  frames for UI consumers.
 - `terminal-transport-api`: dependency-free connector contract for byte-stream
   transports.
 - `terminal-session`: runtime synchronization point that connects transport,
   parser, integration, core response queues, and input encoding.
+- `terminal-ui-swing`: reusable Swing terminal UI component, painting,
+  selection, input event handling, clipboard/font/settings abstractions, and
+  viewport/scrollbar model.
+- `terminal-ui-swing-demo`: standalone Swing demo host that wires the reusable
+  UI component to a local PTY-backed session for manual testing.
 - `terminal-testkit`: reusable public test fakes for connector/session tests.
 - `terminal-pty`: local PTY process lifecycle exposed as transport connectors.
+- `terminal-benchmarks`: JMH benchmarks for performance-sensitive terminal
+  paths.
 
 Keep these boundaries intact:
 
@@ -39,12 +50,23 @@ Keep these boundaries intact:
   internals.
 - Input encodes. It reads stable input-facing mode state and writes host-bound
   bytes without parsing terminal output or touching grid/cursor internals.
+- Render API exposes primitive frame contracts only. It must not depend on UI,
+  Swing, PTY, parser, integration, or core internals.
+- Render cache copies render frame data for consumers. It must not choose host
+  fonts, parse terminal bytes, or own Swing painting policy.
 - Transport connects. Connectors own host I/O threads, deliver raw bytes in
   stream order, synchronously consume host-bound write ranges, and never parse
   terminal protocols.
 - Session serializes. It owns parser/core mutation synchronization, drains core
   response bytes, and serializes UI input plus core responses through one
   outbound write lock.
+- Swing UI displays and interacts. It must not import IntelliJ APIs, contain
+  PTY-specific code, parse terminal output, or know whether bytes come from PTY,
+  SSH, tests, or another transport.
+  It may use `terminal-input` event vocabulary but must send encoded intent
+  through `TerminalSession` rather than writing host bytes directly.
+- Swing demo hosts. It may start PTY sessions and create windows, but reusable
+  rendering and input behavior still belong in `terminal-ui-swing`.
 - PTY hosts. It starts local pseudo-terminal processes and exposes them through
   `TerminalConnector`. It must not parse protocols, encode input itself, or
   mutate core internals.
@@ -130,7 +152,12 @@ A change is not done until:
 - Core tests: `./gradlew :terminal-core:test`
 - Integration tests: `./gradlew :terminal-integration:test`
 - Session tests: `./gradlew :terminal-session:test`
+- Render cache tests: `./gradlew :terminal-render-cache:test`
+- Swing UI tests: `./gradlew :terminal-ui-swing:test`
+- Swing UI demo: `./gradlew :terminal-ui-swing-demo:run`
+  - Custom shell: `./gradlew :terminal-ui-swing-demo:run --args="cmd.exe"`
 - PTY tests: `./gradlew :terminal-pty:test`
+- Benchmarks: `./gradlew :terminal-benchmarks:jmh`
 
 In sandboxed sessions, Gradle may need approval because wrapper/cache writes can
 leave the workspace.
@@ -140,4 +167,4 @@ leave the workspace.
 - Feature backlog: `docs/terminal-feature-gap-map.md`
 - Core contract: `terminal-core/docs/terminal-core-contract.md`
 - Project skills index: `docs/agent-skills.md`
-- Repo-local Codex skills: `.codex/skills/*/SKILL.md`
+- Repo-local Codex skills: `.agents/skills/*/SKILL.md`

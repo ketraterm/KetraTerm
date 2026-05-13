@@ -1,4 +1,5 @@
 plugins {
+    id("java-library")
     kotlin("jvm")
 }
 
@@ -13,7 +14,7 @@ dependencies {
     implementation(project(":terminal-core"))
     implementation(project(":terminal-integration"))
     implementation(project(":terminal-input"))
-    implementation(project(":terminal-session"))
+    api(project(":terminal-session"))
     implementation(project(":terminal-transport-api"))
     implementation("org.jetbrains.pty4j:pty4j:0.13.12")
 

@@ -58,6 +58,12 @@ internal object UnicodeWidth {
             0x094D, 0x094D,
             0x0951, 0x0957,
             0x0962, 0x0963,
+            0x0E31, 0x0E31, // Thai combining
+            0x0E34, 0x0E3A,
+            0x0E47, 0x0E4E,
+            0x0EB1, 0x0EB1, // Lao combining
+            0x0EB4, 0x0EBC,
+            0x0EC8, 0x0ECD,
             0x1DC0, 0x1DFF, // Combining Supplement
             0x200B, 0x200F, // Zero Width Spaces / Formatting
             0x202A, 0x202E, // BiDi Formatting

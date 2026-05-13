@@ -1,7 +1,7 @@
 # Terminal Protocol Agent Guide
 
 `terminal-protocol` holds dependency-free terminal protocol vocabulary shared by
-parser, core, integration, and future input modules.
+parser, core, integration, input, and host-facing modules.
 
 ## Boundary
 

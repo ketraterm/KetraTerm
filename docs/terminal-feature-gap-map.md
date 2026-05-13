@@ -214,6 +214,9 @@ Missing:
   bytes, not only the current representative hostile cases.
 - `TODO(parser)`: configurable replacement policy if needed by host applications.
 - `TODO(parser)`: broader ISO 2022 charset mapping.
+- `DONE(parser/core)`: curated Thai and Lao combining marks are classified as
+  grapheme extenders in parser text segmentation and zero-width marks in core
+  width calculation. Full generated Unicode coverage remains a TODO above.
 
 ## Core Gaps
 
@@ -437,15 +440,31 @@ professional emulator needs explicit contracts for it.
 - `DONE(host)`: dependency-free primitive `TerminalRenderCache` consumer model
   that copies frame rows, clusters, attrs, hyperlinks, wrap flags, cursor state,
   and dirty-row metadata from `TerminalRenderFrameReader`.
-- `TODO(host)`: selection, font shaping/measurement, palette/default-color
-  policy, and backend painter integrations.
-- `TODO(host)`: font measurement policy and fallback fonts.
+- `DONE(host/ui)`: reusable `:terminal-ui-swing` module exists with a public
+  Swing terminal component, immutable settings/metrics snapshots, packed ARGB
+  palette resolution, and a basic Java2D painter backed by
+  `TerminalRenderPublisher`.
+- `DONE(host/ui)`: standalone `:terminal-ui-swing-demo` application wires the
+  reusable Swing component to a local PTY-backed session for manual testing.
+- `DONE(host/ui)`: Swing complex-text fallback path exists for non-ASCII cells
+  and clusters. It uses configured fallback fonts, optional installed system
+  font scanning, cached style variants, per-text fallback resolution caching,
+  and Java2D `TextLayout` shaping without affecting the ASCII fast path.
+- `DONE(host/ui)`: Swing text rendering quality hints are host-configurable via
+  immutable settings, including text antialiasing and fractional-metrics policy.
+- `TODO(host)`: richer font fallback policy, bundled/host-provided font
+  resolver integration, script/run-level shaping, and fallback cache eviction.
+- `TODO(host)`: font measurement policy, palette/default-color policy, and
+  backend painter integrations.
 - `TODO(host)`: double-width glyph display, emoji presentation, and ambiguous
   width presentation must match core width decisions.
 - `TODO(host)`: text selection and clipboard integration.
 - `DONE(render-api/core/cache/session)`: caller-owned scrollback viewport
   offsets can be requested per render-frame read, clamped by core, copied by
   the primitive render cache, and forwarded through session synchronization.
+- `DONE(swing)`: mouse-wheel scrollback updates are owned by the Swing
+  component and request offset-specific render-cache publications through the
+  session render worker.
 - `TODO(host)`: UI scrollback controls, scrollbar policy, selection behavior
   while scrolled, and auto-follow/offset-retention policy.
 - `TODO(host)`: accessibility/export APIs.

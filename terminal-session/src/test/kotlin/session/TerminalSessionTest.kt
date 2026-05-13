@@ -262,6 +262,33 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `requestRender publishes caller owned scrollback offset`() {
+        val terminal = TerminalBuffers.create(width = 10, height = 3)
+        val connector = MockConnector()
+        val renderReader = OffsetRecordingRenderReader()
+        val renderPublished = CountDownLatch(1)
+        val session = TerminalSession(
+            terminal = terminal,
+            publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+            renderReader = renderReader,
+            responseReader = terminal,
+            connector = connector,
+            parser = RecordingParser(),
+            inputEncoder = NoOpInputEncoder,
+        )
+        session.onDirty = { renderPublished.countDown() }
+
+        session.requestRender(scrollbackOffset = 3)
+
+        assertTrue(renderPublished.await(1, TimeUnit.SECONDS), "render was not published")
+        assertAll(
+            { assertEquals(3, renderReader.lastOffset) },
+            { assertEquals(3, session.publisher.current()?.scrollbackOffset) },
+        )
+        session.close()
+    }
+
+    @Test
     fun `notifyRenderDirty coalesces renders while worker is busy`() {
         val terminal = TerminalBuffers.create(width = 10, height = 3)
         val connector = MockConnector()

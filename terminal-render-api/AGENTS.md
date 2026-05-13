@@ -1,7 +1,7 @@
 # Terminal Render API Agent Guide
 
 `terminal-render-api` defines the dependency-free public render contract shared
-by core, session, and future UI modules.
+by core, session, render cache, and UI modules.
 
 ## Boundary
 

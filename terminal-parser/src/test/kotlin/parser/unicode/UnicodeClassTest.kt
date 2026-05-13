@@ -21,6 +21,16 @@ class UnicodeClassTest {
         }
 
         @Test
+        fun `classifies Thai and Lao combining marks as Extend`() {
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0E31))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0E34))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0E4D))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0EB1))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0EB4))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0ECD))
+        }
+
+        @Test
         fun `classifies ZWJ regional indicators and spacing marks`() {
             assertEquals(UnicodeClass.GRAPHEME_ZWJ, UnicodeClass.graphemeBreakClass(0x200D))
             assertEquals(UnicodeClass.GRAPHEME_REGIONAL_INDICATOR, UnicodeClass.graphemeBreakClass(0x1F1FA))

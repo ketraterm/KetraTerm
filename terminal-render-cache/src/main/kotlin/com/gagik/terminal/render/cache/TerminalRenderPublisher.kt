@@ -10,8 +10,8 @@ import java.util.concurrent.atomic.AtomicReference
  * One buffer is UI-readable (front).
  * One buffer is spare (recycled after front is replaced).
  *
- * Writer and UI never touch the same buffer simultaneously.
- * No locks on the paint path.
+ * Writer and UI never touch the same buffer simultaneously when UI consumers
+ * access the front buffer through [readCurrent].
  */
 class TerminalRenderPublisher(
     columns: Int,
@@ -65,8 +65,29 @@ class TerminalRenderPublisher(
      * Called from EDT only.
      * Returns the latest published snapshot. Never null after first publish.
      * The returned cache must not be retained across paint calls.
+     *
+     * Prefer [readCurrent] for paint code that needs to keep the returned cache
+     * stable for the duration of a read.
      */
     fun current(): TerminalRenderCache? = frontRef.get()
+
+    /**
+     * Reads the latest published front buffer while preventing it from being
+     * recycled as a writer-owned back buffer.
+     *
+     * The callback should only copy or paint from the cache and must not call
+     * back into this publisher. Returning `null` means no frame has been
+     * published yet.
+     *
+     * @param block reader invoked with the current front buffer.
+     * @return [block]'s result, or `null` when no frame is available.
+     */
+    fun <T> readCurrent(block: (TerminalRenderCache) -> T): T? {
+        return synchronized(publishLock) {
+            val current = frontRef.get() ?: return@synchronized null
+            block(current)
+        }
+    }
 
     /**
      * Resizes all buffers atomically.

@@ -36,7 +36,7 @@ class UnicodeWidthTest {
     inner class ZeroWidthTests {
 
         @ParameterizedTest(name = "BMP zero-width cp=0x{0} returns 0")
-        @ValueSource(ints = [0x00AD, 0x0300, 0x05BF, 0x200B, 0xFE0F])
+        @ValueSource(ints = [0x00AD, 0x0300, 0x05BF, 0x0E34, 0x0E48, 0x0EB4, 0x0ECD, 0x200B, 0xFE0F])
         fun `bmp zero-width samples return 0`(cp: Int) {
             assertEquals(0, UnicodeWidth.calculate(cp, ambiguousAsWide = false))
             assertEquals(0, UnicodeWidth.calculate(cp, ambiguousAsWide = true))

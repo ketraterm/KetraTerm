@@ -212,6 +212,16 @@ class PrintableProcessorTest {
         }
 
         @Test
+        fun `Thai base followed by combining marks is emitted as one cluster`() {
+            val f = Fixture()
+
+            f.acceptUtf8Codepoints(0x0E01, 0x0E34, 0x0E48)
+            f.flush()
+
+            assertEquals(listOf(writeCluster(0x0E01, 0x0E34, 0x0E48)), f.sink.events)
+        }
+
+        @Test
         fun `combining mark at start is emitted as its own scalar`() {
             val f = Fixture()
 

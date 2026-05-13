@@ -3,6 +3,9 @@ package com.gagik.terminal.render.cache
 import com.gagik.terminal.render.api.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 class TerminalRenderPublisherTest {
@@ -98,6 +101,41 @@ class TerminalRenderPublisherTest {
             { assertEquals("old", front?.rowText(0)) },
             { assertFalse(front?.cursor?.visible == true) },
         )
+    }
+
+    @Test
+    fun `readCurrent pins front buffer while reader is active`() {
+        val publisher = TerminalRenderPublisher(3, 1)
+        publisher.updateAndPublish(MockFrame(3, 1, "abc"))
+
+        val readerEntered = CountDownLatch(1)
+        val releaseReader = CountDownLatch(1)
+        val writerFinished = AtomicBoolean(false)
+
+        val reader = thread(start = true) {
+            publisher.readCurrent { front ->
+                readerEntered.countDown()
+                assertEquals("abc", front.rowText(0))
+                assertTrue(releaseReader.await(1, TimeUnit.SECONDS))
+                assertEquals("abc", front.rowText(0))
+            }
+        }
+
+        assertTrue(readerEntered.await(1, TimeUnit.SECONDS))
+
+        val writer = thread(start = true) {
+            publisher.updateAndPublish(MockFrame(3, 1, "def"))
+            writerFinished.set(true)
+        }
+
+        Thread.sleep(50)
+        assertFalse(writerFinished.get(), "writer recycled a buffer while readCurrent was active")
+
+        releaseReader.countDown()
+        reader.join()
+        writer.join()
+
+        assertEquals("def", publisher.current()?.rowText(0))
     }
 
     private fun TerminalRenderCache.rowText(row: Int): String =

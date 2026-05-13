@@ -20,6 +20,8 @@
             <option value="$PROJECT_DIR$/terminal-session" />
             <option value="$PROJECT_DIR$/terminal-testkit" />
             <option value="$PROJECT_DIR$/terminal-transport-api" />
+            <option value="$PROJECT_DIR$/terminal-ui-swing" />
+            <option value="$PROJECT_DIR$/terminal-ui-swing-demo" />
           </set>
         </option>
       </GradleProjectSettings>
