@@ -10,6 +10,8 @@ import com.gagik.terminal.ui.swing.settings.TerminalSwingSettingsProvider
 import java.awt.*
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
+import java.awt.event.MouseWheelEvent
+import java.awt.event.MouseWheelListener
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import javax.swing.Timer
@@ -32,6 +34,7 @@ class TerminalSwingTerminal(
     private var settings: TerminalSwingSettings = settingsProvider.currentSettings()
     private var metrics: TerminalSwingMetrics = buildMetrics(settings)
     private var cursorBlinkVisible: Boolean = true
+    private var scrollbackOffset: Int = 0
 
     private val painter = TerminalGridPainter()
     private val cursorTimer = Timer(settings.cursorBlinkMillis) {
@@ -53,6 +56,10 @@ class TerminalSwingTerminal(
         }
     }
 
+    private val viewportWheelListener = MouseWheelListener { event ->
+        handleMouseWheel(event)
+    }
+
     init {
         font = settings.font
         background = Color(settings.palette.defaultBackground, true)
@@ -60,6 +67,7 @@ class TerminalSwingTerminal(
         isFocusable = true
         focusTraversalKeysEnabled = false
         addKeyListener(inputKeyListener)
+        addMouseWheelListener(viewportWheelListener)
         preferredSize = preferredGridSize(settings.columns, settings.rows)
         cursorTimer.isRepeats = true
     }
@@ -77,9 +85,10 @@ class TerminalSwingTerminal(
         this.session = session
         session.onDirty = {
             SwingUtilities.invokeLater {
-                repaint()
+                handlePublishedFrame()
             }
         }
+        scrollbackOffset = 0
         repaint()
     }
 
@@ -89,6 +98,7 @@ class TerminalSwingTerminal(
     fun unbind() {
         session?.onDirty = null
         session = null
+        scrollbackOffset = 0
         repaint()
     }
 
@@ -152,6 +162,44 @@ class TerminalSwingTerminal(
         } finally {
             g.dispose()
         }
+    }
+
+    private fun handleMouseWheel(event: MouseWheelEvent) {
+        val boundSession = session ?: return
+        val cache = boundSession.publisher.current() ?: return
+        val historySize = cache.historySize
+        if (historySize == 0) return
+
+        val delta = -event.unitsToScroll
+        if (delta == 0) return
+
+        val nextOffset = (scrollbackOffset + delta).coerceIn(0, historySize)
+        if (nextOffset == scrollbackOffset) return
+
+        scrollbackOffset = nextOffset
+        boundSession.requestRender(scrollbackOffset)
+        event.consume()
+    }
+
+    private fun handlePublishedFrame() {
+        val boundSession = session ?: return
+        val cache = boundSession.publisher.current()
+        if (cache == null) {
+            repaint()
+            return
+        }
+
+        val clampedOffset = scrollbackOffset.coerceIn(0, cache.historySize)
+        if (clampedOffset != scrollbackOffset) {
+            scrollbackOffset = clampedOffset
+        }
+
+        if (cache.scrollbackOffset != scrollbackOffset) {
+            boundSession.requestRender(scrollbackOffset)
+            return
+        }
+
+        repaint()
     }
 
     private fun preferredGridSize(columns: Int, rows: Int): Dimension {

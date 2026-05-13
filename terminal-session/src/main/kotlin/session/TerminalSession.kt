@@ -22,6 +22,7 @@ import com.gagik.terminal.transport.TerminalConnectorListener
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Runtime terminal session that binds core, parser, input encoding, and a
@@ -47,6 +48,7 @@ class TerminalSession(
     private val parserClosed = AtomicBoolean(false)
     private val started = AtomicBoolean(false)
     private val renderPending = AtomicBoolean(false)
+    private val pendingRenderScrollbackOffset = AtomicInteger(0)
 
     private val inboundLock = Any()
     private val mutationLock = Any()
@@ -190,11 +192,24 @@ class TerminalSession(
      * Submits a render task to the worker thread.
      */
     fun notifyRenderDirty() {
+        requestRender(scrollbackOffset = 0)
+    }
+
+    /**
+     * Requests a render-cache publication for a caller-owned scrollback viewport.
+     *
+     * The offset is transient render request state, not terminal state. UI
+     * layers own scrollback policy and pass the desired offset for each
+     * publication they need.
+     */
+    fun requestRender(scrollbackOffset: Int) {
         if (isClosed()) return
+        pendingRenderScrollbackOffset.set(scrollbackOffset.coerceAtLeast(0))
         if (renderPending.compareAndSet(false, true)) {
             renderWorker.execute {
+                val offset = pendingRenderScrollbackOffset.get()
                 renderPending.set(false)
-                publisher.updateAndPublish(this)
+                publisher.updateAndPublish(this, offset)
                 onDirty?.invoke()
             }
         }

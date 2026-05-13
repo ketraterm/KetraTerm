@@ -452,6 +452,9 @@ professional emulator needs explicit contracts for it.
 - `DONE(render-api/core/cache/session)`: caller-owned scrollback viewport
   offsets can be requested per render-frame read, clamped by core, copied by
   the primitive render cache, and forwarded through session synchronization.
+- `DONE(swing)`: mouse-wheel scrollback updates are owned by the Swing
+  component and request offset-specific render-cache publications through the
+  session render worker.
 - `TODO(host)`: UI scrollback controls, scrollbar policy, selection behavior
   while scrolled, and auto-follow/offset-retention policy.
 - `TODO(host)`: accessibility/export APIs.
