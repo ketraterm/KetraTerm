@@ -6,6 +6,7 @@ import com.gagik.terminal.ui.swing.settings.TerminalSwingMetrics
 import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
 import java.awt.Font
 import java.awt.Graphics2D
+import java.awt.Rectangle
 import java.awt.RenderingHints
 
 /**
@@ -22,6 +23,7 @@ internal class TerminalGridPainter {
     private val decorationPainter = TerminalDecorationPainter(colorCache)
     private val textPainter = TerminalTextPainter(colorCache, decorationPainter)
     private val cursorPainter = TerminalCursorPainter(colorCache, textPainter)
+    private val clipScratch = Rectangle()
 
     /**
      * Clears [width] x [height] with the terminal default background.
@@ -54,10 +56,12 @@ internal class TerminalGridPainter {
         g.font = textPainter.font(Font.PLAIN)
         val fontRenderContext = g.fontRenderContext
 
-        val rows = minOf(cache.rows, height / metrics.cellHeight + 1)
+        val clip = g.getClipBounds(clipScratch)
+        val firstRow = firstPaintRow(clip, metrics)
+        val rows = lastPaintRowExclusive(clip, cache, metrics, height)
         backgroundPainter.clear(g, palette, width, height)
 
-        var row = 0
+        var row = firstRow
         while (row < rows) {
             backgroundPainter.paintRow(g, cache, palette, metrics, row)
             textPainter.paintRow(g, cache, palette, metrics, row, fontRenderContext)
@@ -65,5 +69,28 @@ internal class TerminalGridPainter {
         }
 
         cursorPainter.paint(g, cache, palette, metrics, cursorBlinkVisible, fontRenderContext)
+    }
+
+    private fun firstPaintRow(
+        clip: Rectangle?,
+        metrics: TerminalSwingMetrics,
+    ): Int {
+        if (clip == null) return 0
+        return maxOf(0, clip.y / metrics.cellHeight)
+    }
+
+    private fun lastPaintRowExclusive(
+        clip: Rectangle?,
+        cache: TerminalRenderCache,
+        metrics: TerminalSwingMetrics,
+        componentHeight: Int,
+    ): Int {
+        val visibleRows = minOf(cache.rows, componentHeight / metrics.cellHeight + 1)
+        if (clip == null || clip.height <= 0) return visibleRows
+
+        val clipBottom = clip.y + clip.height
+        if (clipBottom <= 0) return 0
+        val clippedRows = (clipBottom + metrics.cellHeight - 1) / metrics.cellHeight
+        return clippedRows.coerceIn(0, visibleRows)
     }
 }

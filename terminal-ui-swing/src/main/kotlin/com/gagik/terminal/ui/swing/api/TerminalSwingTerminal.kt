@@ -38,9 +38,10 @@ class TerminalSwingTerminal(
     private val renderPending = AtomicBoolean(false)
 
     private val painter = TerminalGridPainter()
+    private val repaintPlanner = TerminalSwingRepaintPlanner()
     private val cursorTimer = Timer(settings.cursorBlinkMillis) {
         cursorBlinkVisible = !cursorBlinkVisible
-        repaint()
+        repaintBlinkingCursor()
     }
 
     private val inputKeyListener = object : KeyAdapter() {
@@ -89,6 +90,7 @@ class TerminalSwingTerminal(
             schedulePublishedFrame()
         }
         scrollbackOffset = 0
+        repaintPlanner.reset()
         renderPending.set(false)
         repaint()
     }
@@ -100,6 +102,7 @@ class TerminalSwingTerminal(
         session?.onDirty = null
         session = null
         scrollbackOffset = 0
+        repaintPlanner.reset()
         renderPending.set(false)
         repaint()
     }
@@ -216,7 +219,30 @@ class TerminalSwingTerminal(
             return
         }
 
-        repaint()
+        repaintPlanner.requestFrameRepaint(
+            cache = cache,
+            metrics = metrics,
+            componentWidth = width,
+            componentHeight = height,
+            repaintAll = { repaint() },
+            repaintRegion = { x, y, regionWidth, regionHeight ->
+                repaint(x, y, regionWidth, regionHeight)
+            },
+        )
+    }
+
+    private fun repaintBlinkingCursor() {
+        val publisher = session?.publisher ?: return
+        publisher.readCurrent { cache ->
+            repaintPlanner.requestCursorBlinkRepaint(
+                cache = cache,
+                metrics = metrics,
+                componentHeight = height,
+                repaintRegion = { x, y, regionWidth, regionHeight ->
+                    repaint(x, y, regionWidth, regionHeight)
+                },
+            )
+        }
     }
 
     private fun preferredGridSize(columns: Int, rows: Int): Dimension {
