@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Dimension
 import java.awt.Font
+import java.awt.event.ComponentEvent
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -86,14 +87,67 @@ class TerminalSwingTerminalThreadingTest {
         assertEquals(visibleFromEdt, visibleFromBackground.get())
     }
 
-    private fun testSession(): TerminalSession {
+    @Test
+    fun `bind resizes session to current visible grid when component has bounds`() {
+        val connector = RecordingConnector()
+        val session = testSession(connector)
+        val component = TerminalSwingTerminal()
+
+        val expected = edtCall {
+            component.size = Dimension(160, 80)
+            component.visibleGridSize()
+        }
+
+        component.bind(session)
+
+        assertAll(
+            { assertEquals(expected.width, connector.lastColumns.get()) },
+            { assertEquals(expected.height, connector.lastRows.get()) },
+            { assertEquals(1, connector.resizeCount.get()) },
+        )
+        session.close()
+    }
+
+    @Test
+    fun `component resize updates session only when visible grid changes`() {
+        val connector = RecordingConnector()
+        val session = testSession(connector)
+        val component = TerminalSwingTerminal()
+
+        edtCall {
+            component.size = Dimension(160, 80)
+        }
+        component.bind(session)
+        connector.reset()
+
+        val expected = edtCall {
+            component.size = Dimension(320, 160)
+            component.dispatchEvent(ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED))
+            component.visibleGridSize()
+        }
+
+        assertAll(
+            { assertEquals(expected.width, connector.lastColumns.get()) },
+            { assertEquals(expected.height, connector.lastRows.get()) },
+            { assertEquals(1, connector.resizeCount.get()) },
+        )
+
+        edtCall {
+            component.dispatchEvent(ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED))
+        }
+
+        assertEquals(1, connector.resizeCount.get())
+        session.close()
+    }
+
+    private fun testSession(connector: TerminalConnector = NoOpConnector): TerminalSession {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
         return TerminalSession(
             terminal = terminal,
             publisher = TerminalRenderPublisher(3, 1),
             renderReader = terminal as TerminalRenderFrameReader,
             responseReader = terminal,
-            connector = NoOpConnector,
+            connector = connector,
             parser = NoOpParser,
             inputEncoder = NoOpInputEncoder,
         )
@@ -132,6 +186,30 @@ class TerminalSwingTerminalThreadingTest {
         override fun resize(columns: Int, rows: Int) = Unit
 
         override fun close() = Unit
+    }
+
+    private class RecordingConnector : TerminalConnector {
+        val resizeCount = AtomicInteger()
+        val lastColumns = AtomicInteger()
+        val lastRows = AtomicInteger()
+
+        override fun start(listener: TerminalConnectorListener) = Unit
+
+        override fun write(bytes: ByteArray, offset: Int, length: Int) = Unit
+
+        override fun resize(columns: Int, rows: Int) {
+            lastColumns.set(columns)
+            lastRows.set(rows)
+            resizeCount.incrementAndGet()
+        }
+
+        override fun close() = Unit
+
+        fun reset() {
+            resizeCount.set(0)
+            lastColumns.set(0)
+            lastRows.set(0)
+        }
     }
 
     private object NoOpParser : TerminalOutputParser {

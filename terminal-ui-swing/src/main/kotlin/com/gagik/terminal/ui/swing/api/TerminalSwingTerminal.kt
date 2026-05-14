@@ -7,10 +7,7 @@ import com.gagik.terminal.ui.swing.settings.TerminalSwingMetrics
 import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
 import com.gagik.terminal.ui.swing.settings.TerminalSwingSettingsProvider
 import java.awt.*
-import java.awt.event.KeyAdapter
-import java.awt.event.KeyEvent
-import java.awt.event.MouseWheelEvent
-import java.awt.event.MouseWheelListener
+import java.awt.event.*
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JComponent
@@ -36,6 +33,8 @@ class TerminalSwingTerminal(
     private var metrics: TerminalSwingMetrics = buildMetrics(settings)
     private var cursorBlinkVisible: Boolean = true
     private var scrollbackOffset: Int = 0
+    private var lastResizedColumns: Int = NO_RESIZE_DIMENSION
+    private var lastResizedRows: Int = NO_RESIZE_DIMENSION
     private val renderPending = AtomicBoolean(false)
 
     private val painter = TerminalGridPainter()
@@ -64,6 +63,12 @@ class TerminalSwingTerminal(
         handleMouseWheel(event)
     }
 
+    private val resizeListener = object : ComponentAdapter() {
+        override fun componentResized(event: ComponentEvent) {
+            resizeSessionToVisibleGridOnEdt()
+        }
+    }
+
     init {
         font = settings.font
         background = Color(settings.palette.defaultBackground, true)
@@ -73,6 +78,7 @@ class TerminalSwingTerminal(
         focusTraversalKeysEnabled = false
         addKeyListener(inputKeyListener)
         addMouseWheelListener(viewportWheelListener)
+        addComponentListener(resizeListener)
         preferredSize = preferredGridSize(settings.columns, settings.rows)
         cursorTimer.isRepeats = true
     }
@@ -180,8 +186,11 @@ class TerminalSwingTerminal(
             schedulePublishedFrame()
         }
         scrollbackOffset = 0
+        lastResizedColumns = NO_RESIZE_DIMENSION
+        lastResizedRows = NO_RESIZE_DIMENSION
         repaintPlanner.reset()
         renderPending.set(false)
+        resizeSessionToVisibleGridOnEdt()
         repaint()
     }
 
@@ -189,6 +198,8 @@ class TerminalSwingTerminal(
         session?.onDirty = null
         session = null
         scrollbackOffset = 0
+        lastResizedColumns = NO_RESIZE_DIMENSION
+        lastResizedRows = NO_RESIZE_DIMENSION
         repaintPlanner.reset()
         renderPending.set(false)
         repaint()
@@ -203,6 +214,7 @@ class TerminalSwingTerminal(
         metrics = buildMetrics(settings)
         preferredSize = preferredGridSize(settings.columns, settings.rows)
         cursorTimer.delay = settings.cursorBlinkMillis
+        resizeSessionToVisibleGridOnEdt()
         revalidate()
         repaint()
     }
@@ -281,6 +293,19 @@ class TerminalSwingTerminal(
         return Dimension(columns * metrics.cellWidth, rows * metrics.cellHeight)
     }
 
+    private fun resizeSessionToVisibleGridOnEdt() {
+        val boundSession = session ?: return
+        if (width <= 0 || height <= 0) return
+
+        val columns = maxOf(1, width / metrics.cellWidth)
+        val rows = maxOf(1, height / metrics.cellHeight)
+        if (columns == lastResizedColumns && rows == lastResizedRows) return
+
+        lastResizedColumns = columns
+        lastResizedRows = rows
+        boundSession.resize(columns, rows)
+    }
+
     private fun buildMetrics(settings: TerminalSwingSettings): TerminalSwingMetrics {
         val metricsSource: FontMetrics = getFontMetrics(settings.font)
         return TerminalSwingMetrics.from(metricsSource)
@@ -316,5 +341,9 @@ class TerminalSwingTerminal(
 
         @Suppress("UNCHECKED_CAST")
         return result as T
+    }
+
+    private companion object {
+        private const val NO_RESIZE_DIMENSION = -1
     }
 }
