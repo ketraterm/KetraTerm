@@ -11,6 +11,7 @@ import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseWheelEvent
 import java.awt.event.MouseWheelListener
+import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
@@ -80,60 +81,56 @@ class TerminalSwingTerminal(
      * Binds this component to [session].
      *
      * The session remains host-owned; this component only observes dirty render
-     * notifications and repaints itself on the EDT.
+     * notifications and repaints itself on the EDT. This method may be called
+     * from any thread; component state is updated synchronously on the EDT.
      *
      * @param session terminal session to display.
      */
     fun bind(session: TerminalSession) {
-        this.session?.onDirty = null
-        this.session = session
-        session.onDirty = {
-            schedulePublishedFrame()
+        runOnEdtAndWait {
+            bindOnEdt(session)
         }
-        scrollbackOffset = 0
-        repaintPlanner.reset()
-        renderPending.set(false)
-        repaint()
     }
 
     /**
      * Removes the current session binding.
+     *
+     * This method may be called from any thread; component state is updated
+     * synchronously on the EDT.
      */
     fun unbind() {
-        session?.onDirty = null
-        session = null
-        scrollbackOffset = 0
-        repaintPlanner.reset()
-        renderPending.set(false)
-        repaint()
+        runOnEdtAndWait {
+            unbindOnEdt()
+        }
     }
 
     /**
      * Rebuilds settings, metrics, preferred size, and repaint state.
+     *
+     * This method may be called from any thread; component state is updated
+     * synchronously on the EDT.
      */
     fun reloadSettings() {
-        settings = settingsProvider.currentSettings()
-        font = settings.font
-        background = Color(settings.palette.defaultBackground, true)
-        foreground = Color(settings.palette.defaultForeground, true)
-        isOpaque = true
-        metrics = buildMetrics(settings)
-        preferredSize = preferredGridSize(settings.columns, settings.rows)
-        cursorTimer.delay = settings.cursorBlinkMillis
-        revalidate()
-        repaint()
+        runOnEdtAndWait {
+            reloadSettingsOnEdt()
+        }
     }
 
     /**
      * Returns the grid size that fits in this component's current bounds.
      *
+     * This method may be called from any thread; component state is read
+     * synchronously on the EDT.
+     *
      * @return dimension where width is columns and height is rows.
      */
     fun visibleGridSize(): Dimension {
-        return Dimension(
-            maxOf(1, width / metrics.cellWidth),
-            maxOf(1, height / metrics.cellHeight),
-        )
+        return callOnEdtAndWait {
+            Dimension(
+                maxOf(1, width / metrics.cellWidth),
+                maxOf(1, height / metrics.cellHeight),
+            )
+        }
     }
 
     override fun addNotify() {
@@ -174,6 +171,40 @@ class TerminalSwingTerminal(
         } finally {
             g.dispose()
         }
+    }
+
+    private fun bindOnEdt(session: TerminalSession) {
+        this.session?.onDirty = null
+        this.session = session
+        session.onDirty = {
+            schedulePublishedFrame()
+        }
+        scrollbackOffset = 0
+        repaintPlanner.reset()
+        renderPending.set(false)
+        repaint()
+    }
+
+    private fun unbindOnEdt() {
+        session?.onDirty = null
+        session = null
+        scrollbackOffset = 0
+        repaintPlanner.reset()
+        renderPending.set(false)
+        repaint()
+    }
+
+    private fun reloadSettingsOnEdt() {
+        settings = settingsProvider.currentSettings()
+        font = settings.font
+        background = Color(settings.palette.defaultBackground, true)
+        foreground = Color(settings.palette.defaultForeground, true)
+        isOpaque = true
+        metrics = buildMetrics(settings)
+        preferredSize = preferredGridSize(settings.columns, settings.rows)
+        cursorTimer.delay = settings.cursorBlinkMillis
+        revalidate()
+        repaint()
     }
 
     private fun handleMouseWheel(event: MouseWheelEvent) {
@@ -253,5 +284,37 @@ class TerminalSwingTerminal(
     private fun buildMetrics(settings: TerminalSwingSettings): TerminalSwingMetrics {
         val metricsSource: FontMetrics = getFontMetrics(settings.font)
         return TerminalSwingMetrics.from(metricsSource)
+    }
+
+    private fun runOnEdtAndWait(action: () -> Unit) {
+        callOnEdtAndWait {
+            action()
+        }
+    }
+
+    private fun <T> callOnEdtAndWait(action: () -> T): T {
+        if (SwingUtilities.isEventDispatchThread()) {
+            return action()
+        }
+
+        var result: T? = null
+        try {
+            SwingUtilities.invokeAndWait {
+                result = action()
+            }
+        } catch (error: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw IllegalStateException("Interrupted while waiting for Swing event dispatch thread", error)
+        } catch (error: InvocationTargetException) {
+            val cause = error.cause ?: error
+            when (cause) {
+                is RuntimeException -> throw cause
+                is Error -> throw cause
+                else -> throw IllegalStateException("Swing event dispatch thread action failed", cause)
+            }
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        return result as T
     }
 }
