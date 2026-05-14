@@ -39,6 +39,7 @@ class TerminalSwingTerminal(
 
     private val painter = TerminalGridPainter()
     private val repaintPlanner = TerminalSwingRepaintPlanner()
+    private val keyMapper = TerminalSwingKeyMapper()
     private val cursorTimer = Timer(settings.cursorBlinkMillis) {
         cursorBlinkVisible = !cursorBlinkVisible
         repaintBlinkingCursor()
@@ -46,13 +47,13 @@ class TerminalSwingTerminal(
 
     private val inputKeyListener = object : KeyAdapter() {
         override fun keyPressed(event: KeyEvent) {
-            val keyEvent = TerminalSwingKeyMapper.keyPressed(event) ?: return
+            val keyEvent = keyMapper.keyPressed(event) ?: return
             session?.encodeKey(keyEvent)
             event.consume()
         }
 
         override fun keyTyped(event: KeyEvent) {
-            val keyEvent = TerminalSwingKeyMapper.keyTyped(event) ?: return
+            val keyEvent = keyMapper.keyTyped(event) ?: return
             session?.encodeKey(keyEvent)
             event.consume()
         }

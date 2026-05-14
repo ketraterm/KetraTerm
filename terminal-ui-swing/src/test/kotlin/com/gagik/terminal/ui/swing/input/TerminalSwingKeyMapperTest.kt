@@ -10,10 +10,11 @@ import kotlin.test.assertNull
 
 class TerminalSwingKeyMapperTest {
     private val source = Canvas()
+    private val mapper = TerminalSwingKeyMapper()
 
     @Test
     fun mapsPrintableTypedCharacter() {
-        val mapped = TerminalSwingKeyMapper.keyTyped(typed('a'))
+        val mapped = mapper.keyTyped(typed('a'))
 
         assertEquals('a'.code, mapped?.codepoint)
         assertEquals(TerminalModifiers.NONE, mapped?.modifiers)
@@ -21,12 +22,40 @@ class TerminalSwingKeyMapperTest {
 
     @Test
     fun ignoresTypedControlCharacter() {
-        assertNull(TerminalSwingKeyMapper.keyTyped(typed('\u0003')))
+        assertNull(mapper.keyTyped(typed('\u0003')))
+    }
+
+    @Test
+    fun mapsTypedSupplementaryCharacterFromSurrogatePair() {
+        val chars = Character.toChars(0x1F680)
+
+        assertNull(mapper.keyTyped(typed(chars[0], modifiers = KeyEvent.SHIFT_DOWN_MASK)))
+        val mapped = mapper.keyTyped(typed(chars[1]))
+
+        assertEquals(0x1F680, mapped?.codepoint)
+        assertEquals(TerminalModifiers.SHIFT, mapped?.modifiers)
+    }
+
+    @Test
+    fun ignoresTypedLowSurrogateWithoutHighSurrogate() {
+        val low = Character.toChars(0x1F680)[1]
+
+        assertNull(mapper.keyTyped(typed(low)))
+    }
+
+    @Test
+    fun dropsPendingHighSurrogateWhenNextTypedCharacterIsNotLowSurrogate() {
+        val high = Character.toChars(0x1F680)[0]
+
+        assertNull(mapper.keyTyped(typed(high)))
+        val mapped = mapper.keyTyped(typed('x'))
+
+        assertEquals('x'.code, mapped?.codepoint)
     }
 
     @Test
     fun mapsArrowPressedKey() {
-        val mapped = TerminalSwingKeyMapper.keyPressed(pressed(KeyEvent.VK_UP))
+        val mapped = mapper.keyPressed(pressed(KeyEvent.VK_UP))
 
         assertEquals(TerminalKey.UP, mapped?.key)
         assertEquals(TerminalModifiers.NONE, mapped?.modifiers)
@@ -34,7 +63,7 @@ class TerminalSwingKeyMapperTest {
 
     @Test
     fun mapsCtrlLetterAsPrintableShortcut() {
-        val mapped = TerminalSwingKeyMapper.keyPressed(
+        val mapped = mapper.keyPressed(
             pressed(KeyEvent.VK_C, modifiers = KeyEvent.CTRL_DOWN_MASK),
         )
 
@@ -44,15 +73,15 @@ class TerminalSwingKeyMapperTest {
 
     @Test
     fun leavesPlainPrintablePressedKeyForTypedEvent() {
-        assertNull(TerminalSwingKeyMapper.keyPressed(pressed(KeyEvent.VK_A)))
+        assertNull(mapper.keyPressed(pressed(KeyEvent.VK_A)))
     }
 
-    private fun typed(char: Char): KeyEvent {
+    private fun typed(char: Char, modifiers: Int = 0): KeyEvent {
         return KeyEvent(
             source,
             KeyEvent.KEY_TYPED,
             System.currentTimeMillis(),
-            0,
+            modifiers,
             KeyEvent.VK_UNDEFINED,
             char,
         )

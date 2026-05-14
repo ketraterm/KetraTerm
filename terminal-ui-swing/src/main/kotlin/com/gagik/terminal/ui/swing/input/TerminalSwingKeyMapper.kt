@@ -11,7 +11,10 @@ import java.awt.event.KeyEvent
  * Printable text is emitted from `KEY_TYPED` events. Navigation, function, and
  * control/meta modified printable keys are emitted from `KEY_PRESSED` events.
  */
-internal object TerminalSwingKeyMapper {
+internal class TerminalSwingKeyMapper {
+    private var pendingHighSurrogate: Char = NO_PENDING_SURROGATE
+    private var pendingHighSurrogateModifiers: Int = TerminalModifiers.NONE
+
     /**
      * Converts a `KEY_PRESSED` event to terminal input when the event should
      * not be handled by the later `KEY_TYPED` event.
@@ -46,9 +49,37 @@ internal object TerminalSwingKeyMapper {
         val char = event.keyChar
         if (char == KeyEvent.CHAR_UNDEFINED) return null
 
-        val codepoint = char.code
+        val eventModifiers = modifiers(event)
+        val codepoint = typedCodepoint(char, eventModifiers) ?: return null
         if (codepoint in 0x00..0x1f || codepoint == 0x7f) return null
-        return TerminalKeyEvent.codepoint(codepoint, modifiers(event))
+        return TerminalKeyEvent.codepoint(codepoint, eventModifiersFor(codepoint, eventModifiers))
+    }
+
+    private fun typedCodepoint(char: Char, eventModifiers: Int): Int? {
+        if (char.isHighSurrogate()) {
+            pendingHighSurrogate = char
+            pendingHighSurrogateModifiers = eventModifiers
+            return null
+        }
+
+        if (char.isLowSurrogate()) {
+            val high = pendingHighSurrogate
+            if (high == NO_PENDING_SURROGATE) return null
+
+            pendingHighSurrogate = NO_PENDING_SURROGATE
+            return Character.toCodePoint(high, char)
+        }
+
+        pendingHighSurrogate = NO_PENDING_SURROGATE
+        return char.code
+    }
+
+    private fun eventModifiersFor(codepoint: Int, currentModifiers: Int): Int {
+        if (codepoint <= 0xFFFF) return currentModifiers
+
+        val modifiers = pendingHighSurrogateModifiers
+        pendingHighSurrogateModifiers = TerminalModifiers.NONE
+        return modifiers
     }
 
     private fun modifiers(event: KeyEvent): Int {
@@ -124,5 +155,9 @@ internal object TerminalSwingKeyMapper {
             KeyEvent.VK_SLASH -> '?'.code
             else -> null
         }
+    }
+
+    private companion object {
+        private const val NO_PENDING_SURROGATE: Char = '\u0000'
     }
 }
