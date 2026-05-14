@@ -65,6 +65,7 @@ class TerminalSwingTerminal(
         font = settings.font
         background = Color(settings.palette.defaultBackground, true)
         foreground = Color(settings.palette.defaultForeground, true)
+        isOpaque = true
         isFocusable = true
         focusTraversalKeysEnabled = false
         addKeyListener(inputKeyListener)
@@ -111,6 +112,7 @@ class TerminalSwingTerminal(
         font = settings.font
         background = Color(settings.palette.defaultBackground, true)
         foreground = Color(settings.palette.defaultForeground, true)
+        isOpaque = true
         metrics = buildMetrics(settings)
         preferredSize = preferredGridSize(settings.columns, settings.rows)
         cursorTimer.delay = settings.cursorBlinkMillis
