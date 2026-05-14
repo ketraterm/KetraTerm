@@ -94,7 +94,6 @@ class TerminalSession(
 
         synchronized(mutationLock) {
             terminal.resize(columns, rows)
-            publisher.resize(columns, rows)
         }
         connector.resize(columns, rows)
         connector.start(this)
@@ -109,7 +108,6 @@ class TerminalSession(
 
         synchronized(mutationLock) {
             terminal.resize(columns, rows)
-            publisher.resize(columns, rows)
         }
         connector.resize(columns, rows)
         notifyRenderDirty()

@@ -1,6 +1,5 @@
 package com.gagik.terminal.render.cache
 
-import com.gagik.terminal.render.api.TerminalRenderFrame
 import com.gagik.terminal.render.api.TerminalRenderFrameReader
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
@@ -121,18 +120,6 @@ class TerminalRenderPublisher(
         }
     }
 
-    /**
-     * Records a host resize boundary without mutating published cache buffers.
-     *
-     * Cache storage is resized only by the writer-owned [updateAndPublish]
-     * path, using the resolved [TerminalRenderFrame] shape. This keeps every
-     * published or in-flight cache snapshot stable while UI readers paint and
-     * while a render callback is copying overscan rows.
-     */
-    fun resize(columns: Int, rows: Int) {
-        require(columns > 0) { "columns must be > 0, was $columns" }
-        require(rows > 0) { "rows must be > 0, was $rows" }
-    }
 
     private fun acquireWritableIndex(): Int {
         publishLock.withLock {

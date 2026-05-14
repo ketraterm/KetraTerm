@@ -172,12 +172,6 @@ class TerminalRenderCache(
         resizeStorage(columns, rows)
     }
 
-    /**
-     * Resizes the primitive storage to [columns] x [rows].
-     */
-    fun resize(columns: Int, rows: Int) {
-        resizeStorage(columns, rows)
-    }
 
     /**
      * Copies changed rows and cursor state from [reader].
