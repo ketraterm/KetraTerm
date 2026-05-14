@@ -3,6 +3,15 @@ package com.gagik.terminal.session
 import com.gagik.terminal.protocol.host.TerminalHostOutput
 import com.gagik.terminal.transport.TerminalConnector
 
+/**
+ * A zero-allocation, thread-safe bridge between terminal input encoding and
+ * the transport connector.
+ *
+ * This implementation pre-allocates reusable buffers to encode ASCII and
+ * UTF-8 text without allocating new [ByteArray] instances on every keypress
+ * or paste event. It ensures all writes are synchronized through the session's
+ * outbound write lock to maintain correct multiplexing order with core responses.
+ */
 internal class ConnectorTerminalHostOutput(
     private val connector: TerminalConnector,
     private val writeLock: Any,
@@ -52,6 +61,10 @@ internal class ConnectorTerminalHostOutput(
         }
     }
 
+    /**
+     * Manually encodes a string to UTF-8 using a reusable buffer.
+     * This avoids allocating a new byte array for every paste or multi-byte input.
+     */
     override fun writeUtf8(text: String) {
         synchronized(writeLock) {
             var bufferOffset = 0

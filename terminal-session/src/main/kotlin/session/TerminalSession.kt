@@ -56,7 +56,7 @@ class TerminalSession(
     private val responseScratch = ByteArray(RESPONSE_BUFFER_SIZE)
 
     private val renderWorker = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "terminal-render-worker").apply { isDaemon = true }
+        Thread(r, "terminal-render-worker-${SESSION_COUNTER.getAndIncrement()}").apply { isDaemon = true }
     }
 
     /**
@@ -120,12 +120,16 @@ class TerminalSession(
      *
      * Input before [start] is ignored.
      */
-    override fun encodeKey(event: TerminalKeyEvent) {
+    private inline fun withInputLock(block: TerminalInputEncoder.() -> Unit) {
         synchronized(outboundWriteLock) {
             if (isAcceptingInput()) {
-                inputEncoder.encodeKey(event)
+                inputEncoder.block()
             }
         }
+    }
+
+    override fun encodeKey(event: TerminalKeyEvent) {
+        withInputLock { encodeKey(event) }
     }
 
     /**
@@ -134,11 +138,7 @@ class TerminalSession(
      * Input before [start] is ignored.
      */
     override fun encodePaste(event: TerminalPasteEvent) {
-        synchronized(outboundWriteLock) {
-            if (isAcceptingInput()) {
-                inputEncoder.encodePaste(event)
-            }
-        }
+        withInputLock { encodePaste(event) }
     }
 
     /**
@@ -147,11 +147,7 @@ class TerminalSession(
      * Input before [start] is ignored.
      */
     override fun encodeFocus(event: TerminalFocusEvent) {
-        synchronized(outboundWriteLock) {
-            if (isAcceptingInput()) {
-                inputEncoder.encodeFocus(event)
-            }
-        }
+        withInputLock { encodeFocus(event) }
     }
 
     /**
@@ -160,11 +156,7 @@ class TerminalSession(
      * Input before [start] is ignored.
      */
     override fun encodeMouse(event: TerminalMouseEvent) {
-        synchronized(outboundWriteLock) {
-            if (isAcceptingInput()) {
-                inputEncoder.encodeMouse(event)
-            }
-        }
+        withInputLock { encodeMouse(event) }
     }
 
     /**
@@ -247,8 +239,13 @@ class TerminalSession(
                 val offset = unpackScrollbackOffset(request)
                 val rows = unpackViewportRows(request)
                 renderedGeneration = generation
-                publisher.updateAndPublish(this, offset, rows)
-                onDirty?.invoke()
+                
+                try {
+                    publisher.updateAndPublish(this, offset, rows)
+                    onDirty?.invoke()
+                } catch (e: Throwable) {
+                    // Ignore UI or publisher errors to prevent killing the render worker
+                }
             }
         } finally {
             renderScheduled.set(false)
@@ -313,7 +310,6 @@ class TerminalSession(
             connector.close()
         }
         cleanupParser()
-        renderWorker.shutdown()
         renderWorker.awaitTermination(500, TimeUnit.MILLISECONDS)
     }
 
@@ -338,6 +334,7 @@ class TerminalSession(
         synchronized(mutationLock) {
             parser.endOfInput()
         }
+        renderWorker.shutdown()
     }
 
     private fun isClosed(): Boolean {
@@ -349,6 +346,7 @@ class TerminalSession(
     }
 
     companion object {
+        private val SESSION_COUNTER = java.util.concurrent.atomic.AtomicInteger(1)
         private const val RESPONSE_BUFFER_SIZE: Int = 1024
 
         private fun packRenderRequest(scrollbackOffset: Int, viewportRows: Int): Long {
