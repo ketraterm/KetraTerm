@@ -141,6 +141,7 @@ class TerminalRenderCache(
         private set
 
     private var clusterSinkRow: Int = NO_CLUSTER_SINK_ROW
+    private var clusterSinkClusters: Array<Array<String?>> = emptyClusterRows()
 
     /**
      * Reused sink to avoid allocating one capturing lambda per copied row.
@@ -150,17 +151,19 @@ class TerminalRenderCache(
      */
     private val reusableClusterSink = TerminalRenderClusterSink { column, text ->
         val row = clusterSinkRow
+        val copiedClusters = clusterSinkClusters
         check(row != NO_CLUSTER_SINK_ROW) {
             "TerminalRenderClusterSink invoked outside copyLine"
         }
-        check(row in 0 until rows) {
-            "Cluster sink row out of bounds: row=$row, rows=$rows"
+        check(row in copiedClusters.indices) {
+            "Cluster sink row out of bounds: row=$row, rows=${copiedClusters.size}"
         }
-        check(column in 0 until columns) {
-            "Cluster sink column out of bounds: column=$column, columns=$columns"
+        val clusterRow = copiedClusters[row]
+        check(column in clusterRow.indices) {
+            "Cluster sink column out of bounds: column=$column, columns=${clusterRow.size}"
         }
 
-        clusters[row][column] = text
+        clusterRow[column] = text
     }
 
     init {
@@ -257,6 +260,7 @@ class TerminalRenderCache(
                     clearClusterRow(row)
 
                     clusterSinkRow = row
+                    clusterSinkClusters = clusters
                     try {
                         frame.copyLine(
                             row = row,
@@ -269,6 +273,7 @@ class TerminalRenderCache(
                         )
                     } finally {
                         clusterSinkRow = NO_CLUSTER_SINK_ROW
+                        clusterSinkClusters = emptyClusterRows()
                     }
 
                     lineGenerations[row] = lineGeneration
@@ -321,6 +326,7 @@ class TerminalRenderCache(
         activeBuffer = TerminalRenderBufferKind.PRIMARY
         cursorChangedOnLastUpdate = false
         clusterSinkRow = NO_CLUSTER_SINK_ROW
+        clusterSinkClusters = emptyClusterRows()
     }
 
     private fun clearAllClusters() {

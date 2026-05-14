@@ -51,7 +51,7 @@ class TerminalRenderPublisherTest {
     }
 
     @Test
-    fun `resize prepares writable buffers for next publication`() {
+    fun `publication after resize uses resolved frame shape`() {
         val publisher = TerminalRenderPublisher(3, 1)
         publisher.resize(5, 2)
 
@@ -103,6 +103,32 @@ class TerminalRenderPublisherTest {
             { assertEquals(3, publisher.current()?.columns) },
             { assertEquals(1, publisher.current()?.rows) },
             { assertEquals("abc", publisher.current()?.rowText(0)) },
+        )
+    }
+
+    @Test
+    fun `resize during overscan cluster copy does not shrink writer cache`() {
+        val publisher = TerminalRenderPublisher(1, 30)
+        val frame = BlockingOverscanClusterFrame(rows = 31)
+        var exception: Throwable? = null
+
+        val writer = thread(start = true) {
+            try {
+                publisher.updateAndPublish(frame)
+            } catch (error: Throwable) {
+                exception = error
+            }
+        }
+
+        assertTrue(frame.awaitOverscanRowCopy(), "writer did not reach overscan row")
+        publisher.resize(1, 30)
+        frame.releaseOverscanRowCopy()
+        writer.join(1_000)
+
+        assertNull(exception)
+        assertAll(
+            { assertEquals(31, publisher.current()?.rows) },
+            { assertEquals("e\u0301", publisher.current()?.clusters?.get(30)?.get(0)) },
         )
     }
 
@@ -315,6 +341,72 @@ class TerminalRenderPublisherTest {
 
         fun releaseCopy() {
             releaseCopy.countDown()
+        }
+    }
+
+    private class BlockingOverscanClusterFrame(
+        override val rows: Int,
+    ) : TerminalRenderFrame, TerminalRenderFrameReader {
+        private val overscanRowCopyEntered = CountDownLatch(1)
+        private val releaseOverscanRowCopy = CountDownLatch(1)
+
+        override val columns: Int = 1
+        override val frameGeneration: Long = 31
+        override val structureGeneration: Long = 31
+        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
+        override val cursor: TerminalRenderCursor = TerminalRenderCursor(
+            column = 0,
+            row = 0,
+            visible = false,
+            blinking = false,
+            shape = TerminalRenderCursorShape.BLOCK,
+            generation = 1L,
+        )
+
+        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+            consumer.accept(this)
+        }
+
+        override fun lineGeneration(row: Int): Long = row.toLong()
+
+        override fun lineWrapped(row: Int): Boolean = false
+
+        override fun copyLine(
+            row: Int,
+            codeWords: IntArray,
+            codeOffset: Int,
+            attrWords: LongArray,
+            attrOffset: Int,
+            flags: IntArray,
+            flagOffset: Int,
+            extraAttrWords: LongArray?,
+            extraAttrOffset: Int,
+            hyperlinkIds: IntArray?,
+            hyperlinkOffset: Int,
+            clusterSink: TerminalRenderClusterSink?,
+        ) {
+            attrWords[attrOffset] = TerminalRenderAttrs.DEFAULT
+            extraAttrWords?.set(extraAttrOffset, TerminalRenderExtraAttrs.DEFAULT)
+            hyperlinkIds?.set(hyperlinkOffset, 0)
+
+            if (row == rows - 1) {
+                overscanRowCopyEntered.countDown()
+                assertTrue(releaseOverscanRowCopy.await(1, TimeUnit.SECONDS), "overscan row copy was not released")
+                codeWords[codeOffset] = 0
+                flags[flagOffset] = TerminalRenderCellFlags.CLUSTER
+                clusterSink?.onCluster(0, "e\u0301")
+            } else {
+                codeWords[codeOffset] = 'x'.code
+                flags[flagOffset] = TerminalRenderCellFlags.CODEPOINT
+            }
+        }
+
+        fun awaitOverscanRowCopy(): Boolean {
+            return overscanRowCopyEntered.await(1, TimeUnit.SECONDS)
+        }
+
+        fun releaseOverscanRowCopy() {
+            releaseOverscanRowCopy.countDown()
         }
     }
 

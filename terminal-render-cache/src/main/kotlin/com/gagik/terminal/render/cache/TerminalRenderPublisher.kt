@@ -1,5 +1,6 @@
 package com.gagik.terminal.render.cache
 
+import com.gagik.terminal.render.api.TerminalRenderFrame
 import com.gagik.terminal.render.api.TerminalRenderFrameReader
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
@@ -112,26 +113,16 @@ class TerminalRenderPublisher(
     }
 
     /**
-     * Pre-sizes buffers that are not currently published, leased by a reader,
-     * or writer-owned.
+     * Records a host resize boundary without mutating published cache buffers.
      *
-     * The current front buffer is intentionally left untouched so an in-flight
-     * UI paint keeps a stable snapshot. Any buffer skipped here is resized
-     * lazily the next time it becomes the writer-owned back buffer.
+     * Cache storage is resized only by the writer-owned [updateAndPublish]
+     * path, using the resolved [TerminalRenderFrame] shape. This keeps every
+     * published or in-flight cache snapshot stable while UI readers paint and
+     * while a render callback is copying overscan rows.
      */
     fun resize(columns: Int, rows: Int) {
         require(columns > 0) { "columns must be > 0, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
-
-        publishLock.withLock {
-            var index = 0
-            while (index < BUFFER_COUNT) {
-                if (index != frontIndex && readerCounts[index] == 0 && !writerOwned[index]) {
-                    buffers[index].resize(columns, rows)
-                }
-                index++
-            }
-        }
     }
 
     private fun acquireWritableIndex(): Int {
