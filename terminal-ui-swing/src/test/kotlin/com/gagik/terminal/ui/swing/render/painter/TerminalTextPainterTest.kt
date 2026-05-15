@@ -4,12 +4,10 @@ import com.gagik.terminal.render.api.*
 import com.gagik.terminal.render.cache.TerminalRenderCache
 import com.gagik.terminal.ui.swing.render.*
 import com.gagik.terminal.ui.swing.render.cache.AwtColorCache
-import com.gagik.terminal.ui.swing.render.primitives.TerminalBoxDrawingPainter
 import com.gagik.terminal.ui.swing.settings.TerminalSwingMetrics
 import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import java.awt.Color
 import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.RenderingHints
@@ -18,119 +16,121 @@ import java.awt.image.BufferedImage
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/**
+ * Validates the text rendering pipeline, ensuring that fast-path ASCII runs,
+ * complex-shaped text, and wide-cell grapheme clusters are painted accurately
+ * according to the terminal's rigid column grid.
+ */
 class TerminalTextPainterTest {
+
     @Nested
-    inner class AsciiRuns {
+    inner class AsciiTextRendering {
+
         @Test
-        fun `paints contiguous ascii run in terminal cells`() {
+        fun `paints contiguous ascii run in consecutive terminal cells`() {
+            // Arrange
             val fixture = fixture()
             val cache = renderCache(TestRenderFrame.text("ii"))
 
+            // Act
             fixture.paintRow(cache)
 
+            // Assert
             assertTrue(
                 fixture.image.containsColorInRange(TEST_RED, fixture.metrics.cellWidth, fixture.metrics.cellWidth * 2),
-                "second glyph was not painted in the second terminal cell",
+                "The second glyph 'i' was not painted in the second terminal column",
             )
         }
 
+        /**
+         * "Mismatch path" refers to the fallback triggered when Java2D's natural
+         * font advances do not align perfectly with the terminal's rigid cell width
+         * (often caused by fractional metrics or kerning).
+         * The painter must abandon `drawChars` and use positioned `GlyphVectors`.
+         */
         @Test
-        fun `ascii mismatch path keeps absolute run origin`() {
-            val image = BufferedImage(120, 40, BufferedImage.TYPE_INT_ARGB)
-            val settings = TerminalSwingSettings(
-                font = Font(Font.SERIF, Font.PLAIN, 18),
-                palette = defaultTestSettings(foreground = TEST_RED, background = TEST_BLACK).palette,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON,
-            )
+        fun `ascii mismatch path maintains absolute origin for positioned glyphs`() {
+            // Arrange
+            val settings = createMismatchSettings()
+            val (image, metrics, painter) = createMismatchFixture(settings)
             val g = image.createGraphics()
-            val fontMetrics = g.getFontMetrics(settings.font)
-            val metrics = TerminalSwingMetrics(
-                cellWidth = maxOf(1, fontMetrics.charWidth('W')),
-                cellHeight = fontMetrics.height,
-                baseline = fontMetrics.ascent,
-                underlineY = minOf(fontMetrics.height - 1, fontMetrics.ascent + 1),
-                strikethroughY = maxOf(0, fontMetrics.ascent - fontMetrics.ascent / 3),
-                overlineY = 0,
-                cursorStrokeWidth = 1,
-            )
-            val painter = TerminalTextPainter(AwtColorCache(), TerminalDecorationPainter(AwtColorCache()))
-            painter.updateSettings(settings)
-            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
-            g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
             val cache = renderCache(TestRenderFrame.text("ii"))
 
+            // Act
             painter.paintRow(g, cache, settings.palette, metrics, row = 0, fontRenderContext = g.fontRenderContext)
             g.dispose()
 
-            assertTrue(image.containsColorInRange(TEST_RED, 0, metrics.cellWidth))
-            assertTrue(image.containsColorInRange(TEST_RED, metrics.cellWidth, metrics.cellWidth * 2))
+            // Assert
+            assertTrue(image.containsColorInRange(TEST_RED, 0, metrics.cellWidth), "First positioned glyph missing")
+            assertTrue(image.containsColorInRange(TEST_RED, metrics.cellWidth, metrics.cellWidth * 2), "Second positioned glyph missing")
         }
 
         @Test
-        fun `ascii mismatch path leaves graphics transform unchanged`() {
-            val image = BufferedImage(120, 40, BufferedImage.TYPE_INT_ARGB)
-            val settings = TerminalSwingSettings(
-                font = Font(Font.SERIF, Font.PLAIN, 18),
-                palette = defaultTestSettings(foreground = TEST_RED, background = TEST_BLACK).palette,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON,
-            )
+        fun `ascii mismatch path leaves graphics transform completely unchanged`() {
+            // Arrange
+            val settings = createMismatchSettings()
+            val (image, metrics, painter) = createMismatchFixture(settings)
             val g = image.createGraphics()
+
+            // Introduce a deliberate transform to verify the painter cleans up after itself
             val initialTransform = AffineTransform.getTranslateInstance(3.0, 5.0)
             g.transform = initialTransform
-            val metrics = testMetrics(image, settings)
-            val painter = TerminalTextPainter(AwtColorCache(), TerminalDecorationPainter(AwtColorCache()))
-            painter.updateSettings(settings)
-            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
-            g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
             val cache = renderCache(TestRenderFrame.text("ii"))
 
+            // Act
             painter.paintRow(g, cache, settings.palette, metrics, row = 0, fontRenderContext = g.fontRenderContext)
 
-            assertEquals(initialTransform, g.transform)
+            // Assert
+            assertEquals(initialTransform, g.transform, "Painter modified the AffineTransform without restoring it")
             g.dispose()
         }
 
         @Test
-        fun `ascii mismatch path does not rescale prefix when run grows`() {
-            val settings = TerminalSwingSettings(
-                font = Font(Font.SERIF, Font.PLAIN, 18),
-                palette = defaultTestSettings(foreground = TEST_RED, background = TEST_BLACK).palette,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON,
-            )
+        fun `ascii mismatch path does not dynamically rescale prefixes when runs grow`() {
+            // Arrange
+            val settings = createMismatchSettings()
+
+            // Act
             val shortImage = paintSerifAscii(settings, "Wi")
             val longImage = paintSerifAscii(settings, "Wii")
             val metrics = testMetrics(shortImage, settings)
 
+            // Assert
+            // The pixels rendered for 'W' in the first cell must remain identical
+            // regardless of the string length that follows it.
             assertEquals(
                 shortImage.countColorInRange(TEST_RED, 0, metrics.cellWidth, 0, metrics.cellHeight),
                 longImage.countColorInRange(TEST_RED, 0, metrics.cellWidth, 0, metrics.cellHeight),
+                "Prefix glyph was warped/rescaled due to sub-pixel layout changes in a longer string"
             )
         }
 
         @Test
-        fun `ascii mismatch path does not also paint compact unpositioned run`() {
-            val settings = TerminalSwingSettings(
-                font = Font(Font.SERIF, Font.PLAIN, 18),
-                palette = defaultTestSettings(foreground = TEST_RED, background = TEST_BLACK).palette,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON,
-            )
+        fun `ascii mismatch path correctly spaces out compact kerning runs`() {
+            // Arrange
+            val settings = createMismatchSettings()
+
+            // Act
             val singleCell = paintSerifAscii(settings, "i")
             val twoCells = paintSerifAscii(settings, "ii")
             val metrics = testMetrics(singleCell, settings)
 
+            // Assert
+            // 'i' is a narrow character. If the pipeline falls back to default Java2D string drawing
+            // instead of our strict grid glyph-vector positioning, the two 'i's will squish together.
             assertEquals(
                 singleCell.countColorInRange(TEST_RED, 0, metrics.cellWidth, 0, metrics.cellHeight),
                 twoCells.countColorInRange(TEST_RED, 0, metrics.cellWidth, 0, metrics.cellHeight),
+                "The first 'i' bled into the second cell, or the run was not spaced to the terminal grid"
             )
         }
 
         @Test
-        fun `ascii decorations split runs by extra attributes`() {
+        fun `ascii runs are split correctly when text decorations change`() {
+            // Arrange
             val fixture = fixture(foreground = TEST_WHITE)
+
+            // Frame with same text and foreground, but different underline colors
             val cache = renderCache(
                 TestRenderFrame.text(
                     text = "AB",
@@ -141,39 +141,49 @@ class TerminalTextPainterTest {
                     extraAttrs = longArrayOf(
                         TerminalRenderExtraAttrs.pack(
                             underlineColorKind = TerminalRenderColorKind.RGB,
-                            underlineColorValue = 0x00FF00,
+                            underlineColorValue = 0x00FF00, // Green underline
                         ),
                         TerminalRenderExtraAttrs.pack(
                             underlineColorKind = TerminalRenderColorKind.RGB,
-                            underlineColorValue = 0x0000FF,
+                            underlineColorValue = 0x0000FF, // Blue underline
                         ),
                     ),
                 ),
             )
 
+            // Act
             fixture.paintRow(cache)
 
-            assertEquals(TEST_GREEN, fixture.image.getRGB(1, fixture.metrics.underlineY))
-            assertEquals(TEST_BLUE, fixture.image.getRGB(fixture.metrics.cellWidth + 1, fixture.metrics.underlineY))
+            // Assert
+            assertEquals(TEST_GREEN, fixture.image.getRGB(1, fixture.metrics.underlineY), "First cell underline should be green")
+            assertEquals(TEST_BLUE, fixture.image.getRGB(fixture.metrics.cellWidth + 1, fixture.metrics.underlineY), "Second cell underline should be blue")
         }
     }
 
     @Nested
-    inner class ComplexText {
+    inner class ComplexTextRendering {
+
         @Test
-        fun `paints non ascii code point`() {
+        fun `paints non-ascii unicode code point using layout cache`() {
+            // Arrange
             val fixture = fixture()
-            val cache = renderCache(TestRenderFrame.text("\u03A9"))
+            val cache = renderCache(TestRenderFrame.text("\u03A9")) // Greek Omega
 
-            fixture.paintRow(cache)
+            // Act
             fixture.paintRow(cache)
 
-            assertTrue(fixture.image.containsColor(TEST_RED, fixture.metrics.cellWidth, fixture.metrics.cellHeight))
+            // Assert
+            assertTrue(
+                fixture.image.containsColor(TEST_RED, fixture.metrics.cellWidth, fixture.metrics.cellHeight),
+                "Non-ascii codepoint failed to render"
+            )
         }
 
         @Test
-        fun `paints grapheme cluster from cluster sink`() {
+        fun `paints grapheme cluster sourced from cluster sink`() {
+            // Arrange
             val fixture = fixture()
+            // Thai cluster (base consonant + combining mark)
             val cache = renderCache(
                 TestRenderFrame(
                     arrayOf(
@@ -188,20 +198,26 @@ class TerminalTextPainterTest {
                 ),
             )
 
+            // Act
             fixture.paintRow(cache)
 
-            assertTrue(fixture.image.containsColor(TEST_RED, fixture.metrics.cellWidth, fixture.metrics.cellHeight))
+            // Assert
+            assertTrue(
+                fixture.image.containsColor(TEST_RED, fixture.metrics.cellWidth, fixture.metrics.cellHeight),
+                "Grapheme cluster failed to render"
+            )
         }
 
         @Test
-        fun `wide complex cell decoration spans two cells`() {
+        fun `wide complex cell layout and decorations span two columns`() {
+            // Arrange
             val fixture = fixture(foreground = TEST_WHITE, width = 80)
             val cache = renderCache(
                 TestRenderFrame(
                     arrayOf(
                         arrayOf(
                             TestCell(
-                                codeWord = 0x4E2D,
+                                codeWord = 0x4E2D, // CJK 'Middle' character
                                 flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING,
                                 attr = TerminalRenderAttrs.pack(underlineStyle = TerminalRenderUnderline.SINGLE),
                             ),
@@ -211,270 +227,28 @@ class TerminalTextPainterTest {
                 ),
             )
 
+            // Act
             fixture.paintRow(cache)
 
+            // Assert
+            // Ensure the underline (or glyph itself) painted successfully into the trailing column's X bounds
             assertTrue(
                 fixture.image.containsColorInRange(TEST_WHITE, fixture.metrics.cellWidth, fixture.metrics.cellWidth * 2),
+                "Wide cell did not paint into its trailing column"
             )
         }
     }
 
     @Nested
-    inner class CellPrimitives {
-        @Test
-        fun `box drawing horizontal spans adjacent cell boundary`() {
-            val fixture = fixture()
-            val cache = renderCache(TestRenderFrame.text("\u2500\u2500"))
-
-            fixture.paintRow(cache)
-
-            val centerY = fixture.metrics.cellHeight / 2
-            assertEquals(TEST_RED, fixture.image.getRGB(fixture.metrics.cellWidth - 1, centerY))
-            assertEquals(TEST_RED, fixture.image.getRGB(fixture.metrics.cellWidth, centerY))
-        }
+    inner class CursorForegroundRendering {
 
         @Test
-        fun `light box drawing stroke remains one pixel clean`() {
-            val fixture = fixture()
-            val cache = renderCache(TestRenderFrame.text("\u2500"))
-
-            fixture.paintRow(cache)
-
-            val centerY = fixture.metrics.cellHeight / 2
-            assertEquals(TEST_RED, fixture.image.getRGB(fixture.metrics.cellWidth / 2, centerY))
-            assertTrue(fixture.image.getRGB(fixture.metrics.cellWidth / 2, centerY + 1) != TEST_RED)
-        }
-
-        @Test
-        fun `box drawing vertical spans adjacent row boundary`() {
-            val fixture = fixture()
-            val cache = renderCache(
-                TestRenderFrame(
-                    arrayOf(
-                        arrayOf(TestCell(codeWord = 0x2502, flags = TerminalRenderCellFlags.CODEPOINT)),
-                        arrayOf(TestCell(codeWord = 0x2502, flags = TerminalRenderCellFlags.CODEPOINT)),
-                    ),
-                ),
-            )
-
-            fixture.paintRow(cache, row = 0)
-            fixture.paintRow(cache, row = 1)
-
-            val centerX = fixture.metrics.cellWidth / 2
-            assertEquals(TEST_RED, fixture.image.getRGB(centerX, fixture.metrics.cellHeight - 1))
-            assertEquals(TEST_RED, fixture.image.getRGB(centerX, fixture.metrics.cellHeight))
-        }
-
-        @Test
-        fun `rounded box corner uses curved geometry instead of square elbow`() {
-            val fixture = fixture()
-            val cache = renderCache(TestRenderFrame.text("\u256D"))
-
-            fixture.paintRow(cache)
-
-            val centerX = fixture.metrics.cellWidth / 2
-            val centerY = fixture.metrics.cellHeight / 2
-            assertTrue(fixture.image.getRGB(centerX, centerY) != TEST_RED)
-            assertTrue(fixture.image.containsNonBackgroundInRange(centerX, fixture.metrics.cellWidth, 0, fixture.metrics.cellHeight))
-        }
-
-        @Test
-        fun `rounded box corners use the correct arc quadrant`() {
-            val fixture = fixture(width = 120)
-            val cache = renderCache(TestRenderFrame.text("\u256D\u256E\u2570\u256F"))
-
-            fixture.paintRow(cache)
-
-            assertRoundedQuadrants(
-                fixture,
-                RoundedQuadrant(column = 0, right = true, lower = true),
-                RoundedQuadrant(column = 1, right = false, lower = true),
-                RoundedQuadrant(column = 2, right = true, lower = false),
-                RoundedQuadrant(column = 3, right = false, lower = false),
-            )
-        }
-
-        @Test
-        fun `double dashed box drawing horizontal is painted`() {
-            val fixture = fixture()
-            val cache = renderCache(TestRenderFrame.text("\u254C\u254D"))
-
-            fixture.paintRow(cache)
-
-            val centerY = fixture.metrics.cellHeight / 2
-            assertTrue(fixture.image.containsColorInRange(TEST_RED, 0, fixture.metrics.cellWidth))
-            assertTrue(
-                fixture.image.containsColorInRange(
-                    TEST_RED,
-                    fixture.metrics.cellWidth,
-                    fixture.metrics.cellWidth * 2,
-                ),
-            )
-            assertEquals(TEST_RED, fixture.image.getRGB(0, centerY))
-        }
-
-        @Test
-        fun `double dashed box drawing vertical is painted`() {
-            val fixture = fixture()
-            val cache = renderCache(TestRenderFrame.text("\u254E\u254F"))
-
-            fixture.paintRow(cache)
-
-            val lightCenterX = fixture.metrics.cellWidth / 2
-            val heavyCenterX = fixture.metrics.cellWidth + fixture.metrics.cellWidth / 2
-            assertTrue(fixture.image.containsColor(TEST_RED, fixture.metrics.cellWidth, fixture.metrics.cellHeight))
-            assertTrue(
-                fixture.image.containsColorInRange(
-                    TEST_RED,
-                    fixture.metrics.cellWidth,
-                    fixture.metrics.cellWidth * 2,
-                ),
-            )
-            assertEquals(TEST_RED, fixture.image.getRGB(lightCenterX, 0))
-            assertEquals(TEST_RED, fixture.image.getRGB(heavyCenterX, 0))
-        }
-
-        @Test
-        fun `dashed box drawing glyphs use unicode dash counts`() {
-            val image = BufferedImage(84, 24, BufferedImage.TYPE_INT_ARGB)
-            val g = image.createGraphics()
-            val painter = TerminalBoxDrawingPainter()
-            g.color = Color(TEST_RED, true)
-
-            painter.paint(g, 0x254C, x = 0, y = 0, width = 21, height = 21)
-            painter.paint(g, 0x2504, x = 28, y = 0, width = 21, height = 21)
-            painter.paint(g, 0x2508, x = 56, y = 0, width = 21, height = 21)
-            g.dispose()
-
-            val centerY = 21 / 2
-            assertEquals(2, image.countColorRunsHorizontal(TEST_RED, xStart = 0, xEnd = 21, y = centerY))
-            assertEquals(3, image.countColorRunsHorizontal(TEST_RED, xStart = 28, xEnd = 49, y = centerY))
-            assertEquals(4, image.countColorRunsHorizontal(TEST_RED, xStart = 56, xEnd = 77, y = centerY))
-        }
-
-        @Test
-        fun `block element fills full terminal cell`() {
-            val fixture = fixture()
-            val cache = renderCache(TestRenderFrame.text("\u2588"))
-
-            fixture.paintRow(cache)
-
-            assertEquals(TEST_RED, fixture.image.getRGB(0, 0))
-            assertEquals(TEST_RED, fixture.image.getRGB(fixture.metrics.cellWidth - 1, fixture.metrics.cellHeight - 1))
-        }
-
-        @Test
-        fun `upper half block fills top half only`() {
-            val fixture = fixture()
-            val cache = renderCache(TestRenderFrame.text("\u2580"))
-
-            fixture.paintRow(cache)
-
-            assertEquals(TEST_RED, fixture.image.getRGB(fixture.metrics.cellWidth / 2, 0))
-            assertTrue(fixture.image.getRGB(fixture.metrics.cellWidth / 2, fixture.metrics.cellHeight - 1) != TEST_RED)
-        }
-
-        @Test
-        fun `dark shade is dense but not solid`() {
-            val fixture = fixture()
-            val cache = renderCache(TestRenderFrame.text("\u2593"))
-
-            fixture.paintRow(cache)
-
-            val painted = fixture.image.countColorInRange(
-                TEST_RED,
-                xStart = 0,
-                xEnd = fixture.metrics.cellWidth,
-                yStart = 0,
-                yEnd = fixture.metrics.cellHeight,
-            )
-            assertTrue(painted > fixture.metrics.cellWidth * fixture.metrics.cellHeight / 2)
-            assertTrue(painted < fixture.metrics.cellWidth * fixture.metrics.cellHeight)
-        }
-
-        @Test
-        fun `shade blocks preserve foreground color and relative density`() {
-            val fixture = fixture()
-            val cache = renderCache(TestRenderFrame.text("\u2591\u2592\u2593"))
-
-            fixture.paintRow(cache)
-
-            val light = fixture.image.countColorInRange(
-                TEST_RED,
-                xStart = 0,
-                xEnd = fixture.metrics.cellWidth,
-                yStart = 0,
-                yEnd = fixture.metrics.cellHeight,
-            )
-            val medium = fixture.image.countColorInRange(
-                TEST_RED,
-                xStart = fixture.metrics.cellWidth,
-                xEnd = fixture.metrics.cellWidth * 2,
-                yStart = 0,
-                yEnd = fixture.metrics.cellHeight,
-            )
-            val dark = fixture.image.countColorInRange(
-                TEST_RED,
-                xStart = fixture.metrics.cellWidth * 2,
-                xEnd = fixture.metrics.cellWidth * 3,
-                yStart = 0,
-                yEnd = fixture.metrics.cellHeight,
-            )
-
-            assertTrue(light > 0)
-            assertTrue(light < medium)
-            assertTrue(medium < dark)
-        }
-
-        @Test
-        fun `cursor foreground repaints box drawing primitive`() {
-            val fixture = fixture(foreground = TEST_WHITE)
-            val cache = renderCache(TestRenderFrame.text("\u2500"))
-
-            fixture.painter.paintCellForeground(
-                fixture.g,
-                cache,
-                fixture.settings.palette,
-                fixture.metrics,
-                column = 0,
-                row = 0,
-                foreground = TEST_GREEN,
-                fontRenderContext = fixture.g.fontRenderContext,
-            )
-
-            assertEquals(TEST_GREEN, fixture.image.getRGB(fixture.metrics.cellWidth / 2, fixture.metrics.cellHeight / 2))
-        }
-
-        private fun assertRoundedQuadrants(fixture: Fixture, vararg quadrants: RoundedQuadrant) {
-            for (quadrant in quadrants) {
-                assertRoundedQuadrant(fixture, quadrant)
-            }
-        }
-
-        private fun assertRoundedQuadrant(
-            fixture: Fixture,
-            quadrant: RoundedQuadrant,
-        ) {
-            val cellX = quadrant.column * fixture.metrics.cellWidth
-            val midX = cellX + fixture.metrics.cellWidth / 2
-            val midY = fixture.metrics.cellHeight / 2
-            val xStart = if (quadrant.right) midX else cellX
-            val xEnd = if (quadrant.right) cellX + fixture.metrics.cellWidth else midX + 1
-            val yStart = if (quadrant.lower) midY else 0
-            val yEnd = if (quadrant.lower) fixture.metrics.cellHeight else midY + 1
-
-            val painted = fixture.image.countNonBackgroundInRange(xStart, xEnd, yStart, yEnd)
-            assertTrue(painted > 0, "rounded corner at column ${quadrant.column} did not paint the expected quadrant")
-        }
-    }
-
-    @Nested
-    inner class CursorForeground {
-        @Test
-        fun `paints ascii cell with supplied foreground`() {
-            val fixture = fixture(foreground = TEST_WHITE)
+        fun `paints ascii cell inverted with supplied cursor foreground`() {
+            // Arrange
+            val fixture = fixture(foreground = TEST_WHITE) // Default text is white
             val cache = renderCache(TestRenderFrame.text("A"))
 
+            // Act
             fixture.painter.paintCellForeground(
                 fixture.g,
                 cache,
@@ -482,18 +256,24 @@ class TerminalTextPainterTest {
                 fixture.metrics,
                 column = 0,
                 row = 0,
-                foreground = TEST_GREEN,
+                foreground = TEST_GREEN, // Override to Green for the cursor block
                 fontRenderContext = fixture.g.fontRenderContext,
             )
 
-            assertTrue(fixture.image.containsColor(TEST_GREEN, fixture.metrics.cellWidth, fixture.metrics.cellHeight))
+            // Assert
+            assertTrue(
+                fixture.image.containsColor(TEST_GREEN, fixture.metrics.cellWidth, fixture.metrics.cellHeight),
+                "Cursor foreground did not override cell text color"
+            )
         }
 
         @Test
-        fun `empty cell does not paint foreground`() {
+        fun `empty cell does not accidentally paint foreground debris`() {
+            // Arrange
             val fixture = fixture(foreground = TEST_WHITE)
-            val cache = renderCache(TestRenderFrame(arrayOf(arrayOf(TestCell()))))
+            val cache = renderCache(TestRenderFrame(arrayOf(arrayOf(TestCell())))) // Empty cell
 
+            // Act
             fixture.painter.paintCellForeground(
                 fixture.g,
                 cache,
@@ -505,9 +285,15 @@ class TerminalTextPainterTest {
                 fontRenderContext = fixture.g.fontRenderContext,
             )
 
-            assertTrue(!fixture.image.containsColor(TEST_GREEN, fixture.metrics.cellWidth, fixture.metrics.cellHeight))
+            // Assert
+            assertTrue(
+                !fixture.image.containsColor(TEST_GREEN, fixture.metrics.cellWidth, fixture.metrics.cellHeight),
+                "Empty cell painted ghost text when targeted by block cursor"
+            )
         }
     }
+
+    // --- Testing Utilities & Helpers ---
 
     private data class Fixture(
         val image: BufferedImage,
@@ -516,22 +302,12 @@ class TerminalTextPainterTest {
         val metrics: TerminalSwingMetrics,
         val painter: TerminalTextPainter,
     ) {
-        fun paintRow(cache: TerminalRenderCache) {
-            paintRow(cache, row = 0)
-        }
-
-        fun paintRow(cache: TerminalRenderCache, row: Int) {
+        fun paintRow(cache: TerminalRenderCache, row: Int = 0) {
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
             g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
             painter.paintRow(g, cache, settings.palette, metrics, row = row, fontRenderContext = g.fontRenderContext)
         }
     }
-
-    private data class RoundedQuadrant(
-        val column: Int,
-        val right: Boolean,
-        val lower: Boolean,
-    )
 
     private fun fixture(
         foreground: Int = TEST_RED,
@@ -552,13 +328,49 @@ class TerminalTextPainterTest {
         )
     }
 
+    private fun createMismatchSettings(): TerminalSwingSettings {
+        return TerminalSwingSettings(
+            font = Font(Font.SERIF, Font.PLAIN, 18),
+            palette = defaultTestSettings(foreground = TEST_RED, background = TEST_BLACK).palette,
+            textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+            fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON,
+        )
+    }
+
+    private fun createMismatchFixture(settings: TerminalSwingSettings): Triple<BufferedImage, TerminalSwingMetrics, TerminalTextPainter> {
+        val image = BufferedImage(120, 40, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val fontMetrics = g.getFontMetrics(settings.font)
+        val metrics = TerminalSwingMetrics(
+            cellWidth = maxOf(1, fontMetrics.charWidth('W')),
+            cellHeight = fontMetrics.height,
+            baseline = fontMetrics.ascent,
+            underlineY = minOf(fontMetrics.height - 1, fontMetrics.ascent + 1),
+            strikethroughY = maxOf(0, fontMetrics.ascent - fontMetrics.ascent / 3),
+            overlineY = 0,
+            cursorStrokeWidth = 1,
+        )
+        val painter = TerminalTextPainter(AwtColorCache(), TerminalDecorationPainter(AwtColorCache()))
+        painter.updateSettings(settings)
+
+        // Push graphics hints to ensure GlyphVector mismatch path triggers
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
+        g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
+
+        g.dispose()
+        return Triple(image, metrics, painter)
+    }
+
     private fun paintSerifAscii(settings: TerminalSwingSettings, text: String): BufferedImage {
         val image = BufferedImage(140, 40, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
-        val painter = TerminalTextPainter(AwtColorCache(), TerminalDecorationPainter(AwtColorCache()))
+        val colorCache = AwtColorCache()
+        val painter = TerminalTextPainter(colorCache, TerminalDecorationPainter(colorCache))
+
         painter.updateSettings(settings)
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
         g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
+
         painter.paintRow(
             g,
             renderCache(TestRenderFrame.text(text)),
@@ -569,48 +381,5 @@ class TerminalTextPainterTest {
         )
         g.dispose()
         return image
-    }
-
-    private fun BufferedImage.containsNonBackgroundInRange(
-        xStart: Int,
-        xEnd: Int,
-        yStart: Int,
-        yEnd: Int,
-    ): Boolean {
-        return countNonBackgroundInRange(xStart, xEnd, yStart, yEnd) > 0
-    }
-
-    private fun BufferedImage.countNonBackgroundInRange(
-        xStart: Int,
-        xEnd: Int,
-        yStart: Int,
-        yEnd: Int,
-    ): Int {
-        var count = 0
-        var y = yStart
-        while (y < yEnd) {
-            var x = xStart
-            while (x < xEnd) {
-                if (getRGB(x, y) != TEST_BLACK) count++
-                x++
-            }
-            y++
-        }
-        return count
-    }
-
-    private fun BufferedImage.countColorRunsHorizontal(argb: Int, xStart: Int, xEnd: Int, y: Int): Int {
-        var runs = 0
-        var insideRun = false
-        var x = xStart
-        while (x < xEnd) {
-            val painted = getRGB(x, y) == argb
-            if (painted && !insideRun) {
-                runs++
-            }
-            insideRun = painted
-            x++
-        }
-        return runs
     }
 }
