@@ -10,7 +10,10 @@ import com.gagik.terminal.ui.swing.render.primitives.TerminalBoxDrawingGlyphs.LI
 import com.gagik.terminal.ui.swing.render.primitives.TerminalBoxDrawingGlyphs.NONE
 import com.gagik.terminal.ui.swing.render.primitives.TerminalBoxDrawingGlyphs.RIGHT_SHIFT
 import com.gagik.terminal.ui.swing.render.primitives.TerminalBoxDrawingGlyphs.UP_SHIFT
+import java.awt.BasicStroke
 import java.awt.Graphics2D
+import java.awt.RenderingHints
+import java.awt.geom.Path2D
 
 /**
  * Paints Unicode box-drawing glyphs from packed glyph metadata.
@@ -157,19 +160,73 @@ internal class TerminalBoxDrawingPainter {
         height: Int,
         fallbackEdges: Int,
     ) {
-        if (width <= 1 || height <= 1) {
+        val thickness = thickness(LIGHT, width, height)
+        if (width <= thickness || height <= thickness) {
             paintPackedEdges(g, x, y, width, height, fallbackEdges)
             return
         }
 
-        g.drawArc(
-            x,
-            y,
-            maxOf(1, width - 1),
-            maxOf(1, height - 1),
-            TerminalBoxDrawingGlyphs.roundedStartAngle(codePoint),
-            TerminalBoxDrawingGlyphs.roundedArcAngle(codePoint),
+        val cx = x + width / 2.0
+        val cy = y + height / 2.0
+        val rx = width / 2.0
+        val ry = height / 2.0
+
+        val path = Path2D.Double()
+
+        // Map endpoints explicitly to the boundary edges connecting to the adjacent cells.
+        when (codePoint) {
+            0x256D -> { // ╭ Top-Left: Connects Bottom-Center and Right-Center
+                path.moveTo(cx, y + height.toDouble())
+                path.curveTo(
+                    cx, (y + height) - ry * KAPPA,
+                    (x + width) - rx * KAPPA, cy,
+                    x + width.toDouble(), cy
+                )
+            }
+            0x256E -> { // ╮ Top-Right: Connects Bottom-Center and Left-Center
+                path.moveTo(cx, y + height.toDouble())
+                path.curveTo(
+                    cx, (y + height) - ry * KAPPA,
+                    x + rx * KAPPA, cy,
+                    x.toDouble(), cy
+                )
+            }
+            0x256F -> { // ╯ Bottom-Right: Connects Top-Center and Left-Center
+                path.moveTo(cx, y.toDouble())
+                path.curveTo(
+                    cx, y + ry * KAPPA,
+                    x + rx * KAPPA, cy,
+                    x.toDouble(), cy
+                )
+            }
+            0x2570 -> { // ╰ Bottom-Left: Connects Top-Center and Right-Center
+                path.moveTo(cx, y.toDouble())
+                path.curveTo(
+                    cx, y + ry * KAPPA,
+                    (x + width) - rx * KAPPA, cy,
+                    x + width.toDouble(), cy
+                )
+            }
+            else -> return
+        }
+
+        val oldStroke = g.stroke
+        val oldHint = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
+
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+
+        // CAP_BUTT guarantees the stroke terminates flush with the cell boundary,
+        // creating a seamless weld with the adjacent fillRect without bleeding over.
+        g.stroke = BasicStroke(
+            thickness.toFloat(),
+            BasicStroke.CAP_BUTT,
+            BasicStroke.JOIN_MITER
         )
+
+        g.draw(path)
+
+        g.stroke = oldStroke
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldHint)
     }
 
     private fun paintDiagonal(g: Graphics2D, x: Int, y: Int, width: Int, height: Int, mask: Int) {
@@ -211,5 +268,7 @@ internal class TerminalBoxDrawingPainter {
 
     private companion object {
         private const val LIGHT_THICKNESS = 1
+        // Magic constant for a perfect circular arc approximation using a cubic Bézier curve
+        private const val KAPPA = 0.552284749831
     }
 }

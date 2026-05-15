@@ -65,22 +65,6 @@ internal object TerminalBoxDrawingGlyphs {
         }
     }
 
-    fun roundedStartAngle(codePoint: Int): Int {
-        return when (codePoint) {
-            0x256D, 0x2570 -> 0
-            0x256E, 0x256F -> 180
-            else -> 0
-        }
-    }
-
-    fun roundedArcAngle(codePoint: Int): Int {
-        return when (codePoint) {
-            0x256D, 0x256E -> -90
-            0x2570, 0x256F -> 90
-            else -> 0
-        }
-    }
-
     fun edges(codePoint: Int): Int {
         return when (codePoint) {
             0x2500 -> pack(LIGHT, LIGHT, NONE, NONE)
