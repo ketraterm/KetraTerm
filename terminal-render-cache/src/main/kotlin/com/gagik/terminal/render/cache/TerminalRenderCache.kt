@@ -118,10 +118,59 @@ class TerminalRenderCache(
         private set
 
     /**
-     * Last copied cursor state.
+     * Last copied cursor column.
      */
-    var cursor: TerminalRenderCursor? = null
+    var cursorColumn: Int = 0
         private set
+
+    /**
+     * Last copied cursor row.
+     */
+    var cursorRow: Int = 0
+        private set
+
+    /**
+     * Last copied cursor visibility.
+     */
+    var cursorVisible: Boolean = false
+        private set
+
+    /**
+     * Last copied cursor blinking mode.
+     */
+    var cursorBlinking: Boolean = false
+        private set
+
+    /**
+     * Last copied cursor shape.
+     */
+    var cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
+        private set
+
+    /**
+     * Last copied cursor generation.
+     */
+    var cursorGeneration: Long = UNINITIALIZED_GENERATION
+        private set
+
+    /**
+     * Convenience cursor snapshot for tests and compatibility callers.
+     *
+     * Hot render paths should consume primitive cursor fields directly to avoid
+     * allocating a value object on every frame.
+     */
+    val cursor: TerminalRenderCursor?
+        get() {
+            if (!hasCursor) return null
+            return TerminalRenderCursor(
+                column = cursorColumn,
+                row = cursorRow,
+                visible = cursorVisible,
+                blinking = cursorBlinking,
+                shape = cursorShape,
+                generation = cursorGeneration,
+            )
+        }
 
     /**
      * Whether the most recent [updateFrom] call resized the primitive storage.
@@ -140,6 +189,13 @@ class TerminalRenderCache(
     private var nextClusterCodepointCount: Int = 0
     private var clusterSinkRow: Int = NO_CLUSTER_SINK_ROW
     private var clusterSinkRefs: LongArray = LongArray(0)
+    private var hasCursor: Boolean = false
+    private var nextCursorColumn: Int = 0
+    private var nextCursorRow: Int = 0
+    private var nextCursorVisible: Boolean = false
+    private var nextCursorBlinking: Boolean = false
+    private var nextCursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
+    private var nextCursorGeneration: Long = UNINITIALIZED_GENERATION
 
     /**
      * Reused sink to avoid allocating one capturing lambda per copied row.
@@ -161,6 +217,18 @@ class TerminalRenderCache(
         }
 
         copiedRefs[rowOffset(row) + column] = appendNextCluster(codepoints, offset, length)
+    }
+
+    /**
+     * Reused sink to copy cursor primitives without allocating a cursor object.
+     */
+    private val reusableCursorSink = TerminalRenderCursorSink { column, row, visible, blinking, shape, generation ->
+        nextCursorColumn = column
+        nextCursorRow = row
+        nextCursorVisible = visible
+        nextCursorBlinking = blinking
+        nextCursorShape = shape
+        nextCursorGeneration = generation
     }
 
     init {
@@ -285,13 +353,8 @@ class TerminalRenderCache(
 
         activeBuffer = frame.activeBuffer
 
-        val oldCursor = cursor
-        val newCursor = frame.cursor
-        if (oldCursor != newCursor) {
-            cursorChangedOnLastUpdate = true
-        }
+        copyCursorFrom(frame)
 
-        cursor = newCursor
         historySize = frame.historySize
         this.scrollbackOffset = frame.scrollbackOffset
         frameGeneration = frame.frameGeneration
@@ -322,7 +385,13 @@ class TerminalRenderCache(
         lineGenerations = LongArray(newRows) { UNINITIALIZED_GENERATION }
         lineWrapped = BooleanArray(newRows)
 
-        cursor = null
+        hasCursor = false
+        cursorColumn = 0
+        cursorRow = 0
+        cursorVisible = false
+        cursorBlinking = false
+        cursorShape = TerminalRenderCursorShape.BLOCK
+        cursorGeneration = UNINITIALIZED_GENERATION
         historySize = 0
         scrollbackOffset = 0
         frameGeneration = UNINITIALIZED_GENERATION
@@ -331,6 +400,34 @@ class TerminalRenderCache(
         cursorChangedOnLastUpdate = false
         clusterSinkRow = NO_CLUSTER_SINK_ROW
         clusterSinkRefs = EMPTY_LONG_REFS
+    }
+
+    private fun copyCursorFrom(frame: TerminalRenderFrame) {
+        val oldHasCursor = hasCursor
+        val oldCursorColumn = cursorColumn
+        val oldCursorRow = cursorRow
+        val oldCursorVisible = cursorVisible
+        val oldCursorBlinking = cursorBlinking
+        val oldCursorShape = cursorShape
+        val oldCursorGeneration = cursorGeneration
+
+        frame.copyCursor(reusableCursorSink)
+
+        cursorChangedOnLastUpdate = !oldHasCursor ||
+            oldCursorColumn != nextCursorColumn ||
+            oldCursorRow != nextCursorRow ||
+            oldCursorVisible != nextCursorVisible ||
+            oldCursorBlinking != nextCursorBlinking ||
+            oldCursorShape != nextCursorShape ||
+            oldCursorGeneration != nextCursorGeneration
+
+        hasCursor = true
+        cursorColumn = nextCursorColumn
+        cursorRow = nextCursorRow
+        cursorVisible = nextCursorVisible
+        cursorBlinking = nextCursorBlinking
+        cursorShape = nextCursorShape
+        cursorGeneration = nextCursorGeneration
     }
 
     private fun clearAllClusters() {

@@ -26,15 +26,14 @@ internal class TerminalCursorPainter(
         cursorBlinkVisible: Boolean,
         fontRenderContext: FontRenderContext,
     ) {
-        val cursor = cache.cursor ?: return
-        if (!cursor.visible || (cursor.blinking && !cursorBlinkVisible)) return
-        if (cursor.column !in 0 until cache.columns || cursor.row !in 0 until cache.rows) return
+        if (!cache.cursorVisible || (cache.cursorBlinking && !cursorBlinkVisible)) return
+        if (cache.cursorColumn !in 0 until cache.columns || cache.cursorRow !in 0 until cache.rows) return
 
-        val x = cursor.column * metrics.cellWidth
-        val y = cursor.row * metrics.cellHeight
+        val x = cache.cursorColumn * metrics.cellWidth
+        val y = cache.cursorRow * metrics.cellHeight
         g.color = colorCache.color(palette.cursorBackground)
 
-        when (cursor.shape) {
+        when (cache.cursorShape) {
             TerminalRenderCursorShape.BLOCK -> g.fillRect(x, y, metrics.cellWidth, metrics.cellHeight)
             TerminalRenderCursorShape.UNDERLINE -> {
                 g.fillRect(
@@ -49,13 +48,13 @@ internal class TerminalCursorPainter(
             }
         }
 
-        if (cursor.shape == TerminalRenderCursorShape.BLOCK) {
+        if (cache.cursorShape == TerminalRenderCursorShape.BLOCK) {
             textPainter.paintCellForeground(
                 g = g,
                 cache = cache,
                 metrics = metrics,
-                column = cursor.column,
-                row = cursor.row,
+                column = cache.cursorColumn,
+                row = cache.cursorRow,
                 foreground = palette.cursorForeground,
                 fontRenderContext = fontRenderContext,
             )

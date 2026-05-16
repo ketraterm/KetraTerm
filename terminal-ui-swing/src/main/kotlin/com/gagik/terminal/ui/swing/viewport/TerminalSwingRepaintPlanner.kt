@@ -1,6 +1,6 @@
 package com.gagik.terminal.ui.swing.viewport
 
-import com.gagik.terminal.render.api.TerminalRenderCursor
+import com.gagik.terminal.render.api.TerminalRenderCursorShape
 import com.gagik.terminal.render.cache.TerminalRenderCache
 import com.gagik.terminal.ui.swing.settings.TerminalSwingMetrics
 import kotlin.math.ceil
@@ -14,7 +14,13 @@ import kotlin.math.floor
  * without repainting the full terminal surface.
  */
 internal class TerminalSwingRepaintPlanner {
-    private var lastCursor: TerminalRenderCursor? = null
+    private var lastCursorKnown: Boolean = false
+    private var lastCursorColumn: Int = 0
+    private var lastCursorRow: Int = 0
+    private var lastCursorVisible: Boolean = false
+    private var lastCursorBlinking: Boolean = false
+    private var lastCursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
+    private var lastCursorGeneration: Long = UNINITIALIZED_GENERATION
     private var lastColumns: Int = 0
     private var lastRows: Int = 0
     private var lastStructureGeneration: Long = UNINITIALIZED_GENERATION
@@ -27,7 +33,13 @@ internal class TerminalSwingRepaintPlanner {
      * Clears remembered cursor state when the component unbinds or resets.
      */
     fun reset() {
-        lastCursor = null
+        lastCursorKnown = false
+        lastCursorColumn = 0
+        lastCursorRow = 0
+        lastCursorVisible = false
+        lastCursorBlinking = false
+        lastCursorShape = TerminalRenderCursorShape.BLOCK
+        lastCursorGeneration = UNINITIALIZED_GENERATION
         lastColumns = 0
         lastRows = 0
         lastStructureGeneration = UNINITIALIZED_GENERATION
@@ -52,7 +64,7 @@ internal class TerminalSwingRepaintPlanner {
     ) {
         if (requiresFullRepaint(cache)) {
             snapshotCacheState(cache)
-            lastCursor = cache.cursor
+            snapshotCursor(cache)
             repaintSink.requestFullRepaint()
             return
         }
@@ -68,9 +80,12 @@ internal class TerminalSwingRepaintPlanner {
             repaintSink = repaintSink,
         )
 
-        if (lastCursor != cache.cursor) {
+        if (cursorChanged(cache)) {
             repaintCursorIfNeeded(
-                cursor = lastCursor,
+                known = lastCursorKnown,
+                column = lastCursorColumn,
+                row = lastCursorRow,
+                visible = lastCursorVisible,
                 cache = cache,
                 metrics = metrics,
                 componentWidth = componentWidth,
@@ -81,7 +96,10 @@ internal class TerminalSwingRepaintPlanner {
                 repaintSink = repaintSink,
             )
             repaintCursorIfNeeded(
-                cursor = cache.cursor,
+                known = true,
+                column = cache.cursorColumn,
+                row = cache.cursorRow,
+                visible = cache.cursorVisible,
                 cache = cache,
                 metrics = metrics,
                 componentWidth = componentWidth,
@@ -94,7 +112,7 @@ internal class TerminalSwingRepaintPlanner {
         }
 
         snapshotCacheState(cache)
-        lastCursor = cache.cursor
+        snapshotCursor(cache)
     }
 
     /**
@@ -108,11 +126,13 @@ internal class TerminalSwingRepaintPlanner {
         contentYOffset: Double,
         repaintSink: TerminalRepaintSink,
     ) {
-        val cursor = cache.cursor ?: return
-        if (!cursor.visible || !cursor.blinking) return
+        if (!cache.cursorVisible || !cache.cursorBlinking) return
 
         repaintCursorIfNeeded(
-            cursor = cursor,
+            known = true,
+            column = cache.cursorColumn,
+            row = cache.cursorRow,
+            visible = true,
             cache = cache,
             metrics = metrics,
             componentWidth = componentWidth,
@@ -159,7 +179,10 @@ internal class TerminalSwingRepaintPlanner {
     }
 
     private fun repaintCursorIfNeeded(
-        cursor: TerminalRenderCursor?,
+        known: Boolean,
+        column: Int,
+        row: Int,
+        visible: Boolean,
         cache: TerminalRenderCache,
         metrics: TerminalSwingMetrics,
         componentWidth: Int,
@@ -169,17 +192,17 @@ internal class TerminalSwingRepaintPlanner {
         skipChangedRows: Boolean,
         repaintSink: TerminalRepaintSink,
     ): Boolean {
-        if (cursor == null || !cursor.visible) return false
-        if (cursor.column !in 0 until cache.columns || cursor.row !in 0 until visibleRows) return false
-        if (skipChangedRows && rowChanged(cache, cursor.row)) return false
+        if (!known || !visible) return false
+        if (column !in 0 until cache.columns || row !in 0 until visibleRows) return false
+        if (skipChangedRows && rowChanged(cache, row)) return false
 
-        val x = cursor.column * metrics.cellWidth
+        val x = column * metrics.cellWidth
         if (x >= componentWidth) return false
         val regionWidth = minOf(metrics.cellWidth, componentWidth - x)
         if (regionWidth <= 0) return false
 
-        val y = rowTop(cursor.row, metrics.cellHeight, contentYOffset)
-        val bottom = rowBottom(cursor.row + 1, metrics.cellHeight, contentYOffset)
+        val y = rowTop(row, metrics.cellHeight, contentYOffset)
+        val bottom = rowBottom(row + 1, metrics.cellHeight, contentYOffset)
         if (bottom <= 0 || y >= componentHeight) return false
         val clippedY = maxOf(0, y)
         val clippedBottom = minOf(componentHeight, bottom)
@@ -264,6 +287,26 @@ internal class TerminalSwingRepaintPlanner {
             lastStructureGeneration != cache.structureGeneration ||
             lastScrollbackOffset != cache.scrollbackOffset ||
             lastActiveBufferOrdinal != cache.activeBuffer.ordinal
+    }
+
+    private fun cursorChanged(cache: TerminalRenderCache): Boolean {
+        return !lastCursorKnown ||
+            lastCursorColumn != cache.cursorColumn ||
+            lastCursorRow != cache.cursorRow ||
+            lastCursorVisible != cache.cursorVisible ||
+            lastCursorBlinking != cache.cursorBlinking ||
+            lastCursorShape != cache.cursorShape ||
+            lastCursorGeneration != cache.cursorGeneration
+    }
+
+    private fun snapshotCursor(cache: TerminalRenderCache) {
+        lastCursorKnown = true
+        lastCursorColumn = cache.cursorColumn
+        lastCursorRow = cache.cursorRow
+        lastCursorVisible = cache.cursorVisible
+        lastCursorBlinking = cache.cursorBlinking
+        lastCursorShape = cache.cursorShape
+        lastCursorGeneration = cache.cursorGeneration
     }
 
     private fun snapshotCacheState(cache: TerminalRenderCache) {

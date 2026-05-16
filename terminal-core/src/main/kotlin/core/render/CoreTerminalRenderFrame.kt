@@ -97,6 +97,19 @@ internal class CoreTerminalRenderFrame(
             )
         }
 
+    override fun copyCursor(sink: TerminalRenderCursorSink) {
+        checkValid()
+        val row = state.cursor.row + resolvedScrollbackOffset
+        sink.onCursor(
+            column = state.cursor.col,
+            row = row,
+            visible = state.modes.isCursorVisible && row in 0 until resolvedRows,
+            blinking = state.modes.isCursorBlinking,
+            shape = TerminalRenderCursorShape.BLOCK,
+            generation = state.cursorGeneration,
+        )
+    }
+
     override fun lineGeneration(row: Int): Long {
         checkValid()
         checkRow(row)

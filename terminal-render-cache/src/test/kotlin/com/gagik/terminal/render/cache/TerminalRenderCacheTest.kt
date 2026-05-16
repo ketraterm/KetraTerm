@@ -141,6 +141,24 @@ class TerminalRenderCacheTest {
     }
 
     @Test
+    fun `cursor copy uses primitive sink without reading cursor object`() {
+        val frame = PrimitiveCursorFrame()
+        val cache = TerminalRenderCache(columns = 1, rows = 1)
+
+        cache.updateFrom(frame.reader)
+
+        assertAll(
+            { assertEquals(2, cache.cursorColumn) },
+            { assertEquals(3, cache.cursorRow) },
+            { assertTrue(cache.cursorVisible) },
+            { assertTrue(cache.cursorBlinking) },
+            { assertEquals(TerminalRenderCursorShape.BAR, cache.cursorShape) },
+            { assertEquals(7L, cache.cursorGeneration) },
+            { assertTrue(cache.cursorChangedOnLastUpdate) },
+        )
+    }
+
+    @Test
     fun `active buffer is cached`() {
         val frame = MutableFrame(columns = 3, rows = 1)
         frame.activeBuffer = TerminalRenderBufferKind.ALTERNATE
@@ -193,6 +211,59 @@ class TerminalRenderCacheTest {
                 append(if (code == 0) ' ' else code.toChar())
                 column++
             }
+        }
+    }
+
+    private class PrimitiveCursorFrame : TerminalRenderFrame {
+        override val columns: Int = 1
+        override val rows: Int = 1
+        override val frameGeneration: Long = 1L
+        override val structureGeneration: Long = 1L
+        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
+        override val cursor: TerminalRenderCursor
+            get() = error("cursor object must not be read by TerminalRenderCache")
+
+        val reader = object : TerminalRenderFrameReader {
+            override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                consumer.accept(this@PrimitiveCursorFrame)
+            }
+        }
+
+        override fun lineGeneration(row: Int): Long = 1L
+
+        override fun lineWrapped(row: Int): Boolean = false
+
+        override fun copyLine(
+            row: Int,
+            codeWords: IntArray,
+            codeOffset: Int,
+            attrWords: LongArray,
+            attrOffset: Int,
+            flags: IntArray,
+            flagOffset: Int,
+            extraAttrWords: LongArray?,
+            extraAttrOffset: Int,
+            hyperlinkIds: IntArray?,
+            hyperlinkOffset: Int,
+            clusterSink: TerminalRenderClusterSink?,
+            clusterDataSink: TerminalRenderClusterDataSink?,
+        ) {
+            codeWords[codeOffset] = 0
+            attrWords[attrOffset] = TerminalRenderAttrs.DEFAULT
+            flags[flagOffset] = TerminalRenderCellFlags.EMPTY
+            extraAttrWords?.set(extraAttrOffset, TerminalRenderExtraAttrs.DEFAULT)
+            hyperlinkIds?.set(hyperlinkOffset, 0)
+        }
+
+        override fun copyCursor(sink: TerminalRenderCursorSink) {
+            sink.onCursor(
+                column = 2,
+                row = 3,
+                visible = true,
+                blinking = true,
+                shape = TerminalRenderCursorShape.BAR,
+                generation = 7L,
+            )
         }
     }
 

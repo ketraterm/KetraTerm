@@ -5,6 +5,8 @@ package com.gagik.terminal.render.api
  *
  * The terminal exposes whether blinking mode is enabled, but not the current
  * blink phase. UI modules own blink timers and repaint cadence.
+ * Allocation-sensitive frame consumers should prefer
+ * [TerminalRenderFrame.copyCursor] and copy primitive cursor fields directly.
  *
  * @property column zero-based visual cursor column.
  * @property row zero-based visual cursor row.

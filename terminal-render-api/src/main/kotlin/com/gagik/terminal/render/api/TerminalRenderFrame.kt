@@ -57,6 +57,9 @@ interface TerminalRenderFrame {
 
     /**
      * Current render cursor overlay state.
+     *
+     * Prefer [copyCursor] in frame-copy hot paths so implementations can expose
+     * cursor state without allocating this value object.
      */
     val cursor: TerminalRenderCursor
 
@@ -123,4 +126,25 @@ interface TerminalRenderFrame {
         clusterSink: TerminalRenderClusterSink? = null,
         clusterDataSink: TerminalRenderClusterDataSink? = null,
     )
+
+    /**
+     * Copies the current cursor overlay state into [sink].
+     *
+     * The default implementation adapts [cursor] for simple frame
+     * implementations. Allocation-sensitive implementations should override
+     * this method and send primitive cursor fields directly.
+     *
+     * @param sink primitive cursor receiver.
+     */
+    fun copyCursor(sink: TerminalRenderCursorSink) {
+        val cursor = cursor
+        sink.onCursor(
+            column = cursor.column,
+            row = cursor.row,
+            visible = cursor.visible,
+            blinking = cursor.blinking,
+            shape = cursor.shape,
+            generation = cursor.generation,
+        )
+    }
 }
