@@ -57,19 +57,21 @@ internal class TerminalTextPainter(
         row: Int,
         fontRenderContext: FontRenderContext,
     ) {
-        val flagsRow = cache.flags[row]
-        val codeWordRow = cache.codeWords[row]
+        val flagsPlane = cache.flags
+        val codeWords = cache.codeWords
+        val rowOffset = cache.rowOffset(row)
         val baselineY = row * metrics.cellHeight + metrics.baseline
         var column = 0
 
         while (column < cache.columns) {
-            val flags = flagsRow[column]
+            val index = rowOffset + column
+            val flags = flagsPlane[index]
             if (!hasDrawableText(flags)) {
                 column++
                 continue
             }
 
-            val codeWord = codeWordRow[column]
+            val codeWord = codeWords[index]
             column = if (isFastAsciiCell(flags, codeWord)) {
                 paintAsciiRun(
                     g = g,
@@ -108,10 +110,15 @@ internal class TerminalTextPainter(
         foreground: Int,
         fontRenderContext: FontRenderContext,
     ) {
-        val flags = cache.flags[row][column]
+        val flagsPlane = cache.flags
+        val attrWords = cache.attrWords
+        val codeWords = cache.codeWords
+        val clusterRefs = cache.clusterRefs
+        val index = cache.rowOffset(row) + column
+        val flags = flagsPlane[index]
         if (!hasDrawableText(flags)) return
 
-        val attr = cache.attrWords[row][column]
+        val attr = attrWords[index]
         val oldClipBounds = g.getClipBounds(clipBoundsScratch) != null
         try {
             g.clipRect(column * metrics.cellWidth, row * metrics.cellHeight, metrics.cellWidth, metrics.cellHeight)
@@ -119,11 +126,11 @@ internal class TerminalTextPainter(
             g.color = colorCache.color(foreground)
 
             val baselineY = row * metrics.cellHeight + metrics.baseline
-            val codeWord = cache.codeWords[row][column]
+            val codeWord = codeWords[index]
             if (flags and TerminalRenderCellFlags.CLUSTER == 0 && cellPrimitives.canPaint(codeWord)) {
                 cellPrimitives.paint(g, codeWord, column, row, metrics)
             } else if (flags and TerminalRenderCellFlags.CLUSTER != 0) {
-                val clusterRef = cache.clusterRefs[row][column]
+                val clusterRef = clusterRefs[index]
                 if (clusterRef != 0L) {
                     drawComplexCluster(
                         g = g,
@@ -170,12 +177,14 @@ internal class TerminalTextPainter(
         baselineY: Int,
         fontRenderContext: FontRenderContext,
     ): Int {
-        val flagsRow = cache.flags[row]
-        val attrRow = cache.attrWords[row]
-        val extraAttrRow = cache.extraAttrWords[row]
-        val codeWordRow = cache.codeWords[row]
-        val attr = attrRow[startColumn]
-        val extraAttr = extraAttrRow[startColumn]
+        val flagsPlane = cache.flags
+        val attrWords = cache.attrWords
+        val extraAttrWords = cache.extraAttrWords
+        val codeWords = cache.codeWords
+        val rowOffset = cache.rowOffset(row)
+        val startIndex = rowOffset + startColumn
+        val attr = attrWords[startIndex]
+        val extraAttr = extraAttrWords[startIndex]
         val foreground = TerminalSwingColors.foreground(palette, attr)
         val fontStyle = terminalFontStyle(attr)
         val decoration = decorationKey(attr, extraAttr)
@@ -183,10 +192,11 @@ internal class TerminalTextPainter(
 
         textRun.clear()
         while (column < cache.columns) {
-            val flags = flagsRow[column]
-            val codeWord = codeWordRow[column]
-            val currentAttr = attrRow[column]
-            val currentExtraAttr = extraAttrRow[column]
+            val index = rowOffset + column
+            val flags = flagsPlane[index]
+            val codeWord = codeWords[index]
+            val currentAttr = attrWords[index]
+            val currentExtraAttr = extraAttrWords[index]
             if (
                 !isFastAsciiCell(flags, codeWord) ||
                 TerminalSwingColors.foreground(palette, currentAttr) != foreground ||
@@ -217,9 +227,15 @@ internal class TerminalTextPainter(
         baselineY: Int,
         fontRenderContext: FontRenderContext,
     ): Int {
-        val flags = cache.flags[row][column]
-        val attr = cache.attrWords[row][column]
-        val extraAttr = cache.extraAttrWords[row][column]
+        val flagsPlane = cache.flags
+        val attrWords = cache.attrWords
+        val extraAttrWords = cache.extraAttrWords
+        val codeWords = cache.codeWords
+        val clusterRefs = cache.clusterRefs
+        val index = cache.rowOffset(row) + column
+        val flags = flagsPlane[index]
+        val attr = attrWords[index]
+        val extraAttr = extraAttrWords[index]
         val foreground = TerminalSwingColors.foreground(palette, attr)
         val fontStyle = terminalFontStyle(attr)
         val endColumn = minOf(cache.columns, column + cellSpan(flags))
@@ -227,11 +243,11 @@ internal class TerminalTextPainter(
         g.font = fontCache.font(fontStyle)
         g.color = colorCache.color(foreground)
 
-        val codeWord = cache.codeWords[row][column]
+        val codeWord = codeWords[index]
         if (flags and TerminalRenderCellFlags.CLUSTER == 0 && cellPrimitives.canPaint(codeWord)) {
             cellPrimitives.paint(g, codeWord, column, row, metrics)
         } else if (flags and TerminalRenderCellFlags.CLUSTER != 0) {
-            val clusterRef = cache.clusterRefs[row][column]
+            val clusterRef = clusterRefs[index]
             if (clusterRef != 0L) {
                 drawComplexCluster(
                     g = g,

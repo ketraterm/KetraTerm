@@ -10,7 +10,7 @@ Render cache owns:
 
 - copying `TerminalRenderFrameReader` data from `terminal-render-api`.
 - retaining copied structure and line generations for renderer-side comparison.
-- retaining copied cluster text and primitive row arrays.
+- retaining copied cluster text and flattened primitive cell planes.
 - publishing cache snapshots with clear ownership between render workers and UI
   readers.
 
@@ -21,8 +21,8 @@ Render cache must not:
 - choose fonts, colors, glyph runs, paint strategy, or Swing repaint policy.
 - depend on parser, core, integration, session, PTY, Swing, or host modules.
 
-Keep cache updates allocation-conscious. Reuse primitive row storage and clear
-cluster rows deliberately when copied frame data changes.
+Keep cache updates allocation-conscious. Reuse primitive cell-plane storage and
+clear cluster row ranges deliberately when copied frame data changes.
 
 ## Testing
 

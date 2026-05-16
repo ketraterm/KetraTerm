@@ -25,6 +25,9 @@ class TerminalRenderCacheTest {
         assertAll(
             { assertEquals("abc", cache.rowText(0)) },
             { assertEquals("def", cache.rowText(1)) },
+            { assertEquals(6, cache.codeWords.size) },
+            { assertEquals(0, cache.rowOffset(0)) },
+            { assertEquals(3, cache.rowOffset(1)) },
             { assertEquals(frame.frameGeneration, cache.frameGeneration) },
             { assertEquals(frame.structureGeneration, cache.structureGeneration) },
             { assertEquals(frame.cursor, cache.cursor) },
@@ -181,8 +184,17 @@ class TerminalRenderCacheTest {
         )
     }
 
-    private fun TerminalRenderCache.rowText(row: Int): String =
-        codeWords[row].map { if (it == 0) ' ' else it.toChar() }.joinToString("")
+    private fun TerminalRenderCache.rowText(row: Int): String {
+        val start = rowOffset(row)
+        return buildString(columns) {
+            var column = 0
+            while (column < columns) {
+                val code = codeWords[start + column]
+                append(if (code == 0) ' ' else code.toChar())
+                column++
+            }
+        }
+    }
 
     private class MutableFrame(
         override val columns: Int,

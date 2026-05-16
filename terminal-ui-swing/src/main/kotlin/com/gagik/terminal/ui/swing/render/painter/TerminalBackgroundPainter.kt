@@ -35,15 +35,19 @@ internal class TerminalBackgroundPainter(
         metrics: TerminalSwingMetrics,
         row: Int,
     ) {
-        val attrRow = cache.attrWords[row]
+        val attrWords = cache.attrWords
+        val rowOffset = cache.rowOffset(row)
         val y = row * metrics.cellHeight
         var column = 0
         while (column < cache.columns) {
-            val background = TerminalSwingColors.background(palette, attrRow[column])
+            val background = TerminalSwingColors.background(palette, attrWords[rowOffset + column])
             val start = column
 
             column++
-            while (column < cache.columns && TerminalSwingColors.background(palette, attrRow[column]) == background) {
+            while (
+                column < cache.columns &&
+                TerminalSwingColors.background(palette, attrWords[rowOffset + column]) == background
+            ) {
                 column++
             }
 

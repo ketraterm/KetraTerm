@@ -116,7 +116,7 @@ class TerminalRenderPublisherTest {
 
         val current = publisher.current()
         assertNotNull(current)
-        val clusterRef = current!!.clusterRefs[30][0]
+        val clusterRef = current!!.clusterRefs[current.rowOffset(30)]
         val clusterOffset = current.clusterOffset(clusterRef)
         val clusterLength = current.clusterLength(clusterRef)
         assertNull(exception)
@@ -256,7 +256,15 @@ class TerminalRenderPublisherTest {
     }
 
     private fun TerminalRenderCache.rowText(row: Int): String =
-        codeWords[row].map { if (it == 0) ' ' else it.toChar() }.joinToString("")
+        buildString(columns) {
+            val start = rowOffset(row)
+            var column = 0
+            while (column < columns) {
+                val code = codeWords[start + column]
+                append(if (code == 0) ' ' else code.toChar())
+                column++
+            }
+        }
 
     private open class MockFrame(
         override val columns: Int,
