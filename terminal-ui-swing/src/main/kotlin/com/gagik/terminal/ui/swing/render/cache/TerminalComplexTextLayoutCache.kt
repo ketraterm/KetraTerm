@@ -70,14 +70,15 @@ internal class TerminalComplexTextLayoutCache(
 
         val normalizedStyle = style and STYLE_MASK
         val key = codePointKey(codePoint, normalizedStyle)
-        val cached = codePointLayouts[key]
+        val slot = codePointLayouts.findSlot(key)
+        val cached = codePointLayouts.layoutAtSlot(slot)
         if (cached != null) return cached
 
         // Convert the code point directly to a transient char array on cache misses to minimize
         // object lifecycle footprints prior to layout shaping.
         val text = String(Character.toChars(codePoint))
         val layout = TextLayout(text, fontCache.fontForCodePoint(codePoint, normalizedStyle), fontRenderContext)
-        codePointLayouts.put(key, layout)
+        codePointLayouts.putAtMissSlot(key, layout, slot)
         return layout
     }
 
@@ -124,7 +125,9 @@ internal class TerminalComplexTextLayoutCache(
         val normalizedStyle = style and STYLE_MASK
         val styleLayouts = clusterLayouts[normalizedStyle]
 
-        val cached = styleLayouts.get(codepoints, offset, length)
+        val hash = styleLayouts.contentHash(codepoints, offset, length)
+        val slot = styleLayouts.findSlot(codepoints, offset, length, hash)
+        val cached = styleLayouts.layoutAtSlot(slot)
         if (cached != null) return cached
 
         // TextLayout and Font.canDisplayUpTo require text objects. Construct
@@ -132,7 +135,7 @@ internal class TerminalComplexTextLayoutCache(
         // codepoint slices directly.
         val text = String(codepoints, offset, length)
         val layout = TextLayout(text, fontCache.fontForText(text, normalizedStyle), fontRenderContext)
-        styleLayouts.put(codepoints, offset, length, layout)
+        styleLayouts.putAtMissSlot(codepoints, offset, length, hash, layout, slot)
         return layout
     }
 
@@ -203,22 +206,24 @@ internal class TerminalComplexTextLayoutCache(
         private var head = EMPTY
         private var tail = EMPTY
 
-        operator fun get(key: Long): TextLayout? {
-            val entry = findEntry(key)
+        fun findSlot(key: Long): Int {
+            var slot = hashSlot(key)
+            while (true) {
+                val entry = hashEntries[slot]
+                if (entry == EMPTY || hashKeys[slot] == key) return slot
+                slot = (slot + 1) and hashMask
+            }
+        }
+
+        fun layoutAtSlot(slot: Int): TextLayout? {
+            val entry = hashEntries[slot]
             if (entry == EMPTY) return null
 
             moveToHead(entry)
             return entryLayouts[entry]
         }
 
-        fun put(key: Long, layout: TextLayout) {
-            val existing = findEntry(key)
-            if (existing != EMPTY) {
-                entryLayouts[existing] = layout
-                moveToHead(existing)
-                return
-            }
-
+        fun putAtMissSlot(key: Long, layout: TextLayout, missSlot: Int) {
             val entry = if (size < entryKeys.size) {
                 size++
             } else {
@@ -231,7 +236,7 @@ internal class TerminalComplexTextLayoutCache(
             entryKeys[entry] = key
             entryLayouts[entry] = layout
             linkHead(entry)
-            insertHashEntry(key, entry)
+            insertHashEntryAtSlot(key, entry, missSlot)
         }
 
         fun clear() {
@@ -244,18 +249,12 @@ internal class TerminalComplexTextLayoutCache(
             tail = EMPTY
         }
 
-        private fun findEntry(key: Long): Int {
-            var slot = hashSlot(key)
-            while (true) {
-                val entry = hashEntries[slot]
-                if (entry == EMPTY) return EMPTY
-                if (hashKeys[slot] == key) return entry
-                slot = (slot + 1) and hashMask
-            }
+        private fun insertHashEntry(key: Long, entry: Int) {
+            insertHashEntryAtSlot(key, entry, hashSlot(key))
         }
 
-        private fun insertHashEntry(key: Long, entry: Int) {
-            var slot = hashSlot(key)
+        private fun insertHashEntryAtSlot(key: Long, entry: Int, slotHint: Int) {
+            var slot = slotHint
             while (hashEntries[slot] != EMPTY) {
                 slot = (slot + 1) and hashMask
             }
@@ -344,24 +343,44 @@ internal class TerminalComplexTextLayoutCache(
         private var head = EMPTY
         private var tail = EMPTY
 
-        fun get(codepoints: IntArray, offset: Int, length: Int): TextLayout? {
-            val hash = contentHash(codepoints, offset, length)
-            val entry = findEntry(codepoints, offset, length, hash)
+        fun contentHash(codepoints: IntArray, offset: Int, length: Int): Int {
+            var result = length
+            var index = 0
+            while (index < length) {
+                result = 31 * result + codepoints[offset + index]
+                index++
+            }
+            return result
+        }
+
+        fun findSlot(codepoints: IntArray, offset: Int, length: Int, hash: Int): Int {
+            var slot = hashSlot(hash)
+            while (true) {
+                val entry = hashEntries[slot]
+                if (entry == EMPTY) return slot
+                if (hashKeys[slot] == hash && equalsEntry(entry, codepoints, offset, length)) {
+                    return slot
+                }
+                slot = (slot + 1) and hashMask
+            }
+        }
+
+        fun layoutAtSlot(slot: Int): TextLayout? {
+            val entry = hashEntries[slot]
             if (entry == EMPTY) return null
 
             moveToHead(entry)
             return entryLayouts[entry]
         }
 
-        fun put(codepoints: IntArray, offset: Int, length: Int, layout: TextLayout) {
-            val hash = contentHash(codepoints, offset, length)
-            val existing = findEntry(codepoints, offset, length, hash)
-            if (existing != EMPTY) {
-                entryLayouts[existing] = layout
-                moveToHead(existing)
-                return
-            }
-
+        fun putAtMissSlot(
+            codepoints: IntArray,
+            offset: Int,
+            length: Int,
+            hash: Int,
+            layout: TextLayout,
+            missSlot: Int,
+        ) {
             val entry = if (size < entryCodepoints.size) {
                 size++
             } else {
@@ -378,7 +397,7 @@ internal class TerminalComplexTextLayoutCache(
             entryHashes[entry] = hash
             entryLayouts[entry] = layout
             linkHead(entry)
-            insertHashEntry(hash, entry)
+            insertHashEntryAtSlot(hash, entry, missSlot)
         }
 
         fun clear() {
@@ -390,18 +409,6 @@ internal class TerminalComplexTextLayoutCache(
             size = 0
             head = EMPTY
             tail = EMPTY
-        }
-
-        private fun findEntry(codepoints: IntArray, offset: Int, length: Int, hash: Int): Int {
-            var slot = hashSlot(hash)
-            while (true) {
-                val entry = hashEntries[slot]
-                if (entry == EMPTY) return EMPTY
-                if (hashKeys[slot] == hash && equalsEntry(entry, codepoints, offset, length)) {
-                    return entry
-                }
-                slot = (slot + 1) and hashMask
-            }
         }
 
         private fun equalsEntry(entry: Int, codepoints: IntArray, offset: Int, length: Int): Boolean {
@@ -416,7 +423,11 @@ internal class TerminalComplexTextLayoutCache(
         }
 
         private fun insertHashEntry(hash: Int, entry: Int) {
-            var slot = hashSlot(hash)
+            insertHashEntryAtSlot(hash, entry, hashSlot(hash))
+        }
+
+        private fun insertHashEntryAtSlot(hash: Int, entry: Int, slotHint: Int) {
+            var slot = slotHint
             while (hashEntries[slot] != EMPTY) {
                 slot = (slot + 1) and hashMask
             }
@@ -489,15 +500,6 @@ internal class TerminalComplexTextLayoutCache(
             return mixed and hashMask
         }
 
-        private fun contentHash(codepoints: IntArray, offset: Int, length: Int): Int {
-            var result = length
-            var index = 0
-            while (index < length) {
-                result = 31 * result + codepoints[offset + index]
-                index++
-            }
-            return result
-        }
     }
 
     private companion object {
