@@ -50,6 +50,12 @@ internal class TerminalState(
     var cursorGeneration: Long = 0L
         private set
 
+    var lastPrintableRow: Int = NO_PRINTABLE_CELL
+        private set
+
+    var lastPrintableCol: Int = NO_PRINTABLE_CELL
+        private set
+
     // Physical screens.
 
     val primaryBuffer = ScreenBuffer(initialWidth, initialHeight, maxHistory)
@@ -164,8 +170,26 @@ internal class TerminalState(
         cursorGeneration++
     }
 
-    /** Clears the phantom-column pending-wrap flag on the active cursor. */
+    fun rememberPrintableCell(row: Int, col: Int) {
+        lastPrintableRow = row
+        lastPrintableCol = col
+    }
+
+    fun clearLastPrintableCell() {
+        lastPrintableRow = NO_PRINTABLE_CELL
+        lastPrintableCol = NO_PRINTABLE_CELL
+    }
+
+    /**
+     * Clears the phantom-column pending-wrap flag and any pending printable
+     * continuation target on the active cursor.
+     */
     fun cancelPendingWrap() {
         activeBuffer.cursor.pendingWrap = false
+        clearLastPrintableCell()
+    }
+
+    private companion object {
+        private const val NO_PRINTABLE_CELL: Int = -1
     }
 }

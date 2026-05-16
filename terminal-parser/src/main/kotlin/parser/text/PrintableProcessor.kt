@@ -50,6 +50,15 @@ internal class PrintableProcessor(
         graphemeAssembler.flush(state)
     }
 
+    /**
+     * Publishes the active grapheme prefix for live rendering while retaining
+     * enough parser context to extend that cell if a later byte continues the
+     * same grapheme across a host read boundary.
+     */
+    fun flushForRender(state: ParserState) {
+        graphemeAssembler.flushForRender(state)
+    }
+
     fun reset(state: ParserState) {
         graphemeAssembler.reset(state)
     }

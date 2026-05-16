@@ -40,6 +40,11 @@ internal class TerminalWriterImpl(
         }
     }
 
+    override fun appendToPreviousCluster(codepoint: Int) {
+        require(codepoint in 0..0x10ffff) { "invalid codepoint: $codepoint" }
+        mutationEngine.appendToPreviousCluster(codepoint)
+    }
+
     private fun clusterWidth(codepoints: IntArray, length: Int): Int {
         if (length == 0) return 0
 

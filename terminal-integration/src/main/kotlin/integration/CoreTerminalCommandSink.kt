@@ -61,6 +61,10 @@ class CoreTerminalCommandSink(
         terminal.writeCluster(codepoints, length)
     }
 
+    override fun appendToPreviousCluster(codepoint: Int) {
+        terminal.appendToPreviousCluster(codepoint)
+    }
+
     override fun bell() {
         // TODO(core-gap): Add a core/UI bell hook. Do not fake this by mutating grid state.
         hostEvents.bell()

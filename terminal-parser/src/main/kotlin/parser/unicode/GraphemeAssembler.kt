@@ -23,17 +23,42 @@ internal class GraphemeAssembler(
 
         if (GraphemeSegmenter.continuesCurrentCluster(state, currentClass, codepoint)) {
             appendToClusterOrFlush(state, codepoint)
+            appendContinuationIfAlreadyEmitted(state, codepoint)
             GraphemeSegmenter.updateContext(state, codepoint, currentClass)
             return
         }
 
-        flush(state)
+        finishActiveCluster(state)
 
         appendToClusterOrFlush(state, codepoint)
         GraphemeSegmenter.updateContext(state, codepoint, currentClass)
     }
 
     fun flush(state: ParserState) {
+        if (state.clusterEmittedLength > 0) {
+            state.clearActiveClusterAfterFlush()
+            return
+        }
+        flushUnemitted(state)
+        state.clearActiveClusterAfterFlush()
+    }
+
+    fun flushForRender(state: ParserState) {
+        if (state.clusterLength == 0 || state.clusterEmittedLength == state.clusterLength) return
+        flushUnemitted(state)
+        state.clusterEmittedLength = state.clusterLength
+    }
+
+    private fun finishActiveCluster(state: ParserState) {
+        if (state.clusterEmittedLength > 0) {
+            state.clearActiveClusterAfterFlush()
+        } else {
+            flushUnemitted(state)
+            state.clearActiveClusterAfterFlush()
+        }
+    }
+
+    private fun flushUnemitted(state: ParserState) {
         when (state.clusterLength) {
             0 -> return
             1 -> sink.writeCodepoint(state.clusterBuffer[0])
@@ -42,7 +67,6 @@ internal class GraphemeAssembler(
                 length = state.clusterLength,
             )
         }
-        state.clearActiveClusterAfterFlush()
     }
 
     fun reset(state: ParserState) {
@@ -55,5 +79,11 @@ internal class GraphemeAssembler(
         }
         state.clusterBuffer[state.clusterLength] = codepoint
         state.clusterLength++
+    }
+
+    private fun appendContinuationIfAlreadyEmitted(state: ParserState, codepoint: Int) {
+        if (state.clusterEmittedLength == 0) return
+        sink.appendToPreviousCluster(codepoint)
+        state.clusterEmittedLength = state.clusterLength
     }
 }

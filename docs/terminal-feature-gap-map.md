@@ -217,6 +217,10 @@ Missing:
 - `DONE(parser/core)`: curated Thai and Lao combining marks are classified as
   grapheme extenders in parser text segmentation and zero-width marks in core
   width calculation. Full generated Unicode coverage remains a TODO above.
+- `DONE(parser/core/integration)`: live host-output chunks publish complete
+  printable prefixes immediately while retaining grapheme context, so a later
+  combining mark, variation selector, or ZWJ continuation can extend the
+  already written core cell without moving the cursor.
 
 ## Core Gaps
 

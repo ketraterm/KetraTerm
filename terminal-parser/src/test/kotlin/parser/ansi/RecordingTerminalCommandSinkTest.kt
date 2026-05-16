@@ -18,6 +18,7 @@ class RecordingTerminalCommandSinkTest {
 
             sink.writeCodepoint('A'.code)
             sink.writeCluster(intArrayOf('A'.code), length = 1)
+            sink.appendToPreviousCluster(0x0301)
             sink.bell()
             sink.backspace()
             sink.tab()
@@ -88,6 +89,7 @@ class RecordingTerminalCommandSinkTest {
                 listOf(
                     "writeCodepoint:${'A'.code}",
                     "writeCluster:1:65",
+                    "appendToPreviousCluster:769",
                     "bell",
                     "backspace",
                     "tab",

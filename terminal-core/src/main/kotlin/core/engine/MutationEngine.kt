@@ -6,6 +6,7 @@ import com.gagik.core.model.Line
 import com.gagik.core.model.TerminalConstants
 import com.gagik.core.state.TerminalState
 import com.gagik.core.store.ClusterStore
+import com.gagik.core.util.UnicodeWidth
 
 /**
  * Dedicated mutation engine for grid writes and line-level erase/edit operations.
@@ -231,6 +232,28 @@ internal class MutationEngine(
         }
     }
 
+    private fun ensureClusterScratchCapacity(required: Int) {
+        if (clusterScratch.size >= required) return
+        var nextSize = clusterScratch.size
+        while (nextSize < required) {
+            nextSize *= 2
+        }
+        clusterScratch = IntArray(nextSize)
+    }
+
+    private fun copyCellCodepoints(line: Line, col: Int): Int {
+        val raw = line.rawCodepoint(col)
+        return if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
+            val length = line.store.length(raw)
+            ensureClusterScratchCapacity(length)
+            line.readCluster(col, clusterScratch)
+        } else {
+            ensureClusterScratchCapacity(1)
+            clusterScratch[0] = raw
+            1
+        }
+    }
+
     private fun isProtectedOccupant(line: Line, col: Int): Boolean {
         if (col !in 0 until width) return false
         val start = findClusterStart(line, col)
@@ -345,7 +368,9 @@ internal class MutationEngine(
             annihilateAt(cRow, cCol + 1)
         }
 
-        writeCell(line, cCol)
+        val writtenCol = cCol
+        val writtenRow = cRow
+        writeCell(line, writtenCol)
         state.markLineChanged(line)
         cCol += 1
 
@@ -364,6 +389,7 @@ internal class MutationEngine(
             state.cursor.col = rightMargin
             state.cursor.row = cRow
             state.cursor.pendingWrap = state.modes.isAutoWrap
+            state.rememberPrintableCell(writtenRow, writtenCol)
             markCursorIfMoved(oldCursorCol, oldCursorRow)
             return
         }
@@ -371,6 +397,7 @@ internal class MutationEngine(
         state.cursor.col = cCol
         state.cursor.row = cRow
         state.cursor.pendingWrap = false
+        state.rememberPrintableCell(writtenRow, writtenCol)
         markCursorIfMoved(oldCursorCol, oldCursorRow)
     }
 
@@ -398,6 +425,7 @@ internal class MutationEngine(
             if (line.rawCodepoint(cCol) == TerminalConstants.EMPTY) {
                 line.setCell(cCol, codepoint, attr, extendedAttr)
                 state.markLineChanged(line)
+                state.rememberPrintableCell(cRow, cCol)
                 if (cCol == rightMargin) {
                     if (state.modes.isAutoWrap) {
                         state.cursor.pendingWrap = true
@@ -435,6 +463,43 @@ internal class MutationEngine(
         writeToGrid(charWidth) { line, col ->
             line.setCluster(col, cps, cpLen, attr, extendedAttr)
         }
+    }
+
+    /**
+     * Appends [codepoint] to the most recently written printable cell without
+     * moving the cursor.
+     */
+    fun appendToPreviousCluster(codepoint: Int) {
+        val row = state.lastPrintableRow
+        val col = state.lastPrintableCol
+        if (row !in 0 until height || col !in 0 until width) return
+
+        val line = getLine(row)
+        val raw = line.rawCodepoint(col)
+        if (raw == TerminalConstants.EMPTY || raw == TerminalConstants.WIDE_CHAR_SPACER) return
+
+        val existingLength = copyCellCodepoints(line, col)
+        ensureClusterScratchCapacity(existingLength + 1)
+        clusterScratch[existingLength] = codepoint
+
+        val attr = line.getPackedAttr(col)
+        val extendedAttr = line.getPackedExtendedAttr(col)
+        val clusterWidth = UnicodeWidth.calculate(clusterScratch[0], state.modes.treatAmbiguousAsWide)
+
+        if (clusterWidth == 2 && col + 1 <= rightMargin) {
+            if (line.rawCodepoint(col + 1) != TerminalConstants.WIDE_CHAR_SPACER) {
+                annihilateAt(row, col + 1)
+            }
+        } else if (col + 1 < width && line.rawCodepoint(col + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+            line.setCell(col + 1, TerminalConstants.EMPTY, blankAttr, blankExtendedAttr)
+        }
+
+        line.setCluster(col, clusterScratch, existingLength + 1, attr, extendedAttr)
+        if (clusterWidth == 2 && col + 1 <= rightMargin) {
+            line.setCell(col + 1, TerminalConstants.WIDE_CHAR_SPACER, attr, extendedAttr)
+        }
+        state.markLineChanged(line)
+        state.rememberPrintableCell(row, col)
     }
 
     /**

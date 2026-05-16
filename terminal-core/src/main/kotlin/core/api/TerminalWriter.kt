@@ -58,6 +58,19 @@ interface TerminalWriter {
     fun writeCluster(codepoints: IntArray, length: Int = codepoints.size)
 
     /**
+     * Appends one grapheme-continuation codepoint to the most recently written
+     * printable cell without moving the cursor.
+     *
+     * Parser layers call this when a cluster prefix was already published for
+     * live rendering and a later byte extends that same grapheme. Core owns the
+     * remembered printable-cell target, cluster storage mutation, wide spacer
+     * invariants, and cursor preservation.
+     *
+     * @param codepoint Unicode codepoint to append to the previous grapheme.
+     */
+    fun appendToPreviousCluster(codepoint: Int)
+
+    /**
      * Executes a line feed (LF, `0x0A`).
      *
      * Moves the cursor down one row without resetting the column. Scrolls the

@@ -14,7 +14,7 @@ class ActionEngineTest {
 
     private data class Fixture(
         val events: MutableList<String> = mutableListOf(),
-        val sink: RecordingTerminalCommandSink = RecordingTerminalCommandSink(events),
+        val sink: RecordingTerminalCommandSink = RecordingTerminalCommandSink(),
         val dispatcher: RecordingCommandDispatcher = RecordingCommandDispatcher(events),
         val printable: RecordingPrintableSink = RecordingPrintableSink(events),
     ) {
@@ -122,9 +122,7 @@ class ActionEngineTest {
             )
     }
 
-    private class RecordingTerminalCommandSink(
-        private val events: MutableList<String>,
-    ) : TerminalCommandSink {
+    private class RecordingTerminalCommandSink : TerminalCommandSink {
         val sinkCalls = mutableListOf<String>()
 
         override fun writeCodepoint(codepoint: Int) {
@@ -133,6 +131,10 @@ class ActionEngineTest {
 
         override fun writeCluster(codepoints: IntArray, length: Int) {
             sinkCalls += "writeCluster:$length"
+        }
+
+        override fun appendToPreviousCluster(codepoint: Int) {
+            sinkCalls += "appendToPreviousCluster:$codepoint"
         }
 
         override fun bell() {

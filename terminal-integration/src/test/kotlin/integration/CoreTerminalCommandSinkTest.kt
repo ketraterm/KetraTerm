@@ -55,6 +55,42 @@ class CoreTerminalCommandSinkTest {
         }
 
         @Test
+        fun `plain prompt chunk publishes trailing printable before stream close`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 40, height = 5))
+
+            f.acceptAscii("PS C:\\Users\\gagik> ")
+
+            assertAll(
+                { assertEquals("PS C:\\Users\\gagik> ", f.terminal.getLineAsString(0)) },
+                { assertEquals(19, f.terminal.cursorCol) },
+            )
+        }
+
+        @Test
+        fun `combining mark in later host chunk extends previous core cell`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 6, height = 2))
+
+            f.acceptAscii("e")
+            assertAll(
+                { assertEquals("e", f.terminal.getLineAsString(0)) },
+                { assertEquals(1, f.terminal.cursorCol) },
+            )
+
+            f.parser.accept("\u0301".encodeToByteArray())
+
+            val line = f.terminal.getLine(0)
+            val cluster = IntArray(4)
+            val length = line.readCluster(0, cluster)
+            assertAll(
+                { assertTrue(line.isCluster(0)) },
+                { assertEquals(2, length) },
+                { assertEquals('e'.code, cluster[0]) },
+                { assertEquals(0x0301, cluster[1]) },
+                { assertEquals(1, f.terminal.cursorCol) },
+            )
+        }
+
+        @Test
         fun `CSI absolute cursor position writes at core coordinates`() {
             val f = Fixture()
 

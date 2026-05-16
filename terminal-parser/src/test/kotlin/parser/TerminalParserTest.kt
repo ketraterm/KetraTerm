@@ -4,6 +4,7 @@ import com.gagik.parser.ansi.AnsiState
 import com.gagik.parser.ansi.RecordingTerminalCommandSink
 import com.gagik.parser.api.TerminalOutputParser
 import com.gagik.parser.api.TerminalParsers
+import com.gagik.parser.fixture.ParserEvents.appendToPreviousCluster
 import com.gagik.parser.fixture.ParserEvents.writeCluster
 import com.gagik.parser.fixture.ParserEvents.writeCodepoint
 import com.gagik.parser.fixture.TerminalParserFixture
@@ -112,11 +113,14 @@ class TerminalParserTest {
     inner class PrintableAndUtf8 {
 
         @Test
-        fun `plain ASCII flushes previous scalars during streaming and final scalar at endOfInput`() {
+        fun `plain ASCII publishes final scalar at host chunk boundary`() {
             val f = TerminalParserFixture()
 
             f.acceptAscii("abc")
-            assertEquals(listOf(writeCodepoint('a'.code), writeCodepoint('b'.code)), f.sink.events)
+            assertEquals(
+                listOf(writeCodepoint('a'.code), writeCodepoint('b'.code), writeCodepoint('c'.code)),
+                f.sink.events,
+            )
 
             f.endOfInput()
 
@@ -134,7 +138,6 @@ class TerminalParserTest {
             assertTrue(f.sink.events.isEmpty())
 
             f.parser.accept(byteArrayOf(0xA9.toByte()))
-            f.endOfInput()
 
             assertEquals(listOf(writeCodepoint(0x00E9)), f.sink.events)
         }
@@ -144,7 +147,6 @@ class TerminalParserTest {
             val f = TerminalParserFixture()
 
             f.acceptUtf8("\uD83D\uDE00")
-            f.endOfInput()
 
             assertEquals(listOf(writeCodepoint(0x1F600)), f.sink.events)
         }
@@ -203,12 +205,29 @@ class TerminalParserTest {
 
             assertEquals(
                 listOf(
-                    writeCluster('e'.code, 0x0301),
+                    writeCodepoint('e'.code),
+                    appendToPreviousCluster(0x0301),
                     writeCluster(0x2764, 0xFE0F),
                     writeCluster(0x1F468, 0x200D, 0x1F469),
                     writeCluster(0x1F1FA, 0x1F1F8),
                 ),
                 f.sink.events
+            )
+        }
+
+        @Test
+        fun `combining mark split across host chunks extends already published cell`() {
+            val f = TerminalParserFixture()
+
+            f.acceptAscii("e")
+            assertEquals(listOf(writeCodepoint('e'.code)), f.sink.events)
+
+            f.acceptUtf8("\u0301")
+            f.endOfInput()
+
+            assertEquals(
+                listOf(writeCodepoint('e'.code), appendToPreviousCluster(0x0301)),
+                f.sink.events,
             )
         }
     }
@@ -714,14 +733,14 @@ class TerminalParserTest {
         }
 
         @Test
-        fun `reset does not emit replacement for pending UTF-8 or flush pending printable cluster`() {
+        fun `reset does not emit replacement for pending UTF-8 or duplicate published printable cluster`() {
             val f = TerminalParserFixture()
 
             f.acceptAscii("A")
             f.acceptByte(0xC3)
             f.reset()
 
-            assertTrue(f.sink.events.isEmpty())
+            assertEquals(listOf(writeCodepoint('A'.code)), f.sink.events)
         }
     }
 }

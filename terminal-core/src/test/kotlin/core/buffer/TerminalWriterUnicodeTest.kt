@@ -28,6 +28,49 @@ class TerminalWriterUnicodeTest {
     }
 
     @Test
+    fun `appendToPreviousCluster_mergesCombiningMarkWithoutMovingCursor`() {
+        val buffer = TerminalBuffers.create(width = 6, height = 2)
+
+        buffer.writeCodepoint('e'.code)
+        buffer.appendToPreviousCluster(0x0301)
+        buffer.writeCodepoint('X'.code)
+
+        val line = buffer.getLine(0)
+        val clusterBuf = IntArray(4)
+        val clusterLen = line.readCluster(0, clusterBuf)
+
+        assertAll(
+            { assertTrue(line.isCluster(0), "Continuation must update the previous printable cell") },
+            { assertEquals(2, clusterLen) },
+            { assertEquals('e'.code, clusterBuf[0]) },
+            { assertEquals(0x0301, clusterBuf[1]) },
+            { assertEquals('X'.code, buffer.getCodepointAt(1, 0)) },
+            { assertEquals(2, buffer.cursorCol) },
+        )
+    }
+
+    @Test
+    fun `appendToPreviousCluster_preservesWideSpacerAndPendingWrap`() {
+        val buffer = TerminalBuffers.create(width = 2, height = 2)
+
+        buffer.writeCodepoint(0x1F600)
+        buffer.appendToPreviousCluster(0xFE0F)
+
+        val line = buffer.getLine(0)
+        val clusterBuf = IntArray(4)
+        val clusterLen = line.readCluster(0, clusterBuf)
+
+        assertAll(
+            { assertTrue(line.isCluster(0)) },
+            { assertEquals(2, clusterLen) },
+            { assertEquals(0x1F600, clusterBuf[0]) },
+            { assertEquals(0xFE0F, clusterBuf[1]) },
+            { assertEquals(-1, buffer.getCodepointAt(1, 0)) },
+            { assertEquals(1, buffer.cursorCol) },
+        )
+    }
+
+    @Test
     fun `writeCluster_emojiZwjFamily_staysOneClusterAndOneVisualWidthSequence`() {
         val buffer = TerminalBuffers.create(width = 8, height = 2)
 

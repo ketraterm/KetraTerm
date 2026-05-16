@@ -58,6 +58,10 @@ need instead of the full facade.
 - `writeText(text)` writes the string as a sequence of scalar codepoints.
 - `writeCluster(codepoints, length)` writes one pre-segmented visual cluster.
   The core computes its grid width from the active width policy.
+- `appendToPreviousCluster(codepoint)` appends a parser-identified grapheme
+  continuation to the most recently written printable cell without moving the
+  cursor. This supports live rendering at host read boundaries while preserving
+  chunk-boundary combining marks and ZWJ continuations.
 
 Guaranteed behavior:
 
@@ -67,13 +71,14 @@ Guaranteed behavior:
 - deferred wrap follows terminal semantics
 - clusters are stored in the active buffer arena and survive reflow by
   deep-copy into the new arena
+- parser-identified grapheme continuations preserve the cursor position and
+  wide spacer invariants
 
 Not guaranteed:
 
 - grapheme segmentation
-- combining-mark buffering
-- variation-selector coalescing
-- ZWJ sequence assembly
+- deciding whether a codepoint is a combining mark, variation selector, or ZWJ
+  continuation
 
 Those belong to `:terminal-parser`.
 

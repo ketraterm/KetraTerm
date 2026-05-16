@@ -64,9 +64,10 @@ internal class TerminalParser(
         val end = offset + length
         var index = offset
         while (index < end) {
-            acceptByte(bytes[index].toInt() and 0xff)
+            acceptByteInternal(bytes[index].toInt() and 0xff)
             index++
         }
+        flushPrintableForRender()
     }
 
     /**
@@ -76,7 +77,11 @@ internal class TerminalParser(
      */
     override fun acceptByte(byteValue: Int) {
         require(byteValue in 0..255) { "byteValue out of range: $byteValue" }
+        acceptByteInternal(byteValue)
+        flushPrintableForRender()
+    }
 
+    private fun acceptByteInternal(byteValue: Int) {
         if (utf8Decoder.hasPendingSequence()) {
             acceptUtf8Byte(byteValue, allowReplay = true)
             return
@@ -176,6 +181,12 @@ internal class TerminalParser(
                 state = state,
                 codepoint = Utf8DecodeResult.codepoint(result),
             )
+        }
+    }
+
+    private fun flushPrintableForRender() {
+        if (!utf8Decoder.hasPendingSequence() && state.fsmState == AnsiState.GROUND) {
+            printableProcessor.flushForRender(state)
         }
     }
 }

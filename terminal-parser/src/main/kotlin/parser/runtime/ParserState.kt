@@ -77,6 +77,7 @@ internal class ParserState(
 
     val clusterBuffer: IntArray = IntArray(maxCluster)
     var clusterLength: Int = 0
+    var clusterEmittedLength: Int = 0
 
     var prevGraphemeBreakClass: Int = 0
     var prevWasZwj: Boolean = false
@@ -133,6 +134,7 @@ internal class ParserState(
 
     fun clearActiveClusterAfterFlush() {
         clusterLength = 0
+        clusterEmittedLength = 0
         prevGraphemeBreakClass = 0
         prevWasZwj = false
         zwjBeforeExtendedPictographic = false

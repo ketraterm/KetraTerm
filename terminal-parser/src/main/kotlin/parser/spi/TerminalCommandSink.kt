@@ -25,6 +25,18 @@ interface TerminalCommandSink {
         length: Int,
     )
 
+    /**
+     * Appends one grapheme-continuation codepoint to the most recently written
+     * printable cell without moving the cursor.
+     *
+     * The parser uses this when a host read boundary forced an already complete
+     * printable prefix to be published for interactive latency, and a later
+     * byte proves that the grapheme continues with a combining mark, variation
+     * selector, ZWJ sequence member, or similar continuation. The sink/core owns
+     * locating and mutating the previous cell.
+     */
+    fun appendToPreviousCluster(codepoint: Int)
+
     // -------------------------------------------------------------------------
     // C0 / ESC structural controls
     // -------------------------------------------------------------------------
