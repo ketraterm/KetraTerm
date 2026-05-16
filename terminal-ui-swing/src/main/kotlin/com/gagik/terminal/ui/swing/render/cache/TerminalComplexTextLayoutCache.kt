@@ -71,15 +71,14 @@ internal class TerminalComplexTextLayoutCache(
 
         val normalizedStyle = style and STYLE_MASK
         val key = codePointKey(codePoint, normalizedStyle)
-        val slot = codePointLayouts.findSlot(key)
-        val cached = codePointLayouts.layoutAtSlot(slot)
+        val cached = codePointLayouts[key]
         if (cached != null) return cached
 
         // Convert the code point directly to a transient char array on cache misses to minimize
         // object lifecycle footprints prior to layout shaping.
         val text = String(Character.toChars(codePoint))
         val layout = TextLayout(text, fontCache.fontForCodePoint(codePoint, normalizedStyle), fontRenderContext)
-        codePointLayouts.putAtMissSlot(key, layout, slot)
+        codePointLayouts.put(key, layout)
         return layout
     }
 
@@ -123,8 +122,7 @@ internal class TerminalComplexTextLayoutCache(
         val styleLayouts = clusterLayouts[normalizedStyle]
 
         val hash = styleLayouts.contentHash(codepoints, offset, shapedLength)
-        val slot = styleLayouts.findSlot(codepoints, offset, shapedLength, hash)
-        val cached = styleLayouts.layoutAtSlot(slot)
+        val cached = styleLayouts.get(codepoints, offset, shapedLength, hash)
         if (cached != null) return cached
 
         // TextLayout and Font.canDisplayUpTo require text objects. Construct
@@ -132,7 +130,7 @@ internal class TerminalComplexTextLayoutCache(
         // codepoint slices directly.
         val text = String(codepoints, offset, shapedLength)
         val layout = TextLayout(text, fontCache.fontForText(text, normalizedStyle), fontRenderContext)
-        styleLayouts.putAtMissSlot(codepoints, offset, shapedLength, hash, layout, slot)
+        styleLayouts.put(codepoints, offset, shapedLength, hash, layout)
         return layout
     }
 
@@ -206,30 +204,26 @@ internal class TerminalComplexTextLayoutCache(
         private var head = EMPTY
         private var tail = EMPTY
 
-        fun findSlot(key: Long): Int {
+        operator fun get(key: Long): TextLayout? {
             var slot = hashSlot(key)
             while (true) {
                 val entry = hashEntries[slot]
-                if (entry == EMPTY || hashKeys[slot] == key) return slot
+                if (entry == EMPTY) return null
+                if (hashKeys[slot] == key) {
+                    moveToHead(entry)
+                    return entryLayouts[entry]
+                }
                 slot = (slot + 1) and hashMask
             }
         }
 
-        fun layoutAtSlot(slot: Int): TextLayout? {
-            val entry = hashEntries[slot]
-            if (entry == EMPTY) return null
-
-            moveToHead(entry)
-            return entryLayouts[entry]
-        }
-
-        fun putAtMissSlot(key: Long, layout: TextLayout, missSlot: Int) {
+        fun put(key: Long, layout: TextLayout) {
             val entry = allocateEntry()
 
             entryKeys[entry] = key
             entryLayouts[entry] = layout
             linkHead(entry)
-            insertHashEntryAtSlot(key, entry, missSlot)
+            insertHashEntry(key, entry)
         }
 
         fun clear() {
@@ -370,33 +364,25 @@ internal class TerminalComplexTextLayoutCache(
             return result
         }
 
-        fun findSlot(codepoints: IntArray, offset: Int, length: Int, hash: Int): Int {
+        fun get(codepoints: IntArray, offset: Int, length: Int, hash: Int): TextLayout? {
             var slot = hashSlot(hash)
             while (true) {
                 val entry = hashEntries[slot]
-                if (entry == EMPTY) return slot
+                if (entry == EMPTY) return null
                 if (hashKeys[slot] == hash && equalsEntry(entry, codepoints, offset, length)) {
-                    return slot
+                    moveToHead(entry)
+                    return entryLayouts[entry]
                 }
                 slot = (slot + 1) and hashMask
             }
         }
 
-        fun layoutAtSlot(slot: Int): TextLayout? {
-            val entry = hashEntries[slot]
-            if (entry == EMPTY) return null
-
-            moveToHead(entry)
-            return entryLayouts[entry]
-        }
-
-        fun putAtMissSlot(
+        fun put(
             codepoints: IntArray,
             offset: Int,
             length: Int,
             hash: Int,
             layout: TextLayout,
-            missSlot: Int,
         ) {
             val entry = allocateEntry()
 
@@ -407,7 +393,7 @@ internal class TerminalComplexTextLayoutCache(
             entryHashes[entry] = hash
             entryLayouts[entry] = layout
             linkHead(entry)
-            insertHashEntryAtSlot(hash, entry, missSlot)
+            insertHashEntry(hash, entry)
         }
 
         fun clear() {

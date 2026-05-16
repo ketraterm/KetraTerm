@@ -89,6 +89,24 @@ class TerminalComplexTextLayoutCacheTest {
     }
 
     @Test
+    fun `code point cache keeps collision chain reachable after bulk eviction`() {
+        val fontCache = fontCache()
+        val layoutCache = TerminalComplexTextLayoutCache(codePointCapacity = 20)
+        val frc = FontRenderContext(null, false, false)
+        val codePoints = collidingCodePoints(21)
+        layoutCache.codePointLayout(codePoints[0], Font.PLAIN, frc, fontCache)
+        layoutCache.codePointLayout(codePoints[1], Font.PLAIN, frc, fontCache)
+        val retainedLayout = layoutCache.codePointLayout(codePoints[2], Font.PLAIN, frc, fontCache)
+        repeat(17) { index ->
+            layoutCache.codePointLayout(codePoints[index + 3], Font.PLAIN, frc, fontCache)
+        }
+        val newestLayout = layoutCache.codePointLayout(codePoints[20], Font.PLAIN, frc, fontCache)
+
+        assertSame(newestLayout, layoutCache.codePointLayout(codePoints[20], Font.PLAIN, frc, fontCache))
+        assertSame(retainedLayout, layoutCache.codePointLayout(codePoints[2], Font.PLAIN, frc, fontCache))
+    }
+
+    @Test
     fun `clear invalidates code point layouts`() {
         val fontCache = fontCache()
         val layoutCache = TerminalComplexTextLayoutCache(codePointCapacity = 4)
@@ -158,6 +176,29 @@ class TerminalComplexTextLayoutCacheTest {
         }
 
         assertEquals(19, layoutCache.cachedClusterLayoutCount())
+    }
+
+    @Test
+    fun `cluster cache keeps collision chain reachable after bulk eviction`() {
+        val fontCache = fontCache()
+        val layoutCache = TerminalComplexTextLayoutCache(clusterCapacityPerStyle = 20)
+        val frc = FontRenderContext(null, false, false)
+        val clusters = collidingClusters(21)
+        layoutCache.clusterLayout(clusters[0], 0, clusters[0].size, Font.PLAIN, frc, fontCache)
+        layoutCache.clusterLayout(clusters[1], 0, clusters[1].size, Font.PLAIN, frc, fontCache)
+        val retainedLayout = layoutCache.clusterLayout(clusters[2], 0, clusters[2].size, Font.PLAIN, frc, fontCache)
+        repeat(17) { index ->
+            val cluster = clusters[index + 3]
+            layoutCache.clusterLayout(cluster, 0, cluster.size, Font.PLAIN, frc, fontCache)
+        }
+        val newest = clusters[20]
+        val newestLayout = layoutCache.clusterLayout(newest, 0, newest.size, Font.PLAIN, frc, fontCache)
+
+        assertSame(newestLayout, layoutCache.clusterLayout(newest, 0, newest.size, Font.PLAIN, frc, fontCache))
+        assertSame(
+            retainedLayout,
+            layoutCache.clusterLayout(clusters[2], 0, clusters[2].size, Font.PLAIN, frc, fontCache),
+        )
     }
 
     @Test
@@ -262,6 +303,58 @@ class TerminalComplexTextLayoutCacheTest {
         return layouts.count { it != null }
     }
 
+    private fun collidingCodePoints(count: Int): IntArray {
+        val result = IntArray(count)
+        var found = 0
+        var codePoint = 0x20
+        while (found < count) {
+            if (codePointHashSlot(codePoint) == 0) {
+                result[found++] = codePoint
+            }
+            codePoint++
+        }
+        return result
+    }
+
+    private fun collidingClusters(count: Int): Array<IntArray> {
+        val result = arrayOfNulls<IntArray>(count)
+        var found = 0
+        var codePoint = 0x20
+        while (found < count) {
+            val cluster = intArrayOf(codePoint, 0x0301)
+            if (clusterHashSlot(cluster) == 0) {
+                result[found++] = cluster
+            }
+            codePoint++
+        }
+        @Suppress("UNCHECKED_CAST")
+        return result as Array<IntArray>
+    }
+
+    private fun codePointHashSlot(codePoint: Int): Int {
+        var hash = codePoint.toLong()
+        hash = hash xor (hash ushr 33)
+        hash *= -49064778989728563L
+        hash = hash xor (hash ushr 33)
+        return hash.toInt() and TEST_HASH_MASK
+    }
+
+    private fun clusterHashSlot(cluster: IntArray): Int {
+        var hash = cluster.size
+        for (codePoint in cluster) {
+            hash = 31 * hash + codePoint
+        }
+        var mixed = hash
+        mixed = mixed xor (mixed ushr 16)
+        mixed *= -2048144789
+        mixed = mixed xor (mixed ushr 13)
+        return mixed and TEST_HASH_MASK
+    }
+
     private fun Any.declaredField(name: String) =
         javaClass.getDeclaredField(name).apply { isAccessible = true }
+
+    private companion object {
+        private const val TEST_HASH_MASK = 63
+    }
 }
