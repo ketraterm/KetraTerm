@@ -201,6 +201,7 @@ class TerminalSwingTerminal(
 
     override fun removeNotify() {
         cursorTimer.stop()
+        selectionAutoscrollTimer.stop()
         super.removeNotify()
     }
 
@@ -293,13 +294,8 @@ class TerminalSwingTerminal(
      * @return current selection, or `null`.
      */
     fun currentSelection(): CellSelection? {
-        if (SwingUtilities.isEventDispatchThread()) return getViewportSelection(session?.publisher?.current())
-
-        val result = arrayOfNulls<CellSelection>(1)
-        SwingUtilities.invokeAndWait {
-            result[0] = getViewportSelection(session?.publisher?.current())
-        }
-        return result[0]
+        val pub = session?.publisher ?: return null
+        return pub.readCurrent { cache -> getViewportSelection(cache) }
     }
 
     private fun applySettingsToSession(session: TerminalSession, settings: TerminalSwingSettings) {
@@ -477,9 +473,9 @@ class TerminalSwingTerminal(
     }
 
     private fun copySelectionToClipboard(): Boolean {
-        val currentSelection = getViewportSelection(session?.publisher?.current()) ?: return false
         val publisher = session?.publisher ?: return false
         val selectedText = publisher.readCurrent { cache ->
+            val currentSelection = getViewportSelection(cache) ?: return@readCurrent null
             selectionTextExtractor.selectedText(cache, currentSelection)
         } ?: return false
         if (selectedText.isEmpty()) return false
