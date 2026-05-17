@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.input
 
 import com.gagik.terminal.input.event.TerminalKey
@@ -106,9 +105,10 @@ class TerminalSwingKeyMapperTest {
 
     @Test
     fun mapsCtrlLetterAsPrintableShortcut() {
-        val mapped = mapper.keyPressed(
-            pressed(KeyEvent.VK_C, modifiers = KeyEvent.CTRL_DOWN_MASK),
-        )
+        val mapped =
+            mapper.keyPressed(
+                pressed(KeyEvent.VK_C, modifiers = KeyEvent.CTRL_DOWN_MASK),
+            )
 
         assertEquals('c'.code, mapped?.codepoint)
         assertEquals(TerminalModifiers.CTRL, mapped?.modifiers)
@@ -119,8 +119,11 @@ class TerminalSwingKeyMapperTest {
         assertNull(mapper.keyPressed(pressed(KeyEvent.VK_A)))
     }
 
-    private fun typed(char: Char, modifiers: Int = 0): KeyEvent {
-        return KeyEvent(
+    private fun typed(
+        char: Char,
+        modifiers: Int = 0,
+    ): KeyEvent =
+        KeyEvent(
             source,
             KeyEvent.KEY_TYPED,
             System.currentTimeMillis(),
@@ -128,10 +131,12 @@ class TerminalSwingKeyMapperTest {
             KeyEvent.VK_UNDEFINED,
             char,
         )
-    }
 
-    private fun pressed(keyCode: Int, modifiers: Int = 0): KeyEvent {
-        return KeyEvent(
+    private fun pressed(
+        keyCode: Int,
+        modifiers: Int = 0,
+    ): KeyEvent =
+        KeyEvent(
             source,
             KeyEvent.KEY_PRESSED,
             System.currentTimeMillis(),
@@ -139,5 +144,4 @@ class TerminalSwingKeyMapperTest {
             keyCode,
             KeyEvent.CHAR_UNDEFINED,
         )
-    }
 }

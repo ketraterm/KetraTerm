@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.viewport
 
 import com.gagik.terminal.render.api.*
@@ -318,15 +317,21 @@ class TerminalSwingRepaintPlannerTest {
             componentWidth = WIDTH,
             componentHeight = HEIGHT,
             contentYOffset = 0.0,
-            repaintSink = object : TerminalRepaintSink {
-                override fun requestFullRepaint() {
-                    fullRepaints++
-                }
+            repaintSink =
+                object : TerminalRepaintSink {
+                    override fun requestFullRepaint() {
+                        fullRepaints++
+                    }
 
-                override fun requestRegionRepaint(x: Int, y: Int, width: Int, height: Int) {
-                    error("resize must not request partial repaint")
-                }
-            },
+                    override fun requestRegionRepaint(
+                        x: Int,
+                        y: Int,
+                        width: Int,
+                        height: Int,
+                    ) {
+                        error("resize must not request partial repaint")
+                    }
+                },
         )
 
         assertEquals(1, fullRepaints)
@@ -350,7 +355,12 @@ class TerminalSwingRepaintPlannerTest {
             }
         }
 
-        override fun requestRegionRepaint(x: Int, y: Int, width: Int, height: Int) {
+        override fun requestRegionRepaint(
+            x: Int,
+            y: Int,
+            width: Int,
+            height: Int,
+        ) {
             regions.add(Region(x, y, width, height))
         }
     }
@@ -358,16 +368,22 @@ class TerminalSwingRepaintPlannerTest {
     private object NoOpRepaintSink : TerminalRepaintSink {
         override fun requestFullRepaint() = Unit
 
-        override fun requestRegionRepaint(x: Int, y: Int, width: Int, height: Int) = Unit
+        override fun requestRegionRepaint(
+            x: Int,
+            y: Int,
+            width: Int,
+            height: Int,
+        ) = Unit
     }
 
     private class MutableFrame(
         override val columns: Int,
         override val rows: Int,
     ) : TerminalRenderFrame {
-        private val textRows = Array(rows) { row ->
-            CharArray(columns) { column -> ('a'.code + row * columns + column).toChar() }
-        }
+        private val textRows =
+            Array(rows) { row ->
+                CharArray(columns) { column -> ('a'.code + row * columns + column).toChar() }
+            }
         private val lineGenerations = LongArray(rows) { 1L }
         private val cellFlags = Array(rows) { IntArray(columns) { TerminalRenderCellFlags.CODEPOINT } }
 
@@ -376,13 +392,17 @@ class TerminalSwingRepaintPlannerTest {
         override var activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
         override var cursor: TerminalRenderCursor = cursor(column = 0, row = 0, generation = 1)
 
-        val reader = object : TerminalRenderFrameReader {
-            override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-                consumer.accept(this@MutableFrame)
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                    consumer.accept(this@MutableFrame)
+                }
             }
-        }
 
-        fun setRow(row: Int, text: String) {
+        fun setRow(
+            row: Int,
+            text: String,
+        ) {
             require(text.length == columns)
             var column = 0
             while (column < columns) {
@@ -393,7 +413,10 @@ class TerminalSwingRepaintPlannerTest {
             frameGeneration++
         }
 
-        fun setWideCell(row: Int, column: Int) {
+        fun setWideCell(
+            row: Int,
+            column: Int,
+        ) {
             require(column in 0 until columns - 1)
             cellFlags[row][column] = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING
             cellFlags[row][column + 1] = TerminalRenderCellFlags.WIDE_TRAILING
@@ -437,22 +460,24 @@ class TerminalSwingRepaintPlannerTest {
         private const val CELL_HEIGHT = 16
         private const val WIDTH = 120
         private const val HEIGHT = 80
-        private val METRICS = TerminalSwingMetrics(
-            cellWidth = CELL_WIDTH,
-            cellHeight = CELL_HEIGHT,
-            baseline = 12,
-            underlineY = 13,
-            strikethroughY = 8,
-            overlineY = 0,
-            cursorStrokeWidth = 1,
-        )
+        private val METRICS =
+            TerminalSwingMetrics(
+                cellWidth = CELL_WIDTH,
+                cellHeight = CELL_HEIGHT,
+                baseline = 12,
+                underlineY = 13,
+                strikethroughY = 8,
+                overlineY = 0,
+                cursorStrokeWidth = 1,
+            )
+
         private fun cursor(
             column: Int,
             row: Int,
             blinking: Boolean = false,
             generation: Long,
-        ): TerminalRenderCursor {
-            return TerminalRenderCursor(
+        ): TerminalRenderCursor =
+            TerminalRenderCursor(
                 column = column,
                 row = row,
                 visible = true,
@@ -460,7 +485,5 @@ class TerminalSwingRepaintPlannerTest {
                 shape = TerminalRenderCursorShape.BLOCK,
                 generation = generation,
             )
-        }
     }
 }
-

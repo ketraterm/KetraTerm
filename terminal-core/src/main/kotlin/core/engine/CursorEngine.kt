@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.engine
 
 import com.gagik.core.state.TerminalState
@@ -31,7 +30,9 @@ import com.gagik.core.state.TerminalState
  * no cursor-movement sequence leaves a stale pending-wrap flag that could
  * cause the next printed character to wrap from an unexpected position.
  */
-internal class CursorEngine(private val state: TerminalState) {
+internal class CursorEngine(
+    private val state: TerminalState,
+) {
     private val height: Int get() = state.dimensions.height
     private val leftMargin: Int get() = state.effectiveLeftMargin
     private val rightMargin: Int get() = state.effectiveRightMargin
@@ -58,20 +59,22 @@ internal class CursorEngine(private val state: TerminalState) {
     // --- Cursor Positioning ----------------------------------------------
 
     /** Homes the cursor using the active origin and horizontal-margin modes. */
-    fun homeCursor() = cursorMutation {
-        state.cancelPendingWrap()
-        state.cursor.col = leftMargin
-        state.cursor.row = if (state.modes.isOriginMode) state.scrollTop else 0
-    }
+    fun homeCursor() =
+        cursorMutation {
+            state.cancelPendingWrap()
+            state.cursor.col = leftMargin
+            state.cursor.row = if (state.modes.isOriginMode) state.scrollTop else 0
+        }
 
     /**
      * Moves the cursor to the beginning of the current line (CR, U+000D).
      * Cancels any pending wrap.
      */
-    fun carriageReturn() = cursorMutation {
-        state.cancelPendingWrap()
-        state.cursor.col = leftMargin
-    }
+    fun carriageReturn() =
+        cursorMutation {
+            state.cancelPendingWrap()
+            state.cursor.col = leftMargin
+        }
 
     /**
      * Absolute positioning for programmatic/test use.
@@ -80,7 +83,10 @@ internal class CursorEngine(private val state: TerminalState) {
      * @param col Target column (0-based).
      * @param row Target row (0-based).
      */
-    fun setCursorAbsolute(col: Int, row: Int) = cursorMutation {
+    fun setCursorAbsolute(
+        col: Int,
+        row: Int,
+    ) = cursorMutation {
         state.cancelPendingWrap()
         state.cursor.col = state.dimensions.clampCol(col)
         state.cursor.row = state.dimensions.clampRow(row)
@@ -94,20 +100,25 @@ internal class CursorEngine(private val state: TerminalState) {
      * region, and the cursor is mathematically trapped within those margins.
      * When DECOM is inactive, positioning is absolute across the entire viewport.
      */
-    fun setCursor(col: Int, row: Int) = cursorMutation {
+    fun setCursor(
+        col: Int,
+        row: Int,
+    ) = cursorMutation {
         state.cancelPendingWrap()
-        val targetCol = if (state.modes.isOriginMode && state.modes.isLeftRightMarginMode) {
-            leftMargin + col
-        } else {
-            col
-        }
+        val targetCol =
+            if (state.modes.isOriginMode && state.modes.isLeftRightMarginMode) {
+                leftMargin + col
+            } else {
+                col
+            }
         state.cursor.col = targetCol.coerceIn(leftMargin, rightMargin)
 
-        state.cursor.row = if (state.modes.isOriginMode) {
-            (state.scrollTop + row).coerceIn(state.scrollTop, state.scrollBottom)
-        } else {
-            state.dimensions.clampRow(row)
-        }
+        state.cursor.row =
+            if (state.modes.isOriginMode) {
+                (state.scrollTop + row).coerceIn(state.scrollTop, state.scrollBottom)
+            } else {
+                state.dimensions.clampRow(row)
+            }
     }
 
     // --- Relative Movement -----------------------------------------------
@@ -119,12 +130,13 @@ internal class CursorEngine(private val state: TerminalState) {
      * movement stops at scrollTop. If the cursor is above the scroll region
      * (i.e., outside it entirely), it clamps to row 0.
      */
-    fun cursorUp(n: Int) = cursorMutation {
-        if (n <= 0) return
-        state.cancelPendingWrap()
-        val top = if (state.cursor.row in state.scrollTop..state.scrollBottom) state.scrollTop else 0
-        state.cursor.row = (state.cursor.row - n).coerceAtLeast(top)
-    }
+    fun cursorUp(n: Int) =
+        cursorMutation {
+            if (n <= 0) return
+            state.cancelPendingWrap()
+            val top = if (state.cursor.row in state.scrollTop..state.scrollBottom) state.scrollTop else 0
+            state.cursor.row = (state.cursor.row - n).coerceAtLeast(top)
+        }
 
     /**
      * Moves the cursor down by [n] rows (CUD, CSI n B).
@@ -133,40 +145,44 @@ internal class CursorEngine(private val state: TerminalState) {
      * movement stops at scrollBottom. If the cursor is below the scroll region,
      * it clamps to height - 1.
      */
-    fun cursorDown(n: Int) = cursorMutation {
-        if (n <= 0) return
-        state.cancelPendingWrap()
-        val bottom = if (state.cursor.row in state.scrollTop..state.scrollBottom) state.scrollBottom else height - 1
-        state.cursor.row = (state.cursor.row + n).coerceAtMost(bottom)
-    }
+    fun cursorDown(n: Int) =
+        cursorMutation {
+            if (n <= 0) return
+            state.cancelPendingWrap()
+            val bottom = if (state.cursor.row in state.scrollTop..state.scrollBottom) state.scrollBottom else height - 1
+            state.cursor.row = (state.cursor.row + n).coerceAtMost(bottom)
+        }
 
     /**
      * Moves the cursor left by [n] columns, clamped to column 0 (CUB).
      */
-    fun cursorLeft(n: Int) = cursorMutation {
-        if (n <= 0) return
-        state.cancelPendingWrap()
-        state.cursor.col = (state.cursor.col - n).coerceAtLeast(leftMargin)
-    }
+    fun cursorLeft(n: Int) =
+        cursorMutation {
+            if (n <= 0) return
+            state.cancelPendingWrap()
+            state.cursor.col = (state.cursor.col - n).coerceAtLeast(leftMargin)
+        }
 
     /**
      * Moves the cursor right by [n] columns, clamped to width - 1 (CUF).
      */
-    fun cursorRight(n: Int) = cursorMutation {
-        if (n <= 0) return
-        state.cancelPendingWrap()
-        state.cursor.col = (state.cursor.col + n).coerceAtMost(rightMargin)
-    }
+    fun cursorRight(n: Int) =
+        cursorMutation {
+            if (n <= 0) return
+            state.cancelPendingWrap()
+            state.cursor.col = (state.cursor.col + n).coerceAtMost(rightMargin)
+        }
 
     /**
      * Advances the cursor to the next tab stop (HT, U+0009).
      * Clamps to the right margin if no further stops exist.
      * Tab never triggers a line wrap.
      */
-    fun horizontalTab() = cursorMutation {
-        state.cancelPendingWrap()
-        advanceToNextTabStop()
-    }
+    fun horizontalTab() =
+        cursorMutation {
+            state.cancelPendingWrap()
+            advanceToNextTabStop()
+        }
 
     /**
      * Advances the cursor forward by [count] tab stops (CHT, CSI Ps I).
@@ -175,13 +191,14 @@ internal class CursorEngine(private val state: TerminalState) {
      * if fewer than [count] stops exist before the active right boundary,
      * the cursor clamps there and remains pinned for the remaining steps.
      */
-    fun cursorForwardTab(count: Int = 1) = cursorMutation {
-        state.cancelPendingWrap()
-        val steps = if (count <= 0) 1 else count
-        repeat(steps) {
-            advanceToNextTabStop()
+    fun cursorForwardTab(count: Int = 1) =
+        cursorMutation {
+            state.cancelPendingWrap()
+            val steps = if (count <= 0) 1 else count
+            repeat(steps) {
+                advanceToNextTabStop()
+            }
         }
-    }
 
     /**
      * Moves the cursor backward by [count] tab stops (CBT, CSI Ps Z).
@@ -190,13 +207,14 @@ internal class CursorEngine(private val state: TerminalState) {
      * if fewer than [count] stops exist before the active left boundary,
      * the cursor clamps there and remains pinned for the remaining steps.
      */
-    fun cursorBackwardTab(count: Int = 1) = cursorMutation {
-        state.cancelPendingWrap()
-        val steps = if (count <= 0) 1 else count
-        repeat(steps) {
-            retreatToPreviousTabStop()
+    fun cursorBackwardTab(count: Int = 1) =
+        cursorMutation {
+            state.cancelPendingWrap()
+            val steps = if (count <= 0) 1 else count
+            repeat(steps) {
+                retreatToPreviousTabStop()
+            }
         }
-    }
 
     // --- Save / Restore ----------------------------------------------
 
@@ -261,23 +279,24 @@ internal class CursorEngine(private val state: TerminalState) {
      * The no-save path uses [setCursorAbsolute], so it deliberately ignores
      * DECOM and DECLRMM when homing.
      */
-    fun restoreCursor() = cursorMutation {
-        if (!state.savedCursor.isSaved) {
-            setCursorAbsolute(0, 0)
-            state.pen.reset()
-            state.modes.isOriginMode = false
-            return
+    fun restoreCursor() =
+        cursorMutation {
+            if (!state.savedCursor.isSaved) {
+                setCursorAbsolute(0, 0)
+                state.pen.reset()
+                state.modes.isOriginMode = false
+                return
+            }
+
+            state.modes.isOriginMode = state.savedCursor.isOriginMode
+
+            val restoredCol = state.savedCursor.col.coerceIn(leftMargin, rightMargin)
+            val restoredRow = state.savedCursor.row.coerceIn(0, height - 1)
+
+            state.cursor.col = restoredCol
+            state.cursor.row = restoredRow
+            state.cursor.pendingWrap = state.savedCursor.pendingWrap && restoredCol == rightMargin
+
+            state.pen.restoreAttr(state.savedCursor.attr, state.savedCursor.extendedAttr)
         }
-
-        state.modes.isOriginMode = state.savedCursor.isOriginMode
-
-        val restoredCol = state.savedCursor.col.coerceIn(leftMargin, rightMargin)
-        val restoredRow = state.savedCursor.row.coerceIn(0, height - 1)
-
-        state.cursor.col = restoredCol
-        state.cursor.row = restoredRow
-        state.cursor.pendingWrap = state.savedCursor.pendingWrap && restoredCol == rightMargin
-
-        state.pen.restoreAttr(state.savedCursor.attr, state.savedCursor.extendedAttr)
-    }
 }

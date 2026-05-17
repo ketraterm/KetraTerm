@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.model.AttributeColor
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
 class BrutalTerminalBufferTest {
-
     @Test
     fun `6-1 API lifetime - frame is only valid inside callback`() {
         val buffer = TerminalBuffer(initialWidth = 10, initialHeight = 3)
@@ -249,7 +247,7 @@ class BrutalTerminalBufferTest {
         // Emoji: Family (Man, Woman, Girl, Boy) - often wide
         val emoji = intArrayOf(0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F467, 0x200D, 0x1F466)
         buffer.writeCluster(emoji)
-        
+
         // Combining: 'e' + acute accent
         buffer.writeCluster(intArrayOf('e'.code, 0x0301))
 
@@ -258,13 +256,13 @@ class BrutalTerminalBufferTest {
             val codeWords = IntArray(10)
             val flags = IntArray(10)
             val clusters = mutableMapOf<Int, String>()
-            
+
             frame.copyLine(
                 row = 0,
                 codeWords = codeWords,
                 flags = flags,
                 attrWords = LongArray(10),
-                clusterSink = TerminalRenderClusterSink { col, text -> clusters[col] = text }
+                clusterSink = TerminalRenderClusterSink { col, text -> clusters[col] = text },
             )
 
             // Emoji (usually wide, 2 cells)
@@ -291,7 +289,7 @@ class BrutalTerminalBufferTest {
                 row = 0,
                 codeWords = codeWords,
                 attrWords = LongArray(3),
-                flags = IntArray(3)
+                flags = IntArray(3),
             )
 
             // Cluster cell codeWord must be 0 in the public ABI, not the internal handle
@@ -305,7 +303,7 @@ class BrutalTerminalBufferTest {
         val buffer = TerminalBuffer(initialWidth = 10, initialHeight = 1)
         buffer.setPenColors(
             foreground = AttributeColor.rgb(0xFF, 0x00, 0x00),
-            background = AttributeColor.rgb(0x00, 0xFF, 0x00)
+            background = AttributeColor.rgb(0x00, 0xFF, 0x00),
         )
         buffer.writeCodepoint('X'.code)
 
@@ -316,7 +314,7 @@ class BrutalTerminalBufferTest {
                 row = 0,
                 codeWords = IntArray(10),
                 flags = IntArray(10),
-                attrWords = attrWords
+                attrWords = attrWords,
             )
 
             val attr = attrWords[0]
@@ -331,7 +329,7 @@ class BrutalTerminalBufferTest {
     fun `6-5 Row mapping - line generations stay attached to line content after ring rotation`() {
         val buffer = TerminalBuffer(initialWidth = 3, initialHeight = 2, maxHistory = 10)
         val reader = buffer as TerminalRenderFrameReader
-        
+
         // Write line 0
         buffer.writeText("abc")
         // Move to line 1 and column 0

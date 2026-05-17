@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import com.gagik.core.api.TerminalInputState
@@ -33,7 +32,10 @@ internal class KeyboardEncoder(
     private val scratch: InputScratchBuffer,
     private val policy: TerminalInputPolicy = TerminalInputPolicy(),
 ) {
-    fun encode(event: TerminalKeyEvent, modeBits: Long) {
+    fun encode(
+        event: TerminalKeyEvent,
+        modeBits: Long,
+    ) {
         val key = event.key
         if (key != null) {
             encodeSpecialKey(
@@ -50,7 +52,11 @@ internal class KeyboardEncoder(
         }
     }
 
-    private fun encodeCodepoint(codepoint: Int, modifiers: Int, modeBits: Long) {
+    private fun encodeCodepoint(
+        codepoint: Int,
+        modifiers: Int,
+        modeBits: Long,
+    ) {
         if (shouldEncodeModifyOtherKey(codepoint, modifiers, modeBits)) {
             encodeModifyOtherKey(codepoint, modifiers)
             return
@@ -103,47 +109,53 @@ internal class KeyboardEncoder(
 
             TerminalKey.ESCAPE -> encodeEscape(modifiers)
 
-            TerminalKey.UP -> encodeArrow(
-                modifiers = modifiers,
-                normalFinal = 'A'.code,
-                applicationFinal = 'A'.code,
-                modeBits = modeBits,
-            )
+            TerminalKey.UP ->
+                encodeArrow(
+                    modifiers = modifiers,
+                    normalFinal = 'A'.code,
+                    applicationFinal = 'A'.code,
+                    modeBits = modeBits,
+                )
 
-            TerminalKey.DOWN -> encodeArrow(
-                modifiers = modifiers,
-                normalFinal = 'B'.code,
-                applicationFinal = 'B'.code,
-                modeBits = modeBits,
-            )
+            TerminalKey.DOWN ->
+                encodeArrow(
+                    modifiers = modifiers,
+                    normalFinal = 'B'.code,
+                    applicationFinal = 'B'.code,
+                    modeBits = modeBits,
+                )
 
-            TerminalKey.RIGHT -> encodeArrow(
-                modifiers = modifiers,
-                normalFinal = 'C'.code,
-                applicationFinal = 'C'.code,
-                modeBits = modeBits,
-            )
+            TerminalKey.RIGHT ->
+                encodeArrow(
+                    modifiers = modifiers,
+                    normalFinal = 'C'.code,
+                    applicationFinal = 'C'.code,
+                    modeBits = modeBits,
+                )
 
-            TerminalKey.LEFT -> encodeArrow(
-                modifiers = modifiers,
-                normalFinal = 'D'.code,
-                applicationFinal = 'D'.code,
-                modeBits = modeBits,
-            )
+            TerminalKey.LEFT ->
+                encodeArrow(
+                    modifiers = modifiers,
+                    normalFinal = 'D'.code,
+                    applicationFinal = 'D'.code,
+                    modeBits = modeBits,
+                )
 
-            TerminalKey.HOME -> encodeHomeEnd(
-                modifiers = modifiers,
-                normalFinal = 'H'.code,
-                applicationFinal = 'H'.code,
-                modeBits = modeBits,
-            )
+            TerminalKey.HOME ->
+                encodeHomeEnd(
+                    modifiers = modifiers,
+                    normalFinal = 'H'.code,
+                    applicationFinal = 'H'.code,
+                    modeBits = modeBits,
+                )
 
-            TerminalKey.END -> encodeHomeEnd(
-                modifiers = modifiers,
-                normalFinal = 'F'.code,
-                applicationFinal = 'F'.code,
-                modeBits = modeBits,
-            )
+            TerminalKey.END ->
+                encodeHomeEnd(
+                    modifiers = modifiers,
+                    normalFinal = 'F'.code,
+                    applicationFinal = 'F'.code,
+                    modeBits = modeBits,
+                )
 
             TerminalKey.INSERT -> encodeTildeKey(2, modifiers)
             TerminalKey.DELETE -> encodeTildeKey(3, modifiers)
@@ -189,7 +201,8 @@ internal class KeyboardEncoder(
             TerminalKey.NUMPAD_6,
             TerminalKey.NUMPAD_7,
             TerminalKey.NUMPAD_8,
-            TerminalKey.NUMPAD_9 -> encodeKeypad(key, modifiers, modeBits)
+            TerminalKey.NUMPAD_9,
+            -> encodeKeypad(key, modifiers, modeBits)
         }
     }
 
@@ -210,14 +223,18 @@ internal class KeyboardEncoder(
             return
         }
 
-        val byte = when (policy.backspacePolicy) {
-            BackspacePolicy.DELETE -> ControlCode.DEL
-            BackspacePolicy.BACKSPACE -> BS
-        }
+        val byte =
+            when (policy.backspacePolicy) {
+                BackspacePolicy.DELETE -> ControlCode.DEL
+                BackspacePolicy.BACKSPACE -> BS
+            }
         output.writeByte(byte)
     }
 
-    private fun encodeEnter(modifiers: Int, modeBits: Long) {
+    private fun encodeEnter(
+        modifiers: Int,
+        modeBits: Long,
+    ) {
         if (shouldEncodeModifyOtherSpecial(ENTER_CODEPOINT, modifiers, modeBits)) {
             encodeModifyOtherKey(ENTER_CODEPOINT, modifiers)
             return
@@ -283,7 +300,10 @@ internal class KeyboardEncoder(
         )
     }
 
-    private fun encodeTab(modifiers: Int, modeBits: Long) {
+    private fun encodeTab(
+        modifiers: Int,
+        modeBits: Long,
+    ) {
         if (shouldEncodeModifyOtherSpecial(TAB_CODEPOINT, modifiers, modeBits)) {
             encodeModifyOtherKey(TAB_CODEPOINT, modifiers)
             return
@@ -326,7 +346,10 @@ internal class KeyboardEncoder(
             (codepoint == TAB_CODEPOINT || codepoint == ENTER_CODEPOINT)
     }
 
-    private fun isLegacyAmbiguousOrMissing(codepoint: Int, modifiers: Int): Boolean {
+    private fun isLegacyAmbiguousOrMissing(
+        codepoint: Int,
+        modifiers: Int,
+    ): Boolean {
         if (TerminalModifiers.hasShift(modifiers) && modifiers != TerminalModifiers.SHIFT) {
             return true
         }
@@ -338,7 +361,10 @@ internal class KeyboardEncoder(
         return false
     }
 
-    private fun encodeModifyOtherKey(codepoint: Int, modifiers: Int) {
+    private fun encodeModifyOtherKey(
+        codepoint: Int,
+        modifiers: Int,
+    ) {
         scratch.clear()
         scratch.appendByte(ControlCode.ESC)
         scratch.appendByte('['.code)
@@ -411,7 +437,10 @@ internal class KeyboardEncoder(
         )
     }
 
-    private fun encodeTildeKey(number: Int, modifiers: Int) {
+    private fun encodeTildeKey(
+        number: Int,
+        modifiers: Int,
+    ) {
         if (modifiers == TerminalModifiers.NONE) {
             writeStatic(tildeSequence(number))
             return
@@ -446,7 +475,11 @@ internal class KeyboardEncoder(
         scratch.writeTo(output)
     }
 
-    private fun encodeKeypad(key: TerminalKey, modifiers: Int, modeBits: Long) {
+    private fun encodeKeypad(
+        key: TerminalKey,
+        modifiers: Int,
+        modeBits: Long,
+    ) {
         if (modifiers != TerminalModifiers.NONE) {
             val unsupportedModifier =
                 TerminalModifiers.hasShift(modifiers) || TerminalModifiers.hasCtrl(modifiers)
@@ -489,11 +522,10 @@ internal class KeyboardEncoder(
         }
     }
 
-    private fun shouldSuppressForMeta(modifiers: Int): Boolean {
-        return TerminalModifiers.hasMeta(modifiers) &&
+    private fun shouldSuppressForMeta(modifiers: Int): Boolean =
+        TerminalModifiers.hasMeta(modifiers) &&
             !TerminalModifiers.hasAlt(modifiers) &&
             policy.metaKeyPolicy == MetaKeyPolicy.SUPPRESS_EVENT
-    }
 
     private fun shouldPrefixEscape(modifiers: Int): Boolean {
         if (policy.altSendsEscapePrefix && TerminalModifiers.hasAlt(modifiers)) {
@@ -521,8 +553,8 @@ internal class KeyboardEncoder(
         return true
     }
 
-    private fun applicationKeypadFinal(key: TerminalKey): Int {
-        return when (key) {
+    private fun applicationKeypadFinal(key: TerminalKey): Int =
+        when (key) {
             TerminalKey.NUMPAD_SPACE -> ' '.code
             TerminalKey.NUMPAD_TAB -> 'I'.code
             TerminalKey.NUMPAD_ENTER -> 'M'.code
@@ -542,14 +574,14 @@ internal class KeyboardEncoder(
             TerminalKey.NUMPAD_SUBTRACT -> 'm'.code
             TerminalKey.NUMPAD_ADD -> 'k'.code
             TerminalKey.NUMPAD_COMMA,
-            TerminalKey.NUMPAD_SEPARATOR -> 'l'.code
+            TerminalKey.NUMPAD_SEPARATOR,
+            -> 'l'.code
             TerminalKey.NUMPAD_EQUALS -> 'X'.code
             else -> -1
         }
-    }
 
-    private fun normalKeypadAscii(key: TerminalKey): Int {
-        return when (key) {
+    private fun normalKeypadAscii(key: TerminalKey): Int =
+        when (key) {
             TerminalKey.NUMPAD_SPACE -> ' '.code
             TerminalKey.NUMPAD_TAB -> ControlCode.HT
             TerminalKey.NUMPAD_0 -> '0'.code
@@ -568,18 +600,19 @@ internal class KeyboardEncoder(
             TerminalKey.NUMPAD_SUBTRACT -> '-'.code
             TerminalKey.NUMPAD_ADD -> '+'.code
             TerminalKey.NUMPAD_COMMA,
-            TerminalKey.NUMPAD_SEPARATOR -> ','.code
+            TerminalKey.NUMPAD_SEPARATOR,
+            -> ','.code
             TerminalKey.NUMPAD_EQUALS -> '='.code
             TerminalKey.NUMPAD_BEGIN -> '5'.code
             else -> -1
         }
-    }
 
     private fun controlCodeFor(codepoint: Int): Int {
-        val lower = when (codepoint) {
-            in 'A'.code..'Z'.code -> codepoint + 32
-            else -> codepoint
-        }
+        val lower =
+            when (codepoint) {
+                in 'A'.code..'Z'.code -> codepoint + 32
+                else -> codepoint
+            }
 
         return when (lower) {
             in 'a'.code..'z'.code -> lower - 'a'.code + 1
@@ -594,46 +627,45 @@ internal class KeyboardEncoder(
         }
     }
 
-    private fun cursorSequence(finalByte: Int): ByteArray {
-        return when (finalByte) {
+    private fun cursorSequence(finalByte: Int): ByteArray =
+        when (finalByte) {
             'A'.code -> TerminalSequences.CURSOR_UP_NORMAL
             'B'.code -> TerminalSequences.CURSOR_DOWN_NORMAL
             'C'.code -> TerminalSequences.CURSOR_RIGHT_NORMAL
             'D'.code -> TerminalSequences.CURSOR_LEFT_NORMAL
             else -> error("unsupported cursor final: $finalByte")
         }
-    }
 
-    private fun applicationCursorSequence(finalByte: Int): ByteArray {
-        return when (finalByte) {
+    private fun applicationCursorSequence(finalByte: Int): ByteArray =
+        when (finalByte) {
             'A'.code -> TerminalSequences.CURSOR_UP_APPLICATION
             'B'.code -> TerminalSequences.CURSOR_DOWN_APPLICATION
             'C'.code -> TerminalSequences.CURSOR_RIGHT_APPLICATION
             'D'.code -> TerminalSequences.CURSOR_LEFT_APPLICATION
             else -> error("unsupported cursor final: $finalByte")
         }
-    }
 
-    private fun homeEndSequence(finalByte: Int, application: Boolean): ByteArray {
-        return when (finalByte) {
+    private fun homeEndSequence(
+        finalByte: Int,
+        application: Boolean,
+    ): ByteArray =
+        when (finalByte) {
             'H'.code -> if (application) TerminalSequences.HOME_APPLICATION else TerminalSequences.HOME_NORMAL
             'F'.code -> if (application) TerminalSequences.END_APPLICATION else TerminalSequences.END_NORMAL
             else -> error("unsupported home/end final: $finalByte")
         }
-    }
 
-    private fun functionSs3Sequence(finalByte: Int): ByteArray {
-        return when (finalByte) {
+    private fun functionSs3Sequence(finalByte: Int): ByteArray =
+        when (finalByte) {
             'P'.code -> TerminalSequences.F1
             'Q'.code -> TerminalSequences.F2
             'R'.code -> TerminalSequences.F3
             'S'.code -> TerminalSequences.F4
             else -> error("unsupported function final: $finalByte")
         }
-    }
 
-    private fun tildeSequence(number: Int): ByteArray {
-        return when (number) {
+    private fun tildeSequence(number: Int): ByteArray =
+        when (number) {
             2 -> TerminalSequences.INSERT
             3 -> TerminalSequences.DELETE
             5 -> TerminalSequences.PAGE_UP
@@ -648,7 +680,6 @@ internal class KeyboardEncoder(
             24 -> TerminalSequences.F12
             else -> error("unsupported tilde key number: $number")
         }
-    }
 
     private fun writeSs3(finalByte: Int) {
         scratch.clear()

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.engine
 
 import com.gagik.core.codec.AttributeCodec
@@ -24,17 +23,24 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class MutationEngineProtectionTest {
+    private fun createState(
+        width: Int = 6,
+        height: Int = 2,
+        history: Int = 2,
+    ): TerminalState = TerminalState(width, height, maxHistory = history)
 
-    private fun createState(width: Int = 6, height: Int = 2, history: Int = 2): TerminalState {
-        return TerminalState(width, height, maxHistory = history)
-    }
-
-    private fun lineAt(state: TerminalState, row: Int): Line {
+    private fun lineAt(
+        state: TerminalState,
+        row: Int,
+    ): Line {
         val top = (state.ring.size - state.dimensions.height).coerceAtLeast(0)
         return state.ring[top + row]
     }
 
-    private fun writeAscii(writer: MutationEngine, text: String) {
+    private fun writeAscii(
+        writer: MutationEngine,
+        text: String,
+    ) {
         for (ch in text) {
             writer.printCodepoint(ch.code, 1)
         }
@@ -54,7 +60,7 @@ class MutationEngineProtectionTest {
 
         assertAll(
             { assertEquals('B'.code, lineAt(state, 0).getCodepoint(0)) },
-            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(0))) }
+            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(0))) },
         )
     }
 
@@ -85,7 +91,7 @@ class MutationEngineProtectionTest {
             { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(0)) },
             { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(1)) },
             { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(0))) },
-            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(1))) }
+            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(1))) },
         )
     }
 
@@ -105,7 +111,7 @@ class MutationEngineProtectionTest {
             { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(0)) },
             { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(1)) },
             { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(0))) },
-            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(1))) }
+            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(1))) },
         )
     }
 
@@ -126,7 +132,7 @@ class MutationEngineProtectionTest {
             { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(1)) },
             { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(2)) },
             { assertTrue(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(0))) },
-            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(1))) }
+            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(1))) },
         )
     }
 
@@ -148,7 +154,7 @@ class MutationEngineProtectionTest {
             { assertEquals('A'.code, lineAt(state, 0).getCodepoint(0)) },
             { assertEquals('B'.code, lineAt(state, 0).getCodepoint(1)) },
             { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(2)) },
-            { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(3)) }
+            { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(3)) },
         )
     }
 
@@ -162,7 +168,7 @@ class MutationEngineProtectionTest {
 
         assertAll(
             { assertTrue(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(0))) },
-            { assertTrue(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(1))) }
+            { assertTrue(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(1))) },
         )
     }
 
@@ -179,7 +185,7 @@ class MutationEngineProtectionTest {
 
         assertAll(
             { assertEquals(0x1F600, lineAt(state, 0).getCodepoint(0)) },
-            { assertEquals(TerminalConstants.WIDE_CHAR_SPACER, lineAt(state, 0).rawCodepoint(1)) }
+            { assertEquals(TerminalConstants.WIDE_CHAR_SPACER, lineAt(state, 0).rawCodepoint(1)) },
         )
     }
 
@@ -199,7 +205,7 @@ class MutationEngineProtectionTest {
             { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(0)) },
             { assertEquals('A'.code, lineAt(state, 0).getCodepoint(1)) },
             { assertTrue(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(1))) },
-            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(0))) }
+            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(0))) },
         )
     }
 
@@ -221,7 +227,7 @@ class MutationEngineProtectionTest {
             { assertEquals('A'.code, lineAt(state, 0).getCodepoint(0)) },
             { assertTrue(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(0))) },
             { assertEquals('B'.code, lineAt(state, 0).getCodepoint(1)) },
-            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(1))) }
+            { assertFalse(AttributeCodec.isProtected(lineAt(state, 0).getPackedAttr(1))) },
         )
     }
 }

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.cache
 
 import com.gagik.terminal.render.api.*
@@ -25,7 +24,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 class TerminalRenderPublisherTest {
-
     @Test
     fun `writer buffers can be reused by different worker threads`() {
         val publisher = TerminalRenderPublisher(3, 1)
@@ -33,13 +31,14 @@ class TerminalRenderPublisherTest {
 
         texts.forEach { text ->
             var exception: Throwable? = null
-            val renderThread = thread(start = true) {
-                try {
-                    publisher.updateAndPublish(MockFrame(3, 1, text))
-                } catch (error: Throwable) {
-                    exception = error
+            val renderThread =
+                thread(start = true) {
+                    try {
+                        publisher.updateAndPublish(MockFrame(3, 1, text))
+                    } catch (error: Throwable) {
+                        exception = error
+                    }
                 }
-            }
             renderThread.join()
 
             assertNull(exception)
@@ -95,10 +94,11 @@ class TerminalRenderPublisherTest {
         val frame = BlockingMockFrame(3, 1, "abc")
         val writerFinished = AtomicBoolean(false)
 
-        val writer = thread(start = true) {
-            publisher.updateAndPublish(frame)
-            writerFinished.set(true)
-        }
+        val writer =
+            thread(start = true) {
+                publisher.updateAndPublish(frame)
+                writerFinished.set(true)
+            }
 
         assertTrue(frame.awaitCopy(), "writer did not enter copyLine")
         frame.releaseCopy()
@@ -118,13 +118,14 @@ class TerminalRenderPublisherTest {
         val frame = BlockingOverscanClusterFrame(rows = 31)
         var exception: Throwable? = null
 
-        val writer = thread(start = true) {
-            try {
-                publisher.updateAndPublish(frame)
-            } catch (error: Throwable) {
-                exception = error
+        val writer =
+            thread(start = true) {
+                try {
+                    publisher.updateAndPublish(frame)
+                } catch (error: Throwable) {
+                    exception = error
+                }
             }
-        }
 
         assertTrue(frame.awaitOverscanRowCopy(), "writer did not reach overscan row")
         frame.releaseOverscanRowCopy()
@@ -156,21 +157,21 @@ class TerminalRenderPublisherTest {
         val firstFrame = MockFrame(3, 1, "abc")
         val secondFrame = MockFrame(5, 2, "12345")
 
-        val firstRenderThread = thread(start = true) {
-            publisher.updateAndPublish(firstFrame)
-        }
+        val firstRenderThread =
+            thread(start = true) {
+                publisher.updateAndPublish(firstFrame)
+            }
         firstRenderThread.join()
 
-
-
         var exception: Throwable? = null
-        val secondRenderThread = thread(start = true) {
-            try {
-                publisher.updateAndPublish(secondFrame)
-            } catch (e: Throwable) {
-                exception = e
+        val secondRenderThread =
+            thread(start = true) {
+                try {
+                    publisher.updateAndPublish(secondFrame)
+                } catch (e: Throwable) {
+                    exception = e
+                }
             }
-        }
         secondRenderThread.join()
 
         assertNull(exception)
@@ -218,21 +219,23 @@ class TerminalRenderPublisherTest {
         val releaseReader = CountDownLatch(1)
         val writerFinished = AtomicBoolean(false)
 
-        val reader = thread(start = true) {
-            publisher.readCurrent { front ->
-                readerEntered.countDown()
-                assertEquals("abc", front.rowText(0))
-                assertTrue(releaseReader.await(1, TimeUnit.SECONDS))
-                assertEquals("abc", front.rowText(0))
+        val reader =
+            thread(start = true) {
+                publisher.readCurrent { front ->
+                    readerEntered.countDown()
+                    assertEquals("abc", front.rowText(0))
+                    assertTrue(releaseReader.await(1, TimeUnit.SECONDS))
+                    assertEquals("abc", front.rowText(0))
+                }
             }
-        }
 
         assertTrue(readerEntered.await(1, TimeUnit.SECONDS))
 
-        val writer = thread(start = true) {
-            publisher.updateAndPublish(MockFrame(3, 1, "def"))
-            writerFinished.set(true)
-        }
+        val writer =
+            thread(start = true) {
+                publisher.updateAndPublish(MockFrame(3, 1, "def"))
+                writerFinished.set(true)
+            }
 
         writer.join(1_000)
         assertTrue(writerFinished.get(), "writer was blocked by an active readCurrent callback")
@@ -251,14 +254,15 @@ class TerminalRenderPublisherTest {
         val readerEntered = CountDownLatch(1)
         val releaseReader = CountDownLatch(1)
 
-        val reader = thread(start = true) {
-            publisher.readCurrent { front ->
-                readerEntered.countDown()
-                assertEquals("abc", front.rowText(0))
-                assertTrue(releaseReader.await(1, TimeUnit.SECONDS))
-                assertEquals("abc", front.rowText(0))
+        val reader =
+            thread(start = true) {
+                publisher.readCurrent { front ->
+                    readerEntered.countDown()
+                    assertEquals("abc", front.rowText(0))
+                    assertTrue(releaseReader.await(1, TimeUnit.SECONDS))
+                    assertEquals("abc", front.rowText(0))
+                }
             }
-        }
 
         assertTrue(readerEntered.await(1, TimeUnit.SECONDS))
 
@@ -285,15 +289,16 @@ class TerminalRenderPublisherTest {
     private open class MockFrame(
         override val columns: Int,
         override val rows: Int,
-        val text: String
-    ) : TerminalRenderFrame, TerminalRenderFrameReader {
-
+        val text: String,
+    ) : TerminalRenderFrame,
+        TerminalRenderFrameReader {
         override val frameGeneration: Long = text.hashCode().toLong()
         override val structureGeneration: Long = 1L
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
         override val cursor: TerminalRenderCursor = TerminalRenderCursor(0, 0, true, false, TerminalRenderCursorShape.BLOCK, 1L)
 
         override fun lineGeneration(row: Int): Long = text.hashCode().toLong()
+
         override fun lineWrapped(row: Int): Boolean = false
 
         override fun copyLine(
@@ -343,7 +348,7 @@ class TerminalRenderPublisherTest {
             hyperlinkIds: IntArray?,
             hyperlinkOffset: Int,
             clusterSink: TerminalRenderClusterSink?,
-            clusterDataSink: TerminalRenderClusterDataSink?
+            clusterDataSink: TerminalRenderClusterDataSink?,
         ) {
             copyEntered.countDown()
             assertTrue(releaseCopy.await(1, TimeUnit.SECONDS), "copyLine was not released")
@@ -364,9 +369,7 @@ class TerminalRenderPublisherTest {
             )
         }
 
-        fun awaitCopy(): Boolean {
-            return copyEntered.await(1, TimeUnit.SECONDS)
-        }
+        fun awaitCopy(): Boolean = copyEntered.await(1, TimeUnit.SECONDS)
 
         fun releaseCopy() {
             releaseCopy.countDown()
@@ -375,7 +378,8 @@ class TerminalRenderPublisherTest {
 
     private class BlockingOverscanClusterFrame(
         override val rows: Int,
-    ) : TerminalRenderFrame, TerminalRenderFrameReader {
+    ) : TerminalRenderFrame,
+        TerminalRenderFrameReader {
         private val overscanRowCopyEntered = CountDownLatch(1)
         private val releaseOverscanRowCopy = CountDownLatch(1)
 
@@ -383,14 +387,15 @@ class TerminalRenderPublisherTest {
         override val frameGeneration: Long = 31
         override val structureGeneration: Long = 31
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
-        override val cursor: TerminalRenderCursor = TerminalRenderCursor(
-            column = 0,
-            row = 0,
-            visible = false,
-            blinking = false,
-            shape = TerminalRenderCursorShape.BLOCK,
-            generation = 1L,
-        )
+        override val cursor: TerminalRenderCursor =
+            TerminalRenderCursor(
+                column = 0,
+                row = 0,
+                visible = false,
+                blinking = false,
+                shape = TerminalRenderCursorShape.BLOCK,
+                generation = 1L,
+            )
 
         override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
             consumer.accept(this)
@@ -432,16 +437,16 @@ class TerminalRenderPublisherTest {
             }
         }
 
-        fun awaitOverscanRowCopy(): Boolean {
-            return overscanRowCopyEntered.await(1, TimeUnit.SECONDS)
-        }
+        fun awaitOverscanRowCopy(): Boolean = overscanRowCopyEntered.await(1, TimeUnit.SECONDS)
 
         fun releaseOverscanRowCopy() {
             releaseOverscanRowCopy.countDown()
         }
     }
 
-    private class OffsetRecordingFrame : TerminalRenderFrame, TerminalRenderFrameReader {
+    private class OffsetRecordingFrame :
+        TerminalRenderFrame,
+        TerminalRenderFrameReader {
         private var resolvedOffset: Int = 0
         private var resolvedRows: Int = 1
 
@@ -460,14 +465,15 @@ class TerminalRenderPublisherTest {
         override val structureGeneration: Long = 1L
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
         override val cursor: TerminalRenderCursor
-            get() = TerminalRenderCursor(
-                column = 0,
-                row = 0,
-                visible = resolvedOffset == 0,
-                blinking = false,
-                shape = TerminalRenderCursorShape.BLOCK,
-                generation = 1L,
-            )
+            get() =
+                TerminalRenderCursor(
+                    column = 0,
+                    row = 0,
+                    visible = resolvedOffset == 0,
+                    blinking = false,
+                    shape = TerminalRenderCursorShape.BLOCK,
+                    generation = 1L,
+                )
 
         override fun lineGeneration(row: Int): Long = 1L
 
@@ -486,7 +492,7 @@ class TerminalRenderPublisherTest {
             hyperlinkIds: IntArray?,
             hyperlinkOffset: Int,
             clusterSink: TerminalRenderClusterSink?,
-            clusterDataSink: TerminalRenderClusterDataSink?
+            clusterDataSink: TerminalRenderClusterDataSink?,
         ) {
             val text = if (resolvedOffset == 0) "new" else "old"
             for (i in 0 until columns) {
@@ -499,7 +505,10 @@ class TerminalRenderPublisherTest {
             readRenderFrame(scrollbackOffset = 0, consumer = consumer)
         }
 
-        override fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
+        override fun readRenderFrame(
+            scrollbackOffset: Int,
+            consumer: TerminalRenderFrameConsumer,
+        ) {
             lastRequestedOffset = scrollbackOffset
             lastRequestedRows = 0
             resolvedOffset = scrollbackOffset.coerceIn(0, historySize)

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import com.gagik.core.TerminalBuffers
@@ -26,7 +25,6 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Test
 
 class DefaultTerminalInputEncoderCoreStateTest {
-
     @Test
     fun `uses real core application cursor mode for keyboard encoding`() {
         val terminal = TerminalBuffers.create(width = 4, height = 2)
@@ -231,36 +229,31 @@ class DefaultTerminalInputEncoderCoreStateTest {
         )
     }
 
-    private fun esc(textAfterEsc: String): ByteArray {
-        return byteArrayOf(0x1b) + textAfterEsc.encodeToByteArray()
-    }
+    private fun esc(textAfterEsc: String): ByteArray = byteArrayOf(0x1b) + textAfterEsc.encodeToByteArray()
 
-    private fun mousePress(): TerminalMouseEvent {
-        return TerminalMouseEvent(
+    private fun mousePress(): TerminalMouseEvent =
+        TerminalMouseEvent(
             column = 0,
             row = 0,
             button = TerminalMouseButton.LEFT,
             type = TerminalMouseEventType.PRESS,
         )
-    }
 
-    private fun mouseRelease(): TerminalMouseEvent {
-        return TerminalMouseEvent(
+    private fun mouseRelease(): TerminalMouseEvent =
+        TerminalMouseEvent(
             column = 0,
             row = 0,
             button = TerminalMouseButton.LEFT,
             type = TerminalMouseEventType.RELEASE,
         )
-    }
 
-    private fun mouseMotion(button: TerminalMouseButton): TerminalMouseEvent {
-        return TerminalMouseEvent(
+    private fun mouseMotion(button: TerminalMouseButton): TerminalMouseEvent =
+        TerminalMouseEvent(
             column = 0,
             row = 0,
             button = button,
             type = TerminalMouseEventType.MOTION,
         )
-    }
 
     private class RecordingHostOutput : TerminalHostOutput {
         var bytes: ByteArray = ByteArray(0)

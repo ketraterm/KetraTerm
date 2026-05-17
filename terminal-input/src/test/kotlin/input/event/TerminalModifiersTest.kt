@@ -13,14 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.event
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalModifiersTest {
-
     @Test
     fun `recognizes individual modifier bits`() {
         val modifiers = TerminalModifiers.SHIFT or TerminalModifiers.CTRL

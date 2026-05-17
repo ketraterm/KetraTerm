@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.store
 
 import com.gagik.core.model.Line
@@ -25,12 +24,15 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ClusterStore Test Suite")
 class ClusterStoreTest {
-
     // -------------------------------------------------------------------------
     // Shared assertion helper
     // -------------------------------------------------------------------------
 
-    private fun assertCluster(store: ClusterStore, handle: Int, expected: IntArray) {
+    private fun assertCluster(
+        store: ClusterStore,
+        handle: Int,
+        expected: IntArray,
+    ) {
         assertEquals(expected.size, store.length(handle), "Cluster length mismatch")
         assertEquals(expected[0], store.baseCodepoint(handle), "Base codepoint mismatch")
         for (i in expected.indices) {
@@ -45,7 +47,6 @@ class ClusterStoreTest {
     @Nested
     @DisplayName("alloc()")
     inner class AllocationTests {
-
         @Test
         fun `alloc returns negative handles starting from -2`() {
             val store = ClusterStore()
@@ -56,7 +57,7 @@ class ClusterStoreTest {
             assertAll(
                 { assertEquals(-2, h0, "First handle must be -2") },
                 { assertEquals(-3, h1, "Second handle must be -3") },
-                { assertEquals(-4, h2, "Third handle must be -4") }
+                { assertEquals(-4, h2, "Third handle must be -4") },
             )
         }
 
@@ -66,8 +67,11 @@ class ClusterStoreTest {
             // Alloc enough clusters that if encoding were off-by-one, handle -1 would appear.
             val handles = (0 until 10).map { store.alloc(intArrayOf(it)) }
             handles.forEach { h ->
-                assertNotEquals(TerminalConstants.WIDE_CHAR_SPACER, h,
-                    "Handle $h collides with WIDE_CHAR_SPACER sentinel")
+                assertNotEquals(
+                    TerminalConstants.WIDE_CHAR_SPACER,
+                    h,
+                    "Handle $h collides with WIDE_CHAR_SPACER sentinel",
+                )
             }
         }
 
@@ -76,8 +80,11 @@ class ClusterStoreTest {
             val store = ClusterStore()
             val handles = (0 until 10).map { store.alloc(intArrayOf(it)) }
             handles.forEach { h ->
-                assertNotEquals(TerminalConstants.EMPTY, h,
-                    "Handle $h collides with EMPTY sentinel")
+                assertNotEquals(
+                    TerminalConstants.EMPTY,
+                    h,
+                    "Handle $h collides with EMPTY sentinel",
+                )
             }
         }
 
@@ -86,7 +93,9 @@ class ClusterStoreTest {
             val store = ClusterStore()
             val source = intArrayOf(0x1F469, 0x200D, 0x1F680)
             val handle = store.alloc(source)
-            source[0] = 'X'.code; source[1] = 'Y'.code; source[2] = 'Z'.code
+            source[0] = 'X'.code
+            source[1] = 'Y'.code
+            source[2] = 'Z'.code
 
             assertCluster(store, handle, intArrayOf(0x1F469, 0x200D, 0x1F680))
         }
@@ -117,7 +126,7 @@ class ClusterStoreTest {
             assertAll(
                 { assertEquals(1, store.length(handle)) },
                 { assertEquals(0x1F600, store.baseCodepoint(handle)) },
-                { assertEquals(0x1F600, store.codepointAt(handle, 0)) }
+                { assertEquals(0x1F600, store.codepointAt(handle, 0)) },
             )
         }
 
@@ -129,8 +138,11 @@ class ClusterStoreTest {
 
             assertEquals(16, store.length(handle))
             for (i in 0 until 16) {
-                assertEquals(0x1000 + i, store.codepointAt(handle, i),
-                    "Codepoint mismatch at index $i")
+                assertEquals(
+                    0x1000 + i,
+                    store.codepointAt(handle, i),
+                    "Codepoint mismatch at index $i",
+                )
             }
         }
 
@@ -186,7 +198,6 @@ class ClusterStoreTest {
     @Nested
     @DisplayName("free() and freeRange()")
     inner class FreeingTests {
-
         @Test
         fun `free is no-op for EMPTY`() {
             val store = ClusterStore()
@@ -227,9 +238,10 @@ class ClusterStoreTest {
 
             store.free(handle)
 
-            val error = assertThrows(IllegalStateException::class.java) {
-                store.free(handle)
-            }
+            val error =
+                assertThrows(IllegalStateException::class.java) {
+                    store.free(handle)
+                }
 
             assertTrue(error.message!!.contains(handle.toString()))
         }
@@ -275,8 +287,11 @@ class ClusterStoreTest {
 
             // Next fresh slot should still be at high-water mark 5 → handle -(5+2) = -7
             val nextFresh = store.alloc(intArrayOf(999))
-            assertEquals(-7, nextFresh,
-                "Slot table must not have grown beyond high-water mark of 5")
+            assertEquals(
+                -7,
+                nextFresh,
+                "Slot table must not have grown beyond high-water mark of 5",
+            )
 
             // All re-allocated handles contain correct new data
             for (i in reallocs.indices) {
@@ -304,7 +319,7 @@ class ClusterStoreTest {
                 { assertEquals(-5, nextFresh, "Next fresh slot must follow high-water mark") },
                 { assertCluster(store, r1, intArrayOf(901)) },
                 { assertCluster(store, r2, intArrayOf(902)) },
-                { assertCluster(store, h2, intArrayOf(300), ) } // h2 untouched
+                { assertCluster(store, h2, intArrayOf(300)) }, // h2 untouched
             )
         }
 
@@ -326,7 +341,7 @@ class ClusterStoreTest {
                 { assertEquals(h1, r1) },
                 { assertEquals(h0, r2) },
                 { assertEquals(-5, r3, "r3 must be a fresh slot since h2 was not freed") },
-                { assertCluster(store, h2, intArrayOf(3)) }
+                { assertCluster(store, h2, intArrayOf(3)) },
             )
         }
 
@@ -352,7 +367,7 @@ class ClusterStoreTest {
                 { assertEquals(survivingHandle, reused[0], "Shifted live handle should be freed exactly once") },
                 { assertCluster(store, reused[0], intArrayOf(100, 200)) },
                 { assertCluster(store, reused[1], intArrayOf(101, 201)) },
-                { assertCluster(store, reused[2], intArrayOf(102, 202)) }
+                { assertCluster(store, reused[2], intArrayOf(102, 202)) },
             )
         }
 
@@ -372,12 +387,13 @@ class ClusterStoreTest {
         fun `freeRange on array with no cluster handles is a no-op`() {
             val store = ClusterStore()
             val h = store.alloc(intArrayOf(1))
-            val arr = intArrayOf(
-                TerminalConstants.EMPTY,
-                TerminalConstants.WIDE_CHAR_SPACER,
-                'A'.code,
-                0x1F600
-            )
+            val arr =
+                intArrayOf(
+                    TerminalConstants.EMPTY,
+                    TerminalConstants.WIDE_CHAR_SPACER,
+                    'A'.code,
+                    0x1F600,
+                )
 
             store.freeRange(arr, fromIndex = 0, toIndex = arr.size)
 
@@ -410,8 +426,11 @@ class ClusterStoreTest {
 
             // No slot table growth — next fresh slot must be at high-water mark 20 → handle -(20+2) = -22
             val nextFresh = store.alloc(intArrayOf(999))
-            assertEquals(-22, nextFresh,
-                "Slot table must not have grown beyond high-water mark of 20")
+            assertEquals(
+                -22,
+                nextFresh,
+                "Slot table must not have grown beyond high-water mark of 20",
+            )
         }
     }
 
@@ -422,7 +441,6 @@ class ClusterStoreTest {
     @Nested
     @DisplayName("accessors: length, codepointAt, baseCodepoint")
     inner class AccessorTests {
-
         @Test
         fun `length codepointAt and baseCodepoint expose stored data`() {
             val store = ClusterStore()
@@ -433,7 +451,7 @@ class ClusterStoreTest {
                 { assertEquals(0x0915, store.baseCodepoint(handle)) },
                 { assertEquals(0x0915, store.codepointAt(handle, 0)) },
                 { assertEquals(0x094D, store.codepointAt(handle, 1)) },
-                { assertEquals(0x0937, store.codepointAt(handle, 2)) }
+                { assertEquals(0x0937, store.codepointAt(handle, 2)) },
             )
         }
 
@@ -479,7 +497,6 @@ class ClusterStoreTest {
     @Nested
     @DisplayName("readInto()")
     inner class ReadIntoTests {
-
         @Test
         fun `readInto with default destOffset 0 copies payload from start`() {
             val store = ClusterStore()
@@ -492,7 +509,7 @@ class ClusterStoreTest {
                 { assertEquals(3, written) },
                 { assertEquals(1, dest[0]) },
                 { assertEquals(2, dest[1]) },
-                { assertEquals(3, dest[2]) }
+                { assertEquals(3, dest[2]) },
             )
         }
 
@@ -510,7 +527,7 @@ class ClusterStoreTest {
                 { assertEquals(7, dest[1]) },
                 { assertEquals(8, dest[2]) },
                 { assertEquals(9, dest[3]) },
-                { assertEquals(100, dest[4], "Slot after payload must be untouched") }
+                { assertEquals(100, dest[4], "Slot after payload must be untouched") },
             )
         }
 
@@ -525,7 +542,7 @@ class ClusterStoreTest {
             assertAll(
                 { assertEquals(1, written) },
                 { assertEquals(0x1F600, dest[0]) },
-                { assertEquals(0, dest[1], "Second slot must remain untouched") }
+                { assertEquals(0, dest[1], "Second slot must remain untouched") },
             )
         }
 
@@ -582,7 +599,6 @@ class ClusterStoreTest {
     @Nested
     @DisplayName("capacity growth")
     inner class GrowthTests {
-
         @Test
         fun `growing slot table preserves all old handles and data`() {
             val store = ClusterStore()
@@ -591,7 +607,7 @@ class ClusterStoreTest {
 
             assertAll(
                 { assertEquals(-2, handles.first(), "First handle must be -2") },
-                { assertEquals(-(handles.lastIndex + 2), handles.last(), "Last handle encoding must be correct") }
+                { assertEquals(-(handles.lastIndex + 2), handles.last(), "Last handle encoding must be correct") },
             )
             for (i in handles.indices) {
                 assertCluster(store, handles[i], intArrayOf(1000 + i))
@@ -602,9 +618,10 @@ class ClusterStoreTest {
         fun `growing data pool preserves all previously written cluster payloads`() {
             val store = ClusterStore()
             // 80 × 5 = 400 codepoints > initial data capacity of 256, forces doubling
-            val handles = IntArray(80) { i ->
-                store.alloc(IntArray(5) { j -> i * 10 + j })
-            }
+            val handles =
+                IntArray(80) { i ->
+                    store.alloc(IntArray(5) { j -> i * 10 + j })
+                }
 
             for (i in handles.indices) {
                 assertCluster(store, handles[i], IntArray(5) { j -> i * 10 + j })
@@ -626,9 +643,10 @@ class ClusterStoreTest {
         fun `data pool grows multiple times and payloads remain valid`() {
             val store = ClusterStore()
             // 50 × 10 = 500 > 256, then 100 × 10 = 1000 > 512 → two doublings minimum
-            val handles = IntArray(100) { i ->
-                store.alloc(IntArray(10) { j -> i * 100 + j })
-            }
+            val handles =
+                IntArray(100) { i ->
+                    store.alloc(IntArray(10) { j -> i * 100 + j })
+                }
 
             for (i in handles.indices) {
                 val expected = IntArray(10) { j -> i * 100 + j }
@@ -663,7 +681,6 @@ class ClusterStoreTest {
     @Nested
     @DisplayName("handle encoding contract")
     inner class HandleEncodingTests {
-
         @Test
         fun `all handles are strictly less than CLUSTER_HANDLE_MAX`() {
             val store = ClusterStore()
@@ -693,8 +710,11 @@ class ClusterStoreTest {
             store.free(original)
             val reissued = store.alloc(intArrayOf(9, 8, 7))
 
-            assertEquals(originalValue, reissued,
-                "Reissued handle must have the same numeric value as the freed one")
+            assertEquals(
+                originalValue,
+                reissued,
+                "Reissued handle must have the same numeric value as the freed one",
+            )
         }
     }
 }

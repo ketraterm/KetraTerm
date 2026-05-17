@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.cache
 
 import java.awt.Font
@@ -34,11 +33,10 @@ internal class TerminalAsciiGlyphVectorCache(
 
     private val glyphPosition = Point2D.Float()
     private val lookupKey = LookupKey()
-    private val layouts = object : LinkedHashMap<Key, GlyphVector>(capacity, LOAD_FACTOR, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, GlyphVector>?): Boolean {
-            return size > capacity
+    private val layouts =
+        object : LinkedHashMap<Key, GlyphVector>(capacity, LOAD_FACTOR, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, GlyphVector>?): Boolean = size > capacity
         }
-    }
     private var fontRenderContext: FontRenderContext? = null
 
     /**

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.api
 
 import com.gagik.core.TerminalBuffers
@@ -84,14 +83,15 @@ class TerminalSwingTerminalThreadingTest {
         }
         assertTrue(edtBlocked.await(1, TimeUnit.SECONDS), "EDT blocker did not start")
 
-        val worker = thread(start = true) {
-            try {
-                component.bind(session)
-                bindReturned.set(true)
-            } catch (error: Throwable) {
-                failure.set(error)
+        val worker =
+            thread(start = true) {
+                try {
+                    component.bind(session)
+                    bindReturned.set(true)
+                } catch (error: Throwable) {
+                    failure.set(error)
+                }
             }
-        }
 
         worker.join(500)
         assertTrue(bindReturned.get(), "bind should post to EDT and return without waiting")
@@ -108,16 +108,17 @@ class TerminalSwingTerminalThreadingTest {
     fun `reloadSettings called off EDT rebuilds component state on EDT`() {
         val reloadCalledOnEdt = AtomicBoolean(false)
         val calls = AtomicInteger()
-        val component = TerminalSwingTerminal {
-            if (calls.incrementAndGet() > 1) {
-                reloadCalledOnEdt.set(SwingUtilities.isEventDispatchThread())
+        val component =
+            TerminalSwingTerminal {
+                if (calls.incrementAndGet() > 1) {
+                    reloadCalledOnEdt.set(SwingUtilities.isEventDispatchThread())
+                }
+                TerminalSwingSettings(
+                    font = Font(Font.MONOSPACED, Font.PLAIN, 18),
+                    columns = 100,
+                    rows = 30,
+                )
             }
-            TerminalSwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 18),
-                columns = 100,
-                rows = 30,
-            )
-        }
 
         runOffEdt {
             component.reloadSettings()
@@ -134,10 +135,11 @@ class TerminalSwingTerminalThreadingTest {
     @Test
     fun `visibleGridSize called off EDT reads cached grid size without waiting for EDT`() {
         val component = TerminalSwingTerminal()
-        val expected = edtCall {
-            component.size = Dimension(160, 80)
-            component.visibleGridSize()
-        }
+        val expected =
+            edtCall {
+                component.size = Dimension(160, 80)
+                component.visibleGridSize()
+            }
         val visibleFromBackground = AtomicReference<Dimension>()
         val edtBlocked = CountDownLatch(1)
         val releaseEdt = CountDownLatch(1)
@@ -156,14 +158,15 @@ class TerminalSwingTerminalThreadingTest {
         }
         assertTrue(edtBlocked.await(1, TimeUnit.SECONDS), "EDT blocker did not start")
 
-        val worker = thread(start = true) {
-            try {
-                visibleFromBackground.set(component.visibleGridSize())
-                returned.countDown()
-            } catch (error: Throwable) {
-                failure.set(error)
+        val worker =
+            thread(start = true) {
+                try {
+                    visibleFromBackground.set(component.visibleGridSize())
+                    returned.countDown()
+                } catch (error: Throwable) {
+                    failure.set(error)
+                }
             }
-        }
 
         val completedWhileEdtBlocked = returned.await(500, TimeUnit.MILLISECONDS)
         releaseEdt.countDown()
@@ -179,10 +182,11 @@ class TerminalSwingTerminalThreadingTest {
         val session = testSession(connector)
         val component = TerminalSwingTerminal()
 
-        val expected = edtCall {
-            component.size = Dimension(160, 80)
-            component.visibleGridSize()
-        }
+        val expected =
+            edtCall {
+                component.size = Dimension(160, 80)
+                component.visibleGridSize()
+            }
 
         component.bind(session)
         drainEdt()
@@ -198,9 +202,10 @@ class TerminalSwingTerminalThreadingTest {
     @Test
     fun `bind applies ambiguous width setting to session core`() {
         val session = testSession()
-        val component = TerminalSwingTerminal {
-            TerminalSwingSettings(treatAmbiguousAsWide = true)
-        }
+        val component =
+            TerminalSwingTerminal {
+                TerminalSwingSettings(treatAmbiguousAsWide = true)
+            }
 
         component.bind(session)
         drainEdt()
@@ -213,9 +218,10 @@ class TerminalSwingTerminalThreadingTest {
     fun `reloadSettings updates ambiguous width setting on bound session`() {
         val session = testSession()
         var ambiguousAsWide = false
-        val component = TerminalSwingTerminal {
-            TerminalSwingSettings(treatAmbiguousAsWide = ambiguousAsWide)
-        }
+        val component =
+            TerminalSwingTerminal {
+                TerminalSwingSettings(treatAmbiguousAsWide = ambiguousAsWide)
+            }
 
         component.bind(session)
         drainEdt()
@@ -242,11 +248,12 @@ class TerminalSwingTerminalThreadingTest {
         drainEdt()
         connector.reset()
 
-        val expected = edtCall {
-            component.size = Dimension(320, 160)
-            component.dispatchEvent(ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED))
-            component.visibleGridSize()
-        }
+        val expected =
+            edtCall {
+                component.size = Dimension(320, 160)
+                component.dispatchEvent(ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED))
+                component.visibleGridSize()
+            }
 
         assertAll(
             { assertEquals(expected.width, connector.lastColumns.get()) },
@@ -278,14 +285,15 @@ class TerminalSwingTerminalThreadingTest {
     private fun runOffEdt(action: () -> Unit) {
         assertFalse(SwingUtilities.isEventDispatchThread())
         val failure = AtomicReference<Throwable?>()
-        val worker = thread(start = true) {
-            try {
-                assertFalse(SwingUtilities.isEventDispatchThread())
-                action()
-            } catch (error: Throwable) {
-                failure.set(error)
+        val worker =
+            thread(start = true) {
+                try {
+                    assertFalse(SwingUtilities.isEventDispatchThread())
+                    action()
+                } catch (error: Throwable) {
+                    failure.set(error)
+                }
             }
-        }
         worker.join()
         failure.get()?.let { throw it }
     }
@@ -307,9 +315,16 @@ class TerminalSwingTerminalThreadingTest {
     private object NoOpConnector : TerminalConnector {
         override fun start(listener: TerminalConnectorListener) = Unit
 
-        override fun write(bytes: ByteArray, offset: Int, length: Int) = Unit
+        override fun write(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) = Unit
 
-        override fun resize(columns: Int, rows: Int) = Unit
+        override fun resize(
+            columns: Int,
+            rows: Int,
+        ) = Unit
 
         override fun close() = Unit
     }
@@ -321,9 +336,16 @@ class TerminalSwingTerminalThreadingTest {
 
         override fun start(listener: TerminalConnectorListener) = Unit
 
-        override fun write(bytes: ByteArray, offset: Int, length: Int) = Unit
+        override fun write(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) = Unit
 
-        override fun resize(columns: Int, rows: Int) {
+        override fun resize(
+            columns: Int,
+            rows: Int,
+        ) {
             lastColumns.set(columns)
             lastRows.set(rows)
             resizeCount.incrementAndGet()
@@ -339,7 +361,11 @@ class TerminalSwingTerminalThreadingTest {
     }
 
     private object NoOpParser : TerminalOutputParser {
-        override fun accept(bytes: ByteArray, offset: Int, length: Int) = Unit
+        override fun accept(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) = Unit
 
         override fun acceptByte(byteValue: Int) = Unit
 

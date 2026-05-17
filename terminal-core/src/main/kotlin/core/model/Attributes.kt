@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.model
 
 /**
@@ -56,7 +55,7 @@ data class Attributes(
     val inverse: Boolean = false,
     val conceal: Boolean = false,
     val selectiveEraseProtected: Boolean = false,
-    val hyperlinkId: Int = 0
+    val hyperlinkId: Int = 0,
 ) {
     init {
         require(hyperlinkId >= 0) { "hyperlinkId must be non-negative, was $hyperlinkId" }
@@ -71,19 +70,22 @@ data class Attributes(
  */
 data class AttributeColor(
     val kind: AttributeColorKind,
-    val value: Int = 0
+    val value: Int = 0,
 ) {
     init {
         when (kind) {
-            AttributeColorKind.DEFAULT -> require(value == 0) {
-                "default color value must be 0, was $value"
-            }
-            AttributeColorKind.INDEXED -> require(value in 0..255) {
-                "indexed color value must be in 0..255, was $value"
-            }
-            AttributeColorKind.RGB -> require(value in 0..0xFF_FF_FF) {
-                "RGB color value must be in 0x000000..0xFFFFFF, was $value"
-            }
+            AttributeColorKind.DEFAULT ->
+                require(value == 0) {
+                    "default color value must be 0, was $value"
+                }
+            AttributeColorKind.INDEXED ->
+                require(value in 0..255) {
+                    "indexed color value must be in 0..255, was $value"
+                }
+            AttributeColorKind.RGB ->
+                require(value in 0..0xFF_FF_FF) {
+                    "RGB color value must be in 0x000000..0xFFFFFF, was $value"
+                }
         }
     }
 
@@ -107,7 +109,11 @@ data class AttributeColor(
          * @param blue Blue channel in `0..255`.
          * @return RGB color descriptor.
          */
-        fun rgb(red: Int, green: Int, blue: Int): AttributeColor {
+        fun rgb(
+            red: Int,
+            green: Int,
+            blue: Int,
+        ): AttributeColor {
             require(red in 0..255) { "red must be in 0..255, was $red" }
             require(green in 0..255) { "green must be in 0..255, was $green" }
             require(blue in 0..255) { "blue must be in 0..255, was $blue" }
@@ -133,7 +139,7 @@ enum class AttributeColorKind {
     INDEXED,
 
     /** Direct RGB color stored as `0xRRGGBB`. */
-    RGB
+    RGB,
 }
 
 /**
@@ -141,7 +147,9 @@ enum class AttributeColorKind {
  *
  * [sgrCode] is the value used by colon SGR underline forms such as `CSI 4:3 m`.
  */
-enum class UnderlineStyle(val sgrCode: Int) {
+enum class UnderlineStyle(
+    val sgrCode: Int,
+) {
     /** No underline. */
     NONE(0),
 
@@ -158,7 +166,8 @@ enum class UnderlineStyle(val sgrCode: Int) {
     DOTTED(4),
 
     /** Dashed underline. */
-    DASHED(5);
+    DASHED(5),
+    ;
 
     companion object {
         /**
@@ -167,14 +176,15 @@ enum class UnderlineStyle(val sgrCode: Int) {
          * @param code SGR underline-style code.
          * @return Matching style, or `null` when [code] is unsupported.
          */
-        fun fromSgrCode(code: Int): UnderlineStyle? = when (code) {
-            NONE.sgrCode -> NONE
-            SINGLE.sgrCode -> SINGLE
-            DOUBLE.sgrCode -> DOUBLE
-            CURLY.sgrCode -> CURLY
-            DOTTED.sgrCode -> DOTTED
-            DASHED.sgrCode -> DASHED
-            else -> null
-        }
+        fun fromSgrCode(code: Int): UnderlineStyle? =
+            when (code) {
+                NONE.sgrCode -> NONE
+                SINGLE.sgrCode -> SINGLE
+                DOUBLE.sgrCode -> DOUBLE
+                CURLY.sgrCode -> CURLY
+                DOTTED.sgrCode -> DOTTED
+                DASHED.sgrCode -> DASHED
+                else -> null
+            }
     }
 }

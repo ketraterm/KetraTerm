@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import org.junit.jupiter.api.Assertions.assertAll
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Test
 
 class TerminalSequencesTest {
-
     @Test
     fun `stores cursor key sequences`() {
         assertAll(
@@ -79,7 +77,10 @@ class TerminalSequencesTest {
         )
     }
 
-    private fun assertSequence(expected: String, actual: ByteArray) {
+    private fun assertSequence(
+        expected: String,
+        actual: ByteArray,
+    ) {
         val expectedBytes = ByteArray(expected.length)
         var i = 0
         while (i < expected.length) {

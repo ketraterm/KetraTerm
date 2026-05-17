@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.pty
 
 import com.gagik.terminal.input.event.TerminalKeyEvent
@@ -32,15 +31,17 @@ class TerminalPtySessionTest {
     @Test
     fun `pty stdout is parsed into terminal core through shared session`() {
         val process = FakeTerminalProcess(inputBytes = "hello\u001B[5n".ascii())
-        val session = TerminalPtySessions.start(
-            options = TerminalPtyOptions(
-                command = listOf("fake"),
-                columns = 10,
-                rows = 3,
-                readerThreadName = "terminal-pty-test-reader",
-            ),
-            processFactory = FixedProcessFactory(process),
-        )
+        val session =
+            TerminalPtySessions.start(
+                options =
+                    TerminalPtyOptions(
+                        command = listOf("fake"),
+                        columns = 10,
+                        rows = 3,
+                        readerThreadName = "terminal-pty-test-reader",
+                    ),
+                processFactory = FixedProcessFactory(process),
+            )
 
         waitUntil { session.terminal.getLineAsString(0) == "hello" }
 
@@ -50,10 +51,11 @@ class TerminalPtySessionTest {
     @Test
     fun `parser core responses are written back to pty stdin`() {
         val process = FakeTerminalProcess(inputBytes = "\u001B[6n".ascii())
-        val session = TerminalPtySessions.start(
-            options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
-            processFactory = FixedProcessFactory(process),
-        )
+        val session =
+            TerminalPtySessions.start(
+                options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                processFactory = FixedProcessFactory(process),
+            )
 
         waitUntil { process.outputText() == "\u001B[1;1R" }
 
@@ -64,10 +66,11 @@ class TerminalPtySessionTest {
     @Test
     fun `input events are encoded to pty stdin through session serialization point`() {
         val process = FakeTerminalProcess.running()
-        val session = TerminalPtySessions.start(
-            options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
-            processFactory = FixedProcessFactory(process),
-        )
+        val session =
+            TerminalPtySessions.start(
+                options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                processFactory = FixedProcessFactory(process),
+            )
 
         session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
 
@@ -77,10 +80,11 @@ class TerminalPtySessionTest {
     @Test
     fun `resize updates process and terminal dimensions`() {
         val process = FakeTerminalProcess.running()
-        val session = TerminalPtySessions.start(
-            options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
-            processFactory = FixedProcessFactory(process),
-        )
+        val session =
+            TerminalPtySessions.start(
+                options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                processFactory = FixedProcessFactory(process),
+            )
 
         session.resize(columns = 20, rows = 5)
 
@@ -92,15 +96,17 @@ class TerminalPtySessionTest {
     @Test
     fun `ambiguous width option is applied before pty output is parsed`() {
         val process = FakeTerminalProcess(inputBytes = "\u20ACX".toByteArray(StandardCharsets.UTF_8))
-        val session = TerminalPtySessions.start(
-            options = TerminalPtyOptions(
-                command = listOf("fake"),
-                columns = 6,
-                rows = 2,
-                treatAmbiguousAsWide = true,
-            ),
-            processFactory = FixedProcessFactory(process),
-        )
+        val session =
+            TerminalPtySessions.start(
+                options =
+                    TerminalPtyOptions(
+                        command = listOf("fake"),
+                        columns = 6,
+                        rows = 2,
+                        treatAmbiguousAsWide = true,
+                    ),
+                processFactory = FixedProcessFactory(process),
+            )
 
         waitUntil { session.terminal.getCodepointAt(2, 0) == 'X'.code }
 
@@ -115,10 +121,11 @@ class TerminalPtySessionTest {
     @Test
     fun `close destroys process and does not fake an exit code`() {
         val process = FakeTerminalProcess.running()
-        val session = TerminalPtySessions.start(
-            options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
-            processFactory = FixedProcessFactory(process),
-        )
+        val session =
+            TerminalPtySessions.start(
+                options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                processFactory = FixedProcessFactory(process),
+            )
 
         session.close()
 
@@ -129,10 +136,11 @@ class TerminalPtySessionTest {
     @Test
     fun `process exit is captured on shared session`() {
         val process = FakeTerminalProcess(inputBytes = ByteArray(0), exitCode = 7)
-        val session = TerminalPtySessions.start(
-            options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
-            processFactory = FixedProcessFactory(process),
-        )
+        val session =
+            TerminalPtySessions.start(
+                options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                processFactory = FixedProcessFactory(process),
+            )
 
         waitUntil { session.exitCode == 7 }
 
@@ -143,16 +151,18 @@ class TerminalPtySessionTest {
     fun `large output is parsed without losing bytes across connector chunks`() {
         val text = "x".repeat(20_000) + "\n"
         val process = FakeTerminalProcess(inputBytes = text.ascii())
-        val session = TerminalPtySessions.start(
-            options = TerminalPtyOptions(
-                command = listOf("fake"),
-                columns = 200,
-                rows = 120,
-                maxHistory = 200,
-                readBufferSize = 17,
-            ),
-            processFactory = FixedProcessFactory(process),
-        )
+        val session =
+            TerminalPtySessions.start(
+                options =
+                    TerminalPtyOptions(
+                        command = listOf("fake"),
+                        columns = 200,
+                        rows = 120,
+                        maxHistory = 200,
+                        readBufferSize = 17,
+                    ),
+                processFactory = FixedProcessFactory(process),
+            )
 
         waitUntil { session.terminal.getAllAsString().count { it == 'x' } == 20_000 }
 
@@ -165,12 +175,13 @@ class TerminalPtySessionTest {
         val input = "\u0007\u001B]0;both\u001B\\".ascii()
         val process = FakeTerminalProcess(inputBytes = input)
         TerminalPtySessions.start(
-            options = TerminalPtyOptions(
-                command = listOf("fake"),
-                columns = 10,
-                rows = 3,
-                eventListener = listener,
-            ),
+            options =
+                TerminalPtyOptions(
+                    command = listOf("fake"),
+                    columns = 10,
+                    rows = 3,
+                    eventListener = listener,
+                ),
             processFactory = FixedProcessFactory(process),
         )
 
@@ -183,17 +194,19 @@ class TerminalPtySessionTest {
 
     @Test
     fun `listener exception is reported through listenerFailed`() {
-        val listener = object : TerminalPtyEventListener by TerminalPtyEventListener.NONE {
-            val failures = mutableListOf<Exception>()
+        val listener =
+            object : TerminalPtyEventListener by TerminalPtyEventListener.NONE {
+                val failures = mutableListOf<Exception>()
 
-            override fun bell(session: TerminalSession) {
-                throw IllegalStateException("bell failed")
-            }
+                override fun bell(session: TerminalSession): Unit = throw IllegalStateException("bell failed")
 
-            override fun listenerFailed(session: TerminalSession, exception: Exception) {
-                failures += exception
+                override fun listenerFailed(
+                    session: TerminalSession,
+                    exception: Exception,
+                ) {
+                    failures += exception
+                }
             }
-        }
         val process = FakeTerminalProcess(inputBytes = "\u0007".ascii())
         TerminalPtySessions.start(
             options = TerminalPtyOptions(command = listOf("fake"), eventListener = listener),
@@ -244,7 +257,10 @@ class TerminalPtySessionTest {
             }
         }
 
-        override fun resize(columns: Int, rows: Int) {
+        override fun resize(
+            columns: Int,
+            rows: Int,
+        ) {
             sizes += columns to rows
         }
 
@@ -269,7 +285,11 @@ class TerminalPtySessionTest {
             return value
         }
 
-        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+        override fun read(
+            buffer: ByteArray,
+            offset: Int,
+            length: Int,
+        ): Int {
             val count = super.read(buffer, offset, length)
             if (count < 0) drained.countDown()
             return count
@@ -284,7 +304,11 @@ class TerminalPtySessionTest {
             return -1
         }
 
-        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+        override fun read(
+            buffer: ByteArray,
+            offset: Int,
+            length: Int,
+        ): Int {
             released.await(1, TimeUnit.SECONDS)
             return -1
         }
@@ -303,15 +327,24 @@ class TerminalPtySessionTest {
             bells++
         }
 
-        override fun iconTitleChanged(session: TerminalSession, title: String) {
+        override fun iconTitleChanged(
+            session: TerminalSession,
+            title: String,
+        ) {
             iconTitles += title
         }
 
-        override fun windowTitleChanged(session: TerminalSession, title: String) {
+        override fun windowTitleChanged(
+            session: TerminalSession,
+            title: String,
+        ) {
             windowTitles += title
         }
 
-        override fun listenerFailed(session: TerminalSession, exception: Exception) = Unit
+        override fun listenerFailed(
+            session: TerminalSession,
+            exception: Exception,
+        ) = Unit
     }
 
     private fun String.ascii(): ByteArray = toByteArray(StandardCharsets.US_ASCII)

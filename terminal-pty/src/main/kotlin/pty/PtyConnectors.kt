@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.pty
 
 import com.gagik.terminal.transport.TerminalConnector
@@ -39,13 +38,14 @@ object PtyConnectors {
         columns: Int = 80,
         rows: Int = 24,
     ): TerminalConnector {
-        val options = TerminalPtyOptions(
-            command = command,
-            environment = env,
-            workingDirectory = workingDirectory,
-            columns = columns,
-            rows = rows,
-        )
+        val options =
+            TerminalPtyOptions(
+                command = command,
+                environment = env,
+                workingDirectory = workingDirectory,
+                columns = columns,
+                rows = rows,
+            )
         return create(options, Pty4jTerminalProcessFactory)
     }
 

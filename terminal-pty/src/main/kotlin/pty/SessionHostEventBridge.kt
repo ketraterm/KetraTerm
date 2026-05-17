@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.pty
 
 import com.gagik.integration.TerminalHostEventSink
@@ -44,9 +43,10 @@ internal class SessionHostEventBridge(
     }
 
     private inline fun safeDispatch(block: (TerminalSession) -> Unit) {
-        val session = checkNotNull(attachedSession) {
-            "SessionHostEventBridge not attached"
-        }
+        val session =
+            checkNotNull(attachedSession) {
+                "SessionHostEventBridge not attached"
+            }
 
         try {
             block(session)

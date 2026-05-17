@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.runtime.ParserState
@@ -23,11 +22,17 @@ internal class RecordingPrintableActionSink : PrintableActionSink {
     val utf8Bytes = ArrayList<Int>()
     var flushCount: Int = 0
 
-    override fun onAsciiByte(state: ParserState, byteValue: Int) {
+    override fun onAsciiByte(
+        state: ParserState,
+        byteValue: Int,
+    ) {
         asciiBytes += byteValue
     }
 
-    override fun onUtf8Byte(state: ParserState, byteValue: Int) {
+    override fun onUtf8Byte(
+        state: ParserState,
+        byteValue: Int,
+    ) {
         utf8Bytes += byteValue
     }
 

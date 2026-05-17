@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 /**
@@ -29,12 +28,10 @@ internal object TerminalBlockElementGlyphs {
     const val LOWER_LEFT: Int = 1 shl 2
     const val LOWER_RIGHT: Int = 1 shl 3
 
-    fun canPaint(codePoint: Int): Boolean {
-        return codePoint in 0x2580..0x259F
-    }
+    fun canPaint(codePoint: Int): Boolean = codePoint in 0x2580..0x259F
 
-    fun quadrantMask(codePoint: Int): Int {
-        return when (codePoint) {
+    fun quadrantMask(codePoint: Int): Int =
+        when (codePoint) {
             0x2596 -> LOWER_LEFT
             0x2597 -> LOWER_RIGHT
             0x2598 -> UPPER_LEFT
@@ -47,14 +44,12 @@ internal object TerminalBlockElementGlyphs {
             0x259F -> UPPER_RIGHT or LOWER_LEFT or LOWER_RIGHT
             else -> 0
         }
-    }
 
-    fun shadeKind(codePoint: Int): Int {
-        return when (codePoint) {
+    fun shadeKind(codePoint: Int): Int =
+        when (codePoint) {
             0x2591 -> SHADE_LIGHT
             0x2592 -> SHADE_MEDIUM
             0x2593 -> SHADE_DARK
             else -> 0
         }
-    }
 }

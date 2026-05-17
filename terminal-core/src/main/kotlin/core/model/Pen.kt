@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.model
 
 import com.gagik.core.codec.AttributeCodec
@@ -22,7 +21,6 @@ import com.gagik.core.codec.AttributeCodec
  * Manages the current writing attributes.
  */
 internal class Pen {
-
     var currentAttr: Long = AttributeCodec.DEFAULT_ATTR
         private set
 
@@ -50,28 +48,30 @@ internal class Pen {
         blink: Boolean = false,
         inverse: Boolean = false,
         conceal: Boolean = false,
-        underlineColor: Int = 0
+        underlineColor: Int = 0,
     ) {
         val protected = AttributeCodec.isProtected(currentAttr)
         val hyperlinkId = AttributeCodec.hyperlinkId(currentExtendedAttr)
-        currentAttr = AttributeCodec.pack(
-            fg = fg.coerceIn(0, AttributeCodec.MAX_COLOR),
-            bg = bg.coerceIn(0, AttributeCodec.MAX_COLOR),
-            bold = bold,
-            faint = faint,
-            italic = italic,
-            blink = blink,
-            inverse = inverse,
-            protected = protected,
-        )
-        currentExtendedAttr = AttributeCodec.packExtended(
-            underlineColor = underlineColor.coerceIn(0, AttributeCodec.MAX_COLOR),
-            underlineStyle = underlineStyle,
-            strikethrough = strikethrough,
-            overline = overline,
-            conceal = conceal,
-            hyperlinkId = hyperlinkId,
-        )
+        currentAttr =
+            AttributeCodec.pack(
+                fg = fg.coerceIn(0, AttributeCodec.MAX_COLOR),
+                bg = bg.coerceIn(0, AttributeCodec.MAX_COLOR),
+                bold = bold,
+                faint = faint,
+                italic = italic,
+                blink = blink,
+                inverse = inverse,
+                protected = protected,
+            )
+        currentExtendedAttr =
+            AttributeCodec.packExtended(
+                underlineColor = underlineColor.coerceIn(0, AttributeCodec.MAX_COLOR),
+                underlineStyle = underlineStyle,
+                strikethrough = strikethrough,
+                overline = overline,
+                conceal = conceal,
+                hyperlinkId = hyperlinkId,
+            )
     }
 
     fun setColors(
@@ -86,28 +86,30 @@ internal class Pen {
         overline: Boolean = false,
         blink: Boolean = false,
         inverse: Boolean = false,
-        conceal: Boolean = false
+        conceal: Boolean = false,
     ) {
         val protected = AttributeCodec.isProtected(currentAttr)
         val hyperlinkId = AttributeCodec.hyperlinkId(currentExtendedAttr)
-        currentAttr = AttributeCodec.packColors(
-            foreground = foreground,
-            background = background,
-            bold = bold,
-            faint = faint,
-            italic = italic,
-            blink = blink,
-            inverse = inverse,
-            protected = protected,
-        )
-        currentExtendedAttr = AttributeCodec.packExtendedColors(
-            underlineColor = underlineColor,
-            underlineStyle = underlineStyle,
-            strikethrough = strikethrough,
-            overline = overline,
-            conceal = conceal,
-            hyperlinkId = hyperlinkId,
-        )
+        currentAttr =
+            AttributeCodec.packColors(
+                foreground = foreground,
+                background = background,
+                bold = bold,
+                faint = faint,
+                italic = italic,
+                blink = blink,
+                inverse = inverse,
+                protected = protected,
+            )
+        currentExtendedAttr =
+            AttributeCodec.packExtendedColors(
+                underlineColor = underlineColor,
+                underlineStyle = underlineStyle,
+                strikethrough = strikethrough,
+                overline = overline,
+                conceal = conceal,
+                hyperlinkId = hyperlinkId,
+            )
     }
 
     fun setSelectiveEraseProtection(enabled: Boolean) {
@@ -118,7 +120,10 @@ internal class Pen {
         currentExtendedAttr = AttributeCodec.withHyperlinkId(currentExtendedAttr, hyperlinkId)
     }
 
-    fun restoreAttr(packedAttr: Long, packedExtendedAttr: Long) {
+    fun restoreAttr(
+        packedAttr: Long,
+        packedExtendedAttr: Long,
+    ) {
         currentAttr = packedAttr
         currentExtendedAttr = packedExtendedAttr
     }

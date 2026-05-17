@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer.impl
 
 import com.gagik.core.engine.CursorEngine
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalCursorImplTest {
-
     @Test
     fun `moves the cursor and clamps to bounds`() {
         val state = TerminalState(5, 4, 2)
@@ -37,7 +35,7 @@ class TerminalCursorImplTest {
 
         assertAll(
             { assertEquals(0, state.cursor.col) },
-            { assertEquals(0, state.cursor.row) }
+            { assertEquals(0, state.cursor.row) },
         )
     }
 
@@ -56,7 +54,7 @@ class TerminalCursorImplTest {
 
         assertAll(
             { assertEquals(3, state.cursor.col) },
-            { assertEquals(2, state.cursor.row) }
+            { assertEquals(2, state.cursor.row) },
         )
     }
 

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render
 
 import com.gagik.terminal.render.api.TerminalColorPalette
@@ -32,10 +31,11 @@ class TerminalSwingColorsTest {
 
     @Test
     fun invisibleForegroundMatchesBackgroundEvenWhenFaint() {
-        val palette = TerminalColorPalette(
-            defaultForeground = 0xFF224466.toInt(),
-            defaultBackground = 0xFF102030.toInt(),
-        )
+        val palette =
+            TerminalColorPalette(
+                defaultForeground = 0xFF224466.toInt(),
+                defaultBackground = 0xFF102030.toInt(),
+            )
         val attrs = TerminalRenderAttrs.pack(faint = true, invisible = true)
 
         assertEquals(TerminalSwingColors.background(palette, attrs), TerminalSwingColors.foreground(palette, attrs))

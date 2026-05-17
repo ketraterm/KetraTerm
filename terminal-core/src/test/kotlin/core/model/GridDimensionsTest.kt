@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.model
 
 import org.junit.jupiter.api.Assertions.*
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
 class GridDimensionsTest {
-
     @Test
     fun `rejects non-positive dimensions`() {
         assertThrows<IllegalArgumentException> { GridDimensions(0, 1) }
@@ -50,4 +48,3 @@ class GridDimensionsTest {
         assertFalse(dimensions.isValidRow(5))
     }
 }
-

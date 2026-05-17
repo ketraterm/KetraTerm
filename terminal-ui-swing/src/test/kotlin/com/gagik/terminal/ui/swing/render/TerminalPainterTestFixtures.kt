@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render
 
 import com.gagik.terminal.render.api.*
@@ -33,20 +32,23 @@ internal const val TEST_BLUE: Int = 0xFF0000FF.toInt()
 internal fun defaultTestSettings(
     foreground: Int = TEST_WHITE,
     background: Int = TEST_BLACK,
-): TerminalSwingSettings {
-    return TerminalSwingSettings(
+): TerminalSwingSettings =
+    TerminalSwingSettings(
         font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-        palette = TerminalColorPalette(
-            defaultForeground = foreground,
-            defaultBackground = background,
-            cursorForeground = TEST_RED,
-            cursorBackground = TEST_BLUE,
-        ),
+        palette =
+            TerminalColorPalette(
+                defaultForeground = foreground,
+                defaultBackground = background,
+                cursorForeground = TEST_RED,
+                cursorBackground = TEST_BLUE,
+            ),
         textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
     )
-}
 
-internal fun testMetrics(image: BufferedImage, settings: TerminalSwingSettings): TerminalSwingMetrics {
+internal fun testMetrics(
+    image: BufferedImage,
+    settings: TerminalSwingSettings,
+): TerminalSwingMetrics {
     val g = image.createGraphics()
     try {
         return TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
@@ -61,7 +63,11 @@ internal fun renderCache(frame: TestRenderFrame): TerminalRenderCache {
     return cache
 }
 
-internal fun BufferedImage.containsColor(argb: Int, width: Int = this.width, height: Int = this.height): Boolean {
+internal fun BufferedImage.containsColor(
+    argb: Int,
+    width: Int = this.width,
+    height: Int = this.height,
+): Boolean {
     var y = 0
     while (y < height) {
         var x = 0
@@ -74,7 +80,11 @@ internal fun BufferedImage.containsColor(argb: Int, width: Int = this.width, hei
     return false
 }
 
-internal fun BufferedImage.containsColorInRange(argb: Int, xStart: Int, xEnd: Int): Boolean {
+internal fun BufferedImage.containsColorInRange(
+    argb: Int,
+    xStart: Int,
+    xEnd: Int,
+): Boolean {
     var y = 0
     while (y < height) {
         var x = xStart
@@ -135,15 +145,17 @@ internal data class TestCell(
 
 internal class TestRenderFrame(
     private val cells: Array<Array<TestCell>>,
-    private val cursorValue: TerminalRenderCursor = TerminalRenderCursor(
-        column = 0,
-        row = 0,
-        visible = false,
-        blinking = false,
-        shape = TerminalRenderCursorShape.BLOCK,
-        generation = 1,
-    ),
-) : TerminalRenderFrameReader, TerminalRenderFrame {
+    private val cursorValue: TerminalRenderCursor =
+        TerminalRenderCursor(
+            column = 0,
+            row = 0,
+            visible = false,
+            blinking = false,
+            shape = TerminalRenderCursorShape.BLOCK,
+            generation = 1,
+        ),
+) : TerminalRenderFrameReader,
+    TerminalRenderFrame {
     override val columns: Int = cells.firstOrNull()?.size ?: 0
     override val rows: Int = cells.size
     override val frameGeneration: Long = 1
@@ -227,26 +239,28 @@ internal class TestRenderFrame(
             }
 
             var charIndex = 0
-            val row = Array(codePointCount) { column ->
-                val codePoint = text.codePointAt(charIndex)
-                charIndex += Character.charCount(codePoint)
-                TestCell(
-                    codeWord = codePoint,
-                    flags = TerminalRenderCellFlags.CODEPOINT,
-                    attr = attrs[column],
-                    extraAttr = extraAttrs[column],
-                )
-            }
+            val row =
+                Array(codePointCount) { column ->
+                    val codePoint = text.codePointAt(charIndex)
+                    charIndex += Character.charCount(codePoint)
+                    TestCell(
+                        codeWord = codePoint,
+                        flags = TerminalRenderCellFlags.CODEPOINT,
+                        attr = attrs[column],
+                        extraAttr = extraAttrs[column],
+                    )
+                }
             return TestRenderFrame(
                 cells = arrayOf(row),
-                cursorValue = TerminalRenderCursor(
-                    column = 0,
-                    row = 0,
-                    visible = cursorVisible,
-                    blinking = false,
-                    shape = TerminalRenderCursorShape.BLOCK,
-                    generation = 1,
-                ),
+                cursorValue =
+                    TerminalRenderCursor(
+                        column = 0,
+                        row = 0,
+                        visible = cursorVisible,
+                        blinking = false,
+                        shape = TerminalRenderCursorShape.BLOCK,
+                        generation = 1,
+                    ),
             )
         }
     }

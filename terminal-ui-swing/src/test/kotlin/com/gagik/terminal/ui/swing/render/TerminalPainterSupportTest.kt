@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render
 
 import com.gagik.terminal.render.api.TerminalRenderAttrs
@@ -26,7 +25,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TerminalPainterSupportTest {
-
     @Nested
     inner class FontStyleResolution {
         @Test

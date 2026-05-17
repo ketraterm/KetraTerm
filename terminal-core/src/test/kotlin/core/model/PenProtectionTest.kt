@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.model
 
 import com.gagik.core.codec.AttributeCodec
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class PenProtectionTest {
-
     @Test
     fun `setSelectiveEraseProtection toggles current attr without disturbing visual attrs`() {
         val pen = Pen()
@@ -40,7 +38,7 @@ class PenProtectionTest {
             { assertEquals(AttributeCodec.isBold(visualOnly), AttributeCodec.isBold(protectedAttr)) },
             { assertEquals(AttributeCodec.isFaint(visualOnly), AttributeCodec.isFaint(protectedAttr)) },
             { assertEquals(AttributeCodec.isItalic(visualOnly), AttributeCodec.isItalic(protectedAttr)) },
-            { assertEquals(visualOnlyExtended, pen.currentExtendedAttr) }
+            { assertEquals(visualOnlyExtended, pen.currentExtendedAttr) },
         )
     }
 
@@ -53,7 +51,7 @@ class PenProtectionTest {
 
         assertAll(
             { assertTrue(pen.isSelectiveEraseProtected) },
-            { assertTrue(AttributeCodec.isProtected(pen.currentAttr)) }
+            { assertTrue(AttributeCodec.isProtected(pen.currentAttr)) },
         )
     }
 
@@ -66,7 +64,7 @@ class PenProtectionTest {
 
         assertAll(
             { assertFalse(pen.isSelectiveEraseProtected) },
-            { assertFalse(AttributeCodec.isProtected(pen.currentAttr)) }
+            { assertFalse(AttributeCodec.isProtected(pen.currentAttr)) },
         )
     }
 
@@ -85,7 +83,7 @@ class PenProtectionTest {
             { assertEquals(AttributeCodec.background(pen.currentAttr), AttributeCodec.background(blankAttr)) },
             { assertEquals(AttributeCodec.isBold(pen.currentAttr), AttributeCodec.isBold(blankAttr)) },
             { assertEquals(AttributeCodec.isItalic(pen.currentAttr), AttributeCodec.isItalic(blankAttr)) },
-            { assertEquals(pen.currentExtendedAttr, blankExtendedAttr) }
+            { assertEquals(pen.currentExtendedAttr, blankExtendedAttr) },
         )
     }
 }

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.settings
 
 import java.awt.Toolkit
@@ -54,7 +53,8 @@ interface TerminalClipboardHandler {
 
 private object SystemTerminalClipboardHandler : TerminalClipboardHandler {
     override fun copyText(text: String) {
-        Toolkit.getDefaultToolkit()
+        Toolkit
+            .getDefaultToolkit()
             .systemClipboard
             .setContents(StringSelection(text), null)
     }

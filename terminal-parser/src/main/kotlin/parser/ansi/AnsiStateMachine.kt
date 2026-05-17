@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 /**
@@ -53,7 +52,10 @@ internal object AnsiStateMachine {
     }
 
     @JvmStatic
-    fun transition(state: Int, byteClass: Int): Int {
+    fun transition(
+        state: Int,
+        byteClass: Int,
+    ): Int {
         require(state in 0 until AnsiState.COUNT) { "state out of range: $state" }
         require(byteClass in 0 until ByteClass.ROUTING_COUNT) { "byteClass out of range: $byteClass" }
         return transitions[index(state, byteClass)]
@@ -404,15 +406,26 @@ internal object AnsiStateMachine {
         set(ignore, ByteClass.FINAL_BYTE, ignore, FsmAction.IGNORE)
     }
 
-    private fun set(state: Int, byteClass: Int, nextState: Int, action: Int) {
+    private fun set(
+        state: Int,
+        byteClass: Int,
+        nextState: Int,
+        action: Int,
+    ) {
         transitions[index(state, byteClass)] = encode(nextState, action)
     }
 
-    private fun encode(nextState: Int, action: Int): Int {
+    private fun encode(
+        nextState: Int,
+        action: Int,
+    ): Int {
         require(nextState in 0 until AnsiState.COUNT) { "nextState out of range: $nextState" }
         require(action in 0 until FsmAction.COUNT) { "action out of range: $action" }
         return (nextState shl ACTION_BITS) or action
     }
 
-    private fun index(state: Int, byteClass: Int): Int = (state shl CLASS_SHIFT) or byteClass
+    private fun index(
+        state: Int,
+        byteClass: Int,
+    ): Int = (state shl CLASS_SHIFT) or byteClass
 }

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.TerminalBuffers
@@ -24,7 +23,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class TerminalResponseChannelTest {
-
     @Test
     fun `response queue starts empty and supports zero length reads`() {
         val buffer = TerminalBuffers.create(width = 10, height = 5)

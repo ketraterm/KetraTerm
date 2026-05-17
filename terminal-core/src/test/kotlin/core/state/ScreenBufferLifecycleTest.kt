@@ -13,14 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.state
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class ScreenBufferLifecycleTest {
-
     @Test
     fun `clearGrid_withHistoryBacklog_doesNotLeakClusterHandles`() {
         val buffer = ScreenBuffer(initialWidth = 4, initialHeight = 2, maxHistory = 3)
@@ -37,7 +35,7 @@ class ScreenBufferLifecycleTest {
         assertEquals(
             originalHandle,
             buffer.ring[0].rawCodepoint(0),
-            "Clearing the grid must release cluster slots from discarded history lines"
+            "Clearing the grid must release cluster slots from discarded history lines",
         )
     }
 }

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import com.gagik.terminal.protocol.host.TerminalHostOutput
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class InputScratchBufferTest {
-
     @Test
     fun `appends bytes and ascii text`() {
         val buffer = InputScratchBuffer(ByteArray(8))
@@ -148,7 +146,10 @@ class InputScratchBufferTest {
         assertArrayEquals(ascii("old"), output.bytes)
     }
 
-    private fun assertOutput(expected: ByteArray, buffer: InputScratchBuffer) {
+    private fun assertOutput(
+        expected: ByteArray,
+        buffer: InputScratchBuffer,
+    ) {
         val output = RecordingHostOutput()
         buffer.writeTo(output)
         assertArrayEquals(expected, output.bytes)

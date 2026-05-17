@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.api
 
 import org.junit.jupiter.api.Assertions.*
@@ -42,12 +41,13 @@ class TerminalRenderAttrsTest {
 
     @Test
     fun `packed indexed and rgb colors decode through public ABI`() {
-        val word = TerminalRenderAttrs.pack(
-            foregroundKind = TerminalRenderColorKind.INDEXED,
-            foregroundValue = 196,
-            backgroundKind = TerminalRenderColorKind.RGB,
-            backgroundValue = 0x12_34_56,
-        )
+        val word =
+            TerminalRenderAttrs.pack(
+                foregroundKind = TerminalRenderColorKind.INDEXED,
+                foregroundValue = 196,
+                backgroundKind = TerminalRenderColorKind.RGB,
+                backgroundValue = 0x12_34_56,
+            )
 
         assertAll(
             { assertEquals(TerminalRenderColorKind.INDEXED, TerminalRenderAttrs.foregroundKind(word)) },
@@ -59,16 +59,17 @@ class TerminalRenderAttrsTest {
 
     @Test
     fun `packed style bits decode independently`() {
-        val word = TerminalRenderAttrs.pack(
-            bold = true,
-            faint = true,
-            italic = true,
-            underlineStyle = TerminalRenderUnderline.DOTTED,
-            blink = true,
-            inverse = true,
-            invisible = true,
-            strikethrough = true,
-        )
+        val word =
+            TerminalRenderAttrs.pack(
+                bold = true,
+                faint = true,
+                italic = true,
+                underlineStyle = TerminalRenderUnderline.DOTTED,
+                blink = true,
+                inverse = true,
+                invisible = true,
+                strikethrough = true,
+            )
 
         assertAll(
             { assertTrue(TerminalRenderAttrs.isBold(word)) },
@@ -84,20 +85,21 @@ class TerminalRenderAttrsTest {
 
     @Test
     fun `packed word uses documented stable bit layout`() {
-        val word = TerminalRenderAttrs.pack(
-            foregroundKind = TerminalRenderColorKind.RGB,
-            foregroundValue = 0x11_22_33,
-            backgroundKind = TerminalRenderColorKind.INDEXED,
-            backgroundValue = 245,
-            bold = true,
-            faint = true,
-            italic = true,
-            underlineStyle = TerminalRenderUnderline.DASHED,
-            blink = true,
-            inverse = true,
-            invisible = true,
-            strikethrough = true,
-        )
+        val word =
+            TerminalRenderAttrs.pack(
+                foregroundKind = TerminalRenderColorKind.RGB,
+                foregroundValue = 0x11_22_33,
+                backgroundKind = TerminalRenderColorKind.INDEXED,
+                backgroundValue = 245,
+                bold = true,
+                faint = true,
+                italic = true,
+                underlineStyle = TerminalRenderUnderline.DASHED,
+                blink = true,
+                inverse = true,
+                invisible = true,
+                strikethrough = true,
+            )
 
         val expected =
             (TerminalRenderColorKind.RGB.toLong() shl 0) or

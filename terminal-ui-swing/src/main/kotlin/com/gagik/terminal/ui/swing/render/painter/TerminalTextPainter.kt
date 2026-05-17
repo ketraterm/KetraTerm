@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.painter
 
 import com.gagik.terminal.render.api.TerminalColorPalette
@@ -90,29 +89,30 @@ internal class TerminalTextPainter(
             }
 
             val codeWord = codeWords[index]
-            column = if (isFastAsciiCell(flags, codeWord)) {
-                paintAsciiRun(
-                    g = g,
-                    cache = cache,
-                    palette = palette,
-                    metrics = metrics,
-                    row = row,
-                    startColumn = column,
-                    baselineY = baselineY,
-                    fontRenderContext = fontRenderContext,
-                )
-            } else {
-                paintComplexCell(
-                    g = g,
-                    cache = cache,
-                    palette = palette,
-                    metrics = metrics,
-                    row = row,
-                    column = column,
-                    baselineY = baselineY,
-                    fontRenderContext = fontRenderContext,
-                )
-            }
+            column =
+                if (isFastAsciiCell(flags, codeWord)) {
+                    paintAsciiRun(
+                        g = g,
+                        cache = cache,
+                        palette = palette,
+                        metrics = metrics,
+                        row = row,
+                        startColumn = column,
+                        baselineY = baselineY,
+                        fontRenderContext = fontRenderContext,
+                    )
+                } else {
+                    paintComplexCell(
+                        g = g,
+                        cache = cache,
+                        palette = palette,
+                        metrics = metrics,
+                        row = row,
+                        column = column,
+                        baselineY = baselineY,
+                        fontRenderContext = fontRenderContext,
+                    )
+                }
         }
     }
 
@@ -159,16 +159,17 @@ internal class TerminalTextPainter(
                 if (clusterRef != 0L) {
                     val offset = cache.clusterOffset(clusterRef)
                     val length = cache.clusterLength(clusterRef)
-                    val paintedEmoji = platformEmojiPainter.paintCluster(
-                        g = g,
-                        codepoints = cache.clusterCodepoints,
-                        offset = offset,
-                        length = length,
-                        column = column,
-                        row = row,
-                        columnSpan = safeColumnSpan,
-                        metrics = metrics,
-                    )
+                    val paintedEmoji =
+                        platformEmojiPainter.paintCluster(
+                            g = g,
+                            codepoints = cache.clusterCodepoints,
+                            offset = offset,
+                            length = length,
+                            column = column,
+                            row = row,
+                            columnSpan = safeColumnSpan,
+                            metrics = metrics,
+                        )
                     if (!paintedEmoji) {
                         drawComplexCluster(
                             g = g,
@@ -300,16 +301,17 @@ internal class TerminalTextPainter(
             if (clusterRef != 0L) {
                 val offset = cache.clusterOffset(clusterRef)
                 val length = cache.clusterLength(clusterRef)
-                val paintedEmoji = platformEmojiPainter.paintCluster(
-                    g = g,
-                    codepoints = cache.clusterCodepoints,
-                    offset = offset,
-                    length = length,
-                    column = column,
-                    row = row,
-                    columnSpan = endColumn - column,
-                    metrics = metrics,
-                )
+                val paintedEmoji =
+                    platformEmojiPainter.paintCluster(
+                        g = g,
+                        codepoints = cache.clusterCodepoints,
+                        offset = offset,
+                        length = length,
+                        column = column,
+                        row = row,
+                        columnSpan = endColumn - column,
+                        metrics = metrics,
+                    )
                 if (!paintedEmoji) {
                     drawComplexCluster(
                         g = g,
@@ -361,15 +363,16 @@ internal class TerminalTextPainter(
             return
         }
 
-        val glyphVector = asciiGlyphVectors.glyphVector(
-            chars = textRun.chars,
-            offset = 0,
-            length = textRun.length,
-            font = g.font,
-            style = fontStyle,
-            cellWidth = metrics.cellWidth,
-            fontRenderContext = fontRenderContext,
-        )
+        val glyphVector =
+            asciiGlyphVectors.glyphVector(
+                chars = textRun.chars,
+                offset = 0,
+                length = textRun.length,
+                font = g.font,
+                style = fontStyle,
+                cellWidth = metrics.cellWidth,
+                fontRenderContext = fontRenderContext,
+            )
         g.drawGlyphVector(glyphVector, (startColumn * metrics.cellWidth).toFloat(), baselineY.toFloat())
     }
 
@@ -387,16 +390,18 @@ internal class TerminalTextPainter(
         val baseline = baselineY.toFloat()
         var drawX = x.toFloat()
 
-        val layout = complexTextLayouts
-            .clusterLayout(codepoints, offset, shapedLength, fontStyle, fontRenderContext, fontCache)
+        val layout =
+            complexTextLayouts
+                .clusterLayout(codepoints, offset, shapedLength, fontStyle, fontRenderContext, fontCache)
         layout.draw(g, drawX, baseline)
         drawX += layout.advance
 
         var index = offset + shapedLength
         val end = offset + length
         while (index < end) {
-            val codePointLayout = complexTextLayouts
-                .codePointLayout(codepoints[index], fontStyle, fontRenderContext, fontCache)
+            val codePointLayout =
+                complexTextLayouts
+                    .codePointLayout(codepoints[index], fontStyle, fontRenderContext, fontCache)
             codePointLayout.draw(g, drawX, baseline)
             drawX += codePointLayout.advance
             index++
@@ -416,11 +421,13 @@ internal class TerminalTextPainter(
             .draw(g, x.toFloat(), baselineY.toFloat())
     }
 
-    private fun decorationKey(attr: Long, extraAttr: Long): Long {
-        return TerminalRenderAttrs.underlineStyle(attr).toLong() or
+    private fun decorationKey(
+        attr: Long,
+        extraAttr: Long,
+    ): Long =
+        TerminalRenderAttrs.underlineStyle(attr).toLong() or
             (if (TerminalRenderAttrs.isStrikethrough(attr)) STRIKETHROUGH_KEY else 0L) or
             (extraAttr shl EXTRA_ATTR_KEY_SHIFT)
-    }
 
     private companion object {
         private const val INITIAL_TEXT_RUN_CAPACITY = 256

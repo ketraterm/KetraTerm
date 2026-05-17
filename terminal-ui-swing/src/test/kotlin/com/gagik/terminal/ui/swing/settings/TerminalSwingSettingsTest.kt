@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.settings
 
 import com.gagik.terminal.ui.swing.api.TerminalSwingTerminal
@@ -62,14 +61,15 @@ class TerminalSwingSettingsTest {
 
     @Test
     fun fallbackPolicyPrefersInstalledColorEmojiBeforeSymbolFonts() {
-        val families = TerminalSwingSettings.fallbackFontFamiliesForInstalledFonts(
-            arrayOf(
-                "Segoe UI Symbol",
-                "Dialog",
-                "Segoe UI Emoji",
-                "SansSerif",
-            ),
-        )
+        val families =
+            TerminalSwingSettings.fallbackFontFamiliesForInstalledFonts(
+                arrayOf(
+                    "Segoe UI Symbol",
+                    "Dialog",
+                    "Segoe UI Emoji",
+                    "SansSerif",
+                ),
+            )
 
         assertTrue(families.indexOf("Segoe UI Emoji") < families.indexOf(Font.DIALOG))
         assertTrue(families.indexOf("Segoe UI Emoji") < families.indexOf("Segoe UI Symbol"))
@@ -87,9 +87,10 @@ class TerminalSwingSettingsTest {
 
     @Test
     fun componentReportsVisibleGridFromFrozenMetrics() {
-        val component = TerminalSwingTerminal {
-            TerminalSwingSettings(columns = 10, rows = 4)
-        }
+        val component =
+            TerminalSwingTerminal {
+                TerminalSwingSettings(columns = 10, rows = 4)
+            }
         val preferred = component.preferredSize
         var visibleColumns = 0
         var visibleRows = 0

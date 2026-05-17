@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.model
 
 import org.junit.jupiter.api.Assertions.*
@@ -23,21 +22,33 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("TabStops")
 class TabStopsTest {
-
     // ----- Helpers ----------------------------------------------------------
 
-    private fun stopsAt(ts: TabStops, vararg cols: Int) {
+    private fun stopsAt(
+        ts: TabStops,
+        vararg cols: Int,
+    ) {
         for (col in cols) {
-            assertEquals(col, ts.getNextStop(col - 1),
-                "Expected a stop at col $col")
+            assertEquals(
+                col,
+                ts.getNextStop(col - 1),
+                "Expected a stop at col $col",
+            )
         }
     }
 
-    private fun noStopBetween(ts: TabStops, fromExclusive: Int, toExclusive: Int) {
+    private fun noStopBetween(
+        ts: TabStops,
+        fromExclusive: Int,
+        toExclusive: Int,
+    ) {
         for (col in fromExclusive until toExclusive - 1) {
             val next = ts.getNextStop(col)
-            assertNotEquals(col + 1, next,
-                "Unexpected stop found at col ${col + 1}")
+            assertNotEquals(
+                col + 1,
+                next,
+                "Unexpected stop found at col ${col + 1}",
+            )
         }
     }
 
@@ -46,7 +57,6 @@ class TabStopsTest {
     @Nested
     @DisplayName("default construction")
     inner class DefaultConstruction {
-
         @Test
         fun `default stops are at every 8th column`() {
             val ts = TabStops(40)
@@ -87,7 +97,6 @@ class TabStopsTest {
     @Nested
     @DisplayName("getNextStop")
     inner class GetNextStop {
-
         @Test
         fun `returns next stop to the right of cursor`() {
             val ts = TabStops(24)
@@ -144,7 +153,6 @@ class TabStopsTest {
     @Nested
     @DisplayName("setStop and clearStop")
     inner class SetAndClearStop {
-
         @Test
         fun `setStop creates a reachable stop`() {
             val ts = TabStops(20)
@@ -198,8 +206,8 @@ class TabStopsTest {
             ts.setStop(7)
             ts.setStop(12)
 
-            assertEquals(3,  ts.getNextStop(0))
-            assertEquals(7,  ts.getNextStop(3))
+            assertEquals(3, ts.getNextStop(0))
+            assertEquals(7, ts.getNextStop(3))
             assertEquals(12, ts.getNextStop(7))
             assertEquals(19, ts.getNextStop(12))
         }
@@ -210,7 +218,6 @@ class TabStopsTest {
     @Nested
     @DisplayName("clearAll")
     inner class ClearAll {
-
         @Test
         fun `clearAll causes getNextStop to always return right margin`() {
             val ts = TabStops(24)
@@ -224,7 +231,7 @@ class TabStopsTest {
             val ts = TabStops(24)
             ts.clearAll()
             ts.setStop(5)
-            assertEquals(5,  ts.getNextStop(0))
+            assertEquals(5, ts.getNextStop(0))
             assertEquals(23, ts.getNextStop(5))
         }
 
@@ -242,13 +249,12 @@ class TabStopsTest {
     @Nested
     @DisplayName("resetToDefault")
     inner class ResetToDefault {
-
         @Test
         fun `resetToDefault restores 8-column spacing after clearAll`() {
             val ts = TabStops(24)
             ts.clearAll()
             ts.resetToDefault()
-            assertEquals(8,  ts.getNextStop(0))
+            assertEquals(8, ts.getNextStop(0))
             assertEquals(16, ts.getNextStop(8))
         }
 
@@ -259,7 +265,7 @@ class TabStopsTest {
             ts.setStop(3)
             ts.setStop(11)
             ts.resetToDefault()
-            assertEquals(8,  ts.getNextStop(0))
+            assertEquals(8, ts.getNextStop(0))
             assertEquals(16, ts.getNextStop(8))
         }
 
@@ -270,7 +276,7 @@ class TabStopsTest {
             assertEquals(15, ts.getNextStop(0)) // no stops
 
             ts.resetToDefault()
-            assertEquals(8, ts.getNextStop(0))  // stop at 8 restored
+            assertEquals(8, ts.getNextStop(0)) // stop at 8 restored
         }
 
         @Test
@@ -285,7 +291,6 @@ class TabStopsTest {
     @Nested
     @DisplayName("reset(newWidth)")
     inner class Reset {
-
         @Test
         fun `reset_withSameWidth_restoresDefaultStops`() {
             val ts = TabStops(20)
@@ -308,7 +313,7 @@ class TabStopsTest {
 
             assertAll(
                 { assertEquals(8, ts.getNextStop(0)) },
-                { assertEquals(16, ts.getNextStop(8)) }
+                { assertEquals(16, ts.getNextStop(8)) },
             )
         }
 
@@ -322,7 +327,7 @@ class TabStopsTest {
 
             assertAll(
                 { assertEquals(8, ts.getNextStop(0)) },
-                { assertEquals(9, ts.getNextStop(8)) }
+                { assertEquals(9, ts.getNextStop(8)) },
             )
         }
     }
@@ -330,7 +335,6 @@ class TabStopsTest {
     @Nested
     @DisplayName("getPreviousStop")
     inner class GetPreviousStop {
-
         @Test
         fun `returns nearest stop to left`() {
             val ts = TabStops(24)
@@ -355,7 +359,6 @@ class TabStopsTest {
     @Nested
     @DisplayName("resize")
     inner class Resize {
-
         @Test
         fun `resize to same width is a no-op`() {
             val ts = TabStops(20)
@@ -396,9 +399,9 @@ class TabStopsTest {
         fun `shrink then grow does not resurrect stale custom stops`() {
             val ts = TabStops(20)
             ts.clearAll()
-            ts.setStop(15)   // custom stop at col 15
-            ts.resize(10)    // col 15 discarded
-            ts.resize(20)    // expand back — cols 10-19 get fresh defaults (i % 8 == 0)
+            ts.setStop(15) // custom stop at col 15
+            ts.resize(10) // col 15 discarded
+            ts.resize(20) // expand back — cols 10-19 get fresh defaults (i % 8 == 0)
             // col 15 custom stop is gone; col 16 is a fresh default stop (16 % 8 == 0)
             assertEquals(16, ts.getNextStop(15))
         }
@@ -424,11 +427,9 @@ class TabStopsTest {
     @Nested
     @DisplayName("Resize Expansion")
     inner class ResizeTests {
-
         @Nested
         @DisplayName("Resize Expansion")
         inner class ResizeTests {
-
             @Test
             fun `resizing to a narrower dimension safely truncates stops without error`() {
                 val tabStops = TabStops(20)

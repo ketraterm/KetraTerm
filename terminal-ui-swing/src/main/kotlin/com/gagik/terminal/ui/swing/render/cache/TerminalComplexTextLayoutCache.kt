@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.cache
 
 import com.gagik.terminal.ui.swing.render.cache.TerminalComplexTextLayoutCache.Companion.MAX_CLUSTER_LENGTH
@@ -45,9 +44,10 @@ internal class TerminalComplexTextLayoutCache(
     }
 
     private val codePointLayouts = LongTextLayoutLru(codePointCapacity)
-    private val clusterLayouts = Array(STYLE_COUNT) {
-        ClusterTextLayoutLru(clusterCapacityPerStyle)
-    }
+    private val clusterLayouts =
+        Array(STYLE_COUNT) {
+            ClusterTextLayoutLru(clusterCapacityPerStyle)
+        }
     private var stringClusterScratch = IntArray(MAX_CLUSTER_LENGTH)
     private var sanitizedClusterScratch = IntArray(MAX_CLUSTER_LENGTH)
     private var fontRenderContext: FontRenderContext? = null
@@ -138,11 +138,12 @@ internal class TerminalComplexTextLayoutCache(
 
         val normalizedStyle = style and STYLE_MASK
         val styleLayouts = clusterLayouts[normalizedStyle]
-        val safeCodepoints = if (hasOnlyUnicodeScalars(codepoints, offset, shapedLength)) {
-            codepoints
-        } else {
-            sanitizeCluster(codepoints, offset, shapedLength)
-        }
+        val safeCodepoints =
+            if (hasOnlyUnicodeScalars(codepoints, offset, shapedLength)) {
+                codepoints
+            } else {
+                sanitizeCluster(codepoints, offset, shapedLength)
+            }
         val safeOffset = if (safeCodepoints === codepoints) offset else 0
 
         val hash = styleLayouts.contentHash(safeCodepoints, safeOffset, shapedLength)
@@ -174,7 +175,10 @@ internal class TerminalComplexTextLayoutCache(
         return clusterLayout(stringClusterScratch, 0, length, style, fontRenderContext, fontCache)
     }
 
-    private fun prepare(nextFontRenderContext: FontRenderContext, nextFontGeneration: Int) {
+    private fun prepare(
+        nextFontRenderContext: FontRenderContext,
+        nextFontGeneration: Int,
+    ) {
         if (nextFontRenderContext == fontRenderContext && nextFontGeneration == fontGeneration) return
 
         fontRenderContext = nextFontRenderContext
@@ -200,7 +204,11 @@ internal class TerminalComplexTextLayoutCache(
         return required
     }
 
-    private fun hasOnlyUnicodeScalars(codepoints: IntArray, offset: Int, length: Int): Boolean {
+    private fun hasOnlyUnicodeScalars(
+        codepoints: IntArray,
+        offset: Int,
+        length: Int,
+    ): Boolean {
         var index = 0
         while (index < length) {
             if (!isUnicodeScalar(codepoints[offset + index])) return false
@@ -209,7 +217,11 @@ internal class TerminalComplexTextLayoutCache(
         return true
     }
 
-    private fun sanitizeCluster(codepoints: IntArray, offset: Int, length: Int): IntArray {
+    private fun sanitizeCluster(
+        codepoints: IntArray,
+        offset: Int,
+        length: Int,
+    ): IntArray {
         if (sanitizedClusterScratch.size < length) {
             sanitizedClusterScratch = IntArray(length)
         }
@@ -234,7 +246,9 @@ internal class TerminalComplexTextLayoutCache(
      * this math alone.
      */
     @Suppress("DuplicatedCode")
-    private class LongTextLayoutLru(capacity: Int) {
+    private class LongTextLayoutLru(
+        capacity: Int,
+    ) {
         private val entryKeys = LongArray(capacity)
         private val entryLayouts = arrayOfNulls<TextLayout>(capacity)
         private val previous = IntArray(capacity) { EMPTY }
@@ -262,7 +276,10 @@ internal class TerminalComplexTextLayoutCache(
             }
         }
 
-        fun put(key: Long, layout: TextLayout) {
+        fun put(
+            key: Long,
+            layout: TextLayout,
+        ) {
             val entry = allocateEntry()
 
             entryKeys[entry] = key
@@ -302,11 +319,18 @@ internal class TerminalComplexTextLayoutCache(
             }
         }
 
-        private fun insertHashEntry(key: Long, entry: Int) {
+        private fun insertHashEntry(
+            key: Long,
+            entry: Int,
+        ) {
             insertHashEntryAtSlot(key, entry, hashSlot(key))
         }
 
-        private fun insertHashEntryAtSlot(key: Long, entry: Int, slotHint: Int) {
+        private fun insertHashEntryAtSlot(
+            key: Long,
+            entry: Int,
+            slotHint: Int,
+        ) {
             var slot = slotHint
             while (hashEntries[slot] != EMPTY) {
                 slot = (slot + 1) and hashMask
@@ -315,7 +339,10 @@ internal class TerminalComplexTextLayoutCache(
             hashEntries[slot] = entry
         }
 
-        private fun removeHashEntry(key: Long, entry: Int) {
+        private fun removeHashEntry(
+            key: Long,
+            entry: Int,
+        ) {
             var slot = hashSlot(key)
             var probes = 0
             while (probes < hashEntries.size) {
@@ -389,7 +416,9 @@ internal class TerminalComplexTextLayoutCache(
     }
 
     @Suppress("DuplicatedCode")
-    private class ClusterTextLayoutLru(capacity: Int) {
+    private class ClusterTextLayoutLru(
+        capacity: Int,
+    ) {
         private val entryCodepoints = arrayOfNulls<IntArray>(capacity)
         private val entryLengths = IntArray(capacity)
         private val entryHashes = IntArray(capacity)
@@ -406,7 +435,11 @@ internal class TerminalComplexTextLayoutCache(
         private var head = EMPTY
         private var tail = EMPTY
 
-        fun contentHash(codepoints: IntArray, offset: Int, length: Int): Int {
+        fun contentHash(
+            codepoints: IntArray,
+            offset: Int,
+            length: Int,
+        ): Int {
             var result = length
             var index = 0
             while (index < length) {
@@ -416,7 +449,12 @@ internal class TerminalComplexTextLayoutCache(
             return result
         }
 
-        fun get(codepoints: IntArray, offset: Int, length: Int, hash: Int): TextLayout? {
+        fun get(
+            codepoints: IntArray,
+            offset: Int,
+            length: Int,
+            hash: Int,
+        ): TextLayout? {
             var slot = hashSlot(hash)
             while (true) {
                 val entry = hashEntries[slot]
@@ -483,7 +521,12 @@ internal class TerminalComplexTextLayoutCache(
             }
         }
 
-        private fun equalsEntry(entry: Int, codepoints: IntArray, offset: Int, length: Int): Boolean {
+        private fun equalsEntry(
+            entry: Int,
+            codepoints: IntArray,
+            offset: Int,
+            length: Int,
+        ): Boolean {
             if (entryLengths[entry] != length) return false
             val stored = entryCodepoints[entry] ?: return false
             var index = 0
@@ -494,11 +537,18 @@ internal class TerminalComplexTextLayoutCache(
             return true
         }
 
-        private fun insertHashEntry(hash: Int, entry: Int) {
+        private fun insertHashEntry(
+            hash: Int,
+            entry: Int,
+        ) {
             insertHashEntryAtSlot(hash, entry, hashSlot(hash))
         }
 
-        private fun insertHashEntryAtSlot(hash: Int, entry: Int, slotHint: Int) {
+        private fun insertHashEntryAtSlot(
+            hash: Int,
+            entry: Int,
+            slotHint: Int,
+        ) {
             var slot = slotHint
             while (hashEntries[slot] != EMPTY) {
                 slot = (slot + 1) and hashMask
@@ -507,7 +557,10 @@ internal class TerminalComplexTextLayoutCache(
             hashEntries[slot] = entry
         }
 
-        private fun removeHashEntry(hash: Int, entry: Int) {
+        private fun removeHashEntry(
+            hash: Int,
+            entry: Int,
+        ) {
             var slot = hashSlot(hash)
             var probes = 0
             while (probes < hashEntries.size) {
@@ -580,7 +633,6 @@ internal class TerminalComplexTextLayoutCache(
             mixed = mixed xor (mixed ushr 13)
             return mixed and hashMask
         }
-
     }
 
     companion object {
@@ -600,19 +652,16 @@ internal class TerminalComplexTextLayoutCache(
         private const val REPLACEMENT_CODE_POINT = 0xFFFD
 
         @JvmStatic
-        private fun codePointKey(codePoint: Int, style: Int): Long {
-            return (style.toLong() shl 32) or (codePoint.toLong() and 0xFFFF_FFFFL)
-        }
+        private fun codePointKey(
+            codePoint: Int,
+            style: Int,
+        ): Long = (style.toLong() shl 32) or (codePoint.toLong() and 0xFFFF_FFFFL)
 
         @JvmStatic
-        private fun unicodeScalarOrReplacement(codePoint: Int): Int {
-            return if (isUnicodeScalar(codePoint)) codePoint else REPLACEMENT_CODE_POINT
-        }
+        private fun unicodeScalarOrReplacement(codePoint: Int): Int = if (isUnicodeScalar(codePoint)) codePoint else REPLACEMENT_CODE_POINT
 
         @JvmStatic
-        private fun isUnicodeScalar(codePoint: Int): Boolean {
-            return codePoint in 0..0x10FFFF && codePoint !in 0xD800..0xDFFF
-        }
+        private fun isUnicodeScalar(codePoint: Int): Boolean = codePoint in 0..0x10FFFF && codePoint !in 0xD800..0xDFFF
 
         @JvmStatic
         private fun hashCapacity(entryCapacity: Int): Int {

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.platform
 
 import java.awt.Color
@@ -35,18 +34,22 @@ internal class WindowsColorEmojiRasterizer private constructor(
 ) : TerminalPlatformEmojiRasterizer {
     override val available: Boolean = true
 
-    override fun rasterize(text: String, pixelSize: Int): BufferedImage? {
+    override fun rasterize(
+        text: String,
+        pixelSize: Int,
+    ): BufferedImage? {
         if (text.isEmpty() || pixelSize <= 0) return null
 
         val sizedFont = font.deriveFont(pixelSize.toFloat())
         val chars = text.toCharArray()
-        val baseVector = sizedFont.layoutGlyphVector(
-            FONT_RENDER_CONTEXT,
-            chars,
-            0,
-            chars.size,
-            Font.LAYOUT_LEFT_TO_RIGHT,
-        )
+        val baseVector =
+            sizedFont.layoutGlyphVector(
+                FONT_RENDER_CONTEXT,
+                chars,
+                0,
+                chars.size,
+                Font.LAYOUT_LEFT_TO_RIGHT,
+            )
         if (baseVector.numGlyphs == 0) return null
 
         val bounds = baseVector.visualBounds
@@ -100,9 +103,10 @@ internal class WindowsColorEmojiRasterizer private constructor(
         }
 
         private fun segoeEmojiFontPath(): Path? {
-            val windowsDirectory = System.getenv("SystemRoot")
-                ?: System.getenv("windir")
-                ?: "C:\\Windows"
+            val windowsDirectory =
+                System.getenv("SystemRoot")
+                    ?: System.getenv("windir")
+                    ?: "C:\\Windows"
             val path = Path.of(windowsDirectory, "Fonts", "seguiemj.ttf")
             return if (Files.isRegularFile(path)) path else null
         }
@@ -115,7 +119,11 @@ internal class WindowsColorEmojiRasterizer private constructor(
 
         private object Unavailable : TerminalPlatformEmojiRasterizer {
             override val available: Boolean = false
-            override fun rasterize(text: String, pixelSize: Int): BufferedImage? = null
+
+            override fun rasterize(
+                text: String,
+                pixelSize: Int,
+            ): BufferedImage? = null
         }
 
         private val FONT_RENDER_CONTEXT = FontRenderContext(null, true, true)
@@ -143,7 +151,10 @@ private class WindowsColorEmojiFont(
             return if (layers.isEmpty()) null else WindowsColorEmojiFont(layers)
         }
 
-        private fun parsePalette(reader: OpenTypeReader, cpal: TableRange): IntArray? {
+        private fun parsePalette(
+            reader: OpenTypeReader,
+            cpal: TableRange,
+        ): IntArray? {
             if (cpal.length < CPAL_MIN_LENGTH) return null
             val numPaletteEntries = reader.u16(cpal.offset + 2)
             val numPalettes = reader.u16(cpal.offset + 4)
@@ -209,13 +220,15 @@ private class WindowsColorEmojiFont(
             return result
         }
 
-        private fun paletteColor(colors: IntArray, paletteIndex: Int): Int {
-            return if (paletteIndex == FOREGROUND_PALETTE_INDEX || paletteIndex !in colors.indices) {
+        private fun paletteColor(
+            colors: IntArray,
+            paletteIndex: Int,
+        ): Int =
+            if (paletteIndex == FOREGROUND_PALETTE_INDEX || paletteIndex !in colors.indices) {
                 FOREGROUND_ARGB
             } else {
                 colors[paletteIndex]
             }
-        }
 
         private const val CPAL_MIN_LENGTH = 12
         private const val COLR_V0_HEADER_LENGTH = 14
@@ -240,21 +253,21 @@ private class OpenTypeReader(
 
     fun table(tag: String): TableRange? = tables[tag]
 
-    fun hasRange(offset: Int, length: Int): Boolean {
-        return offset >= 0 && length >= 0 && offset <= bytes.size - length
-    }
+    fun hasRange(
+        offset: Int,
+        length: Int,
+    ): Boolean = offset >= 0 && length >= 0 && offset <= bytes.size - length
 
     fun u8(offset: Int): Int = bytes[offset].toInt() and 0xFF
 
-    fun u16(offset: Int): Int {
-        return (u8(offset) shl 8) or u8(offset + 1)
-    }
+    fun u16(offset: Int): Int = (u8(offset) shl 8) or u8(offset + 1)
 
     fun u32(offset: Int): Int {
-        val value = (u8(offset).toLong() shl 24) or
-            (u8(offset + 1).toLong() shl 16) or
-            (u8(offset + 2).toLong() shl 8) or
-            u8(offset + 3).toLong()
+        val value =
+            (u8(offset).toLong() shl 24) or
+                (u8(offset + 1).toLong() shl 16) or
+                (u8(offset + 2).toLong() shl 8) or
+                u8(offset + 3).toLong()
         return if (value <= Int.MAX_VALUE) value.toInt() else -1
     }
 
@@ -268,15 +281,16 @@ private class OpenTypeReader(
         var index = 0
         while (index < numTables) {
             val recordOffset = recordsOffset + index * TABLE_RECORD_SIZE
-            val tag = String(
-                byteArrayOf(
-                    bytes[recordOffset],
-                    bytes[recordOffset + 1],
-                    bytes[recordOffset + 2],
-                    bytes[recordOffset + 3],
-                ),
-                Charsets.US_ASCII,
-            )
+            val tag =
+                String(
+                    byteArrayOf(
+                        bytes[recordOffset],
+                        bytes[recordOffset + 1],
+                        bytes[recordOffset + 2],
+                        bytes[recordOffset + 3],
+                    ),
+                    Charsets.US_ASCII,
+                )
             val offset = u32(recordOffset + 8)
             val length = u32(recordOffset + 12)
             if (hasRange(offset, length)) {

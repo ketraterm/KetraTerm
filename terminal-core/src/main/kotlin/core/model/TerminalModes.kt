@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.model
 
 import com.gagik.core.api.TerminalInputState
@@ -31,7 +30,6 @@ import java.util.concurrent.atomic.AtomicLong
  * without reading unrelated mutable core structures.
  */
 internal class TerminalModes : TerminalInputState {
-
     private val modeBits = AtomicLong(DEFAULT_MODE_BITS)
 
     /** Mode 4: Insert/Replace Mode (IRM). False = replace (default), true = insert. */
@@ -123,11 +121,12 @@ internal class TerminalModes : TerminalInputState {
      */
     var modifyOtherKeysMode: Int
         get() = TerminalInputState.modifyOtherKeysMode(currentBits)
-        set(value) = setPacked(
-            TerminalModeBits.MODIFY_OTHER_KEYS_MASK,
-            TerminalModeBits.MODIFY_OTHER_KEYS_SHIFT,
-            value.coerceIn(0, 7)
-        )
+        set(value) =
+            setPacked(
+                TerminalModeBits.MODIFY_OTHER_KEYS_MASK,
+                TerminalModeBits.MODIFY_OTHER_KEYS_SHIFT,
+                value.coerceIn(0, 7),
+            )
 
     private val currentBits: Long
         get() = modeBits.get()
@@ -157,7 +156,7 @@ internal class TerminalModes : TerminalInputState {
             treatAmbiguousAsWide = TerminalModeBits.hasFlag(bits, TerminalModeBits.AMBIGUOUS_WIDE),
             mouseTrackingMode = decodeMouseTracking(bits),
             mouseEncodingMode = decodeMouseEncoding(bits),
-            modifyOtherKeysMode = TerminalInputState.modifyOtherKeysMode(bits)
+            modifyOtherKeysMode = TerminalInputState.modifyOtherKeysMode(bits),
         )
     }
 
@@ -180,7 +179,10 @@ internal class TerminalModes : TerminalInputState {
         modeBits.set(preserved or SOFT_RESET_MODE_BITS)
     }
 
-    private fun setFlag(flag: Long, enabled: Boolean) {
+    private fun setFlag(
+        flag: Long,
+        enabled: Boolean,
+    ) {
         while (true) {
             val old = modeBits.get()
             val new = if (enabled) old or flag else old and flag.inv()
@@ -188,7 +190,11 @@ internal class TerminalModes : TerminalInputState {
         }
     }
 
-    private fun setPacked(mask: Long, shift: Int, value: Int) {
+    private fun setPacked(
+        mask: Long,
+        shift: Int,
+        value: Int,
+    ) {
         while (true) {
             val old = modeBits.get()
             val new = TerminalModeBits.withPackedValue(old, mask, shift, value)

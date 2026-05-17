@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 /**
@@ -34,64 +33,61 @@ internal object TerminalBoxDrawingGlyphs {
     const val DIAGONAL_RISING: Int = 1
     const val DIAGONAL_FALLING: Int = 1 shl 1
 
-    fun canPaint(codePoint: Int): Boolean {
-        return codePoint in 0x2500..0x257F
-    }
+    fun canPaint(codePoint: Int): Boolean = codePoint in 0x2500..0x257F
 
-    fun pack(left: Int, right: Int, up: Int, down: Int): Int {
-        return left or (right shl RIGHT_SHIFT) or (up shl UP_SHIFT) or (down shl DOWN_SHIFT)
-    }
+    fun pack(
+        left: Int,
+        right: Int,
+        up: Int,
+        down: Int,
+    ): Int = left or (right shl RIGHT_SHIFT) or (up shl UP_SHIFT) or (down shl DOWN_SHIFT)
 
-    fun edge(packed: Int, shift: Int): Int {
-        return packed ushr shift and STYLE_MASK
-    }
+    fun edge(
+        packed: Int,
+        shift: Int,
+    ): Int = packed ushr shift and STYLE_MASK
 
-    fun horizontalDashStyle(codePoint: Int): Int {
-        return when (codePoint) {
+    fun horizontalDashStyle(codePoint: Int): Int =
+        when (codePoint) {
             0x2504, 0x2508, 0x254C -> LIGHT
             0x2505, 0x2509, 0x254D -> HEAVY
             else -> NONE
         }
-    }
 
-    fun verticalDashStyle(codePoint: Int): Int {
-        return when (codePoint) {
+    fun verticalDashStyle(codePoint: Int): Int =
+        when (codePoint) {
             0x2506, 0x250A, 0x254E -> LIGHT
             0x2507, 0x250B, 0x254F -> HEAVY
             else -> NONE
         }
-    }
 
-    fun dashCount(codePoint: Int): Int {
-        return when (codePoint) {
+    fun dashCount(codePoint: Int): Int =
+        when (codePoint) {
             0x2504, 0x2505, 0x2506, 0x2507 -> 3
             0x2508, 0x2509, 0x250A, 0x250B -> 4
             0x254C, 0x254D, 0x254E, 0x254F -> 2
             else -> 0
         }
-    }
 
-    fun diagonalMask(codePoint: Int): Int {
-        return when (codePoint) {
+    fun diagonalMask(codePoint: Int): Int =
+        when (codePoint) {
             0x2571 -> DIAGONAL_RISING
             0x2572 -> DIAGONAL_FALLING
             0x2573 -> DIAGONAL_RISING or DIAGONAL_FALLING
             else -> NONE
         }
-    }
 
-    fun roundedFallbackEdges(codePoint: Int): Int {
-        return when (codePoint) {
+    fun roundedFallbackEdges(codePoint: Int): Int =
+        when (codePoint) {
             0x256D -> pack(NONE, LIGHT, NONE, LIGHT)
             0x256E -> pack(LIGHT, NONE, NONE, LIGHT)
             0x2570 -> pack(NONE, LIGHT, LIGHT, NONE)
             0x256F -> pack(LIGHT, NONE, LIGHT, NONE)
             else -> NONE
         }
-    }
 
-    fun edges(codePoint: Int): Int {
-        return when (codePoint) {
+    fun edges(codePoint: Int): Int =
+        when (codePoint) {
             0x2500 -> pack(LIGHT, LIGHT, NONE, NONE)
             0x2501 -> pack(HEAVY, HEAVY, NONE, NONE)
             0x2502 -> pack(NONE, NONE, LIGHT, LIGHT)
@@ -203,5 +199,4 @@ internal object TerminalBoxDrawingGlyphs {
             0x257F -> pack(NONE, NONE, LIGHT, HEAVY)
             else -> NONE
         }
-    }
 }

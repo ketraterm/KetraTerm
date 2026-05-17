@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.unicode
 
 import com.gagik.parser.runtime.ParserState
@@ -28,7 +27,10 @@ import com.gagik.parser.spi.TerminalCommandSink
 internal class GraphemeAssembler(
     private val sink: TerminalCommandSink,
 ) {
-    fun accept(state: ParserState, codepoint: Int) {
+    fun accept(
+        state: ParserState,
+        codepoint: Int,
+    ) {
         val currentClass = UnicodeClass.graphemeBreakClass(codepoint)
 
         if (state.clusterLength == 0) {
@@ -78,10 +80,11 @@ internal class GraphemeAssembler(
         when (state.clusterLength) {
             0 -> return
             1 -> sink.writeCodepoint(state.clusterBuffer[0])
-            else -> sink.writeCluster(
-                codepoints = state.clusterBuffer,
-                length = state.clusterLength,
-            )
+            else ->
+                sink.writeCluster(
+                    codepoints = state.clusterBuffer,
+                    length = state.clusterLength,
+                )
         }
     }
 
@@ -89,7 +92,10 @@ internal class GraphemeAssembler(
         state.clearActiveClusterAfterFlush()
     }
 
-    private fun appendToClusterOrFlush(state: ParserState, codepoint: Int) {
+    private fun appendToClusterOrFlush(
+        state: ParserState,
+        codepoint: Int,
+    ) {
         if (state.clusterLength >= state.clusterBuffer.size) {
             flush(state)
         }
@@ -97,7 +103,10 @@ internal class GraphemeAssembler(
         state.clusterLength++
     }
 
-    private fun appendContinuationIfAlreadyEmitted(state: ParserState, codepoint: Int) {
+    private fun appendContinuationIfAlreadyEmitted(
+        state: ParserState,
+        codepoint: Int,
+    ) {
         if (state.clusterEmittedLength == 0) return
         sink.appendToPreviousCluster(codepoint)
         state.clusterEmittedLength = state.clusterLength

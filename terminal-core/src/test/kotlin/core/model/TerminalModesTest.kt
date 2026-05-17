@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.model
 
 import com.gagik.terminal.protocol.MouseEncodingMode
@@ -22,7 +21,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalModesTest {
-
     @Test
     fun `defaults reflect current shared terminal state contract`() {
         val modes = TerminalModes()
@@ -43,7 +41,7 @@ class TerminalModesTest {
             { assertFalse(modes.treatAmbiguousAsWide) },
             { assertEquals(MouseTrackingMode.OFF, modes.mouseTrackingMode) },
             { assertEquals(MouseEncodingMode.DEFAULT, modes.mouseEncodingMode) },
-            { assertEquals(0, modes.modifyOtherKeysMode) }
+            { assertEquals(0, modes.modifyOtherKeysMode) },
         )
     }
 
@@ -85,7 +83,7 @@ class TerminalModesTest {
             { assertFalse(modes.treatAmbiguousAsWide) },
             { assertEquals(MouseTrackingMode.OFF, modes.mouseTrackingMode) },
             { assertEquals(MouseEncodingMode.DEFAULT, modes.mouseEncodingMode) },
-            { assertEquals(0, modes.modifyOtherKeysMode) }
+            { assertEquals(0, modes.modifyOtherKeysMode) },
         )
     }
 
@@ -112,7 +110,7 @@ class TerminalModesTest {
             { assertTrue(snapshot.isBracketedPasteEnabled) },
             { assertEquals(MouseTrackingMode.BUTTON_EVENT, snapshot.mouseTrackingMode) },
             { assertEquals(MouseEncodingMode.SGR, snapshot.mouseEncodingMode) },
-            { assertEquals(2, snapshot.modifyOtherKeysMode) }
+            { assertEquals(2, snapshot.modifyOtherKeysMode) },
         )
     }
 
@@ -154,7 +152,7 @@ class TerminalModesTest {
             { assertTrue(modes.treatAmbiguousAsWide) },
             { assertEquals(MouseTrackingMode.OFF, modes.mouseTrackingMode) },
             { assertEquals(MouseEncodingMode.URXVT, modes.mouseEncodingMode) },
-            { assertEquals(0, modes.modifyOtherKeysMode) }
+            { assertEquals(0, modes.modifyOtherKeysMode) },
         )
     }
 }

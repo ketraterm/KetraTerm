@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.TerminalBuffers
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalWriterUnicodeTest {
-
     @Test
     fun `writeCluster_combiningSequence_doesNotConsumeSecondCell`() {
         val buffer = TerminalBuffers.create(width = 6, height = 2)
@@ -39,7 +37,7 @@ class TerminalWriterUnicodeTest {
             { assertEquals('e'.code, clusterBuf[0]) },
             { assertEquals(0x0301, clusterBuf[1]) },
             { assertEquals('B'.code, buffer.getCodepointAt(1, 0), "Next printable must land in the next cell") },
-            { assertEquals(2, buffer.cursorCol) }
+            { assertEquals(2, buffer.cursorCol) },
         )
     }
 
@@ -91,7 +89,7 @@ class TerminalWriterUnicodeTest {
         val buffer = TerminalBuffers.create(width = 8, height = 2)
 
         buffer.writeCluster(
-            intArrayOf(0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F467, 0x200D, 0x1F466)
+            intArrayOf(0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F467, 0x200D, 0x1F466),
         )
         buffer.writeCodepoint('X'.code)
 
@@ -111,7 +109,7 @@ class TerminalWriterUnicodeTest {
             { assertEquals(0x1F466, clusterBuf[6]) },
             { assertEquals(-1, buffer.getCodepointAt(1, 0), "Wide cluster must reserve a spacer cell") },
             { assertEquals('X'.code, buffer.getCodepointAt(2, 0), "Next printable must start after the full visual sequence") },
-            { assertEquals(3, buffer.cursorCol) }
+            { assertEquals(3, buffer.cursorCol) },
         )
     }
 
@@ -133,7 +131,7 @@ class TerminalWriterUnicodeTest {
             { assertEquals(0xFE0F, clusterBuf[1]) },
             { assertEquals(-1, buffer.getCodepointAt(1, 0), "Emoji-style heart cluster reserves its computed wide spacer") },
             { assertEquals('X'.code, buffer.getCodepointAt(2, 0)) },
-            { assertEquals(3, buffer.cursorCol) }
+            { assertEquals(3, buffer.cursorCol) },
         )
     }
 
@@ -156,7 +154,7 @@ class TerminalWriterUnicodeTest {
             { assertEquals(2, narrow.cursorCol) },
             { assertEquals(-1, wide.getCodepointAt(1, 0), "Wide ambiguous mode reserves a spacer cell") },
             { assertEquals('X'.code, wide.getCodepointAt(2, 0)) },
-            { assertEquals(3, wide.cursorCol) }
+            { assertEquals(3, wide.cursorCol) },
         )
     }
 

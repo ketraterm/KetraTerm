@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.pty
 
 import com.gagik.terminal.session.TerminalSession
@@ -28,7 +27,5 @@ object TerminalSessions {
      */
     @JvmStatic
     @Throws(IOException::class)
-    fun localPty(options: TerminalPtyOptions = TerminalPtyOptions()): TerminalSession {
-        return TerminalPtySessions.start(options)
-    }
+    fun localPty(options: TerminalPtyOptions = TerminalPtyOptions()): TerminalSession = TerminalPtySessions.start(options)
 }

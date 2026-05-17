@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 import com.gagik.terminal.ui.swing.settings.TerminalSwingMetrics
@@ -29,10 +28,9 @@ internal class TerminalCellPrimitivePainter {
     /**
      * Returns true when [codePoint] is handled by this primitive painter.
      */
-    fun canPaint(codePoint: Int): Boolean {
-        return TerminalBoxDrawingGlyphs.canPaint(codePoint) ||
+    fun canPaint(codePoint: Int): Boolean =
+        TerminalBoxDrawingGlyphs.canPaint(codePoint) ||
             TerminalBlockElementGlyphs.canPaint(codePoint)
-    }
 
     /**
      * Paints one supported cell-native glyph.

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.demo
 
 import com.gagik.terminal.pty.TerminalPtyEventListener
@@ -50,45 +49,50 @@ private object TerminalSwingDemo {
 
     fun start(command: List<String>) {
         var currentTheme = TerminalTheme.CAMPBELL
-        var currentSettings = TerminalSwingSettings(
-            columns = INITIAL_COLUMNS,
-            rows = INITIAL_ROWS,
-            theme = currentTheme
-        )
+        var currentSettings =
+            TerminalSwingSettings(
+                columns = INITIAL_COLUMNS,
+                rows = INITIAL_ROWS,
+                theme = currentTheme,
+            )
 
         val terminal = TerminalSwingTerminal { currentSettings }
 
         val frame = JFrame("Terminal Swing Demo")
-        
+
         // Add a premium JMenuBar for dynamic theme switching
         val menuBar = javax.swing.JMenuBar()
         val themeMenu = javax.swing.JMenu("Themes")
-        
+
         TerminalTheme.entries.forEach { theme ->
-            val themeDisplayName = theme.name.lowercase().split("_").joinToString(" ") { 
-                it.replaceFirstChar { c -> if (c.isLowerCase()) c.titlecase() else c.toString() } 
-            }
+            val themeDisplayName =
+                theme.name.lowercase().split("_").joinToString(" ") {
+                    it.replaceFirstChar { c -> if (c.isLowerCase()) c.titlecase() else c.toString() }
+                }
             val menuItem = javax.swing.JMenuItem(themeDisplayName)
             menuItem.addActionListener {
                 currentTheme = theme
-                currentSettings = currentSettings.copy(
-                    theme = currentTheme,
-                    palette = currentTheme.createPalette()
-                )
+                currentSettings =
+                    currentSettings.copy(
+                        theme = currentTheme,
+                        palette = currentTheme.createPalette(),
+                    )
                 terminal.reloadSettings()
             }
             themeMenu.add(menuItem)
         }
         menuBar.add(themeMenu)
         val widthMenu = javax.swing.JMenu("Width")
-        val ambiguousWidthItem = javax.swing.JCheckBoxMenuItem(
-            "Ambiguous as wide",
-            currentSettings.treatAmbiguousAsWide,
-        )
-        ambiguousWidthItem.addActionListener {
-            currentSettings = currentSettings.copy(
-                treatAmbiguousAsWide = ambiguousWidthItem.isSelected,
+        val ambiguousWidthItem =
+            javax.swing.JCheckBoxMenuItem(
+                "Ambiguous as wide",
+                currentSettings.treatAmbiguousAsWide,
             )
+        ambiguousWidthItem.addActionListener {
+            currentSettings =
+                currentSettings.copy(
+                    treatAmbiguousAsWide = ambiguousWidthItem.isSelected,
+                )
             terminal.reloadSettings()
         }
         widthMenu.add(ambiguousWidthItem)
@@ -96,35 +100,38 @@ private object TerminalSwingDemo {
         frame.jMenuBar = menuBar
         val listener = DemoPtyEventListener(frame)
 
-        val session = try {
-            TerminalPtySessions.start(
-                TerminalPtyOptions(
-                    command = command,
-                    columns = INITIAL_COLUMNS,
-                    rows = INITIAL_ROWS,
-                    treatAmbiguousAsWide = currentSettings.treatAmbiguousAsWide,
-                    eventListener = listener,
-                ),
-            )
-        } catch (exception: Exception) {
-            JOptionPane.showMessageDialog(
-                frame,
-                exception.message ?: exception.javaClass.name,
-                "Unable to start terminal",
-                JOptionPane.ERROR_MESSAGE,
-            )
-            return
-        }
+        val session =
+            try {
+                TerminalPtySessions.start(
+                    TerminalPtyOptions(
+                        command = command,
+                        columns = INITIAL_COLUMNS,
+                        rows = INITIAL_ROWS,
+                        treatAmbiguousAsWide = currentSettings.treatAmbiguousAsWide,
+                        eventListener = listener,
+                    ),
+                )
+            } catch (exception: Exception) {
+                JOptionPane.showMessageDialog(
+                    frame,
+                    exception.message ?: exception.javaClass.name,
+                    "Unable to start terminal",
+                    JOptionPane.ERROR_MESSAGE,
+                )
+                return
+            }
 
         terminal.bind(session)
         frame.defaultCloseOperation = WindowConstants.DISPOSE_ON_CLOSE
         frame.layout = BorderLayout()
         frame.add(terminal, BorderLayout.CENTER)
-        frame.addWindowListener(object : WindowAdapter() {
-            override fun windowClosed(event: WindowEvent) {
-                session.close()
-            }
-        })
+        frame.addWindowListener(
+            object : WindowAdapter() {
+                override fun windowClosed(event: WindowEvent) {
+                    session.close()
+                }
+            },
+        )
         terminal.addComponentListener(DemoResizeAdapter(terminal, session))
 
         frame.pack()
@@ -136,30 +143,28 @@ private object TerminalSwingDemo {
 }
 
 private object DemoShellCommand {
-    fun resolve(args: List<String>): List<String> {
-        return if (args.isNotEmpty()) {
+    fun resolve(args: List<String>): List<String> =
+        if (args.isNotEmpty()) {
             args
         } else if (isWindows()) {
             windowsPowerShellCommand()
         } else {
             TerminalPtyOptions.defaultCommand()
         }
-    }
 
-    private fun isWindows(): Boolean {
-        return System.getProperty("os.name").lowercase().contains("windows")
-    }
+    private fun isWindows(): Boolean = System.getProperty("os.name").lowercase().contains("windows")
 
     private fun windowsPowerShellCommand(): List<String> {
         val systemRoot = System.getenv("SystemRoot")
         if (!systemRoot.isNullOrBlank()) {
-            val powershell = Path.of(
-                systemRoot,
-                "System32",
-                "WindowsPowerShell",
-                "v1.0",
-                "powershell.exe",
-            )
+            val powershell =
+                Path.of(
+                    systemRoot,
+                    "System32",
+                    "WindowsPowerShell",
+                    "v1.0",
+                    "powershell.exe",
+                )
             if (Files.isRegularFile(powershell)) {
                 return listOf(powershell.toString(), "-NoLogo")
             }
@@ -196,17 +201,27 @@ private class DemoPtyEventListener(
         }
     }
 
-    override fun iconTitleChanged(session: TerminalSession, title: String) = Unit
+    override fun iconTitleChanged(
+        session: TerminalSession,
+        title: String,
+    ) = Unit
 
-    override fun windowTitleChanged(session: TerminalSession, title: String) {
+    override fun windowTitleChanged(
+        session: TerminalSession,
+        title: String,
+    ) {
         SwingUtilities.invokeLater {
-            frame.title = if (title.isBlank()) {
-                "Terminal Swing Demo"
-            } else {
-                title
-            }
+            frame.title =
+                if (title.isBlank()) {
+                    "Terminal Swing Demo"
+                } else {
+                    title
+                }
         }
     }
 
-    override fun listenerFailed(session: TerminalSession, exception: Exception) = Unit
+    override fun listenerFailed(
+        session: TerminalSession,
+        exception: Exception,
+    ) = Unit
 }

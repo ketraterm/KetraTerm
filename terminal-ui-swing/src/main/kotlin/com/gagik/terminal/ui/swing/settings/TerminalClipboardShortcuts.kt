@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.settings
 
 import java.awt.event.InputEvent
@@ -50,7 +49,10 @@ data class TerminalClipboardShortcuts(
      * @param modifiersEx extended Swing modifier mask.
      * @return requested action, or [TerminalClipboardAction.NONE].
      */
-    fun actionFor(keyCode: Int, modifiersEx: Int): TerminalClipboardAction {
+    fun actionFor(
+        keyCode: Int,
+        modifiersEx: Int,
+    ): TerminalClipboardAction {
         val normalizedModifiers = modifiersEx and RELEVANT_MODIFIERS
         return when {
             keyCode == copyKey && normalizedModifiers == copyModifiers -> TerminalClipboardAction.COPY
@@ -64,9 +66,7 @@ data class TerminalClipboardShortcuts(
          * Returns the default terminal clipboard shortcuts for this JVM host.
          */
         @JvmStatic
-        fun platformDefault(): TerminalClipboardShortcuts {
-            return platformDefault(System.getProperty("os.name").orEmpty())
-        }
+        fun platformDefault(): TerminalClipboardShortcuts = platformDefault(System.getProperty("os.name").orEmpty())
 
         internal fun platformDefault(osName: String): TerminalClipboardShortcuts {
             val normalized = osName.lowercase(Locale.ROOT)
@@ -81,27 +81,25 @@ data class TerminalClipboardShortcuts(
          * Windows terminal-style clipboard shortcuts.
          */
         @JvmStatic
-        fun windows(): TerminalClipboardShortcuts {
-            return TerminalClipboardShortcuts(
+        fun windows(): TerminalClipboardShortcuts =
+            TerminalClipboardShortcuts(
                 copyKey = KeyEvent.VK_C,
                 copyModifiers = InputEvent.CTRL_DOWN_MASK,
                 pasteKey = KeyEvent.VK_V,
                 pasteModifiers = InputEvent.CTRL_DOWN_MASK,
             )
-        }
 
         /**
          * macOS menu-shortcut clipboard bindings.
          */
         @JvmStatic
-        fun macOs(): TerminalClipboardShortcuts {
-            return TerminalClipboardShortcuts(
+        fun macOs(): TerminalClipboardShortcuts =
+            TerminalClipboardShortcuts(
                 copyKey = KeyEvent.VK_C,
                 copyModifiers = InputEvent.META_DOWN_MASK,
                 pasteKey = KeyEvent.VK_V,
                 pasteModifiers = InputEvent.META_DOWN_MASK,
             )
-        }
 
         /**
          * Linux and Unix terminal clipboard bindings.

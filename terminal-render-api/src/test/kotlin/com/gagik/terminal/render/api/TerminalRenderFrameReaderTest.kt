@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.api
 
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -24,11 +23,12 @@ class TerminalRenderFrameReaderTest {
     @Test
     fun `reader passes short lived frame to callback`() {
         val frame = RecordingFrame(columns = 80, rows = 24)
-        val reader = object : TerminalRenderFrameReader {
-            override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-                consumer.accept(frame)
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                    consumer.accept(frame)
+                }
             }
-        }
 
         var observed: TerminalRenderFrame? = null
         reader.readRenderFrame { callbackFrame ->
@@ -44,16 +44,20 @@ class TerminalRenderFrameReaderTest {
     fun `default overscan read delegates to scrollback read`() {
         val frame = RecordingFrame(columns = 80, rows = 24)
         var requestedOffset = -1
-        val reader = object : TerminalRenderFrameReader {
-            override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-                consumer.accept(frame)
-            }
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                    consumer.accept(frame)
+                }
 
-            override fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
-                requestedOffset = scrollbackOffset
-                consumer.accept(frame)
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    requestedOffset = scrollbackOffset
+                    consumer.accept(frame)
+                }
             }
-        }
 
         reader.readRenderFrame(scrollbackOffset = 7, viewportRows = 25) {
             assertSame(frame, it)
@@ -69,14 +73,15 @@ class TerminalRenderFrameReaderTest {
         override val frameGeneration: Long = 0L
         override val structureGeneration: Long = 0L
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
-        override val cursor: TerminalRenderCursor = TerminalRenderCursor(
-            column = 0,
-            row = 0,
-            visible = true,
-            blinking = false,
-            shape = TerminalRenderCursorShape.BLOCK,
-            generation = 0L,
-        )
+        override val cursor: TerminalRenderCursor =
+            TerminalRenderCursor(
+                column = 0,
+                row = 0,
+                visible = true,
+                blinking = false,
+                shape = TerminalRenderCursorShape.BLOCK,
+                generation = 0L,
+            )
 
         override fun lineGeneration(row: Int): Long = 0L
 
@@ -96,8 +101,6 @@ class TerminalRenderFrameReaderTest {
             hyperlinkOffset: Int,
             clusterSink: TerminalRenderClusterSink?,
             clusterDataSink: TerminalRenderClusterDataSink?,
-        ) {
-            throw UnsupportedOperationException("not needed for callback contract test")
-        }
+        ): Unit = throw UnsupportedOperationException("not needed for callback contract test")
     }
 }

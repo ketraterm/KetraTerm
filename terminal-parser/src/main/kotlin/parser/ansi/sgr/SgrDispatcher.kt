@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi.sgr
 
 import com.gagik.parser.runtime.ParserState
@@ -33,165 +32,169 @@ internal object SgrDispatcher {
         while (i < state.paramCount) {
             val param = state.params[i]
 
-            i = when {
-                param < 0 -> {
-                    sink.resetAttributes()
-                    i + 1
+            i =
+                when {
+                    param < 0 -> {
+                        sink.resetAttributes()
+                        i + 1
+                    }
+
+                    param == 0 -> {
+                        sink.resetAttributes()
+                        i + 1
+                    }
+
+                    param == 1 -> {
+                        sink.setBold(true)
+                        i + 1
+                    }
+
+                    param == 2 -> {
+                        sink.setFaint(true)
+                        i + 1
+                    }
+
+                    param == 3 -> {
+                        sink.setItalic(true)
+                        i + 1
+                    }
+
+                    param == 4 -> {
+                        dispatchUnderlineStyle(sink, state, i)
+                    }
+
+                    param == 5 || param == 6 -> {
+                        sink.setBlink(true)
+                        i + 1
+                    }
+
+                    param == 7 -> {
+                        sink.setInverse(true)
+                        i + 1
+                    }
+
+                    param == 8 -> {
+                        sink.setConceal(true)
+                        i + 1
+                    }
+
+                    param == 9 -> {
+                        sink.setStrikethrough(true)
+                        i + 1
+                    }
+
+                    param == 21 -> {
+                        sink.setUnderlineStyle(SgrUnderlineStyle.DOUBLE)
+                        i + 1
+                    }
+
+                    param == 22 -> {
+                        sink.setBold(false)
+                        sink.setFaint(false)
+                        i + 1
+                    }
+
+                    param == 23 -> {
+                        sink.setItalic(false)
+                        i + 1
+                    }
+
+                    param == 24 -> {
+                        sink.setUnderlineStyle(SgrUnderlineStyle.NONE)
+                        i + 1
+                    }
+
+                    param == 25 -> {
+                        sink.setBlink(false)
+                        i + 1
+                    }
+
+                    param == 27 -> {
+                        sink.setInverse(false)
+                        i + 1
+                    }
+
+                    param == 28 -> {
+                        sink.setConceal(false)
+                        i + 1
+                    }
+
+                    param == 29 -> {
+                        sink.setStrikethrough(false)
+                        i + 1
+                    }
+
+                    param in 30..37 -> {
+                        sink.setForegroundIndexed(param - 30)
+                        i + 1
+                    }
+
+                    param == 38 ->
+                        dispatchExtendedColor(
+                            sink = sink,
+                            state = state,
+                            startIndex = i,
+                            target = ColorTarget.FOREGROUND,
+                        )
+
+                    param == 39 -> {
+                        sink.setForegroundDefault()
+                        i + 1
+                    }
+
+                    param in 40..47 -> {
+                        sink.setBackgroundIndexed(param - 40)
+                        i + 1
+                    }
+
+                    param == 48 ->
+                        dispatchExtendedColor(
+                            sink = sink,
+                            state = state,
+                            startIndex = i,
+                            target = ColorTarget.BACKGROUND,
+                        )
+
+                    param == 49 -> {
+                        sink.setBackgroundDefault()
+                        i + 1
+                    }
+
+                    param == 53 -> {
+                        sink.setOverline(true)
+                        i + 1
+                    }
+
+                    param == 55 -> {
+                        sink.setOverline(false)
+                        i + 1
+                    }
+
+                    param == 58 ->
+                        dispatchExtendedColor(
+                            sink = sink,
+                            state = state,
+                            startIndex = i,
+                            target = ColorTarget.UNDERLINE,
+                        )
+
+                    param == 59 -> {
+                        sink.setUnderlineColorDefault()
+                        i + 1
+                    }
+
+                    param in 90..97 -> {
+                        sink.setForegroundIndexed(8 + (param - 90))
+                        i + 1
+                    }
+
+                    param in 100..107 -> {
+                        sink.setBackgroundIndexed(8 + (param - 100))
+                        i + 1
+                    }
+
+                    else -> i + 1
                 }
-
-                param == 0 -> {
-                    sink.resetAttributes()
-                    i + 1
-                }
-
-                param == 1 -> {
-                    sink.setBold(true)
-                    i + 1
-                }
-
-                param == 2 -> {
-                    sink.setFaint(true)
-                    i + 1
-                }
-
-                param == 3 -> {
-                    sink.setItalic(true)
-                    i + 1
-                }
-
-                param == 4 -> {
-                    dispatchUnderlineStyle(sink, state, i)
-                }
-
-                param == 5 || param == 6 -> {
-                    sink.setBlink(true)
-                    i + 1
-                }
-
-                param == 7 -> {
-                    sink.setInverse(true)
-                    i + 1
-                }
-
-                param == 8 -> {
-                    sink.setConceal(true)
-                    i + 1
-                }
-
-                param == 9 -> {
-                    sink.setStrikethrough(true)
-                    i + 1
-                }
-
-                param == 21 -> {
-                    sink.setUnderlineStyle(SgrUnderlineStyle.DOUBLE)
-                    i + 1
-                }
-
-                param == 22 -> {
-                    sink.setBold(false)
-                    sink.setFaint(false)
-                    i + 1
-                }
-
-                param == 23 -> {
-                    sink.setItalic(false)
-                    i + 1
-                }
-
-                param == 24 -> {
-                    sink.setUnderlineStyle(SgrUnderlineStyle.NONE)
-                    i + 1
-                }
-
-                param == 25 -> {
-                    sink.setBlink(false)
-                    i + 1
-                }
-
-                param == 27 -> {
-                    sink.setInverse(false)
-                    i + 1
-                }
-
-                param == 28 -> {
-                    sink.setConceal(false)
-                    i + 1
-                }
-
-                param == 29 -> {
-                    sink.setStrikethrough(false)
-                    i + 1
-                }
-
-                param in 30..37 -> {
-                    sink.setForegroundIndexed(param - 30)
-                    i + 1
-                }
-
-                param == 38 -> dispatchExtendedColor(
-                    sink = sink,
-                    state = state,
-                    startIndex = i,
-                    target = ColorTarget.FOREGROUND,
-                )
-
-                param == 39 -> {
-                    sink.setForegroundDefault()
-                    i + 1
-                }
-
-                param in 40..47 -> {
-                    sink.setBackgroundIndexed(param - 40)
-                    i + 1
-                }
-
-                param == 48 -> dispatchExtendedColor(
-                    sink = sink,
-                    state = state,
-                    startIndex = i,
-                    target = ColorTarget.BACKGROUND,
-                )
-
-                param == 49 -> {
-                    sink.setBackgroundDefault()
-                    i + 1
-                }
-
-                param == 53 -> {
-                    sink.setOverline(true)
-                    i + 1
-                }
-
-                param == 55 -> {
-                    sink.setOverline(false)
-                    i + 1
-                }
-
-                param == 58 -> dispatchExtendedColor(
-                    sink = sink,
-                    state = state,
-                    startIndex = i,
-                    target = ColorTarget.UNDERLINE,
-                )
-
-                param == 59 -> {
-                    sink.setUnderlineColorDefault()
-                    i + 1
-                }
-
-                param in 90..97 -> {
-                    sink.setForegroundIndexed(8 + (param - 90))
-                    i + 1
-                }
-
-                param in 100..107 -> {
-                    sink.setBackgroundIndexed(8 + (param - 100))
-                    i + 1
-                }
-
-                else -> i + 1
-            }
         }
     }
 
@@ -208,19 +211,21 @@ internal object SgrDispatcher {
         }
 
         return when (mode) {
-            5 -> dispatchIndexedColor(
-                sink = sink,
-                state = state,
-                startIndex = startIndex,
-                target = target,
-            )
+            5 ->
+                dispatchIndexedColor(
+                    sink = sink,
+                    state = state,
+                    startIndex = startIndex,
+                    target = target,
+                )
 
-            2 -> dispatchRgbColor(
-                sink = sink,
-                state = state,
-                startIndex = startIndex,
-                target = target,
-            )
+            2 ->
+                dispatchRgbColor(
+                    sink = sink,
+                    state = state,
+                    startIndex = startIndex,
+                    target = target,
+                )
 
             else -> startIndex + 2
         }
@@ -303,21 +308,24 @@ internal object SgrDispatcher {
         return redIndex + 3
     }
 
-    private fun paramOrMissing(state: ParserState, index: Int): Int {
-        return if (index in 0 until state.paramCount) {
+    private fun paramOrMissing(
+        state: ParserState,
+        index: Int,
+    ): Int =
+        if (index in 0 until state.paramCount) {
             state.params[index]
         } else {
             -1
         }
-    }
 
-    private fun isColonOpened(state: ParserState, index: Int): Boolean {
-        return index in 0..31 && ((state.subParameterMask ushr index) and 1) != 0
-    }
+    private fun isColonOpened(
+        state: ParserState,
+        index: Int,
+    ): Boolean = index in 0..31 && ((state.subParameterMask ushr index) and 1) != 0
 
     private enum class ColorTarget {
         FOREGROUND,
         BACKGROUND,
-        UNDERLINE
+        UNDERLINE,
     }
 }

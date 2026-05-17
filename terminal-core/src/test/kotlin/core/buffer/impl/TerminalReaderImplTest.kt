@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer.impl
 
 import com.gagik.core.engine.MutationEngine
@@ -24,7 +23,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class TerminalReaderImplTest {
-
     @Test
     fun `exposes dimensions cursor and history from shared state`() {
         val state = TerminalState(4, 3, 5)
@@ -35,7 +33,7 @@ class TerminalReaderImplTest {
             { assertEquals(3, reader.height) },
             { assertEquals(0, reader.cursorCol) },
             { assertEquals(0, reader.cursorRow) },
-            { assertEquals(0, reader.historySize) }
+            { assertEquals(0, reader.historySize) },
         )
     }
 
@@ -49,7 +47,7 @@ class TerminalReaderImplTest {
             { assertEquals(TerminalConstants.EMPTY, reader.getCodepointAt(-1, 0)) },
             { assertEquals(TerminalConstants.EMPTY, reader.getCodepointAt(0, -1)) },
             { assertEquals(state.pen.currentAttr, reader.getPackedAttrAt(-1, 0)) },
-            { assertEquals(state.pen.currentAttr, reader.getPackedAttrAt(0, 99)) }
+            { assertEquals(state.pen.currentAttr, reader.getPackedAttrAt(0, 99)) },
         )
     }
 
@@ -67,9 +65,7 @@ class TerminalReaderImplTest {
             { assertEquals('B'.code, reader.getCodepointAt(1, 0)) },
             { assertEquals(state.pen.currentAttr, reader.getPackedAttrAt(1, 0)) },
             { assertEquals('A'.code, reader.getLine(0).getCodepoint(0)) },
-            { assertEquals('B'.code, reader.getLine(0).getCodepoint(1)) }
+            { assertEquals('B'.code, reader.getLine(0).getCodepoint(1)) },
         )
     }
 }
-
-

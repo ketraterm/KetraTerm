@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.viewport
 
 import com.gagik.terminal.render.api.TerminalRenderCursorShape
@@ -266,41 +265,39 @@ internal class TerminalSwingRepaintPlanner {
         row: Int,
         cellHeight: Int,
         contentYOffset: Double,
-    ): Int {
-        return if (contentYOffset == 0.0) {
+    ): Int =
+        if (contentYOffset == 0.0) {
             row * cellHeight
         } else {
             floor(row.toDouble() * cellHeight.toDouble() + contentYOffset).toInt()
         }
-    }
 
     private fun rowBottom(
         endRow: Int,
         cellHeight: Int,
         contentYOffset: Double,
-    ): Int {
-        return if (contentYOffset == 0.0) {
+    ): Int =
+        if (contentYOffset == 0.0) {
             endRow * cellHeight
         } else {
             ceil(endRow.toDouble() * cellHeight.toDouble() + contentYOffset).toInt()
         }
-    }
 
     private fun visibleRows(
         cache: TerminalRenderCache,
         metrics: TerminalSwingMetrics,
         componentHeight: Int,
-    ): Int {
-        return minOf(cache.rows, componentHeight / metrics.cellHeight + 1)
-    }
+    ): Int = minOf(cache.rows, componentHeight / metrics.cellHeight + 1)
 
-    private fun rowChanged(cache: TerminalRenderCache, row: Int): Boolean {
-        return lastLineGenerations[row] != cache.lineGenerations[row] ||
+    private fun rowChanged(
+        cache: TerminalRenderCache,
+        row: Int,
+    ): Boolean =
+        lastLineGenerations[row] != cache.lineGenerations[row] ||
             lastLineWrapped[row] != cache.lineWrapped[row]
-    }
 
-    private fun requiresFullRepaint(cache: TerminalRenderCache): Boolean {
-        return cache.resizedOnLastUpdate ||
+    private fun requiresFullRepaint(cache: TerminalRenderCache): Boolean =
+        cache.resizedOnLastUpdate ||
             lastColumns != cache.columns ||
             lastRows != cache.rows ||
             lastLineGenerations.size != cache.rows ||
@@ -308,17 +305,15 @@ internal class TerminalSwingRepaintPlanner {
             lastStructureGeneration != cache.structureGeneration ||
             lastScrollbackOffset != cache.scrollbackOffset ||
             lastActiveBufferOrdinal != cache.activeBuffer.ordinal
-    }
 
-    private fun cursorChanged(cache: TerminalRenderCache): Boolean {
-        return !lastCursorKnown ||
+    private fun cursorChanged(cache: TerminalRenderCache): Boolean =
+        !lastCursorKnown ||
             lastCursorColumn != cache.cursorColumn ||
             lastCursorRow != cache.cursorRow ||
             lastCursorVisible != cache.cursorVisible ||
             lastCursorBlinking != cache.cursorBlinking ||
             lastCursorShape != cache.cursorShape ||
             lastCursorGeneration != cache.cursorGeneration
-    }
 
     private fun snapshotCursor(cache: TerminalRenderCache) {
         lastCursorKnown = true

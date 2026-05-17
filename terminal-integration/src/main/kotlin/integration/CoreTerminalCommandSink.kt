@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.integration
 
 import com.gagik.core.api.TerminalBufferApi
@@ -74,7 +73,10 @@ class CoreTerminalCommandSink(
         terminal.writeCodepoint(codepoint)
     }
 
-    override fun writeCluster(codepoints: IntArray, length: Int) {
+    override fun writeCluster(
+        codepoints: IntArray,
+        length: Int,
+    ) {
         terminal.writeCluster(codepoints, length)
     }
 
@@ -216,11 +218,17 @@ class CoreTerminalCommandSink(
         terminal.positionCursor(col = terminal.cursorCol, row = row)
     }
 
-    override fun setCursorAbsolute(row: Int, col: Int) {
+    override fun setCursorAbsolute(
+        row: Int,
+        col: Int,
+    ) {
         terminal.positionCursor(col = col, row = row)
     }
 
-    override fun setScrollRegion(top: Int, bottom: Int) {
+    override fun setScrollRegion(
+        top: Int,
+        bottom: Int,
+    ) {
         // Parser SPI passes zero-based inclusive margins; core TerminalWriter keeps DECSTBM's
         // one-based inclusive API. This conversion is intentional.
         terminal.setScrollRegion(
@@ -229,7 +237,10 @@ class CoreTerminalCommandSink(
         )
     }
 
-    override fun setLeftRightMargins(left: Int, right: Int) {
+    override fun setLeftRightMargins(
+        left: Int,
+        right: Int,
+    ) {
         // Parser SPI passes zero-based inclusive margins; core TerminalWriter keeps DECSLRM's
         // one-based inclusive API. This conversion is intentional.
         terminal.setLeftRightMargins(
@@ -238,7 +249,10 @@ class CoreTerminalCommandSink(
         )
     }
 
-    override fun eraseInDisplay(mode: Int, selective: Boolean) {
+    override fun eraseInDisplay(
+        mode: Int,
+        selective: Boolean,
+    ) {
         when {
             selective && mode == 0 -> terminal.selectiveEraseScreenToEnd()
             selective && mode == 1 -> terminal.selectiveEraseScreenToCursor()
@@ -250,7 +264,10 @@ class CoreTerminalCommandSink(
         }
     }
 
-    override fun eraseInLine(mode: Int, selective: Boolean) {
+    override fun eraseInLine(
+        mode: Int,
+        selective: Boolean,
+    ) {
         when {
             selective && mode == 0 -> terminal.selectiveEraseLineToEnd()
             selective && mode == 1 -> terminal.selectiveEraseLineToCursor()
@@ -305,14 +322,20 @@ class CoreTerminalCommandSink(
         terminal.clearAllTabStops()
     }
 
-    override fun setAnsiMode(mode: Int, enable: Boolean) {
+    override fun setAnsiMode(
+        mode: Int,
+        enable: Boolean,
+    ) {
         when (mode) {
             AnsiMode.INSERT -> terminal.setInsertMode(enable)
             AnsiMode.NEW_LINE -> terminal.setNewLineMode(enable)
         }
     }
 
-    override fun setDecMode(mode: Int, enable: Boolean) {
+    override fun setDecMode(
+        mode: Int,
+        enable: Boolean,
+    ) {
         when (mode) {
             DecPrivateMode.APPLICATION_CURSOR_KEYS -> terminal.setApplicationCursorKeys(enable)
             DecPrivateMode.DECCOLM -> terminal.executeDeccolm(if (enable) 132 else 80)
@@ -328,15 +351,18 @@ class CoreTerminalCommandSink(
             DecPrivateMode.MOUSE_BUTTON_EVENT -> setMouseTrackingMode(enable, MouseTrackingMode.BUTTON_EVENT)
             DecPrivateMode.MOUSE_ANY_EVENT -> setMouseTrackingMode(enable, MouseTrackingMode.ANY_EVENT)
             DecPrivateMode.FOCUS_REPORTING -> terminal.setFocusReportingEnabled(enable)
-            DecPrivateMode.MOUSE_UTF8 -> terminal.setMouseEncodingMode(
-                if (enable) MouseEncodingMode.UTF8 else MouseEncodingMode.DEFAULT
-            )
-            DecPrivateMode.MOUSE_SGR -> terminal.setMouseEncodingMode(
-                if (enable) MouseEncodingMode.SGR else MouseEncodingMode.DEFAULT
-            )
-            DecPrivateMode.MOUSE_URXVT -> terminal.setMouseEncodingMode(
-                if (enable) MouseEncodingMode.URXVT else MouseEncodingMode.DEFAULT
-            )
+            DecPrivateMode.MOUSE_UTF8 ->
+                terminal.setMouseEncodingMode(
+                    if (enable) MouseEncodingMode.UTF8 else MouseEncodingMode.DEFAULT,
+                )
+            DecPrivateMode.MOUSE_SGR ->
+                terminal.setMouseEncodingMode(
+                    if (enable) MouseEncodingMode.SGR else MouseEncodingMode.DEFAULT,
+                )
+            DecPrivateMode.MOUSE_URXVT ->
+                terminal.setMouseEncodingMode(
+                    if (enable) MouseEncodingMode.URXVT else MouseEncodingMode.DEFAULT,
+                )
             DecPrivateMode.ALT_SCREEN -> {
                 if (enable) {
                     terminal.enterAltBufferWithoutCursorSave(clearBeforeEnter = false)
@@ -364,11 +390,17 @@ class CoreTerminalCommandSink(
         }
     }
 
-    override fun requestDeviceStatusReport(mode: Int, decPrivate: Boolean) {
+    override fun requestDeviceStatusReport(
+        mode: Int,
+        decPrivate: Boolean,
+    ) {
         terminal.requestDeviceStatusReport(mode, decPrivate)
     }
 
-    override fun requestDeviceAttributes(kind: Int, parameter: Int) {
+    override fun requestDeviceAttributes(
+        kind: Int,
+        parameter: Int,
+    ) {
         terminal.requestDeviceAttributes(kind, parameter)
     }
 
@@ -500,17 +532,29 @@ class CoreTerminalCommandSink(
         applyPen()
     }
 
-    override fun setForegroundRgb(red: Int, green: Int, blue: Int) {
+    override fun setForegroundRgb(
+        red: Int,
+        green: Int,
+        blue: Int,
+    ) {
         foreground = AttributeColor.rgb(red, green, blue)
         applyPen()
     }
 
-    override fun setBackgroundRgb(red: Int, green: Int, blue: Int) {
+    override fun setBackgroundRgb(
+        red: Int,
+        green: Int,
+        blue: Int,
+    ) {
         background = AttributeColor.rgb(red, green, blue)
         applyPen()
     }
 
-    override fun setUnderlineColorRgb(red: Int, green: Int, blue: Int) {
+    override fun setUnderlineColorRgb(
+        red: Int,
+        green: Int,
+        blue: Int,
+    ) {
         underlineColor = AttributeColor.rgb(red, green, blue)
         applyPen()
     }
@@ -528,7 +572,10 @@ class CoreTerminalCommandSink(
         updateWindowTitle(title)
     }
 
-    override fun startHyperlink(uri: String, id: String?) {
+    override fun startHyperlink(
+        uri: String,
+        id: String?,
+    ) {
         if (!isHyperlinkAllowed(uri, id)) {
             activeHyperlinkUri = null
             activeHyperlinkId = null
@@ -557,16 +604,17 @@ class CoreTerminalCommandSink(
         terminal.setMouseTrackingMode(if (enabled) mode else MouseTrackingMode.OFF)
     }
 
-    private fun pushTitle(stack: ArrayDeque<String>, title: String) {
+    private fun pushTitle(
+        stack: ArrayDeque<String>,
+        title: String,
+    ) {
         if (stack.size == MAX_TITLE_STACK_DEPTH) {
             stack.removeFirst()
         }
         stack.addLast(title)
     }
 
-    private fun popTitle(stack: ArrayDeque<String>): String? {
-        return if (stack.isEmpty()) null else stack.removeLast()
-    }
+    private fun popTitle(stack: ArrayDeque<String>): String? = if (stack.isEmpty()) null else stack.removeLast()
 
     private fun updateIconTitle(title: String) {
         iconTitle = title
@@ -580,7 +628,10 @@ class CoreTerminalCommandSink(
         hostEvents.windowTitleChanged(title)
     }
 
-    private fun hyperlinkIdFor(uri: String, id: String?): Int {
+    private fun hyperlinkIdFor(
+        uri: String,
+        id: String?,
+    ): Int {
         val key = HyperlinkKey(id.orEmpty(), uri)
         hyperlinkIds[key]?.let { return it }
 
@@ -598,14 +649,14 @@ class CoreTerminalCommandSink(
         return numericId
     }
 
-    private fun isHyperlinkAllowed(uri: String, id: String?): Boolean {
-        return uri.length <= hostPolicy.maxHyperlinkUriLength &&
+    private fun isHyperlinkAllowed(
+        uri: String,
+        id: String?,
+    ): Boolean =
+        uri.length <= hostPolicy.maxHyperlinkUriLength &&
             (id?.length ?: 0) <= hostPolicy.maxHyperlinkIdLength
-    }
 
-    private fun nextHyperlinkIdAfter(current: Int): Int {
-        return if (current == Int.MAX_VALUE) 1 else current + 1
-    }
+    private fun nextHyperlinkIdAfter(current: Int): Int = if (current == Int.MAX_VALUE) 1 else current + 1
 
     private fun applyPen() {
         terminal.setPenColors(

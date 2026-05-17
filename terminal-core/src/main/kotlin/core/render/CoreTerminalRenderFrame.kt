@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.render
 
 import com.gagik.core.state.TerminalState
@@ -27,15 +26,23 @@ internal class CoreTerminalRenderFrame(
 ) : TerminalRenderFrame {
     private val attrTranslator = RenderAttrTranslator()
     private val clusterScratch = RenderClusterScratch()
+
     @PublishedApi internal var isValid: Boolean = false
+
     @PublishedApi internal var resolvedScrollbackOffset: Int = 0
+
     @PublishedApi internal var resolvedRows: Int = 0
 
-    internal inline fun <T> use(scrollbackOffset: Int, block: () -> T): T {
-        return use(scrollbackOffset, state.dimensions.height, block)
-    }
+    internal inline fun <T> use(
+        scrollbackOffset: Int,
+        block: () -> T,
+    ): T = use(scrollbackOffset, state.dimensions.height, block)
 
-    internal inline fun <T> use(scrollbackOffset: Int, viewportRows: Int, block: () -> T): T {
+    internal inline fun <T> use(
+        scrollbackOffset: Int,
+        viewportRows: Int,
+        block: () -> T,
+    ): T {
         require(viewportRows > 0) { "viewportRows must be > 0, was $viewportRows" }
         resolvedScrollbackOffset = state.clampScrollbackOffset(scrollbackOffset)
         resolvedRows = viewportRows.coerceAtMost(state.dimensions.height + resolvedScrollbackOffset)
@@ -191,8 +198,7 @@ internal class CoreTerminalRenderFrame(
         )
     }
 
-    private fun visibleLineAt(row: Int) =
-        state.ring[state.resolveScrollbackRingIndex(row, resolvedScrollbackOffset)]
+    private fun visibleLineAt(row: Int) = state.ring[state.resolveScrollbackRingIndex(row, resolvedScrollbackOffset)]
 
     private fun checkRow(row: Int) {
         require(row in 0 until rows) {
@@ -200,13 +206,23 @@ internal class CoreTerminalRenderFrame(
         }
     }
 
-    private fun checkCapacity(array: IntArray, offset: Int, length: Int, name: String) {
+    private fun checkCapacity(
+        array: IntArray,
+        offset: Int,
+        length: Int,
+        name: String,
+    ) {
         require(offset >= 0 && array.size - offset >= length) {
             "$name has insufficient capacity: size=${array.size}, offset=$offset, required=$length"
         }
     }
 
-    private fun checkCapacity(array: LongArray, offset: Int, length: Int, name: String) {
+    private fun checkCapacity(
+        array: LongArray,
+        offset: Int,
+        length: Int,
+        name: String,
+    ) {
         require(offset >= 0 && array.size - offset >= length) {
             "$name has insufficient capacity: size=${array.size}, offset=$offset, required=$length"
         }

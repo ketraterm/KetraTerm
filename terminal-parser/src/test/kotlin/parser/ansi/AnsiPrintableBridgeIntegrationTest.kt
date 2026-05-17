@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.charset.CharsetMapper
@@ -27,13 +26,11 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ANSI printable bridge integration")
 class AnsiPrintableBridgeIntegrationTest {
-
     // ----- Charset integration --------------------------------------------
 
     @Nested
     @DisplayName("charset integration")
     inner class CharsetIntegration {
-
         @Test
         fun `ESC left paren 0 designates G0 DEC Special Graphics`() {
             val h = AnsiPrintableBridgeFixture()
@@ -44,7 +41,7 @@ class AnsiPrintableBridgeIntegrationTest {
                 { assertEquals(ParserState.CHARSET_DEC_SPECIAL_GRAPHICS, h.state.charsets[0]) },
                 { assertEquals(ParserState.CHARSET_ASCII, h.state.charsets[1]) },
                 { assertEquals(AnsiState.GROUND, h.state.fsmState) },
-                { assertTrue(h.sink.events.isEmpty()) }
+                { assertTrue(h.sink.events.isEmpty()) },
             )
         }
 
@@ -58,7 +55,7 @@ class AnsiPrintableBridgeIntegrationTest {
                 { assertEquals(ParserState.CHARSET_ASCII, h.state.charsets[0]) },
                 { assertEquals(ParserState.CHARSET_DEC_SPECIAL_GRAPHICS, h.state.charsets[1]) },
                 { assertEquals(AnsiState.GROUND, h.state.fsmState) },
-                { assertTrue(h.sink.events.isEmpty()) }
+                { assertTrue(h.sink.events.isEmpty()) },
             )
         }
 
@@ -74,7 +71,7 @@ class AnsiPrintableBridgeIntegrationTest {
             assertAll(
                 { assertEquals(ParserState.CHARSET_ASCII, h.state.charsets[0]) },
                 { assertEquals(AnsiState.GROUND, h.state.fsmState) },
-                { assertTrue(h.sink.events.isEmpty()) }
+                { assertTrue(h.sink.events.isEmpty()) },
             )
         }
 
@@ -90,7 +87,7 @@ class AnsiPrintableBridgeIntegrationTest {
             assertAll(
                 { assertEquals(0, h.state.glSlot) },
                 { assertEquals(-1, h.state.singleShiftSlot) },
-                { assertTrue(h.sink.events.isEmpty()) }
+                { assertTrue(h.sink.events.isEmpty()) },
             )
         }
 
@@ -114,7 +111,7 @@ class AnsiPrintableBridgeIntegrationTest {
             assertAll(
                 { assertEquals(0, h.state.glSlot) },
                 { assertEquals(ParserState.CHARSET_DEC_SPECIAL_GRAPHICS, h.state.charsets[1]) },
-                { assertEquals(listOf(writeCodepoint('q'.code)), h.sink.events) }
+                { assertEquals(listOf(writeCodepoint('q'.code)), h.sink.events) },
             )
         }
 
@@ -143,7 +140,7 @@ class AnsiPrintableBridgeIntegrationTest {
 
             assertEquals(
                 listOf(writeCodepoint(0x2500), writeCodepoint('q'.code)),
-                h.sink.events
+                h.sink.events,
             )
         }
 
@@ -171,9 +168,9 @@ class AnsiPrintableBridgeIntegrationTest {
                             writeCodepoint(0x2502),
                             writeCodepoint('x'.code),
                         ),
-                        h.sink.events
+                        h.sink.events,
                     )
-                }
+                },
             )
         }
 
@@ -192,9 +189,9 @@ class AnsiPrintableBridgeIntegrationTest {
                             writeCodepoint(0x2500),
                             writeCodepoint('q'.code),
                         ),
-                        h.sink.events
+                        h.sink.events,
                     )
-                }
+                },
             )
         }
 
@@ -213,9 +210,9 @@ class AnsiPrintableBridgeIntegrationTest {
                             writeCodepoint(0x2502),
                             writeCodepoint('x'.code),
                         ),
-                        h.sink.events
+                        h.sink.events,
                     )
-                }
+                },
             )
         }
 
@@ -228,7 +225,7 @@ class AnsiPrintableBridgeIntegrationTest {
             assertAll(
                 { assertEquals(AnsiState.GROUND, h.state.fsmState) },
                 { assertEquals(ParserState.CHARSET_ASCII, h.state.charsets[0]) },
-                { assertTrue(h.sink.events.isEmpty()) }
+                { assertTrue(h.sink.events.isEmpty()) },
             )
         }
 
@@ -240,7 +237,7 @@ class AnsiPrintableBridgeIntegrationTest {
 
             assertAll(
                 { assertEquals(AnsiState.GROUND, h.state.fsmState) },
-                { assertTrue(h.sink.events.isEmpty(), "ESC # D must not become ESC D lineFeed") }
+                { assertTrue(h.sink.events.isEmpty(), "ESC # D must not become ESC D lineFeed") },
             )
         }
     }
@@ -250,7 +247,6 @@ class AnsiPrintableBridgeIntegrationTest {
     @Nested
     @DisplayName("printable bridge")
     inner class PrintableBridge {
-
         @Test
         fun `ASCII fast path writes codepoint after flush`() {
             val h = AnsiPrintableBridgeFixture()
@@ -282,9 +278,9 @@ class AnsiPrintableBridgeIntegrationTest {
                 {
                     assertEquals(
                         listOf(writeCodepoint('A'.code), "saveCursor"),
-                        h.sink.events
+                        h.sink.events,
                     )
-                }
+                },
             )
         }
     }

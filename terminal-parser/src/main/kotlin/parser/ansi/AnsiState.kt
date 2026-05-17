@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.ansi.AnsiState.ESCAPE
 import com.gagik.parser.ansi.AnsiState.GROUND
-
 
 /**
  * ANSI parser finite-state machine states.
@@ -125,13 +123,13 @@ internal object AnsiState {
     fun isStringState(state: Int): Boolean {
         require(state in 0 until COUNT) { "state out of range: $state" }
         return state == OSC_STRING ||
-                state == OSC_ESCAPE ||
-                state == DCS_PASSTHROUGH ||
-                state == DCS_ESCAPE ||
-                state == SOS_PM_APC_STRING ||
-                state == SOS_PM_APC_ESCAPE ||
-                state == IGNORE_UNTIL_ST ||
-                state == IGNORE_UNTIL_ST_ESCAPE
+            state == OSC_ESCAPE ||
+            state == DCS_PASSTHROUGH ||
+            state == DCS_ESCAPE ||
+            state == SOS_PM_APC_STRING ||
+            state == SOS_PM_APC_ESCAPE ||
+            state == IGNORE_UNTIL_ST ||
+            state == IGNORE_UNTIL_ST_ESCAPE
     }
 
     @JvmStatic

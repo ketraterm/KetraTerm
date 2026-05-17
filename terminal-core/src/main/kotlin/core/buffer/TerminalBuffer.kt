@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.api.*
@@ -40,7 +39,7 @@ import com.gagik.terminal.render.api.TerminalRenderFrameReader
  * - soft terminal reset (DECSTR)
  */
 internal class TerminalBuffer private constructor(
-    private val components: Components
+    private val components: Components,
 ) : TerminalBufferApi,
     TerminalRenderFrameReader,
     TerminalReader by TerminalReaderImpl(components.state),
@@ -50,13 +49,12 @@ internal class TerminalBuffer private constructor(
     TerminalModeReader by TerminalModeReaderImpl(components.state),
     TerminalResponseChannel by TerminalResponseChannelImpl(components.state),
     TerminalInspector by TerminalInspectorImpl(components.state) {
-
     private val state: TerminalState
         get() = components.state
     private val renderFrame = CoreTerminalRenderFrame(components.state)
 
     constructor(initialWidth: Int, initialHeight: Int, maxHistory: Int = 1000) : this(
-        createComponents(initialWidth, initialHeight, maxHistory)
+        createComponents(initialWidth, initialHeight, maxHistory),
     )
 
     /**
@@ -69,7 +67,10 @@ internal class TerminalBuffer private constructor(
         readRenderFrame(scrollbackOffset = 0, consumer = consumer)
     }
 
-    override fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
+    override fun readRenderFrame(
+        scrollbackOffset: Int,
+        consumer: TerminalRenderFrameConsumer,
+    ) {
         renderFrame.use(scrollbackOffset) {
             consumer.accept(renderFrame)
         }
@@ -90,7 +91,10 @@ internal class TerminalBuffer private constructor(
      * dimensions and tab stops, then restores invariants that must hold even for
      * the currently inactive buffer.
      */
-    override fun resize(newWidth: Int, newHeight: Int) {
+    override fun resize(
+        newWidth: Int,
+        newHeight: Int,
+    ) {
         require(newWidth > 0) { "newWidth must be > 0, was $newWidth" }
         require(newHeight > 0) { "newHeight must be > 0, was $newHeight" }
 
@@ -187,7 +191,7 @@ internal class TerminalBuffer private constructor(
     private data class Components(
         val state: TerminalState,
         val mutationEngine: MutationEngine,
-        val cursorEngine: CursorEngine
+        val cursorEngine: CursorEngine,
     )
 
     private data class SavedCursorSnapshot(
@@ -197,7 +201,7 @@ internal class TerminalBuffer private constructor(
         val extendedAttr: Long,
         val pendingWrap: Boolean,
         val isOriginMode: Boolean,
-        val isSaved: Boolean
+        val isSaved: Boolean,
     ) {
         fun restoreInto(target: SavedCursorState) {
             target.col = col
@@ -210,27 +214,30 @@ internal class TerminalBuffer private constructor(
         }
 
         companion object {
-            fun from(source: SavedCursorState): SavedCursorSnapshot {
-                return SavedCursorSnapshot(
+            fun from(source: SavedCursorState): SavedCursorSnapshot =
+                SavedCursorSnapshot(
                     col = source.col,
                     row = source.row,
                     attr = source.attr,
                     extendedAttr = source.extendedAttr,
                     pendingWrap = source.pendingWrap,
                     isOriginMode = source.isOriginMode,
-                    isSaved = source.isSaved
+                    isSaved = source.isSaved,
                 )
-            }
         }
     }
 
     private companion object {
-        fun createComponents(initialWidth: Int, initialHeight: Int, maxHistory: Int): Components {
+        fun createComponents(
+            initialWidth: Int,
+            initialHeight: Int,
+            maxHistory: Int,
+        ): Components {
             val state = TerminalState(initialWidth, initialHeight, maxHistory)
             return Components(
                 state = state,
                 mutationEngine = MutationEngine(state),
-                cursorEngine = CursorEngine(state)
+                cursorEngine = CursorEngine(state),
             )
         }
     }

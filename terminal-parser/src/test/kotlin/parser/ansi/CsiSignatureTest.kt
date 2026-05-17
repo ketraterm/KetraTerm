@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -24,31 +23,31 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("CsiSignature")
 class CsiSignatureTest {
-
     @Nested
     @DisplayName("encoding")
     inner class Encoding {
-
         @Test
         fun `packs final private marker intermediates and intermediate count into stable bit fields`() {
-            val signature = CsiSignature.encode(
-                finalByte = 0x70,
-                privateMarker = 0x3F,
-                intermediates = 0x2421,
-                intermediateCount = 2
-            )
+            val signature =
+                CsiSignature.encode(
+                    finalByte = 0x70,
+                    privateMarker = 0x3F,
+                    intermediates = 0x2421,
+                    intermediateCount = 2,
+                )
 
             assertEquals(0x0002_0000_2421_3F70L, signature)
         }
 
         @Test
         fun `masks every encoded component to its assigned width`() {
-            val signature = CsiSignature.encode(
-                finalByte = 0x170,
-                privateMarker = 0x13F,
-                intermediates = -1,
-                intermediateCount = 0x1F
-            )
+            val signature =
+                CsiSignature.encode(
+                    finalByte = 0x170,
+                    privateMarker = 0x13F,
+                    intermediates = -1,
+                    intermediateCount = 0x1F,
+                )
 
             assertEquals(0x000F_FFFF_FFFF_3F70L, signature)
         }
@@ -57,7 +56,6 @@ class CsiSignatureTest {
     @Nested
     @DisplayName("routing distinctions")
     inner class RoutingDistinctions {
-
         @Test
         fun `CSI p and CSI bang p are distinct signatures`() {
             val plain = CsiSignature.encode('p'.code, 0, 0, 0)

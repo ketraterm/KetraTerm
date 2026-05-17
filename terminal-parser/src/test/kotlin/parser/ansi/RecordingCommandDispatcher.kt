@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.runtime.ParserState
 import com.gagik.parser.spi.TerminalCommandSink
 
 internal class RecordingCommandDispatcher : CommandDispatcher {
-    data class C0(val byte: Int)
+    data class C0(
+        val byte: Int,
+    )
+
     data class Esc(
         val finalByte: Int,
         val intermediates: Int,
@@ -53,11 +55,12 @@ internal class RecordingCommandDispatcher : CommandDispatcher {
         state: ParserState,
         finalByte: Int,
     ) {
-        esc += Esc(
-            finalByte = finalByte,
-            intermediates = state.intermediates,
-            intermediateCount = state.intermediateCount,
-        )
+        esc +=
+            Esc(
+                finalByte = finalByte,
+                intermediates = state.intermediates,
+                intermediateCount = state.intermediateCount,
+            )
     }
 
     override fun dispatchCsi(
@@ -72,13 +75,14 @@ internal class RecordingCommandDispatcher : CommandDispatcher {
             i++
         }
 
-        csi += Csi(
-            finalByte = finalByte,
-            params = params,
-            privateMarker = state.privateMarker,
-            intermediates = state.intermediates,
-            intermediateCount = state.intermediateCount,
-            subParameterMask = state.subParameterMask,
-        )
+        csi +=
+            Csi(
+                finalByte = finalByte,
+                params = params,
+                privateMarker = state.privateMarker,
+                intermediates = state.intermediates,
+                intermediateCount = state.intermediateCount,
+                subParameterMask = state.subParameterMask,
+            )
     }
 }

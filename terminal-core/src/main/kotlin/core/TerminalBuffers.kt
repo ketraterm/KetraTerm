@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core
 
 import com.gagik.core.api.TerminalBufferApi
@@ -27,7 +26,9 @@ object TerminalBuffers {
      * Creates a terminal buffer with the requested visible dimensions and
      * scrollback capacity.
      */
-    fun create(width: Int, height: Int, maxHistory: Int = 1000): TerminalBufferApi {
-        return TerminalBuffer(width, height, maxHistory)
-    }
+    fun create(
+        width: Int,
+        height: Int,
+        maxHistory: Int = 1000,
+    ): TerminalBufferApi = TerminalBuffer(width, height, maxHistory)
 }

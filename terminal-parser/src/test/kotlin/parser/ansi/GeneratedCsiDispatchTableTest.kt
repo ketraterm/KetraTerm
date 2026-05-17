@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -23,11 +22,9 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("GeneratedCsiDispatchTable")
 class GeneratedCsiDispatchTableTest {
-
     @Nested
     @DisplayName("lookup")
     inner class Lookup {
-
         @Test
         fun `known plain CSI signatures route to command ids`() {
             assertEquals(CsiCommand.ICH, lookup('@'))
@@ -119,12 +116,13 @@ class GeneratedCsiDispatchTableTest {
         privateMarker: Int = 0,
         intermediates: Int = 0,
         intermediateCount: Int = 0,
-    ): Int = GeneratedCsiDispatchTable.lookup(
-        CsiSignature.encode(
-            finalByte = finalByte.code,
-            privateMarker = privateMarker,
-            intermediates = intermediates,
-            intermediateCount = intermediateCount
+    ): Int =
+        GeneratedCsiDispatchTable.lookup(
+            CsiSignature.encode(
+                finalByte = finalByte.code,
+                privateMarker = privateMarker,
+                intermediates = intermediates,
+                intermediateCount = intermediateCount,
+            ),
         )
-    )
 }

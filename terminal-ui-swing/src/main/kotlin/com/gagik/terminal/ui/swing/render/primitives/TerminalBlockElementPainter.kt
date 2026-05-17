@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 import com.gagik.terminal.ui.swing.render.primitives.TerminalBlockElementGlyphs.LOWER_LEFT
@@ -29,7 +28,14 @@ import java.awt.Paint
 internal class TerminalBlockElementPainter {
     private val shadeTextures = TerminalShadeTextureCache()
 
-    fun paint(g: Graphics2D, codePoint: Int, x: Int, y: Int, width: Int, height: Int) {
+    fun paint(
+        g: Graphics2D,
+        codePoint: Int,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+    ) {
         when (codePoint) {
             0x2580 -> paintUpperBlock(g, x, y, width, height, 4)
             in 0x2581..0x2587 -> paintLowerBlock(g, x, y, width, height, codePoint - 0x2580)
@@ -50,25 +56,60 @@ internal class TerminalBlockElementPainter {
         }
     }
 
-    private fun paintLowerBlock(g: Graphics2D, x: Int, y: Int, width: Int, height: Int, eighths: Int) {
+    private fun paintLowerBlock(
+        g: Graphics2D,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        eighths: Int,
+    ) {
         val blockHeight = maxOf(1, height * eighths / 8)
         g.fillRect(x, y + height - blockHeight, width, blockHeight)
     }
 
-    private fun paintUpperBlock(g: Graphics2D, x: Int, y: Int, width: Int, height: Int, eighths: Int) {
+    private fun paintUpperBlock(
+        g: Graphics2D,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        eighths: Int,
+    ) {
         g.fillRect(x, y, width, maxOf(1, height * eighths / 8))
     }
 
-    private fun paintLeftBlock(g: Graphics2D, x: Int, y: Int, width: Int, height: Int, eighths: Int) {
+    private fun paintLeftBlock(
+        g: Graphics2D,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        eighths: Int,
+    ) {
         g.fillRect(x, y, maxOf(1, width * eighths / 8), height)
     }
 
-    private fun paintRightBlock(g: Graphics2D, x: Int, y: Int, width: Int, height: Int, eighths: Int) {
+    private fun paintRightBlock(
+        g: Graphics2D,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        eighths: Int,
+    ) {
         val blockWidth = maxOf(1, width * eighths / 8)
         g.fillRect(x + width - blockWidth, y, blockWidth, height)
     }
 
-    private fun paintQuadrants(g: Graphics2D, x: Int, y: Int, width: Int, height: Int, mask: Int) {
+    private fun paintQuadrants(
+        g: Graphics2D,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        mask: Int,
+    ) {
         val halfWidth = width / 2
         val halfHeight = height / 2
         if (mask and UPPER_LEFT != 0) g.fillRect(x, y, halfWidth, halfHeight)
@@ -79,7 +120,14 @@ internal class TerminalBlockElementPainter {
         }
     }
 
-    private fun paintShade(g: Graphics2D, x: Int, y: Int, width: Int, height: Int, kind: Int) {
+    private fun paintShade(
+        g: Graphics2D,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        kind: Int,
+    ) {
         val previousPaint: Paint = g.paint
         try {
             g.paint = shadeTextures.texture(kind, g.color.rgb)

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.event
 
 /**
@@ -51,9 +50,8 @@ enum class TerminalMouseButton {
 /**
  * Returns true when this button represents a wheel report.
  */
-fun TerminalMouseButton.isWheel(): Boolean {
-    return this == TerminalMouseButton.WHEEL_UP ||
+fun TerminalMouseButton.isWheel(): Boolean =
+    this == TerminalMouseButton.WHEEL_UP ||
         this == TerminalMouseButton.WHEEL_DOWN ||
         this == TerminalMouseButton.WHEEL_LEFT ||
         this == TerminalMouseButton.WHEEL_RIGHT
-}

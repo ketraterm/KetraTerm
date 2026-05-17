@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import org.junit.jupiter.api.Assertions.*
@@ -23,61 +22,70 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ByteClass")
 class ByteClassTest {
-
     // ----- Helpers ----------------------------------------------------------
 
-    private fun assertClass(byteValue: Int, expectedClass: Int) {
+    private fun assertClass(
+        byteValue: Int,
+        expectedClass: Int,
+    ) {
         assertAll(
             { assertEquals(expectedClass, ByteClass.classify(byteValue), "classify(0x${byteValue.hex()})") },
-            { assertEquals(expectedClass, ByteClass.ASCII_MAP[byteValue].toInt(), "ASCII_MAP[0x${byteValue.hex()}]") }
+            { assertEquals(expectedClass, ByteClass.ASCII_MAP[byteValue].toInt(), "ASCII_MAP[0x${byteValue.hex()}]") },
         )
     }
 
-    private fun assertClassRange(range: IntRange, expectedClass: Int) {
+    private fun assertClassRange(
+        range: IntRange,
+        expectedClass: Int,
+    ) {
         for (byteValue in range) {
             assertClass(byteValue, expectedClass)
         }
     }
 
     private fun assertRejectsByteValue(byteValue: Int) {
-        val classifyError = assertThrows(IllegalArgumentException::class.java) {
-            ByteClass.classify(byteValue)
-        }
-        val asciiError = assertThrows(IllegalArgumentException::class.java) {
-            ByteClass.isAsciiDomain(byteValue)
-        }
-        val utf8Error = assertThrows(IllegalArgumentException::class.java) {
-            ByteClass.isUtf8DomainByDefault(byteValue)
-        }
+        val classifyError =
+            assertThrows(IllegalArgumentException::class.java) {
+                ByteClass.classify(byteValue)
+            }
+        val asciiError =
+            assertThrows(IllegalArgumentException::class.java) {
+                ByteClass.isAsciiDomain(byteValue)
+            }
+        val utf8Error =
+            assertThrows(IllegalArgumentException::class.java) {
+                ByteClass.isUtf8DomainByDefault(byteValue)
+            }
 
         assertAll(
             { assertEquals("byteValue out of range: $byteValue", classifyError.message) },
             { assertEquals("byteValue out of range: $byteValue", asciiError.message) },
-            { assertEquals("byteValue out of range: $byteValue", utf8Error.message) }
+            { assertEquals("byteValue out of range: $byteValue", utf8Error.message) },
         )
     }
 
-    private fun expectedAsciiClass(byteValue: Int): Int = when (byteValue) {
-        in 0x00..0x17 -> ByteClass.EXECUTE
-        0x18 -> ByteClass.CAN_SUB
-        0x19 -> ByteClass.EXECUTE
-        0x1A -> ByteClass.CAN_SUB
-        0x1B -> ByteClass.ESC
-        in 0x1C..0x1F -> ByteClass.EXECUTE
-        in 0x20..0x2F -> ByteClass.INTERMEDIATE
-        in 0x30..0x39 -> ByteClass.PARAM_DIGIT
-        0x3A -> ByteClass.COLON
-        0x3B -> ByteClass.PARAM_SEP
-        in 0x3C..0x3F -> ByteClass.PRIVATE_MARKER
-        'P'.code -> ByteClass.DCS_INTRO
-        'X'.code, '^'.code, '_'.code -> ByteClass.SOS_PM_APC_INTRO
-        '['.code -> ByteClass.CSI_INTRO
-        '\\'.code -> ByteClass.ST_INTRO
-        ']'.code -> ByteClass.OSC_INTRO
-        in 0x40..0x7E -> ByteClass.FINAL_BYTE
-        0x7F -> ByteClass.DEL
-        else -> error("outside ASCII domain: $byteValue")
-    }
+    private fun expectedAsciiClass(byteValue: Int): Int =
+        when (byteValue) {
+            in 0x00..0x17 -> ByteClass.EXECUTE
+            0x18 -> ByteClass.CAN_SUB
+            0x19 -> ByteClass.EXECUTE
+            0x1A -> ByteClass.CAN_SUB
+            0x1B -> ByteClass.ESC
+            in 0x1C..0x1F -> ByteClass.EXECUTE
+            in 0x20..0x2F -> ByteClass.INTERMEDIATE
+            in 0x30..0x39 -> ByteClass.PARAM_DIGIT
+            0x3A -> ByteClass.COLON
+            0x3B -> ByteClass.PARAM_SEP
+            in 0x3C..0x3F -> ByteClass.PRIVATE_MARKER
+            'P'.code -> ByteClass.DCS_INTRO
+            'X'.code, '^'.code, '_'.code -> ByteClass.SOS_PM_APC_INTRO
+            '['.code -> ByteClass.CSI_INTRO
+            '\\'.code -> ByteClass.ST_INTRO
+            ']'.code -> ByteClass.OSC_INTRO
+            in 0x40..0x7E -> ByteClass.FINAL_BYTE
+            0x7F -> ByteClass.DEL
+            else -> error("outside ASCII domain: $byteValue")
+        }
 
     private fun Int.hex(): String = toString(16).uppercase().padStart(2, '0')
 
@@ -86,31 +94,31 @@ class ByteClassTest {
     @Nested
     @DisplayName("constants and lookup table")
     inner class ConstantsAndLookupTable {
-
         @Test
         fun `ASCII domain class ids are contiguous and covered by COUNT`() {
-            val asciiClasses = listOf(
-                ByteClass.EXECUTE,
-                ByteClass.CAN_SUB,
-                ByteClass.ESC,
-                ByteClass.INTERMEDIATE,
-                ByteClass.PARAM_DIGIT,
-                ByteClass.COLON,
-                ByteClass.PARAM_SEP,
-                ByteClass.PRIVATE_MARKER,
-                ByteClass.DCS_INTRO,
-                ByteClass.CSI_INTRO,
-                ByteClass.ST_INTRO,
-                ByteClass.OSC_INTRO,
-                ByteClass.SOS_PM_APC_INTRO,
-                ByteClass.FINAL_BYTE,
-                ByteClass.DEL
-            )
+            val asciiClasses =
+                listOf(
+                    ByteClass.EXECUTE,
+                    ByteClass.CAN_SUB,
+                    ByteClass.ESC,
+                    ByteClass.INTERMEDIATE,
+                    ByteClass.PARAM_DIGIT,
+                    ByteClass.COLON,
+                    ByteClass.PARAM_SEP,
+                    ByteClass.PRIVATE_MARKER,
+                    ByteClass.DCS_INTRO,
+                    ByteClass.CSI_INTRO,
+                    ByteClass.ST_INTRO,
+                    ByteClass.OSC_INTRO,
+                    ByteClass.SOS_PM_APC_INTRO,
+                    ByteClass.FINAL_BYTE,
+                    ByteClass.DEL,
+                )
 
             assertAll(
                 { assertEquals(ByteClass.COUNT, asciiClasses.size) },
                 { assertEquals((0 until ByteClass.COUNT).toList(), asciiClasses) },
-                { assertEquals(asciiClasses.size, asciiClasses.toSet().size, "class ids must be unique") }
+                { assertEquals(asciiClasses.size, asciiClasses.toSet().size, "class ids must be unique") },
             )
         }
 
@@ -119,7 +127,7 @@ class ByteClassTest {
             assertAll(
                 { assertEquals(ByteClass.COUNT, ByteClass.UTF8_PAYLOAD) },
                 { assertTrue(ByteClass.UTF8_PAYLOAD !in 0 until ByteClass.COUNT) },
-                { assertEquals(ByteClass.UTF8_PAYLOAD + 1, ByteClass.ROUTING_COUNT) }
+                { assertEquals(ByteClass.UTF8_PAYLOAD + 1, ByteClass.ROUTING_COUNT) },
             )
         }
 
@@ -134,7 +142,7 @@ class ByteClassTest {
                 assertEquals(
                     ByteClass.ASCII_MAP[byteValue].toInt(),
                     ByteClass.classify(byteValue),
-                    "byte 0x${byteValue.hex()}"
+                    "byte 0x${byteValue.hex()}",
                 )
             }
         }
@@ -144,7 +152,7 @@ class ByteClassTest {
             for (byteValue in 0x00..0x7F) {
                 assertTrue(
                     ByteClass.ASCII_MAP[byteValue].toInt() in 0 until ByteClass.COUNT,
-                    "byte 0x${byteValue.hex()} has an invalid class"
+                    "byte 0x${byteValue.hex()} has an invalid class",
                 )
             }
         }
@@ -155,7 +163,6 @@ class ByteClassTest {
     @Nested
     @DisplayName("C0 control classification")
     inner class C0ControlClassification {
-
         @Test
         fun `ordinary C0 controls are execute bytes`() {
             assertClassRange(0x00..0x17, ByteClass.EXECUTE)
@@ -167,7 +174,7 @@ class ByteClassTest {
         fun `CAN and SUB abort current parser sequence`() {
             assertAll(
                 { assertClass(0x18, ByteClass.CAN_SUB) },
-                { assertClass(0x1A, ByteClass.CAN_SUB) }
+                { assertClass(0x1A, ByteClass.CAN_SUB) },
             )
         }
 
@@ -185,7 +192,7 @@ class ByteClassTest {
                 { assertClass(0x1A, ByteClass.CAN_SUB) },
                 { assertClass(0x1B, ByteClass.ESC) },
                 { assertClass(0x1C, ByteClass.EXECUTE) },
-                { assertClass(0x20, ByteClass.INTERMEDIATE) }
+                { assertClass(0x20, ByteClass.INTERMEDIATE) },
             )
         }
     }
@@ -195,7 +202,6 @@ class ByteClassTest {
     @Nested
     @DisplayName("ASCII structural classification")
     inner class AsciiStructuralClassification {
-
         @Test
         fun `intermediate bytes are classified from space through slash`() {
             assertClassRange(0x20..0x2F, ByteClass.INTERMEDIATE)
@@ -210,7 +216,7 @@ class ByteClassTest {
         fun `colon is distinct from parameter separator`() {
             assertAll(
                 { assertClass(0x3A, ByteClass.COLON) },
-                { assertClass(0x3B, ByteClass.PARAM_SEP) }
+                { assertClass(0x3B, ByteClass.PARAM_SEP) },
             )
         }
 
@@ -229,7 +235,7 @@ class ByteClassTest {
                 { assertClass(0x3B, ByteClass.PARAM_SEP) },
                 { assertClass(0x3C, ByteClass.PRIVATE_MARKER) },
                 { assertClass(0x3F, ByteClass.PRIVATE_MARKER) },
-                { assertClass(0x40, ByteClass.FINAL_BYTE) }
+                { assertClass(0x40, ByteClass.FINAL_BYTE) },
             )
         }
     }
@@ -239,18 +245,18 @@ class ByteClassTest {
     @Nested
     @DisplayName("final bytes and structural introducers")
     inner class FinalBytesAndStructuralIntroducers {
-
         @Test
         fun `ordinary final bytes are classified as FINAL_BYTE`() {
-            val structuralIntroducers = setOf(
-                'P'.code,
-                'X'.code,
-                '['.code,
-                '\\'.code,
-                ']'.code,
-                '^'.code,
-                '_'.code
-            )
+            val structuralIntroducers =
+                setOf(
+                    'P'.code,
+                    'X'.code,
+                    '['.code,
+                    '\\'.code,
+                    ']'.code,
+                    '^'.code,
+                    '_'.code,
+                )
 
             for (byteValue in 0x40..0x7E) {
                 if (byteValue !in structuralIntroducers) {
@@ -284,7 +290,7 @@ class ByteClassTest {
             assertAll(
                 { assertClass('X'.code, ByteClass.SOS_PM_APC_INTRO) },
                 { assertClass('^'.code, ByteClass.SOS_PM_APC_INTRO) },
-                { assertClass('_'.code, ByteClass.SOS_PM_APC_INTRO) }
+                { assertClass('_'.code, ByteClass.SOS_PM_APC_INTRO) },
             )
         }
 
@@ -296,7 +302,7 @@ class ByteClassTest {
                 { assertClass('W'.code, ByteClass.FINAL_BYTE) },
                 { assertClass('Y'.code, ByteClass.FINAL_BYTE) },
                 { assertClass('Z'.code, ByteClass.FINAL_BYTE) },
-                { assertClass('`'.code, ByteClass.FINAL_BYTE) }
+                { assertClass('`'.code, ByteClass.FINAL_BYTE) },
             )
         }
 
@@ -311,14 +317,13 @@ class ByteClassTest {
     @Nested
     @DisplayName("whole-domain classification")
     inner class WholeDomainClassification {
-
         @Test
         fun `every ASCII byte has the expected class`() {
             for (byteValue in 0x00..0x7F) {
                 assertEquals(
                     expectedAsciiClass(byteValue),
                     ByteClass.classify(byteValue),
-                    "byte 0x${byteValue.hex()}"
+                    "byte 0x${byteValue.hex()}",
                 )
             }
         }
@@ -329,7 +334,7 @@ class ByteClassTest {
                 assertEquals(
                     ByteClass.UTF8_PAYLOAD,
                     ByteClass.classify(byteValue),
-                    "byte 0x${byteValue.hex()}"
+                    "byte 0x${byteValue.hex()}",
                 )
             }
         }
@@ -340,7 +345,7 @@ class ByteClassTest {
                 assertEquals(
                     ByteClass.UTF8_PAYLOAD,
                     ByteClass.classify(byteValue),
-                    "C1 byte 0x${byteValue.hex()} must not enter ANSI control classes by default"
+                    "C1 byte 0x${byteValue.hex()} must not enter ANSI control classes by default",
                 )
             }
         }
@@ -353,7 +358,7 @@ class ByteClassTest {
                 { assertEquals(ByteClass.UTF8_PAYLOAD, ByteClass.classify(0xC2)) },
                 { assertEquals(ByteClass.UTF8_PAYLOAD, ByteClass.classify(0xE2)) },
                 { assertEquals(ByteClass.UTF8_PAYLOAD, ByteClass.classify(0xF0)) },
-                { assertEquals(ByteClass.UTF8_PAYLOAD, ByteClass.classify(0xFF)) }
+                { assertEquals(ByteClass.UTF8_PAYLOAD, ByteClass.classify(0xFF)) },
             )
         }
     }
@@ -363,7 +368,6 @@ class ByteClassTest {
     @Nested
     @DisplayName("domain predicates")
     inner class DomainPredicates {
-
         @Test
         fun `ASCII predicate is true only for 7-bit byte values`() {
             for (byteValue in 0x00..0x7F) {
@@ -381,7 +385,7 @@ class ByteClassTest {
                 assertEquals(
                     !ByteClass.isAsciiDomain(byteValue),
                     ByteClass.isUtf8DomainByDefault(byteValue),
-                    "byte 0x${byteValue.hex()}"
+                    "byte 0x${byteValue.hex()}",
                 )
             }
         }
@@ -396,7 +400,7 @@ class ByteClassTest {
                 { assertFalse(ByteClass.isUtf8DomainByDefault(0x00)) },
                 { assertFalse(ByteClass.isUtf8DomainByDefault(0x7F)) },
                 { assertTrue(ByteClass.isUtf8DomainByDefault(0x80)) },
-                { assertTrue(ByteClass.isUtf8DomainByDefault(0xFF)) }
+                { assertTrue(ByteClass.isUtf8DomainByDefault(0xFF)) },
             )
         }
     }
@@ -406,7 +410,6 @@ class ByteClassTest {
     @Nested
     @DisplayName("input validation")
     inner class InputValidation {
-
         @Test
         fun `minimum and maximum byte values are accepted`() {
             assertAll(
@@ -415,7 +418,7 @@ class ByteClassTest {
                 { assertDoesNotThrow { ByteClass.isAsciiDomain(0) } },
                 { assertDoesNotThrow { ByteClass.isAsciiDomain(255) } },
                 { assertDoesNotThrow { ByteClass.isUtf8DomainByDefault(0) } },
-                { assertDoesNotThrow { ByteClass.isUtf8DomainByDefault(255) } }
+                { assertDoesNotThrow { ByteClass.isUtf8DomainByDefault(255) } },
             )
         }
 

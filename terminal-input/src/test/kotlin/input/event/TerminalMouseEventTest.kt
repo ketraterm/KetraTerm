@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.event
 
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class TerminalMouseEventTest {
-
     @Test
     fun `rejects negative column`() {
         assertThrows(IllegalArgumentException::class.java) {
@@ -121,24 +119,26 @@ class TerminalMouseEventTest {
 
     @Test
     fun `accepts no-button motion`() {
-        val event = TerminalMouseEvent(
-            column = 2,
-            row = 3,
-            button = TerminalMouseButton.NONE,
-            type = TerminalMouseEventType.MOTION,
-        )
+        val event =
+            TerminalMouseEvent(
+                column = 2,
+                row = 3,
+                button = TerminalMouseButton.NONE,
+                type = TerminalMouseEventType.MOTION,
+            )
 
         assertEquals(TerminalMouseButton.NONE, event.button)
     }
 
     @Test
     fun `accepts release without button identity`() {
-        val event = TerminalMouseEvent(
-            column = 2,
-            row = 3,
-            button = TerminalMouseButton.NONE,
-            type = TerminalMouseEventType.RELEASE,
-        )
+        val event =
+            TerminalMouseEvent(
+                column = 2,
+                row = 3,
+                button = TerminalMouseButton.NONE,
+                type = TerminalMouseEventType.RELEASE,
+            )
 
         assertEquals(TerminalMouseEventType.RELEASE, event.type)
     }

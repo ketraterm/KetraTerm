@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.util
 
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -27,11 +26,9 @@ import java.util.stream.Stream
 
 @DisplayName("UnicodeWidth Test Suite")
 class UnicodeWidthTest {
-
     @Nested
     @DisplayName("ASCII & Control Fast Paths")
     inner class AsciiAndControlFastPathTests {
-
         @ParameterizedTest(name = "ASCII cp=0x{0} returns width 1")
         @ValueSource(ints = [0x20, 0x41, 0x7E])
         fun `ascii printable returns 1`(cp: Int) {
@@ -50,7 +47,6 @@ class UnicodeWidthTest {
     @Nested
     @DisplayName("Zero Width")
     inner class ZeroWidthTests {
-
         @ParameterizedTest(name = "BMP zero-width cp=0x{0} returns 0")
         @ValueSource(ints = [0x00AD, 0x0300, 0x05BF, 0x0E34, 0x0E48, 0x0EB4, 0x0ECD, 0x200B, 0xFE0F])
         fun `bmp zero-width samples return 0`(cp: Int) {
@@ -69,7 +65,6 @@ class UnicodeWidthTest {
     @Nested
     @DisplayName("Wide Width")
     inner class WideWidthTests {
-
         @ParameterizedTest(name = "BMP wide cp=0x{0} returns 2")
         @ValueSource(ints = [0x1100, 0x231A, 0x3042, 0xAC00, 0xFF01])
         fun `bmp wide samples return 2`(cp: Int) {
@@ -88,7 +83,6 @@ class UnicodeWidthTest {
     @Nested
     @DisplayName("Ambiguous Width")
     inner class AmbiguousWidthTests {
-
         @ParameterizedTest(name = "Ambiguous cp=0x{0} follows toggle")
         @ValueSource(ints = [0x00A1, 0x0391, 0x20AC, 0x2014])
         fun `ambiguous codepoints honor toggle`(cp: Int) {
@@ -105,7 +99,10 @@ class UnicodeWidthTest {
 
         @ParameterizedTest(name = "Non-ambiguous cp=0x{0} ignores toggle")
         @MethodSource("com.gagik.core.util.UnicodeWidthTest#nonAmbiguousSamples")
-        fun `non-ambiguous classes ignore toggle`(cp: Int, expected: Int) {
+        fun `non-ambiguous classes ignore toggle`(
+            cp: Int,
+            expected: Int,
+        ) {
             assertEquals(expected, UnicodeWidth.calculate(cp, ambiguousAsWide = false))
             assertEquals(expected, UnicodeWidth.calculate(cp, ambiguousAsWide = true))
         }
@@ -114,7 +111,6 @@ class UnicodeWidthTest {
     @Nested
     @DisplayName("Fallback & Range Boundaries")
     inner class FallbackAndBoundaryTests {
-
         @ParameterizedTest(name = "Default narrow fallback cp=0x{0} returns 1")
         @ValueSource(ints = [0x0102, 0x0370, 0x10FFFF])
         fun `default fallback returns narrow width 1`(cp: Int) {
@@ -124,7 +120,10 @@ class UnicodeWidthTest {
 
         @ParameterizedTest(name = "Boundary cp=0x{0} expected={1}")
         @MethodSource("com.gagik.core.util.UnicodeWidthTest#astralBoundaryCases")
-        fun `astral boundary checks`(cp: Int, expected: Int) {
+        fun `astral boundary checks`(
+            cp: Int,
+            expected: Int,
+        ) {
             assertEquals(expected, UnicodeWidth.calculate(cp, ambiguousAsWide = false))
             assertEquals(expected, UnicodeWidth.calculate(cp, ambiguousAsWide = true))
         }
@@ -132,33 +131,34 @@ class UnicodeWidthTest {
 
     companion object {
         @JvmStatic
-        fun nonAmbiguousSamples(): Stream<Arguments> = Stream.of(
-            Arguments.of(0x0300, 0), // zero-width combining
-            Arguments.of(0x3042, 2), // wide Hiragana
-            Arguments.of(0x0041, 1)  // ASCII
-        )
+        fun nonAmbiguousSamples(): Stream<Arguments> =
+            Stream.of(
+                Arguments.of(0x0300, 0), // zero-width combining
+                Arguments.of(0x3042, 2), // wide Hiragana
+                Arguments.of(0x0041, 1), // ASCII
+            )
 
         @JvmStatic
-        fun astralBoundaryCases(): Stream<Arguments> = Stream.of(
-            // Astral wide ranges
-            Arguments.of(0x1FFFF, 1),
-            Arguments.of(0x20000, 2),
-            Arguments.of(0x2FFFD, 2),
-            Arguments.of(0x2FFFE, 1),
-            Arguments.of(0x2FFFF, 1),
-            Arguments.of(0x30000, 2),
-            Arguments.of(0x3FFFD, 2),
-            Arguments.of(0x3FFFE, 1),
-            // Astral zero-width ranges
-            Arguments.of(0xDFFFF, 1),
-            Arguments.of(0xE0000, 0),
-            Arguments.of(0xE007F, 0),
-            Arguments.of(0xE0080, 1),
-            Arguments.of(0xE00FF, 1),
-            Arguments.of(0xE0100, 0),
-            Arguments.of(0xE01EF, 0),
-            Arguments.of(0xE01F0, 1)
-        )
+        fun astralBoundaryCases(): Stream<Arguments> =
+            Stream.of(
+                // Astral wide ranges
+                Arguments.of(0x1FFFF, 1),
+                Arguments.of(0x20000, 2),
+                Arguments.of(0x2FFFD, 2),
+                Arguments.of(0x2FFFE, 1),
+                Arguments.of(0x2FFFF, 1),
+                Arguments.of(0x30000, 2),
+                Arguments.of(0x3FFFD, 2),
+                Arguments.of(0x3FFFE, 1),
+                // Astral zero-width ranges
+                Arguments.of(0xDFFFF, 1),
+                Arguments.of(0xE0000, 0),
+                Arguments.of(0xE007F, 0),
+                Arguments.of(0xE0080, 1),
+                Arguments.of(0xE00FF, 1),
+                Arguments.of(0xE0100, 0),
+                Arguments.of(0xE01EF, 0),
+                Arguments.of(0xE01F0, 1),
+            )
     }
 }
-

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer.impl
 
 import com.gagik.core.api.TerminalResponseChannel
@@ -30,22 +29,26 @@ internal class TerminalResponseChannelImpl(
         dst: ByteArray,
         offset: Int,
         length: Int,
-    ): Int {
-        return state.hostResponses.read(dst, offset, length)
-    }
+    ): Int = state.hostResponses.read(dst, offset, length)
 
     override fun clearResponseBytes() {
         state.hostResponses.clear()
     }
 
-    override fun requestDeviceStatusReport(mode: Int, decPrivate: Boolean) {
+    override fun requestDeviceStatusReport(
+        mode: Int,
+        decPrivate: Boolean,
+    ) {
         when {
             !decPrivate && mode == 5 -> enqueueOperatingStatusReport()
             mode == 6 -> enqueueCursorPositionReport(decPrivate)
         }
     }
 
-    override fun requestDeviceAttributes(kind: Int, parameter: Int) {
+    override fun requestDeviceAttributes(
+        kind: Int,
+        parameter: Int,
+    ) {
         if (parameter != 0) return
 
         when (kind) {
@@ -63,7 +66,10 @@ internal class TerminalResponseChannelImpl(
         }
     }
 
-    override fun setWindowSizePixels(width: Int, height: Int) {
+    override fun setWindowSizePixels(
+        width: Int,
+        height: Int,
+    ) {
         if (width <= 0 || height <= 0) {
             state.windowPixelWidth = 0
             state.windowPixelHeight = 0
@@ -85,11 +91,12 @@ internal class TerminalResponseChannelImpl(
                     )
                 }
             }
-            TerminalResponseChannel.WINDOW_REPORT_GRID_CELLS -> enqueueWindowReport(
-                reportType = 8,
-                height = state.dimensions.height,
-                width = state.dimensions.width,
-            )
+            TerminalResponseChannel.WINDOW_REPORT_GRID_CELLS ->
+                enqueueWindowReport(
+                    reportType = 8,
+                    height = state.dimensions.height,
+                    width = state.dimensions.width,
+                )
         }
     }
 

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.codec
 
 import com.gagik.core.model.AttributeColor
@@ -28,7 +27,6 @@ import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("AttributeCodec")
 class AttributeCodecTest {
-
     @Test
     fun `exports expected color constants`() {
         assertAll(
@@ -42,16 +40,17 @@ class AttributeCodecTest {
     inner class PrimaryWord {
         @Test
         fun `packs foreground background and primary flags`() {
-            val packed = AttributeCodec.pack(
-                fg = 256,
-                bg = 17,
-                bold = true,
-                faint = true,
-                italic = true,
-                blink = true,
-                inverse = true,
-                protected = true,
-            )
+            val packed =
+                AttributeCodec.pack(
+                    fg = 256,
+                    bg = 17,
+                    bold = true,
+                    faint = true,
+                    italic = true,
+                    blink = true,
+                    inverse = true,
+                    protected = true,
+                )
 
             assertAll(
                 { assertEquals(256, AttributeCodec.foreground(packed)) },
@@ -67,15 +66,16 @@ class AttributeCodecTest {
 
         @Test
         fun `packColors preserves indexed rgb and primary flags`() {
-            val packed = AttributeCodec.packColors(
-                foreground = AttributeColor.indexed(244),
-                background = AttributeColor.rgb(0x12, 0x34, 0x56),
-                bold = true,
-                faint = true,
-                italic = false,
-                blink = true,
-                inverse = true,
-            )
+            val packed =
+                AttributeCodec.packColors(
+                    foreground = AttributeColor.indexed(244),
+                    background = AttributeColor.rgb(0x12, 0x34, 0x56),
+                    bold = true,
+                    faint = true,
+                    italic = false,
+                    blink = true,
+                    inverse = true,
+                )
             val unpacked = AttributeCodec.unpack(packed)
 
             assertAll(
@@ -113,14 +113,15 @@ class AttributeCodecTest {
     inner class ExtendedWord {
         @Test
         fun `packs underline color decorations conceal and hyperlink id`() {
-            val extended = AttributeCodec.packExtended(
-                underlineColor = 200,
-                underlineStyle = UnderlineStyle.DASHED,
-                strikethrough = true,
-                overline = true,
-                conceal = true,
-                hyperlinkId = 42,
-            )
+            val extended =
+                AttributeCodec.packExtended(
+                    underlineColor = 200,
+                    underlineStyle = UnderlineStyle.DASHED,
+                    strikethrough = true,
+                    overline = true,
+                    conceal = true,
+                    hyperlinkId = 42,
+                )
 
             assertAll(
                 { assertEquals(200, AttributeCodec.underlineColor(extended)) },
@@ -134,10 +135,11 @@ class AttributeCodecTest {
 
         @Test
         fun `packExtendedColors preserves rgb underline color`() {
-            val extended = AttributeCodec.packExtendedColors(
-                underlineColor = AttributeColor.rgb(1, 2, 3),
-                underlineStyle = UnderlineStyle.CURLY,
-            )
+            val extended =
+                AttributeCodec.packExtendedColors(
+                    underlineColor = AttributeColor.rgb(1, 2, 3),
+                    underlineStyle = UnderlineStyle.CURLY,
+                )
             val unpacked = AttributeCodec.unpack(0, extended)
 
             assertAll(
@@ -149,11 +151,12 @@ class AttributeCodecTest {
         @Test
         fun `SGR reset preserves protection and active hyperlink only`() {
             val primary = AttributeCodec.pack(1, 2, bold = true, protected = true)
-            val extended = AttributeCodec.packExtended(
-                underlineStyle = UnderlineStyle.DOUBLE,
-                strikethrough = true,
-                hyperlinkId = 7,
-            )
+            val extended =
+                AttributeCodec.packExtended(
+                    underlineStyle = UnderlineStyle.DOUBLE,
+                    strikethrough = true,
+                    hyperlinkId = 7,
+                )
 
             val resetPrimary = AttributeCodec.sgrResetPrimary(primary)
             val resetExtended = AttributeCodec.sgrResetExtended(extended)

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.runtime.ParserState
@@ -25,7 +24,6 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ActionEngine")
 class ActionEngineTest {
-
     // ----- Fixtures ---------------------------------------------------------
 
     private data class Fixture(
@@ -34,11 +32,12 @@ class ActionEngineTest {
         val dispatcher: RecordingCommandDispatcher = RecordingCommandDispatcher(events),
         val printable: RecordingPrintableSink = RecordingPrintableSink(events),
     ) {
-        val engine = ActionEngine(
-            sink = sink,
-            dispatcher = dispatcher,
-            printableSink = printable
-        )
+        val engine =
+            ActionEngine(
+                sink = sink,
+                dispatcher = dispatcher,
+                printableSink = printable,
+            )
     }
 
     private data class DispatchSnapshot(
@@ -64,13 +63,19 @@ class ActionEngineTest {
         val utf8Bytes = mutableListOf<Int>()
         val utf8States = mutableListOf<Int>()
 
-        override fun onAsciiByte(state: ParserState, byteValue: Int) {
+        override fun onAsciiByte(
+            state: ParserState,
+            byteValue: Int,
+        ) {
             asciiBytes += byteValue
             asciiStates += state.fsmState
             events += "printAscii:$byteValue"
         }
 
-        override fun onUtf8Byte(state: ParserState, byteValue: Int) {
+        override fun onUtf8Byte(
+            state: ParserState,
+            byteValue: Int,
+        ) {
             utf8Bytes += byteValue
             utf8States += state.fsmState
             events += "printUtf8:$byteValue"
@@ -134,7 +139,7 @@ class ActionEngineTest {
                 privateMarker = state.privateMarker,
                 payloadLength = state.payloadLength,
                 payloadCode = state.payloadCode,
-                payloadOverflowed = state.payloadOverflowed
+                payloadOverflowed = state.payloadOverflowed,
             )
     }
 
@@ -145,7 +150,10 @@ class ActionEngineTest {
             sinkCalls += "writeCodepoint:$codepoint"
         }
 
-        override fun writeCluster(codepoints: IntArray, length: Int) {
+        override fun writeCluster(
+            codepoints: IntArray,
+            length: Int,
+        ) {
             sinkCalls += "writeCluster:$length"
         }
 
@@ -245,23 +253,38 @@ class ActionEngineTest {
             sinkCalls += "setCursorRow:$row"
         }
 
-        override fun setCursorAbsolute(row: Int, col: Int) {
+        override fun setCursorAbsolute(
+            row: Int,
+            col: Int,
+        ) {
             sinkCalls += "setCursorAbsolute:$row:$col"
         }
 
-        override fun setScrollRegion(top: Int, bottom: Int) {
+        override fun setScrollRegion(
+            top: Int,
+            bottom: Int,
+        ) {
             sinkCalls += "setScrollRegion:$top:$bottom"
         }
 
-        override fun setLeftRightMargins(left: Int, right: Int) {
+        override fun setLeftRightMargins(
+            left: Int,
+            right: Int,
+        ) {
             sinkCalls += "setLeftRightMargins:$left:$right"
         }
 
-        override fun eraseInDisplay(mode: Int, selective: Boolean) {
+        override fun eraseInDisplay(
+            mode: Int,
+            selective: Boolean,
+        ) {
             sinkCalls += "eraseInDisplay:$mode:$selective"
         }
 
-        override fun eraseInLine(mode: Int, selective: Boolean) {
+        override fun eraseInLine(
+            mode: Int,
+            selective: Boolean,
+        ) {
             sinkCalls += "eraseInLine:$mode:$selective"
         }
 
@@ -305,19 +328,31 @@ class ActionEngineTest {
             sinkCalls += "clearAllTabStops"
         }
 
-        override fun setAnsiMode(mode: Int, enable: Boolean) {
+        override fun setAnsiMode(
+            mode: Int,
+            enable: Boolean,
+        ) {
             sinkCalls += "setAnsiMode:$mode:$enable"
         }
 
-        override fun setDecMode(mode: Int, enable: Boolean) {
+        override fun setDecMode(
+            mode: Int,
+            enable: Boolean,
+        ) {
             sinkCalls += "setDecMode:$mode:$enable"
         }
 
-        override fun requestDeviceStatusReport(mode: Int, decPrivate: Boolean) {
+        override fun requestDeviceStatusReport(
+            mode: Int,
+            decPrivate: Boolean,
+        ) {
             sinkCalls += "requestDeviceStatusReport:$mode:$decPrivate"
         }
 
-        override fun requestDeviceAttributes(kind: Int, parameter: Int) {
+        override fun requestDeviceAttributes(
+            kind: Int,
+            parameter: Int,
+        ) {
             sinkCalls += "requestDeviceAttributes:$kind:$parameter"
         }
 
@@ -401,15 +436,27 @@ class ActionEngineTest {
             sinkCalls += "setUnderlineColorIndexed:$index"
         }
 
-        override fun setForegroundRgb(red: Int, green: Int, blue: Int) {
+        override fun setForegroundRgb(
+            red: Int,
+            green: Int,
+            blue: Int,
+        ) {
             sinkCalls += "setForegroundRgb:$red:$green:$blue"
         }
 
-        override fun setBackgroundRgb(red: Int, green: Int, blue: Int) {
+        override fun setBackgroundRgb(
+            red: Int,
+            green: Int,
+            blue: Int,
+        ) {
             sinkCalls += "setBackgroundRgb:$red:$green:$blue"
         }
 
-        override fun setUnderlineColorRgb(red: Int, green: Int, blue: Int) {
+        override fun setUnderlineColorRgb(
+            red: Int,
+            green: Int,
+            blue: Int,
+        ) {
             sinkCalls += "setUnderlineColorRgb:$red:$green:$blue"
         }
 
@@ -425,7 +472,10 @@ class ActionEngineTest {
             sinkCalls += "setIconAndWindowTitle:$title"
         }
 
-        override fun startHyperlink(uri: String, id: String?) {
+        override fun startHyperlink(
+            uri: String,
+            id: String?,
+        ) {
             sinkCalls += "startHyperlink:$uri:${id ?: "null"}"
         }
 
@@ -465,7 +515,7 @@ class ActionEngineTest {
             state = state,
             nextState = nextState,
             action = action,
-            byteValue = byteValue
+            byteValue = byteValue,
         )
     }
 
@@ -483,7 +533,7 @@ class ActionEngineTest {
                 state = state,
                 nextState = AnsiStateMachine.nextState(transition),
                 action = AnsiStateMachine.action(transition),
-                byteValue = byteValue
+                byteValue = byteValue,
             )
         }
     }
@@ -493,23 +543,24 @@ class ActionEngineTest {
     @Nested
     @DisplayName("input validation")
     inner class InputValidation {
-
         @Test
         fun `rejects byte values outside unsigned byte range`() {
             val fixture = Fixture()
             val state = ParserState()
 
-            val below = assertThrows(IllegalArgumentException::class.java) {
-                execute(fixture, state, nextState = AnsiState.GROUND, action = FsmAction.IGNORE, byteValue = -1)
-            }
-            val above = assertThrows(IllegalArgumentException::class.java) {
-                execute(fixture, state, nextState = AnsiState.GROUND, action = FsmAction.IGNORE, byteValue = 256)
-            }
+            val below =
+                assertThrows(IllegalArgumentException::class.java) {
+                    execute(fixture, state, nextState = AnsiState.GROUND, action = FsmAction.IGNORE, byteValue = -1)
+                }
+            val above =
+                assertThrows(IllegalArgumentException::class.java) {
+                    execute(fixture, state, nextState = AnsiState.GROUND, action = FsmAction.IGNORE, byteValue = 256)
+                }
 
             assertAll(
                 { assertEquals("byteValue out of range: -1", below.message) },
                 { assertEquals("byteValue out of range: 256", above.message) },
-                { assertTrue(fixture.events.isEmpty()) }
+                { assertTrue(fixture.events.isEmpty()) },
             )
         }
 
@@ -519,14 +570,15 @@ class ActionEngineTest {
             val state = ParserState()
             state.fsmState = AnsiState.CSI_PARAM
 
-            val error = assertThrows(IllegalStateException::class.java) {
-                execute(fixture, state, nextState = AnsiState.GROUND, action = FsmAction.COUNT, byteValue = 0)
-            }
+            val error =
+                assertThrows(IllegalStateException::class.java) {
+                    execute(fixture, state, nextState = AnsiState.GROUND, action = FsmAction.COUNT, byteValue = 0)
+                }
 
             assertAll(
                 { assertEquals("Unknown FsmAction: ${FsmAction.COUNT}", error.message) },
                 { assertEquals(AnsiState.CSI_PARAM, state.fsmState) },
-                { assertTrue(fixture.events.isEmpty()) }
+                { assertTrue(fixture.events.isEmpty()) },
             )
         }
     }
@@ -536,7 +588,6 @@ class ActionEngineTest {
     @Nested
     @DisplayName("basic routing actions")
     inner class BasicRoutingActions {
-
         @Test
         fun `IGNORE only updates FSM state`() {
             val fixture = Fixture()
@@ -549,7 +600,7 @@ class ActionEngineTest {
                 { assertEquals(AnsiState.CSI_IGNORE, state.fsmState) },
                 { assertEquals(2, state.paramCount) },
                 { assertEquals(0, fixture.printable.flushCount) },
-                { assertTrue(fixture.events.isEmpty()) }
+                { assertTrue(fixture.events.isEmpty()) },
             )
         }
 
@@ -565,7 +616,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.ESCAPE,
                 action = FsmAction.CLEAR_SEQUENCE,
-                byteValue = 0x1B
+                byteValue = 0x1B,
             )
 
             assertAll(
@@ -577,7 +628,7 @@ class ActionEngineTest {
                 { assertEquals(0, state.intermediates) },
                 { assertEquals(0, state.intermediateCount) },
                 { assertEquals(0, state.privateMarker) },
-                { assertEquals(3, state.payloadLength, "payload is not sequence state") }
+                { assertEquals(3, state.payloadLength, "payload is not sequence state") },
             )
         }
 
@@ -591,14 +642,14 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.GROUND,
                 action = FsmAction.PRINT_ASCII,
-                byteValue = 'A'.code
+                byteValue = 'A'.code,
             )
 
             assertAll(
                 { assertEquals(listOf('A'.code), fixture.printable.asciiBytes) },
                 { assertEquals(listOf(AnsiState.GROUND), fixture.printable.asciiStates) },
                 { assertEquals(0, fixture.printable.flushCount) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -612,14 +663,14 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.GROUND,
                 action = FsmAction.PRINT_UTF8,
-                byteValue = 0xE2
+                byteValue = 0xE2,
             )
 
             assertAll(
                 { assertEquals(listOf(0xE2), fixture.printable.utf8Bytes) },
                 { assertEquals(listOf(AnsiState.GROUND), fixture.printable.utf8States) },
                 { assertEquals(0, fixture.printable.flushCount) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
     }
@@ -629,7 +680,6 @@ class ActionEngineTest {
     @Nested
     @DisplayName("C0 controls")
     inner class C0Controls {
-
         @Test
         fun `EXECUTE flushes then delegates control without clearing sequence state`() {
             val fixture = Fixture()
@@ -641,14 +691,14 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.CSI_PARAM,
                 action = FsmAction.EXECUTE,
-                byteValue = 0x08
+                byteValue = 0x08,
             )
 
             assertAll(
                 { assertEquals(listOf("flush", "control:8"), fixture.events) },
                 { assertEquals(listOf(0x08), fixture.dispatcher.controlBytes) },
                 { assertEquals(2, state.paramCount) },
-                { assertEquals(AnsiState.CSI_PARAM, state.fsmState) }
+                { assertEquals(AnsiState.CSI_PARAM, state.fsmState) },
             )
         }
 
@@ -663,7 +713,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.GROUND,
                 action = FsmAction.EXECUTE_AND_CLEAR,
-                byteValue = 0x18
+                byteValue = 0x18,
             )
 
             assertAll(
@@ -671,7 +721,7 @@ class ActionEngineTest {
                 { assertEquals(listOf(0x18), fixture.dispatcher.controlBytes) },
                 { assertEquals(0, state.paramCount) },
                 { assertEquals(0, state.privateMarker) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -687,7 +737,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.OSC_STRING,
                 action = FsmAction.OSC_EXECUTE_CONTROL,
-                byteValue = 0x07
+                byteValue = 0x07,
             )
 
             assertAll(
@@ -698,7 +748,7 @@ class ActionEngineTest {
                 { assertEquals(-1, state.payloadCode) },
                 { assertFalse(state.payloadOverflowed) },
                 { assertEquals(0, state.paramCount) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
     }
@@ -708,7 +758,6 @@ class ActionEngineTest {
     @Nested
     @DisplayName("sequence accumulation")
     inner class SequenceAccumulation {
-
         @Test
         fun `COLLECT_INTERMEDIATE packs up to four bytes low to high`() {
             val fixture = Fixture()
@@ -720,7 +769,7 @@ class ActionEngineTest {
                     state,
                     nextState = AnsiState.ESCAPE_INTERMEDIATE,
                     action = FsmAction.COLLECT_INTERMEDIATE,
-                    byteValue = byteValue
+                    byteValue = byteValue,
                 )
             }
 
@@ -728,7 +777,7 @@ class ActionEngineTest {
                 { assertEquals(4, state.intermediateCount) },
                 { assertEquals(0x23_22_21_20, state.intermediates) },
                 { assertEquals(5, fixture.printable.flushCount, "each structural byte flushes pending printables") },
-                { assertEquals(AnsiState.ESCAPE_INTERMEDIATE, state.fsmState) }
+                { assertEquals(AnsiState.ESCAPE_INTERMEDIATE, state.fsmState) },
             )
         }
 
@@ -743,7 +792,7 @@ class ActionEngineTest {
                     state,
                     nextState = AnsiState.CSI_PARAM,
                     action = FsmAction.PARAM_DIGIT,
-                    byteValue = byteValue
+                    byteValue = byteValue,
                 )
             }
 
@@ -752,7 +801,7 @@ class ActionEngineTest {
                 { assertTrue(state.currentParamStarted) },
                 { assertEquals(123, state.params[0]) },
                 { assertEquals(3, fixture.printable.flushCount) },
-                { assertEquals(AnsiState.CSI_PARAM, state.fsmState) }
+                { assertEquals(AnsiState.CSI_PARAM, state.fsmState) },
             )
         }
 
@@ -769,7 +818,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.CSI_PARAM,
                 action = FsmAction.PARAM_DIGIT,
-                byteValue = '7'.code
+                byteValue = '7'.code,
             )
 
             assertEquals(7, state.params[0])
@@ -788,7 +837,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.CSI_PARAM,
                 action = FsmAction.PARAM_DIGIT,
-                byteValue = '9'.code
+                byteValue = '9'.code,
             )
 
             assertEquals(Int.MAX_VALUE, state.params[0])
@@ -799,21 +848,22 @@ class ActionEngineTest {
             val fixture = Fixture()
             val state = ParserState()
 
-            val error = assertThrows(IllegalArgumentException::class.java) {
-                execute(
-                    fixture,
-                    state,
-                    nextState = AnsiState.CSI_PARAM,
-                    action = FsmAction.PARAM_DIGIT,
-                    byteValue = 'x'.code
-                )
-            }
+            val error =
+                assertThrows(IllegalArgumentException::class.java) {
+                    execute(
+                        fixture,
+                        state,
+                        nextState = AnsiState.CSI_PARAM,
+                        action = FsmAction.PARAM_DIGIT,
+                        byteValue = 'x'.code,
+                    )
+                }
 
             assertAll(
                 { assertEquals("Expected decimal digit byte, got: ${'x'.code}", error.message) },
                 { assertEquals(listOf("flush"), fixture.events) },
                 { assertEquals(0, state.paramCount) },
-                { assertEquals(AnsiState.GROUND, state.fsmState, "state updates after successful mutation only") }
+                { assertEquals(AnsiState.GROUND, state.fsmState, "state updates after successful mutation only") },
             )
         }
 
@@ -830,14 +880,14 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.CSI_PARAM,
                 action = FsmAction.PARAM_DIGIT,
-                byteValue = '9'.code
+                byteValue = '9'.code,
             )
 
             assertAll(
                 { assertEquals(1, state.paramCount) },
                 { assertEquals(9, state.params[0]) },
                 { assertTrue(state.currentParamStarted) },
-                { assertEquals(AnsiState.CSI_PARAM, state.fsmState) }
+                { assertEquals(AnsiState.CSI_PARAM, state.fsmState) },
             )
         }
 
@@ -851,14 +901,14 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.CSI_PARAM,
                 action = FsmAction.PARAM_SEPARATOR,
-                byteValue = ';'.code
+                byteValue = ';'.code,
             )
 
             assertAll(
                 { assertEquals(2, state.paramCount) },
                 { assertEquals(-1, state.params[0]) },
                 { assertFalse(state.currentParamStarted) },
-                { assertEquals(AnsiState.CSI_PARAM, state.fsmState) }
+                { assertEquals(AnsiState.CSI_PARAM, state.fsmState) },
             )
         }
 
@@ -875,13 +925,13 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.CSI_PARAM,
                 action = FsmAction.PARAM_SEPARATOR,
-                byteValue = ';'.code
+                byteValue = ';'.code,
             )
 
             assertAll(
                 { assertEquals(2, state.paramCount) },
                 { assertEquals(12, state.params[0]) },
-                { assertFalse(state.currentParamStarted) }
+                { assertFalse(state.currentParamStarted) },
             )
         }
 
@@ -898,13 +948,13 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.CSI_PARAM,
                 action = FsmAction.PARAM_SEPARATOR,
-                byteValue = ';'.code
+                byteValue = ';'.code,
             )
 
             assertAll(
                 { assertEquals(1, state.paramCount) },
                 { assertEquals(12, state.params[0]) },
-                { assertFalse(state.currentParamStarted) }
+                { assertFalse(state.currentParamStarted) },
             )
         }
 
@@ -921,14 +971,14 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.CSI_PARAM,
                 action = FsmAction.PARAM_COLON,
-                byteValue = ':'.code
+                byteValue = ':'.code,
             )
 
             assertAll(
                 { assertEquals(2, state.paramCount) },
                 { assertEquals(38, state.params[0]) },
                 { assertEquals(0b10, state.subParameterMask) },
-                { assertFalse(state.currentParamStarted) }
+                { assertFalse(state.currentParamStarted) },
             )
         }
 
@@ -945,14 +995,14 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.CSI_PARAM,
                 action = FsmAction.PARAM_COLON,
-                byteValue = ':'.code
+                byteValue = ':'.code,
             )
 
             assertAll(
                 { assertEquals(1, state.paramCount) },
                 { assertEquals(38, state.params[0]) },
                 { assertEquals(0, state.subParameterMask, "no valid params[1] exists, so bit 1 must remain clear") },
-                { assertFalse(state.currentParamStarted) }
+                { assertFalse(state.currentParamStarted) },
             )
         }
 
@@ -966,20 +1016,20 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.CSI_PARAM,
                 action = FsmAction.SET_PRIVATE_MARKER,
-                byteValue = '?'.code
+                byteValue = '?'.code,
             )
             execute(
                 fixture,
                 state,
                 nextState = AnsiState.CSI_PARAM,
                 action = FsmAction.SET_PRIVATE_MARKER,
-                byteValue = '>'.code
+                byteValue = '>'.code,
             )
 
             assertAll(
                 { assertEquals('?'.code, state.privateMarker) },
                 { assertEquals(2, fixture.printable.flushCount) },
-                { assertEquals(AnsiState.CSI_PARAM, state.fsmState) }
+                { assertEquals(AnsiState.CSI_PARAM, state.fsmState) },
             )
         }
     }
@@ -989,7 +1039,6 @@ class ActionEngineTest {
     @Nested
     @DisplayName("dispatch")
     inner class Dispatch {
-
         @Test
         fun `ESC_DISPATCH flushes before dispatch and clears sequence after dispatcher sees it`() {
             val fixture = Fixture()
@@ -1001,7 +1050,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.GROUND,
                 action = FsmAction.ESC_DISPATCH,
-                byteValue = 'c'.code
+                byteValue = 'c'.code,
             )
 
             val snapshot = fixture.dispatcher.escSnapshots.single()
@@ -1013,7 +1062,7 @@ class ActionEngineTest {
                 { assertEquals('?'.code, snapshot.privateMarker) },
                 { assertEquals(0, state.paramCount) },
                 { assertEquals(0, state.privateMarker) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -1028,7 +1077,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.GROUND,
                 action = FsmAction.CSI_DISPATCH,
-                byteValue = 'm'.code
+                byteValue = 'm'.code,
             )
 
             val snapshot = fixture.dispatcher.csiSnapshots.single()
@@ -1042,7 +1091,7 @@ class ActionEngineTest {
                 { assertEquals(0, state.paramCount) },
                 { assertEquals(0, state.subParameterMask) },
                 { assertEquals(0, state.privateMarker) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -1058,7 +1107,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.GROUND,
                 action = FsmAction.ESC_DISPATCH,
-                byteValue = '\\'.code
+                byteValue = '\\'.code,
             )
 
             assertAll(
@@ -1067,7 +1116,7 @@ class ActionEngineTest {
                 { assertTrue(fixture.sink.sinkCalls.isEmpty()) },
                 { assertEquals(3, state.payloadLength, "string termination is matrix-driven, not ESC_DISPATCH-driven") },
                 { assertEquals(0, state.paramCount) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -1081,14 +1130,14 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.GROUND,
                 action = FsmAction.ESC_DISPATCH,
-                byteValue = '\\'.code
+                byteValue = '\\'.code,
             )
 
             assertAll(
                 { assertEquals(listOf("flush", "esc:${'\\'.code}"), fixture.events) },
                 { assertEquals(listOf('\\'.code), fixture.dispatcher.escFinals) },
                 { assertTrue(fixture.sink.sinkCalls.isEmpty()) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
     }
@@ -1098,7 +1147,6 @@ class ActionEngineTest {
     @Nested
     @DisplayName("payload actions")
     inner class PayloadActions {
-
         @Test
         fun `OSC_START flushes and clears sequence and stale payload state`() {
             val fixture = Fixture()
@@ -1111,7 +1159,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.OSC_STRING,
                 action = FsmAction.OSC_START,
-                byteValue = ']'.code
+                byteValue = ']'.code,
             )
 
             assertAll(
@@ -1120,7 +1168,7 @@ class ActionEngineTest {
                 { assertEquals(0, state.payloadLength) },
                 { assertEquals(-1, state.payloadCode) },
                 { assertFalse(state.payloadOverflowed) },
-                { assertEquals(AnsiState.OSC_STRING, state.fsmState) }
+                { assertEquals(AnsiState.OSC_STRING, state.fsmState) },
             )
         }
 
@@ -1134,14 +1182,14 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.OSC_STRING,
                 action = FsmAction.OSC_PUT_ASCII,
-                byteValue = 'A'.code
+                byteValue = 'A'.code,
             )
             execute(
                 fixture,
                 state,
                 nextState = AnsiState.OSC_STRING,
                 action = FsmAction.OSC_PUT_UTF8,
-                byteValue = 0xE2
+                byteValue = 0xE2,
             )
 
             assertAll(
@@ -1150,7 +1198,7 @@ class ActionEngineTest {
                 { assertEquals('A'.code.toByte(), state.payloadBuffer[0]) },
                 { assertEquals(0xE2.toByte(), state.payloadBuffer[1]) },
                 { assertFalse(state.payloadOverflowed) },
-                { assertEquals(AnsiState.OSC_STRING, state.fsmState) }
+                { assertEquals(AnsiState.OSC_STRING, state.fsmState) },
             )
         }
 
@@ -1165,7 +1213,7 @@ class ActionEngineTest {
                     state,
                     nextState = AnsiState.OSC_STRING,
                     action = FsmAction.OSC_PUT_ASCII,
-                    byteValue = byteValue
+                    byteValue = byteValue,
                 )
             }
 
@@ -1173,7 +1221,7 @@ class ActionEngineTest {
                 { assertEquals(2, state.payloadLength) },
                 { assertTrue(state.payloadOverflowed) },
                 { assertEquals('A'.code.toByte(), state.payloadBuffer[0]) },
-                { assertEquals('B'.code.toByte(), state.payloadBuffer[1]) }
+                { assertEquals('B'.code.toByte(), state.payloadBuffer[1]) },
             )
         }
 
@@ -1188,7 +1236,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.DCS_PASSTHROUGH,
                 action = FsmAction.DCS_IGNORE_START,
-                byteValue = 'q'.code
+                byteValue = 'q'.code,
             )
 
             assertAll(
@@ -1197,7 +1245,7 @@ class ActionEngineTest {
                 { assertEquals('q'.code.toByte(), state.payloadBuffer[0]) },
                 { assertEquals(-1, state.payloadCode) },
                 { assertFalse(state.payloadOverflowed) },
-                { assertEquals(AnsiState.DCS_PASSTHROUGH, state.fsmState) }
+                { assertEquals(AnsiState.DCS_PASSTHROUGH, state.fsmState) },
             )
         }
 
@@ -1211,14 +1259,14 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.DCS_PASSTHROUGH,
                 action = FsmAction.DCS_PUT_ASCII,
-                byteValue = 'A'.code
+                byteValue = 'A'.code,
             )
             execute(
                 fixture,
                 state,
                 nextState = AnsiState.DCS_PASSTHROUGH,
                 action = FsmAction.DCS_PUT_UTF8,
-                byteValue = 0xF0
+                byteValue = 0xF0,
             )
 
             assertAll(
@@ -1226,7 +1274,7 @@ class ActionEngineTest {
                 { assertEquals(2, state.payloadLength) },
                 { assertEquals('A'.code.toByte(), state.payloadBuffer[0]) },
                 { assertEquals(0xF0.toByte(), state.payloadBuffer[1]) },
-                { assertEquals(AnsiState.DCS_PASSTHROUGH, state.fsmState) }
+                { assertEquals(AnsiState.DCS_PASSTHROUGH, state.fsmState) },
             )
         }
 
@@ -1242,7 +1290,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.GROUND,
                 action = FsmAction.OSC_END,
-                byteValue = '\\'.code
+                byteValue = '\\'.code,
             )
 
             assertAll(
@@ -1254,7 +1302,7 @@ class ActionEngineTest {
                 { assertEquals(0, state.payloadLength) },
                 { assertEquals(-1, state.payloadCode) },
                 { assertFalse(state.payloadOverflowed) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -1270,7 +1318,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.GROUND,
                 action = FsmAction.DCS_END,
-                byteValue = '\\'.code
+                byteValue = '\\'.code,
             )
 
             assertAll(
@@ -1282,7 +1330,7 @@ class ActionEngineTest {
                 { assertEquals(0, state.payloadLength) },
                 { assertEquals(-1, state.payloadCode) },
                 { assertFalse(state.payloadOverflowed) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -1298,7 +1346,7 @@ class ActionEngineTest {
                 state,
                 nextState = AnsiState.GROUND,
                 action = FsmAction.STRING_END,
-                byteValue = '\\'.code
+                byteValue = '\\'.code,
             )
 
             assertAll(
@@ -1310,7 +1358,7 @@ class ActionEngineTest {
                 { assertEquals(0, state.payloadLength) },
                 { assertEquals(-1, state.payloadCode) },
                 { assertFalse(state.payloadOverflowed) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
     }
@@ -1320,7 +1368,6 @@ class ActionEngineTest {
     @Nested
     @DisplayName("integrated matrix and action traces")
     inner class IntegratedMatrixAndActionTraces {
-
         @Test
         fun `CSI trace accumulates params and dispatches with sequence intact`() {
             val fixture = Fixture()
@@ -1335,7 +1382,7 @@ class ActionEngineTest {
                 { assertEquals('?'.code, snapshot.privateMarker) },
                 { assertEquals(listOf(25), snapshot.params) },
                 { assertEquals(0, state.paramCount) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -1350,7 +1397,7 @@ class ActionEngineTest {
                 { assertEquals(listOf("setIconAndWindowTitle:t"), fixture.sink.sinkCalls) },
                 { assertTrue(fixture.dispatcher.controlBytes.isEmpty()) },
                 { assertEquals(0, state.payloadLength) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -1365,7 +1412,7 @@ class ActionEngineTest {
                 { assertEquals(listOf("setIconAndWindowTitle:t"), fixture.sink.sinkCalls) },
                 { assertTrue(fixture.dispatcher.escFinals.isEmpty()) },
                 { assertEquals(0, state.payloadLength) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -1380,7 +1427,7 @@ class ActionEngineTest {
                 { assertTrue(fixture.sink.sinkCalls.isEmpty()) },
                 { assertTrue(fixture.dispatcher.escFinals.isEmpty()) },
                 { assertTrue(fixture.dispatcher.controlBytes.isEmpty()) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -1394,7 +1441,7 @@ class ActionEngineTest {
             assertAll(
                 { assertTrue(fixture.sink.sinkCalls.isEmpty()) },
                 { assertTrue(fixture.dispatcher.escFinals.isEmpty()) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -1409,7 +1456,7 @@ class ActionEngineTest {
                 { assertEquals(AnsiState.OSC_STRING, state.fsmState) },
                 { assertTrue(fixture.dispatcher.controlBytes.isEmpty()) },
                 { assertTrue(fixture.sink.sinkCalls.isEmpty()) },
-                { assertEquals(0, state.payloadLength) }
+                { assertEquals(0, state.payloadLength) },
             )
         }
 
@@ -1424,7 +1471,7 @@ class ActionEngineTest {
                 { assertEquals(AnsiState.DCS_ENTRY, state.fsmState) },
                 { assertTrue(fixture.dispatcher.controlBytes.isEmpty()) },
                 { assertEquals(0, state.payloadLength) },
-                { assertTrue(fixture.sink.sinkCalls.isEmpty()) }
+                { assertTrue(fixture.sink.sinkCalls.isEmpty()) },
             )
         }
 
@@ -1440,7 +1487,7 @@ class ActionEngineTest {
                 { assertTrue(fixture.dispatcher.controlBytes.isEmpty()) },
                 { assertEquals(2, state.payloadLength) },
                 { assertEquals('q'.code.toByte(), state.payloadBuffer[0]) },
-                { assertEquals(0x00.toByte(), state.payloadBuffer[1]) }
+                { assertEquals(0x00.toByte(), state.payloadBuffer[1]) },
             )
         }
 
@@ -1457,7 +1504,7 @@ class ActionEngineTest {
                 { assertTrue(fixture.dispatcher.controlBytes.isEmpty()) },
                 { assertEquals(2, state.payloadLength) },
                 { assertEquals('q'.code.toByte(), state.payloadBuffer[0]) },
-                { assertEquals('A'.code.toByte(), state.payloadBuffer[1]) }
+                { assertEquals('A'.code.toByte(), state.payloadBuffer[1]) },
             )
         }
 
@@ -1473,7 +1520,7 @@ class ActionEngineTest {
                 { assertTrue(fixture.dispatcher.escFinals.isEmpty()) },
                 { assertEquals(2, state.payloadLength) },
                 { assertEquals('q'.code.toByte(), state.payloadBuffer[0]) },
-                { assertEquals('A'.code.toByte(), state.payloadBuffer[1]) }
+                { assertEquals('A'.code.toByte(), state.payloadBuffer[1]) },
             )
         }
 
@@ -1488,7 +1535,7 @@ class ActionEngineTest {
                 { assertEquals(AnsiState.GROUND, state.fsmState) },
                 { assertTrue(fixture.dispatcher.escFinals.isEmpty()) },
                 { assertEquals(0, state.payloadLength) },
-                { assertTrue(fixture.sink.sinkCalls.isEmpty()) }
+                { assertTrue(fixture.sink.sinkCalls.isEmpty()) },
             )
         }
     }

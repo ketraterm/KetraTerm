@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 import com.gagik.terminal.ui.swing.render.primitives.TerminalBoxDrawingGlyphs.DIAGONAL_FALLING
@@ -33,17 +32,17 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TerminalBoxDrawingGlyphsTest {
-
     @Nested
     inner class BitwisePacking {
         @Test
         fun `pack and edge shifts preserve all styles flawlessly`() {
-            val packed = TerminalBoxDrawingGlyphs.pack(
-                left = NONE,
-                right = LIGHT,
-                up = HEAVY,
-                down = DOUBLE
-            )
+            val packed =
+                TerminalBoxDrawingGlyphs.pack(
+                    left = NONE,
+                    right = LIGHT,
+                    up = HEAVY,
+                    down = DOUBLE,
+                )
 
             assertEquals(NONE, TerminalBoxDrawingGlyphs.edge(packed, LEFT_SHIFT))
             assertEquals(LIGHT, TerminalBoxDrawingGlyphs.edge(packed, RIGHT_SHIFT))

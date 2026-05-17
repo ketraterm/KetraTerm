@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.runtime.ParserState
@@ -24,13 +23,11 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("RecordingCommandDispatcher")
 class RecordingCommandDispatcherTest {
-
     private val sink = RecordingTerminalCommandSink()
 
     @Nested
     @DisplayName("control recording")
     inner class ControlRecording {
-
         @Test
         fun `records executed C0 control bytes in order`() {
             val dispatcher = RecordingCommandDispatcher()
@@ -42,9 +39,9 @@ class RecordingCommandDispatcherTest {
             assertEquals(
                 listOf(
                     RecordingCommandDispatcher.C0(0x07),
-                    RecordingCommandDispatcher.C0(0x18)
+                    RecordingCommandDispatcher.C0(0x18),
                 ),
-                dispatcher.controls
+                dispatcher.controls,
             )
         }
     }
@@ -52,7 +49,6 @@ class RecordingCommandDispatcherTest {
     @Nested
     @DisplayName("ESC recording")
     inner class EscRecording {
-
         @Test
         fun `records ESC final byte and intermediate snapshot`() {
             val dispatcher = RecordingCommandDispatcher()
@@ -66,9 +62,9 @@ class RecordingCommandDispatcherTest {
                 RecordingCommandDispatcher.Esc(
                     finalByte = 'c'.code,
                     intermediates = 0x21_20,
-                    intermediateCount = 2
+                    intermediateCount = 2,
                 ),
-                dispatcher.esc.single()
+                dispatcher.esc.single(),
             )
         }
     }
@@ -76,7 +72,6 @@ class RecordingCommandDispatcherTest {
     @Nested
     @DisplayName("CSI recording")
     inner class CsiRecording {
-
         @Test
         fun `records CSI final byte and parser accumulator snapshot`() {
             val dispatcher = RecordingCommandDispatcher()
@@ -100,7 +95,7 @@ class RecordingCommandDispatcherTest {
                 { assertEquals('?'.code, csi.privateMarker) },
                 { assertEquals(0x24_20, csi.intermediates) },
                 { assertEquals(2, csi.intermediateCount) },
-                { assertEquals(0b110, csi.subParameterMask) }
+                { assertEquals(0b110, csi.subParameterMask) },
             )
         }
 
@@ -123,7 +118,6 @@ class RecordingCommandDispatcherTest {
     @Nested
     @DisplayName("initial state")
     inner class InitialState {
-
         @Test
         fun `starts with no recorded dispatches`() {
             val dispatcher = RecordingCommandDispatcher()
@@ -131,7 +125,7 @@ class RecordingCommandDispatcherTest {
             assertAll(
                 { assertTrue(dispatcher.controls.isEmpty()) },
                 { assertTrue(dispatcher.esc.isEmpty()) },
-                { assertTrue(dispatcher.csi.isEmpty()) }
+                { assertTrue(dispatcher.csi.isEmpty()) },
             )
         }
     }

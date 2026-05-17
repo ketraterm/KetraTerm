@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.pty
 
 import com.gagik.core.TerminalBuffers
@@ -38,27 +37,27 @@ object TerminalPtySessions {
      */
     @JvmStatic
     @Throws(IOException::class)
-    fun start(options: TerminalPtyOptions = TerminalPtyOptions()): TerminalSession {
-        return start(options, Pty4jTerminalProcessFactory)
-    }
+    fun start(options: TerminalPtyOptions = TerminalPtyOptions()): TerminalSession = start(options, Pty4jTerminalProcessFactory)
 
     internal fun start(
         options: TerminalPtyOptions,
         processFactory: TerminalProcessFactory,
     ): TerminalSession {
         val connector = PtyConnectors.create(options, processFactory)
-        val terminal = TerminalBuffers.create(
-            width = options.columns,
-            height = options.rows,
-            maxHistory = options.maxHistory,
-        )
+        val terminal =
+            TerminalBuffers.create(
+                width = options.columns,
+                height = options.rows,
+                maxHistory = options.maxHistory,
+            )
         terminal.setTreatAmbiguousAsWide(options.treatAmbiguousAsWide)
         val hostEventBridge = SessionHostEventBridge(options.eventListener)
-        val session = TerminalSession.create(
-            terminal = terminal,
-            connector = connector,
-            hostEvents = hostEventBridge,
-        )
+        val session =
+            TerminalSession.create(
+                terminal = terminal,
+                connector = connector,
+                hostEvents = hostEventBridge,
+            )
         hostEventBridge.attach(session)
         session.start(options.columns, options.rows)
         return session

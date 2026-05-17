@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.spi
 
 import com.gagik.terminal.protocol.AnsiMode
@@ -58,11 +57,17 @@ interface TerminalCommandSink {
     // -------------------------------------------------------------------------
 
     fun bell()
+
     fun backspace()
+
     fun tab()
+
     fun lineFeed()
+
     fun carriageReturn()
+
     fun reverseIndex()
+
     fun nextLine()
 
     /**
@@ -87,7 +92,9 @@ interface TerminalCommandSink {
     fun decaln()
 
     fun saveCursor()
+
     fun restoreCursor()
+
     fun setCursorStyle(style: Int)
 
     // -------------------------------------------------------------------------
@@ -95,14 +102,19 @@ interface TerminalCommandSink {
     // -------------------------------------------------------------------------
 
     fun cursorUp(n: Int)
+
     fun cursorDown(n: Int)
+
     fun cursorForward(n: Int)
+
     fun cursorBackward(n: Int)
 
     fun cursorNextLine(n: Int)
+
     fun cursorPreviousLine(n: Int)
 
     fun cursorForwardTabs(n: Int)
+
     fun cursorBackwardTabs(n: Int)
 
     /**
@@ -121,7 +133,10 @@ interface TerminalCommandSink {
      * Row and column are parser-translated to zero-origin before handoff.
      * The core may clamp; the parser must not.
      */
-    fun setCursorAbsolute(row: Int, col: Int)
+    fun setCursorAbsolute(
+        row: Int,
+        col: Int,
+    )
 
     /**
      * DECSTBM scroll region.
@@ -130,7 +145,10 @@ interface TerminalCommandSink {
      * A bottom value of -1 means the sequence omitted the bottom margin, so the
      * core should use the terminal's current last row.
      */
-    fun setScrollRegion(top: Int, bottom: Int)
+    fun setScrollRegion(
+        top: Int,
+        bottom: Int,
+    )
 
     /**
      * DECSLRM left/right margins.
@@ -139,23 +157,37 @@ interface TerminalCommandSink {
      * A right value of -1 means the sequence omitted the right margin, so the
      * core should use the terminal's current last column.
      */
-    fun setLeftRightMargins(left: Int, right: Int)
+    fun setLeftRightMargins(
+        left: Int,
+        right: Int,
+    )
 
     // -------------------------------------------------------------------------
     // Erase / edit / scroll
     // -------------------------------------------------------------------------
 
-    fun eraseInDisplay(mode: Int, selective: Boolean)
-    fun eraseInLine(mode: Int, selective: Boolean)
+    fun eraseInDisplay(
+        mode: Int,
+        selective: Boolean,
+    )
+
+    fun eraseInLine(
+        mode: Int,
+        selective: Boolean,
+    )
 
     fun insertLines(n: Int)
+
     fun deleteLines(n: Int)
 
     fun insertCharacters(n: Int)
+
     fun deleteCharacters(n: Int)
+
     fun eraseCharacters(n: Int)
 
     fun scrollUp(n: Int)
+
     fun scrollDown(n: Int)
 
     // -------------------------------------------------------------------------
@@ -163,7 +195,9 @@ interface TerminalCommandSink {
     // -------------------------------------------------------------------------
 
     fun setTabStop()
+
     fun clearTabStop()
+
     fun clearAllTabStops()
 
     // -------------------------------------------------------------------------
@@ -175,14 +209,20 @@ interface TerminalCommandSink {
      *
      * Mode ids use the shared [AnsiMode] vocabulary.
      */
-    fun setAnsiMode(mode: Int, enable: Boolean)
+    fun setAnsiMode(
+        mode: Int,
+        enable: Boolean,
+    )
 
     /**
      * DEC private mode set/reset.
      *
      * Mode ids use the shared [DecPrivateMode] vocabulary.
      */
-    fun setDecMode(mode: Int, enable: Boolean)
+    fun setDecMode(
+        mode: Int,
+        enable: Boolean,
+    )
 
     // -------------------------------------------------------------------------
     // Terminal-to-host responses
@@ -191,7 +231,10 @@ interface TerminalCommandSink {
     /**
      * DSR/CPR request: CSI Ps n or CSI ? Ps n.
      */
-    fun requestDeviceStatusReport(mode: Int, decPrivate: Boolean)
+    fun requestDeviceStatusReport(
+        mode: Int,
+        decPrivate: Boolean,
+    )
 
     /**
      * DA request.
@@ -201,7 +244,10 @@ interface TerminalCommandSink {
      * - 1: secondary DA, CSI > Ps c
      * - 2: tertiary DA, CSI = Ps c
      */
-    fun requestDeviceAttributes(kind: Int, parameter: Int)
+    fun requestDeviceAttributes(
+        kind: Int,
+        parameter: Int,
+    )
 
     /**
      * Safe xterm window report request.
@@ -218,6 +264,7 @@ interface TerminalCommandSink {
      * - 2: window title
      */
     fun pushTitleStack(scope: Int)
+
     fun popTitleStack(scope: Int)
 
     // -------------------------------------------------------------------------
@@ -227,36 +274,69 @@ interface TerminalCommandSink {
     fun resetAttributes()
 
     fun setBold(enabled: Boolean)
+
     fun setFaint(enabled: Boolean)
+
     fun setItalic(enabled: Boolean)
+
     fun setUnderlineStyle(style: Int)
+
     fun setBlink(enabled: Boolean)
+
     fun setInverse(enabled: Boolean)
+
     fun setConceal(enabled: Boolean)
+
     fun setStrikethrough(enabled: Boolean)
+
     fun setOverline(enabled: Boolean)
+
     fun setSelectiveEraseProtection(enabled: Boolean)
 
     fun setForegroundDefault()
+
     fun setBackgroundDefault()
+
     fun setUnderlineColorDefault()
 
     fun setForegroundIndexed(index: Int)
+
     fun setBackgroundIndexed(index: Int)
+
     fun setUnderlineColorIndexed(index: Int)
 
-    fun setForegroundRgb(red: Int, green: Int, blue: Int)
-    fun setBackgroundRgb(red: Int, green: Int, blue: Int)
-    fun setUnderlineColorRgb(red: Int, green: Int, blue: Int)
+    fun setForegroundRgb(
+        red: Int,
+        green: Int,
+        blue: Int,
+    )
+
+    fun setBackgroundRgb(
+        red: Int,
+        green: Int,
+        blue: Int,
+    )
+
+    fun setUnderlineColorRgb(
+        red: Int,
+        green: Int,
+        blue: Int,
+    )
 
     // -------------------------------------------------------------------------
     // OSC
     // -------------------------------------------------------------------------
 
     fun setWindowTitle(title: String)
+
     fun setIconTitle(title: String)
+
     fun setIconAndWindowTitle(title: String)
 
-    fun startHyperlink(uri: String, id: String?)
+    fun startHyperlink(
+        uri: String,
+        id: String?,
+    )
+
     fun endHyperlink()
 }

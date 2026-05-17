@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.runtime.ParserState
@@ -24,7 +23,6 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ANSI integration harness")
 internal class AnsiIntegrationHarnessTest {
-
     // ----- Helpers ----------------------------------------------------------
 
     private fun assertGround(h: AnsiHarness) {
@@ -36,11 +34,14 @@ internal class AnsiIntegrationHarnessTest {
             { assertTrue(h.dispatcher.controls.isEmpty(), "controls") },
             { assertTrue(h.dispatcher.esc.isEmpty(), "ESC") },
             { assertTrue(h.dispatcher.csi.isEmpty(), "CSI") },
-            { assertTrue(h.sink.events.isEmpty(), "sink") }
+            { assertTrue(h.sink.events.isEmpty(), "sink") },
         )
     }
 
-    private fun assertPayloadBytes(h: AnsiHarness, expected: List<Int>) {
+    private fun assertPayloadBytes(
+        h: AnsiHarness,
+        expected: List<Int>,
+    ) {
         assertEquals(expected.size, h.state.payloadLength)
         for (i in expected.indices) {
             assertEquals(expected[i].toByte(), h.state.payloadBuffer[i], "payload[$i]")
@@ -52,7 +53,6 @@ internal class AnsiIntegrationHarnessTest {
     @Nested
     @DisplayName("ground and printable ingress")
     inner class GroundAndPrintableIngress {
-
         @Test
         fun `plain ASCII prints through printable sink`() {
             val h = AnsiHarness()
@@ -61,7 +61,7 @@ internal class AnsiIntegrationHarnessTest {
 
             assertAll(
                 { assertEquals(listOf('a'.code, 'b'.code, 'c'.code), h.printable.asciiBytes) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -74,7 +74,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals("[]\\P_X^;:?".map { it.code }, h.printable.asciiBytes) },
                 { assertNoCommandDispatch(h) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -88,7 +88,7 @@ internal class AnsiIntegrationHarnessTest {
                 { assertTrue(h.printable.asciiBytes.isEmpty()) },
                 { assertEquals(listOf(0xE2, 0x82, 0xAC), h.printable.utf8Bytes) },
                 { assertNoCommandDispatch(h) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -102,7 +102,7 @@ internal class AnsiIntegrationHarnessTest {
                 { assertEquals(listOf('A'.code, 'B'.code), h.printable.asciiBytes) },
                 { assertEquals(listOf(0x07, 0x09).map { RecordingCommandDispatcher.C0(it) }, h.dispatcher.controls) },
                 { assertTrue(h.dispatcher.csi.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -115,7 +115,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals(listOf('A'.code, 'B'.code), h.printable.asciiBytes) },
                 { assertNoCommandDispatch(h) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
     }
@@ -125,7 +125,6 @@ internal class AnsiIntegrationHarnessTest {
     @Nested
     @DisplayName("ESC sequences")
     inner class EscSequences {
-
         @Test
         fun `plain ESC final dispatches through full matrix and action engine`() {
             val h = AnsiHarness()
@@ -136,7 +135,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals('c'.code, esc.finalByte) },
                 { assertEquals(0, esc.intermediateCount) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -151,7 +150,7 @@ internal class AnsiIntegrationHarnessTest {
                 { assertEquals('8'.code, esc.finalByte) },
                 { assertEquals('#'.code, esc.intermediates) },
                 { assertEquals(1, esc.intermediateCount) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -162,9 +161,16 @@ internal class AnsiIntegrationHarnessTest {
             h.acceptAscii("\u001B\\")
 
             assertAll(
-                { assertEquals('\\'.code, h.dispatcher.esc.single().finalByte) },
+                {
+                    assertEquals(
+                        '\\'.code,
+                        h.dispatcher.esc
+                            .single()
+                            .finalByte,
+                    )
+                },
                 { assertTrue(h.sink.events.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -178,7 +184,7 @@ internal class AnsiIntegrationHarnessTest {
                 { assertTrue(h.dispatcher.esc.isEmpty()) },
                 { assertEquals(listOf('X'.code), h.printable.asciiBytes) },
                 { assertTrue(h.printable.utf8Bytes.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
     }
@@ -188,7 +194,6 @@ internal class AnsiIntegrationHarnessTest {
     @Nested
     @DisplayName("CSI sequences")
     inner class CsiSequences {
-
         @Test
         fun `CSI params dispatch through full matrix and action engine`() {
             val h = AnsiHarness()
@@ -199,7 +204,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals('H'.code, csi.finalByte) },
                 { assertEquals(listOf(12, 34), csi.params) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -214,7 +219,7 @@ internal class AnsiIntegrationHarnessTest {
                 { assertEquals('h'.code, csi.finalByte) },
                 { assertEquals('?'.code, csi.privateMarker) },
                 { assertEquals(listOf(25), csi.params) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -228,7 +233,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals('H'.code, csi.finalByte) },
                 { assertEquals(listOf(-1, 2, -1), csi.params) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -243,7 +248,7 @@ internal class AnsiIntegrationHarnessTest {
                 { assertEquals('m'.code, csi.finalByte) },
                 { assertEquals(listOf(38, 2, 1, 2, 3), csi.params) },
                 { assertEquals(0b11110, csi.subParameterMask) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -259,7 +264,7 @@ internal class AnsiIntegrationHarnessTest {
                 { assertEquals(listOf(1), csi.params) },
                 { assertEquals('$'.code, csi.intermediates) },
                 { assertEquals(1, csi.intermediateCount) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -274,7 +279,7 @@ internal class AnsiIntegrationHarnessTest {
                 { assertEquals(listOf(0x07).map { RecordingCommandDispatcher.C0(it) }, h.dispatcher.controls) },
                 { assertEquals('H'.code, csi.finalByte) },
                 { assertEquals(listOf(12), csi.params) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -288,7 +293,7 @@ internal class AnsiIntegrationHarnessTest {
                 { assertTrue(h.dispatcher.csi.isEmpty()) },
                 { assertEquals(listOf(0x18).map { RecordingCommandDispatcher.C0(it) }, h.dispatcher.controls) },
                 { assertEquals(listOf('X'.code), h.printable.asciiBytes) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -302,7 +307,7 @@ internal class AnsiIntegrationHarnessTest {
                 { assertTrue(h.dispatcher.csi.isEmpty()) },
                 { assertEquals(listOf(0x1A).map { RecordingCommandDispatcher.C0(it) }, h.dispatcher.controls) },
                 { assertEquals(listOf('X'.code), h.printable.asciiBytes) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -316,7 +321,7 @@ internal class AnsiIntegrationHarnessTest {
                 { assertTrue(h.dispatcher.csi.isEmpty()) },
                 { assertEquals(listOf('X'.code), h.printable.asciiBytes) },
                 { assertTrue(h.printable.utf8Bytes.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -330,7 +335,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals('H'.code, csi.finalByte) },
                 { assertEquals(listOf(12), csi.params) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -342,9 +347,16 @@ internal class AnsiIntegrationHarnessTest {
 
             assertAll(
                 { assertTrue(h.dispatcher.csi.isEmpty()) },
-                { assertEquals('c'.code, h.dispatcher.esc.single().finalByte) },
+                {
+                    assertEquals(
+                        'c'.code,
+                        h.dispatcher.esc
+                            .single()
+                            .finalByte,
+                    )
+                },
                 { assertEquals(listOf('X'.code), h.printable.asciiBytes) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -357,7 +369,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.dispatcher.csi.isEmpty()) },
                 { assertEquals(listOf('X'.code), h.printable.asciiBytes) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -370,7 +382,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.dispatcher.csi.isEmpty()) },
                 { assertEquals(listOf('X'.code), h.printable.asciiBytes) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
     }
@@ -380,7 +392,6 @@ internal class AnsiIntegrationHarnessTest {
     @Nested
     @DisplayName("OSC strings")
     inner class OscStrings {
-
         @Test
         fun `OSC terminates with BEL`() {
             val h = AnsiHarness()
@@ -389,7 +400,7 @@ internal class AnsiIntegrationHarnessTest {
 
             assertAll(
                 { assertEquals(listOf("setIconAndWindowTitle:title"), h.sink.events) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -402,7 +413,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals(listOf("setIconAndWindowTitle:title"), h.sink.events) },
                 { assertTrue(h.dispatcher.esc.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -415,7 +426,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.sink.events.isEmpty()) },
                 { assertTrue(h.dispatcher.controls.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -427,7 +438,7 @@ internal class AnsiIntegrationHarnessTest {
 
             assertAll(
                 { assertTrue(h.sink.events.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -440,7 +451,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.sink.events.isEmpty()) },
                 { assertTrue(h.dispatcher.esc.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -453,7 +464,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.sink.events.isEmpty()) },
                 { assertTrue(h.dispatcher.esc.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -466,7 +477,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.sink.events.isEmpty()) },
                 { assertTrue(h.dispatcher.esc.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -479,7 +490,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.sink.events.isEmpty()) },
                 { assertTrue(h.dispatcher.controls.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -491,7 +502,7 @@ internal class AnsiIntegrationHarnessTest {
 
             assertAll(
                 { assertTrue(h.sink.events.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -504,7 +515,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.sink.events.isEmpty()) },
                 { assertTrue(h.printable.utf8Bytes.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -516,7 +527,7 @@ internal class AnsiIntegrationHarnessTest {
 
             assertAll(
                 { assertTrue(h.sink.events.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -529,7 +540,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.sink.events.isEmpty()) },
                 { assertEquals(AnsiState.OSC_STRING, h.state.fsmState) },
-                { assertEquals(3, h.state.payloadLength) }
+                { assertEquals(3, h.state.payloadLength) },
             )
         }
 
@@ -542,7 +553,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.sink.events.isEmpty()) },
                 { assertTrue(h.dispatcher.controls.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
     }
@@ -552,7 +563,6 @@ internal class AnsiIntegrationHarnessTest {
     @Nested
     @DisplayName("DCS passthrough")
     inner class DcsPassthrough {
-
         @Test
         fun `DCS ST drops payload without ESC dispatch`() {
             val h = AnsiHarness()
@@ -562,7 +572,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.dispatcher.esc.isEmpty()) },
                 { assertEquals(0, h.state.payloadLength) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -575,7 +585,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.dispatcher.controls.isEmpty()) },
                 { assertEquals(AnsiState.DCS_ENTRY, h.state.fsmState) },
-                { assertEquals(0, h.state.payloadLength) }
+                { assertEquals(0, h.state.payloadLength) },
             )
         }
 
@@ -588,7 +598,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, h.state.fsmState) },
                 { assertPayloadBytes(h, listOf('q'.code)) },
-                { assertTrue(h.dispatcher.esc.isEmpty()) }
+                { assertTrue(h.dispatcher.esc.isEmpty()) },
             )
         }
 
@@ -601,7 +611,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, h.state.fsmState) },
                 { assertPayloadBytes(h, listOf('q'.code, 0x00)) },
-                { assertTrue(h.dispatcher.controls.isEmpty()) }
+                { assertTrue(h.dispatcher.controls.isEmpty()) },
             )
         }
 
@@ -614,7 +624,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, h.state.fsmState) },
                 { assertPayloadBytes(h, listOf('q'.code, 'A'.code)) },
-                { assertTrue(h.dispatcher.esc.isEmpty()) }
+                { assertTrue(h.dispatcher.esc.isEmpty()) },
             )
         }
 
@@ -627,7 +637,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, h.state.fsmState) },
                 { assertPayloadBytes(h, listOf('q'.code, 'A'.code)) },
-                { assertTrue(h.dispatcher.esc.isEmpty()) }
+                { assertTrue(h.dispatcher.esc.isEmpty()) },
             )
         }
 
@@ -639,7 +649,7 @@ internal class AnsiIntegrationHarnessTest {
 
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, h.state.fsmState) },
-                { assertPayloadBytes(h, listOf('q'.code, '\\'.code)) }
+                { assertPayloadBytes(h, listOf('q'.code, '\\'.code)) },
             )
         }
 
@@ -652,7 +662,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, h.state.fsmState) },
                 { assertPayloadBytes(h, listOf('q'.code, 0xE2)) },
-                { assertTrue(h.printable.utf8Bytes.isEmpty()) }
+                { assertTrue(h.printable.utf8Bytes.isEmpty()) },
             )
         }
 
@@ -665,7 +675,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertTrue(h.dispatcher.controls.isEmpty()) },
                 { assertEquals(0, h.state.payloadLength) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -677,7 +687,7 @@ internal class AnsiIntegrationHarnessTest {
 
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, h.state.fsmState) },
-                { assertPayloadBytes(h, listOf('q'.code, 'r'.code)) }
+                { assertPayloadBytes(h, listOf('q'.code, 'r'.code)) },
             )
         }
     }
@@ -687,7 +697,6 @@ internal class AnsiIntegrationHarnessTest {
     @Nested
     @DisplayName("ignored SOS PM APC strings")
     inner class IgnoredStrings {
-
         @Test
         fun `SOS PM and APC ignore payload until ST`() {
             for (intro in listOf('X', '^', '_')) {
@@ -699,7 +708,7 @@ internal class AnsiIntegrationHarnessTest {
                     "intro=$intro",
                     { assertNoCommandDispatch(h) },
                     { assertEquals(listOf('Z'.code), h.printable.asciiBytes) },
-                    { assertGround(h) }
+                    { assertGround(h) },
                 )
             }
         }
@@ -708,13 +717,25 @@ internal class AnsiIntegrationHarnessTest {
         fun `ignored strings ignore C0 DEL and non-ASCII payload`() {
             val h = AnsiHarness()
 
-            h.accept(byteArrayOf(0x1B, 'X'.code.toByte(), 'a'.code.toByte(), 0x07, 0x7F, 0xE2.toByte(), 0x1B, '\\'.code.toByte(), 'Z'.code.toByte()))
+            h.accept(
+                byteArrayOf(
+                    0x1B,
+                    'X'.code.toByte(),
+                    'a'.code.toByte(),
+                    0x07,
+                    0x7F,
+                    0xE2.toByte(),
+                    0x1B,
+                    '\\'.code.toByte(),
+                    'Z'.code.toByte(),
+                ),
+            )
 
             assertAll(
                 { assertTrue(h.dispatcher.controls.isEmpty()) },
                 { assertTrue(h.printable.utf8Bytes.isEmpty()) },
                 { assertEquals(listOf('Z'.code), h.printable.asciiBytes) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -727,7 +748,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertNoCommandDispatch(h) },
                 { assertEquals(listOf('Z'.code), h.printable.asciiBytes) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -740,7 +761,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertNoCommandDispatch(h) },
                 { assertEquals(listOf('Z'.code), h.printable.asciiBytes) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
     }
@@ -750,7 +771,6 @@ internal class AnsiIntegrationHarnessTest {
     @Nested
     @DisplayName("split and mixed workloads")
     inner class SplitAndMixedWorkloads {
-
         @Test
         fun `CSI sequence can be split across accept calls`() {
             val h = AnsiHarness()
@@ -764,7 +784,7 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals('H'.code, csi.finalByte) },
                 { assertEquals(listOf(12, 34), csi.params) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -779,7 +799,7 @@ internal class AnsiIntegrationHarnessTest {
 
             assertAll(
                 { assertEquals(listOf("setIconAndWindowTitle:title"), h.sink.events) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -792,10 +812,17 @@ internal class AnsiIntegrationHarnessTest {
             assertAll(
                 { assertEquals(listOf('a'.code, 'b'.code, 'c'.code, 'd'.code), h.printable.asciiBytes) },
                 { assertEquals(1, h.dispatcher.csi.size) },
-                { assertEquals(listOf(31), h.dispatcher.csi.single().params) },
+                {
+                    assertEquals(
+                        listOf(31),
+                        h.dispatcher.csi
+                            .single()
+                            .params,
+                    )
+                },
                 { assertEquals(listOf("setIconAndWindowTitle:t"), h.sink.events) },
                 { assertTrue(h.dispatcher.esc.isEmpty()) },
-                { assertGround(h) }
+                { assertGround(h) },
             )
         }
 
@@ -809,8 +836,15 @@ internal class AnsiIntegrationHarnessTest {
             h.acceptAscii("H")
 
             assertAll(
-                { assertEquals(listOf(12), h.dispatcher.csi.single().params) },
-                { assertGround(h) }
+                {
+                    assertEquals(
+                        listOf(12),
+                        h.dispatcher.csi
+                            .single()
+                            .params,
+                    )
+                },
+                { assertGround(h) },
             )
         }
     }

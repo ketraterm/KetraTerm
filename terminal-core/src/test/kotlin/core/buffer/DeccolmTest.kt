@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.TerminalBuffers
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class DeccolmTest {
-
     private fun stateOf(api: TerminalBufferApi): TerminalState {
         val componentsField = api.javaClass.getDeclaredField("components")
         componentsField.isAccessible = true
@@ -67,7 +65,7 @@ class DeccolmTest {
 
         assertAll(
             { assertEquals(blankScreen(2), buffer.getScreenAsString()) },
-            { assertEquals(0, buffer.historySize) }
+            { assertEquals(0, buffer.historySize) },
         )
     }
 
@@ -80,7 +78,7 @@ class DeccolmTest {
 
         assertAll(
             { assertEquals(0, buffer.cursorCol) },
-            { assertEquals(0, buffer.cursorRow) }
+            { assertEquals(0, buffer.cursorRow) },
         )
     }
 
@@ -95,7 +93,7 @@ class DeccolmTest {
 
         assertAll(
             { assertEquals(0, buffer.cursorCol) },
-            { assertEquals(0, buffer.cursorRow) }
+            { assertEquals(0, buffer.cursorRow) },
         )
     }
 
@@ -109,7 +107,7 @@ class DeccolmTest {
 
         assertAll(
             { assertEquals(0, state.activeBuffer.scrollTop) },
-            { assertEquals(4, state.activeBuffer.scrollBottom) }
+            { assertEquals(4, state.activeBuffer.scrollBottom) },
         )
     }
 
@@ -124,7 +122,7 @@ class DeccolmTest {
 
         assertAll(
             { assertEquals(0, state.activeBuffer.leftMargin) },
-            { assertEquals(131, state.activeBuffer.rightMargin) }
+            { assertEquals(131, state.activeBuffer.rightMargin) },
         )
     }
 
@@ -138,7 +136,7 @@ class DeccolmTest {
         assertAll(
             { assertFalse(state.modes.isLeftRightMarginMode) },
             { assertEquals(0, state.activeBuffer.leftMargin) },
-            { assertEquals(131, state.activeBuffer.rightMargin) }
+            { assertEquals(131, state.activeBuffer.rightMargin) },
         )
     }
 
@@ -153,7 +151,7 @@ class DeccolmTest {
 
         assertAll(
             { assertEquals(8, state.tabStops.getNextStop(0)) },
-            { assertEquals(16, state.tabStops.getNextStop(8)) }
+            { assertEquals(16, state.tabStops.getNextStop(8)) },
         )
     }
 
@@ -185,7 +183,7 @@ class DeccolmTest {
             { assertEquals(120, state.savedCursor.col) },
             { assertEquals(3, state.savedCursor.row) },
             { assertTrue(state.savedCursor.pendingWrap) },
-            { assertTrue(state.savedCursor.isOriginMode) }
+            { assertTrue(state.savedCursor.isOriginMode) },
         )
     }
 
@@ -220,7 +218,7 @@ class DeccolmTest {
             { assertEquals(17, state.altBuffer.savedCursor.col) },
             { assertEquals(1, state.altBuffer.savedCursor.row) },
             { assertFalse(state.altBuffer.savedCursor.pendingWrap) },
-            { assertFalse(state.altBuffer.savedCursor.isOriginMode) }
+            { assertFalse(state.altBuffer.savedCursor.isOriginMode) },
         )
     }
 
@@ -239,7 +237,7 @@ class DeccolmTest {
             { assertTrue(state.isAltScreenActive) },
             { assertEquals(blankScreen(3), buffer.getScreenAsString()) },
             { assertEquals('P'.code, state.primaryBuffer.ring[primaryTop].getCodepoint(0)) },
-            { assertEquals(132, buffer.width) }
+            { assertEquals(132, buffer.width) },
         )
     }
 
@@ -257,7 +255,7 @@ class DeccolmTest {
         assertAll(
             { assertEquals(80, buffer.width) },
             { assertEquals("A".repeat(80), buffer.getLineAsString(0)) },
-            { assertEquals("A".repeat(10), buffer.getLineAsString(1)) }
+            { assertEquals("A".repeat(10), buffer.getLineAsString(1)) },
         )
     }
 
@@ -273,7 +271,7 @@ class DeccolmTest {
             { assertEquals(80, buffer.width) },
             { assertEquals(10, buffer.cursorCol) },
             { assertEquals(2, buffer.cursorRow) },
-            { assertEquals(79, state.activeBuffer.rightMargin) }
+            { assertEquals(79, state.activeBuffer.rightMargin) },
         )
     }
 
@@ -288,7 +286,7 @@ class DeccolmTest {
         assertAll(
             { assertEquals('B'.code, buffer.getCodepointAt(0, 1)) },
             { assertEquals(1, buffer.cursorCol) },
-            { assertEquals(1, buffer.cursorRow) }
+            { assertEquals(1, buffer.cursorRow) },
         )
     }
 
@@ -308,7 +306,7 @@ class DeccolmTest {
         assertAll(
             { assertEquals('B'.code, buffer.getCodepointAt(0, 1)) },
             { assertEquals(0, buffer.getCodepointAt(0, 2)) },
-            { assertEquals(2, buffer.cursorRow) }
+            { assertEquals(2, buffer.cursorRow) },
         )
     }
 }

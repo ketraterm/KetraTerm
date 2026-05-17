@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.cache
 
 import com.gagik.terminal.render.api.*
@@ -225,40 +224,41 @@ class TerminalRenderCache(
      * [clusterSinkRow] is set immediately before [TerminalRenderFrame.copyLine]
      * and reset immediately after it. This object must not escape this cache.
      */
-    private val reusableClusterDataSink = TerminalRenderClusterDataSink { column, codepoints, offset, length ->
-        val row = clusterSinkRow
-        val copiedRefs = clusterSinkRefs
-        check(row != NO_CLUSTER_SINK_ROW) {
-            "TerminalRenderClusterDataSink invoked outside copyLine"
-        }
-        check(row in 0 until this@TerminalRenderCache.rows) {
-            "Cluster sink row out of bounds: row=$row, rows=${this@TerminalRenderCache.rows}"
-        }
-        check(column in 0 until this@TerminalRenderCache.columns) {
-            "Cluster sink column out of bounds: column=$column, columns=${this@TerminalRenderCache.columns}"
-        }
+    private val reusableClusterDataSink =
+        TerminalRenderClusterDataSink { column, codepoints, offset, length ->
+            val row = clusterSinkRow
+            val copiedRefs = clusterSinkRefs
+            check(row != NO_CLUSTER_SINK_ROW) {
+                "TerminalRenderClusterDataSink invoked outside copyLine"
+            }
+            check(row in 0 until this@TerminalRenderCache.rows) {
+                "Cluster sink row out of bounds: row=$row, rows=${this@TerminalRenderCache.rows}"
+            }
+            check(column in 0 until this@TerminalRenderCache.columns) {
+                "Cluster sink column out of bounds: column=$column, columns=${this@TerminalRenderCache.columns}"
+            }
 
-        copiedRefs[rowOffset(row) + column] = appendNextCluster(codepoints, offset, length)
-    }
+            copiedRefs[rowOffset(row) + column] = appendNextCluster(codepoints, offset, length)
+        }
 
     /**
      * Reused sink to copy cursor primitives without allocating a cursor object.
      */
-    private val reusableCursorSink = TerminalRenderCursorSink { column, row, visible, blinking, shape, generation ->
-        nextCursorColumn = column
-        nextCursorRow = row
-        nextCursorVisible = visible
-        nextCursorBlinking = blinking
-        nextCursorShape = shape
-        nextCursorGeneration = generation
-    }
+    private val reusableCursorSink =
+        TerminalRenderCursorSink { column, row, visible, blinking, shape, generation ->
+            nextCursorColumn = column
+            nextCursorRow = row
+            nextCursorVisible = visible
+            nextCursorBlinking = blinking
+            nextCursorShape = shape
+            nextCursorGeneration = generation
+        }
 
     init {
         require(columns > 0) { "columns must be > 0, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
         resizeStorage(columns, rows)
     }
-
 
     /**
      * Copies changed rows and cursor state from [reader].
@@ -285,7 +285,10 @@ class TerminalRenderCache(
      * @param reader source of the short-lived render frame.
      * @param scrollbackOffset requested lines above the live bottom viewport.
      */
-    fun updateFrom(reader: TerminalRenderFrameReader, scrollbackOffset: Int) {
+    fun updateFrom(
+        reader: TerminalRenderFrameReader,
+        scrollbackOffset: Int,
+    ) {
         updateFrom(reader, scrollbackOffset, viewportRows = 0)
     }
 
@@ -302,7 +305,11 @@ class TerminalRenderCache(
      * @param scrollbackOffset requested lines above the live bottom viewport.
      * @param viewportRows requested render rows, or zero for the reader default.
      */
-    fun updateFrom(reader: TerminalRenderFrameReader, scrollbackOffset: Int, viewportRows: Int) {
+    fun updateFrom(
+        reader: TerminalRenderFrameReader,
+        scrollbackOffset: Int,
+        viewportRows: Int,
+    ) {
         if (viewportRows > 0) {
             reader.readRenderFrame(scrollbackOffset, viewportRows, this)
         } else {
@@ -384,7 +391,10 @@ class TerminalRenderCache(
         discardedCount = frame.discardedCount
     }
 
-    private fun resizeStorage(newColumns: Int, newRows: Int) {
+    private fun resizeStorage(
+        newColumns: Int,
+        newRows: Int,
+    ) {
         require(newColumns > 0) { "columns must be > 0, was $newColumns" }
         require(newRows > 0) { "rows must be > 0, was $newRows" }
 
@@ -494,7 +504,11 @@ class TerminalRenderCache(
         }
     }
 
-    private fun appendNextCluster(codepoints: IntArray, offset: Int, length: Int): Long {
+    private fun appendNextCluster(
+        codepoints: IntArray,
+        offset: Int,
+        length: Int,
+    ): Long {
         require(length > 0) { "cluster length must be > 0, was $length" }
         require(offset >= 0) { "cluster offset must be >= 0, was $offset" }
 
@@ -535,7 +549,10 @@ class TerminalRenderCache(
      * Rendering should consume [clusterRefs] and [clusterCodepoints] directly so
      * repeated paint passes do not allocate strings for cache hits.
      */
-    fun clusterText(row: Int, column: Int): String? {
+    fun clusterText(
+        row: Int,
+        column: Int,
+    ): String? {
         val ref = clusterRefs[rowOffset(row) + column]
         if (ref == NO_CLUSTER_REF) return null
         return String(clusterCodepoints, clusterOffset(ref), clusterLength(ref))
@@ -568,9 +585,9 @@ class TerminalRenderCache(
 
         private val EMPTY_LONG_REFS = LongArray(0)
 
-        private fun packClusterRef(offset: Int, length: Int): Long {
-            return (offset.toLong() shl 32) or (length.toLong() and 0xFFFF_FFFFL)
-        }
-
+        private fun packClusterRef(
+            offset: Int,
+            length: Int,
+        ): Long = (offset.toLong() shl 32) or (length.toLong() and 0xFFFF_FFFFL)
     }
 }

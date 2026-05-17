@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer.impl
 
 import com.gagik.core.TerminalBuffers
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalWriterImplContractTest {
-
     @Test
     fun `clearAll_resetsTabStopsToDefault`() {
         val buffer = TerminalBuffers.create(width = 12, height = 2)
@@ -42,7 +40,7 @@ class TerminalWriterImplContractTest {
             { assertFalse(buffer.getLine(0).isCluster(0), "Core writeText must stay scalar-only until parser segmentation exists") },
             { assertEquals('e'.code, buffer.getCodepointAt(0, 0)) },
             { assertEquals(0x0301, buffer.getCodepointAt(1, 0)) },
-            { assertEquals(2, buffer.cursorCol) }
+            { assertEquals(2, buffer.cursorCol) },
         )
     }
 
@@ -59,7 +57,7 @@ class TerminalWriterImplContractTest {
             { assertEquals('B'.code, buffer.getCodepointAt(3, 0)) },
             { assertEquals(0, buffer.getCodepointAt(0, 1)) },
             { assertEquals(3, buffer.cursorCol) },
-            { assertEquals(0, buffer.cursorRow) }
+            { assertEquals(0, buffer.cursorRow) },
         )
     }
 }

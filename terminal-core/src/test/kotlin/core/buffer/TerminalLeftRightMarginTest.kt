@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.TerminalBuffers
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalLeftRightMarginTest {
-
     private fun stateOf(api: TerminalBufferApi): TerminalState {
         val componentsField = api.javaClass.getDeclaredField("components")
         componentsField.isAccessible = true
@@ -43,7 +41,7 @@ class TerminalLeftRightMarginTest {
 
         assertAll(
             { assertEquals(0, buffer.cursorCol) },
-            { assertEquals(0, buffer.cursorRow) }
+            { assertEquals(0, buffer.cursorRow) },
         )
     }
 
@@ -62,7 +60,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(0, buffer.cursorCol) },
             { assertEquals(0, buffer.cursorRow) },
             { assertEquals(0, state.activeBuffer.leftMargin) },
-            { assertEquals(7, state.activeBuffer.rightMargin) }
+            { assertEquals(7, state.activeBuffer.rightMargin) },
         )
     }
 
@@ -79,7 +77,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(0, state.activeBuffer.leftMargin) },
             { assertEquals(7, state.activeBuffer.rightMargin) },
             { assertEquals(4, buffer.cursorCol) },
-            { assertEquals(1, buffer.cursorRow) }
+            { assertEquals(1, buffer.cursorRow) },
         )
     }
 
@@ -97,7 +95,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(2, state.activeBuffer.leftMargin) },
             { assertEquals(5, state.activeBuffer.rightMargin) },
             { assertEquals(4, buffer.cursorCol) },
-            { assertEquals(1, buffer.cursorRow) }
+            { assertEquals(1, buffer.cursorRow) },
         )
     }
 
@@ -111,7 +109,7 @@ class TerminalLeftRightMarginTest {
 
         assertAll(
             { assertEquals(2, buffer.cursorCol) },
-            { assertEquals(0, buffer.cursorRow) }
+            { assertEquals(0, buffer.cursorRow) },
         )
     }
 
@@ -129,7 +127,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals('C'.code, buffer.getCodepointAt(4, 0)) },
             { assertEquals('D'.code, buffer.getCodepointAt(2, 1)) },
             { assertEquals(3, buffer.cursorCol) },
-            { assertEquals(1, buffer.cursorRow) }
+            { assertEquals(1, buffer.cursorRow) },
         )
     }
 
@@ -147,7 +145,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals('B'.code, buffer.getCodepointAt(3, 0)) },
             { assertEquals('D'.code, buffer.getCodepointAt(4, 0)) },
             { assertEquals(4, buffer.cursorCol) },
-            { assertEquals(0, buffer.cursorRow) }
+            { assertEquals(0, buffer.cursorRow) },
         )
     }
 
@@ -170,7 +168,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(0, buffer.getCodepointAt(4, 0)) },
             { assertEquals('B'.code, buffer.getCodepointAt(5, 0)) },
             { assertEquals('X'.code, buffer.getCodepointAt(6, 0)) },
-            { assertEquals('Y'.code, buffer.getCodepointAt(7, 0)) }
+            { assertEquals('Y'.code, buffer.getCodepointAt(7, 0)) },
         )
     }
 
@@ -193,7 +191,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(0, buffer.getCodepointAt(4, 0)) },
             { assertEquals(0, buffer.getCodepointAt(5, 0)) },
             { assertEquals('X'.code, buffer.getCodepointAt(6, 0)) },
-            { assertEquals('Y'.code, buffer.getCodepointAt(7, 0)) }
+            { assertEquals('Y'.code, buffer.getCodepointAt(7, 0)) },
         )
     }
 
@@ -241,7 +239,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals('d'.code, buffer.getCodepointAt(2, 2)) },
             { assertEquals('e'.code, buffer.getCodepointAt(3, 2)) },
             { assertEquals('f'.code, buffer.getCodepointAt(4, 2)) },
-            { assertEquals('.'.code, buffer.getCodepointAt(7, 2)) }
+            { assertEquals('.'.code, buffer.getCodepointAt(7, 2)) },
         )
     }
 
@@ -289,7 +287,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(0, buffer.getCodepointAt(2, 2)) },
             { assertEquals(0, buffer.getCodepointAt(3, 2)) },
             { assertEquals(0, buffer.getCodepointAt(4, 2)) },
-            { assertEquals('.'.code, buffer.getCodepointAt(7, 2)) }
+            { assertEquals('.'.code, buffer.getCodepointAt(7, 2)) },
         )
     }
 
@@ -304,7 +302,7 @@ class TerminalLeftRightMarginTest {
 
         assertAll(
             { assertEquals(2, buffer.cursorCol) },
-            { assertEquals(1, buffer.cursorRow) }
+            { assertEquals(1, buffer.cursorRow) },
         )
     }
 
@@ -331,7 +329,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(0, buffer.getCodepointAt(3, 0)) },
             { assertEquals(0, buffer.getCodepointAt(4, 0)) },
             { assertEquals(0, buffer.getCodepointAt(5, 0)) },
-            { assertEquals('R'.code, buffer.getCodepointAt(7, 0)) }
+            { assertEquals('R'.code, buffer.getCodepointAt(7, 0)) },
         )
 
         state.activeBuffer.ring[state.resolveRingIndex(0)].setCell(2, 'a'.code, 0)
@@ -347,7 +345,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(0, buffer.getCodepointAt(3, 0)) },
             { assertEquals(0, buffer.getCodepointAt(4, 0)) },
             { assertEquals('d'.code, buffer.getCodepointAt(5, 0)) },
-            { assertEquals('R'.code, buffer.getCodepointAt(7, 0)) }
+            { assertEquals('R'.code, buffer.getCodepointAt(7, 0)) },
         )
 
         state.activeBuffer.ring[state.resolveRingIndex(0)].setCell(2, 'a'.code, 0)
@@ -362,7 +360,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(0, buffer.getCodepointAt(3, 0)) },
             { assertEquals(0, buffer.getCodepointAt(4, 0)) },
             { assertEquals(0, buffer.getCodepointAt(5, 0)) },
-            { assertEquals('R'.code, buffer.getCodepointAt(7, 0)) }
+            { assertEquals('R'.code, buffer.getCodepointAt(7, 0)) },
         )
     }
 
@@ -389,7 +387,7 @@ class TerminalLeftRightMarginTest {
         buffer.positionCursor(99, 2)
         assertAll(
             { assertEquals(5, buffer.cursorCol) },
-            { assertEquals(2, buffer.cursorRow) }
+            { assertEquals(2, buffer.cursorRow) },
         )
     }
 
@@ -405,7 +403,7 @@ class TerminalLeftRightMarginTest {
 
         assertAll(
             { assertEquals(3, buffer.cursorCol) },
-            { assertEquals(2, buffer.cursorRow) }
+            { assertEquals(2, buffer.cursorRow) },
         )
     }
 
@@ -429,7 +427,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals('T'.code, buffer.getCodepointAt(0, 0)) },
             { assertEquals('B'.code, buffer.getCodepointAt(0, 1)) },
             { assertEquals(0, buffer.getCodepointAt(0, 2)) },
-            { assertEquals('Z'.code, buffer.getCodepointAt(0, 3)) }
+            { assertEquals('Z'.code, buffer.getCodepointAt(0, 3)) },
         )
     }
 
@@ -448,7 +446,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(0, state.primaryBuffer.leftMargin) },
             { assertEquals(9, state.primaryBuffer.rightMargin) },
             { assertEquals(0, state.altBuffer.leftMargin) },
-            { assertEquals(9, state.altBuffer.rightMargin) }
+            { assertEquals(9, state.altBuffer.rightMargin) },
         )
     }
 
@@ -463,7 +461,7 @@ class TerminalLeftRightMarginTest {
 
         assertAll(
             { assertEquals(0, state.altBuffer.leftMargin) },
-            { assertEquals(7, state.altBuffer.rightMargin) }
+            { assertEquals(7, state.altBuffer.rightMargin) },
         )
 
         buffer.setLeftRightMargins(2, 5)
@@ -473,7 +471,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(2, state.primaryBuffer.leftMargin) },
             { assertEquals(5, state.primaryBuffer.rightMargin) },
             { assertEquals(1, state.altBuffer.leftMargin) },
-            { assertEquals(4, state.altBuffer.rightMargin) }
+            { assertEquals(4, state.altBuffer.rightMargin) },
         )
 
         buffer.enterAltBuffer()
@@ -482,7 +480,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(0, state.altBuffer.leftMargin) },
             { assertEquals(7, state.altBuffer.rightMargin) },
             { assertEquals(2, state.primaryBuffer.leftMargin) },
-            { assertEquals(5, state.primaryBuffer.rightMargin) }
+            { assertEquals(5, state.primaryBuffer.rightMargin) },
         )
     }
 
@@ -501,7 +499,7 @@ class TerminalLeftRightMarginTest {
         assertAll(
             { assertEquals(4, buffer.cursorCol) },
             { assertEquals(0, buffer.cursorRow) },
-            { assertTrue(state.cursor.pendingWrap) }
+            { assertTrue(state.cursor.pendingWrap) },
         )
     }
 
@@ -521,7 +519,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals(5, buffer.cursorCol) },
             { assertEquals(1, buffer.cursorRow) },
             { assertEquals('X'.code, buffer.getCodepointAt(5, 1)) },
-            { assertTrue(state.cursor.pendingWrap) }
+            { assertTrue(state.cursor.pendingWrap) },
         )
     }
 
@@ -547,7 +545,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals('a'.code, buffer.getCodepointAt(2, 0)) },
             { assertEquals('b'.code, buffer.getCodepointAt(3, 0)) },
             { assertEquals('c'.code, buffer.getCodepointAt(4, 0)) },
-            { assertEquals('R'.code, buffer.getCodepointAt(7, 0)) }
+            { assertEquals('R'.code, buffer.getCodepointAt(7, 0)) },
         )
     }
 
@@ -573,7 +571,7 @@ class TerminalLeftRightMarginTest {
             { assertEquals('a'.code, buffer.getCodepointAt(2, 0)) },
             { assertEquals('b'.code, buffer.getCodepointAt(3, 0)) },
             { assertEquals('c'.code, buffer.getCodepointAt(4, 0)) },
-            { assertEquals('R'.code, buffer.getCodepointAt(7, 0)) }
+            { assertEquals('R'.code, buffer.getCodepointAt(7, 0)) },
         )
     }
 }

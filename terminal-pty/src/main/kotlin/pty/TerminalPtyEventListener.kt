@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.pty
 
 import com.gagik.terminal.session.TerminalSession
@@ -38,7 +37,10 @@ interface TerminalPtyEventListener {
      * @param session session that received the event.
      * @param title new icon title.
      */
-    fun iconTitleChanged(session: TerminalSession, title: String)
+    fun iconTitleChanged(
+        session: TerminalSession,
+        title: String,
+    )
 
     /**
      * Called after the OSC window title changes.
@@ -46,7 +48,10 @@ interface TerminalPtyEventListener {
      * @param session session that received the event.
      * @param title new window title.
      */
-    fun windowTitleChanged(session: TerminalSession, title: String)
+    fun windowTitleChanged(
+        session: TerminalSession,
+        title: String,
+    )
 
     /**
      * Called when another listener callback throws.
@@ -57,18 +62,34 @@ interface TerminalPtyEventListener {
      * @param session session whose listener callback failed.
      * @param exception exception thrown by another listener callback.
      */
-    fun listenerFailed(session: TerminalSession, exception: Exception)
+    fun listenerFailed(
+        session: TerminalSession,
+        exception: Exception,
+    )
 
     companion object {
         /**
          * Listener used when the host does not need PTY callbacks.
          */
         @JvmField
-        val NONE: TerminalPtyEventListener = object : TerminalPtyEventListener {
-            override fun bell(session: TerminalSession) = Unit
-            override fun iconTitleChanged(session: TerminalSession, title: String) = Unit
-            override fun windowTitleChanged(session: TerminalSession, title: String) = Unit
-            override fun listenerFailed(session: TerminalSession, exception: Exception) = Unit
-        }
+        val NONE: TerminalPtyEventListener =
+            object : TerminalPtyEventListener {
+                override fun bell(session: TerminalSession) = Unit
+
+                override fun iconTitleChanged(
+                    session: TerminalSession,
+                    title: String,
+                ) = Unit
+
+                override fun windowTitleChanged(
+                    session: TerminalSession,
+                    title: String,
+                ) = Unit
+
+                override fun listenerFailed(
+                    session: TerminalSession,
+                    exception: Exception,
+                ) = Unit
+            }
     }
 }

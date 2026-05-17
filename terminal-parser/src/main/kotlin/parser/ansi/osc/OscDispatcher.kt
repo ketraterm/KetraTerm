@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi.osc
 
 import com.gagik.parser.spi.TerminalCommandSink
@@ -67,7 +66,10 @@ internal object OscDispatcher {
         )
     }
 
-    private fun parseDecimal(payload: ByteArray, endExclusive: Int): Int? {
+    private fun parseDecimal(
+        payload: ByteArray,
+        endExclusive: Int,
+    ): Int? {
         var value = 0
         var i = 0
         while (i < endExclusive) {
@@ -119,7 +121,5 @@ internal object OscDispatcher {
         payload: ByteArray,
         startInclusive: Int,
         endExclusive: Int,
-    ): String {
-        return payload.decodeToString(startIndex = startInclusive, endIndex = endExclusive)
-    }
+    ): String = payload.decodeToString(startIndex = startInclusive, endIndex = endExclusive)
 }

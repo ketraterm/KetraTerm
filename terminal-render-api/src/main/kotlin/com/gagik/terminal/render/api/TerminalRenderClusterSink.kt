@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.api
 
 /**
@@ -31,7 +30,10 @@ fun interface TerminalRenderClusterSink {
      * @param column zero-based visual column of the cluster-leading cell.
      * @param text full Unicode grapheme cluster text.
      */
-    fun onCluster(column: Int, text: String)
+    fun onCluster(
+        column: Int,
+        text: String,
+    )
 }
 
 /**
@@ -51,5 +53,10 @@ fun interface TerminalRenderClusterDataSink {
      * @param offset first code point in [codepoints].
      * @param length number of code points in the cluster.
      */
-    fun onCluster(column: Int, codepoints: IntArray, offset: Int, length: Int)
+    fun onCluster(
+        column: Int,
+        codepoints: IntArray,
+        offset: Int,
+        length: Int,
+    )
 }

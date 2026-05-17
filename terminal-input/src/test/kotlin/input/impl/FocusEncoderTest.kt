@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import com.gagik.core.api.TerminalModeBits
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Test
 
 class FocusEncoderTest {
-
     @Test
     fun `focus disabled writes no bytes`() {
         assertBytes(ByteArray(0), TerminalFocusEvent(focused = true))
@@ -61,9 +59,7 @@ class FocusEncoderTest {
         assertArrayEquals(expected, output.bytes)
     }
 
-    private fun esc(textAfterEsc: String): ByteArray {
-        return byteArrayOf(0x1b) + textAfterEsc.encodeToByteArray()
-    }
+    private fun esc(textAfterEsc: String): ByteArray = byteArrayOf(0x1b) + textAfterEsc.encodeToByteArray()
 
     private class RecordingHostOutput : TerminalHostOutput {
         var bytes: ByteArray = ByteArray(0)

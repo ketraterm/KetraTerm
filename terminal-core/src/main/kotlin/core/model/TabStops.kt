@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.model
 
 /**
@@ -23,8 +22,9 @@ package com.gagik.core.model
  * Newly exposed columns inherit the default VT100 rule: a stop every 8 cells
  * starting at column 0.
  */
-internal class TabStops(private var width: Int) {
-
+internal class TabStops(
+    private var width: Int,
+) {
     /** `true` at index `i` means a tab stop exists at column `i`. */
     private var stops = BooleanArray(width) { col -> col % 8 == 0 }
 
@@ -133,7 +133,10 @@ internal class TabStops(private var width: Int) {
      * @param leftBoundary The minimum column the cursor may land on.
      * @return The column index the cursor should jump to.
      */
-    fun getPreviousStop(currentCol: Int, leftBoundary: Int = 0): Int {
+    fun getPreviousStop(
+        currentCol: Int,
+        leftBoundary: Int = 0,
+    ): Int {
         if (currentCol <= leftBoundary) return leftBoundary
         for (i in currentCol - 1 downTo leftBoundary) {
             if (i in 0 until width && stops[i]) return i

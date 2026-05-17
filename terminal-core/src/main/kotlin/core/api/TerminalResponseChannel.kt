@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.api
 
 /**
@@ -28,11 +27,20 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
 
     fun clearResponseBytes()
 
-    fun requestDeviceStatusReport(mode: Int, decPrivate: Boolean)
+    fun requestDeviceStatusReport(
+        mode: Int,
+        decPrivate: Boolean,
+    )
 
-    fun requestDeviceAttributes(kind: Int, parameter: Int)
+    fun requestDeviceAttributes(
+        kind: Int,
+        parameter: Int,
+    )
 
-    fun setWindowSizePixels(width: Int, height: Int)
+    fun setWindowSizePixels(
+        width: Int,
+        height: Int,
+    )
 
     fun requestWindowReport(mode: Int)
 

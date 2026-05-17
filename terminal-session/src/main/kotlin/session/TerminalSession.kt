@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.session
 
 import com.gagik.core.api.TerminalBufferApi
@@ -58,7 +57,10 @@ class TerminalSession(
     private val parser: TerminalOutputParser,
     private val inputEncoder: TerminalInputEncoder,
     private val outboundWriteLock: Any = Any(),
-) : TerminalConnectorListener, TerminalInputEncoder, TerminalRenderFrameReader, AutoCloseable {
+) : TerminalConnectorListener,
+    TerminalInputEncoder,
+    TerminalRenderFrameReader,
+    AutoCloseable {
     private val localCloseRequested = AtomicBoolean(false)
     private val remoteClosed = AtomicBoolean(false)
     private val parserClosed = AtomicBoolean(false)
@@ -71,9 +73,10 @@ class TerminalSession(
     private val mutationLock = Any()
     private val responseScratch = ByteArray(RESPONSE_BUFFER_SIZE)
 
-    private val renderWorker = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "terminal-render-worker-${SESSION_COUNTER.getAndIncrement()}").apply { isDaemon = true }
-    }
+    private val renderWorker =
+        Executors.newSingleThreadExecutor { r ->
+            Thread(r, "terminal-render-worker-${SESSION_COUNTER.getAndIncrement()}").apply { isDaemon = true }
+        }
 
     /**
      * Optional callback invoked after a render frame is published.
@@ -103,7 +106,10 @@ class TerminalSession(
      * Starts the connector after resizing core and transport to [columns] x
      * [rows].
      */
-    fun start(columns: Int, rows: Int) {
+    fun start(
+        columns: Int,
+        rows: Int,
+    ) {
         require(columns > 0) { "columns must be positive, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
         check(started.compareAndSet(false, true)) { "session already started" }
@@ -118,7 +124,10 @@ class TerminalSession(
     /**
      * Resizes core, publisher, and the active connector.
      */
-    fun resize(columns: Int, rows: Int) {
+    fun resize(
+        columns: Int,
+        rows: Int,
+    ) {
         require(columns > 0) { "columns must be positive, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
 
@@ -188,7 +197,11 @@ class TerminalSession(
     /**
      * Consumes host bytes synchronously, mutating parser/core before returning.
      */
-    override fun onBytes(bytes: ByteArray, offset: Int, length: Int) {
+    override fun onBytes(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {
         require(offset >= 0) { "offset must be non-negative, got $offset" }
         require(length >= 0) { "length must be non-negative, got $length" }
         require(offset <= bytes.size) { "offset $offset exceeds size ${bytes.size}" }
@@ -234,13 +247,16 @@ class TerminalSession(
      * many rows when possible. This is UI composition state and must not resize
      * the terminal or connector.
      */
-    fun requestRender(scrollbackOffset: Int, viewportRows: Int) {
+    fun requestRender(
+        scrollbackOffset: Int,
+        viewportRows: Int,
+    ) {
         if (isClosed()) return
         pendingRenderRequest.set(
             packRenderRequest(
                 scrollbackOffset = scrollbackOffset.coerceAtLeast(0),
                 viewportRows = viewportRows.coerceAtLeast(0),
-            )
+            ),
         )
         pendingRenderGeneration.incrementAndGet()
         scheduleRenderDrain()
@@ -311,7 +327,10 @@ class TerminalSession(
         readRenderFrame(scrollbackOffset = 0, consumer = consumer)
     }
 
-    override fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
+    override fun readRenderFrame(
+        scrollbackOffset: Int,
+        consumer: TerminalRenderFrameConsumer,
+    ) {
         synchronized(mutationLock) {
             renderReader.readRenderFrame(scrollbackOffset, consumer)
         }
@@ -360,9 +379,10 @@ class TerminalSession(
 
     private fun drainResponses() {
         while (!isClosed()) {
-            val count = synchronized(mutationLock) {
-                responseReader.readResponseBytes(responseScratch, 0, responseScratch.size)
-            }
+            val count =
+                synchronized(mutationLock) {
+                    responseReader.readResponseBytes(responseScratch, 0, responseScratch.size)
+                }
 
             if (count <= 0) return
 
@@ -382,30 +402,25 @@ class TerminalSession(
         renderWorker.shutdown()
     }
 
-    private fun isClosed(): Boolean {
-        return localCloseRequested.get() || remoteClosed.get()
-    }
+    private fun isClosed(): Boolean = localCloseRequested.get() || remoteClosed.get()
 
-    private fun isAcceptingInput(): Boolean {
-        return started.get() && !isClosed()
-    }
+    private fun isAcceptingInput(): Boolean = started.get() && !isClosed()
 
     companion object {
-        private val SESSION_COUNTER = java.util.concurrent.atomic.AtomicInteger(1)
+        private val SESSION_COUNTER =
+            java.util.concurrent.atomic
+                .AtomicInteger(1)
         private const val RESPONSE_BUFFER_SIZE: Int = 1024
         private const val NO_RENDER_GENERATION: Long = -1L
 
-        private fun packRenderRequest(scrollbackOffset: Int, viewportRows: Int): Long {
-            return (scrollbackOffset.toLong() shl 32) or (viewportRows.toLong() and 0xffff_ffffL)
-        }
+        private fun packRenderRequest(
+            scrollbackOffset: Int,
+            viewportRows: Int,
+        ): Long = (scrollbackOffset.toLong() shl 32) or (viewportRows.toLong() and 0xffff_ffffL)
 
-        private fun unpackScrollbackOffset(request: Long): Int {
-            return (request ushr 32).toInt()
-        }
+        private fun unpackScrollbackOffset(request: Long): Int = (request ushr 32).toInt()
 
-        private fun unpackViewportRows(request: Long): Int {
-            return request.toInt()
-        }
+        private fun unpackViewportRows(request: Long): Int = request.toInt()
 
         /**
          * Creates a production session with the standard parser, integration
@@ -424,8 +439,9 @@ class TerminalSession(
             val sink = CoreTerminalCommandSink(terminal, hostEvents, hostPolicy)
             val parser = TerminalParsers.create(sink)
             val inputEncoder = DefaultTerminalInputEncoder(terminal, hostOutput, inputPolicy)
-            val renderReader = terminal as? TerminalRenderFrameReader
-                ?: error("terminal must implement TerminalRenderFrameReader")
+            val renderReader =
+                terminal as? TerminalRenderFrameReader
+                    ?: error("terminal must implement TerminalRenderFrameReader")
 
             // Create a publisher with initial dimensions
             val publisher = TerminalRenderPublisher(terminal.width, terminal.height)

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi.osc
 
 import com.gagik.parser.ansi.RecordingTerminalCommandSink
@@ -25,7 +24,6 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("OscDispatcher")
 class OscDispatcherTest {
-
     private fun dispatch(
         payload: String,
         overflowed: Boolean = false,
@@ -44,12 +42,11 @@ class OscDispatcherTest {
     @Nested
     @DisplayName("titles")
     inner class Titles {
-
         @Test
         fun `OSC 0 sets icon and window title`() {
             assertEquals(
                 listOf("setIconAndWindowTitle:hello"),
-                dispatch("0;hello").events
+                dispatch("0;hello").events,
             )
         }
 
@@ -57,7 +54,7 @@ class OscDispatcherTest {
         fun `OSC 1 sets icon title`() {
             assertEquals(
                 listOf("setIconTitle:icon"),
-                dispatch("1;icon").events
+                dispatch("1;icon").events,
             )
         }
 
@@ -65,7 +62,7 @@ class OscDispatcherTest {
         fun `OSC 2 sets window title`() {
             assertEquals(
                 listOf("setWindowTitle:window"),
-                dispatch("2;window").events
+                dispatch("2;window").events,
             )
         }
     }
@@ -73,12 +70,11 @@ class OscDispatcherTest {
     @Nested
     @DisplayName("hyperlinks")
     inner class Hyperlinks {
-
         @Test
         fun `OSC 8 with empty params starts hyperlink without id`() {
             assertEquals(
                 listOf("startHyperlink:https://example.com:null"),
-                dispatch("8;;https://example.com").events
+                dispatch("8;;https://example.com").events,
             )
         }
 
@@ -86,7 +82,7 @@ class OscDispatcherTest {
         fun `OSC 8 with id param starts hyperlink with id`() {
             assertEquals(
                 listOf("startHyperlink:https://example.com:abc"),
-                dispatch("8;id=abc;https://example.com").events
+                dispatch("8;id=abc;https://example.com").events,
             )
         }
 
@@ -99,7 +95,6 @@ class OscDispatcherTest {
     @Nested
     @DisplayName("ignored payloads")
     inner class IgnoredPayloads {
-
         @Test
         fun `malformed command is ignored`() {
             assertTrue(dispatch("x;hello").events.isEmpty())

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.viewport
 
 import kotlin.math.floor
@@ -81,7 +80,10 @@ internal class TerminalSwingScrollModel {
      *
      * @return true when the precise offset changed.
      */
-    fun scrollBy(deltaLines: Double, historySize: Int): Boolean {
+    fun scrollBy(
+        deltaLines: Double,
+        historySize: Int,
+    ): Boolean {
         if (deltaLines == 0.0) return false
 
         val nextPrecise = (preciseOffset + deltaLines).coerceIn(0.0, historySize.toDouble())
@@ -113,18 +115,20 @@ internal class TerminalSwingScrollModel {
         return if (needsOverscan) visibleRows + 1 else visibleRows
     }
 
-    private fun committed(offset: Double, historySize: Int): Int {
-        return floor(offset).toInt().coerceIn(0, historySize)
-    }
+    private fun committed(
+        offset: Double,
+        historySize: Int,
+    ): Int = floor(offset).toInt().coerceIn(0, historySize)
 
-    private fun renderOffset(offset: Double, historySize: Int): Int {
+    private fun renderOffset(
+        offset: Double,
+        historySize: Int,
+    ): Int {
         val committed = committed(offset, historySize)
         val offsetFraction = fractionalPart(offset)
         if (offsetFraction == 0.0) return committed
         return (committed + 1).coerceIn(0, historySize)
     }
 
-    private fun fractionalPart(offset: Double): Double {
-        return offset - floor(offset)
-    }
+    private fun fractionalPart(offset: Double): Double = offset - floor(offset)
 }

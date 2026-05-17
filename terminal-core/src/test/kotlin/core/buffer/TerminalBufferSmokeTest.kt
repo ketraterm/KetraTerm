@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.TerminalBuffers
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
 class TerminalBufferSmokeTest {
-
     @Test
     fun `factory exposes a working buffer api`() {
         val buffer = TerminalBuffers.create(4, 3, 2)
@@ -35,7 +33,7 @@ class TerminalBufferSmokeTest {
         assertAll(
             { assertEquals(2, buffer.width) },
             { assertEquals(2, buffer.height) },
-            { assertEquals(List(buffer.height) { "" }.joinToString("\n"), buffer.getScreenAsString()) }
+            { assertEquals(List(buffer.height) { "" }.joinToString("\n"), buffer.getScreenAsString()) },
         )
     }
 
@@ -45,4 +43,3 @@ class TerminalBufferSmokeTest {
         assertThrows<IllegalArgumentException> { TerminalBuffers.create(1, 0) }
     }
 }
-

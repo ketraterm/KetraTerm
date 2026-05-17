@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import com.gagik.core.api.TerminalModeBits
@@ -31,7 +30,6 @@ import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Test
 
 class KeyboardEncoderTest {
-
     @Test
     fun `encodes printable UTF-8 codepoints`() {
         assertBytes(bytes(0x61), TerminalKeyEvent.codepoint('a'.code))
@@ -68,10 +66,11 @@ class KeyboardEncoderTest {
         )
         assertBytes(
             expected = bytes(0x1b, 0x61),
-            event = TerminalKeyEvent.codepoint(
-                'a'.code,
-                TerminalModifiers.ALT or TerminalModifiers.META,
-            ),
+            event =
+                TerminalKeyEvent.codepoint(
+                    'a'.code,
+                    TerminalModifiers.ALT or TerminalModifiers.META,
+                ),
         )
     }
 
@@ -99,19 +98,22 @@ class KeyboardEncoderTest {
         assertBytes(
             expected = bytes(0xc3, 0xa9),
             event = TerminalKeyEvent.codepoint(0x00e9, TerminalModifiers.CTRL),
-            policy = TerminalInputPolicy(
-                unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
-            ),
+            policy =
+                TerminalInputPolicy(
+                    unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
+                ),
         )
         assertBytes(
             expected = bytes(0x1b, 0xc3, 0xa9),
-            event = TerminalKeyEvent.codepoint(
-                0x00e9,
-                TerminalModifiers.CTRL or TerminalModifiers.ALT,
-            ),
-            policy = TerminalInputPolicy(
-                unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
-            ),
+            event =
+                TerminalKeyEvent.codepoint(
+                    0x00e9,
+                    TerminalModifiers.CTRL or TerminalModifiers.ALT,
+                ),
+            policy =
+                TerminalInputPolicy(
+                    unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
+                ),
         )
     }
 
@@ -126,10 +128,11 @@ class KeyboardEncoderTest {
         )
         assertBytes(
             expected = esc("[27;4;97~"),
-            event = TerminalKeyEvent.codepoint(
-                'a'.code,
-                TerminalModifiers.SHIFT or TerminalModifiers.ALT,
-            ),
+            event =
+                TerminalKeyEvent.codepoint(
+                    'a'.code,
+                    TerminalModifiers.SHIFT or TerminalModifiers.ALT,
+                ),
             modeBits = bits,
         )
         assertBytes(
@@ -165,10 +168,11 @@ class KeyboardEncoderTest {
         )
         assertBytes(
             expected = esc("[27;4;97~"),
-            event = TerminalKeyEvent.codepoint(
-                'a'.code,
-                TerminalModifiers.SHIFT or TerminalModifiers.ALT,
-            ),
+            event =
+                TerminalKeyEvent.codepoint(
+                    'a'.code,
+                    TerminalModifiers.SHIFT or TerminalModifiers.ALT,
+                ),
             modeBits = bits,
         )
         assertBytes(
@@ -208,9 +212,10 @@ class KeyboardEncoderTest {
         assertBytes(
             expected = bytes(0x7f),
             event = TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL),
-            policy = TerminalInputPolicy(
-                unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
-            ),
+            policy =
+                TerminalInputPolicy(
+                    unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
+                ),
         )
         assertBytes(
             expected = bytes(),
@@ -228,9 +233,10 @@ class KeyboardEncoderTest {
         assertBytes(
             expected = bytes(0x0d),
             event = TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CTRL),
-            policy = TerminalInputPolicy(
-                unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
-            ),
+            policy =
+                TerminalInputPolicy(
+                    unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
+                ),
         )
     }
 
@@ -258,9 +264,10 @@ class KeyboardEncoderTest {
         assertBytes(
             expected = bytes(0x1b),
             event = TerminalKeyEvent.key(TerminalKey.ESCAPE, TerminalModifiers.SHIFT),
-            policy = TerminalInputPolicy(
-                unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
-            ),
+            policy =
+                TerminalInputPolicy(
+                    unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
+                ),
         )
     }
 
@@ -423,9 +430,10 @@ class KeyboardEncoderTest {
         assertBytes(
             expected = ascii("1"),
             event = TerminalKeyEvent.key(TerminalKey.NUMPAD_1, TerminalModifiers.CTRL),
-            policy = TerminalInputPolicy(
-                unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
-            ),
+            policy =
+                TerminalInputPolicy(
+                    unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
+                ),
         )
         assertBytes(
             expected = bytes(),
@@ -465,18 +473,15 @@ class KeyboardEncoderTest {
         assertArrayEquals(expected, output.bytes)
     }
 
-    private fun esc(textAfterEsc: String): ByteArray {
-        return bytes(0x1b) + ascii(textAfterEsc)
-    }
+    private fun esc(textAfterEsc: String): ByteArray = bytes(0x1b) + ascii(textAfterEsc)
 
-    private fun modifyOtherKeysBits(mode: Int): Long {
-        return TerminalModeBits.withPackedValue(
+    private fun modifyOtherKeysBits(mode: Int): Long =
+        TerminalModeBits.withPackedValue(
             bits = 0L,
             mask = TerminalModeBits.MODIFY_OTHER_KEYS_MASK,
             shift = TerminalModeBits.MODIFY_OTHER_KEYS_SHIFT,
             value = mode,
         )
-    }
 
     private fun ascii(text: String): ByteArray {
         val bytes = ByteArray(text.length)
@@ -526,7 +531,11 @@ class KeyboardEncoderTest {
     private class ReferenceRecordingHostOutput : RecordingHostOutput() {
         val writeBytesCalls: MutableList<ByteArray> = mutableListOf()
 
-        override fun writeBytes(bytes: ByteArray, offset: Int, length: Int) {
+        override fun writeBytes(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) {
             writeBytesCalls += bytes
             super.writeBytes(bytes, offset, length)
         }

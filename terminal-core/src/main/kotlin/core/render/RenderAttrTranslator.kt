@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.render
 
 import com.gagik.core.codec.AttributeCodec
@@ -29,7 +28,11 @@ import com.gagik.terminal.render.api.TerminalRenderUnderline
  * Translates core's private attribute packing into the stable public render ABI.
  */
 internal class RenderAttrTranslator {
-    fun toRenderAttrWord(primaryAttr: Long, extendedAttr: Long, reverseVideo: Boolean): Long {
+    fun toRenderAttrWord(
+        primaryAttr: Long,
+        extendedAttr: Long,
+        reverseVideo: Boolean,
+    ): Long {
         val foreground = AttributeCodec.foregroundColor(primaryAttr)
         val background = AttributeCodec.backgroundColor(primaryAttr)
         return TerminalRenderAttrs.pack(
@@ -57,18 +60,20 @@ internal class RenderAttrTranslator {
         )
     }
 
-    private fun AttributeColor.toRenderKind(): Int = when (kind) {
-        AttributeColorKind.DEFAULT -> TerminalRenderColorKind.DEFAULT
-        AttributeColorKind.INDEXED -> TerminalRenderColorKind.INDEXED
-        AttributeColorKind.RGB -> TerminalRenderColorKind.RGB
-    }
+    private fun AttributeColor.toRenderKind(): Int =
+        when (kind) {
+            AttributeColorKind.DEFAULT -> TerminalRenderColorKind.DEFAULT
+            AttributeColorKind.INDEXED -> TerminalRenderColorKind.INDEXED
+            AttributeColorKind.RGB -> TerminalRenderColorKind.RGB
+        }
 
-    private fun UnderlineStyle.toRenderUnderline(): Int = when (this) {
-        UnderlineStyle.NONE -> TerminalRenderUnderline.NONE
-        UnderlineStyle.SINGLE -> TerminalRenderUnderline.SINGLE
-        UnderlineStyle.DOUBLE -> TerminalRenderUnderline.DOUBLE
-        UnderlineStyle.CURLY -> TerminalRenderUnderline.CURLY
-        UnderlineStyle.DOTTED -> TerminalRenderUnderline.DOTTED
-        UnderlineStyle.DASHED -> TerminalRenderUnderline.DASHED
-    }
+    private fun UnderlineStyle.toRenderUnderline(): Int =
+        when (this) {
+            UnderlineStyle.NONE -> TerminalRenderUnderline.NONE
+            UnderlineStyle.SINGLE -> TerminalRenderUnderline.SINGLE
+            UnderlineStyle.DOUBLE -> TerminalRenderUnderline.DOUBLE
+            UnderlineStyle.CURLY -> TerminalRenderUnderline.CURLY
+            UnderlineStyle.DOTTED -> TerminalRenderUnderline.DOTTED
+            UnderlineStyle.DASHED -> TerminalRenderUnderline.DASHED
+        }
 }

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.api
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,10 +38,11 @@ class TerminalColorPaletteTest {
 
     @Test
     fun resolvesDefaultForegroundAndBackground() {
-        val palette = TerminalColorPalette(
-            defaultForeground = 0xFF010203.toInt(),
-            defaultBackground = 0xFF040506.toInt(),
-        )
+        val palette =
+            TerminalColorPalette(
+                defaultForeground = 0xFF010203.toInt(),
+                defaultBackground = 0xFF040506.toInt(),
+            )
 
         assertEquals(0xFF010203.toInt(), palette.foreground(TerminalRenderAttrs.DEFAULT))
         assertEquals(0xFF040506.toInt(), palette.background(TerminalRenderAttrs.DEFAULT))
@@ -52,11 +52,12 @@ class TerminalColorPaletteTest {
     fun boldForegroundUsesBrightAnsiColorWhenEnabled() {
         val colors = IntArray(256) { 0xFF000000.toInt() or it }
         val palette = TerminalColorPalette(indexedColors = colors, boldAsBright = true)
-        val attrs = TerminalRenderAttrs.pack(
-            foregroundKind = TerminalRenderColorKind.INDEXED,
-            foregroundValue = 2,
-            bold = true,
-        )
+        val attrs =
+            TerminalRenderAttrs.pack(
+                foregroundKind = TerminalRenderColorKind.INDEXED,
+                foregroundValue = 2,
+                bold = true,
+            )
 
         assertEquals(colors[10], palette.foreground(attrs))
     }
@@ -92,19 +93,21 @@ class TerminalColorPaletteTest {
     fun copyIndexedColorsIntoRejectsTooSmallDestination() {
         val palette = TerminalColorPalette()
 
-        val error = assertFailsWith<IllegalArgumentException> {
-            palette.copyIndexedColorsInto(IntArray(255))
-        }
+        val error =
+            assertFailsWith<IllegalArgumentException> {
+                palette.copyIndexedColorsInto(IntArray(255))
+            }
 
         assertTrue(error.message!!.contains("insufficient capacity"))
     }
 
     @Test
     fun inverseSwapsForegroundAndBackground() {
-        val palette = TerminalColorPalette(
-            defaultForeground = 0xFF111111.toInt(),
-            defaultBackground = 0xFF222222.toInt(),
-        )
+        val palette =
+            TerminalColorPalette(
+                defaultForeground = 0xFF111111.toInt(),
+                defaultBackground = 0xFF222222.toInt(),
+            )
         val attrs = TerminalRenderAttrs.pack(inverse = true)
 
         assertEquals(0xFF222222.toInt(), palette.foreground(attrs))

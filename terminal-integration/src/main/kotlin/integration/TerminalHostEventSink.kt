@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.integration
 
 /**
@@ -48,10 +47,13 @@ interface TerminalHostEventSink {
          * Event sink used when the host does not need metadata callbacks.
          */
         @JvmField
-        val NONE: TerminalHostEventSink = object : TerminalHostEventSink {
-            override fun bell() = Unit
-            override fun iconTitleChanged(title: String) = Unit
-            override fun windowTitleChanged(title: String) = Unit
-        }
+        val NONE: TerminalHostEventSink =
+            object : TerminalHostEventSink {
+                override fun bell() = Unit
+
+                override fun iconTitleChanged(title: String) = Unit
+
+                override fun windowTitleChanged(title: String) = Unit
+            }
     }
 }

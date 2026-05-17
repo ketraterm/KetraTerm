@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.api
 
 import org.junit.jupiter.api.Assertions.*
@@ -33,11 +32,12 @@ class TerminalRenderExtraAttrsTest {
 
     @Test
     fun `packed underline color and overline decode through public ABI`() {
-        val word = TerminalRenderExtraAttrs.pack(
-            underlineColorKind = TerminalRenderColorKind.RGB,
-            underlineColorValue = 0xAA_55_11,
-            overline = true,
-        )
+        val word =
+            TerminalRenderExtraAttrs.pack(
+                underlineColorKind = TerminalRenderColorKind.RGB,
+                underlineColorValue = 0xAA_55_11,
+                overline = true,
+            )
 
         assertAll(
             { assertEquals(TerminalRenderColorKind.RGB, TerminalRenderExtraAttrs.underlineColorKind(word)) },

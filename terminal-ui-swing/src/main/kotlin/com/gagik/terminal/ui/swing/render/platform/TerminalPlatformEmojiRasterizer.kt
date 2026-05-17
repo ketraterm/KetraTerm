@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.platform
 
 import java.awt.image.BufferedImage
@@ -31,7 +30,10 @@ internal interface TerminalPlatformEmojiRasterizer {
     /**
      * Rasterizes [text] into a transparent image no larger than [pixelSize].
      */
-    fun rasterize(text: String, pixelSize: Int): BufferedImage?
+    fun rasterize(
+        text: String,
+        pixelSize: Int,
+    ): BufferedImage?
 
     companion object {
         fun create(): TerminalPlatformEmojiRasterizer {
@@ -48,5 +50,8 @@ internal interface TerminalPlatformEmojiRasterizer {
 private object UnavailablePlatformEmojiRasterizer : TerminalPlatformEmojiRasterizer {
     override val available: Boolean = false
 
-    override fun rasterize(text: String, pixelSize: Int): BufferedImage? = null
+    override fun rasterize(
+        text: String,
+        pixelSize: Int,
+    ): BufferedImage? = null
 }

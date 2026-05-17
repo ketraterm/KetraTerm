@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import org.junit.jupiter.api.Assertions.*
@@ -23,11 +22,9 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("RecordingTerminalCommandSink")
 class RecordingTerminalCommandSinkTest {
-
     @Nested
     @DisplayName("terminal command recording")
     inner class TerminalCommandRecording {
-
         @Test
         fun `records terminal commands in call order`() {
             val sink = RecordingTerminalCommandSink()
@@ -170,9 +167,9 @@ class RecordingTerminalCommandSinkTest {
                     "setIconAndWindowTitle:both",
                     "startHyperlink:https://example.com:abc",
                     "startHyperlink:https://example.org:null",
-                    "endHyperlink"
+                    "endHyperlink",
                 ),
-                sink.events
+                sink.events,
             )
         }
 
@@ -181,7 +178,7 @@ class RecordingTerminalCommandSinkTest {
             val sink = RecordingTerminalCommandSink()
 
             assertAll(
-                { assertTrue(sink.events.isEmpty()) }
+                { assertTrue(sink.events.isEmpty()) },
             )
         }
     }

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.state
 
 import com.gagik.core.model.*
@@ -83,12 +82,14 @@ internal class TerminalState(
 
     // Physical screens.
 
-    val primaryBuffer = ScreenBuffer(initialWidth, initialHeight, maxHistory)
-        .apply { clearGrid(pen.currentAttr, pen.currentExtendedAttr, initialHeight) }
+    val primaryBuffer =
+        ScreenBuffer(initialWidth, initialHeight, maxHistory)
+            .apply { clearGrid(pen.currentAttr, pen.currentExtendedAttr, initialHeight) }
 
     /** Alternate buffer always has zero scrollback. */
-    val altBuffer = ScreenBuffer(initialWidth, initialHeight, maxHistory = 0)
-        .apply { clearGrid(pen.currentAttr, pen.currentExtendedAttr, initialHeight) }
+    val altBuffer =
+        ScreenBuffer(initialWidth, initialHeight, maxHistory = 0)
+            .apply { clearGrid(pen.currentAttr, pen.currentExtendedAttr, initialHeight) }
 
     // Hot-swap pointer.
 
@@ -156,17 +157,16 @@ internal class TerminalState(
     val historySize: Int
         get() = (activeBuffer.ring.size - dimensions.height).coerceAtLeast(0)
 
-    fun resolveRingIndex(viewportRow: Int): Int =
-        liveViewportTopIndex() + viewportRow
+    fun resolveRingIndex(viewportRow: Int): Int = liveViewportTopIndex() + viewportRow
 
-    fun clampScrollbackOffset(scrollbackOffset: Int): Int =
-        scrollbackOffset.coerceIn(0, historySize)
+    fun clampScrollbackOffset(scrollbackOffset: Int): Int = scrollbackOffset.coerceIn(0, historySize)
 
-    fun resolveScrollbackRingIndex(viewportRow: Int, scrollbackOffset: Int): Int =
-        liveViewportTopIndex() - clampScrollbackOffset(scrollbackOffset) + viewportRow
+    fun resolveScrollbackRingIndex(
+        viewportRow: Int,
+        scrollbackOffset: Int,
+    ): Int = liveViewportTopIndex() - clampScrollbackOffset(scrollbackOffset) + viewportRow
 
-    private fun liveViewportTopIndex(): Int =
-        (activeBuffer.ring.size - dimensions.height).coerceAtLeast(0)
+    private fun liveViewportTopIndex(): Int = (activeBuffer.ring.size - dimensions.height).coerceAtLeast(0)
 
     // Convenience helpers.
 
@@ -195,7 +195,10 @@ internal class TerminalState(
         cursorGeneration++
     }
 
-    fun rememberPrintableCell(row: Int, col: Int) {
+    fun rememberPrintableCell(
+        row: Int,
+        col: Int,
+    ) {
         lastPrintableRow = row
         lastPrintableCol = col
     }

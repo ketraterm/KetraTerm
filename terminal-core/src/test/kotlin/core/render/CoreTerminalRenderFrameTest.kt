@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.render
 
 import com.gagik.core.buffer.TerminalBuffer
@@ -158,14 +157,15 @@ class CoreTerminalRenderFrameTest {
             val copiedCluster = IntArray(4)
             var copiedColumn = -1
             var copiedLength = 0
-            val row = copyRow(
-                frame = frame,
-                clusterDataSink = { column, codepoints, offset, length ->
-                    copiedColumn = column
-                    copiedLength = length
-                    System.arraycopy(codepoints, offset, copiedCluster, 0, length)
-                },
-            )
+            val row =
+                copyRow(
+                    frame = frame,
+                    clusterDataSink = { column, codepoints, offset, length ->
+                        copiedColumn = column
+                        copiedLength = length
+                        System.arraycopy(codepoints, offset, copiedCluster, 0, length)
+                    },
+                )
 
             assertAll(
                 { assertEquals(TerminalRenderCellFlags.CLUSTER, row.flags[0]) },
@@ -428,16 +428,18 @@ class CoreTerminalRenderFrameTest {
             flags = copied.flags,
             extraAttrWords = copied.extraAttrWords,
             hyperlinkIds = copied.hyperlinkIds,
-            clusterSink = if (clusterSink == null) {
-                null
-            } else {
-                TerminalRenderClusterSink(clusterSink)
-            },
-            clusterDataSink = if (clusterDataSink == null) {
-                null
-            } else {
-                TerminalRenderClusterDataSink(clusterDataSink)
-            },
+            clusterSink =
+                if (clusterSink == null) {
+                    null
+                } else {
+                    TerminalRenderClusterSink(clusterSink)
+                },
+            clusterDataSink =
+                if (clusterDataSink == null) {
+                    null
+                } else {
+                    TerminalRenderClusterDataSink(clusterDataSink)
+                },
         )
         copied.flags.forEach {
             assertTrue(TerminalRenderCellFlags.isValidCombination(it), "invalid flag combination: $it")
@@ -445,12 +447,15 @@ class CoreTerminalRenderFrameTest {
         return copied
     }
 
-    private fun rowText(frame: TerminalRenderFrame, row: Int): String {
-        return copyRow(frame, row).codeWords
+    private fun rowText(
+        frame: TerminalRenderFrame,
+        row: Int,
+    ): String =
+        copyRow(frame, row)
+            .codeWords
             .map { if (it == 0) ' ' else it.toChar() }
             .joinToString("")
             .trimEnd()
-    }
 
     private fun TerminalBuffer.writeLogicalLine(text: String) {
         writeText(text)
@@ -458,7 +463,9 @@ class CoreTerminalRenderFrameTest {
         newLine()
     }
 
-    private class CopiedRow(columns: Int) {
+    private class CopiedRow(
+        columns: Int,
+    ) {
         val codeWords = IntArray(columns)
         val attrWords = LongArray(columns)
         val flags = IntArray(columns)

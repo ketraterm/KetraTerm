@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.fixture
 
 import com.gagik.parser.ansi.*
@@ -26,11 +25,12 @@ internal class AnsiPrintableBridgeFixture(
     val sink: RecordingTerminalCommandSink = RecordingTerminalCommandSink(),
 ) {
     private val processor = PrintableProcessor(sink)
-    private val engine = ActionEngine(
-        sink = sink,
-        dispatcher = AnsiCommandDispatcher,
-        printableSink = PrintableProcessorActionSink(processor),
-    )
+    private val engine =
+        ActionEngine(
+            sink = sink,
+            dispatcher = AnsiCommandDispatcher,
+            printableSink = PrintableProcessorActionSink(processor),
+        )
 
     fun acceptAscii(text: String) {
         for (byteValue in text.encodeToByteArray()) {

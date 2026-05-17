@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer.impl
 
 import com.gagik.core.codec.AttributeCodec
@@ -27,7 +26,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalWriterImplTest {
-
     @Test
     fun `writes codepoints and advances the cursor`() {
         val state = TerminalState(5, 2, 2)
@@ -47,14 +45,14 @@ class TerminalWriterImplTest {
                         background = AttributeColor.indexed(6),
                         bold = true,
                         italic = true,
-                        underlineStyle = UnderlineStyle.NONE
+                        underlineStyle = UnderlineStyle.NONE,
                     ),
                     AttributeCodec.unpack(
                         state.ring[state.resolveRingIndex(0)].getPackedAttr(0),
                         state.ring[state.resolveRingIndex(0)].getPackedExtendedAttr(0),
-                    )
+                    ),
                 )
-            }
+            },
         )
     }
 
@@ -67,20 +65,21 @@ class TerminalWriterImplTest {
             foreground = AttributeColor.rgb(0x10, 0x20, 0x30),
             background = AttributeColor.indexed(231),
             underlineStyle = UnderlineStyle.SINGLE,
-            inverse = true
+            inverse = true,
         )
         writer.writeCodepoint('R'.code)
 
-        val unpacked = AttributeCodec.unpack(
-            state.ring[state.resolveRingIndex(0)].getPackedAttr(0),
-            state.ring[state.resolveRingIndex(0)].getPackedExtendedAttr(0),
-        )
+        val unpacked =
+            AttributeCodec.unpack(
+                state.ring[state.resolveRingIndex(0)].getPackedAttr(0),
+                state.ring[state.resolveRingIndex(0)].getPackedExtendedAttr(0),
+            )
 
         assertAll(
             { assertEquals(AttributeColor.rgb(0x10, 0x20, 0x30), unpacked.foreground) },
             { assertEquals(AttributeColor.indexed(231), unpacked.background) },
             { assertEquals(UnderlineStyle.SINGLE, unpacked.underlineStyle) },
-            { assertTrue(unpacked.inverse) }
+            { assertTrue(unpacked.inverse) },
         )
     }
 
@@ -93,7 +92,7 @@ class TerminalWriterImplTest {
 
         assertAll(
             { assertEquals("A\uD83D\uDE00B", state.ring[state.resolveRingIndex(0)].toTextTrimmed()) },
-            { assertEquals(4, state.cursor.col) }
+            { assertEquals(4, state.cursor.col) },
         )
     }
 
@@ -111,7 +110,7 @@ class TerminalWriterImplTest {
             { assertTrue(state.ring[state.resolveRingIndex(0)].isCluster(0)) },
             { assertEquals(2, written) },
             { assertEquals('e'.code, dest[0]) },
-            { assertEquals(0x0301, dest[1]) }
+            { assertEquals(0x0301, dest[1]) },
         )
     }
 
@@ -129,7 +128,7 @@ class TerminalWriterImplTest {
             { assertEquals("", state.ring[state.resolveRingIndex(0)].toTextTrimmed()) },
             { assertEquals(0, state.cursor.col) },
             { assertEquals(0, state.cursor.row) },
-            { assertEquals(false, state.savedCursor.isSaved) }
+            { assertEquals(false, state.savedCursor.isSaved) },
         )
     }
 }

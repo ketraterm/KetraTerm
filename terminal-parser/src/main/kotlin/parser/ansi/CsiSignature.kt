@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 /**
@@ -32,10 +31,9 @@ internal object CsiSignature {
         privateMarker: Int,
         intermediates: Int,
         intermediateCount: Int,
-    ): Long {
-        return (finalByte.toLong() and 0xffL) or
+    ): Long =
+        (finalByte.toLong() and 0xffL) or
             ((privateMarker.toLong() and 0xffL) shl 8) or
             ((intermediates.toLong() and 0xffffffffL) shl 16) or
             ((intermediateCount.toLong() and 0x0fL) shl 48)
-    }
 }

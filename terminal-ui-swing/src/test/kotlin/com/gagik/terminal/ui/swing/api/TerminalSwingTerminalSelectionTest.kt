@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.api
 
 import com.gagik.core.TerminalBuffers
@@ -80,10 +79,11 @@ class TerminalSwingTerminalSelectionTest {
     @Test
     fun `drag above viewport autoscrolls into scrollback`() {
         val renderReader = ScrollbackFrameReader()
-        val session = testSession(
-            frame = ScrollbackFrame(scrollbackOffset = 0, rows = 1),
-            renderReader = renderReader,
-        )
+        val session =
+            testSession(
+                frame = ScrollbackFrame(scrollbackOffset = 0, rows = 1),
+                renderReader = renderReader,
+            )
         val component = TerminalSwingTerminal()
 
         SwingUtilities.invokeAndWait {
@@ -128,16 +128,25 @@ class TerminalSwingTerminalSelectionTest {
 
     @Test
     fun `selection snaps to enclose full wide characters`() {
-        val cells = arrayOf(
+        val cells =
             arrayOf(
-                TestCell(codeWord = 0x41, flags = TerminalRenderCellFlags.CODEPOINT), // 'A' at col 0
-                TestCell(codeWord = 0x4E2D, flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING), // '中' (wide leading) at col 1
-                TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING), // (wide trailing) at col 2
-                TestCell(codeWord = 0x42, flags = TerminalRenderCellFlags.CODEPOINT), // 'B' at col 3
+                arrayOf(
+                    // 'A' at col 0
+                    TestCell(codeWord = 0x41, flags = TerminalRenderCellFlags.CODEPOINT),
+                    // '中' (wide leading) at col 1
+                    TestCell(
+                        codeWord = 0x4E2D,
+                        flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING,
+                    ),
+                    // (wide trailing) at col 2
+                    TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING),
+                    TestCell(codeWord = 0x42, flags = TerminalRenderCellFlags.CODEPOINT), // 'B' at col 3
+                ),
             )
-        )
         val frame = TestRenderFrame(cells)
-        val cache = com.gagik.terminal.ui.swing.render.renderCache(frame)
+        val cache =
+            com.gagik.terminal.ui.swing.render
+                .renderCache(frame)
 
         // Case 1: Selecting starting on wide trailing cell (col 2)
         val selection1 = CellSelection(anchorColumn = 2, anchorRow = 0, caretColumn = 3, caretRow = 0)
@@ -154,16 +163,24 @@ class TerminalSwingTerminalSelectionTest {
 
     @Test
     fun `clipboard copy extracts fully snapped wide characters`() {
-        val cells = arrayOf(
+        val cells =
             arrayOf(
-                TestCell(codeWord = 0x41, flags = TerminalRenderCellFlags.CODEPOINT), // 'A'
-                TestCell(codeWord = 0x4E2D, flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING, cluster = "中"), // '中'
-                TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING),
-                TestCell(codeWord = 0x42, flags = TerminalRenderCellFlags.CODEPOINT), // 'B'
+                arrayOf(
+                    TestCell(codeWord = 0x41, flags = TerminalRenderCellFlags.CODEPOINT), // 'A'
+                    // '中'
+                    TestCell(
+                        codeWord = 0x4E2D,
+                        flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING,
+                        cluster = "中",
+                    ),
+                    TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING),
+                    TestCell(codeWord = 0x42, flags = TerminalRenderCellFlags.CODEPOINT), // 'B'
+                ),
             )
-        )
         val frame = TestRenderFrame(cells)
-        val cache = com.gagik.terminal.ui.swing.render.renderCache(frame)
+        val cache =
+            com.gagik.terminal.ui.swing.render
+                .renderCache(frame)
 
         // Selecting only trailing half should extract the whole Chinese char
         val selection = CellSelection(anchorColumn = 2, anchorRow = 0, caretColumn = 3, caretRow = 0)
@@ -176,12 +193,13 @@ class TerminalSwingTerminalSelectionTest {
         val clipboard = RecordingClipboard()
         val frame = TestRenderFrame.text("hello world")
         val session = testSession(frame = frame)
-        val component = TerminalSwingTerminal {
-            TerminalSwingSettings(
-                clipboardHandler = clipboard,
-                clipboardShortcuts = TerminalClipboardShortcuts.windows(),
-            )
-        }
+        val component =
+            TerminalSwingTerminal {
+                TerminalSwingSettings(
+                    clipboardHandler = clipboard,
+                    clipboardShortcuts = TerminalClipboardShortcuts.windows(),
+                )
+            }
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
@@ -200,12 +218,13 @@ class TerminalSwingTerminalSelectionTest {
         val clipboard = RecordingClipboard()
         val frame = TestRenderFrame.text("hello world")
         val session = testSession(frame = frame)
-        val component = TerminalSwingTerminal {
-            TerminalSwingSettings(
-                clipboardHandler = clipboard,
-                clipboardShortcuts = TerminalClipboardShortcuts.linuxAndUnix(),
-            )
-        }
+        val component =
+            TerminalSwingTerminal {
+                TerminalSwingSettings(
+                    clipboardHandler = clipboard,
+                    clipboardShortcuts = TerminalClipboardShortcuts.linuxAndUnix(),
+                )
+            }
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
@@ -227,12 +246,13 @@ class TerminalSwingTerminalSelectionTest {
         val input = RecordingInputEncoder()
         val frame = TestRenderFrame.text("ready")
         val session = testSession(frame = frame, inputEncoder = input)
-        val component = TerminalSwingTerminal {
-            TerminalSwingSettings(
-                clipboardHandler = clipboard,
-                clipboardShortcuts = TerminalClipboardShortcuts.windows(),
-            )
-        }
+        val component =
+            TerminalSwingTerminal {
+                TerminalSwingSettings(
+                    clipboardHandler = clipboard,
+                    clipboardShortcuts = TerminalClipboardShortcuts.windows(),
+                )
+            }
 
         session.start(columns = 5, rows = 1)
         SwingUtilities.invokeAndWait {
@@ -251,12 +271,13 @@ class TerminalSwingTerminalSelectionTest {
         val input = RecordingInputEncoder()
         val frame = TestRenderFrame.text("ready")
         val session = testSession(frame = frame, inputEncoder = input)
-        val component = TerminalSwingTerminal {
-            TerminalSwingSettings(
-                clipboardHandler = clipboard,
-                clipboardShortcuts = TerminalClipboardShortcuts.windows(),
-            )
-        }
+        val component =
+            TerminalSwingTerminal {
+                TerminalSwingSettings(
+                    clipboardHandler = clipboard,
+                    clipboardShortcuts = TerminalClipboardShortcuts.windows(),
+                )
+            }
 
         session.start(columns = 5, rows = 1)
         SwingUtilities.invokeAndWait {
@@ -292,8 +313,8 @@ class TerminalSwingTerminalSelectionTest {
         x: Int,
         y: Int,
         clickCount: Int,
-    ): MouseEvent {
-        return MouseEvent(
+    ): MouseEvent =
+        MouseEvent(
             component,
             MouseEvent.MOUSE_PRESSED,
             System.currentTimeMillis(),
@@ -304,14 +325,13 @@ class TerminalSwingTerminalSelectionTest {
             false,
             MouseEvent.BUTTON1,
         )
-    }
 
     private fun mouseDragged(
         component: TerminalSwingTerminal,
         x: Int,
         y: Int,
-    ): MouseEvent {
-        return MouseEvent(
+    ): MouseEvent =
+        MouseEvent(
             component,
             MouseEvent.MOUSE_DRAGGED,
             System.currentTimeMillis(),
@@ -322,14 +342,13 @@ class TerminalSwingTerminalSelectionTest {
             false,
             MouseEvent.BUTTON1,
         )
-    }
 
     private fun mouseReleased(
         component: TerminalSwingTerminal,
         x: Int,
         y: Int,
-    ): MouseEvent {
-        return MouseEvent(
+    ): MouseEvent =
+        MouseEvent(
             component,
             MouseEvent.MOUSE_RELEASED,
             System.currentTimeMillis(),
@@ -340,14 +359,13 @@ class TerminalSwingTerminalSelectionTest {
             false,
             MouseEvent.BUTTON1,
         )
-    }
 
     private fun mousePressedWithAlt(
         component: TerminalSwingTerminal,
         x: Int,
         y: Int,
-    ): MouseEvent {
-        return MouseEvent(
+    ): MouseEvent =
+        MouseEvent(
             component,
             MouseEvent.MOUSE_PRESSED,
             System.currentTimeMillis(),
@@ -358,14 +376,13 @@ class TerminalSwingTerminalSelectionTest {
             false,
             MouseEvent.BUTTON1,
         )
-    }
 
     private fun mouseDraggedWithAlt(
         component: TerminalSwingTerminal,
         x: Int,
         y: Int,
-    ): MouseEvent {
-        return MouseEvent(
+    ): MouseEvent =
+        MouseEvent(
             component,
             MouseEvent.MOUSE_DRAGGED,
             System.currentTimeMillis(),
@@ -376,9 +393,11 @@ class TerminalSwingTerminalSelectionTest {
             false,
             MouseEvent.BUTTON1,
         )
-    }
 
-    private fun awaitOffset(session: TerminalSession, offset: Int): Boolean {
+    private fun awaitOffset(
+        session: TerminalSession,
+        offset: Int,
+    ): Boolean {
         val deadline = System.nanoTime() + 1_000_000_000L
         while (System.nanoTime() < deadline) {
             if (session.publisher.current()?.scrollbackOffset == offset) return true
@@ -387,16 +406,22 @@ class TerminalSwingTerminalSelectionTest {
         return false
     }
 
-    private fun copyKey(component: TerminalSwingTerminal, modifiers: Int): KeyEvent {
-        return clipboardKey(component, KeyEvent.VK_C, modifiers)
-    }
+    private fun copyKey(
+        component: TerminalSwingTerminal,
+        modifiers: Int,
+    ): KeyEvent = clipboardKey(component, KeyEvent.VK_C, modifiers)
 
-    private fun pasteKey(component: TerminalSwingTerminal, modifiers: Int): KeyEvent {
-        return clipboardKey(component, KeyEvent.VK_V, modifiers)
-    }
+    private fun pasteKey(
+        component: TerminalSwingTerminal,
+        modifiers: Int,
+    ): KeyEvent = clipboardKey(component, KeyEvent.VK_V, modifiers)
 
-    private fun clipboardKey(component: TerminalSwingTerminal, keyCode: Int, modifiers: Int): KeyEvent {
-        return KeyEvent(
+    private fun clipboardKey(
+        component: TerminalSwingTerminal,
+        keyCode: Int,
+        modifiers: Int,
+    ): KeyEvent =
+        KeyEvent(
             component,
             KeyEvent.KEY_PRESSED,
             System.currentTimeMillis(),
@@ -404,7 +429,6 @@ class TerminalSwingTerminalSelectionTest {
             keyCode,
             KeyEvent.CHAR_UNDEFINED,
         )
-    }
 
     private class StaticFrameReader(
         private val frame: TerminalRenderFrame,
@@ -423,7 +447,10 @@ class TerminalSwingTerminalSelectionTest {
             readRenderFrame(scrollbackOffset = 0, consumer = consumer)
         }
 
-        override fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
+        override fun readRenderFrame(
+            scrollbackOffset: Int,
+            consumer: TerminalRenderFrameConsumer,
+        ) {
             lastRequestedOffset = scrollbackOffset
             consumer.accept(ScrollbackFrame(scrollbackOffset = scrollbackOffset.coerceIn(0, 5), rows = 1))
         }
@@ -438,7 +465,7 @@ class TerminalSwingTerminalSelectionTest {
                 ScrollbackFrame(
                     scrollbackOffset = scrollbackOffset.coerceIn(0, 5),
                     rows = viewportRows.coerceAtLeast(1),
-                )
+                ),
             )
         }
     }
@@ -452,14 +479,15 @@ class TerminalSwingTerminalSelectionTest {
         override val frameGeneration: Long = scrollbackOffset.toLong() + 1
         override val structureGeneration: Long = 1
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
-        override val cursor: TerminalRenderCursor = TerminalRenderCursor(
-            column = 0,
-            row = 0,
-            visible = scrollbackOffset == 0,
-            blinking = false,
-            shape = TerminalRenderCursorShape.BLOCK,
-            generation = frameGeneration,
-        )
+        override val cursor: TerminalRenderCursor =
+            TerminalRenderCursor(
+                column = 0,
+                row = 0,
+                visible = scrollbackOffset == 0,
+                blinking = false,
+                shape = TerminalRenderCursorShape.BLOCK,
+                generation = frameGeneration,
+            )
 
         override fun lineGeneration(row: Int): Long = frameGeneration
 
@@ -525,15 +553,26 @@ class TerminalSwingTerminalSelectionTest {
     private object NoOpConnector : TerminalConnector {
         override fun start(listener: TerminalConnectorListener) = Unit
 
-        override fun write(bytes: ByteArray, offset: Int, length: Int) = Unit
+        override fun write(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) = Unit
 
-        override fun resize(columns: Int, rows: Int) = Unit
+        override fun resize(
+            columns: Int,
+            rows: Int,
+        ) = Unit
 
         override fun close() = Unit
     }
 
     private object NoOpParser : TerminalOutputParser {
-        override fun accept(bytes: ByteArray, offset: Int, length: Int) = Unit
+        override fun accept(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) = Unit
 
         override fun acceptByte(byteValue: Int) = Unit
 

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.runtime.ParserState
@@ -24,11 +23,12 @@ internal class AnsiHarness(
     val dispatcher: RecordingCommandDispatcher = RecordingCommandDispatcher(),
     val printable: RecordingPrintableActionSink = RecordingPrintableActionSink(),
 ) {
-    private val engine = ActionEngine(
-        sink = sink,
-        dispatcher = dispatcher,
-        printableSink = printable,
-    )
+    private val engine =
+        ActionEngine(
+            sink = sink,
+            dispatcher = dispatcher,
+            printableSink = printable,
+        )
 
     fun accept(bytes: ByteArray) {
         var i = 0

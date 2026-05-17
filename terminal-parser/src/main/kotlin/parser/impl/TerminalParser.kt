@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.impl
 
 import com.gagik.parser.ansi.*
@@ -50,11 +49,12 @@ internal class TerminalParser(
     private val utf8Decoder = Utf8Decoder()
     private val printableProcessor = PrintableProcessor(sink)
 
-    private val actionEngine = ActionEngine(
-        sink = sink,
-        dispatcher = AnsiCommandDispatcher,
-        printableSink = PrintableProcessorActionSink(printableProcessor),
-    )
+    private val actionEngine =
+        ActionEngine(
+            sink = sink,
+            dispatcher = AnsiCommandDispatcher,
+            printableSink = PrintableProcessorActionSink(printableProcessor),
+        )
 
     /**
      * Accepts one chunk of host-output bytes.

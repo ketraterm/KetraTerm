@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 import com.gagik.terminal.ui.swing.render.primitives.TerminalBoxDrawingGlyphs.DIAGONAL_FALLING
@@ -38,8 +37,14 @@ import kotlin.math.roundToInt
  * Engineered for sub-pixel accuracy, dynamic DPI scaling, and zero-allocation hot paths.
  */
 internal class TerminalBoxDrawingPainter {
-
-    fun paint(g: Graphics2D, codePoint: Int, x: Int, y: Int, width: Int, height: Int) {
+    fun paint(
+        g: Graphics2D,
+        codePoint: Int,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+    ) {
         val xD = x.toDouble()
         val yD = y.toDouble()
         val wD = width.toDouble()
@@ -76,7 +81,14 @@ internal class TerminalBoxDrawingPainter {
         }
     }
 
-    private fun paintPackedEdges(g: Graphics2D, x: Double, y: Double, w: Double, h: Double, packed: Int) {
+    private fun paintPackedEdges(
+        g: Graphics2D,
+        x: Double,
+        y: Double,
+        w: Double,
+        h: Double,
+        packed: Int,
+    ) {
         val left = TerminalBoxDrawingGlyphs.edge(packed, LEFT_SHIFT)
         val right = TerminalBoxDrawingGlyphs.edge(packed, RIGHT_SHIFT)
         val up = TerminalBoxDrawingGlyphs.edge(packed, UP_SHIFT)
@@ -93,8 +105,15 @@ internal class TerminalBoxDrawingPainter {
     }
 
     private fun paintSingleEdges(
-        g: Graphics2D, x: Double, y: Double, w: Double, h: Double,
-        left: Int, right: Int, up: Int, down: Int,
+        g: Graphics2D,
+        x: Double,
+        y: Double,
+        w: Double,
+        h: Double,
+        left: Int,
+        right: Int,
+        up: Int,
+        down: Int,
     ) {
         val cx = x + w / 2.0
         val cy = y + h / 2.0
@@ -124,8 +143,15 @@ internal class TerminalBoxDrawingPainter {
     }
 
     private fun paintDoubleEdges(
-        g: Graphics2D, x: Double, y: Double, w: Double, h: Double,
-        left: Int, right: Int, up: Int, down: Int,
+        g: Graphics2D,
+        x: Double,
+        y: Double,
+        w: Double,
+        h: Double,
+        left: Int,
+        right: Int,
+        up: Int,
+        down: Int,
     ) {
         val cx = x + w / 2.0
         val cy = y + h / 2.0
@@ -138,63 +164,153 @@ internal class TerminalBoxDrawingPainter {
         val y1 = cy - off
         val y2 = cy + off
 
-        val L = left == DOUBLE
-        val R = right == DOUBLE
-        val U = up == DOUBLE
-        val D = down == DOUBLE
+        val l = left == DOUBLE
+        val r = right == DOUBLE
+        val u = up == DOUBLE
+        val d = down == DOUBLE
 
         // --- LEFT edges ---
-        if (L) {
-            val endTop = if (U) x1 + ext else if (D) x2 + ext else cx
-            val endBot = if (D) x1 + ext else if (U) x2 + ext else cx
+        if (l) {
+            val endTop =
+                if (u) {
+                    x1 + ext
+                } else if (d) {
+                    x2 + ext
+                } else {
+                    cx
+                }
+            val endBot =
+                if (d) {
+                    x1 + ext
+                } else if (u) {
+                    x2 + ext
+                } else {
+                    cx
+                }
             fillRectBounds(g, x, y1 - ext, endTop, y1 + ext)
             fillRectBounds(g, x, y2 - ext, endBot, y2 + ext)
         } else if (left != NONE) {
             val lt = thickness(left, w, h)
             // Mixed junction topology: Stop at inner track for cross, wrap to outer track for corner.
-            val endL = if (U && D) x1 + ext else if (U || D) x2 + ext else cx
+            val endL =
+                if (u && d) {
+                    x1 + ext
+                } else if (u || d) {
+                    x2 + ext
+                } else {
+                    cx
+                }
             fillRectBounds(g, x, cy - lt / 2.0, endL, cy + lt / 2.0)
         }
 
         // --- RIGHT edges ---
-        if (R) {
-            val startTop = if (U) x2 - ext else if (D) x1 - ext else cx
-            val startBot = if (D) x2 - ext else if (U) x1 - ext else cx
+        if (r) {
+            val startTop =
+                if (u) {
+                    x2 - ext
+                } else if (d) {
+                    x1 - ext
+                } else {
+                    cx
+                }
+            val startBot =
+                if (d) {
+                    x2 - ext
+                } else if (u) {
+                    x1 - ext
+                } else {
+                    cx
+                }
             fillRectBounds(g, startTop, y1 - ext, x + w, y1 + ext)
             fillRectBounds(g, startBot, y2 - ext, x + w, y2 + ext)
         } else if (right != NONE) {
             val rt = thickness(right, w, h)
-            val startR = if (U && D) x2 - ext else if (U || D) x1 - ext else cx
+            val startR =
+                if (u && d) {
+                    x2 - ext
+                } else if (u || d) {
+                    x1 - ext
+                } else {
+                    cx
+                }
             fillRectBounds(g, startR, cy - rt / 2.0, x + w, cy + rt / 2.0)
         }
 
         // --- UP edges ---
-        if (U) {
-            val endLeft = if (L) y1 + ext else if (R) y2 + ext else cy
-            val endRight = if (R) y1 + ext else if (L) y2 + ext else cy
+        if (u) {
+            val endLeft =
+                if (l) {
+                    y1 + ext
+                } else if (r) {
+                    y2 + ext
+                } else {
+                    cy
+                }
+            val endRight =
+                if (r) {
+                    y1 + ext
+                } else if (l) {
+                    y2 + ext
+                } else {
+                    cy
+                }
             fillRectBounds(g, x1 - ext, y, x1 + ext, endLeft)
             fillRectBounds(g, x2 - ext, y, x2 + ext, endRight)
         } else if (up != NONE) {
             val ut = thickness(up, w, h)
-            val endU = if (L && R) y1 + ext else if (L || R) y2 + ext else cy
+            val endU =
+                if (l && r) {
+                    y1 + ext
+                } else if (l || r) {
+                    y2 + ext
+                } else {
+                    cy
+                }
             fillRectBounds(g, cx - ut / 2.0, y, cx + ut / 2.0, endU)
         }
 
         // --- DOWN edges ---
-        if (D) {
-            val startLeft = if (L) y2 - ext else if (R) y1 - ext else cy
-            val startRight = if (R) y2 - ext else if (L) y1 - ext else cy
+        if (d) {
+            val startLeft =
+                if (l) {
+                    y2 - ext
+                } else if (r) {
+                    y1 - ext
+                } else {
+                    cy
+                }
+            val startRight =
+                if (r) {
+                    y2 - ext
+                } else if (l) {
+                    y2 - ext
+                } else {
+                    cy
+                }
             fillRectBounds(g, x1 - ext, startLeft, x1 + ext, y + h)
             fillRectBounds(g, x2 - ext, startRight, x2 + ext, y + h)
         } else if (down != NONE) {
             val dt = thickness(down, w, h)
-            val startD = if (L && R) y2 - ext else if (L || R) y1 - ext else cy
+            val startD =
+                if (l && r) {
+                    y2 - ext
+                } else if (l || r) {
+                    y1 - ext
+                } else {
+                    cy
+                }
             fillRectBounds(g, cx - dt / 2.0, startD, cx + dt / 2.0, y + h)
         }
     }
 
     private fun paintDashedHorizontal(
-        g: Graphics2D, x: Double, y: Double, w: Double, h: Double, style: Int, dashCount: Int
+        g: Graphics2D,
+        x: Double,
+        y: Double,
+        w: Double,
+        h: Double,
+        style: Int,
+        dashCount: Int,
     ) {
         val t = thickness(style, w, h)
         val cy = y + h / 2.0
@@ -205,7 +321,13 @@ internal class TerminalBoxDrawingPainter {
     }
 
     private fun paintDashedVertical(
-        g: Graphics2D, x: Double, y: Double, w: Double, h: Double, style: Int, dashCount: Int
+        g: Graphics2D,
+        x: Double,
+        y: Double,
+        w: Double,
+        h: Double,
+        style: Int,
+        dashCount: Int,
     ) {
         val t = thickness(style, w, h)
         val cx = x + w / 2.0
@@ -219,7 +341,11 @@ internal class TerminalBoxDrawingPainter {
      * Calculates absolute mathematical bounds for half-dash topology.
      * Inlined to avoid object allocation during the render loop.
      */
-    private inline fun iterateDashes(dashCount: Int, dimension: Double, block: (start: Double, end: Double) -> Unit) {
+    private inline fun iterateDashes(
+        dashCount: Int,
+        dimension: Double,
+        block: (start: Double, end: Double) -> Unit,
+    ) {
         val units = dashCount * 2.0
         for (i in 0..dashCount) {
             val startUnit = if (i == 0) 0.0 else i * 2.0 - 0.5
@@ -237,7 +363,13 @@ internal class TerminalBoxDrawingPainter {
      * Takes exact bounding box coordinates, rounds to integer boundaries at the final step,
      * guaranteeing no lines can ever overshoot the terminal cell dimensions.
      */
-    private fun fillRectBounds(g: Graphics2D, left: Double, top: Double, right: Double, bottom: Double) {
+    private fun fillRectBounds(
+        g: Graphics2D,
+        left: Double,
+        top: Double,
+        right: Double,
+        bottom: Double,
+    ) {
         val x1 = left.roundToInt()
         val y1 = top.roundToInt()
         val x2 = right.roundToInt()
@@ -246,7 +378,13 @@ internal class TerminalBoxDrawingPainter {
     }
 
     private fun paintRoundedCorner(
-        g: Graphics2D, codePoint: Int, x: Double, y: Double, w: Double, h: Double, fallbackEdges: Int
+        g: Graphics2D,
+        codePoint: Int,
+        x: Double,
+        y: Double,
+        w: Double,
+        h: Double,
+        fallbackEdges: Int,
     ) {
         val strokeThickness = thickness(LIGHT, w, h)
         if (w <= strokeThickness || h <= strokeThickness) {
@@ -286,7 +424,14 @@ internal class TerminalBoxDrawingPainter {
         }
     }
 
-    private fun paintDiagonal(g: Graphics2D, x: Double, y: Double, w: Double, h: Double, mask: Int) {
+    private fun paintDiagonal(
+        g: Graphics2D,
+        x: Double,
+        y: Double,
+        w: Double,
+        h: Double,
+        mask: Int,
+    ) {
         val path = pathLocal.get().apply { reset() }
 
         if (mask and DIAGONAL_RISING != 0) {
@@ -305,10 +450,14 @@ internal class TerminalBoxDrawingPainter {
     }
 
     /**
-     * Executes drawing commands with required anti-aliasing and stroke geometry, safely restoring 
+     * Executes drawing commands with required anti-aliasing and stroke geometry, safely restoring
      * the prior context state regardless of execution outcome.
      */
-    private inline fun withAntialiasing(g: Graphics2D, strokeWidth: Float, block: () -> Unit) {
+    private inline fun withAntialiasing(
+        g: Graphics2D,
+        strokeWidth: Float,
+        block: () -> Unit,
+    ) {
         val oldAA = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
         val oldStrokeControl = g.getRenderingHint(RenderingHints.KEY_STROKE_CONTROL)
         val oldStroke = g.stroke
@@ -328,18 +477,31 @@ internal class TerminalBoxDrawingPainter {
 
     // --- Dynamic Scaling Mathematics ---
 
-    private fun thin(w: Double, h: Double): Double = maxOf(1.0, minOf(w, h) / THIN_RATIO)
-    private fun lightThickness(w: Double, h: Double): Double = maxOf(1.0, minOf(w, h) / LIGHT_RATIO)
+    private fun thin(
+        w: Double,
+        h: Double,
+    ): Double = maxOf(1.0, minOf(w, h) / THIN_RATIO)
 
-    private fun thickness(style: Int, w: Double, h: Double): Double {
-        return when (style) {
+    private fun lightThickness(
+        w: Double,
+        h: Double,
+    ): Double = maxOf(1.0, minOf(w, h) / LIGHT_RATIO)
+
+    private fun thickness(
+        style: Int,
+        w: Double,
+        h: Double,
+    ): Double =
+        when (style) {
             HEAVY -> maxOf(2.0, minOf(w, h) / HEAVY_RATIO)
             DOUBLE -> thin(w, h)
             else -> lightThickness(w, h)
         }
-    }
 
-    private fun doubleOffset(w: Double, h: Double): Double = maxOf(2.0, minOf(w, h) / DOUBLE_OFFSET_RATIO)
+    private fun doubleOffset(
+        w: Double,
+        h: Double,
+    ): Double = maxOf(2.0, minOf(w, h) / DOUBLE_OFFSET_RATIO)
 
     private companion object {
         private const val KAPPA = 0.552284749831

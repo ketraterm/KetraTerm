@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.viewport
 
 /**
@@ -36,5 +35,10 @@ internal interface TerminalRepaintSink {
      * @param width repaint region width in pixels.
      * @param height repaint region height in pixels.
      */
-    fun requestRegionRepaint(x: Int, y: Int, width: Int, height: Int)
+    fun requestRegionRepaint(
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+    )
 }

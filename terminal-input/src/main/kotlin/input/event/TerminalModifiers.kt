@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.event
 
 /**
@@ -64,9 +63,7 @@ object TerminalModifiers {
     /**
      * Returns true when [modifiers] contains only supported modifier bits.
      */
-    fun isValid(modifiers: Int): Boolean {
-        return (modifiers and VALID_MASK.inv()) == 0
-    }
+    fun isValid(modifiers: Int): Boolean = (modifiers and VALID_MASK.inv()) == 0
 
     /**
      * Converts internal modifier bits to an xterm-style CSI modifier parameter.

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render
 
 import com.gagik.terminal.render.api.TerminalColorPalette
@@ -26,7 +25,10 @@ internal object TerminalSwingColors {
     /**
      * Resolves the foreground color Swing should paint for [attrWord].
      */
-    fun foreground(palette: TerminalColorPalette, attrWord: Long): Int {
+    fun foreground(
+        palette: TerminalColorPalette,
+        attrWord: Long,
+    ): Int {
         if (TerminalRenderAttrs.isInvisible(attrWord)) {
             return background(palette, attrWord)
         }
@@ -38,9 +40,10 @@ internal object TerminalSwingColors {
     /**
      * Resolves the background color Swing should paint for [attrWord].
      */
-    fun background(palette: TerminalColorPalette, attrWord: Long): Int {
-        return palette.background(attrWord)
-    }
+    fun background(
+        palette: TerminalColorPalette,
+        attrWord: Long,
+    ): Int = palette.background(attrWord)
 
     /**
      * Applies Swing's current faint rendering policy to a packed ARGB color.

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.transport
 
 /**
@@ -46,7 +45,10 @@ interface TerminalConnector : AutoCloseable {
     /**
      * Resizes the remote terminal transport in character cells.
      */
-    fun resize(columns: Int, rows: Int)
+    fun resize(
+        columns: Int,
+        rows: Int,
+    )
 
     /**
      * Requests local transport shutdown.

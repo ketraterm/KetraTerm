@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import org.junit.jupiter.api.Assertions.*
@@ -23,11 +22,9 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("AnsiHarness")
 class AnsiHarnessTest {
-
     @Nested
     @DisplayName("byte ingestion")
     inner class ByteIngestion {
-
         @Test
         fun `acceptByte rejects values outside unsigned byte range`() {
             val harness = AnsiHarness()
@@ -42,7 +39,7 @@ class AnsiHarnessTest {
                     assertThrows(IllegalArgumentException::class.java) {
                         harness.acceptByte(256)
                     }
-                }
+                },
             )
         }
 
@@ -55,7 +52,7 @@ class AnsiHarnessTest {
             assertAll(
                 { assertEquals(listOf(0xE2, 0x82, 0xAC), harness.printable.utf8Bytes) },
                 { assertTrue(harness.printable.asciiBytes.isEmpty()) },
-                { assertEquals(AnsiState.GROUND, harness.state.fsmState) }
+                { assertEquals(AnsiState.GROUND, harness.state.fsmState) },
             )
         }
 
@@ -70,7 +67,7 @@ class AnsiHarnessTest {
                 { assertTrue(harness.printable.asciiBytes.isEmpty()) },
                 { assertTrue(harness.printable.utf8Bytes.isEmpty()) },
                 { assertTrue(harness.dispatcher.controls.isEmpty()) },
-                { assertTrue(harness.sink.events.isEmpty()) }
+                { assertTrue(harness.sink.events.isEmpty()) },
             )
         }
     }
@@ -78,7 +75,6 @@ class AnsiHarnessTest {
     @Nested
     @DisplayName("ASCII traces")
     inner class AsciiTraces {
-
         @Test
         fun `acceptAscii feeds printable ASCII through the real matrix and action engine`() {
             val harness = AnsiHarness()
@@ -89,7 +85,7 @@ class AnsiHarnessTest {
                 { assertEquals(listOf('H'.code, 'i'.code), harness.printable.asciiBytes) },
                 { assertTrue(harness.printable.utf8Bytes.isEmpty()) },
                 { assertEquals(0, harness.printable.flushCount) },
-                { assertEquals(AnsiState.GROUND, harness.state.fsmState) }
+                { assertEquals(AnsiState.GROUND, harness.state.fsmState) },
             )
         }
 
@@ -105,7 +101,7 @@ class AnsiHarnessTest {
                 { assertEquals(listOf(25), csi.params) },
                 { assertEquals('?'.code, csi.privateMarker) },
                 { assertEquals(AnsiState.GROUND, harness.state.fsmState) },
-                { assertEquals(0, harness.state.paramCount) }
+                { assertEquals(0, harness.state.paramCount) },
             )
         }
     }
@@ -113,7 +109,6 @@ class AnsiHarnessTest {
     @Nested
     @DisplayName("string traces")
     inner class StringTraces {
-
         @Test
         fun `OSC BEL dispatches semantic OSC title`() {
             val harness = AnsiHarness()
@@ -123,7 +118,7 @@ class AnsiHarnessTest {
             assertAll(
                 { assertEquals(listOf("setIconAndWindowTitle:t"), harness.sink.events) },
                 { assertTrue(harness.dispatcher.controls.isEmpty()) },
-                { assertEquals(AnsiState.GROUND, harness.state.fsmState) }
+                { assertEquals(AnsiState.GROUND, harness.state.fsmState) },
             )
         }
 
@@ -136,7 +131,7 @@ class AnsiHarnessTest {
             assertAll(
                 { assertEquals(listOf("setIconTitle:x"), harness.sink.events) },
                 { assertTrue(harness.dispatcher.esc.isEmpty()) },
-                { assertEquals(AnsiState.GROUND, harness.state.fsmState) }
+                { assertEquals(AnsiState.GROUND, harness.state.fsmState) },
             )
         }
 
@@ -149,7 +144,7 @@ class AnsiHarnessTest {
             assertAll(
                 { assertEquals(AnsiState.DCS_ENTRY, harness.state.fsmState) },
                 { assertTrue(harness.dispatcher.controls.isEmpty()) },
-                { assertEquals(0, harness.state.payloadLength) }
+                { assertEquals(0, harness.state.payloadLength) },
             )
         }
 
@@ -163,7 +158,7 @@ class AnsiHarnessTest {
                 { assertEquals(AnsiState.GROUND, harness.state.fsmState) },
                 { assertTrue(harness.dispatcher.esc.isEmpty()) },
                 { assertEquals(0, harness.state.payloadLength) },
-                { assertTrue(harness.sink.events.isEmpty()) }
+                { assertTrue(harness.sink.events.isEmpty()) },
             )
         }
     }

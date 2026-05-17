@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.engine.MutationEngine
@@ -22,7 +21,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class TerminalHistoryLifecycleTest {
-
     @Test
     fun `clearAllHistory_releasesClusterStoreSlots`() {
         val state = TerminalState(initialWidth = 4, initialHeight = 2, maxHistory = 3)
@@ -39,23 +37,28 @@ class TerminalHistoryLifecycleTest {
         assertEquals(
             originalHandle,
             state.ring[0].rawCodepoint(0),
-            "Clearing history must release all cluster slots so the next allocation can reuse them"
+            "Clearing history must release all cluster slots so the next allocation can reuse them",
         )
     }
 
     @Test
     fun `reset_releasesAllPrimaryHistoryClusterSlots`() {
         val buffer = TerminalBuffer(initialWidth = 4, initialHeight = 2, maxHistory = 3)
-        val state = TerminalBufferResizeTest().run {
-            val componentsField = TerminalBuffer::class.java.getDeclaredField("components")
-            componentsField.isAccessible = true
-            val components = componentsField.get(buffer)
-            val stateField = components.javaClass.getDeclaredField("state")
-            stateField.isAccessible = true
-            stateField.get(components) as TerminalState
-        }
+        val state =
+            TerminalBufferResizeTest().run {
+                val componentsField = TerminalBuffer::class.java.getDeclaredField("components")
+                componentsField.isAccessible = true
+                val components = componentsField.get(buffer)
+                val stateField = components.javaClass.getDeclaredField("state")
+                stateField.isAccessible = true
+                stateField.get(components) as TerminalState
+            }
 
-        repeat(3) { state.primaryBuffer.ring.push().clear(state.pen.currentAttr) }
+        repeat(3) {
+            state.primaryBuffer.ring
+                .push()
+                .clear(state.pen.currentAttr)
+        }
         val leakedLine = state.primaryBuffer.ring[4]
         leakedLine.setCluster(0, intArrayOf('C'.code, 0x0301), 2, 0)
         val originalHandle = leakedLine.rawCodepoint(0)
@@ -66,7 +69,7 @@ class TerminalHistoryLifecycleTest {
         assertEquals(
             originalHandle,
             state.primaryBuffer.ring[0].rawCodepoint(0),
-            "Reset must release cluster slots retained in primary scrollback"
+            "Reset must release cluster slots retained in primary scrollback",
         )
     }
 }

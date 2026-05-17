@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer.impl
 
 import com.gagik.core.buffer.TerminalBuffer
@@ -28,11 +27,10 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalModeControllerImplTest {
-
     private fun withPendingWrap(
         modeController: TerminalModeControllerImpl,
         state: TerminalState,
-        assertion: () -> Unit
+        assertion: () -> Unit,
     ) {
         state.cursor.pendingWrap = true
         assertion()
@@ -51,7 +49,7 @@ class TerminalModeControllerImplTest {
         assertAll(
             { assertEquals(true, state.modes.isInsertMode) },
             { assertEquals(true, state.modes.isApplicationCursorKeys) },
-            { assertEquals(true, state.modes.treatAmbiguousAsWide) }
+            { assertEquals(true, state.modes.treatAmbiguousAsWide) },
         )
     }
 
@@ -109,7 +107,7 @@ class TerminalModeControllerImplTest {
             { assertEquals(2, state.modes.modifyOtherKeysMode) },
             { assertTrue(state.modes.isReverseVideo) },
             { assertFalse(state.modes.isCursorVisible) },
-            { assertTrue(state.modes.isCursorBlinking) }
+            { assertTrue(state.modes.isCursorBlinking) },
         )
     }
 
@@ -159,7 +157,7 @@ class TerminalModeControllerImplTest {
             { assertEquals('X'.code, state.ring[state.resolveRingIndex(0)].getCodepoint(3)) },
             { assertEquals(0, state.ring[state.resolveRingIndex(1)].getCodepoint(0)) },
             { assertEquals(3, state.cursor.col) },
-            { assertEquals(0, state.cursor.row) }
+            { assertEquals(0, state.cursor.row) },
         )
     }
 
@@ -173,7 +171,7 @@ class TerminalModeControllerImplTest {
             top = 2,
             bottom = 3,
             isOriginMode = false,
-            viewportHeight = state.dimensions.height
+            viewportHeight = state.dimensions.height,
         )
         modeController.setAutoWrap(false)
         modeController.setOriginMode(true)
@@ -183,7 +181,7 @@ class TerminalModeControllerImplTest {
             { assertEquals(false, state.cursor.pendingWrap) },
             { assertEquals(1, state.cursor.row) },
             { assertEquals(0, state.cursor.col) },
-            { assertEquals(true, state.modes.isOriginMode) }
+            { assertEquals(true, state.modes.isOriginMode) },
         )
     }
 
@@ -205,7 +203,7 @@ class TerminalModeControllerImplTest {
             { assertTrue(state.isAltScreenActive) },
             { assertEquals(1, state.cursor.col) },
             { assertEquals(1, state.cursor.row) },
-            { assertEquals("A", state.altBuffer.ring[1].toTextTrimmed()) }
+            { assertEquals("A", state.altBuffer.ring[1].toTextTrimmed()) },
         )
 
         modeController.exitAltBufferWithoutCursorRestore()
@@ -214,7 +212,7 @@ class TerminalModeControllerImplTest {
             { assertFalse(state.isAltScreenActive) },
             { assertEquals(3, state.cursor.col) },
             { assertEquals(2, state.cursor.row) },
-            { assertTrue(state.cursor.pendingWrap) }
+            { assertTrue(state.cursor.pendingWrap) },
         )
     }
 
@@ -237,7 +235,7 @@ class TerminalModeControllerImplTest {
             { assertEquals(0, state.cursor.row) },
             { assertFalse(state.cursor.pendingWrap) },
             { assertFalse(state.savedCursor.isSaved) },
-            { assertEquals("", state.altBuffer.ring[0].toTextTrimmed()) }
+            { assertEquals("", state.altBuffer.ring[0].toTextTrimmed()) },
         )
     }
 
@@ -271,7 +269,7 @@ class TerminalModeControllerImplTest {
             { assertEquals(0, state.cursor.row) },
             { assertFalse(state.cursor.pendingWrap) },
             { assertEquals("", state.altBuffer.ring[state.resolveRingIndex(0)].toTextTrimmed()) },
-            { assertEquals("P", state.primaryBuffer.ring[0].toTextTrimmed()) }
+            { assertEquals("P", state.primaryBuffer.ring[0].toTextTrimmed()) },
         )
 
         // 3. Mutate state while inside Alt Screen
@@ -298,8 +296,7 @@ class TerminalModeControllerImplTest {
             // Global hardware modes MUST NOT be restored (they keep the mutations from step 3)
             { assertFalse(state.modes.isInsertMode, "IRM is global and should not revert") },
             { assertTrue(state.modes.isAutoWrap, "DECAWM is global and should not revert") },
-
-            { assertEquals('P'.code, state.primaryBuffer.ring[state.resolveRingIndex(0)].getCodepoint(0)) }
+            { assertEquals('P'.code, state.primaryBuffer.ring[state.resolveRingIndex(0)].getCodepoint(0)) },
         )
     }
 
@@ -317,8 +314,7 @@ class TerminalModeControllerImplTest {
 
         assertAll(
             { assertTrue(state.isAltScreenActive) },
-            { assertEquals('A'.code, state.altBuffer.ring[state.resolveRingIndex(0)].getCodepoint(0)) }
+            { assertEquals('A'.code, state.altBuffer.ring[state.resolveRingIndex(0)].getCodepoint(0)) },
         )
     }
 }
-

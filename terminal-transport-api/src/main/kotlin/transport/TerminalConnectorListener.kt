@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.transport
 
 /**
@@ -28,7 +27,11 @@ interface TerminalConnectorListener {
      * Connectors must invoke this callback serially and in stream order for one
      * started listener.
      */
-    fun onBytes(bytes: ByteArray, offset: Int, length: Int)
+    fun onBytes(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    )
 
     /**
      * Reports remote transport closure.

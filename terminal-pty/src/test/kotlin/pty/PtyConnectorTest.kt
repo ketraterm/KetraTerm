@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.pty
 
 import com.gagik.terminal.transport.TerminalConnectorListener
@@ -56,10 +55,11 @@ class PtyConnectorTest {
 
     @Test
     fun `reader emits bytes in stream order across chunks`() {
-        val connector = PtyConnector(
-            process = TestProcess(input = ByteArrayInputStream("abcdef".ascii())),
-            readBufferSize = 2,
-        )
+        val connector =
+            PtyConnector(
+                process = TestProcess(input = ByteArrayInputStream("abcdef".ascii())),
+                readBufferSize = 2,
+            )
         val listener = RecordingListener()
 
         connector.start(listener)
@@ -71,10 +71,11 @@ class PtyConnectorTest {
     @Test
     fun `large output emits every byte`() {
         val text = "0123456789".repeat(1000)
-        val connector = PtyConnector(
-            process = TestProcess(input = ByteArrayInputStream(text.ascii())),
-            readBufferSize = 31,
-        )
+        val connector =
+            PtyConnector(
+                process = TestProcess(input = ByteArrayInputStream(text.ascii())),
+                readBufferSize = 31,
+            )
         val listener = RecordingListener()
 
         connector.start(listener)
@@ -174,11 +175,12 @@ class PtyConnectorTest {
 
     @Test
     fun `reader eof waits for watcher instead of emitting null close`() {
-        val process = TestProcess(
-            input = ByteArrayInputStream(ByteArray(0)),
-            exitCode = 7,
-            waitForRelease = CountDownLatch(1),
-        )
+        val process =
+            TestProcess(
+                input = ByteArrayInputStream(ByteArray(0)),
+                exitCode = 7,
+                waitForRelease = CountDownLatch(1),
+            )
         val connector = PtyConnector(process)
         val listener = RecordingListener()
 
@@ -198,12 +200,17 @@ class PtyConnectorTest {
         lateinit var connector: PtyConnector
         val process = TestProcess(input = ByteArrayInputStream("x".ascii()))
         val closedInCallback = CountDownLatch(1)
-        val listener = object : RecordingListener() {
-            override fun onBytes(bytes: ByteArray, offset: Int, length: Int) {
-                connector.close()
-                closedInCallback.countDown()
+        val listener =
+            object : RecordingListener() {
+                override fun onBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    connector.close()
+                    closedInCallback.countDown()
+                }
             }
-        }
         connector = PtyConnector(process)
 
         connector.start(listener)
@@ -217,7 +224,11 @@ class PtyConnectorTest {
         val closed = mutableListOf<Int?>()
         val errors = mutableListOf<Throwable>()
 
-        override fun onBytes(bytes: ByteArray, offset: Int, length: Int) {
+        override fun onBytes(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) {
             byteEvents += bytes.copyOfRange(offset, offset + length)
         }
 
@@ -242,6 +253,7 @@ class PtyConnectorTest {
         val sizes = mutableListOf<Pair<Int, Int>>()
 
         override fun isAlive(): Boolean = !destroyed
+
         override fun waitFor(): Int {
             if (blockWaitFor) {
                 while (!destroyed) {
@@ -251,13 +263,18 @@ class PtyConnectorTest {
             waitForRelease?.await(1, TimeUnit.SECONDS)
             return exitCode
         }
+
         override fun destroy() {
             destroyed = true
             if (input is BlockingInputStream) {
                 input.release()
             }
         }
-        override fun resize(columns: Int, rows: Int) {
+
+        override fun resize(
+            columns: Int,
+            rows: Int,
+        ) {
             sizes += columns to rows
         }
 
@@ -292,7 +309,11 @@ class PtyConnectorTest {
             return -1
         }
 
-        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+        override fun read(
+            buffer: ByteArray,
+            offset: Int,
+            length: Int,
+        ): Int {
             released.await(1, TimeUnit.SECONDS)
             return -1
         }
@@ -305,13 +326,13 @@ class PtyConnectorTest {
     private class FailingInputStream(
         private val failure: IOException,
     ) : InputStream() {
-        override fun read(): Int {
-            throw failure
-        }
+        override fun read(): Int = throw failure
 
-        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
-            throw failure
-        }
+        override fun read(
+            buffer: ByteArray,
+            offset: Int,
+            length: Int,
+        ): Int = throw failure
     }
 
     private fun String.ascii(): ByteArray = toByteArray(StandardCharsets.US_ASCII)

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import com.gagik.core.api.TerminalInputState
@@ -32,7 +31,10 @@ internal class MouseEncoder(
     private val scratch: InputScratchBuffer,
     private val policy: TerminalInputPolicy,
 ) {
-    fun encode(event: TerminalMouseEvent, modeBits: Long) {
+    fun encode(
+        event: TerminalMouseEvent,
+        modeBits: Long,
+    ) {
         val trackingMode = TerminalInputState.mouseTrackingMode(modeBits)
         if (!shouldReport(event, trackingMode)) {
             return
@@ -49,8 +51,11 @@ internal class MouseEncoder(
         }
     }
 
-    private fun shouldReport(event: TerminalMouseEvent, trackingMode: Int): Boolean {
-        return when (trackingMode) {
+    private fun shouldReport(
+        event: TerminalMouseEvent,
+        trackingMode: Int,
+    ): Boolean =
+        when (trackingMode) {
             MouseTrackingMode.NONE -> false
 
             MouseTrackingMode.X10 ->
@@ -65,8 +70,10 @@ internal class MouseEncoder(
                 event.type == TerminalMouseEventType.PRESS ||
                     event.type == TerminalMouseEventType.RELEASE ||
                     event.type == TerminalMouseEventType.WHEEL ||
-                    (event.type == TerminalMouseEventType.MOTION &&
-                        event.button != TerminalMouseButton.NONE)
+                    (
+                        event.type == TerminalMouseEventType.MOTION &&
+                            event.button != TerminalMouseButton.NONE
+                    )
 
             MouseTrackingMode.ANY_EVENT ->
                 event.type == TerminalMouseEventType.PRESS ||
@@ -76,7 +83,6 @@ internal class MouseEncoder(
 
             else -> false
         }
-    }
 
     private fun encodeSgr(event: TerminalMouseEvent) {
         val x = oneBasedCoordinate(event.column)
@@ -180,9 +186,7 @@ internal class MouseEncoder(
         scratch.writeTo(output)
     }
 
-    private fun oneBasedCoordinate(zeroBased: Int): Int {
-        return zeroBased + 1
-    }
+    private fun oneBasedCoordinate(zeroBased: Int): Int = zeroBased + 1
 
     private fun boundedLegacyCoordinate(oneBased: Int): Int? {
         if (oneBased <= LEGACY_MAX_COORDINATE) {
@@ -199,38 +203,40 @@ internal class MouseEncoder(
         event: TerminalMouseEvent,
         legacyRelease: Boolean,
     ): Int {
-        var code = when (event.type) {
-            TerminalMouseEventType.RELEASE -> {
-                if (legacyRelease) {
-                    3
-                } else {
-                    baseButtonCode(event.button)
-                }
-            }
-
-            TerminalMouseEventType.WHEEL -> {
-                when (event.button) {
-                    TerminalMouseButton.WHEEL_UP -> 64
-                    TerminalMouseButton.WHEEL_DOWN -> 65
-                    TerminalMouseButton.WHEEL_LEFT -> 66
-                    TerminalMouseButton.WHEEL_RIGHT -> 67
-                    else -> return -1
-                }
-            }
-
-            TerminalMouseEventType.PRESS,
-            TerminalMouseEventType.MOTION -> {
-                if (event.button == TerminalMouseButton.NONE) {
-                    if (event.type == TerminalMouseEventType.MOTION) {
+        var code =
+            when (event.type) {
+                TerminalMouseEventType.RELEASE -> {
+                    if (legacyRelease) {
                         3
                     } else {
-                        return -1
+                        baseButtonCode(event.button)
                     }
-                } else {
-                    baseButtonCode(event.button)
+                }
+
+                TerminalMouseEventType.WHEEL -> {
+                    when (event.button) {
+                        TerminalMouseButton.WHEEL_UP -> 64
+                        TerminalMouseButton.WHEEL_DOWN -> 65
+                        TerminalMouseButton.WHEEL_LEFT -> 66
+                        TerminalMouseButton.WHEEL_RIGHT -> 67
+                        else -> return -1
+                    }
+                }
+
+                TerminalMouseEventType.PRESS,
+                TerminalMouseEventType.MOTION,
+                -> {
+                    if (event.button == TerminalMouseButton.NONE) {
+                        if (event.type == TerminalMouseEventType.MOTION) {
+                            3
+                        } else {
+                            return -1
+                        }
+                    } else {
+                        baseButtonCode(event.button)
+                    }
                 }
             }
-        }
 
         if (code < 0) {
             return -1
@@ -247,14 +253,13 @@ internal class MouseEncoder(
         return code
     }
 
-    private fun baseButtonCode(button: TerminalMouseButton): Int {
-        return when (button) {
+    private fun baseButtonCode(button: TerminalMouseButton): Int =
+        when (button) {
             TerminalMouseButton.LEFT -> 0
             TerminalMouseButton.MIDDLE -> 1
             TerminalMouseButton.RIGHT -> 2
             else -> -1
         }
-    }
 
     private fun appendUtf8Scalar(codepoint: Int) {
         when {

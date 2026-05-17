@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.api
 
 /**
@@ -77,8 +76,7 @@ object TerminalRenderAttrs {
      * @return one of [TerminalRenderColorKind.DEFAULT],
      * [TerminalRenderColorKind.INDEXED], or [TerminalRenderColorKind.RGB].
      */
-    fun foregroundKind(word: Long): Int =
-        ((word ushr FG_KIND_SHIFT) and COLOR_KIND_MASK).toInt()
+    fun foregroundKind(word: Long): Int = ((word ushr FG_KIND_SHIFT) and COLOR_KIND_MASK).toInt()
 
     /**
      * Returns the foreground color value.
@@ -87,8 +85,7 @@ object TerminalRenderAttrs {
      * @return zero for default colors, `0..255` for indexed colors, or
      * `0xRRGGBB` for RGB colors.
      */
-    fun foregroundValue(word: Long): Int =
-        ((word ushr FG_VALUE_SHIFT) and COLOR_VALUE_MASK).toInt()
+    fun foregroundValue(word: Long): Int = ((word ushr FG_VALUE_SHIFT) and COLOR_VALUE_MASK).toInt()
 
     /**
      * Returns the background color kind.
@@ -97,8 +94,7 @@ object TerminalRenderAttrs {
      * @return one of [TerminalRenderColorKind.DEFAULT],
      * [TerminalRenderColorKind.INDEXED], or [TerminalRenderColorKind.RGB].
      */
-    fun backgroundKind(word: Long): Int =
-        ((word ushr BG_KIND_SHIFT) and COLOR_KIND_MASK).toInt()
+    fun backgroundKind(word: Long): Int = ((word ushr BG_KIND_SHIFT) and COLOR_KIND_MASK).toInt()
 
     /**
      * Returns the background color value.
@@ -107,8 +103,7 @@ object TerminalRenderAttrs {
      * @return zero for default colors, `0..255` for indexed colors, or
      * `0xRRGGBB` for RGB colors.
      */
-    fun backgroundValue(word: Long): Int =
-        ((word ushr BG_VALUE_SHIFT) and COLOR_VALUE_MASK).toInt()
+    fun backgroundValue(word: Long): Int = ((word ushr BG_VALUE_SHIFT) and COLOR_VALUE_MASK).toInt()
 
     /**
      * Returns whether bold intensity is enabled.
@@ -140,8 +135,7 @@ object TerminalRenderAttrs {
      * @param word public render attribute word.
      * @return one of the [TerminalRenderUnderline] style constants.
      */
-    fun underlineStyle(word: Long): Int =
-        ((word ushr UNDERLINE_SHIFT) and UNDERLINE_MASK).toInt()
+    fun underlineStyle(word: Long): Int = ((word ushr UNDERLINE_SHIFT) and UNDERLINE_MASK).toInt()
 
     /**
      * Returns whether blink style is enabled.

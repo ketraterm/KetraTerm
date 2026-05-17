@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.ansi.sgr.SgrDispatcher
@@ -48,7 +47,6 @@ internal interface CommandDispatcher {
 }
 
 internal object AnsiCommandDispatcher : CommandDispatcher {
-
     override fun executeControl(
         sink: TerminalCommandSink,
         state: ParserState,
@@ -109,12 +107,13 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         state: ParserState,
         finalByte: Int,
     ) {
-        val signature = CsiSignature.encode(
-            finalByte = finalByte,
-            privateMarker = state.privateMarker,
-            intermediates = state.intermediates,
-            intermediateCount = state.intermediateCount,
-        )
+        val signature =
+            CsiSignature.encode(
+                finalByte = finalByte,
+                privateMarker = state.privateMarker,
+                intermediates = state.intermediates,
+                intermediateCount = state.intermediateCount,
+            )
 
         when (GeneratedCsiDispatchTable.lookup(signature)) {
             CsiCommand.UNKNOWN -> Unit
@@ -131,10 +130,11 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.DA_SECONDARY -> sink.requestDeviceAttributes(kind = 1, parameter = modeParam(state, 0))
             CsiCommand.DA_TERTIARY -> sink.requestDeviceAttributes(kind = 2, parameter = modeParam(state, 0))
             CsiCommand.CHA -> sink.setCursorColumn(oneBasedPositionParam(state, 0))
-            CsiCommand.CUP -> sink.setCursorAbsolute(
-                row = oneBasedPositionParam(state, 0),
-                col = oneBasedPositionParam(state, 1),
-            )
+            CsiCommand.CUP ->
+                sink.setCursorAbsolute(
+                    row = oneBasedPositionParam(state, 0),
+                    col = oneBasedPositionParam(state, 1),
+                )
             CsiCommand.VPA -> sink.setCursorRow(oneBasedPositionParam(state, 0))
 
             CsiCommand.ED -> sink.eraseInDisplay(modeParam(state, 0), selective = false)
@@ -152,14 +152,16 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.DSR_DEC -> sink.requestDeviceStatusReport(modeParam(state, 0), decPrivate = true)
             CsiCommand.TBC -> dispatchTabClear(sink, state)
             CsiCommand.WINDOW_OP -> dispatchWindowOperation(sink, state)
-            CsiCommand.DECSTBM -> sink.setScrollRegion(
-                top = scrollRegionTopParam(state, 0),
-                bottom = scrollRegionBottomParam(state, 1),
-            )
-            CsiCommand.DECSLRM -> sink.setLeftRightMargins(
-                left = leftRightMarginLeftParam(state, 0),
-                right = leftRightMarginRightParam(state, 1),
-            )
+            CsiCommand.DECSTBM ->
+                sink.setScrollRegion(
+                    top = scrollRegionTopParam(state, 0),
+                    bottom = scrollRegionBottomParam(state, 1),
+                )
+            CsiCommand.DECSLRM ->
+                sink.setLeftRightMargins(
+                    left = leftRightMarginLeftParam(state, 0),
+                    right = leftRightMarginRightParam(state, 1),
+                )
             CsiCommand.DECSCA -> dispatchSelectiveEraseProtection(sink, state)
 
             CsiCommand.SM_ANSI -> dispatchAnsiMode(sink, state, enable = true)
@@ -173,44 +175,66 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         }
     }
 
-    private fun countParam(state: ParserState, index: Int): Int {
+    private fun countParam(
+        state: ParserState,
+        index: Int,
+    ): Int {
         val value = paramOrMissing(state, index)
         return if (value <= 0) 1 else value
     }
 
-    private fun modeParam(state: ParserState, index: Int): Int {
+    private fun modeParam(
+        state: ParserState,
+        index: Int,
+    ): Int {
         val value = paramOrMissing(state, index)
         return if (value < 0) 0 else value
     }
 
-    private fun oneBasedPositionParam(state: ParserState, index: Int): Int {
+    private fun oneBasedPositionParam(
+        state: ParserState,
+        index: Int,
+    ): Int {
         val value = paramOrMissing(state, index)
         return if (value <= 0) 0 else value - 1
     }
 
-    private fun scrollRegionTopParam(state: ParserState, index: Int): Int {
+    private fun scrollRegionTopParam(
+        state: ParserState,
+        index: Int,
+    ): Int {
         val value = paramOrMissing(state, index)
         return if (value <= 0) 0 else value - 1
     }
 
-    private fun scrollRegionBottomParam(state: ParserState, index: Int): Int {
+    private fun scrollRegionBottomParam(
+        state: ParserState,
+        index: Int,
+    ): Int {
         val value = paramOrMissing(state, index)
         return if (value <= 0) -1 else value - 1
     }
 
-    private fun leftRightMarginLeftParam(state: ParserState, index: Int): Int {
+    private fun leftRightMarginLeftParam(
+        state: ParserState,
+        index: Int,
+    ): Int {
         val value = paramOrMissing(state, index)
         return if (value <= 0) 0 else value - 1
     }
 
-    private fun leftRightMarginRightParam(state: ParserState, index: Int): Int {
+    private fun leftRightMarginRightParam(
+        state: ParserState,
+        index: Int,
+    ): Int {
         val value = paramOrMissing(state, index)
         return if (value <= 0) -1 else value - 1
     }
 
-    private fun paramOrMissing(state: ParserState, index: Int): Int {
-        return if (index < state.paramCount) state.params[index] else -1
-    }
+    private fun paramOrMissing(
+        state: ParserState,
+        index: Int,
+    ): Int = if (index < state.paramCount) state.params[index] else -1
 
     private fun dispatchAnsiMode(
         sink: TerminalCommandSink,
@@ -298,13 +322,14 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             return false
         }
 
-        val slot = when (state.intermediates and 0xff) {
-            '('.code -> 0
-            ')'.code -> 1
-            '*'.code -> 2
-            '+'.code -> 3
-            else -> return false
-        }
+        val slot =
+            when (state.intermediates and 0xff) {
+                '('.code -> 0
+                ')'.code -> 1
+                '*'.code -> 2
+                '+'.code -> 3
+                else -> return false
+            }
 
         when (finalByte) {
             'B'.code -> CharsetMapper.designateAscii(state, slot)

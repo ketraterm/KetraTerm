@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.api
 
 import com.gagik.terminal.protocol.MouseEncodingMode
@@ -42,7 +41,7 @@ data class TerminalModeSnapshot(
     val treatAmbiguousAsWide: Boolean,
     val mouseTrackingMode: MouseTrackingMode,
     val mouseEncodingMode: MouseEncodingMode,
-    val modifyOtherKeysMode: Int
+    val modifyOtherKeysMode: Int,
 )
 
 /**
@@ -53,7 +52,6 @@ data class TerminalModeSnapshot(
  * state accidentally.
  */
 interface TerminalModeReader : TerminalInputState {
-
     /**
      * Returns one atomic packed snapshot of durable mode state.
      *

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.api
 
 import com.gagik.parser.impl.TerminalParser
@@ -24,7 +23,5 @@ import com.gagik.parser.spi.TerminalCommandSink
  */
 object TerminalParsers {
     @JvmStatic
-    fun create(sink: TerminalCommandSink): TerminalOutputParser {
-        return TerminalParser(sink)
-    }
+    fun create(sink: TerminalCommandSink): TerminalOutputParser = TerminalParser(sink)
 }

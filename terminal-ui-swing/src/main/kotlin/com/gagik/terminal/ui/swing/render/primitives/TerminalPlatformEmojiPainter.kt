@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 import com.gagik.terminal.ui.swing.render.platform.TerminalPlatformEmojiRasterizer
@@ -35,11 +34,10 @@ internal class TerminalPlatformEmojiPainter(
         rasterizerFactory()
     }
 
-    private val cache = object : LinkedHashMap<EmojiImageKey, BufferedImage>(CACHE_CAPACITY, LOAD_FACTOR, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<EmojiImageKey, BufferedImage>?): Boolean {
-            return size > CACHE_CAPACITY
+    private val cache =
+        object : LinkedHashMap<EmojiImageKey, BufferedImage>(CACHE_CAPACITY, LOAD_FACTOR, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<EmojiImageKey, BufferedImage>?): Boolean = size > CACHE_CAPACITY
         }
-    }
 
     fun paintCodePoint(
         g: Graphics2D,
@@ -79,9 +77,10 @@ internal class TerminalPlatformEmojiPainter(
     ): Boolean {
         val pixelSize = maxOf(1, min(metrics.cellWidth * columnSpan, metrics.cellHeight))
         val key = EmojiImageKey(text, pixelSize)
-        val image = synchronized(cache) {
-            cache[key] ?: rasterizer.rasterize(text, pixelSize)?.also { cache[key] = it }
-        } ?: return false
+        val image =
+            synchronized(cache) {
+                cache[key] ?: rasterizer.rasterize(text, pixelSize)?.also { cache[key] = it }
+            } ?: return false
 
         val cellX = column * metrics.cellWidth
         val cellY = row * metrics.cellHeight
@@ -100,7 +99,11 @@ internal class TerminalPlatformEmojiPainter(
         return true
     }
 
-    private fun containsEmojiPresentation(codepoints: IntArray, offset: Int, length: Int): Boolean {
+    private fun containsEmojiPresentation(
+        codepoints: IntArray,
+        offset: Int,
+        length: Int,
+    ): Boolean {
         if (containsCodePoint(codepoints, offset, length, VARIATION_SELECTOR_15)) return false
         if (containsCodePoint(codepoints, offset, length, VARIATION_SELECTOR_16) ||
             containsCodePoint(codepoints, offset, length, ZERO_WIDTH_JOINER)
@@ -119,7 +122,12 @@ internal class TerminalPlatformEmojiPainter(
         return false
     }
 
-    private fun containsCodePoint(codepoints: IntArray, offset: Int, length: Int, needle: Int): Boolean {
+    private fun containsCodePoint(
+        codepoints: IntArray,
+        offset: Int,
+        length: Int,
+        needle: Int,
+    ): Boolean {
         var index = 0
         while (index < length) {
             if (codepoints[offset + index] == needle) return true
@@ -128,8 +136,8 @@ internal class TerminalPlatformEmojiPainter(
         return false
     }
 
-    private fun isDefaultEmojiPresentationCodePoint(codePoint: Int): Boolean {
-        return codePoint in 0x1F000..0x1FAFF ||
+    private fun isDefaultEmojiPresentationCodePoint(codePoint: Int): Boolean =
+        codePoint in 0x1F000..0x1FAFF ||
             codePoint in 0x231A..0x231B ||
             codePoint in 0x23E9..0x23EC ||
             codePoint == 0x23F0 ||
@@ -163,7 +171,6 @@ internal class TerminalPlatformEmojiPainter(
             codePoint in 0x2B1B..0x2B1C ||
             codePoint == 0x2B50 ||
             codePoint == 0x2B55
-    }
 
     private data class EmojiImageKey(
         val text: String,

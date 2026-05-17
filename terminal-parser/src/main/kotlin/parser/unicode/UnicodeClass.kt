@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.unicode
 
 internal object UnicodeClass {
@@ -33,12 +32,8 @@ internal object UnicodeClass {
     const val GRAPHEME_LVT: Int = 13
 
     @JvmStatic
-    fun graphemeBreakClass(codepoint: Int): Int {
-        return GeneratedGraphemeBreakTable.graphemeBreakClass(codepoint)
-    }
+    fun graphemeBreakClass(codepoint: Int): Int = GeneratedGraphemeBreakTable.graphemeBreakClass(codepoint)
 
     @JvmStatic
-    fun isExtendedPictographic(codepoint: Int): Boolean {
-        return GeneratedGraphemeBreakTable.isExtendedPictographic(codepoint)
-    }
+    fun isExtendedPictographic(codepoint: Int): Boolean = GeneratedGraphemeBreakTable.isExtendedPictographic(codepoint)
 }

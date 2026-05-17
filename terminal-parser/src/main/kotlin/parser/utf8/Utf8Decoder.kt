@@ -13,14 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.utf8
 
 import com.gagik.parser.utf8.Utf8DecodeResult.EMIT
 import com.gagik.parser.utf8.Utf8DecodeResult.NONE
 import com.gagik.parser.utf8.Utf8DecodeResult.REPROCESS_CURRENT_BYTE
 import com.gagik.parser.utf8.Utf8DecodeResult.hasOutput
-
 
 /**
  * Packed, allocation-free UTF-8 decode result.
@@ -155,8 +153,8 @@ internal class Utf8Decoder(
         upperBound = 0xbf
     }
 
-    private fun startOrEmitAscii(byteValue: Int): Int {
-        return when {
+    private fun startOrEmitAscii(byteValue: Int): Int =
+        when {
             byteValue <= 0x7f -> Utf8DecodeResult.emit(byteValue)
 
             byteValue in 0xc2..0xdf -> {
@@ -208,9 +206,13 @@ internal class Utf8Decoder(
 
             else -> Utf8DecodeResult.emit(replacementCodepoint)
         }
-    }
 
-    private fun start(prefix: Int, needed: Int, lower: Int, upper: Int) {
+    private fun start(
+        prefix: Int,
+        needed: Int,
+        lower: Int,
+        upper: Int,
+    ) {
         codepoint = prefix
         continuationNeeded = needed
         continuationSeen = 0
@@ -218,9 +220,7 @@ internal class Utf8Decoder(
         upperBound = upper
     }
 
-    private fun isUnicodeScalar(value: Int): Boolean {
-        return value in 0..0x10ffff && value !in 0xd800..0xdfff
-    }
+    private fun isUnicodeScalar(value: Int): Boolean = value in 0..0x10ffff && value !in 0xd800..0xdfff
 
     companion object {
         const val REPLACEMENT_CODEPOINT: Int = 0xfffd

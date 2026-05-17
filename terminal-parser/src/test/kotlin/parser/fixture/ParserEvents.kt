@@ -13,15 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.fixture
 
 internal object ParserEvents {
     fun writeCodepoint(codepoint: Int): String = "writeCodepoint:$codepoint"
 
-    fun writeCluster(vararg codepoints: Int): String {
-        return "writeCluster:${codepoints.size}:${codepoints.joinToString(":")}"
-    }
+    fun writeCluster(vararg codepoints: Int): String = "writeCluster:${codepoints.size}:${codepoints.joinToString(":")}"
 
     fun appendToPreviousCluster(codepoint: Int): String = "appendToPreviousCluster:$codepoint"
 }

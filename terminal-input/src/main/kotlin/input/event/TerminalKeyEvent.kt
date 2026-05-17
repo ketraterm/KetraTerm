@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.event
 
 import com.gagik.terminal.input.event.TerminalKeyEvent.Companion.NO_CODEPOINT
-
 
 /**
  * One keyboard event accepted by the terminal input encoder.
@@ -73,12 +71,11 @@ data class TerminalKeyEvent(
         fun key(
             key: TerminalKey,
             modifiers: Int = TerminalModifiers.NONE,
-        ): TerminalKeyEvent {
-            return TerminalKeyEvent(
+        ): TerminalKeyEvent =
+            TerminalKeyEvent(
                 key = key,
                 modifiers = modifiers,
             )
-        }
 
         /**
          * Creates a printable Unicode scalar key event.
@@ -89,11 +86,10 @@ data class TerminalKeyEvent(
         fun codepoint(
             codepoint: Int,
             modifiers: Int = TerminalModifiers.NONE,
-        ): TerminalKeyEvent {
-            return TerminalKeyEvent(
+        ): TerminalKeyEvent =
+            TerminalKeyEvent(
                 codepoint = codepoint,
                 modifiers = modifiers,
             )
-        }
     }
 }

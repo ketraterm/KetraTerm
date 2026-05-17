@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.font
 
 import java.awt.Font
@@ -40,11 +39,12 @@ internal interface TerminalSystemFontFamilies {
 internal object TerminalSystemFallbackFonts : TerminalSystemFontFamilies {
     private val started = AtomicBoolean(false)
     private val loadedFamilies = AtomicReference<List<String>?>(null)
-    private val executor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "terminal-ui-system-font-loader").apply {
-            isDaemon = true
+    private val executor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "terminal-ui-system-font-loader").apply {
+                isDaemon = true
+            }
         }
-    }
 
     /**
      * Returns loaded font family names, or starts a background load and returns empty.
@@ -61,8 +61,8 @@ internal object TerminalSystemFallbackFonts : TerminalSystemFontFamilies {
         return emptyList()
     }
 
-    private fun loadSystemFontFamilies(): List<String> {
-        return try {
+    private fun loadSystemFontFamilies(): List<String> =
+        try {
             GraphicsEnvironment
                 .getLocalGraphicsEnvironment()
                 .availableFontFamilyNames
@@ -71,5 +71,4 @@ internal object TerminalSystemFallbackFonts : TerminalSystemFontFamilies {
         } catch (_: RuntimeException) {
             emptyList()
         }
-    }
 }

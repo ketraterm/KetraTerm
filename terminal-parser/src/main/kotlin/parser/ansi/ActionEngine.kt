@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.ansi.osc.OscDispatcher
@@ -35,7 +34,6 @@ internal class ActionEngine(
     private val dispatcher: CommandDispatcher,
     private val printableSink: PrintableActionSink,
 ) {
-
     /**
      * Executes one FSM action.
      *
@@ -58,7 +56,7 @@ internal class ActionEngine(
             }
 
             FsmAction.EXECUTE -> {
-                executeControl(state,nextState, byteValue, clearAfter = false)
+                executeControl(state, nextState, byteValue, clearAfter = false)
             }
 
             FsmAction.EXECUTE_AND_CLEAR -> {
@@ -241,7 +239,10 @@ internal class ActionEngine(
         printableSink.flush(state)
     }
 
-    private fun collectIntermediate(state: ParserState, byteValue: Int) {
+    private fun collectIntermediate(
+        state: ParserState,
+        byteValue: Int,
+    ) {
         if (state.intermediateCount >= 4) {
             return
         }
@@ -249,7 +250,10 @@ internal class ActionEngine(
         state.intermediateCount++
     }
 
-    private fun appendParamDigit(state: ParserState, byteValue: Int) {
+    private fun appendParamDigit(
+        state: ParserState,
+        byteValue: Int,
+    ) {
         val digit = byteValue - '0'.code
         require(digit in 0..9) { "Expected decimal digit byte, got: $byteValue" }
 
@@ -260,11 +264,12 @@ internal class ActionEngine(
         val index = state.paramCount - 1
         val current = state.params[index]
 
-        state.params[index] = if (!state.currentParamStarted || current < 0) {
-            digit
-        } else {
-            saturatingAppendDecimal(current, digit)
-        }
+        state.params[index] =
+            if (!state.currentParamStarted || current < 0) {
+                digit
+            } else {
+                saturatingAppendDecimal(current, digit)
+            }
 
         state.currentParamStarted = true
     }
@@ -287,13 +292,19 @@ internal class ActionEngine(
         state.currentParamStarted = false
     }
 
-    private fun setPrivateMarker(state: ParserState, byteValue: Int) {
+    private fun setPrivateMarker(
+        state: ParserState,
+        byteValue: Int,
+    ) {
         if (state.privateMarker == 0) {
             state.privateMarker = byteValue
         }
     }
 
-    private fun openParamField(state: ParserState, openedByColon: Boolean): Boolean {
+    private fun openParamField(
+        state: ParserState,
+        openedByColon: Boolean,
+    ): Boolean {
         val index = state.paramCount
         if (index >= state.params.size) {
             return false
@@ -309,7 +320,10 @@ internal class ActionEngine(
         return true
     }
 
-    private fun putPayloadByte(state: ParserState, byteValue: Int) {
+    private fun putPayloadByte(
+        state: ParserState,
+        byteValue: Int,
+    ) {
         if (state.payloadOverflowed) {
             return
         }
@@ -323,13 +337,15 @@ internal class ActionEngine(
         state.payloadLength++
     }
 
-    private fun saturatingAppendDecimal(value: Int, digit: Int): Int {
-        return if (value > 214_748_363) {
+    private fun saturatingAppendDecimal(
+        value: Int,
+        digit: Int,
+    ): Int =
+        if (value > 214_748_363) {
             Int.MAX_VALUE
         } else {
             value * 10 + digit
         }
-    }
 }
 
 /**
@@ -338,8 +354,15 @@ internal class ActionEngine(
  * This keeps ActionEngine from knowing UTF-8 decoder details or grapheme storage details.
  */
 internal interface PrintableActionSink {
-    fun onAsciiByte(state: ParserState, byteValue: Int)
-    fun onUtf8Byte(state: ParserState, byteValue: Int)
+    fun onAsciiByte(
+        state: ParserState,
+        byteValue: Int,
+    )
+
+    fun onUtf8Byte(
+        state: ParserState,
+        byteValue: Int,
+    )
+
     fun flush(state: ParserState)
 }
-

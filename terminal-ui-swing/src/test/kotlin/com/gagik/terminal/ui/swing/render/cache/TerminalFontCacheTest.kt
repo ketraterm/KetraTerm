@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.cache
 
 import com.gagik.terminal.ui.swing.render.font.TerminalSystemFontFamilies

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import org.junit.jupiter.api.Assertions.*
@@ -23,43 +22,42 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("FsmAction")
 class FsmActionTest {
-
-    private val allActions: List<Int> = listOf(
-        FsmAction.IGNORE,
-        FsmAction.EXECUTE,
-        FsmAction.EXECUTE_AND_CLEAR,
-        FsmAction.CLEAR_SEQUENCE,
-        FsmAction.PRINT_ASCII,
-        FsmAction.PRINT_UTF8,
-        FsmAction.COLLECT_INTERMEDIATE,
-        FsmAction.PARAM_DIGIT,
-        FsmAction.PARAM_SEPARATOR,
-        FsmAction.PARAM_COLON,
-        FsmAction.SET_PRIVATE_MARKER,
-        FsmAction.ESC_DISPATCH,
-        FsmAction.CSI_DISPATCH,
-        FsmAction.OSC_START,
-        FsmAction.OSC_PUT_ASCII,
-        FsmAction.OSC_PUT_UTF8,
-        FsmAction.DCS_IGNORE_START,
-        FsmAction.DCS_PUT_ASCII,
-        FsmAction.DCS_PUT_UTF8,
-        FsmAction.OSC_EXECUTE_CONTROL,
-        FsmAction.OSC_END,
-        FsmAction.DCS_END,
-        FsmAction.STRING_END
-    )
+    private val allActions: List<Int> =
+        listOf(
+            FsmAction.IGNORE,
+            FsmAction.EXECUTE,
+            FsmAction.EXECUTE_AND_CLEAR,
+            FsmAction.CLEAR_SEQUENCE,
+            FsmAction.PRINT_ASCII,
+            FsmAction.PRINT_UTF8,
+            FsmAction.COLLECT_INTERMEDIATE,
+            FsmAction.PARAM_DIGIT,
+            FsmAction.PARAM_SEPARATOR,
+            FsmAction.PARAM_COLON,
+            FsmAction.SET_PRIVATE_MARKER,
+            FsmAction.ESC_DISPATCH,
+            FsmAction.CSI_DISPATCH,
+            FsmAction.OSC_START,
+            FsmAction.OSC_PUT_ASCII,
+            FsmAction.OSC_PUT_UTF8,
+            FsmAction.DCS_IGNORE_START,
+            FsmAction.DCS_PUT_ASCII,
+            FsmAction.DCS_PUT_UTF8,
+            FsmAction.OSC_EXECUTE_CONTROL,
+            FsmAction.OSC_END,
+            FsmAction.DCS_END,
+            FsmAction.STRING_END,
+        )
 
     @Nested
     @DisplayName("constants and layout")
     inner class ConstantsAndLayout {
-
         @Test
         fun `action ids are contiguous and covered by COUNT`() {
             assertAll(
                 { assertEquals(FsmAction.COUNT, allActions.size) },
                 { assertEquals((0 until FsmAction.COUNT).toList(), allActions) },
-                { assertEquals(allActions.size, allActions.toSet().size, "action ids must be unique") }
+                { assertEquals(allActions.size, allActions.toSet().size, "action ids must be unique") },
             )
         }
 
@@ -77,19 +75,19 @@ class FsmActionTest {
     @Nested
     @DisplayName("string actions")
     inner class StringActions {
-
         @Test
         fun `string-specific actions are separate from global control execution`() {
-            val stringActions = setOf(
-                FsmAction.OSC_EXECUTE_CONTROL,
-                FsmAction.OSC_END,
-                FsmAction.DCS_END,
-                FsmAction.STRING_END
-            )
+            val stringActions =
+                setOf(
+                    FsmAction.OSC_EXECUTE_CONTROL,
+                    FsmAction.OSC_END,
+                    FsmAction.DCS_END,
+                    FsmAction.STRING_END,
+                )
 
             assertAll(
                 { assertTrue(FsmAction.EXECUTE !in stringActions) },
-                { assertTrue(FsmAction.EXECUTE_AND_CLEAR !in stringActions) }
+                { assertTrue(FsmAction.EXECUTE_AND_CLEAR !in stringActions) },
             )
         }
     }

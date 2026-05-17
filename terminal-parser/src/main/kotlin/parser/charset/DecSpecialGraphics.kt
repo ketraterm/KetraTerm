@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.charset
 
 /**
@@ -24,8 +23,8 @@ package com.gagik.parser.charset
  */
 internal object DecSpecialGraphics {
     @JvmStatic
-    fun map(codepoint: Int): Int {
-        return when (codepoint) {
+    fun map(codepoint: Int): Int =
+        when (codepoint) {
             '`'.code -> 0x25c6 // ◆ black diamond
             'a'.code -> 0x2592 // ▒ checkerboard
             'b'.code -> 0x2409 // symbol for horizontal tab
@@ -59,5 +58,4 @@ internal object DecSpecialGraphics {
             '~'.code -> 0x00b7 // · middle dot
             else -> codepoint
         }
-    }
 }

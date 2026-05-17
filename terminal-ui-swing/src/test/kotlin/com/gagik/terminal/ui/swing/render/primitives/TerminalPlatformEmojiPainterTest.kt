@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 import com.gagik.terminal.ui.swing.render.TEST_RED
@@ -80,7 +79,10 @@ class TerminalPlatformEmojiPainterTest {
         val texts = mutableListOf<String>()
         override val available: Boolean = true
 
-        override fun rasterize(text: String, pixelSize: Int): BufferedImage {
+        override fun rasterize(
+            text: String,
+            pixelSize: Int,
+        ): BufferedImage {
             texts += text
             return BufferedImage(pixelSize, pixelSize, BufferedImage.TYPE_INT_ARGB).also { image ->
                 image.setRGB(pixelSize / 2, pixelSize / 2, TEST_RED)
@@ -89,14 +91,15 @@ class TerminalPlatformEmojiPainterTest {
     }
 
     private companion object {
-        private val METRICS = TerminalSwingMetrics(
-            cellWidth = 10,
-            cellHeight = 20,
-            baseline = 14,
-            underlineY = 15,
-            strikethroughY = 9,
-            overlineY = 0,
-            cursorStrokeWidth = 1,
-        )
+        private val METRICS =
+            TerminalSwingMetrics(
+                cellWidth = 10,
+                cellHeight = 20,
+                baseline = 14,
+                underlineY = 15,
+                strikethroughY = 9,
+                overlineY = 0,
+                cursorStrokeWidth = 1,
+            )
     }
 }

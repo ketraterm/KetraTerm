@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import org.junit.jupiter.api.Assertions.*
@@ -23,12 +22,11 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("AnsiStateMachine")
 class AnsiStateMachineTest {
-
     // ----- Helpers ----------------------------------------------------------
 
     private data class DecodedTransition(
         val nextState: Int,
-        val action: Int
+        val action: Int,
     )
 
     private data class Step(
@@ -36,80 +34,88 @@ class AnsiStateMachineTest {
         val byteClass: Int,
         val fromState: Int,
         val nextState: Int,
-        val action: Int
+        val action: Int,
     )
 
     private val states: List<Int> = (0 until AnsiState.COUNT).toList()
     private val byteClasses: List<Int> = (0 until ByteClass.ROUTING_COUNT).toList()
 
-    private val groundPrintableClasses: List<Int> = listOf(
-        ByteClass.INTERMEDIATE,
-        ByteClass.PARAM_DIGIT,
-        ByteClass.COLON,
-        ByteClass.PARAM_SEP,
-        ByteClass.PRIVATE_MARKER,
-        ByteClass.DCS_INTRO,
-        ByteClass.CSI_INTRO,
-        ByteClass.ST_INTRO,
-        ByteClass.OSC_INTRO,
-        ByteClass.SOS_PM_APC_INTRO,
-        ByteClass.FINAL_BYTE
-    )
+    private val groundPrintableClasses: List<Int> =
+        listOf(
+            ByteClass.INTERMEDIATE,
+            ByteClass.PARAM_DIGIT,
+            ByteClass.COLON,
+            ByteClass.PARAM_SEP,
+            ByteClass.PRIVATE_MARKER,
+            ByteClass.DCS_INTRO,
+            ByteClass.CSI_INTRO,
+            ByteClass.ST_INTRO,
+            ByteClass.OSC_INTRO,
+            ByteClass.SOS_PM_APC_INTRO,
+            ByteClass.FINAL_BYTE,
+        )
 
-    private val escDispatchClasses: List<Int> = listOf(
-        ByteClass.PARAM_DIGIT,
-        ByteClass.COLON,
-        ByteClass.PARAM_SEP,
-        ByteClass.PRIVATE_MARKER,
-        ByteClass.FINAL_BYTE
-    )
+    private val escDispatchClasses: List<Int> =
+        listOf(
+            ByteClass.PARAM_DIGIT,
+            ByteClass.COLON,
+            ByteClass.PARAM_SEP,
+            ByteClass.PRIVATE_MARKER,
+            ByteClass.FINAL_BYTE,
+        )
 
-    private val escIntermediateDispatchClasses: List<Int> = listOf(
-        ByteClass.PARAM_DIGIT,
-        ByteClass.COLON,
-        ByteClass.PARAM_SEP,
-        ByteClass.PRIVATE_MARKER,
-        ByteClass.DCS_INTRO,
-        ByteClass.CSI_INTRO,
-        ByteClass.ST_INTRO,
-        ByteClass.OSC_INTRO,
-        ByteClass.SOS_PM_APC_INTRO,
-        ByteClass.FINAL_BYTE
-    )
+    private val escIntermediateDispatchClasses: List<Int> =
+        listOf(
+            ByteClass.PARAM_DIGIT,
+            ByteClass.COLON,
+            ByteClass.PARAM_SEP,
+            ByteClass.PRIVATE_MARKER,
+            ByteClass.DCS_INTRO,
+            ByteClass.CSI_INTRO,
+            ByteClass.ST_INTRO,
+            ByteClass.OSC_INTRO,
+            ByteClass.SOS_PM_APC_INTRO,
+            ByteClass.FINAL_BYTE,
+        )
 
-    private val csiDispatchClasses: List<Int> = listOf(
-        ByteClass.DCS_INTRO,
-        ByteClass.CSI_INTRO,
-        ByteClass.ST_INTRO,
-        ByteClass.OSC_INTRO,
-        ByteClass.SOS_PM_APC_INTRO,
-        ByteClass.FINAL_BYTE
-    )
+    private val csiDispatchClasses: List<Int> =
+        listOf(
+            ByteClass.DCS_INTRO,
+            ByteClass.CSI_INTRO,
+            ByteClass.ST_INTRO,
+            ByteClass.OSC_INTRO,
+            ByteClass.SOS_PM_APC_INTRO,
+            ByteClass.FINAL_BYTE,
+        )
 
-    private val stringAsciiPayloadClasses: List<Int> = listOf(
-        ByteClass.INTERMEDIATE,
-        ByteClass.PARAM_DIGIT,
-        ByteClass.COLON,
-        ByteClass.PARAM_SEP,
-        ByteClass.PRIVATE_MARKER,
-        ByteClass.DCS_INTRO,
-        ByteClass.CSI_INTRO,
-        ByteClass.ST_INTRO,
-        ByteClass.OSC_INTRO,
-        ByteClass.SOS_PM_APC_INTRO,
-        ByteClass.FINAL_BYTE
-    )
+    private val stringAsciiPayloadClasses: List<Int> =
+        listOf(
+            ByteClass.INTERMEDIATE,
+            ByteClass.PARAM_DIGIT,
+            ByteClass.COLON,
+            ByteClass.PARAM_SEP,
+            ByteClass.PRIVATE_MARKER,
+            ByteClass.DCS_INTRO,
+            ByteClass.CSI_INTRO,
+            ByteClass.ST_INTRO,
+            ByteClass.OSC_INTRO,
+            ByteClass.SOS_PM_APC_INTRO,
+            ByteClass.FINAL_BYTE,
+        )
 
     private val stringAsciiPayloadClassesExceptSt: List<Int> =
         stringAsciiPayloadClasses.filterNot { it == ByteClass.ST_INTRO }
 
     private val nonStringStates: List<Int> = states.filterNot(AnsiState::isStringState)
 
-    private fun decoded(state: Int, byteClass: Int): DecodedTransition {
+    private fun decoded(
+        state: Int,
+        byteClass: Int,
+    ): DecodedTransition {
         val transition = AnsiStateMachine.transition(state, byteClass)
         return DecodedTransition(
             nextState = AnsiStateMachine.nextState(transition),
-            action = AnsiStateMachine.action(transition)
+            action = AnsiStateMachine.action(transition),
         )
     }
 
@@ -117,14 +123,14 @@ class AnsiStateMachineTest {
         state: Int,
         byteClass: Int,
         expectedNextState: Int,
-        expectedAction: Int
+        expectedAction: Int,
     ) {
         val actual = decoded(state, byteClass)
 
         assertAll(
             "state=$state byteClass=$byteClass",
             { assertEquals(expectedNextState, actual.nextState, "next state") },
-            { assertEquals(expectedAction, actual.action, "action") }
+            { assertEquals(expectedAction, actual.action, "action") },
         )
     }
 
@@ -132,7 +138,7 @@ class AnsiStateMachineTest {
         state: Int,
         classes: Iterable<Int>,
         expectedNextState: Int,
-        expectedAction: Int
+        expectedAction: Int,
     ) {
         for (byteClass in classes) {
             assertTransition(state, byteClass, expectedNextState, expectedAction)
@@ -146,13 +152,14 @@ class AnsiStateMachineTest {
         for (byteValue in byteValues) {
             val byteClass = ByteClass.classify(byteValue)
             val transition = decoded(state, byteClass)
-            steps += Step(
-                byteValue = byteValue,
-                byteClass = byteClass,
-                fromState = state,
-                nextState = transition.nextState,
-                action = transition.action
-            )
+            steps +=
+                Step(
+                    byteValue = byteValue,
+                    byteClass = byteClass,
+                    fromState = state,
+                    nextState = transition.nextState,
+                    action = transition.action,
+                )
             state = transition.nextState
         }
 
@@ -162,26 +169,29 @@ class AnsiStateMachineTest {
     private fun assertStTerminationNeedsStringContext(startState: Int) {
         val esc = decoded(startState, ByteClass.ESC)
         val st = decoded(esc.nextState, ByteClass.ST_INTRO)
-        val expectedEscapeState = when (startState) {
-            AnsiState.OSC_STRING -> AnsiState.OSC_ESCAPE
-            AnsiState.DCS_PASSTHROUGH -> AnsiState.DCS_ESCAPE
-            AnsiState.SOS_PM_APC_STRING -> AnsiState.SOS_PM_APC_ESCAPE
-            AnsiState.IGNORE_UNTIL_ST -> AnsiState.IGNORE_UNTIL_ST_ESCAPE
-            else -> error("unsupported start state: $startState")
-        }
-        val expectedEndAction = when (startState) {
-            AnsiState.OSC_STRING -> FsmAction.OSC_END
-            AnsiState.DCS_PASSTHROUGH -> FsmAction.DCS_END
-            AnsiState.SOS_PM_APC_STRING,
-            AnsiState.IGNORE_UNTIL_ST -> FsmAction.STRING_END
-            else -> error("unsupported start state: $startState")
-        }
+        val expectedEscapeState =
+            when (startState) {
+                AnsiState.OSC_STRING -> AnsiState.OSC_ESCAPE
+                AnsiState.DCS_PASSTHROUGH -> AnsiState.DCS_ESCAPE
+                AnsiState.SOS_PM_APC_STRING -> AnsiState.SOS_PM_APC_ESCAPE
+                AnsiState.IGNORE_UNTIL_ST -> AnsiState.IGNORE_UNTIL_ST_ESCAPE
+                else -> error("unsupported start state: $startState")
+            }
+        val expectedEndAction =
+            when (startState) {
+                AnsiState.OSC_STRING -> FsmAction.OSC_END
+                AnsiState.DCS_PASSTHROUGH -> FsmAction.DCS_END
+                AnsiState.SOS_PM_APC_STRING,
+                AnsiState.IGNORE_UNTIL_ST,
+                -> FsmAction.STRING_END
+                else -> error("unsupported start state: $startState")
+            }
 
         assertAll(
             { assertEquals(expectedEscapeState, esc.nextState, "ESC must enter a string-local escape state") },
             { assertEquals(FsmAction.IGNORE, esc.action, "ESC inside strings must preserve payload context") },
             { assertEquals(AnsiState.GROUND, st.nextState, "ESC followed by ST_INTRO must terminate the string") },
-            { assertEquals(expectedEndAction, st.action, "ESC \\ from a string must terminate via string-end action") }
+            { assertEquals(expectedEndAction, st.action, "ESC \\ from a string must terminate via string-end action") },
         )
     }
 
@@ -201,7 +211,7 @@ class AnsiStateMachineTest {
             { assertTransition(escapeState, ByteClass.ST_INTRO, AnsiState.GROUND, endAction) },
             { assertTransition(escapeState, ByteClass.CAN_SUB, AnsiState.GROUND, endAction) },
             { assertTransition(escapeState, ByteClass.ESC, escapeState, FsmAction.IGNORE) },
-            { assertTransition(escapeState, ByteClass.DEL, escapeState, FsmAction.IGNORE) }
+            { assertTransition(escapeState, ByteClass.DEL, escapeState, FsmAction.IGNORE) },
         )
     }
 
@@ -210,13 +220,12 @@ class AnsiStateMachineTest {
     @Nested
     @DisplayName("matrix shape and encoding")
     inner class MatrixShapeAndEncoding {
-
         @Test
         fun `routing count includes all ASCII classes plus UTF-8 payload`() {
             assertAll(
                 { assertEquals(ByteClass.COUNT + 1, ByteClass.ROUTING_COUNT) },
                 { assertEquals(ByteClass.UTF8_PAYLOAD + 1, ByteClass.ROUTING_COUNT) },
-                { assertEquals((0 until ByteClass.ROUTING_COUNT).toList(), byteClasses) }
+                { assertEquals((0 until ByteClass.ROUTING_COUNT).toList(), byteClasses) },
             )
         }
 
@@ -229,7 +238,7 @@ class AnsiStateMachineTest {
                     assertAll(
                         "state=$state byteClass=$byteClass",
                         { assertTrue(transition.nextState in 0 until AnsiState.COUNT, "valid next state") },
-                        { assertTrue(transition.action in 0 until FsmAction.COUNT, "valid action") }
+                        { assertTrue(transition.action in 0 until FsmAction.COUNT, "valid action") },
                     )
                 }
             }
@@ -241,45 +250,51 @@ class AnsiStateMachineTest {
 
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, AnsiStateMachine.nextState(encoded)) },
-                { assertEquals(FsmAction.DCS_PUT_UTF8, AnsiStateMachine.action(encoded)) }
+                { assertEquals(FsmAction.DCS_PUT_UTF8, AnsiStateMachine.action(encoded)) },
             )
         }
 
         @Test
         fun `transition rejects states outside the state table`() {
-            val below = assertThrows(IllegalArgumentException::class.java) {
-                AnsiStateMachine.transition(-1, ByteClass.EXECUTE)
-            }
-            val atCount = assertThrows(IllegalArgumentException::class.java) {
-                AnsiStateMachine.transition(AnsiState.COUNT, ByteClass.EXECUTE)
-            }
-            val above = assertThrows(IllegalArgumentException::class.java) {
-                AnsiStateMachine.transition(Int.MAX_VALUE, ByteClass.EXECUTE)
-            }
+            val below =
+                assertThrows(IllegalArgumentException::class.java) {
+                    AnsiStateMachine.transition(-1, ByteClass.EXECUTE)
+                }
+            val atCount =
+                assertThrows(IllegalArgumentException::class.java) {
+                    AnsiStateMachine.transition(AnsiState.COUNT, ByteClass.EXECUTE)
+                }
+            val above =
+                assertThrows(IllegalArgumentException::class.java) {
+                    AnsiStateMachine.transition(Int.MAX_VALUE, ByteClass.EXECUTE)
+                }
 
             assertAll(
                 { assertEquals("state out of range: -1", below.message) },
                 { assertEquals("state out of range: ${AnsiState.COUNT}", atCount.message) },
-                { assertEquals("state out of range: ${Int.MAX_VALUE}", above.message) }
+                { assertEquals("state out of range: ${Int.MAX_VALUE}", above.message) },
             )
         }
 
         @Test
         fun `transition rejects byte classes outside the routing table`() {
-            val below = assertThrows(IllegalArgumentException::class.java) {
-                AnsiStateMachine.transition(AnsiState.GROUND, -1)
-            }
-            val atCount = assertThrows(IllegalArgumentException::class.java) {
-                AnsiStateMachine.transition(AnsiState.GROUND, ByteClass.ROUTING_COUNT)
-            }
-            val above = assertThrows(IllegalArgumentException::class.java) {
-                AnsiStateMachine.transition(AnsiState.GROUND, Int.MAX_VALUE)
-            }
+            val below =
+                assertThrows(IllegalArgumentException::class.java) {
+                    AnsiStateMachine.transition(AnsiState.GROUND, -1)
+                }
+            val atCount =
+                assertThrows(IllegalArgumentException::class.java) {
+                    AnsiStateMachine.transition(AnsiState.GROUND, ByteClass.ROUTING_COUNT)
+                }
+            val above =
+                assertThrows(IllegalArgumentException::class.java) {
+                    AnsiStateMachine.transition(AnsiState.GROUND, Int.MAX_VALUE)
+                }
 
             assertAll(
                 { assertEquals("byteClass out of range: -1", below.message) },
                 { assertEquals("byteClass out of range: ${ByteClass.ROUTING_COUNT}", atCount.message) },
-                { assertEquals("byteClass out of range: ${Int.MAX_VALUE}", above.message) }
+                { assertEquals("byteClass out of range: ${Int.MAX_VALUE}", above.message) },
             )
         }
     }
@@ -289,14 +304,13 @@ class AnsiStateMachineTest {
     @Nested
     @DisplayName("GROUND")
     inner class Ground {
-
         @Test
         fun `ASCII structural and final classes print without leaving ground`() {
             assertClasses(
                 AnsiState.GROUND,
                 groundPrintableClasses,
                 AnsiState.GROUND,
-                FsmAction.PRINT_ASCII
+                FsmAction.PRINT_ASCII,
             )
         }
 
@@ -306,7 +320,7 @@ class AnsiStateMachineTest {
                 AnsiState.GROUND,
                 ByteClass.EXECUTE,
                 AnsiState.GROUND,
-                FsmAction.EXECUTE
+                FsmAction.EXECUTE,
             )
         }
 
@@ -316,7 +330,7 @@ class AnsiStateMachineTest {
                 AnsiState.GROUND,
                 ByteClass.CAN_SUB,
                 AnsiState.GROUND,
-                FsmAction.EXECUTE_AND_CLEAR
+                FsmAction.EXECUTE_AND_CLEAR,
             )
         }
 
@@ -326,7 +340,7 @@ class AnsiStateMachineTest {
                 AnsiState.GROUND,
                 ByteClass.ESC,
                 AnsiState.ESCAPE,
-                FsmAction.CLEAR_SEQUENCE
+                FsmAction.CLEAR_SEQUENCE,
             )
         }
 
@@ -336,7 +350,7 @@ class AnsiStateMachineTest {
                 AnsiState.GROUND,
                 ByteClass.DEL,
                 AnsiState.GROUND,
-                FsmAction.IGNORE
+                FsmAction.IGNORE,
             )
         }
 
@@ -346,7 +360,7 @@ class AnsiStateMachineTest {
                 AnsiState.GROUND,
                 ByteClass.UTF8_PAYLOAD,
                 AnsiState.GROUND,
-                FsmAction.PRINT_UTF8
+                FsmAction.PRINT_UTF8,
             )
         }
     }
@@ -356,7 +370,6 @@ class AnsiStateMachineTest {
     @Nested
     @DisplayName("anywhere and UTF-8 rules")
     inner class AnywhereAndUtf8Rules {
-
         @Test
         fun `CAN and SUB abort every state back to ground`() {
             for (state in states) {
@@ -379,28 +392,29 @@ class AnsiStateMachineTest {
                     state,
                     ByteClass.ESC,
                     AnsiState.ESCAPE,
-                    FsmAction.CLEAR_SEQUENCE
+                    FsmAction.CLEAR_SEQUENCE,
                 )
             }
         }
 
         @Test
         fun `active 7-bit control grammar states reject UTF-8 payload back to ground`() {
-            val activeGrammarStates = listOf(
-                AnsiState.ESCAPE,
-                AnsiState.ESCAPE_INTERMEDIATE,
-                AnsiState.CSI_ENTRY,
-                AnsiState.CSI_PARAM,
-                AnsiState.CSI_INTERMEDIATE,
-                AnsiState.CSI_IGNORE
-            )
+            val activeGrammarStates =
+                listOf(
+                    AnsiState.ESCAPE,
+                    AnsiState.ESCAPE_INTERMEDIATE,
+                    AnsiState.CSI_ENTRY,
+                    AnsiState.CSI_PARAM,
+                    AnsiState.CSI_INTERMEDIATE,
+                    AnsiState.CSI_IGNORE,
+                )
 
             for (state in activeGrammarStates) {
                 assertTransition(
                     state,
                     ByteClass.UTF8_PAYLOAD,
                     AnsiState.GROUND,
-                    FsmAction.CLEAR_SEQUENCE
+                    FsmAction.CLEAR_SEQUENCE,
                 )
             }
         }
@@ -413,7 +427,7 @@ class AnsiStateMachineTest {
                         AnsiState.OSC_STRING,
                         ByteClass.UTF8_PAYLOAD,
                         AnsiState.OSC_STRING,
-                        FsmAction.OSC_PUT_UTF8
+                        FsmAction.OSC_PUT_UTF8,
                     )
                 },
                 {
@@ -421,7 +435,7 @@ class AnsiStateMachineTest {
                         AnsiState.DCS_PASSTHROUGH,
                         ByteClass.UTF8_PAYLOAD,
                         AnsiState.DCS_PASSTHROUGH,
-                        FsmAction.DCS_PUT_UTF8
+                        FsmAction.DCS_PUT_UTF8,
                     )
                 },
                 {
@@ -429,7 +443,7 @@ class AnsiStateMachineTest {
                         AnsiState.SOS_PM_APC_STRING,
                         ByteClass.UTF8_PAYLOAD,
                         AnsiState.SOS_PM_APC_STRING,
-                        FsmAction.IGNORE
+                        FsmAction.IGNORE,
                     )
                 },
                 {
@@ -437,9 +451,9 @@ class AnsiStateMachineTest {
                         AnsiState.IGNORE_UNTIL_ST,
                         ByteClass.UTF8_PAYLOAD,
                         AnsiState.IGNORE_UNTIL_ST,
-                        FsmAction.IGNORE
+                        FsmAction.IGNORE,
                     )
-                }
+                },
             )
         }
     }
@@ -449,14 +463,13 @@ class AnsiStateMachineTest {
     @Nested
     @DisplayName("ESCAPE")
     inner class Escape {
-
         @Test
         fun `intermediate bytes enter escape intermediate collection`() {
             assertTransition(
                 AnsiState.ESCAPE,
                 ByteClass.INTERMEDIATE,
                 AnsiState.ESCAPE_INTERMEDIATE,
-                FsmAction.COLLECT_INTERMEDIATE
+                FsmAction.COLLECT_INTERMEDIATE,
             )
         }
 
@@ -468,7 +481,7 @@ class AnsiStateMachineTest {
                         AnsiState.ESCAPE,
                         ByteClass.CSI_INTRO,
                         AnsiState.CSI_ENTRY,
-                        FsmAction.CLEAR_SEQUENCE
+                        FsmAction.CLEAR_SEQUENCE,
                     )
                 },
                 {
@@ -476,7 +489,7 @@ class AnsiStateMachineTest {
                         AnsiState.ESCAPE,
                         ByteClass.OSC_INTRO,
                         AnsiState.OSC_STRING,
-                        FsmAction.OSC_START
+                        FsmAction.OSC_START,
                     )
                 },
                 {
@@ -484,7 +497,7 @@ class AnsiStateMachineTest {
                         AnsiState.ESCAPE,
                         ByteClass.DCS_INTRO,
                         AnsiState.DCS_ENTRY,
-                        FsmAction.CLEAR_SEQUENCE
+                        FsmAction.CLEAR_SEQUENCE,
                     )
                 },
                 {
@@ -492,9 +505,9 @@ class AnsiStateMachineTest {
                         AnsiState.ESCAPE,
                         ByteClass.SOS_PM_APC_INTRO,
                         AnsiState.SOS_PM_APC_STRING,
-                        FsmAction.IGNORE
+                        FsmAction.IGNORE,
                     )
-                }
+                },
             )
         }
 
@@ -504,7 +517,7 @@ class AnsiStateMachineTest {
                 AnsiState.ESCAPE,
                 escDispatchClasses,
                 AnsiState.GROUND,
-                FsmAction.ESC_DISPATCH
+                FsmAction.ESC_DISPATCH,
             )
         }
 
@@ -514,7 +527,7 @@ class AnsiStateMachineTest {
                 AnsiState.ESCAPE,
                 ByteClass.ST_INTRO,
                 AnsiState.GROUND,
-                FsmAction.ESC_DISPATCH
+                FsmAction.ESC_DISPATCH,
             )
         }
     }
@@ -524,14 +537,13 @@ class AnsiStateMachineTest {
     @Nested
     @DisplayName("ESCAPE_INTERMEDIATE")
     inner class EscapeIntermediate {
-
         @Test
         fun `additional intermediate bytes continue collection`() {
             assertTransition(
                 AnsiState.ESCAPE_INTERMEDIATE,
                 ByteClass.INTERMEDIATE,
                 AnsiState.ESCAPE_INTERMEDIATE,
-                FsmAction.COLLECT_INTERMEDIATE
+                FsmAction.COLLECT_INTERMEDIATE,
             )
         }
 
@@ -541,7 +553,7 @@ class AnsiStateMachineTest {
                 AnsiState.ESCAPE_INTERMEDIATE,
                 escIntermediateDispatchClasses,
                 AnsiState.GROUND,
-                FsmAction.ESC_DISPATCH
+                FsmAction.ESC_DISPATCH,
             )
         }
     }
@@ -551,7 +563,6 @@ class AnsiStateMachineTest {
     @Nested
     @DisplayName("CSI states")
     inner class CsiStates {
-
         @Test
         fun `CSI entry routes parameter grammar and intermediates`() {
             assertAll(
@@ -559,7 +570,14 @@ class AnsiStateMachineTest {
                 { assertTransition(AnsiState.CSI_ENTRY, ByteClass.COLON, AnsiState.CSI_PARAM, FsmAction.PARAM_COLON) },
                 { assertTransition(AnsiState.CSI_ENTRY, ByteClass.PARAM_SEP, AnsiState.CSI_PARAM, FsmAction.PARAM_SEPARATOR) },
                 { assertTransition(AnsiState.CSI_ENTRY, ByteClass.PRIVATE_MARKER, AnsiState.CSI_PARAM, FsmAction.SET_PRIVATE_MARKER) },
-                { assertTransition(AnsiState.CSI_ENTRY, ByteClass.INTERMEDIATE, AnsiState.CSI_INTERMEDIATE, FsmAction.COLLECT_INTERMEDIATE) }
+                {
+                    assertTransition(
+                        AnsiState.CSI_ENTRY,
+                        ByteClass.INTERMEDIATE,
+                        AnsiState.CSI_INTERMEDIATE,
+                        FsmAction.COLLECT_INTERMEDIATE,
+                    )
+                },
             )
         }
 
@@ -569,7 +587,7 @@ class AnsiStateMachineTest {
                 AnsiState.CSI_ENTRY,
                 csiDispatchClasses,
                 AnsiState.GROUND,
-                FsmAction.CSI_DISPATCH
+                FsmAction.CSI_DISPATCH,
             )
         }
 
@@ -580,7 +598,14 @@ class AnsiStateMachineTest {
                 { assertTransition(AnsiState.CSI_PARAM, ByteClass.COLON, AnsiState.CSI_PARAM, FsmAction.PARAM_COLON) },
                 { assertTransition(AnsiState.CSI_PARAM, ByteClass.PARAM_SEP, AnsiState.CSI_PARAM, FsmAction.PARAM_SEPARATOR) },
                 { assertTransition(AnsiState.CSI_PARAM, ByteClass.PRIVATE_MARKER, AnsiState.CSI_IGNORE, FsmAction.IGNORE) },
-                { assertTransition(AnsiState.CSI_PARAM, ByteClass.INTERMEDIATE, AnsiState.CSI_INTERMEDIATE, FsmAction.COLLECT_INTERMEDIATE) }
+                {
+                    assertTransition(
+                        AnsiState.CSI_PARAM,
+                        ByteClass.INTERMEDIATE,
+                        AnsiState.CSI_INTERMEDIATE,
+                        FsmAction.COLLECT_INTERMEDIATE,
+                    )
+                },
             )
         }
 
@@ -590,7 +615,7 @@ class AnsiStateMachineTest {
                 AnsiState.CSI_PARAM,
                 csiDispatchClasses,
                 AnsiState.GROUND,
-                FsmAction.CSI_DISPATCH
+                FsmAction.CSI_DISPATCH,
             )
         }
 
@@ -602,13 +627,13 @@ class AnsiStateMachineTest {
                         AnsiState.CSI_INTERMEDIATE,
                         ByteClass.INTERMEDIATE,
                         AnsiState.CSI_INTERMEDIATE,
-                        FsmAction.COLLECT_INTERMEDIATE
+                        FsmAction.COLLECT_INTERMEDIATE,
                     )
                 },
                 { assertTransition(AnsiState.CSI_INTERMEDIATE, ByteClass.PARAM_DIGIT, AnsiState.CSI_IGNORE, FsmAction.IGNORE) },
                 { assertTransition(AnsiState.CSI_INTERMEDIATE, ByteClass.COLON, AnsiState.CSI_IGNORE, FsmAction.IGNORE) },
                 { assertTransition(AnsiState.CSI_INTERMEDIATE, ByteClass.PARAM_SEP, AnsiState.CSI_IGNORE, FsmAction.IGNORE) },
-                { assertTransition(AnsiState.CSI_INTERMEDIATE, ByteClass.PRIVATE_MARKER, AnsiState.CSI_IGNORE, FsmAction.IGNORE) }
+                { assertTransition(AnsiState.CSI_INTERMEDIATE, ByteClass.PRIVATE_MARKER, AnsiState.CSI_IGNORE, FsmAction.IGNORE) },
             )
         }
 
@@ -618,25 +643,26 @@ class AnsiStateMachineTest {
                 AnsiState.CSI_INTERMEDIATE,
                 csiDispatchClasses,
                 AnsiState.GROUND,
-                FsmAction.CSI_DISPATCH
+                FsmAction.CSI_DISPATCH,
             )
         }
 
         @Test
         fun `CSI ignore drains parameter and intermediate tail until final-like terminator`() {
-            val ignoredTailClasses = listOf(
-                ByteClass.INTERMEDIATE,
-                ByteClass.PARAM_DIGIT,
-                ByteClass.COLON,
-                ByteClass.PARAM_SEP,
-                ByteClass.PRIVATE_MARKER
-            )
+            val ignoredTailClasses =
+                listOf(
+                    ByteClass.INTERMEDIATE,
+                    ByteClass.PARAM_DIGIT,
+                    ByteClass.COLON,
+                    ByteClass.PARAM_SEP,
+                    ByteClass.PRIVATE_MARKER,
+                )
 
             assertClasses(
                 AnsiState.CSI_IGNORE,
                 ignoredTailClasses,
                 AnsiState.CSI_IGNORE,
-                FsmAction.IGNORE
+                FsmAction.IGNORE,
             )
         }
 
@@ -646,7 +672,7 @@ class AnsiStateMachineTest {
                 AnsiState.CSI_IGNORE,
                 csiDispatchClasses,
                 AnsiState.GROUND,
-                FsmAction.IGNORE
+                FsmAction.IGNORE,
             )
         }
     }
@@ -656,14 +682,13 @@ class AnsiStateMachineTest {
     @Nested
     @DisplayName("string and passthrough states")
     inner class StringAndPassthroughStates {
-
         @Test
         fun `OSC string treats printable ASCII routing classes as OSC payload`() {
             assertClasses(
                 AnsiState.OSC_STRING,
                 stringAsciiPayloadClasses,
                 AnsiState.OSC_STRING,
-                FsmAction.OSC_PUT_ASCII
+                FsmAction.OSC_PUT_ASCII,
             )
         }
 
@@ -673,7 +698,7 @@ class AnsiStateMachineTest {
                 AnsiState.DCS_ENTRY,
                 stringAsciiPayloadClasses + ByteClass.UTF8_PAYLOAD,
                 AnsiState.DCS_PASSTHROUGH,
-                FsmAction.DCS_IGNORE_START
+                FsmAction.DCS_IGNORE_START,
             )
         }
 
@@ -683,7 +708,7 @@ class AnsiStateMachineTest {
                 AnsiState.DCS_PASSTHROUGH,
                 stringAsciiPayloadClasses,
                 AnsiState.DCS_PASSTHROUGH,
-                FsmAction.DCS_PUT_ASCII
+                FsmAction.DCS_PUT_ASCII,
             )
         }
 
@@ -693,7 +718,7 @@ class AnsiStateMachineTest {
                 AnsiState.SOS_PM_APC_STRING,
                 stringAsciiPayloadClasses,
                 AnsiState.SOS_PM_APC_STRING,
-                FsmAction.IGNORE
+                FsmAction.IGNORE,
             )
         }
 
@@ -703,7 +728,7 @@ class AnsiStateMachineTest {
                 AnsiState.IGNORE_UNTIL_ST,
                 stringAsciiPayloadClasses,
                 AnsiState.IGNORE_UNTIL_ST,
-                FsmAction.IGNORE
+                FsmAction.IGNORE,
             )
         }
     }
@@ -713,7 +738,6 @@ class AnsiStateMachineTest {
     @Nested
     @DisplayName("representative traces")
     inner class RepresentativeTraces {
-
         @Test
         fun `plain text stays in ground and prints`() {
             val steps = feedBytes('H'.code, 'i'.code)
@@ -724,7 +748,7 @@ class AnsiStateMachineTest {
                 { assertEquals(FsmAction.PRINT_ASCII, steps[0].action) },
                 { assertEquals(AnsiState.GROUND, steps[1].fromState) },
                 { assertEquals(AnsiState.GROUND, steps[1].nextState) },
-                { assertEquals(FsmAction.PRINT_ASCII, steps[1].action) }
+                { assertEquals(FsmAction.PRINT_ASCII, steps[1].action) },
             )
         }
 
@@ -742,7 +766,7 @@ class AnsiStateMachineTest {
                 { assertEquals(AnsiState.CSI_PARAM, steps[4].nextState) },
                 { assertEquals(FsmAction.PARAM_DIGIT, steps[4].action) },
                 { assertEquals(AnsiState.GROUND, steps[5].nextState) },
-                { assertEquals(FsmAction.CSI_DISPATCH, steps[5].action) }
+                { assertEquals(FsmAction.CSI_DISPATCH, steps[5].action) },
             )
         }
 
@@ -754,7 +778,7 @@ class AnsiStateMachineTest {
                 { assertEquals(AnsiState.ESCAPE, steps[0].nextState) },
                 { assertEquals(AnsiState.DCS_ENTRY, steps[1].nextState) },
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, steps[2].nextState) },
-                { assertEquals(FsmAction.DCS_IGNORE_START, steps[2].action) }
+                { assertEquals(FsmAction.DCS_IGNORE_START, steps[2].action) },
             )
         }
     }
@@ -764,7 +788,6 @@ class AnsiStateMachineTest {
     @Nested
     @DisplayName("string termination semantics")
     inner class StringTerminationSemantics {
-
         @Test
         fun `OSC BEL terminates the OSC string and returns to ground`() {
             val steps = feedBytes(0x1B, ']'.code, '0'.code, ';'.code, 't'.code, 0x07)
@@ -774,7 +797,7 @@ class AnsiStateMachineTest {
                 { assertEquals(AnsiState.OSC_STRING, bel.fromState) },
                 { assertEquals(ByteClass.EXECUTE, bel.byteClass) },
                 { assertEquals(AnsiState.OSC_STRING, bel.nextState, "matrix stays in OSC; action interprets BEL") },
-                { assertEquals(FsmAction.OSC_EXECUTE_CONTROL, bel.action) }
+                { assertEquals(FsmAction.OSC_EXECUTE_CONTROL, bel.action) },
             )
         }
 
@@ -787,7 +810,7 @@ class AnsiStateMachineTest {
                 { assertEquals(AnsiState.OSC_STRING, nul.fromState) },
                 { assertEquals(ByteClass.EXECUTE, nul.byteClass) },
                 { assertEquals(AnsiState.OSC_STRING, nul.nextState) },
-                { assertEquals(FsmAction.OSC_EXECUTE_CONTROL, nul.action, "OSC has dedicated C0 handling action") }
+                { assertEquals(FsmAction.OSC_EXECUTE_CONTROL, nul.action, "OSC has dedicated C0 handling action") },
             )
         }
 
@@ -800,7 +823,7 @@ class AnsiStateMachineTest {
                 { assertEquals(AnsiState.DCS_ENTRY, nul.fromState) },
                 { assertEquals(ByteClass.EXECUTE, nul.byteClass) },
                 { assertEquals(AnsiState.DCS_ENTRY, nul.nextState) },
-                { assertEquals(FsmAction.IGNORE, nul.action) }
+                { assertEquals(FsmAction.IGNORE, nul.action) },
             )
         }
 
@@ -813,7 +836,7 @@ class AnsiStateMachineTest {
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, nul.fromState) },
                 { assertEquals(ByteClass.EXECUTE, nul.byteClass) },
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, nul.nextState) },
-                { assertEquals(FsmAction.DCS_PUT_ASCII, nul.action, "ordinary C0 controls are part of DCS passthrough data") }
+                { assertEquals(FsmAction.DCS_PUT_ASCII, nul.action, "ordinary C0 controls are part of DCS passthrough data") },
             )
         }
 
@@ -827,15 +850,15 @@ class AnsiStateMachineTest {
                     assertAll(
                         { assertEquals(AnsiState.SOS_PM_APC_STRING, sosNul.fromState) },
                         { assertEquals(AnsiState.SOS_PM_APC_STRING, sosNul.nextState) },
-                        { assertEquals(FsmAction.IGNORE, sosNul.action) }
+                        { assertEquals(FsmAction.IGNORE, sosNul.action) },
                     )
                 },
                 {
                     assertAll(
                         { assertEquals(AnsiState.IGNORE_UNTIL_ST, genericIgnoreNul.nextState) },
-                        { assertEquals(FsmAction.IGNORE, genericIgnoreNul.action) }
+                        { assertEquals(FsmAction.IGNORE, genericIgnoreNul.action) },
                     )
-                }
+                },
             )
         }
 
@@ -851,7 +874,7 @@ class AnsiStateMachineTest {
                     assertNotEquals(
                         FsmAction.CLEAR_SEQUENCE,
                         esc.action,
-                        "ESC inside OSC must preserve string context until the following byte is known"
+                        "ESC inside OSC must preserve string context until the following byte is known",
                     )
                 },
                 { assertEquals(AnsiState.GROUND, st.nextState) },
@@ -859,9 +882,9 @@ class AnsiStateMachineTest {
                     assertNotEquals(
                         FsmAction.ESC_DISPATCH,
                         st.action,
-                        "ESC \\ must terminate OSC, not dispatch as a standalone ESC sequence"
+                        "ESC \\ must terminate OSC, not dispatch as a standalone ESC sequence",
                     )
-                }
+                },
             )
         }
 
@@ -877,7 +900,7 @@ class AnsiStateMachineTest {
                     assertNotEquals(
                         FsmAction.CLEAR_SEQUENCE,
                         esc.action,
-                        "ESC inside DCS passthrough must preserve passthrough context"
+                        "ESC inside DCS passthrough must preserve passthrough context",
                     )
                 },
                 { assertEquals(AnsiState.GROUND, st.nextState) },
@@ -885,9 +908,9 @@ class AnsiStateMachineTest {
                     assertNotEquals(
                         FsmAction.ESC_DISPATCH,
                         st.action,
-                        "ESC \\ must terminate DCS passthrough, not dispatch as a standalone ESC sequence"
+                        "ESC \\ must terminate DCS passthrough, not dispatch as a standalone ESC sequence",
                     )
-                }
+                },
             )
         }
 
@@ -895,7 +918,7 @@ class AnsiStateMachineTest {
         fun `ignored string states terminate on ST with string context intact`() {
             assertAll(
                 { assertStTerminationNeedsStringContext(AnsiState.SOS_PM_APC_STRING) },
-                { assertStTerminationNeedsStringContext(AnsiState.IGNORE_UNTIL_ST) }
+                { assertStTerminationNeedsStringContext(AnsiState.IGNORE_UNTIL_ST) },
             )
         }
 
@@ -907,7 +930,7 @@ class AnsiStateMachineTest {
                 asciiAction = FsmAction.OSC_PUT_ASCII,
                 executeAction = FsmAction.OSC_EXECUTE_CONTROL,
                 utf8Action = FsmAction.OSC_PUT_UTF8,
-                endAction = FsmAction.OSC_END
+                endAction = FsmAction.OSC_END,
             )
         }
 
@@ -919,7 +942,7 @@ class AnsiStateMachineTest {
                 asciiAction = FsmAction.DCS_PUT_ASCII,
                 executeAction = FsmAction.DCS_PUT_ASCII,
                 utf8Action = FsmAction.DCS_PUT_UTF8,
-                endAction = FsmAction.DCS_END
+                endAction = FsmAction.DCS_END,
             )
         }
 
@@ -933,7 +956,7 @@ class AnsiStateMachineTest {
                         asciiAction = FsmAction.IGNORE,
                         executeAction = FsmAction.IGNORE,
                         utf8Action = FsmAction.IGNORE,
-                        endAction = FsmAction.STRING_END
+                        endAction = FsmAction.STRING_END,
                     )
                 },
                 {
@@ -943,9 +966,9 @@ class AnsiStateMachineTest {
                         asciiAction = FsmAction.IGNORE,
                         executeAction = FsmAction.IGNORE,
                         utf8Action = FsmAction.IGNORE,
-                        endAction = FsmAction.STRING_END
+                        endAction = FsmAction.STRING_END,
                     )
-                }
+                },
             )
         }
 
@@ -959,7 +982,7 @@ class AnsiStateMachineTest {
                 { assertTransition(AnsiState.SOS_PM_APC_STRING, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
                 { assertTransition(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
                 { assertTransition(AnsiState.IGNORE_UNTIL_ST, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
-                { assertTransition(AnsiState.IGNORE_UNTIL_ST_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) }
+                { assertTransition(AnsiState.IGNORE_UNTIL_ST_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
             )
         }
     }

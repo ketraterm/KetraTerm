@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import com.gagik.core.api.TerminalModeBits
@@ -25,7 +24,6 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Test
 
 class PasteEncoderTest {
-
     @Test
     fun `plain paste writes UTF-8 text`() {
         assertBytes("plain é".encodeToByteArray(), TerminalPasteEvent("plain é"))
@@ -69,20 +67,22 @@ class PasteEncoderTest {
     @Test
     fun `strip C0 paste policy removes controls except tab cr and lf`() {
         assertBytes(
-            expected = byteArrayOf(
-                'a'.code.toByte(),
-                0x09,
-                'b'.code.toByte(),
-                0x0d,
-                'c'.code.toByte(),
-                0x0a,
-                'd'.code.toByte(),
-                'e'.code.toByte(),
-            ),
+            expected =
+                byteArrayOf(
+                    'a'.code.toByte(),
+                    0x09,
+                    'b'.code.toByte(),
+                    0x0d,
+                    'c'.code.toByte(),
+                    0x0a,
+                    'd'.code.toByte(),
+                    'e'.code.toByte(),
+                ),
             event = TerminalPasteEvent("a\tb\rc\nd\u001be\u0000"),
-            policy = TerminalInputPolicy(
-                pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
-            ),
+            policy =
+                TerminalInputPolicy(
+                    pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                ),
         )
     }
 
@@ -91,9 +91,10 @@ class PasteEncoderTest {
         assertBytes(
             expected = "Ã©😀".encodeToByteArray(),
             event = TerminalPasteEvent("\u001bÃ©😀"),
-            policy = TerminalInputPolicy(
-                pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
-            ),
+            policy =
+                TerminalInputPolicy(
+                    pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                ),
         )
     }
 
@@ -102,9 +103,10 @@ class PasteEncoderTest {
         assertBytes(
             expected = "a\nb\nc\nd".encodeToByteArray(),
             event = TerminalPasteEvent("a\r\nb\rc\nd"),
-            policy = TerminalInputPolicy(
-                pasteSanitizationPolicy = PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS,
-            ),
+            policy =
+                TerminalInputPolicy(
+                    pasteSanitizationPolicy = PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS,
+                ),
         )
     }
 
@@ -114,9 +116,10 @@ class PasteEncoderTest {
             expected = esc("[200~") + "ab".encodeToByteArray() + esc("[201~"),
             event = TerminalPasteEvent("a\u001bb"),
             modeBits = TerminalModeBits.BRACKETED_PASTE,
-            policy = TerminalInputPolicy(
-                pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
-            ),
+            policy =
+                TerminalInputPolicy(
+                    pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                ),
         )
     }
 
@@ -134,9 +137,7 @@ class PasteEncoderTest {
         assertArrayEquals(expected, output.bytes)
     }
 
-    private fun esc(textAfterEsc: String): ByteArray {
-        return byteArrayOf(0x1b) + textAfterEsc.encodeToByteArray()
-    }
+    private fun esc(textAfterEsc: String): ByteArray = byteArrayOf(0x1b) + textAfterEsc.encodeToByteArray()
 
     private class RecordingHostOutput : TerminalHostOutput {
         var bytes: ByteArray = ByteArray(0)

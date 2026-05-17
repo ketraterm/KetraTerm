@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.api
 
 import com.gagik.core.model.Attributes
@@ -25,7 +24,6 @@ import com.gagik.core.model.Attributes
  * not use on a hot rendering path. Production code should use [TerminalReader].
  */
 interface TerminalInspector {
-
     /**
      * Returns the attributes at a screen position as an unpacked [Attributes] object.
      *
@@ -33,7 +31,10 @@ interface TerminalInspector {
      * @param row Row index (0-based).
      * @return Unpacked attributes, or `null` if the position is out of bounds.
      */
-    fun getAttrAt(col: Int, row: Int): Attributes?
+    fun getAttrAt(
+        col: Int,
+        row: Int,
+    ): Attributes?
 
     /**
      * Returns the content of a visible row as a string, trimming trailing blank

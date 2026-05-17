@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 import org.junit.jupiter.api.Nested
@@ -25,7 +24,6 @@ import java.awt.image.BufferedImage
 import kotlin.test.assertTrue
 
 class TerminalBoxDrawingPainterTest {
-
     private val width = 20
     private val height = 20
     private val cx = width / 2
@@ -90,7 +88,9 @@ class TerminalBoxDrawingPainterTest {
         return Triple(image, g, TerminalBoxDrawingPainter())
     }
 
-    private fun isPainted(image: BufferedImage, x: Int, y: Int): Boolean {
-        return image.getRGB(x, y) != 0
-    }
+    private fun isPainted(
+        image: BufferedImage,
+        x: Int,
+        y: Int,
+    ): Boolean = image.getRGB(x, y) != 0
 }

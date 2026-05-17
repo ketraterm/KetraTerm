@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.pty
 
 import com.gagik.core.TerminalBuffers
@@ -61,17 +60,19 @@ class SessionHostEventBridgeTest {
 
     @Test
     fun `listener failures are reported and isolated`() {
-        val listener = object : TerminalPtyEventListener by TerminalPtyEventListener.NONE {
-            val failures = mutableListOf<String?>()
+        val listener =
+            object : TerminalPtyEventListener by TerminalPtyEventListener.NONE {
+                val failures = mutableListOf<String?>()
 
-            override fun bell(session: TerminalSession) {
-                throw IllegalStateException("bell failed")
-            }
+                override fun bell(session: TerminalSession): Unit = throw IllegalStateException("bell failed")
 
-            override fun listenerFailed(session: TerminalSession, exception: Exception) {
-                failures += exception.message
+                override fun listenerFailed(
+                    session: TerminalSession,
+                    exception: Exception,
+                ) {
+                    failures += exception.message
+                }
             }
-        }
         val bridge = SessionHostEventBridge(listener)
         bridge.attach(testSession())
 
@@ -82,15 +83,15 @@ class SessionHostEventBridgeTest {
 
     @Test
     fun `listenerFailed failures are ignored`() {
-        val listener = object : TerminalPtyEventListener by TerminalPtyEventListener.NONE {
-            override fun bell(session: TerminalSession) {
-                throw IllegalStateException("bell failed")
-            }
+        val listener =
+            object : TerminalPtyEventListener by TerminalPtyEventListener.NONE {
+                override fun bell(session: TerminalSession): Unit = throw IllegalStateException("bell failed")
 
-            override fun listenerFailed(session: TerminalSession, exception: Exception) {
-                throw IllegalStateException("listenerFailed failed")
+                override fun listenerFailed(
+                    session: TerminalSession,
+                    exception: Exception,
+                ): Unit = throw IllegalStateException("listenerFailed failed")
             }
-        }
         val bridge = SessionHostEventBridge(listener)
         bridge.attach(testSession())
 
@@ -109,22 +110,40 @@ class SessionHostEventBridgeTest {
             events += "bell"
         }
 
-        override fun iconTitleChanged(session: TerminalSession, title: String) {
+        override fun iconTitleChanged(
+            session: TerminalSession,
+            title: String,
+        ) {
             events += "icon:$title"
         }
 
-        override fun windowTitleChanged(session: TerminalSession, title: String) {
+        override fun windowTitleChanged(
+            session: TerminalSession,
+            title: String,
+        ) {
             events += "window:$title"
         }
 
-        override fun listenerFailed(session: TerminalSession, exception: Exception) = Unit
+        override fun listenerFailed(
+            session: TerminalSession,
+            exception: Exception,
+        ) = Unit
     }
 
     private object NoopConnector : TerminalConnector {
         override fun start(listener: TerminalConnectorListener) = Unit
-        override fun write(bytes: ByteArray, offset: Int, length: Int) = Unit
-        override fun resize(columns: Int, rows: Int) = Unit
+
+        override fun write(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) = Unit
+
+        override fun resize(
+            columns: Int,
+            rows: Int,
+        ) = Unit
+
         override fun close() = Unit
     }
-
 }

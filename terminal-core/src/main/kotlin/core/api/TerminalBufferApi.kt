@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.api
 
 /**
@@ -37,7 +36,6 @@ interface TerminalBufferApi :
     TerminalResponseChannel,
     TerminalReader,
     TerminalInspector {
-
     /**
      * Resizes the terminal to [newWidth] x [newHeight].
      *
@@ -54,7 +52,10 @@ interface TerminalBufferApi :
      * @param newHeight New terminal height in rows. Must be > 0.
      * @throws IllegalArgumentException if either dimension is <= 0.
      */
-    fun resize(newWidth: Int, newHeight: Int)
+    fun resize(
+        newWidth: Int,
+        newHeight: Int,
+    )
 
     /**
      * Performs a full terminal reset (RIS, `ESC c`).

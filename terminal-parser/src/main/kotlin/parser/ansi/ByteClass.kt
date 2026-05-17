@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.ansi.ByteClass.UTF8_PAYLOAD
@@ -42,23 +41,23 @@ import com.gagik.terminal.protocol.ControlCode
  */
 internal object ByteClass {
     // 0x00..0x1F control / execution classes
-    const val EXECUTE: Int = 0           // C0 controls executed immediately
-    const val CAN_SUB: Int = 1           // CAN / SUB abort current escape/control sequence
-    const val ESC: Int = 2               // ESC introducer
+    const val EXECUTE: Int = 0 // C0 controls executed immediately
+    const val CAN_SUB: Int = 1 // CAN / SUB abort current escape/control sequence
+    const val ESC: Int = 2 // ESC introducer
 
     // 0x20..0x7E ASCII structural / printable classes
-    const val INTERMEDIATE: Int = 3      // 0x20..0x2F
-    const val PARAM_DIGIT: Int = 4       // 0x30..0x39
-    const val COLON: Int = 5             // 0x3A
-    const val PARAM_SEP: Int = 6         // 0x3B
-    const val PRIVATE_MARKER: Int = 7    // 0x3C..0x3F
-    const val DCS_INTRO: Int = 8         // 'P' 0x50
-    const val CSI_INTRO: Int = 9         // '[' 0x5B
-    const val ST_INTRO: Int = 10         // '\\' 0x5C (used in ESC \\ => ST)
-    const val OSC_INTRO: Int = 11        // ']' 0x5D
+    const val INTERMEDIATE: Int = 3 // 0x20..0x2F
+    const val PARAM_DIGIT: Int = 4 // 0x30..0x39
+    const val COLON: Int = 5 // 0x3A
+    const val PARAM_SEP: Int = 6 // 0x3B
+    const val PRIVATE_MARKER: Int = 7 // 0x3C..0x3F
+    const val DCS_INTRO: Int = 8 // 'P' 0x50
+    const val CSI_INTRO: Int = 9 // '[' 0x5B
+    const val ST_INTRO: Int = 10 // '\\' 0x5C (used in ESC \\ => ST)
+    const val OSC_INTRO: Int = 11 // ']' 0x5D
     const val SOS_PM_APC_INTRO: Int = 12 // 'X', '^', '_'
-    const val FINAL_BYTE: Int = 13       // 0x40..0x7E excluding structural introducers
-    const val DEL: Int = 14              // 0x7F
+    const val FINAL_BYTE: Int = 13 // 0x40..0x7E excluding structural introducers
+    const val DEL: Int = 14 // 0x7F
 
     /** Total number of active classes in the ASCII/control domain. */
     const val COUNT: Int = 15
@@ -70,45 +69,46 @@ internal object ByteClass {
      * Bytes above 0x7F are intentionally routed as [UTF8_PAYLOAD], because they belong
      * to the UTF-8 path by default.
      */
-    val ASCII_MAP: ByteArray = ByteArray(128).also { map ->
-        // --- C0 controls ----------------------------------------------------
-        for (b in ControlCode.NUL..ControlCode.ETB) {
-            map[b] = EXECUTE.toByte()
-        }
-        map[ControlCode.CAN] = CAN_SUB.toByte()
-        map[ControlCode.EM] = EXECUTE.toByte()
-        map[ControlCode.SUB] = CAN_SUB.toByte()
-        map[ControlCode.ESC] = ESC.toByte()
-        for (b in ControlCode.FS..ControlCode.US) {
-            map[b] = EXECUTE.toByte()
-        }
+    val ASCII_MAP: ByteArray =
+        ByteArray(128).also { map ->
+            // --- C0 controls ----------------------------------------------------
+            for (b in ControlCode.NUL..ControlCode.ETB) {
+                map[b] = EXECUTE.toByte()
+            }
+            map[ControlCode.CAN] = CAN_SUB.toByte()
+            map[ControlCode.EM] = EXECUTE.toByte()
+            map[ControlCode.SUB] = CAN_SUB.toByte()
+            map[ControlCode.ESC] = ESC.toByte()
+            for (b in ControlCode.FS..ControlCode.US) {
+                map[b] = EXECUTE.toByte()
+            }
 
-        // --- ASCII structural / printable domain ---------------------------
-        for (b in 0x20..0x2F) {
-            map[b] = INTERMEDIATE.toByte()
-        }
-        for (b in 0x30..0x39) {
-            map[b] = PARAM_DIGIT.toByte()
-        }
-        map[0x3A] = COLON.toByte()
-        map[0x3B] = PARAM_SEP.toByte()
-        for (b in 0x3C..0x3F) {
-            map[b] = PRIVATE_MARKER.toByte()
-        }
-        for (b in 0x40..0x7E) {
-            map[b] = FINAL_BYTE.toByte()
-        }
-        map[ControlCode.DEL] = DEL.toByte()
+            // --- ASCII structural / printable domain ---------------------------
+            for (b in 0x20..0x2F) {
+                map[b] = INTERMEDIATE.toByte()
+            }
+            for (b in 0x30..0x39) {
+                map[b] = PARAM_DIGIT.toByte()
+            }
+            map[0x3A] = COLON.toByte()
+            map[0x3B] = PARAM_SEP.toByte()
+            for (b in 0x3C..0x3F) {
+                map[b] = PRIVATE_MARKER.toByte()
+            }
+            for (b in 0x40..0x7E) {
+                map[b] = FINAL_BYTE.toByte()
+            }
+            map[ControlCode.DEL] = DEL.toByte()
 
-        // --- Structural introducer overrides -------------------------------
-        map['P'.code] = DCS_INTRO.toByte()
-        map['X'.code] = SOS_PM_APC_INTRO.toByte()
-        map['['.code] = CSI_INTRO.toByte()
-        map['\\'.code] = ST_INTRO.toByte()
-        map[']'.code] = OSC_INTRO.toByte()
-        map['^'.code] = SOS_PM_APC_INTRO.toByte()
-        map['_'.code] = SOS_PM_APC_INTRO.toByte()
-    }
+            // --- Structural introducer overrides -------------------------------
+            map['P'.code] = DCS_INTRO.toByte()
+            map['X'.code] = SOS_PM_APC_INTRO.toByte()
+            map['['.code] = CSI_INTRO.toByte()
+            map['\\'.code] = ST_INTRO.toByte()
+            map[']'.code] = OSC_INTRO.toByte()
+            map['^'.code] = SOS_PM_APC_INTRO.toByte()
+            map['_'.code] = SOS_PM_APC_INTRO.toByte()
+        }
 
     /**
      * Sentinel for bytes that are outside the ASCII/control routing domain.

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.render
 
 import com.gagik.core.codec.AttributeCodec
@@ -48,11 +47,12 @@ internal fun Line.copyToRenderAbi(
         val extendedAttr = getPackedExtendedAttr(col)
 
         codeWords[codeOffset + col] = 0
-        attrWords[attrOffset + col] = attrTranslator.toRenderAttrWord(
-            primaryAttr = primaryAttr,
-            extendedAttr = extendedAttr,
-            reverseVideo = reverseVideo,
-        )
+        attrWords[attrOffset + col] =
+            attrTranslator.toRenderAttrWord(
+                primaryAttr = primaryAttr,
+                extendedAttr = extendedAttr,
+                reverseVideo = reverseVideo,
+            )
         flags[flagOffset + col] = cellFlags(col, raw)
 
         if (extraAttrWords != null) {
@@ -86,33 +86,39 @@ internal fun Line.copyToRenderAbi(
     }
 }
 
-private fun Line.cellFlags(col: Int, raw: Int): Int = when {
-    raw == TerminalConstants.EMPTY -> TerminalRenderCellFlags.EMPTY
-    raw == TerminalConstants.WIDE_CHAR_SPACER -> TerminalRenderCellFlags.WIDE_TRAILING
-    raw <= TerminalConstants.CLUSTER_HANDLE_MAX -> {
-        var flags = TerminalRenderCellFlags.CLUSTER
-        if (isWideLeading(col)) {
-            flags = flags or TerminalRenderCellFlags.WIDE_LEADING
+private fun Line.cellFlags(
+    col: Int,
+    raw: Int,
+): Int =
+    when {
+        raw == TerminalConstants.EMPTY -> TerminalRenderCellFlags.EMPTY
+        raw == TerminalConstants.WIDE_CHAR_SPACER -> TerminalRenderCellFlags.WIDE_TRAILING
+        raw <= TerminalConstants.CLUSTER_HANDLE_MAX -> {
+            var flags = TerminalRenderCellFlags.CLUSTER
+            if (isWideLeading(col)) {
+                flags = flags or TerminalRenderCellFlags.WIDE_LEADING
+            }
+            flags
         }
-        flags
-    }
-    else -> {
-        var flags = TerminalRenderCellFlags.CODEPOINT
-        if (isWideLeading(col)) {
-            flags = flags or TerminalRenderCellFlags.WIDE_LEADING
+        else -> {
+            var flags = TerminalRenderCellFlags.CODEPOINT
+            if (isWideLeading(col)) {
+                flags = flags or TerminalRenderCellFlags.WIDE_LEADING
+            }
+            flags
         }
-        flags
     }
-}
 
-private fun Line.isWideLeading(col: Int): Boolean =
-    col + 1 < width && rawCodepoint(col + 1) == TerminalConstants.WIDE_CHAR_SPACER
+private fun Line.isWideLeading(col: Int): Boolean = col + 1 < width && rawCodepoint(col + 1) == TerminalConstants.WIDE_CHAR_SPACER
 
 internal class RenderClusterScratch {
     var codepoints = IntArray(16)
         private set
 
-    fun readCluster(line: Line, col: Int): Int {
+    fun readCluster(
+        line: Line,
+        col: Int,
+    ): Int {
         val raw = line.rawCodepoint(col)
         val length = line.store.length(raw)
         if (codepoints.size < length) {

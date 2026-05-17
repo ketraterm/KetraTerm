@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 import org.junit.jupiter.api.Test
@@ -24,7 +23,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TerminalBlockElementPainterTest {
-
     // Use an even 16x16 grid so 1/8th fractional blocks divide perfectly without rounding errors
     private val width = 16
     private val height = 16
@@ -97,7 +95,9 @@ class TerminalBlockElementPainterTest {
         return count
     }
 
-    private fun isPainted(image: BufferedImage, x: Int, y: Int): Boolean {
-        return image.getRGB(x, y) != 0
-    }
+    private fun isPainted(
+        image: BufferedImage,
+        x: Int,
+        y: Int,
+    ): Boolean = image.getRGB(x, y) != 0
 }

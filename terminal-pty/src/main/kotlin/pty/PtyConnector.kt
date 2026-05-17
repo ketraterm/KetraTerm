@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.pty
 
 import com.gagik.terminal.transport.TerminalConnector
@@ -91,20 +90,26 @@ class PtyConnector internal constructor(
         check(started.compareAndSet(false, true)) { "connector already started" }
         this.listener = listener
 
-        val watcher = Thread(this::watchProcessExit, watcherThreadName).apply {
-            isDaemon = true
-        }
+        val watcher =
+            Thread(this::watchProcessExit, watcherThreadName).apply {
+                isDaemon = true
+            }
         watcherThread = watcher
         watcher.start()
 
-        val reader = Thread(this::pumpOutput, readerThreadName).apply {
-            isDaemon = true
-        }
+        val reader =
+            Thread(this::pumpOutput, readerThreadName).apply {
+                isDaemon = true
+            }
         readerThread = reader
         reader.start()
     }
 
-    override fun write(bytes: ByteArray, offset: Int, length: Int) {
+    override fun write(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {
         require(offset >= 0) { "offset must be non-negative, got $offset" }
         require(length >= 0) { "length must be non-negative, got $length" }
         require(offset <= bytes.size) { "offset $offset exceeds size ${bytes.size}" }
@@ -121,7 +126,10 @@ class PtyConnector internal constructor(
         }
     }
 
-    override fun resize(columns: Int, rows: Int) {
+    override fun resize(
+        columns: Int,
+        rows: Int,
+    ) {
         require(columns > 0) { "columns must be positive, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
 
@@ -153,13 +161,9 @@ class PtyConnector internal constructor(
     @Throws(InterruptedException::class)
     fun waitFor(): Int = process.waitFor()
 
-    internal fun joinReader(timeoutMillis: Long): Boolean {
-        return joinThread(readerThread, timeoutMillis)
-    }
+    internal fun joinReader(timeoutMillis: Long): Boolean = joinThread(readerThread, timeoutMillis)
 
-    internal fun joinWatcher(timeoutMillis: Long): Boolean {
-        return joinThread(watcherThread, timeoutMillis)
-    }
+    internal fun joinWatcher(timeoutMillis: Long): Boolean = joinThread(watcherThread, timeoutMillis)
 
     private fun pumpOutput() {
         val buffer = ByteArray(readBufferSize)
@@ -204,7 +208,10 @@ class PtyConnector internal constructor(
         joinThread(watcherThread, CLOSE_JOIN_MILLIS)
     }
 
-    private fun joinThread(thread: Thread?, timeoutMillis: Long): Boolean {
+    private fun joinThread(
+        thread: Thread?,
+        timeoutMillis: Long,
+    ): Boolean {
         if (thread == null || Thread.currentThread() === thread) return true
 
         return try {
@@ -216,13 +223,9 @@ class PtyConnector internal constructor(
         }
     }
 
-    private fun isClosed(): Boolean {
-        return localCloseRequested.get() || closedNotified.get()
-    }
+    private fun isClosed(): Boolean = localCloseRequested.get() || closedNotified.get()
 
-    private fun listenerOrThrow(): TerminalConnectorListener {
-        return checkNotNull(listener) { "connector has not been started" }
-    }
+    private fun listenerOrThrow(): TerminalConnectorListener = checkNotNull(listener) { "connector has not been started" }
 
     private companion object {
         const val DEFAULT_READ_BUFFER_SIZE: Int = 8192

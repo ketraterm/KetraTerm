@@ -13,14 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.state
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalStateTest {
-
     @Test
     fun `constructor initializes global hardware and both screens`() {
         val state = TerminalState(initialWidth = 10, initialHeight = 3, maxHistory = 7)
@@ -41,7 +39,7 @@ class TerminalStateTest {
             { assertEquals(0, state.scrollTop) },
             { assertEquals(2, state.scrollBottom) },
             { assertTrue(state.isFullViewportScroll) },
-            { assertEquals(8, state.tabStops.getNextStop(1)) }
+            { assertEquals(8, state.tabStops.getNextStop(1)) },
         )
     }
 
@@ -49,12 +47,16 @@ class TerminalStateTest {
     fun `resolveRingIndex maps against active ring with and without history`() {
         val state = TerminalState(initialWidth = 10, initialHeight = 3, maxHistory = 7)
 
-        repeat(2) { state.primaryBuffer.ring.push().clear(state.pen.currentAttr) }
+        repeat(2) {
+            state.primaryBuffer.ring
+                .push()
+                .clear(state.pen.currentAttr)
+        }
 
         assertAll(
             { assertEquals(2, state.resolveRingIndex(0)) },
             { assertEquals(3, state.resolveRingIndex(1)) },
-            { assertEquals(4, state.resolveRingIndex(2)) }
+            { assertEquals(4, state.resolveRingIndex(2)) },
         )
 
         state.enterAltScreen(clearBeforeEnter = true)
@@ -62,7 +64,7 @@ class TerminalStateTest {
         assertAll(
             { assertEquals(0, state.resolveRingIndex(0)) },
             { assertEquals(1, state.resolveRingIndex(1)) },
-            { assertEquals(2, state.resolveRingIndex(2)) }
+            { assertEquals(2, state.resolveRingIndex(2)) },
         )
     }
 
@@ -96,7 +98,7 @@ class TerminalStateTest {
             { assertEquals(4, state.scrollBottom) },
             { assertTrue(state.isFullViewportScroll) },
             { assertEquals("", state.altBuffer.ring[0].toTextTrimmed()) },
-            { assertEquals("P", state.primaryBuffer.ring[0].toTextTrimmed()) }
+            { assertEquals("P", state.primaryBuffer.ring[0].toTextTrimmed()) },
         )
     }
 
@@ -110,7 +112,7 @@ class TerminalStateTest {
 
         assertAll(
             { assertTrue(state.isAltScreenActive) },
-            { assertEquals("A", state.altBuffer.ring[0].toTextTrimmed()) }
+            { assertEquals("A", state.altBuffer.ring[0].toTextTrimmed()) },
         )
     }
 
@@ -141,7 +143,7 @@ class TerminalStateTest {
             { assertEquals(1, state.cursor.row) },
             { assertTrue(state.cursor.pendingWrap) },
             { assertEquals("P", state.primaryBuffer.ring[0].toTextTrimmed()) },
-            { assertEquals("A", state.altBuffer.ring[0].toTextTrimmed()) }
+            { assertEquals("A", state.altBuffer.ring[0].toTextTrimmed()) },
         )
     }
 
@@ -153,7 +155,7 @@ class TerminalStateTest {
 
         assertAll(
             { assertFalse(state.isAltScreenActive) },
-            { assertSame(state.primaryBuffer, state.activeBuffer) }
+            { assertSame(state.primaryBuffer, state.activeBuffer) },
         )
     }
 
@@ -178,7 +180,7 @@ class TerminalStateTest {
         state.cancelPendingWrap()
         assertAll(
             { assertFalse(state.primaryBuffer.cursor.pendingWrap) },
-            { assertTrue(state.altBuffer.cursor.pendingWrap) }
+            { assertTrue(state.altBuffer.cursor.pendingWrap) },
         )
 
         state.enterAltScreen(clearBeforeEnter = true)
@@ -187,7 +189,7 @@ class TerminalStateTest {
 
         assertAll(
             { assertFalse(state.altBuffer.cursor.pendingWrap) },
-            { assertFalse(state.primaryBuffer.cursor.pendingWrap) }
+            { assertFalse(state.primaryBuffer.cursor.pendingWrap) },
         )
     }
 
@@ -210,7 +212,7 @@ class TerminalStateTest {
         // Ensure the saved cursor was wiped clean
         assertFalse(
             state.altBuffer.savedCursor.isSaved,
-            "Entering the Alt Screen MUST wipe any stale saved cursor state"
+            "Entering the Alt Screen MUST wipe any stale saved cursor state",
         )
     }
 }

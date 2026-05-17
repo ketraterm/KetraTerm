@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.cache
 
 import com.gagik.terminal.render.api.*
@@ -257,11 +256,12 @@ class TerminalRenderCacheTest {
         override val cursor: TerminalRenderCursor
             get() = error("cursor object must not be read by TerminalRenderCache")
 
-        val reader = object : TerminalRenderFrameReader {
-            override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-                consumer.accept(this@PrimitiveCursorFrame)
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                    consumer.accept(this@PrimitiveCursorFrame)
+                }
             }
-        }
 
         override fun lineGeneration(row: Int): Long = 1L
 
@@ -309,21 +309,23 @@ class TerminalRenderCacheTest {
         override val frameGeneration: Long = 1L
         override val structureGeneration: Long = 1L
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
-        override val cursor: TerminalRenderCursor = TerminalRenderCursor(
-            column = 0,
-            row = 0,
-            visible = false,
-            blinking = false,
-            shape = TerminalRenderCursorShape.BLOCK,
-            generation = 1L,
-        )
+        override val cursor: TerminalRenderCursor =
+            TerminalRenderCursor(
+                column = 0,
+                row = 0,
+                visible = false,
+                blinking = false,
+                shape = TerminalRenderCursorShape.BLOCK,
+                generation = 1L,
+            )
         private val clusterCodepoints = IntArray(256) { 'z'.code }
 
-        val reader = object : TerminalRenderFrameReader {
-            override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-                consumer.accept(this@LongClusterFrame)
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                    consumer.accept(this@LongClusterFrame)
+                }
             }
-        }
 
         override fun lineGeneration(row: Int): Long = 1L
 
@@ -366,25 +368,30 @@ class TerminalRenderCacheTest {
         override var frameGeneration: Long = 0L
         override var structureGeneration: Long = 0L
         override var activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
-        override var cursor: TerminalRenderCursor = TerminalRenderCursor(
-            column = 0,
-            row = 0,
-            visible = true,
-            blinking = false,
-            shape = TerminalRenderCursorShape.BLOCK,
-            generation = 0L,
-        )
+        override var cursor: TerminalRenderCursor =
+            TerminalRenderCursor(
+                column = 0,
+                row = 0,
+                visible = true,
+                blinking = false,
+                shape = TerminalRenderCursorShape.BLOCK,
+                generation = 0L,
+            )
 
         private val lineGenerations = LongArray(rows)
         private val wrapped = BooleanArray(rows)
 
-        val reader = object : TerminalRenderFrameReader {
-            override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-                consumer.accept(this@MutableFrame)
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                    consumer.accept(this@MutableFrame)
+                }
             }
-        }
 
-        fun setRow(row: Int, text: String) {
+        fun setRow(
+            row: Int,
+            text: String,
+        ) {
             require(text.length <= columns)
             var col = 0
             while (col < columns) {
@@ -481,40 +488,45 @@ class TerminalRenderCacheTest {
         override val structureGeneration: Long = 1L
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
         override val cursor: TerminalRenderCursor
-            get() = TerminalRenderCursor(
-                column = 0,
-                row = 0,
-                visible = currentOffset == 0,
-                blinking = false,
-                shape = TerminalRenderCursorShape.BLOCK,
-                generation = 1L,
-            )
+            get() =
+                TerminalRenderCursor(
+                    column = 0,
+                    row = 0,
+                    visible = currentOffset == 0,
+                    blinking = false,
+                    shape = TerminalRenderCursorShape.BLOCK,
+                    generation = 1L,
+                )
 
-        val reader = object : TerminalRenderFrameReader {
-            override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-                readRenderFrame(scrollbackOffset = 0, consumer = consumer)
-            }
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                    readRenderFrame(scrollbackOffset = 0, consumer = consumer)
+                }
 
-            override fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
-                lastRequestedOffset = scrollbackOffset
-                lastRequestedRows = 0
-                currentOffset = scrollbackOffset.coerceIn(0, historySize)
-                currentRows = 1
-                consumer.accept(this@OffsetFrame)
-            }
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    lastRequestedOffset = scrollbackOffset
+                    lastRequestedRows = 0
+                    currentOffset = scrollbackOffset.coerceIn(0, historySize)
+                    currentRows = 1
+                    consumer.accept(this@OffsetFrame)
+                }
 
-            override fun readRenderFrame(
-                scrollbackOffset: Int,
-                viewportRows: Int,
-                consumer: TerminalRenderFrameConsumer,
-            ) {
-                lastRequestedOffset = scrollbackOffset
-                lastRequestedRows = viewportRows
-                currentOffset = scrollbackOffset.coerceIn(0, historySize)
-                currentRows = viewportRows.coerceAtLeast(1)
-                consumer.accept(this@OffsetFrame)
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    viewportRows: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    lastRequestedOffset = scrollbackOffset
+                    lastRequestedRows = viewportRows
+                    currentOffset = scrollbackOffset.coerceIn(0, historySize)
+                    currentRows = viewportRows.coerceAtLeast(1)
+                    consumer.accept(this@OffsetFrame)
+                }
             }
-        }
 
         override fun lineGeneration(row: Int): Long = 1L
 

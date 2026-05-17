@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer.impl
 
 import com.gagik.core.api.TerminalWriter
@@ -27,13 +26,13 @@ import com.gagik.core.util.UnicodeWidth
 internal class TerminalWriterImpl(
     private val state: TerminalState,
     private val mutationEngine: MutationEngine,
-    private val cursorEngine: CursorEngine
+    private val cursorEngine: CursorEngine,
 ) : TerminalWriter {
-
     override fun writeCodepoint(codepoint: Int) {
         val charWidth = UnicodeWidth.calculate(codepoint, state.modes.treatAmbiguousAsWide)
         mutationEngine.printCodepoint(codepoint, charWidth)
     }
+
     override fun writeText(text: String) {
         var i = 0
         while (i < text.length) {
@@ -44,7 +43,10 @@ internal class TerminalWriterImpl(
         }
     }
 
-    override fun writeCluster(codepoints: IntArray, length: Int) {
+    override fun writeCluster(
+        codepoints: IntArray,
+        length: Int,
+    ) {
         require(length in 1..codepoints.size) { "length must be in 1..${codepoints.size}, was $length" }
 
         val charWidth = clusterWidth(codepoints, length)
@@ -61,7 +63,10 @@ internal class TerminalWriterImpl(
         mutationEngine.appendToPreviousCluster(codepoint)
     }
 
-    private fun clusterWidth(codepoints: IntArray, length: Int): Int {
+    private fun clusterWidth(
+        codepoints: IntArray,
+        length: Int,
+    ): Int {
         if (length == 0) return 0
 
         val baseWidth = UnicodeWidth.calculate(codepoints[0], state.modes.treatAmbiguousAsWide)
@@ -77,7 +82,10 @@ internal class TerminalWriterImpl(
 
     override fun carriageReturn() = cursorEngine.carriageReturn()
 
-    override fun setScrollRegion(top: Int, bottom: Int) {
+    override fun setScrollRegion(
+        top: Int,
+        bottom: Int,
+    ) {
         val oldCol = state.cursor.col
         val oldRow = state.cursor.row
         state.activeBuffer.setScrollRegion(
@@ -85,14 +93,17 @@ internal class TerminalWriterImpl(
             bottom,
             state.modes.isOriginMode,
             state.dimensions.height,
-            state.effectiveLeftMargin
+            state.effectiveLeftMargin,
         )
         if (state.cursor.col != oldCol || state.cursor.row != oldRow) {
             state.markCursorChanged()
         }
     }
 
-    override fun setLeftRightMargins(left: Int, right: Int) {
+    override fun setLeftRightMargins(
+        left: Int,
+        right: Int,
+    ) {
         if (!state.modes.isLeftRightMarginMode) return
         if (state.activeBuffer.setLeftRightMargins(left, right, state.dimensions.width)) {
             cursorEngine.homeCursor()
@@ -173,7 +184,7 @@ internal class TerminalWriterImpl(
         blink: Boolean,
         inverse: Boolean,
         conceal: Boolean,
-        underlineColor: Int
+        underlineColor: Int,
     ) {
         state.pen.setAttributes(
             fg = fg,
@@ -203,7 +214,7 @@ internal class TerminalWriterImpl(
         overline: Boolean,
         blink: Boolean,
         inverse: Boolean,
-        conceal: Boolean
+        conceal: Boolean,
     ) {
         state.pen.setColors(
             foreground = foreground,

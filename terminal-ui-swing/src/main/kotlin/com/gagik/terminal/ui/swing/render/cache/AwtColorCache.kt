@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.cache
 
 import java.awt.Color
@@ -64,15 +63,19 @@ internal class AwtColorCache(
         return color
     }
 
-    private fun put(argb: Int, color: Color) {
-        val entry = if (size < entryKeys.size) {
-            size++
-        } else {
-            val evicted = tail
-            removeHashEntry(entryKeys[evicted], evicted)
-            unlink(evicted)
-            evicted
-        }
+    private fun put(
+        argb: Int,
+        color: Color,
+    ) {
+        val entry =
+            if (size < entryKeys.size) {
+                size++
+            } else {
+                val evicted = tail
+                removeHashEntry(entryKeys[evicted], evicted)
+                unlink(evicted)
+                evicted
+            }
 
         entryKeys[entry] = argb
         entryColors[entry] = color
@@ -90,7 +93,10 @@ internal class AwtColorCache(
         }
     }
 
-    private fun insertHashEntry(argb: Int, entry: Int) {
+    private fun insertHashEntry(
+        argb: Int,
+        entry: Int,
+    ) {
         var slot = hashSlot(argb)
         while (hashEntries[slot] != EMPTY) {
             slot = (slot + 1) and hashMask
@@ -99,7 +105,10 @@ internal class AwtColorCache(
         hashEntries[slot] = entry
     }
 
-    private fun removeHashEntry(argb: Int, entry: Int) {
+    private fun removeHashEntry(
+        argb: Int,
+        entry: Int,
+    ) {
         var slot = hashSlot(argb)
         while (true) {
             if (hashEntries[slot] == entry && hashKeys[slot] == argb) {

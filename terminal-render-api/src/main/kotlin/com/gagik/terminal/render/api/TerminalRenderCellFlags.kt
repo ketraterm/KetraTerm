@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.api
 
 import com.gagik.terminal.render.api.TerminalRenderCellFlags.CLUSTER
@@ -21,7 +20,6 @@ import com.gagik.terminal.render.api.TerminalRenderCellFlags.CODEPOINT
 import com.gagik.terminal.render.api.TerminalRenderCellFlags.EMPTY
 import com.gagik.terminal.render.api.TerminalRenderCellFlags.WIDE_LEADING
 import com.gagik.terminal.render.api.TerminalRenderCellFlags.WIDE_TRAILING
-
 
 /**
  * Public render cell flag bit set.
@@ -70,14 +68,15 @@ object TerminalRenderCellFlags {
      * @param flags flag bit set to validate.
      * @return `true` when the bit set is valid for one render cell.
      */
-    fun isValidCombination(flags: Int): Boolean = when (flags) {
-        EMPTY,
-        CODEPOINT,
-        CODEPOINT or WIDE_LEADING,
-        CLUSTER,
-        CLUSTER or WIDE_LEADING,
-        WIDE_TRAILING,
-        -> true
-        else -> false
-    }
+    fun isValidCombination(flags: Int): Boolean =
+        when (flags) {
+            EMPTY,
+            CODEPOINT,
+            CODEPOINT or WIDE_LEADING,
+            CLUSTER,
+            CLUSTER or WIDE_LEADING,
+            WIDE_TRAILING,
+            -> true
+            else -> false
+        }
 }

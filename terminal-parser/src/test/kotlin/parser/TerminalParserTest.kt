@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser
 
 import com.gagik.parser.ansi.AnsiState
@@ -33,36 +32,38 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("TerminalParser")
 class TerminalParserTest {
-
     // ----- API validation ---------------------------------------------------
 
     @Nested
     @DisplayName("API validation")
     inner class ApiValidation {
-
         @Test
         fun `accept rejects invalid offset and length ranges`() {
             val f = TerminalParserFixture()
             val bytes = byteArrayOf('a'.code.toByte())
 
-            val negativeOffset = assertThrows(IllegalArgumentException::class.java) {
-                f.parser.accept(bytes, offset = -1, length = 1)
-            }
-            val negativeLength = assertThrows(IllegalArgumentException::class.java) {
-                f.parser.accept(bytes, offset = 0, length = -1)
-            }
-            val offsetOutOfRange = assertThrows(IllegalArgumentException::class.java) {
-                f.parser.accept(bytes, offset = 2, length = 0)
-            }
-            val sumOutOfRange = assertThrows(IllegalArgumentException::class.java) {
-                f.parser.accept(bytes, offset = 1, length = 1)
-            }
+            val negativeOffset =
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.parser.accept(bytes, offset = -1, length = 1)
+                }
+            val negativeLength =
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.parser.accept(bytes, offset = 0, length = -1)
+                }
+            val offsetOutOfRange =
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.parser.accept(bytes, offset = 2, length = 0)
+                }
+            val sumOutOfRange =
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.parser.accept(bytes, offset = 1, length = 1)
+                }
 
             assertAll(
                 { assertEquals("offset must be non-negative: -1", negativeOffset.message) },
                 { assertEquals("length must be non-negative: -1", negativeLength.message) },
                 { assertEquals("offset out of range: 2", offsetOutOfRange.message) },
-                { assertEquals("offset + length out of range: offset=1 length=1 size=1", sumOutOfRange.message) }
+                { assertEquals("offset + length out of range: offset=1 length=1 size=1", sumOutOfRange.message) },
             )
         }
 
@@ -70,16 +71,18 @@ class TerminalParserTest {
         fun `acceptByte rejects values outside unsigned byte range`() {
             val f = TerminalParserFixture()
 
-            val below = assertThrows(IllegalArgumentException::class.java) {
-                f.parser.acceptByte(-1)
-            }
-            val above = assertThrows(IllegalArgumentException::class.java) {
-                f.parser.acceptByte(256)
-            }
+            val below =
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.parser.acceptByte(-1)
+                }
+            val above =
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.parser.acceptByte(256)
+                }
 
             assertAll(
                 { assertEquals("byteValue out of range: -1", below.message) },
-                { assertEquals("byteValue out of range: 256", above.message) }
+                { assertEquals("byteValue out of range: 256", above.message) },
             )
         }
 
@@ -92,7 +95,7 @@ class TerminalParserTest {
 
             assertAll(
                 { assertTrue(f.sink.events.isEmpty()) },
-                { assertEquals(AnsiState.GROUND, f.state.fsmState) }
+                { assertEquals(AnsiState.GROUND, f.state.fsmState) },
             )
         }
 
@@ -117,7 +120,7 @@ class TerminalParserTest {
 
             assertEquals(
                 listOf(writeCodepoint('a'.code), writeCodepoint('b'.code), writeCodepoint('c'.code)),
-                f.sink.events
+                f.sink.events,
             )
         }
     }
@@ -127,7 +130,6 @@ class TerminalParserTest {
     @Nested
     @DisplayName("printable and UTF-8")
     inner class PrintableAndUtf8 {
-
         @Test
         fun `plain ASCII publishes final scalar at host chunk boundary`() {
             val f = TerminalParserFixture()
@@ -142,7 +144,7 @@ class TerminalParserTest {
 
             assertEquals(
                 listOf(writeCodepoint('a'.code), writeCodepoint('b'.code), writeCodepoint('c'.code)),
-                f.sink.events
+                f.sink.events,
             )
         }
 
@@ -186,7 +188,7 @@ class TerminalParserTest {
 
             assertEquals(
                 listOf(writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT), writeCodepoint('A'.code)),
-                f.sink.events
+                f.sink.events,
             )
         }
 
@@ -201,10 +203,10 @@ class TerminalParserTest {
                 {
                     assertEquals(
                         listOf(writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT), "cursorUp:1"),
-                        f.sink.events
+                        f.sink.events,
                     )
                 },
-                { assertFalse(f.sink.events.contains(writeCodepoint(0x1B))) }
+                { assertFalse(f.sink.events.contains(writeCodepoint(0x1B))) },
             )
         }
 
@@ -227,7 +229,7 @@ class TerminalParserTest {
                     writeCluster(0x1F468, 0x200D, 0x1F469),
                     writeCluster(0x1F1FA, 0x1F1F8),
                 ),
-                f.sink.events
+                f.sink.events,
             )
         }
 
@@ -253,7 +255,6 @@ class TerminalParserTest {
     @Nested
     @DisplayName("structural routing")
     inner class StructuralRouting {
-
         @Test
         fun `C0 control flushes pending printable output before dispatch`() {
             val f = TerminalParserFixture()
@@ -302,7 +303,7 @@ class TerminalParserTest {
 
             assertAll(
                 { assertEquals(AnsiState.GROUND, f.state.fsmState) },
-                { assertEquals(listOf("setCursorAbsolute:11:33"), f.sink.events) }
+                { assertEquals(listOf("setCursorAbsolute:11:33"), f.sink.events) },
             )
         }
 
@@ -332,7 +333,7 @@ class TerminalParserTest {
                     "clearAllTabStops",
                     "setScrollRegion:4:9",
                 ),
-                f.sink.events
+                f.sink.events,
             )
         }
 
@@ -349,7 +350,7 @@ class TerminalParserTest {
             assertAll(
                 { assertEquals(listOf("setScrollRegion:0:-1"), full.sink.events) },
                 { assertEquals(listOf("setScrollRegion:4:-1"), topOnly.sink.events) },
-                { assertEquals(listOf("setScrollRegion:0:9"), bottomOnly.sink.events) }
+                { assertEquals(listOf("setScrollRegion:0:9"), bottomOnly.sink.events) },
             )
         }
 
@@ -366,7 +367,7 @@ class TerminalParserTest {
             assertAll(
                 { assertEquals(listOf("setLeftRightMargins:0:-1"), full.sink.events) },
                 { assertEquals(listOf("setLeftRightMargins:4:-1"), leftOnly.sink.events) },
-                { assertEquals(listOf("setLeftRightMargins:0:9"), rightOnly.sink.events) }
+                { assertEquals(listOf("setLeftRightMargins:0:9"), rightOnly.sink.events) },
             )
         }
 
@@ -386,7 +387,7 @@ class TerminalParserTest {
                 { assertEquals(listOf("eraseInDisplay:2:true"), eraseDisplay.sink.events) },
                 { assertEquals(listOf("eraseInLine:1:true"), eraseLine.sink.events) },
                 { assertEquals(listOf("setSelectiveEraseProtection:true"), protected.sink.events) },
-                { assertEquals(listOf("setSelectiveEraseProtection:false"), unprotected.sink.events) }
+                { assertEquals(listOf("setSelectiveEraseProtection:false"), unprotected.sink.events) },
             )
         }
 
@@ -459,7 +460,7 @@ class TerminalParserTest {
             assertAll(
                 { assertEquals(listOf("setIconAndWindowTitle:title"), bel.sink.events) },
                 { assertEquals(listOf("setIconTitle:name"), st.sink.events) },
-                { assertEquals(listOf("setWindowTitle:window"), window.sink.events) }
+                { assertEquals(listOf("setWindowTitle:window"), window.sink.events) },
             )
         }
 
@@ -479,7 +480,7 @@ class TerminalParserTest {
                 { assertTrue(malformed.sink.events.isEmpty()) },
                 { assertTrue(unsupported.sink.events.isEmpty()) },
                 { assertTrue(overflowed.sink.events.isEmpty()) },
-                { assertTrue(clipboard.sink.events.isEmpty()) }
+                { assertTrue(clipboard.sink.events.isEmpty()) },
             )
         }
 
@@ -506,7 +507,7 @@ class TerminalParserTest {
                         withId.sink.events,
                     )
                 },
-                { assertEquals(listOf("endHyperlink"), end.sink.events) }
+                { assertEquals(listOf("endHyperlink"), end.sink.events) },
             )
         }
 
@@ -518,7 +519,7 @@ class TerminalParserTest {
 
             assertAll(
                 { assertEquals(AnsiState.GROUND, f.state.fsmState) },
-                { assertTrue(f.sink.events.isEmpty()) }
+                { assertTrue(f.sink.events.isEmpty()) },
             )
         }
 
@@ -528,16 +529,16 @@ class TerminalParserTest {
 
             // CSI 2 SP q (Underline)
             f.acceptAscii("\u001B[2 q")
-            
+
             // CSI SP q (Default/Omitted)
             f.acceptAscii("\u001B[ q")
 
             assertEquals(
                 listOf(
                     "setCursorStyle:2",
-                    "setCursorStyle:0"
+                    "setCursorStyle:0",
                 ),
-                f.sink.events
+                f.sink.events,
             )
         }
     }
@@ -547,7 +548,6 @@ class TerminalParserTest {
     @Nested
     @DisplayName("SGR")
     inner class Sgr {
-
         @Test
         fun `CSI m and CSI 0 m reset attributes through the full parser`() {
             val empty = TerminalParserFixture()
@@ -558,7 +558,7 @@ class TerminalParserTest {
 
             assertAll(
                 { assertEquals(listOf("resetAttributes"), empty.sink.events) },
-                { assertEquals(listOf("resetAttributes"), zero.sink.events) }
+                { assertEquals(listOf("resetAttributes"), zero.sink.events) },
             )
         }
 
@@ -591,7 +591,7 @@ class TerminalParserTest {
                         listOf("setForegroundIndexed:1", "resetAttributes"),
                         omittedLast.sink.events,
                     )
-                }
+                },
             )
         }
 
@@ -641,7 +641,7 @@ class TerminalParserTest {
                 { assertEquals(listOf("setBackgroundIndexed:17"), indexedBackground.sink.events) },
                 { assertEquals(listOf("setForegroundRgb:10:20:30"), rgbForeground.sink.events) },
                 { assertEquals(listOf("setUnderlineStyle:5"), underline.sink.events) },
-                { assertEquals(listOf("setUnderlineColorRgb:10:20:30"), underlineColor.sink.events) }
+                { assertEquals(listOf("setUnderlineColorRgb:10:20:30"), underlineColor.sink.events) },
             )
         }
 
@@ -666,7 +666,7 @@ class TerminalParserTest {
                         listOf("setForegroundRgb:10:20:30", "setBold:true"),
                         rgbThenBold.sink.events,
                     )
-                }
+                },
             )
         }
     }
@@ -676,7 +676,6 @@ class TerminalParserTest {
     @Nested
     @DisplayName("charset and shifts")
     inner class CharsetAndShifts {
-
         @Test
         fun `ESC charset designation maps active DEC Special Graphics through printable path`() {
             val f = TerminalParserFixture()
@@ -704,7 +703,7 @@ class TerminalParserTest {
                     writeCodepoint(0x2500),
                     writeCodepoint('q'.code),
                 ),
-                f.sink.events
+                f.sink.events,
             )
         }
 
@@ -722,7 +721,7 @@ class TerminalParserTest {
                     writeCodepoint(0x2502),
                     writeCodepoint('x'.code),
                 ),
-                f.sink.events
+                f.sink.events,
             )
         }
 
@@ -735,7 +734,7 @@ class TerminalParserTest {
             assertAll(
                 { assertEquals(AnsiState.GROUND, f.state.fsmState) },
                 { assertTrue(f.sink.events.isEmpty()) },
-                { assertArrayEquals(intArrayOf(0, 0, 0, 0), f.state.charsets) }
+                { assertArrayEquals(intArrayOf(0, 0, 0, 0), f.state.charsets) },
             )
         }
 
@@ -773,7 +772,6 @@ class TerminalParserTest {
     @Nested
     @DisplayName("reset")
     inner class Reset {
-
         @Test
         fun `reset drops pending printable cluster CSI state and charset shifts`() {
             val f = TerminalParserFixture()
@@ -791,7 +789,7 @@ class TerminalParserTest {
                 { assertArrayEquals(intArrayOf(0, 0, 0, 0), f.state.charsets) },
                 { assertEquals(0, f.state.glSlot) },
                 { assertEquals(-1, f.state.singleShiftSlot) },
-                { assertEquals(listOf(writeCodepoint('q'.code)), f.sink.events) }
+                { assertEquals(listOf(writeCodepoint('q'.code)), f.sink.events) },
             )
         }
 

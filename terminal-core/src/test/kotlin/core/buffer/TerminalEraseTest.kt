@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.TerminalBuffers
@@ -22,7 +21,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class TerminalEraseTest {
-
     @Test
     fun `ed3_clearsScrollbackButPreservesViewport_ifTargetingXtermSemantics`() {
         val buffer = TerminalBuffers.create(width = 3, height = 2, maxHistory = 4)
@@ -38,7 +36,7 @@ class TerminalEraseTest {
 
         assertAll(
             { assertEquals(screenBefore, buffer.getScreenAsString(), "ED 3 should preserve the visible viewport") },
-            { assertEquals(0, buffer.historySize, "ED 3 should clear scrollback history") }
+            { assertEquals(0, buffer.historySize, "ED 3 should clear scrollback history") },
         )
     }
 }

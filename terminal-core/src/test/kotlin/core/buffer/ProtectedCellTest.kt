@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.TerminalBuffers
@@ -24,7 +23,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class ProtectedCellTest {
-
     private fun blankScreen(height: Int): String = List(height) { "" }.joinToString("\n")
 
     private fun stateOf(api: TerminalBufferApi): TerminalState {
@@ -48,7 +46,7 @@ class ProtectedCellTest {
 
         assertAll(
             { assertEquals(blankScreen(2), buffer.getScreenAsString()) },
-            { assertFalse(AttributeCodec.isProtected(state.altBuffer.ring[state.altBuffer.ring.size - 1].getPackedAttr(0))) }
+            { assertFalse(AttributeCodec.isProtected(state.altBuffer.ring[state.altBuffer.ring.size - 1].getPackedAttr(0))) },
         )
     }
 
@@ -64,7 +62,7 @@ class ProtectedCellTest {
         val top = (state.primaryBuffer.ring.size - state.dimensions.height).coerceAtLeast(0)
         assertAll(
             { assertEquals(blankScreen(2), buffer.getScreenAsString()) },
-            { assertFalse(AttributeCodec.isProtected(state.primaryBuffer.ring[top].getPackedAttr(0))) }
+            { assertFalse(AttributeCodec.isProtected(state.primaryBuffer.ring[top].getPackedAttr(0))) },
         )
     }
 }

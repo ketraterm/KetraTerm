@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render
 
 import com.gagik.terminal.render.api.*
@@ -33,14 +32,16 @@ class TerminalGridPainterTest {
     fun `ascii runs paint contiguous measured cells`() {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
-        val settings = TerminalSwingSettings(
-            font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-            palette = TerminalColorPalette(
-                defaultForeground = RED,
-                defaultBackground = BLACK,
-            ),
-            textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-        )
+        val settings =
+            TerminalSwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = RED,
+                        defaultBackground = BLACK,
+                    ),
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+            )
         val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame(text = "ii", cursorVisible = false))
@@ -66,25 +67,28 @@ class TerminalGridPainterTest {
     fun `ascii run fallback preserves grid cells when measured width differs`() {
         val image = BufferedImage(120, 40, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
-        val settings = TerminalSwingSettings(
-            font = Font(Font.SERIF, Font.PLAIN, 18),
-            palette = TerminalColorPalette(
-                defaultForeground = RED,
-                defaultBackground = BLACK,
-            ),
-            textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-            fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON,
-        )
+        val settings =
+            TerminalSwingSettings(
+                font = Font(Font.SERIF, Font.PLAIN, 18),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = RED,
+                        defaultBackground = BLACK,
+                    ),
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+                fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON,
+            )
         val fontMetrics = g.getFontMetrics(settings.font)
-        val metrics = TerminalSwingMetrics(
-            cellWidth = maxOf(1, fontMetrics.charWidth('W')),
-            cellHeight = fontMetrics.height,
-            baseline = fontMetrics.ascent,
-            underlineY = minOf(fontMetrics.height - 1, fontMetrics.ascent + 1),
-            strikethroughY = maxOf(0, fontMetrics.ascent - fontMetrics.ascent / 3),
-            overlineY = 0,
-            cursorStrokeWidth = 1,
-        )
+        val metrics =
+            TerminalSwingMetrics(
+                cellWidth = maxOf(1, fontMetrics.charWidth('W')),
+                cellHeight = fontMetrics.height,
+                baseline = fontMetrics.ascent,
+                underlineY = minOf(fontMetrics.height - 1, fontMetrics.ascent + 1),
+                strikethroughY = maxOf(0, fontMetrics.ascent - fontMetrics.ascent / 3),
+                overlineY = 0,
+                cursorStrokeWidth = 1,
+            )
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame(text = "ii", cursorVisible = false))
 
@@ -113,16 +117,18 @@ class TerminalGridPainterTest {
     fun `block cursor redraws covered glyph with cursor foreground`() {
         val image = BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
-        val settings = TerminalSwingSettings(
-            font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-            palette = TerminalColorPalette(
-                defaultForeground = WHITE,
-                defaultBackground = BLACK,
-                cursorForeground = RED,
-                cursorBackground = BLUE,
-            ),
-            textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-        )
+        val settings =
+            TerminalSwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = WHITE,
+                        defaultBackground = BLACK,
+                        cursorForeground = RED,
+                        cursorBackground = BLUE,
+                    ),
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+            )
         val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "A", cursorVisible = true))
@@ -149,14 +155,16 @@ class TerminalGridPainterTest {
     fun `complex code point paints with foreground color`() {
         val image = BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
-        val settings = TerminalSwingSettings(
-            font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-            palette = TerminalColorPalette(
-                defaultForeground = RED,
-                defaultBackground = BLACK,
-            ),
-            textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-        )
+        val settings =
+            TerminalSwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = RED,
+                        defaultBackground = BLACK,
+                    ),
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+            )
         val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "\u03A9", cursorVisible = false))
@@ -191,16 +199,18 @@ class TerminalGridPainterTest {
     fun `block cursor redraws covered complex code point with cursor foreground`() {
         val image = BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
-        val settings = TerminalSwingSettings(
-            font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-            palette = TerminalColorPalette(
-                defaultForeground = WHITE,
-                defaultBackground = BLACK,
-                cursorForeground = GREEN,
-                cursorBackground = BLUE,
-            ),
-            textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-        )
+        val settings =
+            TerminalSwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = WHITE,
+                        defaultBackground = BLACK,
+                        cursorForeground = GREEN,
+                        cursorBackground = BLUE,
+                    ),
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+            )
         val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "\u03A9", cursorVisible = true))
@@ -227,31 +237,35 @@ class TerminalGridPainterTest {
     fun `decorations use extra attributes for underline color and overline`() {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
-        val settings = TerminalSwingSettings(
-            font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-            palette = TerminalColorPalette(
-                defaultForeground = WHITE,
-                defaultBackground = BLACK,
-            ),
-            textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-        )
+        val settings =
+            TerminalSwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = WHITE,
+                        defaultBackground = BLACK,
+                    ),
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+            )
         val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(
             TextFrame(
                 text = "AB",
                 cursorVisible = false,
-                attrs = longArrayOf(
-                    TerminalRenderAttrs.pack(underlineStyle = TerminalRenderUnderline.SINGLE),
-                    TerminalRenderAttrs.DEFAULT,
-                ),
-                extraAttrs = longArrayOf(
-                    TerminalRenderExtraAttrs.pack(
-                        underlineColorKind = TerminalRenderColorKind.RGB,
-                        underlineColorValue = 0x00FF00,
+                attrs =
+                    longArrayOf(
+                        TerminalRenderAttrs.pack(underlineStyle = TerminalRenderUnderline.SINGLE),
+                        TerminalRenderAttrs.DEFAULT,
                     ),
-                    TerminalRenderExtraAttrs.pack(overline = true),
-                ),
+                extraAttrs =
+                    longArrayOf(
+                        TerminalRenderExtraAttrs.pack(
+                            underlineColorKind = TerminalRenderColorKind.RGB,
+                            underlineColorValue = 0x00FF00,
+                        ),
+                        TerminalRenderExtraAttrs.pack(overline = true),
+                    ),
             ),
         )
 
@@ -274,34 +288,38 @@ class TerminalGridPainterTest {
     fun `extra decoration attributes split ascii runs`() {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
-        val settings = TerminalSwingSettings(
-            font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-            palette = TerminalColorPalette(
-                defaultForeground = WHITE,
-                defaultBackground = BLACK,
-            ),
-            textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-        )
+        val settings =
+            TerminalSwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = WHITE,
+                        defaultBackground = BLACK,
+                    ),
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+            )
         val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(
             TextFrame(
                 text = "AB",
                 cursorVisible = false,
-                attrs = longArrayOf(
-                    TerminalRenderAttrs.pack(underlineStyle = TerminalRenderUnderline.SINGLE),
-                    TerminalRenderAttrs.pack(underlineStyle = TerminalRenderUnderline.SINGLE),
-                ),
-                extraAttrs = longArrayOf(
-                    TerminalRenderExtraAttrs.pack(
-                        underlineColorKind = TerminalRenderColorKind.RGB,
-                        underlineColorValue = 0x00FF00,
+                attrs =
+                    longArrayOf(
+                        TerminalRenderAttrs.pack(underlineStyle = TerminalRenderUnderline.SINGLE),
+                        TerminalRenderAttrs.pack(underlineStyle = TerminalRenderUnderline.SINGLE),
                     ),
-                    TerminalRenderExtraAttrs.pack(
-                        underlineColorKind = TerminalRenderColorKind.RGB,
-                        underlineColorValue = 0x0000FF,
+                extraAttrs =
+                    longArrayOf(
+                        TerminalRenderExtraAttrs.pack(
+                            underlineColorKind = TerminalRenderColorKind.RGB,
+                            underlineColorValue = 0x00FF00,
+                        ),
+                        TerminalRenderExtraAttrs.pack(
+                            underlineColorKind = TerminalRenderColorKind.RGB,
+                            underlineColorValue = 0x0000FF,
+                        ),
                     ),
-                ),
             ),
         )
 
@@ -324,15 +342,17 @@ class TerminalGridPainterTest {
     fun `selection background uses configurable Swing color`() {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
-        val settings = TerminalSwingSettings(
-            font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-            palette = TerminalColorPalette(
-                defaultForeground = WHITE,
-                defaultBackground = BLACK,
-            ),
-            selectionBackground = RED,
-            textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-        )
+        val settings =
+            TerminalSwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = WHITE,
+                        defaultBackground = BLACK,
+                    ),
+                selectionBackground = RED,
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+            )
         val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame(text = "AB", cursorVisible = false))
@@ -353,7 +373,11 @@ class TerminalGridPainterTest {
         assertEquals(BLACK, image.getRGB(metrics.cellWidth + 1, 1))
     }
 
-    private fun BufferedImage.containsColorInRange(argb: Int, xStart: Int, xEnd: Int): Boolean {
+    private fun BufferedImage.containsColorInRange(
+        argb: Int,
+        xStart: Int,
+        xEnd: Int,
+    ): Boolean {
         var y = 0
         while (y < height) {
             var x = xStart
@@ -366,7 +390,11 @@ class TerminalGridPainterTest {
         return false
     }
 
-    private fun BufferedImage.containsColor(argb: Int, width: Int, height: Int): Boolean {
+    private fun BufferedImage.containsColor(
+        argb: Int,
+        width: Int,
+        height: Int,
+    ): Boolean {
         var y = 0
         while (y < height) {
             var x = 0
@@ -384,20 +412,22 @@ class TerminalGridPainterTest {
         cursorVisible: Boolean,
         private val attrs: LongArray = LongArray(text.length) { TerminalRenderAttrs.DEFAULT },
         private val extraAttrs: LongArray = LongArray(text.length) { TerminalRenderExtraAttrs.DEFAULT },
-    ) : TerminalRenderFrameReader, TerminalRenderFrame {
+    ) : TerminalRenderFrameReader,
+        TerminalRenderFrame {
         override val columns: Int = text.length
         override val rows: Int = 1
         override val frameGeneration: Long = 1
         override val structureGeneration: Long = 1
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
-        override val cursor: TerminalRenderCursor = TerminalRenderCursor(
-            column = 0,
-            row = 0,
-            visible = cursorVisible,
-            blinking = false,
-            shape = TerminalRenderCursorShape.BLOCK,
-            generation = 1,
-        )
+        override val cursor: TerminalRenderCursor =
+            TerminalRenderCursor(
+                column = 0,
+                row = 0,
+                visible = cursorVisible,
+                blinking = false,
+                shape = TerminalRenderCursorShape.BLOCK,
+                generation = 1,
+            )
 
         override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
             consumer.accept(this)

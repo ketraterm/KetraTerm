@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.state
 
 import com.gagik.core.buffer.HistoryRing
@@ -63,8 +62,7 @@ internal class ScreenBuffer(
     var rightMargin: Int = initialWidth - 1
         private set
 
-    fun isFullViewportScroll(viewportHeight: Int): Boolean =
-        scrollTop == 0 && scrollBottom == viewportHeight - 1
+    fun isFullViewportScroll(viewportHeight: Int): Boolean = scrollTop == 0 && scrollBottom == viewportHeight - 1
 
     /**
      * DECSTBM: sets the scroll margins and homes the cursor per the VT spec.
@@ -77,7 +75,7 @@ internal class ScreenBuffer(
         bottom: Int,
         isOriginMode: Boolean,
         viewportHeight: Int,
-        homeCol: Int = 0
+        homeCol: Int = 0,
     ) {
         val t = (top - 1).coerceIn(0, viewportHeight - 1)
         val b = (bottom - 1).coerceIn(0, viewportHeight - 1)
@@ -101,7 +99,11 @@ internal class ScreenBuffer(
      * Returns `true` when a non-degenerate range was applied and `false` when
      * the request was ignored.
      */
-    fun setLeftRightMargins(left: Int, right: Int, viewportWidth: Int): Boolean {
+    fun setLeftRightMargins(
+        left: Int,
+        right: Int,
+        viewportWidth: Int,
+    ): Boolean {
         val l = (left - 1).coerceIn(0, viewportWidth - 1)
         val r = (right - 1).coerceIn(0, viewportWidth - 1)
         if (l >= r) return false
@@ -123,7 +125,10 @@ internal class ScreenBuffer(
      * new right margin; otherwise it is cleared to avoid stale phantom-column
      * state when DECRC restores later.
      */
-    fun clampSavedCursorToBounds(newWidth: Int, newHeight: Int) {
+    fun clampSavedCursorToBounds(
+        newWidth: Int,
+        newHeight: Int,
+    ) {
         if (!savedCursor.isSaved) return
         savedCursor.col = savedCursor.col.coerceIn(0, newWidth - 1)
         savedCursor.row = savedCursor.row.coerceIn(0, newHeight - 1)
@@ -138,11 +143,18 @@ internal class ScreenBuffer(
      * place: every live line must be cleared before logical reachability is
      * dropped, otherwise cluster payloads can leak in the shared [store].
      */
-    fun clearGrid(penAttr: Long, viewportHeight: Int) {
+    fun clearGrid(
+        penAttr: Long,
+        viewportHeight: Int,
+    ) {
         clearGrid(penAttr, 0L, viewportHeight)
     }
 
-    fun clearGrid(penAttr: Long, penExtendedAttr: Long, viewportHeight: Int) {
+    fun clearGrid(
+        penAttr: Long,
+        penExtendedAttr: Long,
+        viewportHeight: Int,
+    ) {
         for (i in 0 until ring.size) {
             ring[i].clear(penAttr, penExtendedAttr)
         }
@@ -158,7 +170,12 @@ internal class ScreenBuffer(
      * replace them independently because every [Line] in the ring closes over
      * the active store instance.
      */
-    fun replaceStorage(newWidth: Int, newHeight: Int, penAttr: Long, penExtendedAttr: Long = 0L) {
+    fun replaceStorage(
+        newWidth: Int,
+        newHeight: Int,
+        penAttr: Long,
+        penExtendedAttr: Long = 0L,
+    ) {
         store = ClusterStore()
         ring = HistoryRing(maxHistory + newHeight) { Line(newWidth, store) }
         repeat(newHeight) { ring.push().clear(penAttr, penExtendedAttr) }

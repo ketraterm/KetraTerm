@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 import com.gagik.terminal.ui.swing.render.primitives.TerminalBlockElementGlyphs.SHADE_LIGHT
@@ -24,7 +23,6 @@ import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 
 class TerminalShadeTextureCacheTest {
-
     @Test
     fun `texture reuses cached instances for identical kind and color`() {
         val cache = TerminalShadeTextureCache()

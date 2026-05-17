@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import com.gagik.core.api.TerminalModeBits
@@ -30,7 +29,6 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Test
 
 class MouseEncoderTest {
-
     @Test
     fun `tracking NONE suppresses all events`() {
         assertMouseBytes(bytes(), press(), tracking = MouseTrackingMode.NONE)
@@ -239,9 +237,10 @@ class MouseEncoderTest {
             esc("[M") + bytes(32, 255, 255),
             press(column = 223, row = 223),
             encoding = MouseEncodingMode.DEFAULT,
-            policy = TerminalInputPolicy(
-                mouseCoordinateLimitPolicy = MouseCoordinateLimitPolicy.CLAMP_TO_MAX,
-            ),
+            policy =
+                TerminalInputPolicy(
+                    mouseCoordinateLimitPolicy = MouseCoordinateLimitPolicy.CLAMP_TO_MAX,
+                ),
         )
     }
 
@@ -322,7 +321,10 @@ class MouseEncoderTest {
         )
     }
 
-    private fun assertTrackingMatrix(encoding: Int, encodedPress: ByteArray) {
+    private fun assertTrackingMatrix(
+        encoding: Int,
+        encodedPress: ByteArray,
+    ) {
         assertMouseBytes(encodedPress, press(), tracking = MouseTrackingMode.X10, encoding = encoding)
         assertMouseBytes(bytes(), release(), tracking = MouseTrackingMode.X10, encoding = encoding)
         assertMouseBytes(bytes(), motion(TerminalMouseButton.LEFT), tracking = MouseTrackingMode.X10, encoding = encoding)
@@ -351,11 +353,15 @@ class MouseEncoderTest {
         )
     }
 
-    private fun expectedMotion(button: TerminalMouseButton, encoding: Int): ByteArray {
+    private fun expectedMotion(
+        button: TerminalMouseButton,
+        encoding: Int,
+    ): ByteArray {
         val code = if (button == TerminalMouseButton.NONE) 67 else 64
         return when (encoding) {
             MouseEncodingMode.DEFAULT,
-            MouseEncodingMode.UTF8 -> esc("[M") + bytes(code, 33, 33)
+            MouseEncodingMode.UTF8,
+            -> esc("[M") + bytes(code, 33, 33)
             MouseEncodingMode.SGR -> esc("[<${code - 32};1;1M")
             MouseEncodingMode.URXVT -> esc("[$code;1;1M")
             else -> bytes()
@@ -377,13 +383,17 @@ class MouseEncoderTest {
         assertArrayEquals(expected, output.bytes)
     }
 
-    private fun mouseBits(tracking: Int, encoding: Int): Long {
-        val withTracking = TerminalModeBits.withPackedValue(
-            bits = 0L,
-            mask = TerminalModeBits.MOUSE_TRACKING_MASK,
-            shift = TerminalModeBits.MOUSE_TRACKING_SHIFT,
-            value = tracking,
-        )
+    private fun mouseBits(
+        tracking: Int,
+        encoding: Int,
+    ): Long {
+        val withTracking =
+            TerminalModeBits.withPackedValue(
+                bits = 0L,
+                mask = TerminalModeBits.MOUSE_TRACKING_MASK,
+                shift = TerminalModeBits.MOUSE_TRACKING_SHIFT,
+                value = tracking,
+            )
         return TerminalModeBits.withPackedValue(
             bits = withTracking,
             mask = TerminalModeBits.MOUSE_ENCODING_MASK,
@@ -397,37 +407,27 @@ class MouseEncoderTest {
         column: Int = 0,
         row: Int = 0,
         modifiers: Int = TerminalModifiers.NONE,
-    ): TerminalMouseEvent {
-        return TerminalMouseEvent(column, row, button, TerminalMouseEventType.PRESS, modifiers)
-    }
+    ): TerminalMouseEvent = TerminalMouseEvent(column, row, button, TerminalMouseEventType.PRESS, modifiers)
 
     private fun release(
         button: TerminalMouseButton = TerminalMouseButton.LEFT,
         column: Int = 0,
         row: Int = 0,
-    ): TerminalMouseEvent {
-        return TerminalMouseEvent(column, row, button, TerminalMouseEventType.RELEASE)
-    }
+    ): TerminalMouseEvent = TerminalMouseEvent(column, row, button, TerminalMouseEventType.RELEASE)
 
     private fun motion(
         button: TerminalMouseButton,
         column: Int = 0,
         row: Int = 0,
-    ): TerminalMouseEvent {
-        return TerminalMouseEvent(column, row, button, TerminalMouseEventType.MOTION)
-    }
+    ): TerminalMouseEvent = TerminalMouseEvent(column, row, button, TerminalMouseEventType.MOTION)
 
     private fun wheel(
         button: TerminalMouseButton,
         column: Int = 0,
         row: Int = 0,
-    ): TerminalMouseEvent {
-        return TerminalMouseEvent(column, row, button, TerminalMouseEventType.WHEEL)
-    }
+    ): TerminalMouseEvent = TerminalMouseEvent(column, row, button, TerminalMouseEventType.WHEEL)
 
-    private fun esc(textAfterEsc: String): ByteArray {
-        return bytes(0x1b) + textAfterEsc.encodeToByteArray()
-    }
+    private fun esc(textAfterEsc: String): ByteArray = bytes(0x1b) + textAfterEsc.encodeToByteArray()
 
     private fun bytes(vararg values: Int): ByteArray {
         val bytes = ByteArray(values.size)
@@ -449,26 +449,28 @@ class MouseEncoderTest {
         return bytes
     }
 
-    private fun utf8Scalar(value: Int): ByteArray {
-        return when {
+    private fun utf8Scalar(value: Int): ByteArray =
+        when {
             value <= 0x7f -> bytes(value)
-            value <= 0x7ff -> bytes(
-                0xc0 or (value shr 6),
-                0x80 or (value and 0x3f),
-            )
-            value <= 0xffff -> bytes(
-                0xe0 or (value shr 12),
-                0x80 or ((value shr 6) and 0x3f),
-                0x80 or (value and 0x3f),
-            )
-            else -> bytes(
-                0xf0 or (value shr 18),
-                0x80 or ((value shr 12) and 0x3f),
-                0x80 or ((value shr 6) and 0x3f),
-                0x80 or (value and 0x3f),
-            )
+            value <= 0x7ff ->
+                bytes(
+                    0xc0 or (value shr 6),
+                    0x80 or (value and 0x3f),
+                )
+            value <= 0xffff ->
+                bytes(
+                    0xe0 or (value shr 12),
+                    0x80 or ((value shr 6) and 0x3f),
+                    0x80 or (value and 0x3f),
+                )
+            else ->
+                bytes(
+                    0xf0 or (value shr 18),
+                    0x80 or ((value shr 12) and 0x3f),
+                    0x80 or ((value shr 6) and 0x3f),
+                    0x80 or (value and 0x3f),
+                )
         }
-    }
 
     private class RecordingHostOutput : TerminalHostOutput {
         var bytes: ByteArray = ByteArray(0)
@@ -478,7 +480,11 @@ class MouseEncoderTest {
             bytes += byte.toByte()
         }
 
-        override fun writeBytes(bytes: ByteArray, offset: Int, length: Int) {
+        override fun writeBytes(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) {
             this.bytes += bytes.copyOfRange(offset, offset + length)
         }
 

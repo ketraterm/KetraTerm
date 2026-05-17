@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.benchmark
 
 import com.gagik.core.TerminalBuffers
@@ -42,7 +41,6 @@ import java.util.concurrent.TimeUnit
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 open class TerminalLargeInputBenchmark {
-
     @Param("ascii", "styled")
     lateinit var workload: String
 
@@ -53,20 +51,22 @@ open class TerminalLargeInputBenchmark {
 
     @Setup(Level.Trial)
     open fun setupBytes() {
-        bytes = when (workload) {
-            "ascii" -> buildAsciiInput(LARGE_INPUT_LINES, LARGE_INPUT_COLUMNS)
-            "styled" -> buildStyledInput(LARGE_INPUT_LINES, LARGE_INPUT_COLUMNS)
-            else -> error("unknown workload: $workload")
-        }
+        bytes =
+            when (workload) {
+                "ascii" -> buildAsciiInput(LARGE_INPUT_LINES, LARGE_INPUT_COLUMNS)
+                "styled" -> buildStyledInput(LARGE_INPUT_LINES, LARGE_INPUT_COLUMNS)
+                else -> error("unknown workload: $workload")
+            }
     }
 
     @Setup(Level.Trial)
     open fun setupTerminal() {
-        terminal = TerminalBuffers.create(
-            width = LARGE_INPUT_COLUMNS,
-            height = LARGE_INPUT_ROWS,
-            maxHistory = LARGE_INPUT_LINES,
-        )
+        terminal =
+            TerminalBuffers.create(
+                width = LARGE_INPUT_COLUMNS,
+                height = LARGE_INPUT_ROWS,
+                maxHistory = LARGE_INPUT_LINES,
+            )
         renderReader = terminal as TerminalRenderFrameReader
         publisher = TerminalRenderPublisher(LARGE_INPUT_COLUMNS, LARGE_INPUT_ROWS)
     }
@@ -93,7 +93,6 @@ open class TerminalLargeInputBenchmark {
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 open class TerminalRenderPublishBenchmark {
-
     @Param("0", "5000", "15000")
     var scrollbackOffset: Int = 0
 
@@ -102,11 +101,12 @@ open class TerminalRenderPublishBenchmark {
 
     @Setup(Level.Trial)
     open fun setupTerminal() {
-        val terminal = TerminalBuffers.create(
-            width = LARGE_INPUT_COLUMNS,
-            height = LARGE_INPUT_ROWS,
-            maxHistory = LARGE_INPUT_LINES,
-        )
+        val terminal =
+            TerminalBuffers.create(
+                width = LARGE_INPUT_COLUMNS,
+                height = LARGE_INPUT_ROWS,
+                maxHistory = LARGE_INPUT_LINES,
+            )
         writeScrollbackContent(terminal, LARGE_INPUT_LINES, LARGE_INPUT_COLUMNS)
         renderReader = terminal as TerminalRenderFrameReader
     }
@@ -141,7 +141,6 @@ open class TerminalRenderPublishBenchmark {
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 open class TerminalSwingPaintBenchmark {
-
     @Param("80", "160", "240")
     var columns: Int = 0
 
@@ -170,15 +169,16 @@ open class TerminalSwingPaintBenchmark {
         session = benchmarkSession(terminal)
         session.publisher.updateAndPublish(terminal as TerminalRenderFrameReader)
 
-        component = TerminalSwingTerminal(
-            TerminalSwingSettingsProvider {
-                TerminalSwingSettings(
-                    columns = columns,
-                    rows = rows,
-                    useSystemFallbackFonts = false,
-                )
-            }
-        )
+        component =
+            TerminalSwingTerminal(
+                TerminalSwingSettingsProvider {
+                    TerminalSwingSettings(
+                        columns = columns,
+                        rows = rows,
+                        useSystemFallbackFonts = false,
+                    )
+                },
+            )
         component.bind(session)
         component.setSize(component.preferredSize)
 
@@ -203,7 +203,10 @@ private const val LARGE_INPUT_COLUMNS = 160
 private const val LARGE_INPUT_ROWS = 48
 private const val LARGE_INPUT_LINES = 20_000
 
-private fun buildAsciiInput(lines: Int, columns: Int): ByteArray {
+private fun buildAsciiInput(
+    lines: Int,
+    columns: Int,
+): ByteArray {
     val builder = StringBuilder(lines * (columns + 2))
     repeat(lines) { row ->
         appendLinePayload(builder, row, columns)
@@ -211,7 +214,10 @@ private fun buildAsciiInput(lines: Int, columns: Int): ByteArray {
     return builder.toString().toByteArray(StandardCharsets.UTF_8)
 }
 
-private fun buildStyledInput(lines: Int, columns: Int): ByteArray {
+private fun buildStyledInput(
+    lines: Int,
+    columns: Int,
+): ByteArray {
     val builder = StringBuilder(lines * (columns + 16))
     repeat(lines) { row ->
         builder.append("\u001b[3").append(row % 8).append('m')
@@ -221,7 +227,11 @@ private fun buildStyledInput(lines: Int, columns: Int): ByteArray {
     return builder.toString().toByteArray(StandardCharsets.UTF_8)
 }
 
-private fun appendLinePayload(builder: StringBuilder, row: Int, columns: Int) {
+private fun appendLinePayload(
+    builder: StringBuilder,
+    row: Int,
+    columns: Int,
+) {
     var column = 0
     while (column < columns) {
         val codepoint = 'A'.code + ((row + column) % 26)
@@ -231,7 +241,11 @@ private fun appendLinePayload(builder: StringBuilder, row: Int, columns: Int) {
     builder.append('\r').append('\n')
 }
 
-private fun writeScrollbackContent(terminal: TerminalBufferApi, lines: Int, columns: Int) {
+private fun writeScrollbackContent(
+    terminal: TerminalBufferApi,
+    lines: Int,
+    columns: Int,
+) {
     repeat(lines) { row ->
         var column = 0
         while (column < columns) {
@@ -243,7 +257,11 @@ private fun writeScrollbackContent(terminal: TerminalBufferApi, lines: Int, colu
     }
 }
 
-private fun writeAsciiViewport(terminal: TerminalBufferApi, rows: Int, columns: Int) {
+private fun writeAsciiViewport(
+    terminal: TerminalBufferApi,
+    rows: Int,
+    columns: Int,
+) {
     for (row in 0 until rows) {
         terminal.positionCursor(0, row)
         var column = 0
@@ -254,7 +272,11 @@ private fun writeAsciiViewport(terminal: TerminalBufferApi, rows: Int, columns: 
     }
 }
 
-private fun writeStyledViewport(terminal: TerminalBufferApi, rows: Int, columns: Int) {
+private fun writeStyledViewport(
+    terminal: TerminalBufferApi,
+    rows: Int,
+    columns: Int,
+) {
     for (row in 0 until rows) {
         terminal.positionCursor(0, row)
         terminal.setPenAttributes(
@@ -273,7 +295,11 @@ private fun writeStyledViewport(terminal: TerminalBufferApi, rows: Int, columns:
     terminal.resetPen()
 }
 
-private fun writeClusterViewport(terminal: TerminalBufferApi, rows: Int, columns: Int) {
+private fun writeClusterViewport(
+    terminal: TerminalBufferApi,
+    rows: Int,
+    columns: Int,
+) {
     val accentedE = intArrayOf('e'.code, 0x0301)
     for (row in 0 until rows) {
         terminal.positionCursor(0, row)
@@ -289,19 +315,25 @@ private fun writeClusterViewport(terminal: TerminalBufferApi, rows: Int, columns
     }
 }
 
-private fun benchmarkSession(terminal: TerminalBufferApi): TerminalSession {
-    return TerminalSession.create(
+private fun benchmarkSession(terminal: TerminalBufferApi): TerminalSession =
+    TerminalSession.create(
         terminal = terminal,
         connector = NoOpTerminalConnector,
     )
-}
 
 private object NoOpTerminalConnector : TerminalConnector {
     override fun start(listener: TerminalConnectorListener) = Unit
 
-    override fun write(bytes: ByteArray, offset: Int, length: Int) = Unit
+    override fun write(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) = Unit
 
-    override fun resize(columns: Int, rows: Int) = Unit
+    override fun resize(
+        columns: Int,
+        rows: Int,
+    ) = Unit
 
     override fun close() = Unit
 }

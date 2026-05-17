@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.state.TerminalState
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalBufferResizeTest {
-
     private fun stateOf(buffer: TerminalBuffer): TerminalState {
         val componentsField = TerminalBuffer::class.java.getDeclaredField("components")
         componentsField.isAccessible = true
@@ -44,7 +42,7 @@ class TerminalBufferResizeTest {
         assertAll(
             { assertTrue(state.primaryBuffer.scrollTop in 0 until 3) },
             { assertTrue(state.primaryBuffer.scrollBottom in 0 until 3) },
-            { assertTrue(state.primaryBuffer.scrollTop <= state.primaryBuffer.scrollBottom) }
+            { assertTrue(state.primaryBuffer.scrollTop <= state.primaryBuffer.scrollBottom) },
         )
     }
 
@@ -78,7 +76,7 @@ class TerminalBufferResizeTest {
             { assertTrue(state.primaryBuffer.scrollTop <= state.primaryBuffer.scrollBottom) },
             { assertTrue(state.altBuffer.scrollTop in 0 until 3) },
             { assertTrue(state.altBuffer.scrollBottom in 0 until 3) },
-            { assertTrue(state.altBuffer.scrollTop <= state.altBuffer.scrollBottom) }
+            { assertTrue(state.altBuffer.scrollTop <= state.altBuffer.scrollBottom) },
         )
     }
 }

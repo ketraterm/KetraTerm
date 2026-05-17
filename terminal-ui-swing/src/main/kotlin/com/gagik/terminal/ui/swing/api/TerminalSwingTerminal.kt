@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.api
 
 import com.gagik.terminal.input.event.*
@@ -66,9 +65,10 @@ class TerminalSwingTerminal(
     private var selectionIsBlock: Boolean = false
     private var lastSelectionDragX: Int = 0
     private var lastSelectionDragY: Int = 0
-    private val selectionAutoscrollTimer = Timer(50) {
-        handleSelectionAutoscrollTick()
-    }
+    private val selectionAutoscrollTimer =
+        Timer(50) {
+            handleSelectionAutoscrollTick()
+        }
     private val renderPending = AtomicBoolean(false)
     private val visibleGridSizeSnapshot = AtomicLong(packVisibleGridSize(1, 1))
 
@@ -77,65 +77,77 @@ class TerminalSwingTerminal(
     private val scrollModel = TerminalSwingScrollModel()
     private val keyMapper = TerminalSwingKeyMapper()
     private val selectionTextExtractor = TerminalSelectionTextExtractor()
-    private val repaintSink = object : TerminalRepaintSink {
-        override fun requestFullRepaint() {
-            repaint()
+    private val repaintSink =
+        object : TerminalRepaintSink {
+            override fun requestFullRepaint() {
+                repaint()
+            }
+
+            override fun requestRegionRepaint(
+                x: Int,
+                y: Int,
+                width: Int,
+                height: Int,
+            ) {
+                repaint(x, y, width, height)
+            }
+        }
+    private val cursorTimer =
+        Timer(settings.cursorBlinkMillis) {
+            cursorBlinkVisible = !cursorBlinkVisible
+            repaintBlinkingCursor()
         }
 
-        override fun requestRegionRepaint(x: Int, y: Int, width: Int, height: Int) {
-            repaint(x, y, width, height)
-        }
-    }
-    private val cursorTimer = Timer(settings.cursorBlinkMillis) {
-        cursorBlinkVisible = !cursorBlinkVisible
-        repaintBlinkingCursor()
-    }
+    private val inputKeyListener =
+        object : KeyAdapter() {
+            override fun keyPressed(event: KeyEvent) {
+                if (handleClipboardShortcut(event)) return
 
-    private val inputKeyListener = object : KeyAdapter() {
-        override fun keyPressed(event: KeyEvent) {
-            if (handleClipboardShortcut(event)) return
+                val keyEvent = keyMapper.keyPressed(event) ?: return
+                session?.encodeKey(keyEvent)
+                event.consume()
+            }
 
-            val keyEvent = keyMapper.keyPressed(event) ?: return
-            session?.encodeKey(keyEvent)
-            event.consume()
-        }
-
-        override fun keyTyped(event: KeyEvent) {
-            val keyEvent = keyMapper.keyTyped(event) ?: return
-            session?.encodeKey(keyEvent)
-            event.consume()
-        }
-    }
-
-    private val viewportWheelListener = MouseWheelListener { event ->
-        handleMouseWheel(event)
-    }
-
-    private val selectionMouseListener = object : MouseAdapter() {
-        override fun mousePressed(event: MouseEvent) {
-            handleSelectionMousePressed(event)
+            override fun keyTyped(event: KeyEvent) {
+                val keyEvent = keyMapper.keyTyped(event) ?: return
+                session?.encodeKey(keyEvent)
+                event.consume()
+            }
         }
 
-        override fun mouseReleased(event: MouseEvent) {
-            handleSelectionMouseReleased(event)
-        }
-    }
-
-    private val selectionMouseMotionListener = object : MouseMotionAdapter() {
-        override fun mouseDragged(event: MouseEvent) {
-            handleSelectionMouseDragged(event)
+    private val viewportWheelListener =
+        MouseWheelListener { event ->
+            handleMouseWheel(event)
         }
 
-        override fun mouseMoved(event: MouseEvent) {
-            handleSelectionMouseMoved(event)
-        }
-    }
+    private val selectionMouseListener =
+        object : MouseAdapter() {
+            override fun mousePressed(event: MouseEvent) {
+                handleSelectionMousePressed(event)
+            }
 
-    private val resizeListener = object : ComponentAdapter() {
-        override fun componentResized(event: ComponentEvent) {
-            resizeSessionToVisibleGridOnEdt()
+            override fun mouseReleased(event: MouseEvent) {
+                handleSelectionMouseReleased(event)
+            }
         }
-    }
+
+    private val selectionMouseMotionListener =
+        object : MouseMotionAdapter() {
+            override fun mouseDragged(event: MouseEvent) {
+                handleSelectionMouseDragged(event)
+            }
+
+            override fun mouseMoved(event: MouseEvent) {
+                handleSelectionMouseMoved(event)
+            }
+        }
+
+    private val resizeListener =
+        object : ComponentAdapter() {
+            override fun componentResized(event: ComponentEvent) {
+                resizeSessionToVisibleGridOnEdt()
+            }
+        }
 
     init {
         font = settings.font
@@ -202,11 +214,12 @@ class TerminalSwingTerminal(
      * @return dimension where width is columns and height is rows.
      */
     fun visibleGridSize(): Dimension {
-        val packed = if (SwingUtilities.isEventDispatchThread()) {
-            updateVisibleGridSizeOnEdt()
-        } else {
-            visibleGridSizeSnapshot.get()
-        }
+        val packed =
+            if (SwingUtilities.isEventDispatchThread()) {
+                updateVisibleGridSizeOnEdt()
+            } else {
+                visibleGridSizeSnapshot.get()
+            }
         return Dimension(unpackVisibleColumns(packed), unpackVisibleRows(packed))
     }
 
@@ -232,19 +245,20 @@ class TerminalSwingTerminal(
                 return
             }
 
-            val painted = publisher.readCurrent { cache ->
-                painter.paint(
-                    g = g,
-                    cache = cache,
-                    settings = settings,
-                    metrics = metrics,
-                    width = width,
-                    height = height,
-                    cursorBlinkVisible = cursorBlinkVisible,
-                    contentYOffset = contentYOffset(cache),
-                    selection = getViewportSelection(cache),
-                )
-            }
+            val painted =
+                publisher.readCurrent { cache ->
+                    painter.paint(
+                        g = g,
+                        cache = cache,
+                        settings = settings,
+                        metrics = metrics,
+                        width = width,
+                        height = height,
+                        cursorBlinkVisible = cursorBlinkVisible,
+                        contentYOffset = contentYOffset(cache),
+                        selection = getViewportSelection(cache),
+                    )
+                }
             if (painted == null) {
                 painter.clear(g, settings.palette, width, height)
             }
@@ -314,7 +328,10 @@ class TerminalSwingTerminal(
         return pub.readCurrent { cache -> getViewportSelection(cache) }
     }
 
-    private fun applySettingsToSession(session: TerminalSession, settings: TerminalSwingSettings) {
+    private fun applySettingsToSession(
+        session: TerminalSession,
+        settings: TerminalSwingSettings,
+    ) {
         session.setTreatAmbiguousAsWide(settings.treatAmbiguousAsWide)
     }
 
@@ -347,7 +364,10 @@ class TerminalSwingTerminal(
         return trackingMode != MouseTrackingMode.OFF
     }
 
-    private fun handleMouseTracking(event: MouseEvent, type: TerminalMouseEventType): Boolean {
+    private fun handleMouseTracking(
+        event: MouseEvent,
+        type: TerminalMouseEventType,
+    ): Boolean {
         val boundSession = session ?: return false
         if (!isMouseTrackingIntercepted(event)) return false
 
@@ -356,16 +376,17 @@ class TerminalSwingTerminal(
             val column = unpackCellColumn(cell)
             val row = unpackCellRow(cell)
 
-            val button = if (event is MouseWheelEvent) {
-                if (event.wheelRotation < 0) TerminalMouseButton.WHEEL_UP else TerminalMouseButton.WHEEL_DOWN
-            } else {
-                when {
-                    SwingUtilities.isLeftMouseButton(event) -> TerminalMouseButton.LEFT
-                    SwingUtilities.isMiddleMouseButton(event) -> TerminalMouseButton.MIDDLE
-                    SwingUtilities.isRightMouseButton(event) -> TerminalMouseButton.RIGHT
-                    else -> TerminalMouseButton.NONE
+            val button =
+                if (event is MouseWheelEvent) {
+                    if (event.wheelRotation < 0) TerminalMouseButton.WHEEL_UP else TerminalMouseButton.WHEEL_DOWN
+                } else {
+                    when {
+                        SwingUtilities.isLeftMouseButton(event) -> TerminalMouseButton.LEFT
+                        SwingUtilities.isMiddleMouseButton(event) -> TerminalMouseButton.MIDDLE
+                        SwingUtilities.isRightMouseButton(event) -> TerminalMouseButton.RIGHT
+                        else -> TerminalMouseButton.NONE
+                    }
                 }
-            }
 
             var mods = TerminalModifiers.NONE
             if (event.isShiftDown) mods = mods or TerminalModifiers.SHIFT
@@ -373,13 +394,14 @@ class TerminalSwingTerminal(
             if (event.isControlDown) mods = mods or TerminalModifiers.CTRL
             if (event.isMetaDown) mods = mods or TerminalModifiers.META
 
-            val mouseEvent = TerminalMouseEvent(
-                column = column,
-                row = row,
-                button = button,
-                type = type,
-                modifiers = mods
-            )
+            val mouseEvent =
+                TerminalMouseEvent(
+                    column = column,
+                    row = row,
+                    button = button,
+                    type = type,
+                    modifiers = mods,
+                )
             boundSession.encodeMouse(mouseEvent)
         }
         event.consume()
@@ -456,16 +478,18 @@ class TerminalSwingTerminal(
             val row = unpackCellRow(cell)
 
             val caretAbsRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset + row
-            val anchorAbsRow = selectionAnchorAbsoluteRow ?: (cache.discardedCount + cache.historySize - cache.scrollbackOffset + selectionAnchorRow)
+            val anchorAbsRow =
+                selectionAnchorAbsoluteRow ?: (cache.discardedCount + cache.historySize - cache.scrollbackOffset + selectionAnchorRow)
 
-            val caretColumn = if (
-                caretAbsRow < anchorAbsRow ||
-                (caretAbsRow == anchorAbsRow && column < selectionAnchorColumn)
-            ) {
-                column
-            } else {
-                column + 1
-            }
+            val caretColumn =
+                if (
+                    caretAbsRow < anchorAbsRow ||
+                    (caretAbsRow == anchorAbsRow && column < selectionAnchorColumn)
+                ) {
+                    column
+                } else {
+                    column + 1
+                }
 
             selectionAnchorAbsoluteRow = anchorAbsRow
             selectionCaretAbsoluteRow = caretAbsRow
@@ -477,11 +501,12 @@ class TerminalSwingTerminal(
     }
 
     private fun handleClipboardShortcut(event: KeyEvent): Boolean {
-        val handled = when (settings.clipboardShortcuts.actionFor(event.keyCode, event.modifiersEx)) {
-            TerminalClipboardAction.COPY -> copySelectionToClipboard()
-            TerminalClipboardAction.PASTE -> pasteClipboardText()
-            TerminalClipboardAction.NONE -> false
-        }
+        val handled =
+            when (settings.clipboardShortcuts.actionFor(event.keyCode, event.modifiersEx)) {
+                TerminalClipboardAction.COPY -> copySelectionToClipboard()
+                TerminalClipboardAction.PASTE -> pasteClipboardText()
+                TerminalClipboardAction.NONE -> false
+            }
 
         if (!handled) return false
         event.consume()
@@ -490,10 +515,11 @@ class TerminalSwingTerminal(
 
     private fun copySelectionToClipboard(): Boolean {
         val publisher = session?.publisher ?: return false
-        val selectedText = publisher.readCurrent { cache ->
-            val currentSelection = getViewportSelection(cache) ?: return@readCurrent null
-            selectionTextExtractor.selectedText(cache, currentSelection)
-        } ?: return false
+        val selectedText =
+            publisher.readCurrent { cache ->
+                val currentSelection = getViewportSelection(cache) ?: return@readCurrent null
+                selectionTextExtractor.selectedText(cache, currentSelection)
+            } ?: return false
         if (selectedText.isEmpty()) return false
         settings.clipboardHandler.copyText(selectedText)
         return true
@@ -516,7 +542,8 @@ class TerminalSwingTerminal(
         val caretAbsRow = selectionCaretAbsoluteRow ?: return null
         val c = cache ?: return null
 
-        val isForward = caretAbsRow > anchorAbsRow ||
+        val isForward =
+            caretAbsRow > anchorAbsRow ||
                 (caretAbsRow == anchorAbsRow && selectionCaretColumn >= selectionAnchorColumn)
 
         val startAbsRow = if (isForward) anchorAbsRow else caretAbsRow
@@ -556,15 +583,21 @@ class TerminalSwingTerminal(
         }
     }
 
-    private fun cellAt(event: MouseEvent, cache: TerminalRenderCache): Long {
-        return cellAt(event.x, event.y, cache)
-    }
+    private fun cellAt(
+        event: MouseEvent,
+        cache: TerminalRenderCache,
+    ): Long = cellAt(event.x, event.y, cache)
 
-    private fun cellAt(x: Int, y: Int, cache: TerminalRenderCache): Long {
+    private fun cellAt(
+        x: Int,
+        y: Int,
+        cache: TerminalRenderCache,
+    ): Long {
         val column = (x / metrics.cellWidth).coerceIn(0, cache.columns - 1)
-        val row = ((y - contentYOffset(cache)) / metrics.cellHeight)
-            .toInt()
-            .coerceIn(0, cache.rows - 1)
+        val row =
+            ((y - contentYOffset(cache)) / metrics.cellHeight)
+                .toInt()
+                .coerceIn(0, cache.rows - 1)
         return packCell(column, row)
     }
 
@@ -589,8 +622,8 @@ class TerminalSwingTerminal(
         }
     }
 
-    private fun selectionAutoscrollDelta(y: Int): Double {
-        return when {
+    private fun selectionAutoscrollDelta(y: Int): Double =
+        when {
             y < 0 -> {
                 val distance = -y
                 kotlin.math.floor(1.0 + (distance / 20.0))
@@ -601,7 +634,6 @@ class TerminalSwingTerminal(
             }
             else -> 0.0
         }
-    }
 
     private fun handleSelectionAutoscrollTick() {
         if (!selectingWithMouse) {
@@ -625,16 +657,18 @@ class TerminalSwingTerminal(
                 val row = unpackCellRow(cell)
 
                 val caretAbsRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset + row
-                val anchorAbsRow = selectionAnchorAbsoluteRow ?: (cache.discardedCount + cache.historySize - cache.scrollbackOffset + selectionAnchorRow)
+                val anchorAbsRow =
+                    selectionAnchorAbsoluteRow ?: (cache.discardedCount + cache.historySize - cache.scrollbackOffset + selectionAnchorRow)
 
-                val caretColumn = if (
-                    caretAbsRow < anchorAbsRow ||
-                    (caretAbsRow == anchorAbsRow && column < selectionAnchorColumn)
-                ) {
-                    column
-                } else {
-                    column + 1
-                }
+                val caretColumn =
+                    if (
+                        caretAbsRow < anchorAbsRow ||
+                        (caretAbsRow == anchorAbsRow && column < selectionAnchorColumn)
+                    ) {
+                        column
+                    } else {
+                        column + 1
+                    }
 
                 selectionAnchorAbsoluteRow = anchorAbsRow
                 selectionCaretAbsoluteRow = caretAbsRow
@@ -643,7 +677,11 @@ class TerminalSwingTerminal(
         }
     }
 
-    private fun scrollViewportBy(boundSession: TerminalSession, delta: Double, historySize: Int): Boolean {
+    private fun scrollViewportBy(
+        boundSession: TerminalSession,
+        delta: Double,
+        historySize: Int,
+    ): Boolean {
         val previousRequestedOffset = scrollModel.requestedOffset
         val previousRequestedRows = requestedRenderRows()
         if (!scrollModel.scrollBy(delta, historySize)) return false
@@ -720,9 +758,10 @@ class TerminalSwingTerminal(
         scrollModel.reset()
     }
 
-    private fun preferredGridSize(columns: Int, rows: Int): Dimension {
-        return Dimension(columns * metrics.cellWidth, rows * metrics.cellHeight)
-    }
+    private fun preferredGridSize(
+        columns: Int,
+        rows: Int,
+    ): Dimension = Dimension(columns * metrics.cellWidth, rows * metrics.cellHeight)
 
     private fun resizeSessionToVisibleGridOnEdt() {
         val packedGridSize = updateVisibleGridSizeOnEdt()
@@ -746,21 +785,16 @@ class TerminalSwingTerminal(
         return packed
     }
 
-    private fun wheelScrollLines(event: MouseWheelEvent): Double {
-        return when (event.scrollType) {
+    private fun wheelScrollLines(event: MouseWheelEvent): Double =
+        when (event.scrollType) {
             MouseWheelEvent.WHEEL_UNIT_SCROLL -> -event.preciseWheelRotation * event.scrollAmount
             MouseWheelEvent.WHEEL_BLOCK_SCROLL -> -event.preciseWheelRotation * visibleGridRows()
             else -> -event.preciseWheelRotation
         }
-    }
 
-    private fun visibleGridRows(): Int {
-        return maxOf(1, height / metrics.cellHeight)
-    }
+    private fun visibleGridRows(): Int = maxOf(1, height / metrics.cellHeight)
 
-    private fun requestedRenderRows(): Int {
-        return scrollModel.requestedRows(visibleGridRows())
-    }
+    private fun requestedRenderRows(): Int = scrollModel.requestedRows(visibleGridRows())
 
     private fun contentYOffset(cache: TerminalRenderCache): Double {
         if (cache.rows < requestedRenderRows()) return 0.0
@@ -783,28 +817,22 @@ class TerminalSwingTerminal(
     private companion object {
         private const val NO_RESIZE_DIMENSION = -1
 
-        private fun packVisibleGridSize(columns: Int, rows: Int): Long {
-            return (columns.toLong() shl 32) or (rows.toLong() and 0xffff_ffffL)
-        }
+        private fun packVisibleGridSize(
+            columns: Int,
+            rows: Int,
+        ): Long = (columns.toLong() shl 32) or (rows.toLong() and 0xffff_ffffL)
 
-        private fun unpackVisibleColumns(packed: Long): Int {
-            return (packed ushr 32).toInt()
-        }
+        private fun unpackVisibleColumns(packed: Long): Int = (packed ushr 32).toInt()
 
-        private fun unpackVisibleRows(packed: Long): Int {
-            return packed.toInt()
-        }
+        private fun unpackVisibleRows(packed: Long): Int = packed.toInt()
 
-        private fun packCell(column: Int, row: Int): Long {
-            return (column.toLong() shl 32) or (row.toLong() and 0xffff_ffffL)
-        }
+        private fun packCell(
+            column: Int,
+            row: Int,
+        ): Long = (column.toLong() shl 32) or (row.toLong() and 0xffff_ffffL)
 
-        private fun unpackCellColumn(packed: Long): Int {
-            return (packed ushr 32).toInt()
-        }
+        private fun unpackCellColumn(packed: Long): Int = (packed ushr 32).toInt()
 
-        private fun unpackCellRow(packed: Long): Int {
-            return packed.toInt()
-        }
+        private fun unpackCellRow(packed: Long): Int = packed.toInt()
     }
 }

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.api
 
 import com.gagik.terminal.render.api.TerminalRenderCellFlags
@@ -25,7 +24,10 @@ import com.gagik.terminal.render.cache.TerminalRenderCache
 internal class TerminalSelectionTextExtractor {
     private val rowScratch = StringBuilder(INITIAL_ROW_CAPACITY)
 
-    fun selectedText(cache: TerminalRenderCache, selection: CellSelection): String {
+    fun selectedText(
+        cache: TerminalRenderCache,
+        selection: CellSelection,
+    ): String {
         if (selection.isEmpty) return ""
 
         val result = StringBuilder()
@@ -48,7 +50,11 @@ internal class TerminalSelectionTextExtractor {
         return result.toString()
     }
 
-    fun wordSelectionAt(cache: TerminalRenderCache, row: Int, column: Int): CellSelection? {
+    fun wordSelectionAt(
+        cache: TerminalRenderCache,
+        row: Int,
+        column: Int,
+    ): CellSelection? {
         if (row !in 0 until cache.rows || column !in 0 until cache.columns) return null
 
         val rowOffset = cache.rowOffset(row)
@@ -127,7 +133,12 @@ internal class TerminalSelectionTextExtractor {
         destination.append(rowScratch, 0, trimmedEnd)
     }
 
-    private fun appendCell(destination: StringBuilder, cache: TerminalRenderCache, row: Int, column: Int): Int {
+    private fun appendCell(
+        destination: StringBuilder,
+        cache: TerminalRenderCache,
+        row: Int,
+        column: Int,
+    ): Int {
         val index = cache.rowOffset(row) + column
         val flags = cache.flags[index]
         if (flags and TerminalRenderCellFlags.WIDE_TRAILING != 0) {
@@ -154,7 +165,11 @@ internal class TerminalSelectionTextExtractor {
         return column + if (flags and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1
     }
 
-    private fun StringBuilder.appendCodePoints(codepoints: IntArray, offset: Int, length: Int) {
+    private fun StringBuilder.appendCodePoints(
+        codepoints: IntArray,
+        offset: Int,
+        length: Int,
+    ) {
         var index = offset
         val end = offset + length
         while (index < end) {
@@ -163,7 +178,10 @@ internal class TerminalSelectionTextExtractor {
         }
     }
 
-    private fun isPathChar(flags: Int, codeWord: Int): Boolean {
+    private fun isPathChar(
+        flags: Int,
+        codeWord: Int,
+    ): Boolean {
         if (flags and (TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.CLUSTER) == 0) return false
         if (flags and TerminalRenderCellFlags.CLUSTER != 0) return true
         if (Character.isLetterOrDigit(codeWord)) return true
@@ -173,7 +191,10 @@ internal class TerminalSelectionTextExtractor {
         }
     }
 
-    private fun wordKind(flags: Int, codeWord: Int): Int {
+    private fun wordKind(
+        flags: Int,
+        codeWord: Int,
+    ): Int {
         if (flags and (TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.CLUSTER) == 0) return WORD_KIND_SPACE
         if (flags and TerminalRenderCellFlags.CLUSTER != 0) return WORD_KIND_WORD
         if (Character.isLetterOrDigit(codeWord) || codeWord == '_'.code) {

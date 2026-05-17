@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.spi.TerminalCommandSink
@@ -25,7 +24,10 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "writeCodepoint:$codepoint"
     }
 
-    override fun writeCluster(codepoints: IntArray, length: Int) {
+    override fun writeCluster(
+        codepoints: IntArray,
+        length: Int,
+    ) {
         events += "writeCluster:$length:${codepoints.take(length).joinToString(":")}"
     }
 
@@ -125,23 +127,38 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "setCursorRow:$row"
     }
 
-    override fun setCursorAbsolute(row: Int, col: Int) {
+    override fun setCursorAbsolute(
+        row: Int,
+        col: Int,
+    ) {
         events += "setCursorAbsolute:$row:$col"
     }
 
-    override fun setScrollRegion(top: Int, bottom: Int) {
+    override fun setScrollRegion(
+        top: Int,
+        bottom: Int,
+    ) {
         events += "setScrollRegion:$top:$bottom"
     }
 
-    override fun setLeftRightMargins(left: Int, right: Int) {
+    override fun setLeftRightMargins(
+        left: Int,
+        right: Int,
+    ) {
         events += "setLeftRightMargins:$left:$right"
     }
 
-    override fun eraseInDisplay(mode: Int, selective: Boolean) {
+    override fun eraseInDisplay(
+        mode: Int,
+        selective: Boolean,
+    ) {
         events += "eraseInDisplay:$mode:$selective"
     }
 
-    override fun eraseInLine(mode: Int, selective: Boolean) {
+    override fun eraseInLine(
+        mode: Int,
+        selective: Boolean,
+    ) {
         events += "eraseInLine:$mode:$selective"
     }
 
@@ -185,19 +202,31 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "clearAllTabStops"
     }
 
-    override fun setAnsiMode(mode: Int, enable: Boolean) {
+    override fun setAnsiMode(
+        mode: Int,
+        enable: Boolean,
+    ) {
         events += "setAnsiMode:$mode:$enable"
     }
 
-    override fun setDecMode(mode: Int, enable: Boolean) {
+    override fun setDecMode(
+        mode: Int,
+        enable: Boolean,
+    ) {
         events += "setDecMode:$mode:$enable"
     }
 
-    override fun requestDeviceStatusReport(mode: Int, decPrivate: Boolean) {
+    override fun requestDeviceStatusReport(
+        mode: Int,
+        decPrivate: Boolean,
+    ) {
         events += "requestDeviceStatusReport:$mode:$decPrivate"
     }
 
-    override fun requestDeviceAttributes(kind: Int, parameter: Int) {
+    override fun requestDeviceAttributes(
+        kind: Int,
+        parameter: Int,
+    ) {
         events += "requestDeviceAttributes:$kind:$parameter"
     }
 
@@ -281,15 +310,27 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "setUnderlineColorIndexed:$index"
     }
 
-    override fun setForegroundRgb(red: Int, green: Int, blue: Int) {
+    override fun setForegroundRgb(
+        red: Int,
+        green: Int,
+        blue: Int,
+    ) {
         events += "setForegroundRgb:$red:$green:$blue"
     }
 
-    override fun setBackgroundRgb(red: Int, green: Int, blue: Int) {
+    override fun setBackgroundRgb(
+        red: Int,
+        green: Int,
+        blue: Int,
+    ) {
         events += "setBackgroundRgb:$red:$green:$blue"
     }
 
-    override fun setUnderlineColorRgb(red: Int, green: Int, blue: Int) {
+    override fun setUnderlineColorRgb(
+        red: Int,
+        green: Int,
+        blue: Int,
+    ) {
         events += "setUnderlineColorRgb:$red:$green:$blue"
     }
 
@@ -305,7 +346,10 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "setIconAndWindowTitle:$title"
     }
 
-    override fun startHyperlink(uri: String, id: String?) {
+    override fun startHyperlink(
+        uri: String,
+        id: String?,
+    ) {
         events += "startHyperlink:$uri:${id ?: "null"}"
     }
 

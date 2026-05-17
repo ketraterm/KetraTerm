@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import com.gagik.core.api.TerminalInputState
@@ -27,7 +26,10 @@ internal class PasteEncoder(
     private val scratch: InputScratchBuffer,
     private val policy: TerminalInputPolicy = TerminalInputPolicy(),
 ) {
-    fun encode(event: TerminalPasteEvent, modeBits: Long) {
+    fun encode(
+        event: TerminalPasteEvent,
+        modeBits: Long,
+    ) {
         if (TerminalInputState.isBracketedPasteEnabled(modeBits)) {
             output.writeBytes(
                 TerminalSequences.BRACKETED_PASTE_START,
@@ -64,12 +66,11 @@ internal class PasteEncoder(
         }
     }
 
-    private fun isAllowedAfterC0Strip(codepoint: Int): Boolean {
-        return codepoint !in 0x00..0x1f ||
+    private fun isAllowedAfterC0Strip(codepoint: Int): Boolean =
+        codepoint !in 0x00..0x1f ||
             codepoint == TAB ||
             codepoint == CR ||
             codepoint == LF
-    }
 
     private fun writeNormalizedLineEndings(text: String) {
         var offset = 0

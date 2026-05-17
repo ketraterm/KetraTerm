@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.api
 
 import com.gagik.terminal.protocol.MouseEncodingMode
@@ -27,7 +26,6 @@ import com.gagik.terminal.render.api.TerminalRenderCursorShape
  * They do not expose the underlying storage model to the parser.
  */
 interface TerminalModeController {
-
     /** Enables or disables Insert Replace Mode (IRM, `CSI 4 h` / `CSI 4 l`). */
     fun setInsertMode(enabled: Boolean)
 

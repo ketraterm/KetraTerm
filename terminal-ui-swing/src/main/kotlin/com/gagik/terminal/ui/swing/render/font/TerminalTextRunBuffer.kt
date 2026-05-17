@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.font
 
 /**
@@ -27,7 +26,8 @@ package com.gagik.terminal.ui.swing.render.font
  */
 internal class TerminalTextRunBuffer(
     initialCapacity: Int,
-    private val maxCapacity: Int = 8192 // Safe upper bound for a physical terminal row
+    // Safe upper bound for a physical terminal row
+    private val maxCapacity: Int = 8192,
 ) {
     init {
         require(initialCapacity > 0) { "initialCapacity must be > 0, was $initialCapacity" }
@@ -88,11 +88,12 @@ internal class TerminalTextRunBuffer(
         var newCapacity = chars.size
         while (newCapacity < required) {
             val doubled = newCapacity * 2
-            newCapacity = if (doubled <= 0 || doubled > maxCapacity) {
-                maxCapacity
-            } else {
-                doubled
-            }
+            newCapacity =
+                if (doubled <= 0 || doubled > maxCapacity) {
+                    maxCapacity
+                } else {
+                    doubled
+                }
         }
         chars = chars.copyOf(newCapacity)
         return true

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.runtime
 
 import com.gagik.parser.ansi.AnsiState
@@ -24,7 +23,6 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ParserState")
 class ParserStateTest {
-
     // ----- Helpers ----------------------------------------------------------
 
     private fun dirtySequenceState(state: ParserState) {
@@ -90,14 +88,14 @@ class ParserStateTest {
             { assertEquals(0, state.subParameterMask) },
             { assertEquals(0, state.intermediates) },
             { assertEquals(0, state.intermediateCount) },
-            { assertEquals(0, state.privateMarker) }
+            { assertEquals(0, state.privateMarker) },
         )
     }
 
     private fun assertDefaultUtf8State(state: ParserState) {
         assertAll(
             { assertEquals(0, state.utf8State) },
-            { assertEquals(0, state.utf8Codepoint) }
+            { assertEquals(0, state.utf8Codepoint) },
         )
     }
 
@@ -108,7 +106,7 @@ class ParserStateTest {
             { assertFalse(state.prevWasZwj) },
             { assertFalse(state.zwjBeforeExtendedPictographic) },
             { assertFalse(state.lastNonExtendWasExtendedPictographic) },
-            { assertEquals(0, state.regionalIndicatorParity) }
+            { assertEquals(0, state.regionalIndicatorParity) },
         )
     }
 
@@ -117,7 +115,7 @@ class ParserStateTest {
             { assertArrayEquals(IntArray(4) { ParserState.CHARSET_ASCII }, state.charsets) },
             { assertEquals(0, state.glSlot) },
             { assertEquals(2, state.grSlot) },
-            { assertEquals(-1, state.singleShiftSlot) }
+            { assertEquals(-1, state.singleShiftSlot) },
         )
     }
 
@@ -125,7 +123,7 @@ class ParserStateTest {
         assertAll(
             { assertEquals(0, state.payloadLength) },
             { assertEquals(-1, state.payloadCode) },
-            { assertFalse(state.payloadOverflowed) }
+            { assertFalse(state.payloadOverflowed) },
         )
     }
 
@@ -135,9 +133,10 @@ class ParserStateTest {
         maxPayload: Int = ParserState.DEFAULT_MAX_PAYLOAD_BYTES,
         expectedMessage: String,
     ) {
-        val error = assertThrows(IllegalArgumentException::class.java) {
-            ParserState(maxParams = maxParams, maxCluster = maxCluster, maxPayload = maxPayload)
-        }
+        val error =
+            assertThrows(IllegalArgumentException::class.java) {
+                ParserState(maxParams = maxParams, maxCluster = maxCluster, maxPayload = maxPayload)
+            }
         assertEquals(expectedMessage, error.message)
     }
 
@@ -146,7 +145,6 @@ class ParserStateTest {
     @Nested
     @DisplayName("construction")
     inner class Construction {
-
         @Test
         fun `default construction initializes all partitions`() {
             val state = ParserState()
@@ -160,7 +158,7 @@ class ParserStateTest {
                 { assertDefaultUtf8State(state) },
                 { assertDefaultClusterState(state) },
                 { assertDefaultCharsetState(state) },
-                { assertDefaultPayloadState(state) }
+                { assertDefaultPayloadState(state) },
             )
         }
 
@@ -175,7 +173,7 @@ class ParserStateTest {
                 { assertEquals(AnsiState.GROUND, state.fsmState) },
                 { assertDefaultSequenceState(state) },
                 { assertDefaultClusterState(state) },
-                { assertDefaultPayloadState(state) }
+                { assertDefaultPayloadState(state) },
             )
         }
 
@@ -192,27 +190,27 @@ class ParserStateTest {
                 {
                     assertRejectsConstruction(
                         maxParams = 0,
-                        expectedMessage = "maxParams must be in 1..32, got 0"
+                        expectedMessage = "maxParams must be in 1..32, got 0",
                     )
                 },
                 {
                     assertRejectsConstruction(
                         maxParams = -1,
-                        expectedMessage = "maxParams must be in 1..32, got -1"
+                        expectedMessage = "maxParams must be in 1..32, got -1",
                     )
                 },
                 {
                     assertRejectsConstruction(
                         maxParams = 33,
-                        expectedMessage = "maxParams must be in 1..32, got 33"
+                        expectedMessage = "maxParams must be in 1..32, got 33",
                     )
                 },
                 {
                     assertRejectsConstruction(
                         maxParams = Int.MIN_VALUE,
-                        expectedMessage = "maxParams must be in 1..32, got ${Int.MIN_VALUE}"
+                        expectedMessage = "maxParams must be in 1..32, got ${Int.MIN_VALUE}",
                     )
-                }
+                },
             )
         }
 
@@ -222,21 +220,21 @@ class ParserStateTest {
                 {
                     assertRejectsConstruction(
                         maxCluster = 0,
-                        expectedMessage = "maxCluster must be positive, got 0"
+                        expectedMessage = "maxCluster must be positive, got 0",
                     )
                 },
                 {
                     assertRejectsConstruction(
                         maxCluster = -1,
-                        expectedMessage = "maxCluster must be positive, got -1"
+                        expectedMessage = "maxCluster must be positive, got -1",
                     )
                 },
                 {
                     assertRejectsConstruction(
                         maxCluster = Int.MIN_VALUE,
-                        expectedMessage = "maxCluster must be positive, got ${Int.MIN_VALUE}"
+                        expectedMessage = "maxCluster must be positive, got ${Int.MIN_VALUE}",
                     )
-                }
+                },
             )
         }
 
@@ -246,21 +244,21 @@ class ParserStateTest {
                 {
                     assertRejectsConstruction(
                         maxPayload = 0,
-                        expectedMessage = "maxPayload must be positive, got 0"
+                        expectedMessage = "maxPayload must be positive, got 0",
                     )
                 },
                 {
                     assertRejectsConstruction(
                         maxPayload = -1,
-                        expectedMessage = "maxPayload must be positive, got -1"
+                        expectedMessage = "maxPayload must be positive, got -1",
                     )
                 },
                 {
                     assertRejectsConstruction(
                         maxPayload = Int.MIN_VALUE,
-                        expectedMessage = "maxPayload must be positive, got ${Int.MIN_VALUE}"
+                        expectedMessage = "maxPayload must be positive, got ${Int.MIN_VALUE}",
                     )
-                }
+                },
             )
         }
     }
@@ -270,14 +268,13 @@ class ParserStateTest {
     @Nested
     @DisplayName("default invariants")
     inner class DefaultInvariants {
-
         @Test
         fun `params start with no valid fields even though backing array is allocated`() {
             val state = ParserState(maxParams = 4)
 
             assertAll(
                 { assertEquals(0, state.paramCount) },
-                { assertArrayEquals(intArrayOf(0, 0, 0, 0), state.params) }
+                { assertArrayEquals(intArrayOf(0, 0, 0, 0), state.params) },
             )
         }
 
@@ -289,7 +286,7 @@ class ParserStateTest {
                 { assertEquals(0, state.payloadLength) },
                 { assertEquals(-1, state.payloadCode) },
                 { assertFalse(state.payloadOverflowed) },
-                { assertArrayEquals(byteArrayOf(0, 0, 0, 0), state.payloadBuffer) }
+                { assertArrayEquals(byteArrayOf(0, 0, 0, 0), state.payloadBuffer) },
             )
         }
 
@@ -301,7 +298,7 @@ class ParserStateTest {
                 { assertArrayEquals(IntArray(4) { ParserState.CHARSET_ASCII }, state.charsets) },
                 { assertEquals(0, state.glSlot) },
                 { assertEquals(2, state.grSlot) },
-                { assertEquals(-1, state.singleShiftSlot) }
+                { assertEquals(-1, state.singleShiftSlot) },
             )
         }
     }
@@ -311,7 +308,6 @@ class ParserStateTest {
     @Nested
     @DisplayName("clearSequenceState")
     inner class ClearSequenceState {
-
         @Test
         fun `clears sequence metadata in O(1)`() {
             val state = ParserState()
@@ -332,7 +328,7 @@ class ParserStateTest {
             assertAll(
                 { assertEquals(12, state.params[0]) },
                 { assertEquals(-1, state.params[1]) },
-                { assertEquals(345, state.params[2]) }
+                { assertEquals(345, state.params[2]) },
             )
         }
 
@@ -348,7 +344,7 @@ class ParserStateTest {
                 { assertEquals(7, state.utf8State) },
                 { assertEquals(2, state.clusterLength) },
                 { assertEquals(1, state.glSlot) },
-                { assertEquals(3, state.payloadLength) }
+                { assertEquals(3, state.payloadLength) },
             )
         }
 
@@ -368,7 +364,6 @@ class ParserStateTest {
     @Nested
     @DisplayName("clearPayloadState")
     inner class ClearPayloadState {
-
         @Test
         fun `clears payload validity metadata`() {
             val state = ParserState()
@@ -389,7 +384,7 @@ class ParserStateTest {
             assertAll(
                 { assertEquals(0x1B.toByte(), state.payloadBuffer[0]) },
                 { assertEquals('P'.code.toByte(), state.payloadBuffer[1]) },
-                { assertEquals('q'.code.toByte(), state.payloadBuffer[2]) }
+                { assertEquals('q'.code.toByte(), state.payloadBuffer[2]) },
             )
         }
 
@@ -405,7 +400,7 @@ class ParserStateTest {
                 { assertEquals(3, state.paramCount) },
                 { assertEquals(7, state.utf8State) },
                 { assertEquals(2, state.clusterLength) },
-                { assertEquals(1, state.glSlot) }
+                { assertEquals(1, state.glSlot) },
             )
         }
 
@@ -425,7 +420,6 @@ class ParserStateTest {
     @Nested
     @DisplayName("clearActiveClusterAfterFlush")
     inner class ClearActiveClusterAfterFlush {
-
         @Test
         fun `clears active grapheme metadata`() {
             val state = ParserState()
@@ -445,7 +439,7 @@ class ParserStateTest {
 
             assertAll(
                 { assertEquals('a'.code, state.clusterBuffer[0]) },
-                { assertEquals(0x0301, state.clusterBuffer[1]) }
+                { assertEquals(0x0301, state.clusterBuffer[1]) },
             )
         }
 
@@ -462,7 +456,7 @@ class ParserStateTest {
                 { assertEquals(0x1F600, state.utf8Codepoint) },
                 { assertEquals(3, state.paramCount) },
                 { assertEquals(1, state.glSlot) },
-                { assertEquals(3, state.payloadLength) }
+                { assertEquals(3, state.payloadLength) },
             )
         }
 
@@ -482,7 +476,6 @@ class ParserStateTest {
     @Nested
     @DisplayName("resetUtf8State")
     inner class ResetUtf8State {
-
         @Test
         fun `resets decoder progress and partial codepoint`() {
             val state = ParserState()
@@ -505,7 +498,7 @@ class ParserStateTest {
                 { assertEquals(3, state.paramCount) },
                 { assertEquals(1, state.glSlot) },
                 { assertEquals(3, state.payloadLength) },
-                { assertEquals(AnsiState.DCS_PASSTHROUGH, state.fsmState) }
+                { assertEquals(AnsiState.DCS_PASSTHROUGH, state.fsmState) },
             )
         }
 
@@ -525,7 +518,6 @@ class ParserStateTest {
     @Nested
     @DisplayName("resetCharsetState")
     inner class ResetCharsetState {
-
         @Test
         fun `restores all charset slots and shifts to defaults`() {
             val state = ParserState()
@@ -548,7 +540,7 @@ class ParserStateTest {
                 { assertEquals(3, state.paramCount) },
                 { assertEquals(7, state.utf8State) },
                 { assertEquals(2, state.clusterLength) },
-                { assertEquals(3, state.payloadLength) }
+                { assertEquals(3, state.payloadLength) },
             )
         }
 
@@ -568,7 +560,6 @@ class ParserStateTest {
     @Nested
     @DisplayName("resetAll")
     inner class ResetAll {
-
         @Test
         fun `resets every logical partition to defaults`() {
             val state = ParserState()
@@ -582,7 +573,7 @@ class ParserStateTest {
                 { assertDefaultUtf8State(state) },
                 { assertDefaultClusterState(state) },
                 { assertDefaultCharsetState(state) },
-                { assertDefaultPayloadState(state) }
+                { assertDefaultPayloadState(state) },
             )
         }
 
@@ -602,7 +593,7 @@ class ParserStateTest {
                 { assertEquals('P'.code.toByte(), state.payloadBuffer[1]) },
                 { assertEquals(0, state.paramCount) },
                 { assertEquals(0, state.clusterLength) },
-                { assertEquals(0, state.payloadLength) }
+                { assertEquals(0, state.payloadLength) },
             )
         }
 
@@ -616,7 +607,7 @@ class ParserStateTest {
                 { assertEquals(3, state.params.size) },
                 { assertEquals(2, state.clusterBuffer.size) },
                 { assertEquals(5, state.payloadBuffer.size) },
-                { assertEquals(AnsiState.GROUND, state.fsmState) }
+                { assertEquals(AnsiState.GROUND, state.fsmState) },
             )
         }
 
@@ -634,7 +625,7 @@ class ParserStateTest {
                 { assertDefaultUtf8State(state) },
                 { assertDefaultClusterState(state) },
                 { assertDefaultCharsetState(state) },
-                { assertDefaultPayloadState(state) }
+                { assertDefaultPayloadState(state) },
             )
         }
     }

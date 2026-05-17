@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.event
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalKeyEventTest {
-
     @Test
     fun `creates non-printable key event`() {
-        val event = TerminalKeyEvent.key(
-            key = TerminalKey.UP,
-            modifiers = TerminalModifiers.SHIFT,
-        )
+        val event =
+            TerminalKeyEvent.key(
+                key = TerminalKey.UP,
+                modifiers = TerminalModifiers.SHIFT,
+            )
 
         assertAll(
             { assertEquals(TerminalKey.UP, event.key) },
@@ -37,10 +36,11 @@ class TerminalKeyEventTest {
 
     @Test
     fun `creates printable codepoint event`() {
-        val event = TerminalKeyEvent.codepoint(
-            codepoint = 'a'.code,
-            modifiers = TerminalModifiers.ALT,
-        )
+        val event =
+            TerminalKeyEvent.codepoint(
+                codepoint = 'a'.code,
+                modifiers = TerminalModifiers.ALT,
+            )
 
         assertAll(
             { assertNull(event.key) },

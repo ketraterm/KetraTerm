@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.api
 
 /**
@@ -63,13 +62,14 @@ class TerminalColorPalette(
             return background(attrWord)
         }
 
-        val color = resolveColor(
-            kind = TerminalRenderAttrs.foregroundKind(attrWord),
-            value = TerminalRenderAttrs.foregroundValue(attrWord),
-            defaultColor = defaultForeground,
-            bold = TerminalRenderAttrs.isBold(attrWord),
-            applyBoldAsBright = true,
-        )
+        val color =
+            resolveColor(
+                kind = TerminalRenderAttrs.foregroundKind(attrWord),
+                value = TerminalRenderAttrs.foregroundValue(attrWord),
+                defaultColor = defaultForeground,
+                bold = TerminalRenderAttrs.isBold(attrWord),
+                applyBoldAsBright = true,
+            )
 
         return if (TerminalRenderAttrs.isInverse(attrWord)) {
             backgroundWithoutInverse(attrWord)
@@ -84,13 +84,12 @@ class TerminalColorPalette(
      * @param attrWord public render attribute word.
      * @return packed ARGB background color.
      */
-    fun background(attrWord: Long): Int {
-        return if (TerminalRenderAttrs.isInverse(attrWord)) {
+    fun background(attrWord: Long): Int =
+        if (TerminalRenderAttrs.isInverse(attrWord)) {
             foregroundWithoutInverse(attrWord)
         } else {
             backgroundWithoutInverse(attrWord)
         }
-    }
 
     /**
      * Returns an indexed palette color without exposing mutable palette storage.
@@ -113,7 +112,10 @@ class TerminalColorPalette(
      * @param destination destination array receiving 256 packed ARGB colors.
      * @param offset first destination index to write.
      */
-    fun copyIndexedColorsInto(destination: IntArray, offset: Int = 0) {
+    fun copyIndexedColorsInto(
+        destination: IntArray,
+        offset: Int = 0,
+    ) {
         require(offset >= 0 && destination.size - offset >= INDEXED_COLOR_COUNT) {
             "destination has insufficient capacity: size=${destination.size}, offset=$offset, required=$INDEXED_COLOR_COUNT"
         }
@@ -125,9 +127,7 @@ class TerminalColorPalette(
      *
      * @return 256-entry indexed palette in packed ARGB form.
      */
-    fun toIndexedColorsArray(): IntArray {
-        return indexedColorStorage.copyOf()
-    }
+    fun toIndexedColorsArray(): IntArray = indexedColorStorage.copyOf()
 
     /**
      * Creates a palette with selected properties replaced.
@@ -152,8 +152,8 @@ class TerminalColorPalette(
         cursorBackground: Int = this.cursorBackground,
         indexedColors: IntArray = indexedColorStorage,
         boldAsBright: Boolean = this.boldAsBright,
-    ): TerminalColorPalette {
-        return TerminalColorPalette(
+    ): TerminalColorPalette =
+        TerminalColorPalette(
             defaultForeground = defaultForeground,
             defaultBackground = defaultBackground,
             selectionForeground = selectionForeground,
@@ -163,28 +163,27 @@ class TerminalColorPalette(
             indexedColors = indexedColors,
             boldAsBright = boldAsBright,
         )
-    }
 
     private fun foregroundWithoutInverse(attrWord: Long): Int {
-        val color = resolveColor(
-            kind = TerminalRenderAttrs.foregroundKind(attrWord),
-            value = TerminalRenderAttrs.foregroundValue(attrWord),
-            defaultColor = defaultForeground,
-            bold = TerminalRenderAttrs.isBold(attrWord),
-            applyBoldAsBright = true,
-        )
+        val color =
+            resolveColor(
+                kind = TerminalRenderAttrs.foregroundKind(attrWord),
+                value = TerminalRenderAttrs.foregroundValue(attrWord),
+                defaultColor = defaultForeground,
+                bold = TerminalRenderAttrs.isBold(attrWord),
+                applyBoldAsBright = true,
+            )
         return color
     }
 
-    private fun backgroundWithoutInverse(attrWord: Long): Int {
-        return resolveColor(
+    private fun backgroundWithoutInverse(attrWord: Long): Int =
+        resolveColor(
             kind = TerminalRenderAttrs.backgroundKind(attrWord),
             value = TerminalRenderAttrs.backgroundValue(attrWord),
             defaultColor = defaultBackground,
             bold = false,
             applyBoldAsBright = false,
         )
-    }
 
     private fun resolveColor(
         kind: Int,
@@ -192,21 +191,21 @@ class TerminalColorPalette(
         defaultColor: Int,
         bold: Boolean,
         applyBoldAsBright: Boolean,
-    ): Int {
-        return when (kind) {
+    ): Int =
+        when (kind) {
             TerminalRenderColorKind.DEFAULT -> defaultColor
             TerminalRenderColorKind.INDEXED -> {
-                val index = if (boldAsBright && applyBoldAsBright && bold && value in 0..7) {
-                    value + 8
-                } else {
-                    value
-                }
+                val index =
+                    if (boldAsBright && applyBoldAsBright && bold && value in 0..7) {
+                        value + 8
+                    } else {
+                        value
+                    }
                 indexedColorStorage[index]
             }
             TerminalRenderColorKind.RGB -> 0xFF000000.toInt() or value
             else -> defaultColor
         }
-    }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -234,8 +233,8 @@ class TerminalColorPalette(
         return result
     }
 
-    override fun toString(): String {
-        return "TerminalColorPalette(" +
+    override fun toString(): String =
+        "TerminalColorPalette(" +
             "defaultForeground=$defaultForeground, " +
             "defaultBackground=$defaultBackground, " +
             "selectionForeground=$selectionForeground, " +
@@ -245,7 +244,6 @@ class TerminalColorPalette(
             "indexedColors=${indexedColorStorage.contentToString()}, " +
             "boldAsBright=$boldAsBright" +
             ")"
-    }
 
     companion object {
         private const val INDEXED_COLOR_COUNT = 256
@@ -259,24 +257,25 @@ class TerminalColorPalette(
         @JvmStatic
         fun defaultIndexedColors(): IntArray {
             val colors = IntArray(INDEXED_COLOR_COUNT)
-            val ansi16 = intArrayOf(
-                0xFF000000.toInt(),
-                0xFF800000.toInt(),
-                0xFF008000.toInt(),
-                0xFF808000.toInt(),
-                0xFF000080.toInt(),
-                0xFF800080.toInt(),
-                0xFF008080.toInt(),
-                0xFFC0C0C0.toInt(),
-                0xFF808080.toInt(),
-                0xFFFF0000.toInt(),
-                0xFF00FF00.toInt(),
-                0xFFFFFF00.toInt(),
-                0xFF0000FF.toInt(),
-                0xFFFF00FF.toInt(),
-                0xFF00FFFF.toInt(),
-                0xFFFFFFFF.toInt(),
-            )
+            val ansi16 =
+                intArrayOf(
+                    0xFF000000.toInt(),
+                    0xFF800000.toInt(),
+                    0xFF008000.toInt(),
+                    0xFF808000.toInt(),
+                    0xFF000080.toInt(),
+                    0xFF800080.toInt(),
+                    0xFF008080.toInt(),
+                    0xFFC0C0C0.toInt(),
+                    0xFF808080.toInt(),
+                    0xFFFF0000.toInt(),
+                    0xFF00FF00.toInt(),
+                    0xFFFFFF00.toInt(),
+                    0xFF0000FF.toInt(),
+                    0xFFFF00FF.toInt(),
+                    0xFF00FFFF.toInt(),
+                    0xFFFFFFFF.toInt(),
+                )
             ansi16.copyInto(colors)
 
             var index = 16
@@ -298,8 +297,10 @@ class TerminalColorPalette(
 
         private fun cubeLevel(value: Int): Int = if (value == 0) 0 else 55 + value * 40
 
-        private fun rgb(red: Int, green: Int, blue: Int): Int {
-            return 0xFF000000.toInt() or (red shl 16) or (green shl 8) or blue
-        }
+        private fun rgb(
+            red: Int,
+            green: Int,
+            blue: Int,
+        ): Int = 0xFF000000.toInt() or (red shl 16) or (green shl 8) or blue
     }
 }

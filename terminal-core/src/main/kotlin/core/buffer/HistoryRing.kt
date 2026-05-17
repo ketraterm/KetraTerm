@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.model.Line
@@ -23,7 +22,7 @@ import com.gagik.core.model.Line
  */
 internal class HistoryRing(
     val capacity: Int,
-    private val lineFactory: () -> Line
+    private val lineFactory: () -> Line,
 ) {
     init {
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
@@ -53,8 +52,8 @@ internal class HistoryRing(
      * Pushes a new line into the ring.
      * If full, the oldest line is recycled and returned for reuse.
      */
-    fun push(): Line {
-        return if (size < capacity) {
+    fun push(): Line =
+        if (size < capacity) {
             val slot = (head + size) % capacity
             size++
             data[slot]
@@ -64,7 +63,6 @@ internal class HistoryRing(
             discardedCount++
             recycled
         }
-    }
 
     /**
      * Rotates lines in the logical range [fromLogical, toLogical] upward by one slot.
@@ -72,7 +70,10 @@ internal class HistoryRing(
      * After this call, the line now at [toLogical] is the one that was at [fromLogical] —
      * caller is responsible for clearing it to create a blank scroll-in line.
      */
-    internal fun rotateUp(fromLogical: Int, toLogical: Int) {
+    internal fun rotateUp(
+        fromLogical: Int,
+        toLogical: Int,
+    ) {
         val evicted = data[(head + fromLogical) % capacity]
         for (i in fromLogical until toLogical) {
             data[(head + i) % capacity] = data[(head + i + 1) % capacity]
@@ -86,7 +87,10 @@ internal class HistoryRing(
      * After this call, the line now at [fromLogical] is the one that was at [toLogical] —
      * caller is responsible for clearing it to create a blank scroll-in line.
      */
-    internal fun rotateDown(fromLogical: Int, toLogical: Int) {
+    internal fun rotateDown(
+        fromLogical: Int,
+        toLogical: Int,
+    ) {
         val evicted = data[(head + toLogical) % capacity]
         for (i in toLogical downTo fromLogical + 1) {
             data[(head + i) % capacity] = data[(head + i - 1) % capacity]

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.benchmark
 
 import com.gagik.core.TerminalBuffers
@@ -29,7 +28,6 @@ import java.util.concurrent.TimeUnit
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 open class TerminalBufferBenchmark : TerminalRenderFrameConsumer {
-
     @Param("80", "120", "240")
     var width: Int = 0
 
@@ -91,7 +89,6 @@ open class TerminalBufferBenchmark : TerminalRenderFrameConsumer {
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 open class TerminalBufferClusterBenchmark : TerminalRenderFrameConsumer {
-
     @Param("0", "1", "100")
     var clusterPercent: Int = 0
 
@@ -138,7 +135,7 @@ open class TerminalBufferClusterBenchmark : TerminalRenderFrameConsumer {
                     attrOffset = 0,
                     flags = flags,
                     flagOffset = 0,
-                    clusterDataSink = clusterDataSink
+                    clusterDataSink = clusterDataSink,
                 )
             }
         } else {
@@ -151,7 +148,7 @@ open class TerminalBufferClusterBenchmark : TerminalRenderFrameConsumer {
                     attrOffset = 0,
                     flags = flags,
                     flagOffset = 0,
-                    clusterSink = clusterSink
+                    clusterSink = clusterSink,
                 )
             }
         }

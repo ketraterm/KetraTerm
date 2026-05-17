@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.unicode
 
 import org.junit.jupiter.api.Assertions.*
@@ -23,11 +22,9 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("UnicodeClass")
 class UnicodeClassTest {
-
     @Nested
     @DisplayName("grapheme break class")
     inner class GraphemeBreakClass {
-
         @Test
         fun `classifies combining marks and variation selectors as Extend`() {
             assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0301))
@@ -75,7 +72,6 @@ class UnicodeClassTest {
     @Nested
     @DisplayName("extended pictographic")
     inner class ExtendedPictographic {
-
         @Test
         fun `classifies emoji and symbol bases`() {
             assertTrue(UnicodeClass.isExtendedPictographic(0x1F468))
@@ -89,5 +85,4 @@ class UnicodeClassTest {
             assertFalse(UnicodeClass.isExtendedPictographic(0x1F1FA))
         }
     }
-
 }

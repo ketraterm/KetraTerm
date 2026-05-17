@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.api
 
 /**
@@ -24,7 +23,6 @@ package com.gagik.core.api
  * may mutate at any time if background output arrives.
  */
 interface TerminalLineApi {
-
     /** Number of columns in this line. */
     val width: Int
 
@@ -90,7 +88,10 @@ interface TerminalLineApi {
      * @param col  Column index (0-based).
      * @param dest Destination array. Must have capacity >= actual cluster length;
      * there is no fixed public upper bound guaranteed by this API.
-     * @return     Number of codepoints written, or 0 if the cell is not a cluster.
+     * @return Number of codepoints written, or 0 if the cell is not a cluster.
      */
-    fun readCluster(col: Int, dest: IntArray): Int = 0
+    fun readCluster(
+        col: Int,
+        dest: IntArray,
+    ): Int = 0
 }

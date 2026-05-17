@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.text
 
 import com.gagik.parser.ansi.RecordingTerminalCommandSink
@@ -27,7 +26,6 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("PrintableProcessor")
 class PrintableProcessorTest {
-
     // ----- Helpers ----------------------------------------------------------
 
     private data class Fixture(
@@ -62,7 +60,6 @@ class PrintableProcessorTest {
     @Nested
     @DisplayName("input validation")
     inner class InputValidation {
-
         @Test
         fun `acceptAsciiByte accepts printable 7-bit ASCII only`() {
             val f = Fixture()
@@ -70,20 +67,23 @@ class PrintableProcessorTest {
             f.processor.acceptAsciiByte(f.state, 0x20)
             f.processor.acceptAsciiByte(f.state, 0x7E)
 
-            val below = assertThrows(IllegalArgumentException::class.java) {
-                f.processor.acceptAsciiByte(f.state, 0x1F)
-            }
-            val del = assertThrows(IllegalArgumentException::class.java) {
-                f.processor.acceptAsciiByte(f.state, 0x7F)
-            }
-            val above = assertThrows(IllegalArgumentException::class.java) {
-                f.processor.acceptAsciiByte(f.state, 0x80)
-            }
+            val below =
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.processor.acceptAsciiByte(f.state, 0x1F)
+                }
+            val del =
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.processor.acceptAsciiByte(f.state, 0x7F)
+                }
+            val above =
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.processor.acceptAsciiByte(f.state, 0x80)
+                }
 
             assertAll(
                 { assertEquals("byteValue is not printable ASCII: 31", below.message) },
                 { assertEquals("byteValue is not printable ASCII: 127", del.message) },
-                { assertEquals("byteValue is not printable ASCII: 128", above.message) }
+                { assertEquals("byteValue is not printable ASCII: 128", above.message) },
             )
         }
 
@@ -94,16 +94,18 @@ class PrintableProcessorTest {
             f.processor.acceptDecodedCodepoint(f.state, 0)
             f.processor.acceptDecodedCodepoint(f.state, 0x10FFFF)
 
-            val below = assertThrows(IllegalArgumentException::class.java) {
-                f.processor.acceptDecodedCodepoint(f.state, -1)
-            }
-            val above = assertThrows(IllegalArgumentException::class.java) {
-                f.processor.acceptDecodedCodepoint(f.state, 0x11_0000)
-            }
+            val below =
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.processor.acceptDecodedCodepoint(f.state, -1)
+                }
+            val above =
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.processor.acceptDecodedCodepoint(f.state, 0x11_0000)
+                }
 
             assertAll(
                 { assertEquals("invalid codepoint: -1", below.message) },
-                { assertEquals("invalid codepoint: 1114112", above.message) }
+                { assertEquals("invalid codepoint: 1114112", above.message) },
             )
         }
     }
@@ -113,7 +115,6 @@ class PrintableProcessorTest {
     @Nested
     @DisplayName("ASCII printable flow")
     inner class AsciiPrintableFlow {
-
         @Test
         fun `plain ASCII is emitted in order once cluster boundaries are known`() {
             val f = Fixture()
@@ -123,7 +124,7 @@ class PrintableProcessorTest {
 
             assertAll(
                 { assertEquals(listOf(writeCodepoint('a'.code), writeCodepoint('b'.code), writeCodepoint('c'.code)), f.sink.events) },
-                { assertEquals(0, f.state.clusterLength) }
+                { assertEquals(0, f.state.clusterLength) },
             )
         }
 
@@ -135,7 +136,7 @@ class PrintableProcessorTest {
 
             assertAll(
                 { assertTrue(f.sink.events.isEmpty()) },
-                { assertEquals(1, f.state.clusterLength) }
+                { assertEquals(1, f.state.clusterLength) },
             )
         }
 
@@ -151,7 +152,7 @@ class PrintableProcessorTest {
                 { assertEquals(listOf(writeCodepoint('x'.code)), f.sink.events) },
                 { assertEquals(0, f.state.clusterLength) },
                 { assertFalse(f.state.prevWasZwj) },
-                { assertEquals(0, f.state.regionalIndicatorParity) }
+                { assertEquals(0, f.state.regionalIndicatorParity) },
             )
         }
 
@@ -171,7 +172,6 @@ class PrintableProcessorTest {
     @Nested
     @DisplayName("decoded printable flow")
     inner class DecodedPrintableFlow {
-
         @Test
         fun `decoded non-ASCII scalars print in order`() {
             val f = Fixture()
@@ -185,7 +185,7 @@ class PrintableProcessorTest {
                     writeCodepoint(0x20AC),
                     writeCodepoint(0x1F600),
                 ),
-                f.sink.events
+                f.sink.events,
             )
         }
 
@@ -205,7 +205,6 @@ class PrintableProcessorTest {
     @Nested
     @DisplayName("grapheme assembly")
     inner class GraphemeAssembly {
-
         @Test
         fun `ASCII base followed by combining mark is emitted as one cluster`() {
             val f = Fixture()
@@ -276,7 +275,7 @@ class PrintableProcessorTest {
 
             assertEquals(
                 listOf(writeCluster(0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F467, 0x200D, 0x1F466)),
-                f.sink.events
+                f.sink.events,
             )
         }
 
@@ -293,7 +292,7 @@ class PrintableProcessorTest {
                     writeCluster(0x1F1E8, 0x1F1E6),
                     writeCodepoint(0x1F1EF),
                 ),
-                f.sink.events
+                f.sink.events,
             )
         }
 
@@ -319,7 +318,7 @@ class PrintableProcessorTest {
                     writeCluster('A'.code, 0x200D),
                     writeCodepoint('B'.code),
                 ),
-                f.sink.events
+                f.sink.events,
             )
         }
 
@@ -344,7 +343,7 @@ class PrintableProcessorTest {
 
             assertEquals(
                 listOf(writeCluster('e'.code, 0x0301), writeCodepoint('X'.code)),
-                f.sink.events
+                f.sink.events,
             )
         }
     }
@@ -354,7 +353,6 @@ class PrintableProcessorTest {
     @Nested
     @DisplayName("cluster capacity and state")
     inner class ClusterCapacityAndState {
-
         @Test
         fun `cluster buffer capacity flushes safely instead of writing out of bounds`() {
             val f = Fixture(state = ParserState(maxCluster = 2))
@@ -367,7 +365,7 @@ class PrintableProcessorTest {
                     writeCluster(0x1F468, 0x200D),
                     writeCodepoint(0x1F469),
                 ),
-                f.sink.events
+                f.sink.events,
             )
         }
 
@@ -384,7 +382,7 @@ class PrintableProcessorTest {
                 { assertFalse(f.state.prevWasZwj) },
                 { assertFalse(f.state.zwjBeforeExtendedPictographic) },
                 { assertFalse(f.state.lastNonExtendWasExtendedPictographic) },
-                { assertEquals(0, f.state.regionalIndicatorParity) }
+                { assertEquals(0, f.state.regionalIndicatorParity) },
             )
         }
 
@@ -399,7 +397,7 @@ class PrintableProcessorTest {
 
             assertAll(
                 { assertEquals(listOf(writeCodepoint('B'.code)), f.sink.events) },
-                { assertEquals(0, f.state.clusterLength) }
+                { assertEquals(0, f.state.clusterLength) },
             )
         }
     }
@@ -409,7 +407,6 @@ class PrintableProcessorTest {
     @Nested
     @DisplayName("PrintableProcessorActionSink")
     inner class PrintableProcessorActionSinkTest {
-
         @Test
         fun `adapter forwards ASCII and flush callbacks to processor`() {
             val f = Fixture()
@@ -426,13 +423,14 @@ class PrintableProcessorTest {
             val f = Fixture()
             val actionSink = PrintableProcessorActionSink(f.processor)
 
-            val error = assertThrows(IllegalStateException::class.java) {
-                actionSink.onUtf8Byte(f.state, 0xE2)
-            }
+            val error =
+                assertThrows(IllegalStateException::class.java) {
+                    actionSink.onUtf8Byte(f.state, 0xE2)
+                }
 
             assertEquals(
                 "UTF-8 payload must be decoded by TerminalParser before printable processing",
-                error.message
+                error.message,
             )
         }
     }

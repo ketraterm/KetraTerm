@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer.impl
 
 import com.gagik.core.codec.AttributeCodec
@@ -27,7 +26,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class TerminalInspectorImplTest {
-
     @Test
     fun `renders visible rows screen and all content`() {
         val state = TerminalState(3, 2, 2)
@@ -44,7 +42,7 @@ class TerminalInspectorImplTest {
             { assertEquals("AB", inspector.getLineAsString(0)) },
             { assertEquals("C", inspector.getLineAsString(1)) },
             { assertEquals("AB\nC", inspector.getScreenAsString()) },
-            { assertEquals("AB\nC", inspector.getAllAsString()) }
+            { assertEquals("AB\nC", inspector.getAllAsString()) },
         )
     }
 
@@ -57,13 +55,14 @@ class TerminalInspectorImplTest {
         state.pen.setAttributes(3, 7, bold = true, italic = true)
         mutation.printCodepoint('X'.code, 1)
 
-        val expected = Attributes(
-            foreground = AttributeColor.indexed(2),
-            background = AttributeColor.indexed(6),
-            bold = true,
-            italic = true,
-            underlineStyle = UnderlineStyle.NONE
-        )
+        val expected =
+            Attributes(
+                foreground = AttributeColor.indexed(2),
+                background = AttributeColor.indexed(6),
+                bold = true,
+                italic = true,
+                underlineStyle = UnderlineStyle.NONE,
+            )
         assertAll(
             { assertEquals(expected, inspector.getAttrAt(0, 0)) },
             {
@@ -72,10 +71,9 @@ class TerminalInspectorImplTest {
                     AttributeCodec.unpack(
                         state.ring[state.resolveRingIndex(0)].getPackedAttr(0),
                         state.ring[state.resolveRingIndex(0)].getPackedExtendedAttr(0),
-                    )
+                    ),
                 )
-            }
+            },
         )
     }
 }
-

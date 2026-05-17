@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.api
 
 /**
@@ -101,7 +100,10 @@ object TerminalModeBits {
      * @param flag one boolean flag constant from this object.
      */
     @JvmStatic
-    fun hasFlag(bits: Long, flag: Long): Boolean = (bits and flag) != 0L
+    fun hasFlag(
+        bits: Long,
+        flag: Long,
+    ): Boolean = (bits and flag) != 0L
 
     /**
      * Extracts a packed integer field from [bits].
@@ -111,9 +113,11 @@ object TerminalModeBits {
      * @param shift number of low bits to shift away after masking.
      */
     @JvmStatic
-    fun packedValue(bits: Long, mask: Long, shift: Int): Int {
-        return ((bits and mask) ushr shift).toInt()
-    }
+    fun packedValue(
+        bits: Long,
+        mask: Long,
+        shift: Int,
+    ): Int = ((bits and mask) ushr shift).toInt()
 
     /**
      * Returns [bits] with one packed integer field replaced by [value].
@@ -125,7 +129,12 @@ object TerminalModeBits {
      * @throws IllegalArgumentException when [value] does not fit inside [mask].
      */
     @JvmStatic
-    fun withPackedValue(bits: Long, mask: Long, shift: Int, value: Int): Long {
+    fun withPackedValue(
+        bits: Long,
+        mask: Long,
+        shift: Int,
+        value: Int,
+    ): Long {
         val shifted = value.toLong() shl shift
         require((shifted and mask.inv()) == 0L) {
             "packed value $value does not fit mask ${mask.toString(16)}"

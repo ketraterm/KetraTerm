@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.protocol
 
 /** Mouse tracking selection toggled by DECSET private modes. */
@@ -22,7 +21,7 @@ enum class MouseTrackingMode {
     X10,
     NORMAL,
     BUTTON_EVENT,
-    ANY_EVENT
+    ANY_EVENT,
 }
 
 /** Mouse report encoding selected by xterm private modes. */
@@ -30,5 +29,5 @@ enum class MouseEncodingMode {
     DEFAULT,
     UTF8,
     SGR,
-    URXVT
+    URXVT,
 }

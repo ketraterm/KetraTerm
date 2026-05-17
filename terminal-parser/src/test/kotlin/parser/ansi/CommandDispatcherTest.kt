@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.runtime.ParserState
@@ -25,10 +24,7 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("CommandDispatcher")
 class CommandDispatcherTest {
-
-    private fun executeControl(byteValue: Int): RecordingTerminalCommandSink {
-        return executeControl(ParserState(), byteValue)
-    }
+    private fun executeControl(byteValue: Int): RecordingTerminalCommandSink = executeControl(ParserState(), byteValue)
 
     private fun executeControl(
         state: ParserState,
@@ -38,7 +34,7 @@ class CommandDispatcherTest {
         AnsiCommandDispatcher.executeControl(
             sink = sink,
             state = state,
-            controlByte = byteValue
+            controlByte = byteValue,
         )
         return sink
     }
@@ -55,7 +51,7 @@ class CommandDispatcherTest {
         AnsiCommandDispatcher.dispatchEsc(
             sink = sink,
             state = state,
-            finalByte = finalByte.code
+            finalByte = finalByte.code,
         )
         return sink
     }
@@ -82,7 +78,7 @@ class CommandDispatcherTest {
         AnsiCommandDispatcher.dispatchCsi(
             sink = sink,
             state = state,
-            finalByte = finalByte
+            finalByte = finalByte,
         )
 
         return sink
@@ -95,21 +91,21 @@ class CommandDispatcherTest {
         intermediates: Int = 0,
         intermediateCount: Int = 0,
         subParameterMask: Int = 0,
-    ): RecordingTerminalCommandSink = dispatchCsi(
-        finalByte = finalByte.code,
-        params = params,
-        privateMarker = privateMarker,
-        intermediates = intermediates,
-        intermediateCount = intermediateCount,
-        subParameterMask = subParameterMask,
-    )
+    ): RecordingTerminalCommandSink =
+        dispatchCsi(
+            finalByte = finalByte.code,
+            params = params,
+            privateMarker = privateMarker,
+            intermediates = intermediates,
+            intermediateCount = intermediateCount,
+            subParameterMask = subParameterMask,
+        )
 
     // ----- executeControl ---------------------------------------------------
 
     @Nested
     @DisplayName("executeControl")
     inner class ExecuteControl {
-
         @Test
         fun `BEL dispatches bell`() {
             assertEquals(listOf("bell"), executeControl(0x07).events)
@@ -148,7 +144,7 @@ class CommandDispatcherTest {
                 { assertTrue(soSink.events.isEmpty()) },
                 { assertTrue(siSink.events.isEmpty()) },
                 { assertEquals(0, state.glSlot) },
-                { assertEquals(-1, state.singleShiftSlot) }
+                { assertEquals(-1, state.singleShiftSlot) },
             )
         }
 
@@ -163,7 +159,7 @@ class CommandDispatcherTest {
             assertAll(
                 { assertEquals(1, state.glSlot) },
                 { assertEquals(-1, state.singleShiftSlot) },
-                { assertArrayEquals(intArrayOf(0, 1, 1, 0), state.charsets) }
+                { assertArrayEquals(intArrayOf(0, 1, 1, 0), state.charsets) },
             )
 
             state.singleShiftSlot = 3
@@ -172,7 +168,7 @@ class CommandDispatcherTest {
             assertAll(
                 { assertEquals(0, state.glSlot) },
                 { assertEquals(-1, state.singleShiftSlot) },
-                { assertArrayEquals(intArrayOf(0, 1, 1, 0), state.charsets) }
+                { assertArrayEquals(intArrayOf(0, 1, 1, 0), state.charsets) },
             )
         }
 
@@ -187,7 +183,6 @@ class CommandDispatcherTest {
     @Nested
     @DisplayName("dispatchEsc")
     inner class DispatchEsc {
-
         @Test
         fun `ESC 7 saves cursor`() {
             assertEquals(listOf("saveCursor"), dispatchEsc('7').events)
@@ -202,7 +197,7 @@ class CommandDispatcherTest {
         fun `ESC hash 8 dispatches alignment test decaln`() {
             assertEquals(
                 listOf("decaln"),
-                dispatchEsc('8', intermediates = '#'.code, intermediateCount = 1).events
+                dispatchEsc('8', intermediates = '#'.code, intermediateCount = 1).events,
             )
         }
 
@@ -253,7 +248,7 @@ class CommandDispatcherTest {
                         ),
                         sink.events,
                     )
-                }
+                },
             )
         }
 
@@ -279,7 +274,7 @@ class CommandDispatcherTest {
                         ),
                         sink.events,
                     )
-                }
+                },
             )
         }
 
@@ -294,9 +289,9 @@ class CommandDispatcherTest {
                             finalByte = 'M',
                             intermediates = '#'.code or ('$'.code shl 8),
                             intermediateCount = 2,
-                        ).events.isEmpty()
+                        ).events.isEmpty(),
                     )
-                }
+                },
             )
         }
 
@@ -308,7 +303,7 @@ class CommandDispatcherTest {
             assertAll(
                 { assertEquals(ParserState.CHARSET_DEC_SPECIAL_GRAPHICS, state.charsets[0]) },
                 { assertEquals(ParserState.CHARSET_ASCII, state.charsets[1]) },
-                { assertTrue(sink.events.isEmpty()) }
+                { assertTrue(sink.events.isEmpty()) },
             )
         }
 
@@ -320,7 +315,7 @@ class CommandDispatcherTest {
             assertAll(
                 { assertEquals(ParserState.CHARSET_ASCII, state.charsets[0]) },
                 { assertEquals(ParserState.CHARSET_DEC_SPECIAL_GRAPHICS, state.charsets[1]) },
-                { assertTrue(sink.events.isEmpty()) }
+                { assertTrue(sink.events.isEmpty()) },
             )
         }
 
@@ -335,7 +330,7 @@ class CommandDispatcherTest {
                 { assertEquals(ParserState.CHARSET_DEC_SPECIAL_GRAPHICS, state.charsets[2]) },
                 { assertEquals(ParserState.CHARSET_DEC_SPECIAL_GRAPHICS, state.charsets[3]) },
                 { assertTrue(g2Sink.events.isEmpty()) },
-                { assertTrue(g3Sink.events.isEmpty()) }
+                { assertTrue(g3Sink.events.isEmpty()) },
             )
         }
 
@@ -363,7 +358,7 @@ class CommandDispatcherTest {
 
             assertAll(
                 { assertArrayEquals(intArrayOf(0, 0, 0, 0), state.charsets) },
-                { assertTrue(sink.events.isEmpty()) }
+                { assertTrue(sink.events.isEmpty()) },
             )
         }
 
@@ -375,7 +370,7 @@ class CommandDispatcherTest {
 
             assertAll(
                 { assertArrayEquals(intArrayOf(0, 0, 0, 0), state.charsets) },
-                { assertTrue(sink.events.isEmpty()) }
+                { assertTrue(sink.events.isEmpty()) },
             )
         }
 
@@ -387,10 +382,11 @@ class CommandDispatcherTest {
 
             AnsiCommandDispatcher.dispatchEsc(
                 sink = sink,
-                state = state.also {
-                    it.intermediates = '('.code
-                    it.intermediateCount = 1
-                },
+                state =
+                    state.also {
+                        it.intermediates = '('.code
+                        it.intermediateCount = 1
+                    },
                 finalByte = '0'.code,
             )
             state.clearSequenceState()
@@ -407,7 +403,6 @@ class CommandDispatcherTest {
     @Nested
     @DisplayName("CSI cursor movement")
     inner class CsiCursorMovement {
-
         @Test
         fun `CSI A B C and D dispatch relative cursor movement`() {
             assertEquals(listOf("cursorUp:5"), dispatchCsi('A', params = listOf(5)).events)
@@ -465,7 +460,6 @@ class CommandDispatcherTest {
     @Nested
     @DisplayName("CSI erase edit and scroll")
     inner class CsiEraseEditAndScroll {
-
         @Test
         fun `CSI J and K dispatch erase commands with default mode zero`() {
             assertEquals(listOf("eraseInDisplay:0:false"), dispatchCsi('J').events)
@@ -592,7 +586,6 @@ class CommandDispatcherTest {
     @Nested
     @DisplayName("CSI tab stop dispatch")
     inner class CsiTabStopDispatch {
-
         @Test
         fun `CSI g clears current tab stop by default or mode zero`() {
             assertEquals(listOf("clearTabStop"), dispatchCsi('g').events)
@@ -618,7 +611,6 @@ class CommandDispatcherTest {
     @Nested
     @DisplayName("CSI mode dispatch")
     inner class CsiModeDispatch {
-
         @Test
         fun `CSI c dispatches primary secondary and tertiary DA requests`() {
             assertEquals(listOf("requestDeviceAttributes:0:0"), dispatchCsi('c').events)
@@ -637,11 +629,11 @@ class CommandDispatcherTest {
         fun `CSI h and l dispatch ANSI mode set and reset`() {
             assertEquals(
                 listOf("setAnsiMode:4:true", "setAnsiMode:20:true"),
-                dispatchCsi('h', params = listOf(4, 20)).events
+                dispatchCsi('h', params = listOf(4, 20)).events,
             )
             assertEquals(
                 listOf("setAnsiMode:4:false"),
-                dispatchCsi('l', params = listOf(4)).events
+                dispatchCsi('l', params = listOf(4)).events,
             )
         }
 
@@ -649,11 +641,11 @@ class CommandDispatcherTest {
         fun `CSI private h and l dispatch DEC mode set and reset`() {
             assertEquals(
                 listOf("setDecMode:25:true", "setDecMode:1049:true"),
-                dispatchCsi('h', params = listOf(25, 1049), privateMarker = '?'.code).events
+                dispatchCsi('h', params = listOf(25, 1049), privateMarker = '?'.code).events,
             )
             assertEquals(
                 listOf("setDecMode:25:false"),
-                dispatchCsi('l', params = listOf(25), privateMarker = '?'.code).events
+                dispatchCsi('l', params = listOf(25), privateMarker = '?'.code).events,
             )
         }
 
@@ -661,7 +653,7 @@ class CommandDispatcherTest {
         fun `mode dispatch skips omitted params`() {
             assertEquals(
                 listOf("setAnsiMode:4:true"),
-                dispatchCsi('h', params = listOf(-1, 4)).events
+                dispatchCsi('h', params = listOf(-1, 4)).events,
             )
         }
 
@@ -676,7 +668,6 @@ class CommandDispatcherTest {
     @Nested
     @DisplayName("CSI SGR dispatch")
     inner class CsiSgrDispatch {
-
         @Test
         fun `CSI m and CSI 0 m reset attributes`() {
             assertEquals(listOf("resetAttributes"), dispatchCsi('m').events)
@@ -689,7 +680,7 @@ class CommandDispatcherTest {
             assertEquals(listOf("setBold:true"), dispatchCsi('m', params = listOf(1)).events)
             assertEquals(
                 listOf("setBold:false", "setFaint:false"),
-                dispatchCsi('m', params = listOf(22)).events
+                dispatchCsi('m', params = listOf(22)).events,
             )
         }
 
@@ -698,7 +689,7 @@ class CommandDispatcherTest {
             assertEquals(listOf("setFaint:true"), dispatchCsi('m', params = listOf(2)).events)
             assertEquals(
                 listOf("setBold:false", "setFaint:false"),
-                dispatchCsi('m', params = listOf(22)).events
+                dispatchCsi('m', params = listOf(22)).events,
             )
         }
 
@@ -706,7 +697,7 @@ class CommandDispatcherTest {
         fun `CSI 1 31 m applies bold then foreground red in order`() {
             assertEquals(
                 listOf("setBold:true", "setForegroundIndexed:1"),
-                dispatchCsi('m', params = listOf(1, 31)).events
+                dispatchCsi('m', params = listOf(1, 31)).events,
             )
         }
 
@@ -714,7 +705,7 @@ class CommandDispatcherTest {
         fun `CSI 31 1 m applies foreground red then bold in order`() {
             assertEquals(
                 listOf("setForegroundIndexed:1", "setBold:true"),
-                dispatchCsi('m', params = listOf(31, 1)).events
+                dispatchCsi('m', params = listOf(31, 1)).events,
             )
         }
 
@@ -722,7 +713,7 @@ class CommandDispatcherTest {
         fun `CSI 0 31 m resets then applies foreground red`() {
             assertEquals(
                 listOf("resetAttributes", "setForegroundIndexed:1"),
-                dispatchCsi('m', params = listOf(0, 31)).events
+                dispatchCsi('m', params = listOf(0, 31)).events,
             )
         }
 
@@ -730,7 +721,7 @@ class CommandDispatcherTest {
         fun `CSI omitted then 31 m resets then applies foreground red`() {
             assertEquals(
                 listOf("resetAttributes", "setForegroundIndexed:1"),
-                dispatchCsi('m', params = listOf(-1, 31)).events
+                dispatchCsi('m', params = listOf(-1, 31)).events,
             )
         }
 
@@ -738,7 +729,7 @@ class CommandDispatcherTest {
         fun `CSI 31 then omitted m applies foreground red then resets`() {
             assertEquals(
                 listOf("setForegroundIndexed:1", "resetAttributes"),
-                dispatchCsi('m', params = listOf(31, -1)).events
+                dispatchCsi('m', params = listOf(31, -1)).events,
             )
         }
 
@@ -765,7 +756,7 @@ class CommandDispatcherTest {
                         params = listOf(4, style),
                         subParameterMask = 0b10,
                     ).events
-                }
+                },
             )
         }
 
@@ -804,7 +795,7 @@ class CommandDispatcherTest {
         fun `standard foreground indexed colors map 30 through 37 to indexes 0 through 7`() {
             assertEquals(
                 (0..7).map { "setForegroundIndexed:$it" },
-                dispatchCsi('m', params = (30..37).toList()).events
+                dispatchCsi('m', params = (30..37).toList()).events,
             )
         }
 
@@ -812,7 +803,7 @@ class CommandDispatcherTest {
         fun `bright foreground indexed colors map 90 through 97 to indexes 8 through 15`() {
             assertEquals(
                 (8..15).map { "setForegroundIndexed:$it" },
-                dispatchCsi('m', params = (90..97).toList()).events
+                dispatchCsi('m', params = (90..97).toList()).events,
             )
         }
 
@@ -820,7 +811,7 @@ class CommandDispatcherTest {
         fun `standard background indexed colors map 40 through 47 to indexes 0 through 7`() {
             assertEquals(
                 (0..7).map { "setBackgroundIndexed:$it" },
-                dispatchCsi('m', params = (40..47).toList()).events
+                dispatchCsi('m', params = (40..47).toList()).events,
             )
         }
 
@@ -828,7 +819,7 @@ class CommandDispatcherTest {
         fun `bright background indexed colors map 100 through 107 to indexes 8 through 15`() {
             assertEquals(
                 (8..15).map { "setBackgroundIndexed:$it" },
-                dispatchCsi('m', params = (100..107).toList()).events
+                dispatchCsi('m', params = (100..107).toList()).events,
             )
         }
 
@@ -842,7 +833,7 @@ class CommandDispatcherTest {
         fun `CSI 38 5 indexed foreground dispatches 256-color foreground`() {
             assertEquals(
                 listOf("setForegroundIndexed:196"),
-                dispatchCsi('m', params = listOf(38, 5, 196)).events
+                dispatchCsi('m', params = listOf(38, 5, 196)).events,
             )
         }
 
@@ -860,7 +851,7 @@ class CommandDispatcherTest {
         fun `CSI 48 5 indexed background dispatches 256-color background`() {
             assertEquals(
                 listOf("setBackgroundIndexed:17"),
-                dispatchCsi('m', params = listOf(48, 5, 17)).events
+                dispatchCsi('m', params = listOf(48, 5, 17)).events,
             )
         }
 
@@ -868,7 +859,7 @@ class CommandDispatcherTest {
         fun `CSI 38 2 RGB foreground dispatches truecolor foreground`() {
             assertEquals(
                 listOf("setForegroundRgb:10:20:30"),
-                dispatchCsi('m', params = listOf(38, 2, 10, 20, 30)).events
+                dispatchCsi('m', params = listOf(38, 2, 10, 20, 30)).events,
             )
         }
 
@@ -881,7 +872,7 @@ class CommandDispatcherTest {
         fun `CSI 38 2 RGB foreground then bold applies in order`() {
             assertEquals(
                 listOf("setForegroundRgb:10:20:30", "setBold:true"),
-                dispatchCsi('m', params = listOf(38, 2, 10, 20, 30, 1)).events
+                dispatchCsi('m', params = listOf(38, 2, 10, 20, 30, 1)).events,
             )
         }
 
@@ -889,7 +880,7 @@ class CommandDispatcherTest {
         fun `CSI 48 2 RGB background dispatches truecolor background`() {
             assertEquals(
                 listOf("setBackgroundRgb:10:20:30"),
-                dispatchCsi('m', params = listOf(48, 2, 10, 20, 30)).events
+                dispatchCsi('m', params = listOf(48, 2, 10, 20, 30)).events,
             )
         }
 
@@ -897,11 +888,11 @@ class CommandDispatcherTest {
         fun `CSI 58 and 59 dispatch underline color updates`() {
             assertEquals(
                 listOf("setUnderlineColorIndexed:42"),
-                dispatchCsi('m', params = listOf(58, 5, 42)).events
+                dispatchCsi('m', params = listOf(58, 5, 42)).events,
             )
             assertEquals(
                 listOf("setUnderlineColorRgb:10:20:30"),
-                dispatchCsi('m', params = listOf(58, 2, 10, 20, 30)).events
+                dispatchCsi('m', params = listOf(58, 2, 10, 20, 30)).events,
             )
             assertEquals(listOf("setUnderlineColorDefault"), dispatchCsi('m', params = listOf(59)).events)
         }
@@ -914,7 +905,7 @@ class CommandDispatcherTest {
                     finalByte = 'm',
                     params = listOf(38, 5, 196),
                     subParameterMask = 0b110,
-                ).events
+                ).events,
             )
         }
 
@@ -926,7 +917,7 @@ class CommandDispatcherTest {
                     finalByte = 'm',
                     params = listOf(48, 5, 17),
                     subParameterMask = 0b110,
-                ).events
+                ).events,
             )
         }
 
@@ -938,7 +929,7 @@ class CommandDispatcherTest {
                     finalByte = 'm',
                     params = listOf(38, 2, 10, 20, 30),
                     subParameterMask = 0b1_1110,
-                ).events
+                ).events,
             )
         }
 
@@ -950,7 +941,7 @@ class CommandDispatcherTest {
                     finalByte = 'm',
                     params = listOf(38, 2, -1, 10, 20, 30),
                     subParameterMask = 0b11_1110,
-                ).events
+                ).events,
             )
         }
 
@@ -962,7 +953,7 @@ class CommandDispatcherTest {
                     finalByte = 'm',
                     params = listOf(4, 2),
                     subParameterMask = 0b10,
-                ).events
+                ).events,
             )
         }
 
@@ -974,7 +965,7 @@ class CommandDispatcherTest {
                     finalByte = 'm',
                     params = listOf(0, 38, 5, 196, 1),
                     subParameterMask = 0b1100,
-                ).events
+                ).events,
             )
         }
 
@@ -982,7 +973,7 @@ class CommandDispatcherTest {
         fun `invalid indexed color is ignored and later normal SGR still applies`() {
             assertEquals(
                 listOf("setBold:true"),
-                dispatchCsi('m', params = listOf(38, 5, 256, 1)).events
+                dispatchCsi('m', params = listOf(38, 5, 256, 1)).events,
             )
         }
 
@@ -995,7 +986,7 @@ class CommandDispatcherTest {
         fun `malformed extended color is ignored and later normal SGR still applies`() {
             assertEquals(
                 listOf("setBold:true"),
-                dispatchCsi('m', params = listOf(38, 2, 999, 20, 30, 1)).events
+                dispatchCsi('m', params = listOf(38, 2, 999, 20, 30, 1)).events,
             )
         }
     }
@@ -1005,14 +996,14 @@ class CommandDispatcherTest {
     @Nested
     @DisplayName("CSI reset dispatch")
     inner class CsiResetDispatch {
-
         @Test
         fun `CSI bang p dispatches soft reset`() {
-            val sink = dispatchCsi(
-                finalByte = 'p'.code,
-                intermediates = '!'.code,
-                intermediateCount = 1,
-            )
+            val sink =
+                dispatchCsi(
+                    finalByte = 'p'.code,
+                    intermediates = '!'.code,
+                    intermediateCount = 1,
+                )
 
             assertEquals(listOf("softReset"), sink.events)
         }
@@ -1022,5 +1013,4 @@ class CommandDispatcherTest {
             assertTrue(dispatchCsi(finalByte = 'p'.code).events.isEmpty())
         }
     }
-
 }

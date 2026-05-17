@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.testkit
 
 import com.gagik.terminal.transport.TerminalConnector
@@ -54,7 +53,11 @@ class MockConnector : TerminalConnector {
         startCount++
     }
 
-    override fun write(bytes: ByteArray, offset: Int, length: Int) {
+    override fun write(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {
         require(offset >= 0) { "offset must be non-negative, got $offset" }
         require(length >= 0) { "length must be non-negative, got $length" }
         require(offset <= bytes.size) { "offset $offset exceeds size ${bytes.size}" }
@@ -71,7 +74,10 @@ class MockConnector : TerminalConnector {
         }
     }
 
-    override fun resize(columns: Int, rows: Int) {
+    override fun resize(
+        columns: Int,
+        rows: Int,
+    ) {
         if (isClosed) return
         resizeCalls += columns to rows
     }
@@ -84,7 +90,11 @@ class MockConnector : TerminalConnector {
     /**
      * Delivers host output to the session.
      */
-    fun feedFromHost(bytes: ByteArray, offset: Int = 0, length: Int = bytes.size) {
+    fun feedFromHost(
+        bytes: ByteArray,
+        offset: Int = 0,
+        length: Int = bytes.size,
+    ) {
         check(!isClosed) { "connector is locally closed" }
         listenerOrThrow().onBytes(bytes, offset, length)
     }
@@ -103,7 +113,5 @@ class MockConnector : TerminalConnector {
         listenerOrThrow().onError(error)
     }
 
-    private fun listenerOrThrow(): TerminalConnectorListener {
-        return checkNotNull(listener) { "connector has not been started" }
-    }
+    private fun listenerOrThrow(): TerminalConnectorListener = checkNotNull(listener) { "connector has not been started" }
 }

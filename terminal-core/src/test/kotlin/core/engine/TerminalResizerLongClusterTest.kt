@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.engine
 
 import com.gagik.core.state.TerminalState
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalResizerLongClusterTest {
-
     @Test
     fun `resize_longCluster_over16Codepoints_followsDefinedPolicy`() {
         val state = TerminalState(initialWidth = 8, initialHeight = 2, maxHistory = 0)
@@ -36,7 +34,7 @@ class TerminalResizerLongClusterTest {
                 oldWidth = 8,
                 oldHeight = 2,
                 newWidth = 6,
-                newHeight = 2
+                newHeight = 2,
             )
         }
 
@@ -57,7 +55,7 @@ class TerminalResizerLongClusterTest {
         assertAll(
             { assertTrue(found, "The long cluster must survive resize somewhere in the visible viewport") },
             { assertEquals(17, written) },
-            { assertEquals(cluster.toList(), dest.take(written)) }
+            { assertEquals(cluster.toList(), dest.take(written)) },
         )
     }
 }

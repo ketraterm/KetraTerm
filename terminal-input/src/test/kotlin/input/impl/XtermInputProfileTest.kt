@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import com.gagik.core.api.TerminalInputState
@@ -27,7 +26,6 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Test
 
 class XtermInputProfileTest {
-
     @Test
     fun `application cursor profile switches cursor-key wire sequences`() {
         assertProfileBytes(esc("[A"), bits = 0L) { it.encodeKey(TerminalKeyEvent.key(TerminalKey.UP)) }
@@ -174,13 +172,17 @@ class XtermInputProfileTest {
         encoder.encodeMouse(mouseWheel())
     }
 
-    private fun mouseBits(tracking: Int, encoding: Int): Long {
-        val withTracking = TerminalModeBits.withPackedValue(
-            bits = 0L,
-            mask = TerminalModeBits.MOUSE_TRACKING_MASK,
-            shift = TerminalModeBits.MOUSE_TRACKING_SHIFT,
-            value = tracking,
-        )
+    private fun mouseBits(
+        tracking: Int,
+        encoding: Int,
+    ): Long {
+        val withTracking =
+            TerminalModeBits.withPackedValue(
+                bits = 0L,
+                mask = TerminalModeBits.MOUSE_TRACKING_MASK,
+                shift = TerminalModeBits.MOUSE_TRACKING_SHIFT,
+                value = tracking,
+            )
         return TerminalModeBits.withPackedValue(
             bits = withTracking,
             mask = TerminalModeBits.MOUSE_ENCODING_MASK,
@@ -189,34 +191,24 @@ class XtermInputProfileTest {
         )
     }
 
-    private fun modifyOtherKeysBits(mode: Int): Long {
-        return TerminalModeBits.withPackedValue(
+    private fun modifyOtherKeysBits(mode: Int): Long =
+        TerminalModeBits.withPackedValue(
             bits = 0L,
             mask = TerminalModeBits.MODIFY_OTHER_KEYS_MASK,
             shift = TerminalModeBits.MODIFY_OTHER_KEYS_SHIFT,
             value = mode,
         )
-    }
 
-    private fun mousePress(): TerminalMouseEvent {
-        return TerminalMouseEvent(0, 0, TerminalMouseButton.LEFT, TerminalMouseEventType.PRESS)
-    }
+    private fun mousePress(): TerminalMouseEvent = TerminalMouseEvent(0, 0, TerminalMouseButton.LEFT, TerminalMouseEventType.PRESS)
 
-    private fun mouseRelease(): TerminalMouseEvent {
-        return TerminalMouseEvent(0, 0, TerminalMouseButton.LEFT, TerminalMouseEventType.RELEASE)
-    }
+    private fun mouseRelease(): TerminalMouseEvent = TerminalMouseEvent(0, 0, TerminalMouseButton.LEFT, TerminalMouseEventType.RELEASE)
 
-    private fun mouseMotion(button: TerminalMouseButton): TerminalMouseEvent {
-        return TerminalMouseEvent(0, 0, button, TerminalMouseEventType.MOTION)
-    }
+    private fun mouseMotion(button: TerminalMouseButton): TerminalMouseEvent =
+        TerminalMouseEvent(0, 0, button, TerminalMouseEventType.MOTION)
 
-    private fun mouseWheel(): TerminalMouseEvent {
-        return TerminalMouseEvent(0, 0, TerminalMouseButton.WHEEL_UP, TerminalMouseEventType.WHEEL)
-    }
+    private fun mouseWheel(): TerminalMouseEvent = TerminalMouseEvent(0, 0, TerminalMouseButton.WHEEL_UP, TerminalMouseEventType.WHEEL)
 
-    private fun esc(textAfterEsc: String): ByteArray {
-        return bytes(0x1b) + ascii(textAfterEsc)
-    }
+    private fun esc(textAfterEsc: String): ByteArray = bytes(0x1b) + ascii(textAfterEsc)
 
     private fun ascii(text: String): ByteArray {
         val bytes = ByteArray(text.length)
@@ -252,7 +244,11 @@ class XtermInputProfileTest {
             bytes += byte.toByte()
         }
 
-        override fun writeBytes(bytes: ByteArray, offset: Int, length: Int) {
+        override fun writeBytes(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) {
             this.bytes += bytes.copyOfRange(offset, offset + length)
         }
 

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.engine
 
 import com.gagik.core.model.Line
@@ -24,9 +23,10 @@ import org.junit.jupiter.api.Test
 import kotlin.random.Random
 
 class TerminalInvariantPropertyTest {
-
-    private fun visibleLine(state: TerminalState, row: Int): Line =
-        state.ring[state.resolveRingIndex(row)]
+    private fun visibleLine(
+        state: TerminalState,
+        row: Int,
+    ): Line = state.ring[state.resolveRingIndex(row)]
 
     private fun assertNoOrphanSpacers(state: TerminalState) {
         for (row in 0 until state.dimensions.height) {
@@ -37,7 +37,7 @@ class TerminalInvariantPropertyTest {
                     val leader = line.rawCodepoint(col - 1)
                     assertTrue(
                         leader != TerminalConstants.EMPTY && leader != TerminalConstants.WIDE_CHAR_SPACER,
-                        "Spacer at row=$row col=$col must have a non-empty leader on its left"
+                        "Spacer at row=$row col=$col must have a non-empty leader on its left",
                     )
                 }
             }
@@ -94,7 +94,7 @@ class TerminalInvariantPropertyTest {
                 oldWidth = oldWidth,
                 oldHeight = oldHeight,
                 newWidth = newWidth,
-                newHeight = newHeight
+                newHeight = newHeight,
             )
             state.dimensions.width = newWidth
             state.dimensions.height = newHeight
@@ -109,7 +109,7 @@ class TerminalInvariantPropertyTest {
                         val leader = line.rawCodepoint(col - 1)
                         assertTrue(
                             leader != TerminalConstants.EMPTY && leader != TerminalConstants.WIDE_CHAR_SPACER,
-                            "Spacer at logicalLine=$i col=$col must retain a leader after resize"
+                            "Spacer at logicalLine=$i col=$col must retain a leader after resize",
                         )
                     }
                 }

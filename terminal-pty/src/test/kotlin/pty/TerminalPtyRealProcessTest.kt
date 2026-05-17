@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.pty
 
 import org.junit.jupiter.api.Assertions.*
@@ -27,15 +26,16 @@ class TerminalPtyRealProcessTest {
     fun `real PTY echo output reaches terminal core`() {
         assumeNativePty()
 
-        val session = TerminalPtySessions.start(
-            TerminalPtyOptions(
-                command = printCommand("hello"),
-                workingDirectory = Path.of(System.getProperty("user.home")),
-                columns = 40,
-                rows = 5,
-                maxHistory = 10,
-            ),
-        )
+        val session =
+            TerminalPtySessions.start(
+                TerminalPtyOptions(
+                    command = printCommand("hello"),
+                    workingDirectory = Path.of(System.getProperty("user.home")),
+                    columns = 40,
+                    rows = 5,
+                    maxHistory = 10,
+                ),
+            )
 
         waitUntil { session.exitCode == 0 && session.terminal.getAllAsString().contains("hello") }
 
@@ -47,13 +47,14 @@ class TerminalPtyRealProcessTest {
     fun `real PTY resize mutates session without deadlock`() {
         assumeNativePty()
 
-        val session = TerminalPtySessions.start(
-            TerminalPtyOptions(
-                command = sleepCommand(seconds = 2),
-                columns = 40,
-                rows = 5,
-            ),
-        )
+        val session =
+            TerminalPtySessions.start(
+                TerminalPtyOptions(
+                    command = sleepCommand(seconds = 2),
+                    columns = 40,
+                    rows = 5,
+                ),
+            )
 
         session.resize(columns = 100, rows = 30)
         session.close()
@@ -66,13 +67,14 @@ class TerminalPtyRealProcessTest {
     fun `real PTY close requests local shutdown without fake exit code`() {
         assumeNativePty()
 
-        val session = TerminalPtySessions.start(
-            TerminalPtyOptions(
-                command = sleepCommand(seconds = 5),
-                columns = 40,
-                rows = 5,
-            ),
-        )
+        val session =
+            TerminalPtySessions.start(
+                TerminalPtyOptions(
+                    command = sleepCommand(seconds = 5),
+                    columns = 40,
+                    rows = 5,
+                ),
+            )
 
         session.close()
 
@@ -83,13 +85,14 @@ class TerminalPtyRealProcessTest {
     fun `real PTY process exit sets session exit code`() {
         assumeNativePty()
 
-        val session = TerminalPtySessions.start(
-            TerminalPtyOptions(
-                command = exitCommand(7),
-                columns = 40,
-                rows = 5,
-            ),
-        )
+        val session =
+            TerminalPtySessions.start(
+                TerminalPtyOptions(
+                    command = exitCommand(7),
+                    columns = 40,
+                    rows = 5,
+                ),
+            )
 
         waitUntil { session.exitCode == 7 }
 
@@ -101,15 +104,16 @@ class TerminalPtyRealProcessTest {
         assumeNativePty()
 
         val expectedCount = 12_000
-        val session = TerminalPtySessions.start(
-            TerminalPtyOptions(
-                command = repeatCommand('x', expectedCount),
-                columns = 200,
-                rows = 80,
-                maxHistory = 200,
-                readBufferSize = 257,
-            ),
-        )
+        val session =
+            TerminalPtySessions.start(
+                TerminalPtyOptions(
+                    command = repeatCommand('x', expectedCount),
+                    columns = 200,
+                    rows = 80,
+                    maxHistory = 200,
+                    readBufferSize = 257,
+                ),
+            )
 
         waitUntil(timeoutMillis = 5000) {
             session.exitCode == 0 &&
@@ -126,32 +130,32 @@ class TerminalPtyRealProcessTest {
         )
     }
 
-    private fun printCommand(text: String): List<String> {
-        return if (isWindows()) {
+    private fun printCommand(text: String): List<String> =
+        if (isWindows()) {
             listOf("cmd.exe", "/c", "echo $text")
         } else {
             listOf("/bin/sh", "-lc", "printf '$text\n'")
         }
-    }
 
-    private fun sleepCommand(seconds: Int): List<String> {
-        return if (isWindows()) {
+    private fun sleepCommand(seconds: Int): List<String> =
+        if (isWindows()) {
             listOf("cmd.exe", "/c", "ping -n ${seconds + 1} 127.0.0.1 > nul")
         } else {
             listOf("/bin/sh", "-lc", "sleep $seconds")
         }
-    }
 
-    private fun exitCommand(code: Int): List<String> {
-        return if (isWindows()) {
+    private fun exitCommand(code: Int): List<String> =
+        if (isWindows()) {
             listOf("cmd.exe", "/c", "exit $code")
         } else {
             listOf("/bin/sh", "-lc", "exit $code")
         }
-    }
 
-    private fun repeatCommand(char: Char, count: Int): List<String> {
-        return if (isWindows()) {
+    private fun repeatCommand(
+        char: Char,
+        count: Int,
+    ): List<String> =
+        if (isWindows()) {
             listOf(
                 "powershell.exe",
                 "-NoProfile",
@@ -161,19 +165,15 @@ class TerminalPtyRealProcessTest {
         } else {
             listOf("/bin/sh", "-lc", "printf '%*s\n' $count '' | tr ' ' '$char'")
         }
-    }
 
-    private fun shellCommand(script: String): List<String> {
-        return if (isWindows()) {
+    private fun shellCommand(script: String): List<String> =
+        if (isWindows()) {
             listOf("cmd.exe", "/c", script)
         } else {
             listOf("/bin/sh", "-lc", script)
         }
-    }
 
-    private fun isWindows(): Boolean {
-        return System.getProperty("os.name").lowercase().contains("windows")
-    }
+    private fun isWindows(): Boolean = System.getProperty("os.name").lowercase().contains("windows")
 
     private fun waitUntil(
         timeoutMillis: Long = 3000,

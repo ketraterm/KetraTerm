@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.utf8
 
 import org.junit.jupiter.api.Assertions.*
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("Utf8Decoder")
 class Utf8DecoderTest {
-
     // ----- Helpers ----------------------------------------------------------
 
     private fun decodeAll(
@@ -63,7 +61,7 @@ class Utf8DecoderTest {
         assertAll(
             { assertEquals(Utf8DecodeResult.NONE, result) },
             { assertFalse(Utf8DecodeResult.hasOutput(result)) },
-            { assertFalse(Utf8DecodeResult.shouldReprocessCurrentByte(result)) }
+            { assertFalse(Utf8DecodeResult.shouldReprocessCurrentByte(result)) },
         )
     }
 
@@ -75,7 +73,7 @@ class Utf8DecoderTest {
         assertAll(
             { assertTrue(Utf8DecodeResult.hasOutput(result), "has output") },
             { assertEquals(expectedCodepoint, Utf8DecodeResult.codepoint(result), "codepoint") },
-            { assertEquals(expectedReprocess, Utf8DecodeResult.shouldReprocessCurrentByte(result), "reprocess") }
+            { assertEquals(expectedReprocess, Utf8DecodeResult.shouldReprocessCurrentByte(result), "reprocess") },
         )
     }
 
@@ -86,7 +84,6 @@ class Utf8DecoderTest {
     @Nested
     @DisplayName("packed result")
     inner class PackedResult {
-
         @Test
         fun `NONE means no output and no reprocess`() {
             assertNoOutput(Utf8DecodeResult.NONE)
@@ -115,16 +112,18 @@ class Utf8DecoderTest {
 
         @Test
         fun `packed result rejects codepoints outside Unicode range`() {
-            val below = assertThrows(IllegalArgumentException::class.java) {
-                Utf8DecodeResult.emit(-1)
-            }
-            val above = assertThrows(IllegalArgumentException::class.java) {
-                Utf8DecodeResult.emitAndReprocess(0x11_0000)
-            }
+            val below =
+                assertThrows(IllegalArgumentException::class.java) {
+                    Utf8DecodeResult.emit(-1)
+                }
+            val above =
+                assertThrows(IllegalArgumentException::class.java) {
+                    Utf8DecodeResult.emitAndReprocess(0x11_0000)
+                }
 
             assertAll(
                 { assertEquals("invalid codepoint: -1", below.message) },
-                { assertEquals("invalid codepoint: 1114112", above.message) }
+                { assertEquals("invalid codepoint: 1114112", above.message) },
             )
         }
     }
@@ -134,21 +133,22 @@ class Utf8DecoderTest {
     @Nested
     @DisplayName("input validation")
     inner class InputValidation {
-
         @Test
         fun `accept rejects byte values outside unsigned byte range`() {
             val decoder = Utf8Decoder()
 
-            val below = assertThrows(IllegalArgumentException::class.java) {
-                decoder.accept(-1)
-            }
-            val above = assertThrows(IllegalArgumentException::class.java) {
-                decoder.accept(256)
-            }
+            val below =
+                assertThrows(IllegalArgumentException::class.java) {
+                    decoder.accept(-1)
+                }
+            val above =
+                assertThrows(IllegalArgumentException::class.java) {
+                    decoder.accept(256)
+                }
 
             assertAll(
                 { assertEquals("byteValue out of range: -1", below.message) },
-                { assertEquals("byteValue out of range: 256", above.message) }
+                { assertEquals("byteValue out of range: 256", above.message) },
             )
         }
     }
@@ -158,7 +158,6 @@ class Utf8DecoderTest {
     @Nested
     @DisplayName("valid UTF-8")
     inner class ValidUtf8 {
-
         @Test
         fun `all ASCII bytes emit immediately including NUL and DEL`() {
             val decoder = Utf8Decoder()
@@ -194,10 +193,16 @@ class Utf8DecoderTest {
                 listOf('A'.code, 0x00A2, 0x20AC, 0x1F600),
                 decodeAll(
                     'A'.code,
-                    0xC2, 0xA2,
-                    0xE2, 0x82, 0xAC,
-                    0xF0, 0x9F, 0x98, 0x80
-                )
+                    0xC2,
+                    0xA2,
+                    0xE2,
+                    0x82,
+                    0xAC,
+                    0xF0,
+                    0x9F,
+                    0x98,
+                    0x80,
+                ),
             )
         }
 
@@ -226,7 +231,6 @@ class Utf8DecoderTest {
     @Nested
     @DisplayName("invalid leading bytes")
     inner class InvalidLeadingBytes {
-
         @Test
         fun `lone continuation bytes are consumed and emit replacement`() {
             for (byteValue in 0x80..0xBF) {
@@ -260,7 +264,6 @@ class Utf8DecoderTest {
     @Nested
     @DisplayName("overlong sequences")
     inner class OverlongSequences {
-
         @Test
         fun `two-byte overlong forms emit replacement for each invalid byte`() {
             assertEquals(listOf(replacement(), replacement()), decodeAll(0xC0, 0x80))
@@ -294,7 +297,6 @@ class Utf8DecoderTest {
     @Nested
     @DisplayName("surrogates and upper bound")
     inner class SurrogatesAndUpperBound {
-
         @Test
         fun `UTF-8 encoded surrogate range is rejected`() {
             assertEquals(listOf(replacement(), replacement()), decodeAll(0xED, 0xA0, 0x80))
@@ -311,7 +313,7 @@ class Utf8DecoderTest {
             assertEquals(listOf(replacement(), replacement(), replacement()), decodeAll(0xF4, 0x90, 0x80, 0x80))
             assertEquals(
                 listOf(replacement(), replacement(), replacement(), replacement()),
-                decodeAll(0xF5, 0x80, 0x80, 0x80)
+                decodeAll(0xF5, 0x80, 0x80, 0x80),
             )
         }
     }
@@ -321,7 +323,6 @@ class Utf8DecoderTest {
     @Nested
     @DisplayName("malformed sequence reprocess behavior")
     inner class MalformedSequenceReprocessBehavior {
-
         @Test
         fun `non-continuation after two-byte lead emits replacement and asks to reprocess current byte`() {
             val decoder = Utf8Decoder()
@@ -342,7 +343,7 @@ class Utf8DecoderTest {
         fun `new UTF-8 lead after malformed pending sequence is reprocessed as a new sequence`() {
             assertEquals(
                 listOf(replacement(), 0x20AC),
-                decodeAll(0xF0, 0x9F, 0xE2, 0x82, 0xAC)
+                decodeAll(0xF0, 0x9F, 0xE2, 0x82, 0xAC),
             )
         }
 
@@ -368,7 +369,6 @@ class Utf8DecoderTest {
     @Nested
     @DisplayName("end of input and reset")
     inner class EndOfInputAndReset {
-
         @Test
         fun `flush with no pending sequence emits nothing`() {
             assertNoOutput(Utf8Decoder().flushEndOfInput())
@@ -416,7 +416,6 @@ class Utf8DecoderTest {
     @Nested
     @DisplayName("custom replacement")
     inner class CustomReplacement {
-
         @Test
         fun `custom replacement codepoint is used for malformed bytes`() {
             val decoder = Utf8Decoder(replacementCodepoint = '?'.code)

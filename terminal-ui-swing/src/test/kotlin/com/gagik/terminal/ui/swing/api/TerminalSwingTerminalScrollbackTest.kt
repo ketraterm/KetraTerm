@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.api
 
 import com.gagik.core.TerminalBuffers
@@ -43,15 +42,16 @@ class TerminalSwingTerminalScrollbackTest {
     @Test
     fun `dirty notifications are coalesced into one pending EDT repaint`() {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
-        val session = TerminalSession(
-            terminal = terminal,
-            publisher = TerminalRenderPublisher(3, 1),
-            renderReader = ScrollbackFrameReader(),
-            responseReader = terminal,
-            connector = NoOpConnector,
-            parser = NoOpParser,
-            inputEncoder = NoOpInputEncoder,
-        )
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                publisher = TerminalRenderPublisher(3, 1),
+                renderReader = ScrollbackFrameReader(),
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+            )
         val component = TerminalSwingTerminal()
         val oldManager = RepaintManager.currentManager(component)
         val repaintManager = CountingRepaintManager(component)
@@ -92,15 +92,16 @@ class TerminalSwingTerminalScrollbackTest {
     fun `mouse wheel requests scrolled render snapshot through session`() {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
         val renderReader = ScrollbackFrameReader()
-        val session = TerminalSession(
-            terminal = terminal,
-            publisher = TerminalRenderPublisher(3, 1),
-            renderReader = renderReader,
-            responseReader = terminal,
-            connector = NoOpConnector,
-            parser = NoOpParser,
-            inputEncoder = NoOpInputEncoder,
-        )
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                publisher = TerminalRenderPublisher(3, 1),
+                renderReader = renderReader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+            )
         val component = TerminalSwingTerminal()
 
         SwingUtilities.invokeAndWait {
@@ -124,7 +125,7 @@ class TerminalSwingTerminalScrollbackTest {
                     MouseWheelEvent.WHEEL_UNIT_SCROLL,
                     3,
                     -1,
-                )
+                ),
             )
         }
 
@@ -136,15 +137,16 @@ class TerminalSwingTerminalScrollbackTest {
     @Test
     fun `precise mouse wheel fractions update scrollback viewport`() {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
-        val session = TerminalSession(
-            terminal = terminal,
-            publisher = TerminalRenderPublisher(3, 1),
-            renderReader = ScrollbackFrameReader(),
-            responseReader = terminal,
-            connector = NoOpConnector,
-            parser = NoOpParser,
-            inputEncoder = NoOpInputEncoder,
-        )
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                publisher = TerminalRenderPublisher(3, 1),
+                renderReader = ScrollbackFrameReader(),
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+            )
         val component = TerminalSwingTerminal()
 
         SwingUtilities.invokeAndWait {
@@ -171,7 +173,7 @@ class TerminalSwingTerminalScrollbackTest {
                     3,
                     0,
                     -0.25,
-                )
+                ),
             )
         }
 
@@ -192,7 +194,13 @@ class TerminalSwingTerminalScrollbackTest {
             repaintCount.set(0)
         }
 
-        override fun addDirtyRegion(component: JComponent, x: Int, y: Int, w: Int, h: Int) {
+        override fun addDirtyRegion(
+            component: JComponent,
+            x: Int,
+            y: Int,
+            w: Int,
+            h: Int,
+        ) {
             if (component === target) {
                 repaintCount.incrementAndGet()
             }
@@ -200,7 +208,10 @@ class TerminalSwingTerminalScrollbackTest {
         }
     }
 
-    private fun awaitOffset(session: TerminalSession, offset: Int): Boolean {
+    private fun awaitOffset(
+        session: TerminalSession,
+        offset: Int,
+    ): Boolean {
         val deadline = System.nanoTime() + 1_000_000_000L
         while (System.nanoTime() < deadline) {
             if (session.publisher.current()?.scrollbackOffset == offset) return true
@@ -213,6 +224,7 @@ class TerminalSwingTerminalScrollbackTest {
         @Volatile
         var lastRequestedOffset: Int = -1
             private set
+
         @Volatile
         var lastRequestedRows: Int = -1
             private set
@@ -221,7 +233,10 @@ class TerminalSwingTerminalScrollbackTest {
             readRenderFrame(scrollbackOffset = 0, consumer = consumer)
         }
 
-        override fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
+        override fun readRenderFrame(
+            scrollbackOffset: Int,
+            consumer: TerminalRenderFrameConsumer,
+        ) {
             lastRequestedOffset = scrollbackOffset
             lastRequestedRows = 0
             consumer.accept(ScrollbackFrame(scrollbackOffset.coerceIn(0, 5), rows = 1))
@@ -247,14 +262,15 @@ class TerminalSwingTerminalScrollbackTest {
         override val frameGeneration: Long = 1
         override val structureGeneration: Long = 1
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
-        override val cursor: TerminalRenderCursor = TerminalRenderCursor(
-            column = 0,
-            row = 0,
-            visible = scrollbackOffset == 0,
-            blinking = false,
-            shape = TerminalRenderCursorShape.BLOCK,
-            generation = 1,
-        )
+        override val cursor: TerminalRenderCursor =
+            TerminalRenderCursor(
+                column = 0,
+                row = 0,
+                visible = scrollbackOffset == 0,
+                blinking = false,
+                shape = TerminalRenderCursorShape.BLOCK,
+                generation = 1,
+            )
 
         override fun lineGeneration(row: Int): Long = 1
 
@@ -290,15 +306,26 @@ class TerminalSwingTerminalScrollbackTest {
     private object NoOpConnector : TerminalConnector {
         override fun start(listener: TerminalConnectorListener) = Unit
 
-        override fun write(bytes: ByteArray, offset: Int, length: Int) = Unit
+        override fun write(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) = Unit
 
-        override fun resize(columns: Int, rows: Int) = Unit
+        override fun resize(
+            columns: Int,
+            rows: Int,
+        ) = Unit
 
         override fun close() = Unit
     }
 
     private object NoOpParser : TerminalOutputParser {
-        override fun accept(bytes: ByteArray, offset: Int, length: Int) = Unit
+        override fun accept(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) = Unit
 
         override fun acceptByte(byteValue: Int) = Unit
 

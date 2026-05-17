@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.cache
 
 import org.junit.jupiter.api.Assertions.*
@@ -71,7 +70,10 @@ class TerminalAsciiDrawCharsCacheTest {
         assertTrue(cache.canDrawChars(font, Font.PLAIN, secondWidth, secondContext))
     }
 
-    private fun fixedAsciiAdvance(font: Font, frc: FontRenderContext): Int {
+    private fun fixedAsciiAdvance(
+        font: Font,
+        frc: FontRenderContext,
+    ): Int {
         val probe = CharArray(1)
         probe[0] = ' '.code.toChar()
         val firstAdvance = font.createGlyphVector(frc, probe).getGlyphPosition(1).x

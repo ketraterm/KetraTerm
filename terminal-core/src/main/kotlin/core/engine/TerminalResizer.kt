@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.engine
 
 import com.gagik.core.buffer.HistoryRing
@@ -35,7 +34,6 @@ import com.gagik.core.store.ClusterStore
  * Cluster payloads that survive reflow are deep-copied into the new store.
  */
 internal object TerminalResizer {
-
     /**
      * Resizes a specific [ScreenBuffer], reflowing all its content and safely
      * copying surviving grapheme clusters to a new memory arena.
@@ -45,7 +43,7 @@ internal object TerminalResizer {
         oldWidth: Int,
         oldHeight: Int,
         newWidth: Int,
-        newHeight: Int
+        newHeight: Int,
     ) {
         val newStore = ClusterStore()
         val newRing = HistoryRing(buffer.maxHistory + newHeight) { Line(newWidth, newStore) }
@@ -120,11 +118,12 @@ internal object TerminalResizer {
             val dataLength = if (oldLine.wrapped && logicalLen > 0) oldWidth else logicalLen
             val hasCursor = i == absoluteOldCursorRow
 
-            val readLength = if (hasCursor && buffer.cursor.col > 0) {
-                maxOf(dataLength, buffer.cursor.col + 1)
-            } else {
-                dataLength
-            }
+            val readLength =
+                if (hasCursor && buffer.cursor.col > 0) {
+                    maxOf(dataLength, buffer.cursor.col + 1)
+                } else {
+                    dataLength
+                }
 
             for (col in 0 until readLength) {
                 val isCursor = hasCursor && col == buffer.cursor.col
@@ -192,7 +191,9 @@ internal object TerminalResizer {
  *
  * @param initialCapacity Starting array capacity in cells.
  */
-private class LogicalLineBuilder(initialCapacity: Int) {
+private class LogicalLineBuilder(
+    initialCapacity: Int,
+) {
     var codepoints = IntArray(initialCapacity)
     var attrs = LongArray(initialCapacity)
     var extendedAttrs = LongArray(initialCapacity)
@@ -206,7 +207,12 @@ private class LogicalLineBuilder(initialCapacity: Int) {
      * @param attr The packed cell attribute.
      * @param isCursor `true` if this cell is the current cursor position.
      */
-    fun append(raw: Int, attr: Long, extendedAttr: Long, isCursor: Boolean) {
+    fun append(
+        raw: Int,
+        attr: Long,
+        extendedAttr: Long,
+        isCursor: Boolean,
+    ) {
         if (size == codepoints.size) grow()
         if (isCursor) cursorAbsoluteIndex = size
         codepoints[size] = raw

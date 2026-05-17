@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.text
 
 import com.gagik.parser.charset.CharsetMapper
@@ -41,7 +40,10 @@ internal class PrintableProcessor(
     /**
      * Accepts one ASCII-domain printable byte from the ANSI FSM GROUND state.
      */
-    fun acceptAsciiByte(state: ParserState, byteValue: Int) {
+    fun acceptAsciiByte(
+        state: ParserState,
+        byteValue: Int,
+    ) {
         require(byteValue in 0x20..0x7e) { "byteValue is not printable ASCII: $byteValue" }
         acceptCodepoint(state, byteValue)
     }
@@ -54,7 +56,10 @@ internal class PrintableProcessor(
      * GL charset mapping, and any other policy decisions are applied.
      * The processor will handle grapheme assembly and forwarding to the sink.
      */
-    fun acceptDecodedCodepoint(state: ParserState, codepoint: Int) {
+    fun acceptDecodedCodepoint(
+        state: ParserState,
+        codepoint: Int,
+    ) {
         require(codepoint in 0..0x10ffff) { "invalid codepoint: $codepoint" }
         acceptCodepoint(state, codepoint)
     }
@@ -79,7 +84,10 @@ internal class PrintableProcessor(
         graphemeAssembler.reset(state)
     }
 
-    private fun acceptCodepoint(state: ParserState, codepoint: Int) {
+    private fun acceptCodepoint(
+        state: ParserState,
+        codepoint: Int,
+    ) {
         val mapped = CharsetMapper.map(state, codepoint)
         graphemeAssembler.accept(state, mapped)
     }

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.engine
 
 import com.gagik.core.codec.AttributeCodec
@@ -23,8 +22,11 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalResizerProtectionTest {
-
-    private fun resizeState(state: TerminalState, newWidth: Int, newHeight: Int) {
+    private fun resizeState(
+        state: TerminalState,
+        newWidth: Int,
+        newHeight: Int,
+    ) {
         val oldWidth = state.dimensions.width
         val oldHeight = state.dimensions.height
         TerminalResizer.resizeBuffer(state.primaryBuffer, oldWidth, oldHeight, newWidth, newHeight)
@@ -57,7 +59,7 @@ class TerminalResizerProtectionTest {
             { assertFalse(AttributeCodec.isProtected(firstVisible.getPackedAttr(1))) },
             { assertEquals('C'.code, secondVisible.getCodepoint(0)) },
             { assertFalse(AttributeCodec.isProtected(secondVisible.getPackedAttr(0))) },
-            { assertEquals(TerminalConstants.EMPTY, thirdVisible.getCodepoint(0)) }
+            { assertEquals(TerminalConstants.EMPTY, thirdVisible.getCodepoint(0)) },
         )
     }
 }

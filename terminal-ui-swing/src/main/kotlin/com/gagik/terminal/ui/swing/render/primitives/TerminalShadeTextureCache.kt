@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.primitives
 
 import com.gagik.terminal.ui.swing.render.primitives.TerminalBlockElementGlyphs.SHADE_DARK
@@ -30,7 +29,10 @@ internal class TerminalShadeTextureCache {
     private val keys = IntArray(CACHE_SIZE)
     private val textures = arrayOfNulls<TexturePaint>(CACHE_SIZE)
 
-    fun texture(kind: Int, argb: Int): TexturePaint {
+    fun texture(
+        kind: Int,
+        argb: Int,
+    ): TexturePaint {
         val key = key(kind, argb)
         val slot = slot(key)
         val cached = textures[slot]
@@ -42,7 +44,10 @@ internal class TerminalShadeTextureCache {
         return texture
     }
 
-    private fun createTexture(kind: Int, argb: Int): TexturePaint {
+    private fun createTexture(
+        kind: Int,
+        argb: Int,
+    ): TexturePaint {
         val textureWidth = textureWidth(kind)
         val textureHeight = textureHeight(kind)
         val image = BufferedImage(textureWidth, textureHeight, BufferedImage.TYPE_INT_ARGB)
@@ -62,30 +67,28 @@ internal class TerminalShadeTextureCache {
         return TexturePaint(image, Rectangle2D.Float(0f, 0f, textureWidth.toFloat(), textureHeight.toFloat()))
     }
 
-    private fun textureWidth(kind: Int): Int {
-        return if (kind == SHADE_MEDIUM) 2 else 4
-    }
+    private fun textureWidth(kind: Int): Int = if (kind == SHADE_MEDIUM) 2 else 4
 
-    private fun textureHeight(kind: Int): Int {
-        return if (kind == SHADE_MEDIUM) 2 else 4
-    }
+    private fun textureHeight(kind: Int): Int = if (kind == SHADE_MEDIUM) 2 else 4
 
-    private fun isPainted(kind: Int, column: Int, row: Int): Boolean {
-        return when (kind) {
+    private fun isPainted(
+        kind: Int,
+        column: Int,
+        row: Int,
+    ): Boolean =
+        when (kind) {
             SHADE_LIGHT -> column == (row and 1) * 2
             SHADE_MEDIUM -> column and 1 == row and 1
             SHADE_DARK -> (row + column) and 0x3 != 0
             else -> false
         }
-    }
 
-    private fun key(kind: Int, argb: Int): Int {
-        return argb xor (kind * KIND_KEY_FACTOR)
-    }
+    private fun key(
+        kind: Int,
+        argb: Int,
+    ): Int = argb xor (kind * KIND_KEY_FACTOR)
 
-    private fun slot(key: Int): Int {
-        return key * HASH_FACTOR ushr HASH_SHIFT
-    }
+    private fun slot(key: Int): Int = key * HASH_FACTOR ushr HASH_SHIFT
 
     private companion object {
         private const val CACHE_SIZE = 64

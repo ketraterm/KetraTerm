@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render
 
 import com.gagik.terminal.render.api.TerminalRenderAttrs
@@ -27,29 +26,33 @@ internal fun terminalFontStyle(attr: Long): Int {
     return style
 }
 
-internal fun hasDrawableText(flags: Int): Boolean {
-    return flags and TerminalRenderCellFlags.CODEPOINT != 0 ||
+internal fun hasDrawableText(flags: Int): Boolean =
+    flags and TerminalRenderCellFlags.CODEPOINT != 0 ||
         flags and TerminalRenderCellFlags.CLUSTER != 0
-}
 
-internal fun isFastAsciiCell(flags: Int, codeWord: Int): Boolean {
-    return flags == TerminalRenderCellFlags.CODEPOINT && codeWord in 0x20..0x7e
-}
+internal fun isFastAsciiCell(
+    flags: Int,
+    codeWord: Int,
+): Boolean = flags == TerminalRenderCellFlags.CODEPOINT && codeWord in 0x20..0x7e
 
-internal fun cellSpan(flags: Int): Int {
-    return if (flags and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1
-}
+internal fun cellSpan(flags: Int): Int = if (flags and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1
 
-internal fun visualCellRangeStart(flags: Int, column: Int): Int {
-    return if (flags and TerminalRenderCellFlags.WIDE_TRAILING != 0) maxOf(0, column - 1) else column
-}
+internal fun visualCellRangeStart(
+    flags: Int,
+    column: Int,
+): Int = if (flags and TerminalRenderCellFlags.WIDE_TRAILING != 0) maxOf(0, column - 1) else column
 
-internal fun visualCellRangeSpan(flags: Int, column: Int, columns: Int): Int {
+internal fun visualCellRangeSpan(
+    flags: Int,
+    column: Int,
+    columns: Int,
+): Int {
     val start = visualCellRangeStart(flags, column)
-    val span = when {
-        flags and TerminalRenderCellFlags.WIDE_LEADING != 0 -> 2
-        flags and TerminalRenderCellFlags.WIDE_TRAILING != 0 && column > 0 -> 2
-        else -> 1
-    }
+    val span =
+        when {
+            flags and TerminalRenderCellFlags.WIDE_LEADING != 0 -> 2
+            flags and TerminalRenderCellFlags.WIDE_TRAILING != 0 && column > 0 -> 2
+            else -> 1
+        }
     return minOf(span, columns - start)
 }

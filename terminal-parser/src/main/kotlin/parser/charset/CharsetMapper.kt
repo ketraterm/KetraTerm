@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.charset
 
 import com.gagik.parser.runtime.ParserState
@@ -33,7 +32,10 @@ import com.gagik.parser.runtime.ParserState
  */
 internal object CharsetMapper {
     @JvmStatic
-    fun map(state: ParserState, codepoint: Int): Int {
+    fun map(
+        state: ParserState,
+        codepoint: Int,
+    ): Int {
         if (codepoint !in 0x20..0x7e) {
             return codepoint
         }
@@ -70,18 +72,28 @@ internal object CharsetMapper {
     }
 
     @JvmStatic
-    fun designate(state: ParserState, slot: Int, charset: Int) {
+    fun designate(
+        state: ParserState,
+        slot: Int,
+        charset: Int,
+    ) {
         require(slot in 0..3) { "charset slot out of range: $slot" }
         state.charsets[slot] = charset
     }
 
     @JvmStatic
-    fun designateAscii(state: ParserState, slot: Int) {
+    fun designateAscii(
+        state: ParserState,
+        slot: Int,
+    ) {
         designate(state, slot, ParserState.CHARSET_ASCII)
     }
 
     @JvmStatic
-    fun designateDecSpecialGraphics(state: ParserState, slot: Int) {
+    fun designateDecSpecialGraphics(
+        state: ParserState,
+        slot: Int,
+    ) {
         designate(state, slot, ParserState.CHARSET_DEC_SPECIAL_GRAPHICS)
     }
 

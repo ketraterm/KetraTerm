@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi.mode
 
 import com.gagik.parser.ansi.AnsiCommandDispatcher
@@ -30,7 +29,6 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("Mode dispatcher")
 class ModeDispatchTest {
-
     private fun dispatchMode(
         finalByte: Int,
         vararg params: Int,
@@ -49,30 +47,28 @@ class ModeDispatchTest {
         return sink
     }
 
-    private fun setAnsi(vararg params: Int): RecordingTerminalCommandSink {
-        return dispatchMode('h'.code, params = params)
-    }
+    private fun setAnsi(vararg params: Int): RecordingTerminalCommandSink = dispatchMode('h'.code, params = params)
 
-    private fun resetAnsi(vararg params: Int): RecordingTerminalCommandSink {
-        return dispatchMode('l'.code, params = params)
-    }
+    private fun resetAnsi(vararg params: Int): RecordingTerminalCommandSink = dispatchMode('l'.code, params = params)
 
-    private fun setDec(vararg params: Int): RecordingTerminalCommandSink {
-        return dispatchMode('h'.code, params = params, privateMarker = '?'.code)
-    }
+    private fun setDec(vararg params: Int): RecordingTerminalCommandSink = dispatchMode('h'.code, params = params, privateMarker = '?'.code)
 
-    private fun resetDec(vararg params: Int): RecordingTerminalCommandSink {
-        return dispatchMode('l'.code, params = params, privateMarker = '?'.code)
-    }
+    private fun resetDec(vararg params: Int): RecordingTerminalCommandSink =
+        dispatchMode('l'.code, params = params, privateMarker = '?'.code)
 
-    private fun ansiEvent(mode: Int, enable: Boolean): String = "setAnsiMode:$mode:$enable"
+    private fun ansiEvent(
+        mode: Int,
+        enable: Boolean,
+    ): String = "setAnsiMode:$mode:$enable"
 
-    private fun decEvent(mode: Int, enable: Boolean): String = "setDecMode:$mode:$enable"
+    private fun decEvent(
+        mode: Int,
+        enable: Boolean,
+    ): String = "setDecMode:$mode:$enable"
 
     @Nested
     @DisplayName("ANSI modes CSI Pn h/l")
     inner class AnsiModes {
-
         @Test
         fun `CSI 4 h and l dispatch insert mode`() {
             assertEquals(listOf(ansiEvent(AnsiMode.INSERT, true)), setAnsi(AnsiMode.INSERT).events)
@@ -109,20 +105,20 @@ class ModeDispatchTest {
     @Nested
     @DisplayName("DEC private modes CSI question Pn h/l")
     inner class DecPrivateModes {
-
         @Test
         fun `cursor and rendering physics modes dispatch`() {
-            val modes = intArrayOf(
-                DecPrivateMode.APPLICATION_CURSOR_KEYS,
-                DecPrivateMode.DECCOLM,
-                DecPrivateMode.REVERSE_VIDEO,
-                DecPrivateMode.ORIGIN,
-                DecPrivateMode.AUTO_WRAP,
-                DecPrivateMode.CURSOR_BLINK,
-                DecPrivateMode.CURSOR_VISIBLE,
-                DecPrivateMode.APPLICATION_KEYPAD,
-                DecPrivateMode.LEFT_RIGHT_MARGIN,
-            )
+            val modes =
+                intArrayOf(
+                    DecPrivateMode.APPLICATION_CURSOR_KEYS,
+                    DecPrivateMode.DECCOLM,
+                    DecPrivateMode.REVERSE_VIDEO,
+                    DecPrivateMode.ORIGIN,
+                    DecPrivateMode.AUTO_WRAP,
+                    DecPrivateMode.CURSOR_BLINK,
+                    DecPrivateMode.CURSOR_VISIBLE,
+                    DecPrivateMode.APPLICATION_KEYPAD,
+                    DecPrivateMode.LEFT_RIGHT_MARGIN,
+                )
 
             assertEquals(
                 modes.map { decEvent(it, true) },
@@ -136,16 +132,17 @@ class ModeDispatchTest {
 
         @Test
         fun `mouse protocol modes dispatch`() {
-            val modes = intArrayOf(
-                DecPrivateMode.MOUSE_X10,
-                DecPrivateMode.MOUSE_NORMAL,
-                DecPrivateMode.MOUSE_BUTTON_EVENT,
-                DecPrivateMode.MOUSE_ANY_EVENT,
-                DecPrivateMode.MOUSE_UTF8,
-                DecPrivateMode.MOUSE_SGR,
-                DecPrivateMode.MOUSE_URXVT,
-                DecPrivateMode.SYNCHRONIZED_OUTPUT,
-            )
+            val modes =
+                intArrayOf(
+                    DecPrivateMode.MOUSE_X10,
+                    DecPrivateMode.MOUSE_NORMAL,
+                    DecPrivateMode.MOUSE_BUTTON_EVENT,
+                    DecPrivateMode.MOUSE_ANY_EVENT,
+                    DecPrivateMode.MOUSE_UTF8,
+                    DecPrivateMode.MOUSE_SGR,
+                    DecPrivateMode.MOUSE_URXVT,
+                    DecPrivateMode.SYNCHRONIZED_OUTPUT,
+                )
 
             assertEquals(
                 modes.map { decEvent(it, true) },
@@ -159,10 +156,11 @@ class ModeDispatchTest {
 
         @Test
         fun `focus and bracketed paste modes dispatch`() {
-            val modes = intArrayOf(
-                DecPrivateMode.FOCUS_REPORTING,
-                DecPrivateMode.BRACKETED_PASTE,
-            )
+            val modes =
+                intArrayOf(
+                    DecPrivateMode.FOCUS_REPORTING,
+                    DecPrivateMode.BRACKETED_PASTE,
+                )
 
             assertEquals(
                 modes.map { decEvent(it, true) },
@@ -176,12 +174,13 @@ class ModeDispatchTest {
 
         @Test
         fun `alternate screen and cursor save modes dispatch`() {
-            val modes = intArrayOf(
-                DecPrivateMode.ALT_SCREEN,
-                DecPrivateMode.ALT_SCREEN_BUFFER,
-                DecPrivateMode.SAVE_RESTORE_CURSOR,
-                DecPrivateMode.ALT_SCREEN_SAVE_CURSOR,
-            )
+            val modes =
+                intArrayOf(
+                    DecPrivateMode.ALT_SCREEN,
+                    DecPrivateMode.ALT_SCREEN_BUFFER,
+                    DecPrivateMode.SAVE_RESTORE_CURSOR,
+                    DecPrivateMode.ALT_SCREEN_SAVE_CURSOR,
+                )
 
             assertEquals(
                 modes.map { decEvent(it, true) },
@@ -197,14 +196,14 @@ class ModeDispatchTest {
     @Nested
     @DisplayName("sequence behavior")
     inner class SequenceBehavior {
-
         @Test
         fun `multiple modes in one DEC private sequence preserve source order`() {
-            val sink = setDec(
-                DecPrivateMode.APPLICATION_CURSOR_KEYS,
-                DecPrivateMode.CURSOR_VISIBLE,
-                DecPrivateMode.BRACKETED_PASTE,
-            )
+            val sink =
+                setDec(
+                    DecPrivateMode.APPLICATION_CURSOR_KEYS,
+                    DecPrivateMode.CURSOR_VISIBLE,
+                    DecPrivateMode.BRACKETED_PASTE,
+                )
 
             assertEquals(
                 listOf(
@@ -258,7 +257,7 @@ class ModeDispatchTest {
                     'h'.code,
                     DecPrivateMode.CURSOR_VISIBLE,
                     privateMarker = '>'.code,
-                ).events.isEmpty()
+                ).events.isEmpty(),
             )
         }
     }
@@ -266,7 +265,6 @@ class ModeDispatchTest {
     @Nested
     @DisplayName("full parser path")
     inner class FullParserPath {
-
         @Test
         fun `ANSI modes route through ByteClass FSM action engine and dispatcher`() {
             val fixture = TerminalParserFixture()

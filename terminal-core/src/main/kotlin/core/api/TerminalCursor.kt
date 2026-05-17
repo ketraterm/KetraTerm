@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.api
 
 /**
@@ -23,7 +22,6 @@ package com.gagik.core.api
  * and tab stop commands.
  */
 interface TerminalCursor {
-
     /**
      * Moves the cursor to an absolute position (CUP / HVP, `CSI row ; col H`).
      *
@@ -39,7 +37,10 @@ interface TerminalCursor {
      * @param col Target column (0-based).
      * @param row Target row (0-based).
      */
-    fun positionCursor(col: Int, row: Int)
+    fun positionCursor(
+        col: Int,
+        row: Int,
+    )
 
     /**
      * Moves the cursor up by [n] rows (CUU, `CSI n A`).

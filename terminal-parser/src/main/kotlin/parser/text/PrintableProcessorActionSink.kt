@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.text
 
 import com.gagik.parser.ansi.PrintableActionSink
@@ -25,11 +24,17 @@ import com.gagik.parser.runtime.ParserState
 internal class PrintableProcessorActionSink(
     private val processor: PrintableProcessor,
 ) : PrintableActionSink {
-    override fun onAsciiByte(state: ParserState, byteValue: Int) {
+    override fun onAsciiByte(
+        state: ParserState,
+        byteValue: Int,
+    ) {
         processor.acceptAsciiByte(state, byteValue)
     }
 
-    override fun onUtf8Byte(state: ParserState, byteValue: Int) {
+    override fun onUtf8Byte(
+        state: ParserState,
+        byteValue: Int,
+    ) {
         error("UTF-8 payload must be decoded by TerminalParser before printable processing")
     }
 

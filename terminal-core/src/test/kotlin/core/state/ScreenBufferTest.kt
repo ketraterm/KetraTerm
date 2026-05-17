@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.state
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class ScreenBufferTest {
-
-    private fun newBuffer(width: Int = 10, height: Int = 5, maxHistory: Int = 4): ScreenBuffer {
-        return ScreenBuffer(width, height, maxHistory)
-    }
+    private fun newBuffer(
+        width: Int = 10,
+        height: Int = 5,
+        maxHistory: Int = 4,
+    ): ScreenBuffer = ScreenBuffer(width, height, maxHistory)
 
     @Test
     fun `constructor initializes memory arena cursor and scroll margins`() {
@@ -38,7 +38,7 @@ class ScreenBufferTest {
             { assertEquals(2, buffer.scrollBottom) },
             { assertEquals(0, buffer.ring.size) },
             { assertEquals(10, buffer.ring.capacity) },
-            { assertTrue(buffer.isFullViewportScroll(3)) }
+            { assertTrue(buffer.isFullViewportScroll(3)) },
         )
     }
 
@@ -52,7 +52,7 @@ class ScreenBufferTest {
 
         assertAll(
             { assertFalse(buffer.isFullViewportScroll(5)) },
-            { assertFalse(buffer.isFullViewportScroll(4)) }
+            { assertFalse(buffer.isFullViewportScroll(4)) },
         )
     }
 
@@ -70,7 +70,7 @@ class ScreenBufferTest {
             { assertEquals(3, buffer.scrollBottom) },
             { assertEquals(0, buffer.cursor.col) },
             { assertEquals(0, buffer.cursor.row) },
-            { assertFalse(buffer.cursor.pendingWrap) }
+            { assertFalse(buffer.cursor.pendingWrap) },
         )
     }
 
@@ -88,7 +88,7 @@ class ScreenBufferTest {
             { assertEquals(3, buffer.scrollBottom) },
             { assertEquals(0, buffer.cursor.col) },
             { assertEquals(1, buffer.cursor.row) },
-            { assertFalse(buffer.cursor.pendingWrap) }
+            { assertFalse(buffer.cursor.pendingWrap) },
         )
     }
 
@@ -101,7 +101,7 @@ class ScreenBufferTest {
         assertAll(
             { assertEquals(0, buffer.scrollTop) },
             { assertEquals(4, buffer.scrollBottom) },
-            { assertTrue(buffer.isFullViewportScroll(5)) }
+            { assertTrue(buffer.isFullViewportScroll(5)) },
         )
     }
 
@@ -120,7 +120,7 @@ class ScreenBufferTest {
             { assertEquals(3, buffer.scrollBottom) },
             { assertEquals(5, buffer.cursor.col) },
             { assertEquals(2, buffer.cursor.row) },
-            { assertTrue(buffer.cursor.pendingWrap) }
+            { assertTrue(buffer.cursor.pendingWrap) },
         )
     }
 
@@ -140,7 +140,7 @@ class ScreenBufferTest {
             { assertTrue(buffer.isFullViewportScroll(5)) },
             { assertEquals(7, buffer.cursor.col) },
             { assertEquals(3, buffer.cursor.row) },
-            { assertTrue(buffer.cursor.pendingWrap) }
+            { assertTrue(buffer.cursor.pendingWrap) },
         )
     }
 
@@ -168,7 +168,7 @@ class ScreenBufferTest {
             { assertEquals(37L, buffer.ring[2].getPackedAttr(0)) },
             { assertSame(storeBefore, buffer.ring[0].store) },
             { assertSame(storeBefore, buffer.ring[1].store) },
-            { assertSame(storeBefore, buffer.ring[2].store) }
+            { assertSame(storeBefore, buffer.ring[2].store) },
         )
     }
 
@@ -185,7 +185,7 @@ class ScreenBufferTest {
         assertAll(
             { assertSame(ringBefore, buffer.ring) },
             { assertSame(storeBefore, buffer.store) },
-            { assertEquals(0, buffer.ring.size) }
+            { assertEquals(0, buffer.ring.size) },
         )
     }
 
@@ -225,20 +225,18 @@ class ScreenBufferTest {
             { assertEquals(29L, buffer.ring[4].getPackedAttr(0)) },
             { assertSame(buffer.store, buffer.ring[0].store) },
             { assertSame(buffer.store, buffer.ring[4].store) },
-
             // Cursor is preserved because it is within new bounds
             { assertEquals(2, buffer.cursor.col) },
             { assertEquals(1, buffer.cursor.row) },
             // THE FIX: pendingWrap MUST be false because col 2 is not at the new right margin (11)
             { assertFalse(buffer.cursor.pendingWrap, "pendingWrap must clear when not at right margin") },
-
             // Saved cursor is untouched by active buffer resizes
             { assertEquals(7, buffer.savedCursor.col) },
             { assertEquals(2, buffer.savedCursor.row) },
             { assertEquals(123, buffer.savedCursor.attr) },
             { assertFalse(buffer.savedCursor.pendingWrap, "Saved pendingWrap must clear when grid is wiped") },
             { assertTrue(buffer.savedCursor.isOriginMode) },
-            { assertTrue(buffer.savedCursor.isSaved) }
+            { assertTrue(buffer.savedCursor.isSaved) },
         )
     }
 
@@ -256,7 +254,7 @@ class ScreenBufferTest {
             { assertEquals(0, buffer.scrollBottom) },
             { assertTrue(buffer.isFullViewportScroll(1)) },
             { assertEquals("", buffer.ring[0].toTextTrimmed()) },
-            { assertEquals(41L, buffer.ring[0].getPackedAttr(0)) }
+            { assertEquals(41L, buffer.ring[0].getPackedAttr(0)) },
         )
     }
 
@@ -277,8 +275,7 @@ class ScreenBufferTest {
             { assertTrue(buffer.savedCursor.isSaved, "Saved flag should be preserved") },
             { assertEquals(4, buffer.savedCursor.col, "Saved Col MUST be clamped to new width") },
             { assertEquals(4, buffer.savedCursor.row, "Saved Row MUST be clamped to new height") },
-            { assertFalse(buffer.savedCursor.pendingWrap, "Saved pending wrap MUST be broken if pushed inward") }
+            { assertFalse(buffer.savedCursor.pendingWrap, "Saved pending wrap MUST be broken if pushed inward") },
         )
     }
 }
-

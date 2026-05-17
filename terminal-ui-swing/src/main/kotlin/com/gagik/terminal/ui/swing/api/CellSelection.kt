@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.api
 
 import com.gagik.terminal.render.api.TerminalRenderCellFlags
 import com.gagik.terminal.render.cache.TerminalRenderCache
 import com.gagik.terminal.ui.swing.api.CellSelection.Companion.NO_RANGE
-
 
 /**
  * Half-open terminal cell selection in visible render-cache coordinates.
@@ -62,22 +60,28 @@ data class CellSelection(
      * @param columns visible render-cache column count.
      * @return packed half-open range, or [NO_RANGE].
      */
-    fun packedColumnRange(row: Int, columns: Int, cache: TerminalRenderCache? = null): Long {
+    fun packedColumnRange(
+        row: Int,
+        columns: Int,
+        cache: TerminalRenderCache? = null,
+    ): Long {
         if (isEmpty || row < startRow || row > endRow) return NO_RANGE
 
-        var start = when {
-            isBlock -> minOf(anchorColumn, caretColumn)
-            startRow == endRow -> startColumn
-            row == startRow -> startColumn
-            else -> 0
-        }.coerceIn(0, columns)
+        var start =
+            when {
+                isBlock -> minOf(anchorColumn, caretColumn)
+                startRow == endRow -> startColumn
+                row == startRow -> startColumn
+                else -> 0
+            }.coerceIn(0, columns)
 
-        val endVal = when {
-            isBlock -> maxOf(anchorColumn, caretColumn)
-            startRow == endRow -> endColumn
-            row == endRow -> endColumn
-            else -> columns
-        }.coerceIn(0, columns)
+        val endVal =
+            when {
+                isBlock -> maxOf(anchorColumn, caretColumn)
+                startRow == endRow -> endColumn
+                row == endRow -> endColumn
+                else -> columns
+            }.coerceIn(0, columns)
         var end = endVal
 
         if (cache != null && row in 0 until cache.rows) {
@@ -139,9 +143,10 @@ data class CellSelection(
         /**
          * Packs a half-open column range.
          */
-        fun packRange(startColumn: Int, endColumn: Int): Long {
-            return (startColumn.toLong() shl 32) or (endColumn.toLong() and 0xffff_ffffL)
-        }
+        fun packRange(
+            startColumn: Int,
+            endColumn: Int,
+        ): Long = (startColumn.toLong() shl 32) or (endColumn.toLong() and 0xffff_ffffL)
 
         /**
          * Extracts the start column from a packed range.

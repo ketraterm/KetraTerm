@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.charset
 
 import com.gagik.parser.ansi.RecordingTerminalCommandSink
@@ -27,12 +26,18 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("CharsetMapper")
 class CharsetMapperTest {
-
     // ----- Helpers ----------------------------------------------------------
 
-    private fun map(state: ParserState, char: Char): Int = CharsetMapper.map(state, char.code)
+    private fun map(
+        state: ParserState,
+        char: Char,
+    ): Int = CharsetMapper.map(state, char.code)
 
-    private fun assertMaps(state: ParserState, input: Int, expected: Int) {
+    private fun assertMaps(
+        state: ParserState,
+        input: Int,
+        expected: Int,
+    ) {
         assertEquals(expected, CharsetMapper.map(state, input), "input=${input.toString(16)}")
     }
 
@@ -47,7 +52,6 @@ class CharsetMapperTest {
     @Nested
     @DisplayName("default ASCII mapping")
     inner class DefaultAsciiMapping {
-
         @Test
         fun `new parser state maps every GL printable byte to itself`() {
             val state = ParserState()
@@ -63,7 +67,7 @@ class CharsetMapperTest {
                 { assertArrayEquals(intArrayOf(0, 0, 0, 0), state.charsets) },
                 { assertEquals(0, state.glSlot) },
                 { assertEquals(2, state.grSlot) },
-                { assertEquals(-1, state.singleShiftSlot) }
+                { assertEquals(-1, state.singleShiftSlot) },
             )
         }
 
@@ -72,17 +76,18 @@ class CharsetMapperTest {
             val state = ParserState()
             CharsetMapper.designateDecSpecialGraphics(state, 0)
 
-            val nonGlCodepoints = intArrayOf(
-                0x00,
-                0x1f,
-                0x7f,
-                0x80,
-                0x9f,
-                0x00a0,
-                0x0301,
-                0x20ac,
-                0x1f600,
-            )
+            val nonGlCodepoints =
+                intArrayOf(
+                    0x00,
+                    0x1f,
+                    0x7f,
+                    0x80,
+                    0x9f,
+                    0x00a0,
+                    0x0301,
+                    0x20ac,
+                    0x1f600,
+                )
 
             for (codepoint in nonGlCodepoints) {
                 assertMaps(state, codepoint, codepoint)
@@ -103,7 +108,7 @@ class CharsetMapperTest {
                 { assertEquals(ParserState.CHARSET_ASCII, state.charsets[0]) },
                 { assertEquals(ParserState.CHARSET_DEC_SPECIAL_GRAPHICS, state.charsets[1]) },
                 { assertEquals(ParserState.CHARSET_ASCII, state.charsets[2]) },
-                { assertEquals(ParserState.CHARSET_ASCII, state.charsets[3]) }
+                { assertEquals(ParserState.CHARSET_ASCII, state.charsets[3]) },
             )
         }
     }
@@ -113,7 +118,6 @@ class CharsetMapperTest {
     @Nested
     @DisplayName("DEC Special Graphics")
     inner class DecSpecialGraphicsMapping {
-
         @Test
         fun `DEC Special Graphics maps every documented replacement character`() {
             val state = ParserState()
@@ -154,7 +158,7 @@ class CharsetMapperTest {
                 { assertEquals(0x2510, map(state, 'k')) },
                 { assertEquals(0x2514, map(state, 'm')) },
                 { assertEquals(0x2518, map(state, 'j')) },
-                { assertEquals(0x253c, map(state, 'n')) }
+                { assertEquals(0x253c, map(state, 'n')) },
             )
         }
 
@@ -176,7 +180,6 @@ class CharsetMapperTest {
     @Nested
     @DisplayName("designation")
     inner class Designation {
-
         @Test
         fun `designate writes only the selected G slot`() {
             val state = ParserState()
@@ -190,7 +193,7 @@ class CharsetMapperTest {
                     ParserState.CHARSET_DEC_SPECIAL_GRAPHICS,
                     ParserState.CHARSET_ASCII,
                 ),
-                state.charsets
+                state.charsets,
             )
         }
 
@@ -219,16 +222,18 @@ class CharsetMapperTest {
         fun `designation rejects slots below G0 and above G3`() {
             val state = ParserState()
 
-            val below = assertThrows(IllegalArgumentException::class.java) {
-                CharsetMapper.designate(state, slot = -1, charset = ParserState.CHARSET_ASCII)
-            }
-            val above = assertThrows(IllegalArgumentException::class.java) {
-                CharsetMapper.designate(state, slot = 4, charset = ParserState.CHARSET_ASCII)
-            }
+            val below =
+                assertThrows(IllegalArgumentException::class.java) {
+                    CharsetMapper.designate(state, slot = -1, charset = ParserState.CHARSET_ASCII)
+                }
+            val above =
+                assertThrows(IllegalArgumentException::class.java) {
+                    CharsetMapper.designate(state, slot = 4, charset = ParserState.CHARSET_ASCII)
+                }
 
             assertAll(
                 { assertEquals("charset slot out of range: -1", below.message) },
-                { assertEquals("charset slot out of range: 4", above.message) }
+                { assertEquals("charset slot out of range: 4", above.message) },
             )
         }
 
@@ -236,16 +241,18 @@ class CharsetMapperTest {
         fun `high level designation helpers reject invalid slots through the same invariant`() {
             val state = ParserState()
 
-            val ascii = assertThrows(IllegalArgumentException::class.java) {
-                CharsetMapper.designateAscii(state, slot = Int.MIN_VALUE)
-            }
-            val dec = assertThrows(IllegalArgumentException::class.java) {
-                CharsetMapper.designateDecSpecialGraphics(state, slot = Int.MAX_VALUE)
-            }
+            val ascii =
+                assertThrows(IllegalArgumentException::class.java) {
+                    CharsetMapper.designateAscii(state, slot = Int.MIN_VALUE)
+                }
+            val dec =
+                assertThrows(IllegalArgumentException::class.java) {
+                    CharsetMapper.designateDecSpecialGraphics(state, slot = Int.MAX_VALUE)
+                }
 
             assertAll(
                 { assertEquals("charset slot out of range: ${Int.MIN_VALUE}", ascii.message) },
-                { assertEquals("charset slot out of range: ${Int.MAX_VALUE}", dec.message) }
+                { assertEquals("charset slot out of range: ${Int.MAX_VALUE}", dec.message) },
             )
         }
     }
@@ -255,7 +262,6 @@ class CharsetMapperTest {
     @Nested
     @DisplayName("locking shifts")
     inner class LockingShifts {
-
         @Test
         fun `lockingShiftG0 selects G0 for GL and clears pending single shift`() {
             val state = ParserState()
@@ -268,7 +274,7 @@ class CharsetMapperTest {
             assertAll(
                 { assertEquals(0, state.glSlot) },
                 { assertEquals(-1, state.singleShiftSlot) },
-                { assertEquals('q'.code, map(state, 'q')) }
+                { assertEquals('q'.code, map(state, 'q')) },
             )
         }
 
@@ -283,7 +289,7 @@ class CharsetMapperTest {
             assertAll(
                 { assertEquals(1, state.glSlot) },
                 { assertEquals(-1, state.singleShiftSlot) },
-                { assertEquals(0x2500, map(state, 'q')) }
+                { assertEquals(0x2500, map(state, 'q')) },
             )
         }
 
@@ -299,7 +305,7 @@ class CharsetMapperTest {
 
             assertAll(
                 { assertArrayEquals(intArrayOf(0, 1, 1, 0), state.charsets) },
-                { assertEquals(3, state.grSlot) }
+                { assertEquals(3, state.grSlot) },
             )
         }
 
@@ -321,7 +327,6 @@ class CharsetMapperTest {
     @Nested
     @DisplayName("single shifts")
     inner class SingleShifts {
-
         @Test
         fun `singleShiftG2 applies G2 to exactly one GL printable codepoint`() {
             val state = ParserState()
@@ -333,7 +338,7 @@ class CharsetMapperTest {
                 { assertEquals(2, state.singleShiftSlot) },
                 { assertEquals(0x2500, map(state, 'q')) },
                 { assertEquals(-1, state.singleShiftSlot) },
-                { assertEquals('q'.code, map(state, 'q')) }
+                { assertEquals('q'.code, map(state, 'q')) },
             )
         }
 
@@ -348,7 +353,7 @@ class CharsetMapperTest {
                 { assertEquals(3, state.singleShiftSlot) },
                 { assertEquals(0x2502, map(state, 'x')) },
                 { assertEquals(-1, state.singleShiftSlot) },
-                { assertEquals('x'.code, map(state, 'x')) }
+                { assertEquals('x'.code, map(state, 'x')) },
             )
         }
 
@@ -363,7 +368,7 @@ class CharsetMapperTest {
             assertAll(
                 { assertEquals('q'.code, map(state, 'q')) },
                 { assertEquals(-1, state.singleShiftSlot) },
-                { assertEquals(0x2500, map(state, 'q')) }
+                { assertEquals(0x2500, map(state, 'q')) },
             )
         }
 
@@ -382,7 +387,7 @@ class CharsetMapperTest {
 
             assertAll(
                 { assertEquals(0x2500, map(state, 'q')) },
-                { assertEquals(-1, state.singleShiftSlot) }
+                { assertEquals(-1, state.singleShiftSlot) },
             )
         }
 
@@ -398,7 +403,7 @@ class CharsetMapperTest {
             assertAll(
                 { assertEquals(3, state.singleShiftSlot) },
                 { assertEquals(0x2500, map(state, 'q')) },
-                { assertEquals(-1, state.singleShiftSlot) }
+                { assertEquals(-1, state.singleShiftSlot) },
             )
         }
 
@@ -414,7 +419,7 @@ class CharsetMapperTest {
             assertAll(
                 { assertEquals('q'.code, map(state, 'q')) },
                 { assertEquals(1, state.glSlot) },
-                { assertEquals(0x2500, map(state, 'q')) }
+                { assertEquals(0x2500, map(state, 'q')) },
             )
         }
     }
@@ -424,7 +429,6 @@ class CharsetMapperTest {
     @Nested
     @DisplayName("PrintableProcessor integration")
     inner class PrintableProcessorIntegration {
-
         @Test
         fun `ASCII printable ingress is charset mapped before terminal sink output`() {
             val state = ParserState()
@@ -452,7 +456,7 @@ class CharsetMapperTest {
 
             assertAll(
                 { assertEquals(listOf(writeCodepoint(0x2502), writeCodepoint('x'.code)), sink.events) },
-                { assertEquals(-1, state.singleShiftSlot) }
+                { assertEquals(-1, state.singleShiftSlot) },
             )
         }
 
@@ -485,7 +489,7 @@ class CharsetMapperTest {
                 { assertArrayEquals(intArrayOf(0, 0, 0, 0), state.charsets) },
                 { assertEquals(0, state.glSlot) },
                 { assertEquals(2, state.grSlot) },
-                { assertEquals(-1, state.singleShiftSlot) }
+                { assertEquals(-1, state.singleShiftSlot) },
             )
         }
 
@@ -498,44 +502,45 @@ class CharsetMapperTest {
             assertAll(
                 { assertEquals(2, state.grSlot) },
                 { assertFalse(state.glSlot == state.grSlot) },
-                { assertEquals('q'.code, map(state, 'q')) }
+                { assertEquals('q'.code, map(state, 'q')) },
             )
         }
     }
 
     companion object {
-        private val DEC_SPECIAL_GRAPHICS: Map<Int, Int> = linkedMapOf(
-            '`'.code to 0x25c6,
-            'a'.code to 0x2592,
-            'b'.code to 0x2409,
-            'c'.code to 0x240c,
-            'd'.code to 0x240d,
-            'e'.code to 0x240a,
-            'f'.code to 0x00b0,
-            'g'.code to 0x00b1,
-            'h'.code to 0x2424,
-            'i'.code to 0x240b,
-            'j'.code to 0x2518,
-            'k'.code to 0x2510,
-            'l'.code to 0x250c,
-            'm'.code to 0x2514,
-            'n'.code to 0x253c,
-            'o'.code to 0x23ba,
-            'p'.code to 0x23bb,
-            'q'.code to 0x2500,
-            'r'.code to 0x23bc,
-            's'.code to 0x23bd,
-            't'.code to 0x251c,
-            'u'.code to 0x2524,
-            'v'.code to 0x2534,
-            'w'.code to 0x252c,
-            'x'.code to 0x2502,
-            'y'.code to 0x2264,
-            'z'.code to 0x2265,
-            '{'.code to 0x03c0,
-            '|'.code to 0x2260,
-            '}'.code to 0x00a3,
-            '~'.code to 0x00b7,
-        )
+        private val DEC_SPECIAL_GRAPHICS: Map<Int, Int> =
+            linkedMapOf(
+                '`'.code to 0x25c6,
+                'a'.code to 0x2592,
+                'b'.code to 0x2409,
+                'c'.code to 0x240c,
+                'd'.code to 0x240d,
+                'e'.code to 0x240a,
+                'f'.code to 0x00b0,
+                'g'.code to 0x00b1,
+                'h'.code to 0x2424,
+                'i'.code to 0x240b,
+                'j'.code to 0x2518,
+                'k'.code to 0x2510,
+                'l'.code to 0x250c,
+                'm'.code to 0x2514,
+                'n'.code to 0x253c,
+                'o'.code to 0x23ba,
+                'p'.code to 0x23bb,
+                'q'.code to 0x2500,
+                'r'.code to 0x23bc,
+                's'.code to 0x23bd,
+                't'.code to 0x251c,
+                'u'.code to 0x2524,
+                'v'.code to 0x2534,
+                'w'.code to 0x252c,
+                'x'.code to 0x2502,
+                'y'.code to 0x2264,
+                'z'.code to 0x2265,
+                '{'.code to 0x03c0,
+                '|'.code to 0x2260,
+                '}'.code to 0x00a3,
+                '~'.code to 0x00b7,
+            )
     }
 }

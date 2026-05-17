@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.integration
 
 import com.gagik.core.TerminalBuffers
@@ -33,14 +32,14 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("CoreTerminalCommandSink")
 class CoreTerminalCommandSinkTest {
-
     private data class Fixture(
         val terminal: TerminalBufferApi = TerminalBuffers.create(width = 10, height = 5),
         val hostPolicy: TerminalHostPolicy = TerminalHostPolicy(),
-        val sink: CoreTerminalCommandSink = CoreTerminalCommandSink(
-            terminal = terminal,
-            hostPolicy = hostPolicy,
-        ),
+        val sink: CoreTerminalCommandSink =
+            CoreTerminalCommandSink(
+                terminal = terminal,
+                hostPolicy = hostPolicy,
+            ),
         val parser: TerminalOutputParser = TerminalParsers.create(sink),
     ) {
         fun acceptAscii(text: String) {
@@ -61,7 +60,6 @@ class CoreTerminalCommandSinkTest {
     @Nested
     @DisplayName("printable and cursor pipeline")
     inner class PrintableAndCursorPipeline {
-
         @Test
         fun `plain text parsed through adapter writes the core grid`() {
             val f = Fixture()
@@ -247,7 +245,6 @@ class CoreTerminalCommandSinkTest {
     @Nested
     @DisplayName("mode policy")
     inner class ModePolicy {
-
         @Test
         fun `ANSI and DEC modes parsed from bytes update core mode snapshot`() {
             val f = Fixture()
@@ -516,7 +513,6 @@ class CoreTerminalCommandSinkTest {
     @Nested
     @DisplayName("SGR and OSC policy")
     inner class SgrAndOscPolicy {
-
         @Test
         fun `SGR indexed color and styles update core pen attributes`() {
             val f = Fixture()
@@ -724,10 +720,11 @@ class CoreTerminalCommandSinkTest {
 
         @Test
         fun `overlong OSC hyperlink uri is ignored`() {
-            val f = Fixture(
-                terminal = TerminalBuffers.create(width = 2, height = 1),
-                hostPolicy = TerminalHostPolicy(maxHyperlinkUriLength = 8),
-            )
+            val f =
+                Fixture(
+                    terminal = TerminalBuffers.create(width = 2, height = 1),
+                    hostPolicy = TerminalHostPolicy(maxHyperlinkUriLength = 8),
+                )
 
             f.sink.startHyperlink(uri = "https://too-long.example", id = null)
             f.sink.writeCodepoint('A'.code)
@@ -750,10 +747,11 @@ class CoreTerminalCommandSinkTest {
 
         @Test
         fun `overlong OSC hyperlink id is ignored`() {
-            val f = Fixture(
-                terminal = TerminalBuffers.create(width = 2, height = 1),
-                hostPolicy = TerminalHostPolicy(maxHyperlinkIdLength = 3),
-            )
+            val f =
+                Fixture(
+                    terminal = TerminalBuffers.create(width = 2, height = 1),
+                    hostPolicy = TerminalHostPolicy(maxHyperlinkIdLength = 3),
+                )
 
             f.sink.startHyperlink(uri = "https://example.com", id = "toolong")
             f.sink.writeCodepoint('A'.code)
@@ -776,10 +774,11 @@ class CoreTerminalCommandSinkTest {
 
         @Test
         fun `OSC hyperlink registry evicts least recently used entry when bounded`() {
-            val f = Fixture(
-                terminal = TerminalBuffers.create(width = 5, height = 1),
-                hostPolicy = TerminalHostPolicy(maxHyperlinkEntries = 2),
-            )
+            val f =
+                Fixture(
+                    terminal = TerminalBuffers.create(width = 5, height = 1),
+                    hostPolicy = TerminalHostPolicy(maxHyperlinkEntries = 2),
+                )
 
             f.sink.startHyperlink(uri = "https://example.com/a", id = null)
             f.sink.writeCodepoint('A'.code)
@@ -803,10 +802,11 @@ class CoreTerminalCommandSinkTest {
 
         @Test
         fun `OSC hyperlink spam does not disable new links after registry reaches max`() {
-            val f = Fixture(
-                terminal = TerminalBuffers.create(width = 4, height = 1),
-                hostPolicy = TerminalHostPolicy(maxHyperlinkEntries = 2),
-            )
+            val f =
+                Fixture(
+                    terminal = TerminalBuffers.create(width = 4, height = 1),
+                    hostPolicy = TerminalHostPolicy(maxHyperlinkEntries = 2),
+                )
 
             repeat(16) { index ->
                 f.sink.startHyperlink(uri = "https://example.com/$index", id = null)

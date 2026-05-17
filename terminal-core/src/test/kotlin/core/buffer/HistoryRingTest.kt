@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.model.Line
@@ -28,16 +27,12 @@ import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("HistoryRing Buffer Storage")
 class HistoryRingTest {
-
     // Helper factory to create distinct lines for identity testing
-    private fun createLineFactory(width: Int = 10): () -> Line {
-        return { Line(width, ClusterStore()) }
-    }
+    private fun createLineFactory(width: Int = 10): () -> Line = { Line(width, ClusterStore()) }
 
     @Nested
     @DisplayName("Initialization")
     inner class InitializationTests {
-
         @Test
         @DisplayName("Pre-allocates Line objects immediately")
         fun testPreAllocation() {
@@ -60,7 +55,6 @@ class HistoryRingTest {
     @Nested
     @DisplayName("Push & Fill Logic (Pre-Capacity)")
     inner class PushTests {
-
         @Test
         @DisplayName("Push increases size up to capacity")
         fun testPushIncreasesSize() {
@@ -87,9 +81,12 @@ class HistoryRingTest {
             val ring = HistoryRing(5, createLineFactory())
 
             // Push 3 lines and mark them
-            val l1 = ring.push(); l1.setCell(0, 'A'.code, 0)
-            val l2 = ring.push(); l2.setCell(0, 'B'.code, 0)
-            val l3 = ring.push(); l3.setCell(0, 'C'.code, 0)
+            val l1 = ring.push()
+            l1.setCell(0, 'A'.code, 0)
+            val l2 = ring.push()
+            l2.setCell(0, 'B'.code, 0)
+            val l3 = ring.push()
+            l3.setCell(0, 'C'.code, 0)
 
             // Expect logical index 0 = Oldest ('A')
             assertEquals(l1, ring[0], "Index 0 should be the first pushed line")
@@ -101,7 +98,6 @@ class HistoryRingTest {
     @Nested
     @DisplayName("Ring Rollover & Recycling (Post-Capacity)")
     inner class RolloverTests {
-
         @Test
         @DisplayName("Pushing when full overwrites oldest (FIFO)")
         fun testOverwriteOldest() {
@@ -109,20 +105,24 @@ class HistoryRingTest {
             val ring = HistoryRing(capacity, createLineFactory())
 
             // Fill buffer: [A, B, C]
-            val a = ring.push(); a.setCell(0, 'A'.code, 0)
-            val b = ring.push(); b.setCell(0, 'B'.code, 0)
-            val c = ring.push(); c.setCell(0, 'C'.code, 0)
+            val a = ring.push()
+            a.setCell(0, 'A'.code, 0)
+            val b = ring.push()
+            b.setCell(0, 'B'.code, 0)
+            val c = ring.push()
+            c.setCell(0, 'C'.code, 0)
 
             // Push D. Should overwrite A.
             // New state logical: [B, C, D]
-            val d = ring.push(); d.setCell(0, 'D'.code, 0)
+            val d = ring.push()
+            d.setCell(0, 'D'.code, 0)
 
             assertEquals(3, ring.size, "Size should remain at capacity")
 
             // Check logical indices
-            assertEquals(b , ring[0], "Index 0 should now be B (oldest)")
-            assertEquals(c , ring[1], "Index 1 should now be C")
-            assertEquals(d , ring[2], "Index 2 should now be D (newest)")
+            assertEquals(b, ring[0], "Index 0 should now be B (oldest)")
+            assertEquals(c, ring[1], "Index 1 should now be C")
+            assertEquals(d, ring[2], "Index 2 should now be D (newest)")
         }
 
         @Test
@@ -158,7 +158,6 @@ class HistoryRingTest {
     @Nested
     @DisplayName("Boundary Conditions & Validation")
     inner class BoundaryTests {
-
         @Test
         @DisplayName("Accessing empty ring throws exception")
         fun testEmptyAccess() {
@@ -177,9 +176,10 @@ class HistoryRingTest {
             ring.push()
             // Size is 3. Valid indices: 0, 1, 2.
 
-            val ex = assertThrows<IndexOutOfBoundsException> {
-                ring[index]
-            }
+            val ex =
+                assertThrows<IndexOutOfBoundsException> {
+                    ring[index]
+                }
             assertTrue(ex.message!!.contains("out of bounds"), "Message should describe error")
         }
 
@@ -236,9 +236,12 @@ class HistoryRingTest {
         @DisplayName("rotateUp with single-line region")
         fun testRotateUpSingleLine() {
             val ring = HistoryRing(3, createLineFactory())
-            val l0 = ring.push(); l0.setCell(0, 'A'.code, 0)
-            val l1 = ring.push(); l1.setCell(0, 'B'.code, 0)
-            val l2 = ring.push(); l2.setCell(0, 'C'.code, 0)
+            val l0 = ring.push()
+            l0.setCell(0, 'A'.code, 0)
+            val l1 = ring.push()
+            l1.setCell(0, 'B'.code, 0)
+            val l2 = ring.push()
+            l2.setCell(0, 'C'.code, 0)
 
             ring.rotateUp(1, 1)
 
@@ -252,10 +255,14 @@ class HistoryRingTest {
         @DisplayName("rotateUp with two-line region")
         fun testRotateUpTwoLines() {
             val ring = HistoryRing(4, createLineFactory())
-            val l0 = ring.push(); l0.setCell(0, 'A'.code, 0)
-            val l1 = ring.push(); l1.setCell(0, 'B'.code, 0)
-            val l2 = ring.push(); l2.setCell(0, 'C'.code, 0)
-            val l3 = ring.push(); l3.setCell(0, 'D'.code, 0)
+            val l0 = ring.push()
+            l0.setCell(0, 'A'.code, 0)
+            val l1 = ring.push()
+            l1.setCell(0, 'B'.code, 0)
+            val l2 = ring.push()
+            l2.setCell(0, 'C'.code, 0)
+            val l3 = ring.push()
+            l3.setCell(0, 'D'.code, 0)
 
             // Rotate up [1, 2]: l2 moves to l1, l1 moves to position 2
             ring.rotateUp(1, 2)
@@ -270,9 +277,12 @@ class HistoryRingTest {
         @DisplayName("rotateUp full range moves oldest to newest")
         fun testRotateUpFullRange() {
             val ring = HistoryRing(3, createLineFactory())
-            val l0 = ring.push(); l0.setCell(0, 'A'.code, 0)
-            val l1 = ring.push(); l1.setCell(0, 'B'.code, 0)
-            val l2 = ring.push(); l2.setCell(0, 'C'.code, 0)
+            val l0 = ring.push()
+            l0.setCell(0, 'A'.code, 0)
+            val l1 = ring.push()
+            l1.setCell(0, 'B'.code, 0)
+            val l2 = ring.push()
+            l2.setCell(0, 'C'.code, 0)
 
             ring.rotateUp(0, 2)
 
@@ -304,9 +314,12 @@ class HistoryRingTest {
         @DisplayName("rotateUp three times cycles full range")
         fun testRotateUpMultiple() {
             val ring = HistoryRing(3, createLineFactory())
-            val l0 = ring.push(); l0.setCell(0, 'A'.code, 0)
-            val l1 = ring.push(); l1.setCell(0, 'B'.code, 0)
-            val l2 = ring.push(); l2.setCell(0, 'C'.code, 0)
+            val l0 = ring.push()
+            l0.setCell(0, 'A'.code, 0)
+            val l1 = ring.push()
+            l1.setCell(0, 'B'.code, 0)
+            val l2 = ring.push()
+            l2.setCell(0, 'C'.code, 0)
 
             ring.rotateUp(0, 2)
             ring.rotateUp(0, 2)
@@ -326,9 +339,12 @@ class HistoryRingTest {
         @DisplayName("rotateDown with single-line region")
         fun testRotateDownSingleLine() {
             val ring = HistoryRing(3, createLineFactory())
-            val l0 = ring.push(); l0.setCell(0, 'A'.code, 0)
-            val l1 = ring.push(); l1.setCell(0, 'B'.code, 0)
-            val l2 = ring.push(); l2.setCell(0, 'C'.code, 0)
+            val l0 = ring.push()
+            l0.setCell(0, 'A'.code, 0)
+            val l1 = ring.push()
+            l1.setCell(0, 'B'.code, 0)
+            val l2 = ring.push()
+            l2.setCell(0, 'C'.code, 0)
 
             ring.rotateDown(1, 1)
 
@@ -342,10 +358,14 @@ class HistoryRingTest {
         @DisplayName("rotateDown with two-line region")
         fun testRotateDownTwoLines() {
             val ring = HistoryRing(4, createLineFactory())
-            val l0 = ring.push(); l0.setCell(0, 'A'.code, 0)
-            val l1 = ring.push(); l1.setCell(0, 'B'.code, 0)
-            val l2 = ring.push(); l2.setCell(0, 'C'.code, 0)
-            val l3 = ring.push(); l3.setCell(0, 'D'.code, 0)
+            val l0 = ring.push()
+            l0.setCell(0, 'A'.code, 0)
+            val l1 = ring.push()
+            l1.setCell(0, 'B'.code, 0)
+            val l2 = ring.push()
+            l2.setCell(0, 'C'.code, 0)
+            val l3 = ring.push()
+            l3.setCell(0, 'D'.code, 0)
 
             // Rotate down [1, 2]: l1 moves to l2, l2 moves to position 1
             ring.rotateDown(1, 2)
@@ -360,9 +380,12 @@ class HistoryRingTest {
         @DisplayName("rotateDown full range moves newest to oldest")
         fun testRotateDownFullRange() {
             val ring = HistoryRing(3, createLineFactory())
-            val l0 = ring.push(); l0.setCell(0, 'A'.code, 0)
-            val l1 = ring.push(); l1.setCell(0, 'B'.code, 0)
-            val l2 = ring.push(); l2.setCell(0, 'C'.code, 0)
+            val l0 = ring.push()
+            l0.setCell(0, 'A'.code, 0)
+            val l1 = ring.push()
+            l1.setCell(0, 'B'.code, 0)
+            val l2 = ring.push()
+            l2.setCell(0, 'C'.code, 0)
 
             ring.rotateDown(0, 2)
 
@@ -393,9 +416,12 @@ class HistoryRingTest {
         @DisplayName("rotateDown multiple times cycles through")
         fun testRotateDownMultiple() {
             val ring = HistoryRing(3, createLineFactory())
-            val l0 = ring.push(); l0.setCell(0, 'A'.code, 0)
-            val l1 = ring.push(); l1.setCell(0, 'B'.code, 0)
-            val l2 = ring.push(); l2.setCell(0, 'C'.code, 0)
+            val l0 = ring.push()
+            l0.setCell(0, 'A'.code, 0)
+            val l1 = ring.push()
+            l1.setCell(0, 'B'.code, 0)
+            val l2 = ring.push()
+            l2.setCell(0, 'C'.code, 0)
 
             ring.rotateDown(0, 2)
             ring.rotateDown(0, 2)
@@ -480,13 +506,17 @@ class HistoryRingTest {
         @DisplayName("Push after rotate maintains consistency")
         fun testPushAfterRotate() {
             val ring = HistoryRing(3, createLineFactory())
-            val l0 = ring.push(); l0.setCell(0, 'A'.code, 0)
-            val l1 = ring.push(); l1.setCell(0, 'B'.code, 0)
-            val l2 = ring.push(); l2.setCell(0, 'C'.code, 0)
+            val l0 = ring.push()
+            l0.setCell(0, 'A'.code, 0)
+            val l1 = ring.push()
+            l1.setCell(0, 'B'.code, 0)
+            val l2 = ring.push()
+            l2.setCell(0, 'C'.code, 0)
 
             // After rotateUp(0,2): [l1, l2, l0]
             ring.rotateUp(0, 2)
-            val l3 = ring.push(); l3.setCell(0, 'D'.code, 0)
+            val l3 = ring.push()
+            l3.setCell(0, 'D'.code, 0)
 
             // Push when full: l1 is recycled, becomes l3
             // Result: [l2, l0, l3]

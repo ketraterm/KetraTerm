@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.api
 
 /**
@@ -24,7 +23,6 @@ package com.gagik.core.api
  * sentinel values so renderers can remain branch-light.
  */
 interface TerminalReader {
-
     /** Current viewport width in cells. */
     val width: Int
 
@@ -57,7 +55,10 @@ interface TerminalReader {
      * - Wide-character spacer cells return `-1`.
      * - Blank cells and out-of-bounds probes return `0`.
      */
-    fun getCodepointAt(col: Int, row: Int): Int
+    fun getCodepointAt(
+        col: Int,
+        row: Int,
+    ): Int
 
     /**
      * Returns the primary packed cell attribute word at `[col, row]`.
@@ -71,7 +72,10 @@ interface TerminalReader {
      * @param row Row index (0-based).
      * @return Primary packed attribute word for the cell or active pen.
      */
-    fun getPackedAttrAt(col: Int, row: Int): Long
+    fun getPackedAttrAt(
+        col: Int,
+        row: Int,
+    ): Long
 
     /**
      * Returns the extended packed cell attribute word at `[col, row]`.
@@ -84,5 +88,8 @@ interface TerminalReader {
      * @param row Row index (0-based).
      * @return Extended packed attribute word for the cell or active pen.
      */
-    fun getPackedExtendedAttrAt(col: Int, row: Int): Long
+    fun getPackedExtendedAttrAt(
+        col: Int,
+        row: Int,
+    ): Long
 }

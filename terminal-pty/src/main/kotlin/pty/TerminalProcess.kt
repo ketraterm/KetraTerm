@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.pty
 
 import com.pty4j.PtyProcess
@@ -32,7 +31,10 @@ internal interface TerminalProcess {
 
     fun destroy()
 
-    fun resize(columns: Int, rows: Int)
+    fun resize(
+        columns: Int,
+        rows: Int,
+    )
 }
 
 internal interface TerminalProcessFactory {
@@ -41,12 +43,13 @@ internal interface TerminalProcessFactory {
 
 internal object Pty4jTerminalProcessFactory : TerminalProcessFactory {
     override fun start(options: TerminalPtyOptions): TerminalProcess {
-        val builder = PtyProcessBuilder()
-            .setCommand(options.command.toTypedArray())
-            .setEnvironment(options.environment)
-            .setInitialColumns(options.columns)
-            .setInitialRows(options.rows)
-            .setUseWinConPty(true)
+        val builder =
+            PtyProcessBuilder()
+                .setCommand(options.command.toTypedArray())
+                .setEnvironment(options.environment)
+                .setInitialColumns(options.columns)
+                .setInitialRows(options.rows)
+                .setUseWinConPty(true)
 
         options.workingDirectory?.let { directory ->
             builder.setDirectory(directory.toString())
@@ -73,7 +76,10 @@ internal class Pty4jTerminalProcess(
         process.destroy()
     }
 
-    override fun resize(columns: Int, rows: Int) {
+    override fun resize(
+        columns: Int,
+        rows: Int,
+    ) {
         process.setWinSize(WinSize(columns, rows))
     }
 }

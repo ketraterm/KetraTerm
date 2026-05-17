@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.api
 
 /**
@@ -50,7 +49,10 @@ interface TerminalRenderFrameReader {
      * @param scrollbackOffset requested lines above the live bottom viewport.
      * @param consumer receiver that copies any render data it needs.
      */
-    fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
+    fun readRenderFrame(
+        scrollbackOffset: Int,
+        consumer: TerminalRenderFrameConsumer,
+    ) {
         readRenderFrame(consumer)
     }
 

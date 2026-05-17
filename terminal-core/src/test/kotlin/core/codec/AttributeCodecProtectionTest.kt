@@ -13,30 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.codec
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class AttributeCodecProtectionTest {
-
     @Test
     fun `pack and unpack preserve selective erase protection`() {
-        val packed = AttributeCodec.pack(
-            fg = 9,
-            bg = 4,
-            bold = true,
-            faint = true,
-            italic = false,
-            protected = true
-        )
+        val packed =
+            AttributeCodec.pack(
+                fg = 9,
+                bg = 4,
+                bold = true,
+                faint = true,
+                italic = false,
+                protected = true,
+            )
         val unpacked = AttributeCodec.unpack(packed)
 
         assertAll(
             { assertTrue(AttributeCodec.isProtected(packed)) },
             { assertEquals(1L shl 57, packed and (1L shl 57)) },
-            { assertTrue(unpacked.selectiveEraseProtected) }
+            { assertTrue(unpacked.selectiveEraseProtected) },
         )
     }
 
@@ -54,7 +53,7 @@ class AttributeCodecProtectionTest {
             { assertEquals(AttributeCodec.isFaint(base), AttributeCodec.isFaint(protectedAttr)) },
             { assertEquals(AttributeCodec.isItalic(base), AttributeCodec.isItalic(protectedAttr)) },
             { assertFalse(AttributeCodec.isProtected(unprotectedAttr)) },
-            { assertEquals(base, unprotectedAttr) }
+            { assertEquals(base, unprotectedAttr) },
         )
     }
 }

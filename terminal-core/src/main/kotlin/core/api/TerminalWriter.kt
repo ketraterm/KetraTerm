@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.api
 
 import com.gagik.core.model.AttributeColor
@@ -31,7 +30,6 @@ import com.gagik.core.model.UnderlineStyle
  * fast path ([writeCodepoint]) or the explicit cluster ingress ([writeCluster]).
  */
 interface TerminalWriter {
-
     /**
      * Writes one Unicode scalar value at the cursor position using the active
      * pen attributes, then advances the cursor.
@@ -71,7 +69,10 @@ interface TerminalWriter {
      * @param codepoints Codepoints that make up the grapheme cluster.
      * @param length Number of valid codepoints in [codepoints].
      */
-    fun writeCluster(codepoints: IntArray, length: Int = codepoints.size)
+    fun writeCluster(
+        codepoints: IntArray,
+        length: Int = codepoints.size,
+    )
 
     /**
      * Appends one grapheme-continuation codepoint to the most recently written
@@ -121,7 +122,10 @@ interface TerminalWriter {
      * @param top First row of the scroll region (1-based, inclusive).
      * @param bottom Last row of the scroll region (1-based, inclusive).
      */
-    fun setScrollRegion(top: Int, bottom: Int)
+    fun setScrollRegion(
+        top: Int,
+        bottom: Int,
+    )
 
     /**
      * Sets the active horizontal margins (DECSLRM, `CSI left ; right s`).
@@ -133,7 +137,10 @@ interface TerminalWriter {
      * @param left Left margin column (1-based, inclusive).
      * @param right Right margin column (1-based, inclusive).
      */
-    fun setLeftRightMargins(left: Int, right: Int)
+    fun setLeftRightMargins(
+        left: Int,
+        right: Int,
+    )
 
     /** Resets the scroll region to the full viewport and homes the cursor. */
     fun resetScrollRegion()
@@ -304,7 +311,7 @@ interface TerminalWriter {
         blink: Boolean = false,
         inverse: Boolean = false,
         conceal: Boolean = false,
-        underlineColor: Int = 0
+        underlineColor: Int = 0,
     )
 
     /**
@@ -338,7 +345,7 @@ interface TerminalWriter {
         overline: Boolean = false,
         blink: Boolean = false,
         inverse: Boolean = false,
-        conceal: Boolean = false
+        conceal: Boolean = false,
     )
 
     /**

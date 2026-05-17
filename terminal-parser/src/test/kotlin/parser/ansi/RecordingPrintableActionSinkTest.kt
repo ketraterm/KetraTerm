@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.parser.ansi
 
 import com.gagik.parser.runtime.ParserState
@@ -24,11 +23,9 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("RecordingPrintableActionSink")
 class RecordingPrintableActionSinkTest {
-
     @Nested
     @DisplayName("printable byte recording")
     inner class PrintableByteRecording {
-
         @Test
         fun `records ASCII and UTF-8 bytes into separate streams in order`() {
             val printable = RecordingPrintableActionSink()
@@ -42,7 +39,7 @@ class RecordingPrintableActionSinkTest {
             assertAll(
                 { assertEquals(listOf('A'.code, 'B'.code), printable.asciiBytes) },
                 { assertEquals(listOf(0xE2, 0x82), printable.utf8Bytes) },
-                { assertEquals(0, printable.flushCount) }
+                { assertEquals(0, printable.flushCount) },
             )
         }
     }
@@ -50,7 +47,6 @@ class RecordingPrintableActionSinkTest {
     @Nested
     @DisplayName("flush recording")
     inner class FlushRecording {
-
         @Test
         fun `counts every flush without clearing recorded bytes`() {
             val printable = RecordingPrintableActionSink()
@@ -64,7 +60,7 @@ class RecordingPrintableActionSinkTest {
             assertAll(
                 { assertEquals(2, printable.flushCount) },
                 { assertEquals(listOf('x'.code), printable.asciiBytes) },
-                { assertEquals(listOf(0xF0), printable.utf8Bytes) }
+                { assertEquals(listOf(0xF0), printable.utf8Bytes) },
             )
         }
     }
@@ -72,7 +68,6 @@ class RecordingPrintableActionSinkTest {
     @Nested
     @DisplayName("initial state")
     inner class InitialState {
-
         @Test
         fun `starts with no bytes and zero flushes`() {
             val printable = RecordingPrintableActionSink()
@@ -80,7 +75,7 @@ class RecordingPrintableActionSinkTest {
             assertAll(
                 { assertTrue(printable.asciiBytes.isEmpty()) },
                 { assertTrue(printable.utf8Bytes.isEmpty()) },
-                { assertEquals(0, printable.flushCount) }
+                { assertEquals(0, printable.flushCount) },
             )
         }
     }

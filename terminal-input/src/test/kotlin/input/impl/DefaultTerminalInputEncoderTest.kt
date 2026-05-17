@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.input.impl
 
 import com.gagik.core.api.TerminalInputState
@@ -30,7 +29,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class DefaultTerminalInputEncoderTest {
-
     @Test
     fun `encodeKey reads mode bits once per event`() {
         val inputState = RecordingInputState(TerminalModeBits.APPLICATION_CURSOR_KEYS)
@@ -47,10 +45,11 @@ class DefaultTerminalInputEncoderTest {
     fun `encodePaste reads mode bits once per event`() {
         val inputState = RecordingInputState(TerminalModeBits.BRACKETED_PASTE)
         val output = RecordingHostOutput()
-        val encoder = DefaultTerminalInputEncoder(
-            inputState = inputState,
-            output = output,
-        )
+        val encoder =
+            DefaultTerminalInputEncoder(
+                inputState = inputState,
+                output = output,
+            )
 
         encoder.encodePaste(TerminalPasteEvent("text"))
 
@@ -62,10 +61,11 @@ class DefaultTerminalInputEncoderTest {
     fun `encodeFocus reads mode bits once per event`() {
         val inputState = RecordingInputState(TerminalModeBits.FOCUS_REPORTING)
         val output = RecordingHostOutput()
-        val encoder = DefaultTerminalInputEncoder(
-            inputState = inputState,
-            output = output,
-        )
+        val encoder =
+            DefaultTerminalInputEncoder(
+                inputState = inputState,
+                output = output,
+            )
 
         encoder.encodeFocus(TerminalFocusEvent(focused = true))
 
@@ -77,13 +77,15 @@ class DefaultTerminalInputEncoderTest {
     fun `encodeKey applies injected keyboard policy`() {
         val inputState = RecordingInputState(0L)
         val output = RecordingHostOutput()
-        val encoder = DefaultTerminalInputEncoder(
-            inputState = inputState,
-            output = output,
-            policy = TerminalInputPolicy(
-                unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
-            ),
-        )
+        val encoder =
+            DefaultTerminalInputEncoder(
+                inputState = inputState,
+                output = output,
+                policy =
+                    TerminalInputPolicy(
+                        unsupportedModifiedKeyPolicy = UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED,
+                    ),
+            )
 
         encoder.encodeKey(TerminalKeyEvent.codepoint(0x00e9, TerminalModifiers.CTRL))
 
@@ -95,10 +97,11 @@ class DefaultTerminalInputEncoderTest {
     fun `encodeMouse reads mode bits once per event and emits SGR`() {
         val inputState = RecordingInputState(mouseBits(MouseTrackingMode.NORMAL, MouseEncodingMode.SGR))
         val output = RecordingHostOutput()
-        val encoder = DefaultTerminalInputEncoder(
-            inputState = inputState,
-            output = output,
-        )
+        val encoder =
+            DefaultTerminalInputEncoder(
+                inputState = inputState,
+                output = output,
+            )
 
         encoder.encodeMouse(
             TerminalMouseEvent(
@@ -117,10 +120,11 @@ class DefaultTerminalInputEncoderTest {
     fun `encodeMouse emits nothing when tracking is disabled`() {
         val inputState = RecordingInputState(mouseBits(MouseTrackingMode.NONE, MouseEncodingMode.SGR))
         val output = RecordingHostOutput()
-        val encoder = DefaultTerminalInputEncoder(
-            inputState = inputState,
-            output = output,
-        )
+        val encoder =
+            DefaultTerminalInputEncoder(
+                inputState = inputState,
+                output = output,
+            )
 
         encoder.encodeMouse(
             TerminalMouseEvent(
@@ -139,10 +143,11 @@ class DefaultTerminalInputEncoderTest {
     fun `encodeMouse reuses shared scratch across consecutive events`() {
         val inputState = RecordingInputState(mouseBits(MouseTrackingMode.ANY_EVENT, MouseEncodingMode.SGR))
         val output = RecordingHostOutput()
-        val encoder = DefaultTerminalInputEncoder(
-            inputState = inputState,
-            output = output,
-        )
+        val encoder =
+            DefaultTerminalInputEncoder(
+                inputState = inputState,
+                output = output,
+            )
 
         encoder.encodeMouse(
             TerminalMouseEvent(
@@ -169,13 +174,15 @@ class DefaultTerminalInputEncoderTest {
     fun `encodePaste applies injected paste sanitization policy`() {
         val inputState = RecordingInputState(0L)
         val output = RecordingHostOutput()
-        val encoder = DefaultTerminalInputEncoder(
-            inputState = inputState,
-            output = output,
-            policy = TerminalInputPolicy(
-                pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
-            ),
-        )
+        val encoder =
+            DefaultTerminalInputEncoder(
+                inputState = inputState,
+                output = output,
+                policy =
+                    TerminalInputPolicy(
+                        pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                    ),
+            )
 
         encoder.encodePaste(TerminalPasteEvent("a\u001bb"))
 
@@ -183,17 +190,19 @@ class DefaultTerminalInputEncoderTest {
         assertArrayEquals("ab".encodeToByteArray(), output.bytes)
     }
 
-    private fun esc(textAfterEsc: String): ByteArray {
-        return byteArrayOf(0x1b) + textAfterEsc.encodeToByteArray()
-    }
+    private fun esc(textAfterEsc: String): ByteArray = byteArrayOf(0x1b) + textAfterEsc.encodeToByteArray()
 
-    private fun mouseBits(tracking: Int, encoding: Int): Long {
-        val withTracking = TerminalModeBits.withPackedValue(
-            bits = 0L,
-            mask = TerminalModeBits.MOUSE_TRACKING_MASK,
-            shift = TerminalModeBits.MOUSE_TRACKING_SHIFT,
-            value = tracking,
-        )
+    private fun mouseBits(
+        tracking: Int,
+        encoding: Int,
+    ): Long {
+        val withTracking =
+            TerminalModeBits.withPackedValue(
+                bits = 0L,
+                mask = TerminalModeBits.MOUSE_TRACKING_MASK,
+                shift = TerminalModeBits.MOUSE_TRACKING_SHIFT,
+                value = tracking,
+            )
         return TerminalModeBits.withPackedValue(
             bits = withTracking,
             mask = TerminalModeBits.MOUSE_ENCODING_MASK,

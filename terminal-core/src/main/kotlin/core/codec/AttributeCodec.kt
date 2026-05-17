@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.codec
 
 import com.gagik.core.model.AttributeColor
@@ -43,7 +42,6 @@ import com.gagik.core.model.UnderlineStyle
  * - bits `32..63` hyperlink id
  */
 internal object AttributeCodec {
-
     /** Maximum color value for standard ANSI colors (0 = default, 1-16 = ANSI). */
     const val MAX_ANSI_COLOR = 16
 
@@ -86,7 +84,7 @@ internal object AttributeCodec {
         italic: Boolean = false,
         blink: Boolean = false,
         inverse: Boolean = false,
-        protected: Boolean = false
+        protected: Boolean = false,
     ): Long {
         require(fg in 0..MAX_COLOR) { "fg must be in 0..$MAX_COLOR, was $fg" }
         require(bg in 0..MAX_COLOR) { "bg must be in 0..$MAX_COLOR, was $bg" }
@@ -110,7 +108,7 @@ internal object AttributeCodec {
         italic: Boolean = false,
         blink: Boolean = false,
         inverse: Boolean = false,
-        protected: Boolean = false
+        protected: Boolean = false,
     ): Long {
         var v = encodeColor(foreground).toLong()
         v = v or (encodeColor(background).toLong() shl BG_SHIFT)
@@ -129,7 +127,7 @@ internal object AttributeCodec {
         strikethrough: Boolean = false,
         overline: Boolean = false,
         conceal: Boolean = false,
-        hyperlinkId: Int = 0
+        hyperlinkId: Int = 0,
     ): Long {
         require(underlineColor in 0..MAX_COLOR) {
             "underlineColor must be in 0..$MAX_COLOR, was $underlineColor"
@@ -150,7 +148,7 @@ internal object AttributeCodec {
         strikethrough: Boolean = false,
         overline: Boolean = false,
         conceal: Boolean = false,
-        hyperlinkId: Int = 0
+        hyperlinkId: Int = 0,
     ): Long {
         require(hyperlinkId >= 0) { "hyperlinkId must be non-negative, was $hyperlinkId" }
         var v = encodeColor(underlineColor).toLong()
@@ -199,11 +197,15 @@ internal object AttributeCodec {
 
     fun hyperlinkId(v: Long): Int = (v ushr HYPERLINK_ID_SHIFT).toInt()
 
-    fun withProtected(v: Long, enabled: Boolean): Long {
-        return if (enabled) v or (1L shl PROTECTED_BIT) else v and (1L shl PROTECTED_BIT).inv()
-    }
+    fun withProtected(
+        v: Long,
+        enabled: Boolean,
+    ): Long = if (enabled) v or (1L shl PROTECTED_BIT) else v and (1L shl PROTECTED_BIT).inv()
 
-    fun withHyperlinkId(v: Long, hyperlinkId: Int): Long {
+    fun withHyperlinkId(
+        v: Long,
+        hyperlinkId: Int,
+    ): Long {
         require(hyperlinkId >= 0) { "hyperlinkId must be non-negative, was $hyperlinkId" }
         return (v and ((1L shl HYPERLINK_ID_SHIFT) - 1L)) or (hyperlinkId.toLong() shl HYPERLINK_ID_SHIFT)
     }
@@ -212,8 +214,11 @@ internal object AttributeCodec {
 
     fun sgrResetExtended(v: Long): Long = hyperlinkId(v).toLong() shl HYPERLINK_ID_SHIFT
 
-    fun unpack(primary: Long, extended: Long = DEFAULT_EXTENDED_ATTR): Attributes {
-        return Attributes(
+    fun unpack(
+        primary: Long,
+        extended: Long = DEFAULT_EXTENDED_ATTR,
+    ): Attributes =
+        Attributes(
             foreground = foregroundColor(primary),
             background = backgroundColor(primary),
             underlineColor = underlineAttributeColor(extended),
@@ -229,26 +234,23 @@ internal object AttributeCodec {
             selectiveEraseProtected = isProtected(primary),
             hyperlinkId = hyperlinkId(extended),
         )
-    }
 
-    private fun encodeColorCode(code: Int): Int {
-        return if (code == 0) {
+    private fun encodeColorCode(code: Int): Int =
+        if (code == 0) {
             COLOR_KIND_DEFAULT shl COLOR_KIND_SHIFT
         } else {
             (COLOR_KIND_INDEXED shl COLOR_KIND_SHIFT) or (code - 1)
         }
-    }
 
-    private fun colorFromCode(code: Int): AttributeColor {
-        return if (code == 0) AttributeColor.DEFAULT else AttributeColor.indexed(code - 1)
-    }
+    private fun colorFromCode(code: Int): AttributeColor = if (code == 0) AttributeColor.DEFAULT else AttributeColor.indexed(code - 1)
 
     private fun encodeColor(color: AttributeColor): Int {
-        val kind = when (color.kind) {
-            AttributeColorKind.DEFAULT -> COLOR_KIND_DEFAULT
-            AttributeColorKind.INDEXED -> COLOR_KIND_INDEXED
-            AttributeColorKind.RGB -> COLOR_KIND_RGB
-        }
+        val kind =
+            when (color.kind) {
+                AttributeColorKind.DEFAULT -> COLOR_KIND_DEFAULT
+                AttributeColorKind.INDEXED -> COLOR_KIND_INDEXED
+                AttributeColorKind.RGB -> COLOR_KIND_RGB
+            }
         return (kind shl COLOR_KIND_SHIFT) or color.value
     }
 

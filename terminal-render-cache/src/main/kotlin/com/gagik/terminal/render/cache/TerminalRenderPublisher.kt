@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.render.cache
 
 import com.gagik.terminal.render.api.TerminalRenderFrameReader
@@ -36,12 +35,14 @@ class TerminalRenderPublisher(
     rows: Int,
 ) {
     @PublishedApi internal val buffers = Array(3) { TerminalRenderCache(columns, rows) }
+
     @PublishedApi internal val readerCounts = IntArray(BUFFER_COUNT)
     private val writerOwned = BooleanArray(BUFFER_COUNT)
 
     // Buffer indices, reader counts, and writer leases are mutated under publishLock.
     @PublishedApi internal var frontIndex = NO_FRONT
     private var nextWriteIndex = 0
+
     @PublishedApi internal val publishLock = ReentrantLock()
     private val bufferAvailable = publishLock.newCondition()
 
@@ -62,7 +63,10 @@ class TerminalRenderPublisher(
      * [scrollbackOffset] is caller-owned viewport state in lines above the live
      * bottom viewport. The source reader clamps it before rows are copied.
      */
-    fun updateAndPublish(reader: TerminalRenderFrameReader, scrollbackOffset: Int) {
+    fun updateAndPublish(
+        reader: TerminalRenderFrameReader,
+        scrollbackOffset: Int,
+    ) {
         updateAndPublish(reader, scrollbackOffset, viewportRows = 0)
     }
 
@@ -73,7 +77,11 @@ class TerminalRenderPublisher(
      * does not resize terminal state; the source reader clamps the resolved
      * frame height before rows are copied.
      */
-    fun updateAndPublish(reader: TerminalRenderFrameReader, scrollbackOffset: Int, viewportRows: Int) {
+    fun updateAndPublish(
+        reader: TerminalRenderFrameReader,
+        scrollbackOffset: Int,
+        viewportRows: Int,
+    ) {
         val writeIndex = acquireWritableIndex()
         val back = buffers[writeIndex]
         var published = false
@@ -119,13 +127,14 @@ class TerminalRenderPublisher(
      * @return [block]'s result, or `null` when no frame is available.
      */
     inline fun <T> readCurrent(block: (TerminalRenderCache) -> T): T? {
-        val index = publishLock.withLock {
-            val i = frontIndex
-            if (i != NO_FRONT) {
-                readerCounts[i]++
+        val index =
+            publishLock.withLock {
+                val i = frontIndex
+                if (i != NO_FRONT) {
+                    readerCounts[i]++
+                }
+                i
             }
-            i
-        }
 
         if (index == NO_FRONT) return null
 
@@ -135,7 +144,6 @@ class TerminalRenderPublisher(
             releaseFrontLease(index)
         }
     }
-
 
     private fun acquireWritableIndex(): Int {
         publishLock.withLock {
@@ -178,6 +186,7 @@ class TerminalRenderPublisher(
 
     companion object {
         @PublishedApi internal const val BUFFER_COUNT = 3
+
         @PublishedApi internal const val NO_FRONT = -1
     }
 }

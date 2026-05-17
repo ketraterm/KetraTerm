@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.painter
 
 import com.gagik.terminal.render.api.TerminalRenderAttrs
@@ -47,21 +46,23 @@ class TerminalBackgroundPainterTest {
             val image = BufferedImage(50, 20, BufferedImage.TYPE_INT_ARGB)
             val settings = defaultTestSettings(background = TEST_BLACK)
             val metrics = testMetrics(image, settings)
-            val cache = renderCache(
-                TestRenderFrame(
-                    arrayOf(
+            val cache =
+                renderCache(
+                    TestRenderFrame(
                         arrayOf(
-                            TestCell(attr = TerminalRenderAttrs.DEFAULT),
-                            TestCell(
-                                attr = TerminalRenderAttrs.pack(
-                                    backgroundKind = TerminalRenderColorKind.RGB,
-                                    backgroundValue = 0x0000FF,
+                            arrayOf(
+                                TestCell(attr = TerminalRenderAttrs.DEFAULT),
+                                TestCell(
+                                    attr =
+                                        TerminalRenderAttrs.pack(
+                                            backgroundKind = TerminalRenderColorKind.RGB,
+                                            backgroundValue = 0x0000FF,
+                                        ),
                                 ),
                             ),
                         ),
                     ),
-                ),
-            )
+                )
 
             TerminalBackgroundPainter(AwtColorCache()).paintRow(
                 g = image.createGraphics(),
@@ -80,13 +81,14 @@ class TerminalBackgroundPainterTest {
             val image = BufferedImage(30, 20, BufferedImage.TYPE_INT_ARGB)
             val settings = defaultTestSettings(foreground = TEST_GREEN, background = TEST_BLACK)
             val metrics = testMetrics(image, settings)
-            val cache = renderCache(
-                TestRenderFrame(
-                    arrayOf(
-                        arrayOf(TestCell(attr = TerminalRenderAttrs.pack(inverse = true))),
+            val cache =
+                renderCache(
+                    TestRenderFrame(
+                        arrayOf(
+                            arrayOf(TestCell(attr = TerminalRenderAttrs.pack(inverse = true))),
+                        ),
                     ),
-                ),
-            )
+                )
 
             TerminalBackgroundPainter(AwtColorCache()).paintRow(
                 g = image.createGraphics(),

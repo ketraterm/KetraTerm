@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer
 
 import com.gagik.core.api.TerminalBufferApi
@@ -190,7 +189,8 @@ class TerminalRenderGenerationTest {
         return stateField.get(components) as TerminalState
     }
 
-    private fun lineAt(state: TerminalState, row: Int): Line {
-        return state.ring[state.resolveRingIndex(row)]
-    }
+    private fun lineAt(
+        state: TerminalState,
+        row: Int,
+    ): Line = state.ring[state.resolveRingIndex(row)]
 }

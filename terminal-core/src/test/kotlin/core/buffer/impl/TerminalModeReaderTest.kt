@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.buffer.impl
 
 import com.gagik.core.TerminalBuffers
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalModeReaderTest {
-
     @Test
     fun `exposes stable snapshot`() {
         val buffer = TerminalBuffers.create(width = 4, height = 3, maxHistory = 2)
@@ -46,7 +44,7 @@ class TerminalModeReaderTest {
             { assertFalse(snapshot.treatAmbiguousAsWide) },
             { assertEquals(MouseTrackingMode.OFF, snapshot.mouseTrackingMode) },
             { assertEquals(MouseEncodingMode.DEFAULT, snapshot.mouseEncodingMode) },
-            { assertEquals(0, snapshot.modifyOtherKeysMode) }
+            { assertEquals(0, snapshot.modifyOtherKeysMode) },
         )
     }
 
@@ -93,7 +91,7 @@ class TerminalModeReaderTest {
             { assertEquals(2, after.modifyOtherKeysMode) },
             { assertTrue(after.isReverseVideo) },
             { assertFalse(after.isCursorVisible) },
-            { assertTrue(after.isCursorBlinking) }
+            { assertTrue(after.isCursorBlinking) },
         )
     }
 }

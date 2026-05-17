@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.cache
 
 import com.gagik.terminal.ui.swing.render.font.TerminalSystemFallbackFonts
@@ -51,12 +50,14 @@ internal class TerminalFontCache(
     private val styleFonts = arrayOfNulls<Font>(STYLE_COUNT)
     private var fallbackStyleFonts: Array<Array<Font?>> = emptyArray()
     private var systemStyleFonts: Array<Array<Font?>> = emptyArray()
-    private val resolvedCodePointFonts = Array(STYLE_COUNT) {
-        IntFontLru(codePointFallbackCapacityPerStyle)
-    }
-    private val resolvedTextFonts = Array(STYLE_COUNT) {
-        StringFontLru(textFallbackCapacityPerStyle)
-    }
+    private val resolvedCodePointFonts =
+        Array(STYLE_COUNT) {
+            IntFontLru(codePointFallbackCapacityPerStyle)
+        }
+    private val resolvedTextFonts =
+        Array(STYLE_COUNT) {
+            StringFontLru(textFallbackCapacityPerStyle)
+        }
     private var fontGeneration: Int = 0
 
     /**
@@ -78,7 +79,11 @@ internal class TerminalFontCache(
      * @return `true` if the configuration changed and caches were invalidated;
      * `false` if the provided configuration perfectly matches the current state.
      */
-    fun update(font: Font, fallbackFonts: List<Font>, useSystemFallbackFonts: Boolean): Boolean {
+    fun update(
+        font: Font,
+        fallbackFonts: List<Font>,
+        useSystemFallbackFonts: Boolean,
+    ): Boolean {
         if (
             font == baseFont &&
             fallbackFonts == fallbackBaseFonts &&
@@ -113,9 +118,10 @@ internal class TerminalFontCache(
         val cached = styleFonts[normalizedStyle]
         if (cached != null) return cached
 
-        val font = requireNotNull(baseFont) {
-            "TerminalFontCache.update must be called before font"
-        }.deriveFont(normalizedStyle)
+        val font =
+            requireNotNull(baseFont) {
+                "TerminalFontCache.update must be called before font"
+            }.deriveFont(normalizedStyle)
         styleFonts[normalizedStyle] = font
         return font
     }
@@ -126,7 +132,10 @@ internal class TerminalFontCache(
      * Single code points use a primitive-keyed bounded cache so hostile streams
      * of unique Unicode cells cannot retain unbounded strings.
      */
-    fun fontForCodePoint(codePoint: Int, style: Int): Font {
+    fun fontForCodePoint(
+        codePoint: Int,
+        style: Int,
+    ): Font {
         val normalizedStyle = style and STYLE_MASK
         if (isEmojiPresentationCodePoint(codePoint)) {
             val emojiFont = emojiFontForCodePoint(codePoint, normalizedStyle)
@@ -175,7 +184,10 @@ internal class TerminalFontCache(
      * owns cluster strings for visible cells; this renderer cache must not keep
      * every historical cluster alive for a months-long terminal session.
      */
-    fun fontForText(text: String, style: Int): Font {
+    fun fontForText(
+        text: String,
+        style: Int,
+    ): Font {
         val normalizedStyle = style and STYLE_MASK
         if (containsEmojiPresentation(text)) {
             val emojiFont = emojiFontForText(text, normalizedStyle)
@@ -216,7 +228,10 @@ internal class TerminalFontCache(
         return primary
     }
 
-    private fun emojiFontForCodePoint(codePoint: Int, style: Int): Font? {
+    private fun emojiFontForCodePoint(
+        codePoint: Int,
+        style: Int,
+    ): Font? {
         var index = 0
         while (index < fallbackBaseFonts.size) {
             val fallback = fallbackFont(index, style)
@@ -240,7 +255,10 @@ internal class TerminalFontCache(
         return null
     }
 
-    private fun emojiFontForText(text: String, style: Int): Font? {
+    private fun emojiFontForText(
+        text: String,
+        style: Int,
+    ): Font? {
         var index = 0
         while (index < fallbackBaseFonts.size) {
             val fallback = fallbackFont(index, style)
@@ -304,15 +322,18 @@ internal class TerminalFontCache(
         fontGeneration++
     }
 
-
-    private fun fallbackFont(index: Int, style: Int): Font {
+    private fun fallbackFont(
+        index: Int,
+        style: Int,
+    ): Font {
         val normalizedStyle = style and STYLE_MASK
         val cached = fallbackStyleFonts[index][normalizedStyle]
         if (cached != null) return cached
 
-        val base = requireNotNull(baseFont) {
-            "TerminalFontCache.update must be called before fallbackFont"
-        }
+        val base =
+            requireNotNull(baseFont) {
+                "TerminalFontCache.update must be called before fallbackFont"
+            }
         val fallback = fallbackBaseFonts[index]
         val effectiveStyle = if (isEmojiFontFamily(fallback.family)) Font.PLAIN else normalizedStyle
         val derived = fallback.deriveFont(effectiveStyle, base.size2D)
@@ -320,18 +341,23 @@ internal class TerminalFontCache(
         return derived
     }
 
-    private fun systemFallbackFont(index: Int, style: Int): Font {
+    private fun systemFallbackFont(
+        index: Int,
+        style: Int,
+    ): Font {
         val normalizedStyle = style and STYLE_MASK
         val cached = systemStyleFonts[index][normalizedStyle]
         if (cached != null) return cached
 
-        val base = requireNotNull(baseFont) {
-            "TerminalFontCache.update must be called before systemFallbackFont"
-        }
+        val base =
+            requireNotNull(baseFont) {
+                "TerminalFontCache.update must be called before systemFallbackFont"
+            }
         val family = systemFallbackFamilies[index]
         val effectiveStyle = if (isEmojiFontFamily(family)) Font.PLAIN else normalizedStyle
-        val fallback = Font(family, effectiveStyle, base.size)
-            .deriveFont(base.size2D)
+        val fallback =
+            Font(family, effectiveStyle, base.size)
+                .deriveFont(base.size2D)
         systemStyleFonts[index][normalizedStyle] = fallback
         return fallback
     }
@@ -339,12 +365,13 @@ internal class TerminalFontCache(
     private class StringFontLru(
         private val capacity: Int,
     ) : LinkedHashMap<String, Font>(capacity, LOAD_FACTOR, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Font>?): Boolean {
-            return size > capacity
-        }
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Font>?): Boolean = size > capacity
     }
+
     @Suppress("DuplicatedCode")
-    private class IntFontLru(capacity: Int) {
+    private class IntFontLru(
+        capacity: Int,
+    ) {
         private val entryKeys = IntArray(capacity)
         private val entryFonts = arrayOfNulls<Font>(capacity)
         private val previous = IntArray(capacity) { EMPTY }
@@ -364,7 +391,10 @@ internal class TerminalFontCache(
             return entryFonts[entry]
         }
 
-        fun put(key: Int, font: Font) {
+        fun put(
+            key: Int,
+            font: Font,
+        ) {
             val existing = findEntry(key)
             if (existing != EMPTY) {
                 entryFonts[existing] = font
@@ -372,14 +402,15 @@ internal class TerminalFontCache(
                 return
             }
 
-            val entry = if (size < entryKeys.size) {
-                size++
-            } else {
-                val evicted = tail
-                removeHashEntry(entryKeys[evicted], evicted)
-                unlink(evicted)
-                evicted
-            }
+            val entry =
+                if (size < entryKeys.size) {
+                    size++
+                } else {
+                    val evicted = tail
+                    removeHashEntry(entryKeys[evicted], evicted)
+                    unlink(evicted)
+                    evicted
+                }
 
             entryKeys[entry] = key
             entryFonts[entry] = font
@@ -407,7 +438,10 @@ internal class TerminalFontCache(
             }
         }
 
-        private fun insertHashEntry(key: Int, entry: Int) {
+        private fun insertHashEntry(
+            key: Int,
+            entry: Int,
+        ) {
             var slot = hashSlot(key)
             while (hashEntries[slot] != EMPTY) {
                 slot = (slot + 1) and hashMask
@@ -416,7 +450,10 @@ internal class TerminalFontCache(
             hashEntries[slot] = entry
         }
 
-        private fun removeHashEntry(key: Int, entry: Int) {
+        private fun removeHashEntry(
+            key: Int,
+            entry: Int,
+        ) {
             var slot = hashSlot(key)
             while (true) {
                 if (hashEntries[slot] == entry && hashKeys[slot] == key) {
@@ -505,11 +542,10 @@ internal class TerminalFontCache(
             return false
         }
 
-        private fun isEmojiPresentationCodePoint(codePoint: Int): Boolean {
-            return codePoint in 0x1F000..0x1FAFF ||
+        private fun isEmojiPresentationCodePoint(codePoint: Int): Boolean =
+            codePoint in 0x1F000..0x1FAFF ||
                 codePoint in 0x2600..0x27BF ||
                 codePoint in 0x2B00..0x2BFF
-        }
 
         private fun isEmojiFontFamily(family: String): Boolean {
             val normalized = family.lowercase(Locale.ROOT)

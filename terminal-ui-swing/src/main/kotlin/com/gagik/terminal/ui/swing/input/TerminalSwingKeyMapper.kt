@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.input
 
 import com.gagik.terminal.input.event.TerminalKey
@@ -83,7 +82,10 @@ internal class TerminalSwingKeyMapper {
         return TerminalKeyEvent.codepoint(codepoint, eventModifiersFor(codepoint, eventModifiers))
     }
 
-    private fun typedCodepoint(char: Char, eventModifiers: Int): Int? {
+    private fun typedCodepoint(
+        char: Char,
+        eventModifiers: Int,
+    ): Int? {
         if (char.isHighSurrogate()) {
             pendingHighSurrogate = char
             pendingHighSurrogateModifiers = eventModifiers
@@ -102,7 +104,10 @@ internal class TerminalSwingKeyMapper {
         return char.code
     }
 
-    private fun eventModifiersFor(codepoint: Int, currentModifiers: Int): Int {
+    private fun eventModifiersFor(
+        codepoint: Int,
+        currentModifiers: Int,
+    ): Int {
         if (codepoint <= 0xFFFF) return currentModifiers
 
         val modifiers = pendingHighSurrogateModifiers
@@ -119,76 +124,79 @@ internal class TerminalSwingKeyMapper {
         return modifiers
     }
 
-    private fun terminalKey(keyCode: Int): TerminalKey? = when (keyCode) {
-        KeyEvent.VK_UP -> TerminalKey.UP
-        KeyEvent.VK_DOWN -> TerminalKey.DOWN
-        KeyEvent.VK_LEFT -> TerminalKey.LEFT
-        KeyEvent.VK_RIGHT -> TerminalKey.RIGHT
-        KeyEvent.VK_HOME -> TerminalKey.HOME
-        KeyEvent.VK_END -> TerminalKey.END
-        KeyEvent.VK_PAGE_UP -> TerminalKey.PAGE_UP
-        KeyEvent.VK_PAGE_DOWN -> TerminalKey.PAGE_DOWN
-        KeyEvent.VK_INSERT -> TerminalKey.INSERT
-        KeyEvent.VK_DELETE -> TerminalKey.DELETE
-        KeyEvent.VK_BACK_SPACE -> TerminalKey.BACKSPACE
-        KeyEvent.VK_ENTER -> TerminalKey.ENTER
-        KeyEvent.VK_TAB -> TerminalKey.TAB
-        KeyEvent.VK_ESCAPE -> TerminalKey.ESCAPE
-        KeyEvent.VK_F1 -> TerminalKey.F1
-        KeyEvent.VK_F2 -> TerminalKey.F2
-        KeyEvent.VK_F3 -> TerminalKey.F3
-        KeyEvent.VK_F4 -> TerminalKey.F4
-        KeyEvent.VK_F5 -> TerminalKey.F5
-        KeyEvent.VK_F6 -> TerminalKey.F6
-        KeyEvent.VK_F7 -> TerminalKey.F7
-        KeyEvent.VK_F8 -> TerminalKey.F8
-        KeyEvent.VK_F9 -> TerminalKey.F9
-        KeyEvent.VK_F10 -> TerminalKey.F10
-        KeyEvent.VK_F11 -> TerminalKey.F11
-        KeyEvent.VK_F12 -> TerminalKey.F12
-        KeyEvent.VK_NUMPAD0 -> TerminalKey.NUMPAD_0
-        KeyEvent.VK_NUMPAD1 -> TerminalKey.NUMPAD_1
-        KeyEvent.VK_NUMPAD2 -> TerminalKey.NUMPAD_2
-        KeyEvent.VK_NUMPAD3 -> TerminalKey.NUMPAD_3
-        KeyEvent.VK_NUMPAD4 -> TerminalKey.NUMPAD_4
-        KeyEvent.VK_NUMPAD5 -> TerminalKey.NUMPAD_5
-        KeyEvent.VK_NUMPAD6 -> TerminalKey.NUMPAD_6
-        KeyEvent.VK_NUMPAD7 -> TerminalKey.NUMPAD_7
-        KeyEvent.VK_NUMPAD8 -> TerminalKey.NUMPAD_8
-        KeyEvent.VK_NUMPAD9 -> TerminalKey.NUMPAD_9
-        KeyEvent.VK_DECIMAL -> TerminalKey.NUMPAD_DECIMAL
-        KeyEvent.VK_DIVIDE -> TerminalKey.NUMPAD_DIVIDE
-        KeyEvent.VK_MULTIPLY -> TerminalKey.NUMPAD_MULTIPLY
-        KeyEvent.VK_SUBTRACT -> TerminalKey.NUMPAD_SUBTRACT
-        KeyEvent.VK_ADD -> TerminalKey.NUMPAD_ADD
-        else -> null
-    }
+    private fun terminalKey(keyCode: Int): TerminalKey? =
+        when (keyCode) {
+            KeyEvent.VK_UP -> TerminalKey.UP
+            KeyEvent.VK_DOWN -> TerminalKey.DOWN
+            KeyEvent.VK_LEFT -> TerminalKey.LEFT
+            KeyEvent.VK_RIGHT -> TerminalKey.RIGHT
+            KeyEvent.VK_HOME -> TerminalKey.HOME
+            KeyEvent.VK_END -> TerminalKey.END
+            KeyEvent.VK_PAGE_UP -> TerminalKey.PAGE_UP
+            KeyEvent.VK_PAGE_DOWN -> TerminalKey.PAGE_DOWN
+            KeyEvent.VK_INSERT -> TerminalKey.INSERT
+            KeyEvent.VK_DELETE -> TerminalKey.DELETE
+            KeyEvent.VK_BACK_SPACE -> TerminalKey.BACKSPACE
+            KeyEvent.VK_ENTER -> TerminalKey.ENTER
+            KeyEvent.VK_TAB -> TerminalKey.TAB
+            KeyEvent.VK_ESCAPE -> TerminalKey.ESCAPE
+            KeyEvent.VK_F1 -> TerminalKey.F1
+            KeyEvent.VK_F2 -> TerminalKey.F2
+            KeyEvent.VK_F3 -> TerminalKey.F3
+            KeyEvent.VK_F4 -> TerminalKey.F4
+            KeyEvent.VK_F5 -> TerminalKey.F5
+            KeyEvent.VK_F6 -> TerminalKey.F6
+            KeyEvent.VK_F7 -> TerminalKey.F7
+            KeyEvent.VK_F8 -> TerminalKey.F8
+            KeyEvent.VK_F9 -> TerminalKey.F9
+            KeyEvent.VK_F10 -> TerminalKey.F10
+            KeyEvent.VK_F11 -> TerminalKey.F11
+            KeyEvent.VK_F12 -> TerminalKey.F12
+            KeyEvent.VK_NUMPAD0 -> TerminalKey.NUMPAD_0
+            KeyEvent.VK_NUMPAD1 -> TerminalKey.NUMPAD_1
+            KeyEvent.VK_NUMPAD2 -> TerminalKey.NUMPAD_2
+            KeyEvent.VK_NUMPAD3 -> TerminalKey.NUMPAD_3
+            KeyEvent.VK_NUMPAD4 -> TerminalKey.NUMPAD_4
+            KeyEvent.VK_NUMPAD5 -> TerminalKey.NUMPAD_5
+            KeyEvent.VK_NUMPAD6 -> TerminalKey.NUMPAD_6
+            KeyEvent.VK_NUMPAD7 -> TerminalKey.NUMPAD_7
+            KeyEvent.VK_NUMPAD8 -> TerminalKey.NUMPAD_8
+            KeyEvent.VK_NUMPAD9 -> TerminalKey.NUMPAD_9
+            KeyEvent.VK_DECIMAL -> TerminalKey.NUMPAD_DECIMAL
+            KeyEvent.VK_DIVIDE -> TerminalKey.NUMPAD_DIVIDE
+            KeyEvent.VK_MULTIPLY -> TerminalKey.NUMPAD_MULTIPLY
+            KeyEvent.VK_SUBTRACT -> TerminalKey.NUMPAD_SUBTRACT
+            KeyEvent.VK_ADD -> TerminalKey.NUMPAD_ADD
+            else -> null
+        }
 
-    private fun isPrintableKeypadKey(key: TerminalKey): Boolean = when (key) {
-        TerminalKey.NUMPAD_SPACE,
-        TerminalKey.NUMPAD_TAB,
-        TerminalKey.NUMPAD_DIVIDE,
-        TerminalKey.NUMPAD_MULTIPLY,
-        TerminalKey.NUMPAD_SUBTRACT,
-        TerminalKey.NUMPAD_ADD,
-        TerminalKey.NUMPAD_COMMA,
-        TerminalKey.NUMPAD_SEPARATOR,
-        TerminalKey.NUMPAD_EQUALS,
-        TerminalKey.NUMPAD_BEGIN,
-        TerminalKey.NUMPAD_DECIMAL,
-        TerminalKey.NUMPAD_0,
-        TerminalKey.NUMPAD_1,
-        TerminalKey.NUMPAD_2,
-        TerminalKey.NUMPAD_3,
-        TerminalKey.NUMPAD_4,
-        TerminalKey.NUMPAD_5,
-        TerminalKey.NUMPAD_6,
-        TerminalKey.NUMPAD_7,
-        TerminalKey.NUMPAD_8,
-        TerminalKey.NUMPAD_9 -> true
+    private fun isPrintableKeypadKey(key: TerminalKey): Boolean =
+        when (key) {
+            TerminalKey.NUMPAD_SPACE,
+            TerminalKey.NUMPAD_TAB,
+            TerminalKey.NUMPAD_DIVIDE,
+            TerminalKey.NUMPAD_MULTIPLY,
+            TerminalKey.NUMPAD_SUBTRACT,
+            TerminalKey.NUMPAD_ADD,
+            TerminalKey.NUMPAD_COMMA,
+            TerminalKey.NUMPAD_SEPARATOR,
+            TerminalKey.NUMPAD_EQUALS,
+            TerminalKey.NUMPAD_BEGIN,
+            TerminalKey.NUMPAD_DECIMAL,
+            TerminalKey.NUMPAD_0,
+            TerminalKey.NUMPAD_1,
+            TerminalKey.NUMPAD_2,
+            TerminalKey.NUMPAD_3,
+            TerminalKey.NUMPAD_4,
+            TerminalKey.NUMPAD_5,
+            TerminalKey.NUMPAD_6,
+            TerminalKey.NUMPAD_7,
+            TerminalKey.NUMPAD_8,
+            TerminalKey.NUMPAD_9,
+            -> true
 
-        else -> false
-    }
+            else -> false
+        }
 
     private fun controlShortcutCodepoint(event: KeyEvent): Int? {
         val keyCode = event.keyCode

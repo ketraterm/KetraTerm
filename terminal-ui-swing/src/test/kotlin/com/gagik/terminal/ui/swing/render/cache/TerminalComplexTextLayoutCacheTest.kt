@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.ui.swing.render.cache
 
 import org.junit.jupiter.api.Assertions.*
@@ -23,7 +22,6 @@ import java.awt.Font
 import java.awt.font.FontRenderContext
 
 class TerminalComplexTextLayoutCacheTest {
-
     @Test
     fun `constructor rejects non-positive capacities`() {
         assertThrows<IllegalArgumentException> {
@@ -459,8 +457,7 @@ class TerminalComplexTextLayoutCacheTest {
         return mixed and TEST_HASH_MASK
     }
 
-    private fun Any.declaredField(name: String) =
-        javaClass.getDeclaredField(name).apply { isAccessible = true }
+    private fun Any.declaredField(name: String) = javaClass.getDeclaredField(name).apply { isAccessible = true }
 
     private companion object {
         private const val TEST_HASH_MASK = 63

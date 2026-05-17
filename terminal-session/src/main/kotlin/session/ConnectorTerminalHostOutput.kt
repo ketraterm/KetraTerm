@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.terminal.session
 
 import com.gagik.terminal.protocol.host.TerminalHostOutput
@@ -45,7 +44,11 @@ internal class ConnectorTerminalHostOutput(
         }
     }
 
-    override fun writeBytes(bytes: ByteArray, offset: Int, length: Int) {
+    override fun writeBytes(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {
         require(offset >= 0) { "offset must be non-negative, got $offset" }
         require(length >= 0) { "length must be non-negative, got $length" }
         require(offset <= bytes.size) { "offset $offset exceeds size ${bytes.size}" }
@@ -105,12 +108,13 @@ internal class ConnectorTerminalHostOutput(
                     charIndex++
                 }
 
-                val bytesNeeded = when {
-                    codepoint <= 0x7F -> 1
-                    codepoint <= 0x7FF -> 2
-                    codepoint <= 0xFFFF -> 3
-                    else -> 4
-                }
+                val bytesNeeded =
+                    when {
+                        codepoint <= 0x7F -> 1
+                        codepoint <= 0x7FF -> 2
+                        codepoint <= 0xFFFF -> 3
+                        else -> 4
+                    }
 
                 if (bufferOffset + bytesNeeded > utf8Buffer.size) {
                     connector.write(utf8Buffer, 0, bufferOffset)

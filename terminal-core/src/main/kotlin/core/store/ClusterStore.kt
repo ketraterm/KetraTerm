@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.gagik.core.store
 
 import com.gagik.core.model.TerminalConstants
@@ -53,7 +52,6 @@ import com.gagik.core.store.ClusterStore.Companion.NO_FREE
  * Not thread-safe. All access must be confined to the terminal's write thread.
  */
 internal class ClusterStore {
-
     // Constants
     companion object {
         /** Initial number of cluster slots. Grows by doubling. */
@@ -91,6 +89,7 @@ internal class ClusterStore {
     private var isLive = BooleanArray(INITIAL_SLOT_CAPACITY)
 
     // Flat codepoint pool
+
     /** Contiguous pool of all cluster codepoints from all live slots. */
     private var clusterData = IntArray(INITIAL_DATA_CAPACITY)
 
@@ -120,14 +119,19 @@ internal class ClusterStore {
      * @param length     Number of codepoints to copy. Must be >= 1.
      * @return A negative handle (`<= -2`) encoding the allocated slot.
      */
-    fun alloc(codepoints: IntArray, offset: Int = 0, length: Int = codepoints.size): Int {
+    fun alloc(
+        codepoints: IntArray,
+        offset: Int = 0,
+        length: Int = codepoints.size,
+    ): Int {
         require(length >= 1) { "cluster must have at least 1 codepoint, got $length" }
-        val slot  = acquireSlot()
-        val start = if (slotLengths[slot] >= length) {
-            slotStarts[slot]        // reuse existing data region
-        } else {
-            reserveData(length)     // bump allocate new region
-        }
+        val slot = acquireSlot()
+        val start =
+            if (slotLengths[slot] >= length) {
+                slotStarts[slot] // reuse existing data region
+            } else {
+                reserveData(length) // bump allocate new region
+            }
         System.arraycopy(codepoints, offset, clusterData, start, length)
         slotStarts[slot] = start
         slotLengths[slot] = length
@@ -144,7 +148,7 @@ internal class ClusterStore {
      * @param handle The handle previously returned by [alloc], or any non-cluster value.
      */
     fun free(handle: Int) {
-        if (handle > TerminalConstants.CLUSTER_HANDLE_MAX) return  // EMPTY, codepoint, or SPACER
+        if (handle > TerminalConstants.CLUSTER_HANDLE_MAX) return // EMPTY, codepoint, or SPACER
         val slot = decodeSlot(handle)
         if (!isLive[slot]) {
             throw IllegalStateException("Cluster handle $handle was freed more than once")
@@ -165,7 +169,11 @@ internal class ClusterStore {
      * @param fromIndex Start of the range to sweep (inclusive).
      * @param toIndex   End of the range to sweep (exclusive).
      */
-    fun freeRange(array: IntArray, fromIndex: Int, toIndex: Int) {
+    fun freeRange(
+        array: IntArray,
+        fromIndex: Int,
+        toIndex: Int,
+    ) {
         for (i in fromIndex until toIndex) {
             val v = array[i]
             if (v <= TerminalConstants.CLUSTER_HANDLE_MAX) free(v)
@@ -188,12 +196,15 @@ internal class ClusterStore {
      * @param handle A valid cluster handle returned by [alloc].
      * @param index  Position within the cluster (0-based).
      */
-    fun codepointAt(handle: Int, index: Int): Int {
-        val slot   = decodeSlot(handle)
+    fun codepointAt(
+        handle: Int,
+        index: Int,
+    ): Int {
+        val slot = decodeSlot(handle)
         val length = slotLengths[slot]
         if (index < 0 || index >= length) {
             throw IndexOutOfBoundsException(
-                "index $index out of bounds for cluster of length $length"
+                "index $index out of bounds for cluster of length $length",
             )
         }
         return clusterData[slotStarts[slot] + index]
@@ -219,15 +230,19 @@ internal class ClusterStore {
      * @param handle     A valid cluster handle returned by [alloc].
      * @param dest       Destination array. Must have capacity >= [length(handle)].
      * @param destOffset Starting index in [dest].
-     * @return           Number of codepoints written into [dest].
+     * @return Number of codepoints written into [dest].
      */
-    fun readInto(handle: Int, dest: IntArray, destOffset: Int = 0): Int {
-        val slot   = decodeSlot(handle)
-        val start  = slotStarts[slot]
+    fun readInto(
+        handle: Int,
+        dest: IntArray,
+        destOffset: Int = 0,
+    ): Int {
+        val slot = decodeSlot(handle)
+        val start = slotStarts[slot]
         val length = slotLengths[slot]
         if (destOffset < 0 || destOffset + length > dest.size) {
             throw IndexOutOfBoundsException(
-                "destOffset $destOffset + length $length exceeds dest.size ${dest.size}"
+                "destOffset $destOffset + length $length exceeds dest.size ${dest.size}",
             )
         }
         System.arraycopy(clusterData, start, dest, destOffset, length)
@@ -257,11 +272,11 @@ internal class ClusterStore {
     }
 
     private fun growSlots() {
-        val newCap  = slotStarts.size * 2
-        slotStarts  = slotStarts.copyOf(newCap)
+        val newCap = slotStarts.size * 2
+        slotStarts = slotStarts.copyOf(newCap)
         slotLengths = slotLengths.copyOf(newCap)
-        val grown   = nextFree.copyOf(newCap)
-        isLive      = isLive.copyOf(newCap)
+        val grown = nextFree.copyOf(newCap)
+        isLive = isLive.copyOf(newCap)
         for (i in slotCount until newCap) grown[i] = NO_FREE
         nextFree = grown
     }
