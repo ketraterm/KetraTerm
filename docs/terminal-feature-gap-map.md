@@ -500,19 +500,18 @@ professional emulator needs explicit contracts for it.
 - `TODO(host)`: richer font measurement policy for script/run-level shaping,
   fallback run metrics, and backend painter integrations beyond the current
   Java2D/Swing path.
-- `DONE(host/ui)`: baseline text selection and clipboard integration:
+- `DONE(host/ui)`: baseline and advanced text selection and clipboard integration:
   - mouse drag selection over visible render-cache rows
-  - drag autoscroll at the top/bottom viewport edges requests scrolled
-    render-cache snapshots while extending the visible selection
-  - double-click word selection and triple-click line selection
+  - drag autoscroll at the top/bottom viewport edges with distance-proportional velocity acceleration
+  - double-click smart auto-detecting word, path, and URL selection with full Unicode/CLUSTER support
+  - triple-click line selection
   - selection retention policy while scrolled or when new frames are published
+  - rectangular block selection (via Alt+Drag)
+  - mouse tracking protocol interception (with Shift bypass support)
   - configurable Swing selection overlay color with a soft white default
   - platform clipboard shortcuts copy selected visible text through the Swing
     clipboard abstraction
   - platform paste shortcuts read clipboard text and send a terminal paste event
-- `TODO(host)`: richer text selection behavior, including:
-  - rectangular block selection (e.g., via Alt+Drag)
-  - selection foreground color painting
 - `DONE(render-api/core/cache/session)`: caller-owned scrollback viewport
   offsets can be requested per render-frame read, clamped by core, copied by
   the primitive render cache, and forwarded through session synchronization.

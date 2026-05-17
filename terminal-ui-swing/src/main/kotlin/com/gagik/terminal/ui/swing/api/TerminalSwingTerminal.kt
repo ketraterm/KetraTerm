@@ -1,6 +1,7 @@
 package com.gagik.terminal.ui.swing.api
 
-import com.gagik.terminal.input.event.TerminalPasteEvent
+import com.gagik.terminal.input.event.*
+import com.gagik.terminal.protocol.MouseTrackingMode
 import com.gagik.terminal.render.cache.TerminalRenderCache
 import com.gagik.terminal.session.TerminalSession
 import com.gagik.terminal.ui.swing.input.TerminalSwingKeyMapper
@@ -107,6 +108,10 @@ class TerminalSwingTerminal(
     private val selectionMouseMotionListener = object : MouseMotionAdapter() {
         override fun mouseDragged(event: MouseEvent) {
             handleSelectionMouseDragged(event)
+        }
+
+        override fun mouseMoved(event: MouseEvent) {
+            handleSelectionMouseMoved(event)
         }
     }
 
@@ -302,6 +307,7 @@ class TerminalSwingTerminal(
     }
 
     private fun handleMouseWheel(event: MouseWheelEvent) {
+        if (handleMouseTracking(event, TerminalMouseEventType.WHEEL)) return
         val boundSession = session ?: return
         val historySize = boundSession.publisher.readCurrent { cache -> cache.historySize } ?: return
         if (historySize == 0) return
@@ -323,7 +329,57 @@ class TerminalSwingTerminal(
         event.consume()
     }
 
+    private fun isMouseTrackingIntercepted(event: MouseEvent): Boolean {
+        if (event.isShiftDown) return false
+        val trackingMode = session?.terminal?.getModeSnapshot()?.mouseTrackingMode ?: MouseTrackingMode.OFF
+        return trackingMode != MouseTrackingMode.OFF
+    }
+
+    private fun handleMouseTracking(event: MouseEvent, type: TerminalMouseEventType): Boolean {
+        val boundSession = session ?: return false
+        if (!isMouseTrackingIntercepted(event)) return false
+
+        boundSession.publisher.readCurrent { cache ->
+            val cell = cellAt(event, cache)
+            val column = unpackCellColumn(cell)
+            val row = unpackCellRow(cell)
+
+            val button = if (event is MouseWheelEvent) {
+                if (event.wheelRotation < 0) TerminalMouseButton.WHEEL_UP else TerminalMouseButton.WHEEL_DOWN
+            } else {
+                when {
+                    SwingUtilities.isLeftMouseButton(event) -> TerminalMouseButton.LEFT
+                    SwingUtilities.isMiddleMouseButton(event) -> TerminalMouseButton.MIDDLE
+                    SwingUtilities.isRightMouseButton(event) -> TerminalMouseButton.RIGHT
+                    else -> TerminalMouseButton.NONE
+                }
+            }
+
+            var mods = TerminalModifiers.NONE
+            if (event.isShiftDown) mods = mods or TerminalModifiers.SHIFT
+            if (event.isAltDown) mods = mods or TerminalModifiers.ALT
+            if (event.isControlDown) mods = mods or TerminalModifiers.CTRL
+            if (event.isMetaDown) mods = mods or TerminalModifiers.META
+
+            val mouseEvent = TerminalMouseEvent(
+                column = column,
+                row = row,
+                button = button,
+                type = type,
+                modifiers = mods
+            )
+            boundSession.encodeMouse(mouseEvent)
+        }
+        event.consume()
+        return true
+    }
+
+    private fun handleSelectionMouseMoved(event: MouseEvent) {
+        handleMouseTracking(event, TerminalMouseEventType.MOTION)
+    }
+
     private fun handleSelectionMousePressed(event: MouseEvent) {
+        if (handleMouseTracking(event, TerminalMouseEventType.PRESS)) return
         if (!SwingUtilities.isLeftMouseButton(event)) return
         requestFocusInWindow()
 
@@ -373,6 +429,7 @@ class TerminalSwingTerminal(
     }
 
     private fun handleSelectionMouseDragged(event: MouseEvent) {
+        if (handleMouseTracking(event, TerminalMouseEventType.MOTION)) return
         if (event.modifiersEx and MouseEvent.BUTTON1_DOWN_MASK == 0) return
 
         selectingWithMouse = true
@@ -500,6 +557,7 @@ class TerminalSwingTerminal(
     }
 
     private fun handleSelectionMouseReleased(event: MouseEvent) {
+        if (handleMouseTracking(event, TerminalMouseEventType.RELEASE)) return
         if (SwingUtilities.isLeftMouseButton(event)) {
             stopSelectionDrag()
             event.consume()
