@@ -61,6 +61,12 @@ internal class CoreTerminalRenderFrame(
             return resolvedScrollbackOffset
         }
 
+    override val discardedCount: Long
+        get() {
+            checkValid()
+            return state.ring.discardedCount
+        }
+
     override val frameGeneration: Long
         get() {
             checkValid()

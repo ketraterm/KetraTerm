@@ -32,6 +32,12 @@ interface TerminalRenderFrame {
         get() = 0
 
     /**
+     * Number of history lines discarded due to ring buffer capacity wrapping.
+     */
+    val discardedCount: Long
+        get() = 0L
+
+    /**
      * Monotonic generation that changes on any visually relevant mutation.
      *
      * Consumers can use this as a cheap "anything changed?" check. Callers must

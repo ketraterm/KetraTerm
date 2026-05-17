@@ -16,7 +16,7 @@ internal class TerminalSelectionTextExtractor {
         var row = selection.startRow.coerceAtLeast(0)
         val lastRow = selection.endRow.coerceAtMost(cache.rows - 1)
         while (row <= lastRow) {
-            val range = selection.packedColumnRange(row, cache.columns)
+            val range = selection.packedColumnRange(row, cache.columns, cache)
             if (range != CellSelection.NO_RANGE) {
                 if (result.isNotEmpty()) result.append('\n')
                 appendTrimmedRow(
@@ -38,6 +38,39 @@ internal class TerminalSelectionTextExtractor {
         val rowOffset = cache.rowOffset(row)
         val flagsPlane = cache.flags
         val codeWords = cache.codeWords
+
+        // 1. Expand with the wide path/URL character set
+        var pathStart = column
+        while (pathStart > 0) {
+            val idx = rowOffset + pathStart - 1
+            if (!isPathChar(flagsPlane[idx], codeWords[idx])) break
+            pathStart--
+        }
+
+        var pathEnd = column + 1
+        while (pathEnd < cache.columns) {
+            val idx = rowOffset + pathEnd
+            if (!isPathChar(flagsPlane[idx], codeWords[idx])) break
+            pathEnd++
+        }
+
+        // Check if the expanded path contains any path-defining characters
+        var hasPathIndicator = false
+        var col = pathStart
+        while (col < pathEnd) {
+            val charVal = codeWords[rowOffset + col].toChar()
+            if (charVal == '/' || charVal == '\\' || charVal == '.' || charVal == ':') {
+                hasPathIndicator = true
+                break
+            }
+            col++
+        }
+
+        if (hasPathIndicator) {
+            return CellSelection(pathStart, row, pathEnd, row)
+        }
+
+        // 2. Otherwise, fall back to standard word selection (letters, digits, underscore)
         val clickedIndex = rowOffset + column
         val clickedKind = wordKind(flagsPlane[clickedIndex], codeWords[clickedIndex])
 
@@ -114,9 +147,20 @@ internal class TerminalSelectionTextExtractor {
         }
     }
 
+    private fun isPathChar(flags: Int, codeWord: Int): Boolean {
+        if (flags and (TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.CLUSTER) == 0) return false
+        if (flags and TerminalRenderCellFlags.CLUSTER != 0) return true
+        if (Character.isLetterOrDigit(codeWord)) return true
+        return when (codeWord.toChar()) {
+            '_', '-', '/', '\\', '.', ':', '~', '?', '&', '=', '%', '+', '@', '$', '*' -> true
+            else -> false
+        }
+    }
+
     private fun wordKind(flags: Int, codeWord: Int): Int {
-        if (flags and TerminalRenderCellFlags.CODEPOINT == 0) return WORD_KIND_SPACE
-        if (Character.isLetterOrDigit(codeWord) || codeWord == UNDERSCORE_CODEPOINT) {
+        if (flags and (TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.CLUSTER) == 0) return WORD_KIND_SPACE
+        if (flags and TerminalRenderCellFlags.CLUSTER != 0) return WORD_KIND_WORD
+        if (Character.isLetterOrDigit(codeWord) || codeWord == '_'.code) {
             return WORD_KIND_WORD
         }
         if (Character.isWhitespace(codeWord)) return WORD_KIND_SPACE
@@ -125,7 +169,6 @@ internal class TerminalSelectionTextExtractor {
 
     private companion object {
         private const val INITIAL_ROW_CAPACITY = 256
-        private const val UNDERSCORE_CODEPOINT = '_'.code
         private const val WORD_KIND_SPACE = 0
         private const val WORD_KIND_WORD = 1
         private const val WORD_KIND_PUNCTUATION_BASE = 2

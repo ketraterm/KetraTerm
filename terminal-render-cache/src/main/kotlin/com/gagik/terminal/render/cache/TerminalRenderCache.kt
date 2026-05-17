@@ -43,6 +43,12 @@ class TerminalRenderCache(
         private set
 
     /**
+     * History lines discarded due to capacity wrapping since initialization.
+     */
+    var discardedCount: Long = 0L
+        private set
+
+    /**
      * Copied code words in row-major order. See [TerminalRenderFrame.copyLine].
      */
     var codeWords: IntArray = IntArray(0)
@@ -359,6 +365,7 @@ class TerminalRenderCache(
         this.scrollbackOffset = frame.scrollbackOffset
         frameGeneration = frame.frameGeneration
         structureGeneration = frame.structureGeneration
+        discardedCount = frame.discardedCount
     }
 
     private fun resizeStorage(newColumns: Int, newRows: Int) {
@@ -394,6 +401,7 @@ class TerminalRenderCache(
         cursorGeneration = UNINITIALIZED_GENERATION
         historySize = 0
         scrollbackOffset = 0
+        discardedCount = 0L
         frameGeneration = UNINITIALIZED_GENERATION
         structureGeneration = UNINITIALIZED_GENERATION
         activeBuffer = TerminalRenderBufferKind.PRIMARY

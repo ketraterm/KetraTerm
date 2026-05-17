@@ -22,7 +22,7 @@ internal class TerminalSelectionPainter(
     ) {
         if (selection == null) return
 
-        val range = selection.packedColumnRange(row, cache.columns)
+        val range = selection.packedColumnRange(row, cache.columns, cache)
         if (range == CellSelection.NO_RANGE) return
 
         val startColumn = CellSelection.rangeStart(range)

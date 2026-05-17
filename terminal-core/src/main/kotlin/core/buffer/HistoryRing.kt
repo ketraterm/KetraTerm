@@ -20,6 +20,12 @@ internal class HistoryRing(
         private set
 
     /**
+     * Total number of history lines discarded due to capacity wrapping.
+     */
+    var discardedCount: Long = 0L
+        private set
+
+    /**
      * Gets the Line at the specified logical index (0 = oldest, size-1 = newest).
      */
     operator fun get(i: Int): Line {
@@ -39,6 +45,7 @@ internal class HistoryRing(
         } else {
             val recycled = data[head]
             head = (head + 1) % capacity
+            discardedCount++
             recycled
         }
     }
@@ -78,5 +85,6 @@ internal class HistoryRing(
     fun clear() {
         head = 0
         size = 0
+        discardedCount = 0L
     }
 }
