@@ -114,6 +114,18 @@ class TerminalSession(
     }
 
     /**
+     * Applies the host's East Asian Ambiguous width policy for future writes.
+     *
+     * Existing stored content keeps its current cell shape; changing this
+     * setting does not reinterpret already-written rows.
+     */
+    fun setTreatAmbiguousAsWide(enabled: Boolean) {
+        synchronized(mutationLock) {
+            terminal.setTreatAmbiguousAsWide(enabled)
+        }
+    }
+
+    /**
      * Encodes a key event and writes it to the connector unless closed.
      *
      * Input before [start] is ignored.

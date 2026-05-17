@@ -188,6 +188,23 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `ambiguous width policy applies to future host writes`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector, columns = 6, rows = 2)
+
+        session.setTreatAmbiguousAsWide(true)
+        connector.feedFromHost("\u20ACX".toByteArray(StandardCharsets.UTF_8))
+
+        assertAll(
+            { assertEquals(0x20AC, session.terminal.getCodepointAt(0, 0)) },
+            { assertEquals(-1, session.terminal.getCodepointAt(1, 0)) },
+            { assertEquals('X'.code, session.terminal.getCodepointAt(2, 0)) },
+            { assertTrue(session.terminal.getModeSnapshot().treatAmbiguousAsWide) },
+        )
+        session.close()
+    }
+
+    @Test
     fun `bytes are consumed synchronously before callback returns`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)

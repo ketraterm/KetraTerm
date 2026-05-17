@@ -198,6 +198,7 @@ class TerminalSwingTerminal(
     private fun bindOnEdt(session: TerminalSession) {
         this.session?.onDirty = null
         this.session = session
+        applySettingsToSession(session, settings)
         session.onDirty = {
             schedulePublishedFrame()
         }
@@ -230,9 +231,14 @@ class TerminalSwingTerminal(
         metrics = buildMetrics(settings)
         preferredSize = preferredGridSize(settings.columns, settings.rows)
         cursorTimer.delay = settings.cursorBlinkMillis
+        session?.let { applySettingsToSession(it, settings) }
         resizeSessionToVisibleGridOnEdt()
         revalidate()
         repaint()
+    }
+
+    private fun applySettingsToSession(session: TerminalSession, settings: TerminalSwingSettings) {
+        session.setTreatAmbiguousAsWide(settings.treatAmbiguousAsWide)
     }
 
     private fun handleMouseWheel(event: MouseWheelEvent) {

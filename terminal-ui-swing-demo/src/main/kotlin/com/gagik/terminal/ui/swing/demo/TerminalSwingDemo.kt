@@ -48,7 +48,7 @@ private object TerminalSwingDemo {
         val menuBar = javax.swing.JMenuBar()
         val themeMenu = javax.swing.JMenu("Themes")
         
-        TerminalTheme.values().forEach { theme ->
+        TerminalTheme.entries.forEach { theme ->
             val themeDisplayName = theme.name.lowercase().split("_").joinToString(" ") { 
                 it.replaceFirstChar { c -> if (c.isLowerCase()) c.titlecase() else c.toString() } 
             }
@@ -64,6 +64,19 @@ private object TerminalSwingDemo {
             themeMenu.add(menuItem)
         }
         menuBar.add(themeMenu)
+        val widthMenu = javax.swing.JMenu("Width")
+        val ambiguousWidthItem = javax.swing.JCheckBoxMenuItem(
+            "Ambiguous as wide",
+            currentSettings.treatAmbiguousAsWide,
+        )
+        ambiguousWidthItem.addActionListener {
+            currentSettings = currentSettings.copy(
+                treatAmbiguousAsWide = ambiguousWidthItem.isSelected,
+            )
+            terminal.reloadSettings()
+        }
+        widthMenu.add(ambiguousWidthItem)
+        menuBar.add(widthMenu)
         frame.jMenuBar = menuBar
         val listener = DemoPtyEventListener(frame)
 
@@ -73,6 +86,7 @@ private object TerminalSwingDemo {
                     command = command,
                     columns = INITIAL_COLUMNS,
                     rows = INITIAL_ROWS,
+                    treatAmbiguousAsWide = currentSettings.treatAmbiguousAsWide,
                     eventListener = listener,
                 ),
             )

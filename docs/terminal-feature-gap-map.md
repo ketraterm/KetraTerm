@@ -467,8 +467,10 @@ professional emulator needs explicit contracts for it.
 - `DONE(host/ui)`: native platform emoji presentation has a Windows
   `Segoe UI Emoji` COLR/CPAL rasterizer for platform color glyphs, with a
   Java2D fallback when native color glyph data is unavailable.
-- `TODO(host)`: double-width glyph display and ambiguous width presentation
-  must match core width decisions.
+- `DONE(host/session/ui)`: East Asian Ambiguous width policy is host
+  configurable through Swing settings, applied through the session mutation
+  lock, and can be supplied to PTY startup before host output is parsed.
+- `TODO(host)`: double-width glyph display must match core width decisions.
 - `TODO(host)`: text selection and clipboard integration, including:
   - double-click word selection and triple-click line selection
   - rectangular block selection (e.g., via Alt+Drag)

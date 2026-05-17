@@ -36,6 +36,7 @@ object TerminalPtySessions {
             height = options.rows,
             maxHistory = options.maxHistory,
         )
+        terminal.setTreatAmbiguousAsWide(options.treatAmbiguousAsWide)
         val hostEventBridge = SessionHostEventBridge(options.eventListener)
         val session = TerminalSession.create(
             terminal = terminal,

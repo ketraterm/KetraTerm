@@ -74,6 +74,29 @@ class TerminalPtySessionTest {
     }
 
     @Test
+    fun `ambiguous width option is applied before pty output is parsed`() {
+        val process = FakeTerminalProcess(inputBytes = "\u20ACX".toByteArray(StandardCharsets.UTF_8))
+        val session = TerminalPtySessions.start(
+            options = TerminalPtyOptions(
+                command = listOf("fake"),
+                columns = 6,
+                rows = 2,
+                treatAmbiguousAsWide = true,
+            ),
+            processFactory = FixedProcessFactory(process),
+        )
+
+        waitUntil { session.terminal.getCodepointAt(2, 0) == 'X'.code }
+
+        assertAll(
+            { assertEquals(0x20AC, session.terminal.getCodepointAt(0, 0)) },
+            { assertEquals(-1, session.terminal.getCodepointAt(1, 0)) },
+            { assertEquals('X'.code, session.terminal.getCodepointAt(2, 0)) },
+            { assertTrue(session.terminal.getModeSnapshot().treatAmbiguousAsWide) },
+        )
+    }
+
+    @Test
     fun `close destroys process and does not fake an exit code`() {
         val process = FakeTerminalProcess.running()
         val session = TerminalPtySessions.start(
@@ -176,12 +199,11 @@ class TerminalPtySessionTest {
         override val input: InputStream,
         private val inputDrained: CountDownLatch?,
         private val exitCode: Int,
-        marker: Unit,
     ) : TerminalProcess {
         constructor(
             inputBytes: ByteArray,
             exitCode: Int = 0,
-        ) : this(DrainingByteArrayInputStream(inputBytes), null, exitCode, Unit)
+        ) : this(DrainingByteArrayInputStream(inputBytes), null, exitCode)
 
         private val capturedOutput = ByteArrayOutputStream()
         override val output: OutputStream = capturedOutput
@@ -215,7 +237,7 @@ class TerminalPtySessionTest {
         companion object {
             fun running(exitCode: Int = 0): FakeTerminalProcess {
                 val input = BlockingInputStream()
-                return FakeTerminalProcess(input, input.released, exitCode, Unit)
+                return FakeTerminalProcess(input, input.released, exitCode)
             }
         }
     }

@@ -41,6 +41,7 @@ class TerminalSwingSettingsTest {
         assertEquals(RenderingHints.VALUE_FRACTIONALMETRICS_OFF, settings.fractionalMetrics)
         assertTrue(settings.fallbackFonts.isNotEmpty())
         assertEquals(false, settings.useSystemFallbackFonts)
+        assertEquals(false, settings.treatAmbiguousAsWide)
     }
 
     @Test

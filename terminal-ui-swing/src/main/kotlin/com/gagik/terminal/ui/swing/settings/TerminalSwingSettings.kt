@@ -17,6 +17,8 @@ import java.util.*
  * @property palette resolved terminal color palette.
  * @property columns initial preferred column count.
  * @property rows initial preferred row count.
+ * @property treatAmbiguousAsWide whether future East Asian Ambiguous
+ * codepoints should occupy two terminal cells in core width policy.
  * @property cursorBlinkMillis cursor blink period in milliseconds.
  * @property textAntialiasing text antialiasing hint used during painting.
  * @property fractionalMetrics fractional font metrics hint used during painting.
@@ -35,6 +37,7 @@ data class TerminalSwingSettings(
     val palette: TerminalColorPalette = theme.createPalette(),
     val columns: Int = 80,
     val rows: Int = 24,
+    val treatAmbiguousAsWide: Boolean = false,
     val cursorBlinkMillis: Int = 600,
     val textAntialiasing: Any = RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB,
     val fractionalMetrics: Any = RenderingHints.VALUE_FRACTIONALMETRICS_OFF,

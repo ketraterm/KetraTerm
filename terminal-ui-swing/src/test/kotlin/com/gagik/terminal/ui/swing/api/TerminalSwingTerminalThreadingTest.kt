@@ -180,6 +180,40 @@ class TerminalSwingTerminalThreadingTest {
     }
 
     @Test
+    fun `bind applies ambiguous width setting to session core`() {
+        val session = testSession()
+        val component = TerminalSwingTerminal {
+            TerminalSwingSettings(treatAmbiguousAsWide = true)
+        }
+
+        component.bind(session)
+        drainEdt()
+
+        assertTrue(session.terminal.getModeSnapshot().treatAmbiguousAsWide)
+        session.close()
+    }
+
+    @Test
+    fun `reloadSettings updates ambiguous width setting on bound session`() {
+        val session = testSession()
+        var ambiguousAsWide = false
+        val component = TerminalSwingTerminal {
+            TerminalSwingSettings(treatAmbiguousAsWide = ambiguousAsWide)
+        }
+
+        component.bind(session)
+        drainEdt()
+        assertFalse(session.terminal.getModeSnapshot().treatAmbiguousAsWide)
+
+        ambiguousAsWide = true
+        component.reloadSettings()
+        drainEdt()
+
+        assertTrue(session.terminal.getModeSnapshot().treatAmbiguousAsWide)
+        session.close()
+    }
+
+    @Test
     fun `component resize updates session only when visible grid changes`() {
         val connector = RecordingConnector()
         val session = testSession(connector)

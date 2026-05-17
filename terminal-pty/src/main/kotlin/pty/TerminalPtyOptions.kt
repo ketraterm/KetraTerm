@@ -12,6 +12,8 @@ import java.nio.file.Path
  * PTY4J use its platform default.
  * @param columns initial terminal width in cells.
  * @param rows initial terminal height in rows.
+ * @param treatAmbiguousAsWide whether East Asian Ambiguous codepoints occupy
+ * two cells in the core width policy for future writes.
  * @param maxHistory maximum scrollback lines retained by the core buffer.
  * @param readBufferSize buffer size used by the PTY stdout reader thread.
  * @param readerThreadName name for the daemon PTY stdout reader thread.
@@ -25,6 +27,7 @@ data class TerminalPtyOptions(
     val workingDirectory: Path? = Path.of(System.getProperty("user.home")),
     val columns: Int = 80,
     val rows: Int = 24,
+    val treatAmbiguousAsWide: Boolean = false,
     val maxHistory: Int = 1000,
     val readBufferSize: Int = 8192,
     val readerThreadName: String = "terminal-pty-reader",
