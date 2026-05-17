@@ -325,7 +325,6 @@ internal class TerminalBoxDrawingPainter {
     }
 
     private fun doubleOffset(w: Double, h: Double): Double = maxOf(2.0, minOf(w, h) / 5.0)
-    private fun dashUnits(dashCount: Int): Int = maxOf(1, dashCount * 2 - 1)
 
     private companion object {
         private const val KAPPA = 0.552284749831
