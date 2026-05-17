@@ -33,6 +33,7 @@ internal class TerminalComplexTextLayoutCache(
         ClusterTextLayoutLru(clusterCapacityPerStyle)
     }
     private var stringClusterScratch = IntArray(MAX_CLUSTER_LENGTH)
+    private var sanitizedClusterScratch = IntArray(MAX_CLUSTER_LENGTH)
     private var fontRenderContext: FontRenderContext? = null
     private var fontGeneration: Int = -1
 
@@ -69,15 +70,16 @@ internal class TerminalComplexTextLayoutCache(
         fontCache.refreshSystemFallbackFonts()
         prepare(fontRenderContext, fontCache.generation)
 
+        val safeCodePoint = unicodeScalarOrReplacement(codePoint)
         val normalizedStyle = style and STYLE_MASK
-        val key = codePointKey(codePoint, normalizedStyle)
+        val key = codePointKey(safeCodePoint, normalizedStyle)
         val cached = codePointLayouts[key]
         if (cached != null) return cached
 
         // Convert the code point directly to a transient char array on cache misses to minimize
         // object lifecycle footprints prior to layout shaping.
-        val text = String(Character.toChars(codePoint))
-        val layout = TextLayout(text, fontCache.fontForCodePoint(codePoint, normalizedStyle), fontRenderContext)
+        val text = String(Character.toChars(safeCodePoint))
+        val layout = TextLayout(text, fontCache.fontForCodePoint(safeCodePoint, normalizedStyle), fontRenderContext)
         codePointLayouts.put(key, layout)
         return layout
     }
@@ -120,17 +122,23 @@ internal class TerminalComplexTextLayoutCache(
 
         val normalizedStyle = style and STYLE_MASK
         val styleLayouts = clusterLayouts[normalizedStyle]
+        val safeCodepoints = if (hasOnlyUnicodeScalars(codepoints, offset, shapedLength)) {
+            codepoints
+        } else {
+            sanitizeCluster(codepoints, offset, shapedLength)
+        }
+        val safeOffset = if (safeCodepoints === codepoints) offset else 0
 
-        val hash = styleLayouts.contentHash(codepoints, offset, shapedLength)
-        val cached = styleLayouts.get(codepoints, offset, shapedLength, hash)
+        val hash = styleLayouts.contentHash(safeCodepoints, safeOffset, shapedLength)
+        val cached = styleLayouts.get(safeCodepoints, safeOffset, shapedLength, hash)
         if (cached != null) return cached
 
         // TextLayout and Font.canDisplayUpTo require text objects. Construct
         // them only on cache misses; repeated paint passes compare primitive
         // codepoint slices directly.
-        val text = String(codepoints, offset, shapedLength)
+        val text = String(safeCodepoints, safeOffset, shapedLength)
         val layout = TextLayout(text, fontCache.fontForText(text, normalizedStyle), fontRenderContext)
-        styleLayouts.put(codepoints, offset, shapedLength, hash, layout)
+        styleLayouts.put(safeCodepoints, safeOffset, shapedLength, hash, layout)
         return layout
     }
 
@@ -174,6 +182,27 @@ internal class TerminalComplexTextLayoutCache(
             charIndex += Character.charCount(codePoint)
         }
         return required
+    }
+
+    private fun hasOnlyUnicodeScalars(codepoints: IntArray, offset: Int, length: Int): Boolean {
+        var index = 0
+        while (index < length) {
+            if (!isUnicodeScalar(codepoints[offset + index])) return false
+            index++
+        }
+        return true
+    }
+
+    private fun sanitizeCluster(codepoints: IntArray, offset: Int, length: Int): IntArray {
+        if (sanitizedClusterScratch.size < length) {
+            sanitizedClusterScratch = IntArray(length)
+        }
+        var index = 0
+        while (index < length) {
+            sanitizedClusterScratch[index] = unicodeScalarOrReplacement(codepoints[offset + index])
+            index++
+        }
+        return sanitizedClusterScratch
     }
 
     /**
@@ -557,6 +586,16 @@ internal class TerminalComplexTextLayoutCache(
         @JvmStatic
         private fun codePointKey(codePoint: Int, style: Int): Long {
             return (style.toLong() shl 32) or (codePoint.toLong() and 0xFFFF_FFFFL)
+        }
+
+        @JvmStatic
+        private fun unicodeScalarOrReplacement(codePoint: Int): Int {
+            return if (isUnicodeScalar(codePoint)) codePoint else REPLACEMENT_CODE_POINT
+        }
+
+        @JvmStatic
+        private fun isUnicodeScalar(codePoint: Int): Boolean {
+            return codePoint in 0..0x10FFFF && codePoint !in 0xD800..0xDFFF
         }
 
         @JvmStatic

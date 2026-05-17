@@ -181,6 +181,25 @@ class TerminalTextPainterTest {
         }
 
         @Test
+        fun `paints astral unicode scalar as one terminal cell`() {
+            // Arrange
+            val fixture = fixture(width = 80)
+            val text = String(Character.toChars(ASTRAL_SMILE_CODE_POINT))
+            val cache = renderCache(TestRenderFrame.text(text))
+
+            // Act
+            fixture.paintRow(cache)
+
+            // Assert
+            assertEquals(1, cache.columns)
+            assertEquals(ASTRAL_SMILE_CODE_POINT, cache.codeWords[0])
+            assertTrue(
+                fixture.image.containsPaintedPixelInRange(0, fixture.metrics.cellWidth, 0, fixture.metrics.cellHeight),
+                "Astral-plane scalar failed to render",
+            )
+        }
+
+        @Test
         fun `paints grapheme cluster sourced from cluster sink`() {
             // Arrange
             val fixture = fixture()
@@ -206,6 +225,36 @@ class TerminalTextPainterTest {
             assertTrue(
                 fixture.image.containsColor(TEST_RED, fixture.metrics.cellWidth, fixture.metrics.cellHeight),
                 "Grapheme cluster failed to render"
+            )
+        }
+
+        @Test
+        fun `paints astral grapheme cluster sourced from primitive cluster data`() {
+            // Arrange
+            val fixture = fixture(width = 80)
+            val cluster = String(Character.toChars(ASTRAL_SMILE_CODE_POINT)) + "\uFE0F"
+            val cache = renderCache(
+                TestRenderFrame(
+                    arrayOf(
+                        arrayOf(
+                            TestCell(
+                                flags = TerminalRenderCellFlags.CLUSTER,
+                                attr = TerminalRenderAttrs.DEFAULT,
+                                cluster = cluster,
+                            ),
+                        ),
+                    ),
+                ),
+            )
+
+            // Act
+            fixture.paintRow(cache)
+
+            // Assert
+            assertEquals(cluster, cache.clusterText(row = 0, column = 0))
+            assertTrue(
+                fixture.image.containsPaintedPixelInRange(0, fixture.metrics.cellWidth, 0, fixture.metrics.cellHeight),
+                "Astral grapheme cluster failed to render",
             )
         }
 
@@ -403,5 +452,9 @@ class TerminalTextPainterTest {
         )
         g.dispose()
         return image
+    }
+
+    private companion object {
+        private const val ASTRAL_SMILE_CODE_POINT = 0x1F642
     }
 }

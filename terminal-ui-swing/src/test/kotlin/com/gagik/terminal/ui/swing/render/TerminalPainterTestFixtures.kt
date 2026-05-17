@@ -71,6 +71,24 @@ internal fun BufferedImage.containsColorInRange(argb: Int, xStart: Int, xEnd: In
     return false
 }
 
+internal fun BufferedImage.containsPaintedPixelInRange(
+    xStart: Int,
+    xEnd: Int,
+    yStart: Int = 0,
+    yEnd: Int = height,
+): Boolean {
+    var y = yStart
+    while (y < yEnd) {
+        var x = xStart
+        while (x < xEnd) {
+            if ((getRGB(x, y) ushr 24) != 0) return true
+            x++
+        }
+        y++
+    }
+    return false
+}
+
 internal fun BufferedImage.countColorInRange(
     argb: Int,
     xStart: Int,
@@ -181,12 +199,23 @@ internal class TestRenderFrame(
         fun text(
             text: String,
             cursorVisible: Boolean = false,
-            attrs: LongArray = LongArray(text.length) { TerminalRenderAttrs.DEFAULT },
-            extraAttrs: LongArray = LongArray(text.length) { TerminalRenderExtraAttrs.DEFAULT },
+            attrs: LongArray = LongArray(text.codePointCount(0, text.length)) { TerminalRenderAttrs.DEFAULT },
+            extraAttrs: LongArray = LongArray(text.codePointCount(0, text.length)) { TerminalRenderExtraAttrs.DEFAULT },
         ): TestRenderFrame {
-            val row = Array(text.length) { column ->
+            val codePointCount = text.codePointCount(0, text.length)
+            require(attrs.size == codePointCount) {
+                "attrs size must match text code point count: attrs=${attrs.size}, codePoints=$codePointCount"
+            }
+            require(extraAttrs.size == codePointCount) {
+                "extraAttrs size must match text code point count: extraAttrs=${extraAttrs.size}, codePoints=$codePointCount"
+            }
+
+            var charIndex = 0
+            val row = Array(codePointCount) { column ->
+                val codePoint = text.codePointAt(charIndex)
+                charIndex += Character.charCount(codePoint)
                 TestCell(
-                    codeWord = text[column].code,
+                    codeWord = codePoint,
                     flags = TerminalRenderCellFlags.CODEPOINT,
                     attr = attrs[column],
                     extraAttr = extraAttrs[column],

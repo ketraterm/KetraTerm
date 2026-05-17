@@ -112,6 +112,11 @@ internal class TerminalFontCache(
      */
     fun fontForCodePoint(codePoint: Int, style: Int): Font {
         val normalizedStyle = style and STYLE_MASK
+        if (isEmojiPresentationCodePoint(codePoint)) {
+            val emojiFont = emojiFontForCodePoint(codePoint, normalizedStyle)
+            if (emojiFont != null) return emojiFont
+        }
+
         val primary = font(normalizedStyle)
         if (primary.canDisplay(codePoint)) return primary
 
@@ -156,6 +161,11 @@ internal class TerminalFontCache(
      */
     fun fontForText(text: String, style: Int): Font {
         val normalizedStyle = style and STYLE_MASK
+        if (containsEmojiPresentation(text)) {
+            val emojiFont = emojiFontForText(text, normalizedStyle)
+            if (emojiFont != null) return emojiFont
+        }
+
         val primary = font(normalizedStyle)
         if (primary.canDisplayUpTo(text) < 0) return primary
 
@@ -188,6 +198,54 @@ internal class TerminalFontCache(
 
         styleResolvedTextFonts[text] = primary
         return primary
+    }
+
+    private fun emojiFontForCodePoint(codePoint: Int, style: Int): Font? {
+        var index = 0
+        while (index < fallbackBaseFonts.size) {
+            val fallback = fallbackFont(index, style)
+            if (isEmojiFontFamily(fallback.family) && fallback.canDisplay(codePoint)) {
+                return fallback
+            }
+            index++
+        }
+
+        if (useSystemFallbackFonts) {
+            refreshSystemFallbackFonts()
+            index = 0
+            while (index < systemFallbackFamilies.size) {
+                if (isEmojiFontFamily(systemFallbackFamilies[index])) {
+                    val fallback = systemFallbackFont(index, style)
+                    if (fallback.canDisplay(codePoint)) return fallback
+                }
+                index++
+            }
+        }
+        return null
+    }
+
+    private fun emojiFontForText(text: String, style: Int): Font? {
+        var index = 0
+        while (index < fallbackBaseFonts.size) {
+            val fallback = fallbackFont(index, style)
+            if (isEmojiFontFamily(fallback.family) && fallback.canDisplayUpTo(text) < 0) {
+                return fallback
+            }
+            index++
+        }
+
+        if (useSystemFallbackFonts) {
+            refreshSystemFallbackFonts()
+            index = 0
+            while (index < systemFallbackFamilies.size) {
+                if (isEmojiFontFamily(systemFallbackFamilies[index])) {
+                    val fallback = systemFallbackFont(index, style)
+                    if (fallback.canDisplayUpTo(text) < 0) return fallback
+                }
+                index++
+            }
+        }
+        return null
     }
 
     /**
@@ -240,9 +298,10 @@ internal class TerminalFontCache(
             "TerminalFontCache.update must be called before fallbackFont"
         }
         val fallback = fallbackBaseFonts[index]
-            .deriveFont(normalizedStyle, base.size2D)
-        fallbackStyleFonts[index][normalizedStyle] = fallback
-        return fallback
+        val effectiveStyle = if (isEmojiFontFamily(fallback.family)) Font.PLAIN else normalizedStyle
+        val derived = fallback.deriveFont(effectiveStyle, base.size2D)
+        fallbackStyleFonts[index][normalizedStyle] = derived
+        return derived
     }
 
     private fun systemFallbackFont(index: Int, style: Int): Font {
@@ -253,7 +312,9 @@ internal class TerminalFontCache(
         val base = requireNotNull(baseFont) {
             "TerminalFontCache.update must be called before systemFallbackFont"
         }
-        val fallback = Font(systemFallbackFamilies[index], normalizedStyle, base.size)
+        val family = systemFallbackFamilies[index]
+        val effectiveStyle = if (isEmojiFontFamily(family)) Font.PLAIN else normalizedStyle
+        val fallback = Font(family, effectiveStyle, base.size)
             .deriveFont(base.size2D)
         systemStyleFonts[index][normalizedStyle] = fallback
         return fallback
@@ -413,6 +474,34 @@ internal class TerminalFontCache(
         private const val LOAD_FACTOR = 0.75f
         private const val EMPTY = -1
 
+        private fun containsEmojiPresentation(text: String): Boolean {
+            var charIndex = 0
+            while (charIndex < text.length) {
+                val codePoint = text.codePointAt(charIndex)
+                if (codePoint == VARIATION_SELECTOR_16 ||
+                    codePoint == ZERO_WIDTH_JOINER ||
+                    isEmojiPresentationCodePoint(codePoint)
+                ) {
+                    return true
+                }
+                charIndex += Character.charCount(codePoint)
+            }
+            return false
+        }
+
+        private fun isEmojiPresentationCodePoint(codePoint: Int): Boolean {
+            return codePoint in 0x1F000..0x1FAFF ||
+                codePoint in 0x2600..0x27BF ||
+                codePoint in 0x2B00..0x2BFF
+        }
+
+        private fun isEmojiFontFamily(family: String): Boolean {
+            val normalized = family.lowercase(Locale.ROOT)
+            return "emoji" in normalized ||
+                "twemoji" in normalized ||
+                "joypixels" in normalized
+        }
+
         private fun hashCapacity(entryCapacity: Int): Int {
             var capacity = 1
             while (capacity < entryCapacity * 2) {
@@ -420,5 +509,8 @@ internal class TerminalFontCache(
             }
             return capacity
         }
+
+        private const val VARIATION_SELECTOR_16 = 0xFE0F
+        private const val ZERO_WIDTH_JOINER = 0x200D
     }
 }

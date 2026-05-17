@@ -450,18 +450,26 @@ professional emulator needs explicit contracts for it.
   `TerminalRenderPublisher`.
 - `DONE(host/ui)`: standalone `:terminal-ui-swing-demo` application wires the
   reusable Swing component to a local PTY-backed session for manual testing.
-- `DONE(host/ui)`: Swing complex-text fallback path exists for non-ASCII cells
-  and clusters. It uses configured fallback fonts, optional installed system
-  font scanning, cached style variants, per-text fallback resolution caching,
-  and Java2D `TextLayout` shaping without affecting the ASCII fast path.
+- `DONE(host/ui)`: Swing complex-text fallback path exists for Unicode scalar
+  cells, including astral-plane scalars, and grapheme clusters. It uses
+  configured fallback fonts, optional installed system font scanning, cached
+  style variants, per-text fallback resolution caching, and Java2D `TextLayout`
+  shaping without affecting the ASCII fast path.
+- `DONE(host/ui)`: Swing fallback font policy prefers installed native color
+  emoji families before logical and symbol fonts, and keeps emoji fallback
+  fonts plain so styled cells do not force synthetic monochrome variants.
 - `DONE(host/ui)`: Swing text rendering quality hints are host-configurable via
   immutable settings, including text antialiasing and fractional-metrics policy.
 - `TODO(host)`: richer font fallback policy, bundled/host-provided font
   resolver integration, script/run-level shaping, and fallback cache eviction.
 - `TODO(host)`: font measurement policy, palette/default-color policy, and
   backend painter integrations.
-- `TODO(host)`: double-width glyph display, emoji presentation, and ambiguous
-  width presentation must match core width decisions.
+- `TODO(host/ui)`: native platform emoji presentation. On Windows this should
+  use DirectWrite/Direct2D or another platform text stack that can render
+  `Segoe UI Emoji` color glyphs like Windows Terminal; pure Swing Java2D font
+  fallback may expose only monochrome glyph outlines.
+- `TODO(host)`: double-width glyph display and ambiguous width presentation
+  must match core width decisions.
 - `TODO(host)`: text selection and clipboard integration, including:
   - double-click word selection and triple-click line selection
   - rectangular block selection (e.g., via Alt+Drag)

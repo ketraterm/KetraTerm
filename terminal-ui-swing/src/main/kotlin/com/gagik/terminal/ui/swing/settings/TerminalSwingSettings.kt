@@ -5,6 +5,7 @@ import com.gagik.terminal.ui.swing.api.TerminalSwingTerminal
 import java.awt.Font
 import java.awt.GraphicsEnvironment
 import java.awt.RenderingHints
+import java.util.*
 
 /**
  * Immutable Swing terminal UI settings.
@@ -20,7 +21,7 @@ import java.awt.RenderingHints
  * @property textAntialiasing text antialiasing hint used during painting.
  * @property fractionalMetrics fractional font metrics hint used during painting.
  * @property fallbackFonts ordered fonts used by the complex-text renderer when
- * [font] cannot display a non-ASCII cluster.
+ * [font] cannot display a Unicode scalar cell or grapheme cluster.
  * @property useSystemFallbackFonts whether the complex-text renderer may use
  * installed system fonts after [fallbackFonts] fail. System font discovery is
  * asynchronous and disabled by default to keep Swing startup and painting
@@ -69,26 +70,48 @@ data class TerminalSwingSettings(
 
         /**
          * Returns conservative logical and common platform fonts for complex
-         * script fallback. Hosts can replace this list with their own font
-         * resolver policy.
+         * script fallback. Color emoji fonts are preferred ahead of symbol fonts
+         * so emoji cells do not degrade to monochrome dingbat glyphs when a
+         * native color emoji family is installed.
+         *
+         * Hosts can replace this list with their own font resolver policy.
          */
         @JvmStatic
-        fun defaultFallbackFonts(): List<Font> = listOf(
-            Font("Dialog", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font(Font.SANS_SERIF, Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Segoe UI", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Segoe UI Symbol", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Segoe UI Historic", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Ebrima", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Leelawadee UI", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Nyala", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Abyssinica SIL", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Noto Sans Thai", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Noto Sans Ethiopic", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Noto Sans Runic", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Noto Sans CJK SC", Font.PLAIN, DEFAULT_FONT_SIZE),
-            Font("Noto Color Emoji", Font.PLAIN, DEFAULT_FONT_SIZE),
-        )
+        fun defaultFallbackFonts(): List<Font> {
+            val installedFamilies = GraphicsEnvironment
+                .getLocalGraphicsEnvironment()
+                .availableFontFamilyNames
+            return fallbackFontFamiliesForInstalledFonts(installedFamilies)
+                .map { family -> Font(family, Font.PLAIN, DEFAULT_FONT_SIZE) }
+        }
+
+        internal fun fallbackFontFamiliesForInstalledFonts(installedFamilies: Array<String>): List<String> {
+            val installedByLowercase = LinkedHashMap<String, String>(installedFamilies.size)
+            for (family in installedFamilies) {
+                installedByLowercase.putIfAbsent(family.lowercase(Locale.ROOT), family)
+            }
+
+            val result = ArrayList<String>(DEFAULT_FALLBACK_FONT_FAMILY_CAPACITY)
+            fun addIfAbsent(family: String) {
+                if (result.none { it.equals(family, ignoreCase = true) }) {
+                    result += family
+                }
+            }
+            fun addInstalled(preferredFamily: String) {
+                val installed = installedByLowercase[preferredFamily.lowercase(Locale.ROOT)]
+                if (installed != null) addIfAbsent(installed)
+            }
+
+            for (family in preferredColorEmojiFallbackFamilies) {
+                addInstalled(family)
+            }
+            addIfAbsent(Font.DIALOG)
+            addIfAbsent(Font.SANS_SERIF)
+            for (family in preferredTextFallbackFamilies) {
+                addInstalled(family)
+            }
+            return result
+        }
 
         /**
          * Returns the default Swing terminal palette.
@@ -114,6 +137,30 @@ data class TerminalSwingSettings(
             }
             return Font.MONOSPACED
         }
+
+        private const val DEFAULT_FALLBACK_FONT_FAMILY_CAPACITY = 16
+        private val preferredColorEmojiFallbackFamilies = arrayOf(
+            "Segoe UI Emoji",
+            "Apple Color Emoji",
+            "Noto Color Emoji",
+            "Twemoji Mozilla",
+            "EmojiOne Color",
+            "JoyPixels",
+            "Twitter Color Emoji",
+        )
+        private val preferredTextFallbackFamilies = arrayOf(
+            "Segoe UI",
+            "Segoe UI Symbol",
+            "Segoe UI Historic",
+            "Ebrima",
+            "Leelawadee UI",
+            "Nyala",
+            "Abyssinica SIL",
+            "Noto Sans Thai",
+            "Noto Sans Ethiopic",
+            "Noto Sans Runic",
+            "Noto Sans CJK SC",
+        )
     }
 }
 

@@ -44,6 +44,21 @@ class TerminalSwingSettingsTest {
     }
 
     @Test
+    fun fallbackPolicyPrefersInstalledColorEmojiBeforeSymbolFonts() {
+        val families = TerminalSwingSettings.fallbackFontFamiliesForInstalledFonts(
+            arrayOf(
+                "Segoe UI Symbol",
+                "Dialog",
+                "Segoe UI Emoji",
+                "SansSerif",
+            ),
+        )
+
+        assertTrue(families.indexOf("Segoe UI Emoji") < families.indexOf(Font.DIALOG))
+        assertTrue(families.indexOf("Segoe UI Emoji") < families.indexOf("Segoe UI Symbol"))
+    }
+
+    @Test
     fun settingsDefaultPaletteOwnsSwingThemeColors() {
         val palette = TerminalSwingSettings.defaultPalette()
 

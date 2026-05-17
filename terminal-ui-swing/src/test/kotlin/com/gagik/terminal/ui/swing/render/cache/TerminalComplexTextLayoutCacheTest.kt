@@ -46,6 +46,30 @@ class TerminalComplexTextLayoutCacheTest {
     }
 
     @Test
+    fun `code point layouts support maximum Unicode scalar`() {
+        val fontCache = fontCache()
+        val layoutCache = TerminalComplexTextLayoutCache(codePointCapacity = 4)
+        val frc = FontRenderContext(null, false, false)
+
+        val layout = layoutCache.codePointLayout(0x10FFFF, Font.PLAIN, frc, fontCache)
+
+        assertEquals(2, layout.characterCount)
+        assertSame(layout, layoutCache.codePointLayout(0x10FFFF, Font.PLAIN, frc, fontCache))
+    }
+
+    @Test
+    fun `invalid code point layouts normalize to replacement glyph`() {
+        val fontCache = fontCache()
+        val layoutCache = TerminalComplexTextLayoutCache(codePointCapacity = 4)
+        val frc = FontRenderContext(null, false, false)
+
+        val invalid = layoutCache.codePointLayout(0x11_0000, Font.PLAIN, frc, fontCache)
+        val replacement = layoutCache.codePointLayout(0xFFFD, Font.PLAIN, frc, fontCache)
+
+        assertSame(replacement, invalid)
+    }
+
+    @Test
     fun `code point layouts are bounded by lru capacity`() {
         val fontCache = fontCache()
         val layoutCache = TerminalComplexTextLayoutCache(codePointCapacity = 2)
@@ -145,6 +169,33 @@ class TerminalComplexTextLayoutCacheTest {
 
         assertSame(plain, plainAgain)
         assertNotSame(plain, bold)
+    }
+
+    @Test
+    fun `cluster layouts support astral Unicode scalars`() {
+        val fontCache = fontCache()
+        val layoutCache = TerminalComplexTextLayoutCache(clusterCapacityPerStyle = 4)
+        val frc = FontRenderContext(null, false, false)
+        val cluster = intArrayOf(0x1F642, 0xFE0F)
+
+        val layout = layoutCache.clusterLayout(cluster, 0, cluster.size, Font.PLAIN, frc, fontCache)
+
+        assertEquals(3, layout.characterCount)
+        assertSame(layout, layoutCache.clusterLayout(cluster, 0, cluster.size, Font.PLAIN, frc, fontCache))
+    }
+
+    @Test
+    fun `cluster layouts replace malformed code points before shaping`() {
+        val fontCache = fontCache()
+        val layoutCache = TerminalComplexTextLayoutCache(clusterCapacityPerStyle = 4)
+        val frc = FontRenderContext(null, false, false)
+        val malformed = intArrayOf(0x41, 0xD800, 0x11_0000)
+        val sanitized = intArrayOf(0x41, 0xFFFD, 0xFFFD)
+
+        val malformedLayout = layoutCache.clusterLayout(malformed, 0, malformed.size, Font.PLAIN, frc, fontCache)
+        val sanitizedLayout = layoutCache.clusterLayout(sanitized, 0, sanitized.size, Font.PLAIN, frc, fontCache)
+
+        assertSame(sanitizedLayout, malformedLayout)
     }
 
     @Test
