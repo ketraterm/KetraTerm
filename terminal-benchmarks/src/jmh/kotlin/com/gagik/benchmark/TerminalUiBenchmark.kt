@@ -95,7 +95,7 @@ open class TerminalRenderPublishBenchmark {
         renderReader = terminal as TerminalRenderFrameReader
     }
 
-    @Setup(Level.Invocation)
+    @Setup(Level.Trial)
     open fun setupPublisher() {
         publisher = TerminalRenderPublisher(LARGE_INPUT_COLUMNS, LARGE_INPUT_ROWS)
     }
