@@ -1,5 +1,7 @@
 package com.gagik.terminal.ui.swing.api
 
+import com.gagik.terminal.render.api.TerminalRenderCellFlags
+import com.gagik.terminal.render.cache.TerminalRenderCache
 import com.gagik.terminal.ui.swing.api.CellSelection.Companion.NO_RANGE
 
 
@@ -44,26 +46,42 @@ data class CellSelection(
      * @param columns visible render-cache column count.
      * @return packed half-open range, or [NO_RANGE].
      */
-    fun packedColumnRange(row: Int, columns: Int): Long {
+    fun packedColumnRange(row: Int, columns: Int, cache: TerminalRenderCache? = null): Long {
         if (isEmpty || row < startRow || row > endRow) return NO_RANGE
 
-        if (isBlock) {
-            val start = minOf(anchorColumn, caretColumn).coerceIn(0, columns)
-            val end = maxOf(anchorColumn, caretColumn).coerceIn(0, columns)
-            if (start >= end) return NO_RANGE
-            return packRange(start, end)
-        }
-
-        val start = when {
+        var start = when {
+            isBlock -> minOf(anchorColumn, caretColumn)
             startRow == endRow -> startColumn
             row == startRow -> startColumn
             else -> 0
         }.coerceIn(0, columns)
-        val end = when {
+
+        val endVal = when {
+            isBlock -> maxOf(anchorColumn, caretColumn)
             startRow == endRow -> endColumn
             row == endRow -> endColumn
             else -> columns
         }.coerceIn(0, columns)
+        var end = endVal
+
+        if (cache != null && row in 0 until cache.rows) {
+            val rowOffset = cache.rowOffset(row)
+            val flags = cache.flags
+
+            if (start in 0 until columns) {
+                val startIdx = rowOffset + start
+                if (startIdx in flags.indices && (flags[startIdx] and TerminalRenderCellFlags.WIDE_TRAILING) != 0) {
+                    start = (start - 1).coerceAtLeast(0)
+                }
+            }
+
+            if (end > 0 && end <= columns) {
+                val endIdx = rowOffset + (end - 1)
+                if (endIdx in flags.indices && (flags[endIdx] and TerminalRenderCellFlags.WIDE_LEADING) != 0) {
+                    end = (end + 1).coerceAtMost(columns)
+                }
+            }
+        }
 
         if (start >= end) return NO_RANGE
         return packRange(start, end)

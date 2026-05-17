@@ -16,7 +16,7 @@ internal class TerminalSelectionTextExtractor {
         var row = selection.startRow.coerceAtLeast(0)
         val lastRow = selection.endRow.coerceAtMost(cache.rows - 1)
         while (row <= lastRow) {
-            val range = selection.packedColumnRange(row, cache.columns)
+            val range = selection.packedColumnRange(row, cache.columns, cache)
             if (range != CellSelection.NO_RANGE) {
                 if (result.isNotEmpty()) result.append('\n')
                 appendTrimmedRow(

@@ -12,6 +12,7 @@ import com.gagik.terminal.render.cache.TerminalRenderPublisher
 import com.gagik.terminal.session.TerminalSession
 import com.gagik.terminal.transport.TerminalConnector
 import com.gagik.terminal.transport.TerminalConnectorListener
+import com.gagik.terminal.ui.swing.render.TestCell
 import com.gagik.terminal.ui.swing.render.TestRenderFrame
 import com.gagik.terminal.ui.swing.settings.TerminalClipboardHandler
 import com.gagik.terminal.ui.swing.settings.TerminalClipboardShortcuts
@@ -107,6 +108,51 @@ class TerminalSwingTerminalSelectionTest {
         assertNotNull(selection)
         assertTrue(selection!!.isBlock, "selection should be block selection")
         session.close()
+    }
+
+    @Test
+    fun `selection snaps to enclose full wide characters`() {
+        val cells = arrayOf(
+            arrayOf(
+                TestCell(codeWord = 0x41, flags = TerminalRenderCellFlags.CODEPOINT), // 'A' at col 0
+                TestCell(codeWord = 0x4E2D, flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING), // '中' (wide leading) at col 1
+                TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING), // (wide trailing) at col 2
+                TestCell(codeWord = 0x42, flags = TerminalRenderCellFlags.CODEPOINT), // 'B' at col 3
+            )
+        )
+        val frame = TestRenderFrame(cells)
+        val cache = com.gagik.terminal.ui.swing.render.renderCache(frame)
+
+        // Case 1: Selecting starting on wide trailing cell (col 2)
+        val selection1 = CellSelection(anchorColumn = 2, anchorRow = 0, caretColumn = 3, caretRow = 0)
+        val range1 = selection1.packedColumnRange(row = 0, columns = 4, cache = cache)
+        assertEquals(1, CellSelection.rangeStart(range1))
+        assertEquals(3, CellSelection.rangeEnd(range1))
+
+        // Case 2: Selecting ending on wide leading cell (col 1)
+        val selection2 = CellSelection(anchorColumn = 0, anchorRow = 0, caretColumn = 2, caretRow = 0)
+        val range2 = selection2.packedColumnRange(row = 0, columns = 4, cache = cache)
+        assertEquals(0, CellSelection.rangeStart(range2))
+        assertEquals(3, CellSelection.rangeEnd(range2))
+    }
+
+    @Test
+    fun `clipboard copy extracts fully snapped wide characters`() {
+        val cells = arrayOf(
+            arrayOf(
+                TestCell(codeWord = 0x41, flags = TerminalRenderCellFlags.CODEPOINT), // 'A'
+                TestCell(codeWord = 0x4E2D, flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING, cluster = "中"), // '中'
+                TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING),
+                TestCell(codeWord = 0x42, flags = TerminalRenderCellFlags.CODEPOINT), // 'B'
+            )
+        )
+        val frame = TestRenderFrame(cells)
+        val cache = com.gagik.terminal.ui.swing.render.renderCache(frame)
+
+        // Selecting only trailing half should extract the whole Chinese char
+        val selection = CellSelection(anchorColumn = 2, anchorRow = 0, caretColumn = 3, caretRow = 0)
+        val text = TerminalSelectionTextExtractor().selectedText(cache, selection)
+        assertEquals("中", text)
     }
 
     @Test
