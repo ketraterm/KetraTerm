@@ -2,11 +2,9 @@ package com.gagik.terminal.ui.swing.render
 
 import com.gagik.terminal.render.api.TerminalColorPalette
 import com.gagik.terminal.render.cache.TerminalRenderCache
+import com.gagik.terminal.ui.swing.api.CellSelection
 import com.gagik.terminal.ui.swing.render.cache.AwtColorCache
-import com.gagik.terminal.ui.swing.render.painter.TerminalBackgroundPainter
-import com.gagik.terminal.ui.swing.render.painter.TerminalCursorPainter
-import com.gagik.terminal.ui.swing.render.painter.TerminalDecorationPainter
-import com.gagik.terminal.ui.swing.render.painter.TerminalTextPainter
+import com.gagik.terminal.ui.swing.render.painter.*
 import com.gagik.terminal.ui.swing.settings.TerminalSwingMetrics
 import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
 import java.awt.Font
@@ -27,6 +25,7 @@ import kotlin.math.floor
 internal class TerminalGridPainter {
     private val colorCache = AwtColorCache()
     private val backgroundPainter = TerminalBackgroundPainter(colorCache)
+    private val selectionPainter = TerminalSelectionPainter(colorCache)
     private val decorationPainter = TerminalDecorationPainter(colorCache)
     private val textPainter = TerminalTextPainter(colorCache, decorationPainter)
     private val cursorPainter = TerminalCursorPainter(colorCache, textPainter)
@@ -56,6 +55,7 @@ internal class TerminalGridPainter {
         height: Int,
         cursorBlinkVisible: Boolean,
         contentYOffset: Double = 0.0,
+        selection: CellSelection? = null,
     ) {
         val palette = settings.palette
         textPainter.updateSettings(settings)
@@ -79,6 +79,7 @@ internal class TerminalGridPainter {
             var row = firstRow
             while (row < rows) {
                 backgroundPainter.paintRow(g, cache, palette, metrics, row)
+                selectionPainter.paint(g, cache, metrics, row, selection, settings.selectionBackground)
                 textPainter.paintRow(g, cache, palette, metrics, row, fontRenderContext)
                 row++
             }

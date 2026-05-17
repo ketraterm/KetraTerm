@@ -2,6 +2,7 @@ package com.gagik.terminal.ui.swing.render
 
 import com.gagik.terminal.render.api.*
 import com.gagik.terminal.render.cache.TerminalRenderCache
+import com.gagik.terminal.ui.swing.api.CellSelection
 import com.gagik.terminal.ui.swing.settings.TerminalSwingMetrics
 import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -301,6 +302,39 @@ class TerminalGridPainterTest {
 
         assertEquals(GREEN, image.getRGB(1, metrics.underlineY))
         assertEquals(BLUE, image.getRGB(metrics.cellWidth + 1, metrics.underlineY))
+    }
+
+    @Test
+    fun `selection background uses configurable Swing color`() {
+        val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val settings = TerminalSwingSettings(
+            font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+            palette = TerminalColorPalette(
+                defaultForeground = WHITE,
+                defaultBackground = BLACK,
+            ),
+            selectionBackground = RED,
+            textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+        )
+        val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
+        val cache = TerminalRenderCache(columns = 2, rows = 1)
+        cache.updateFrom(TextFrame(text = "AB", cursorVisible = false))
+
+        TerminalGridPainter().paint(
+            g = g,
+            cache = cache,
+            settings = settings,
+            metrics = metrics,
+            width = image.width,
+            height = image.height,
+            cursorBlinkVisible = true,
+            selection = CellSelection(0, 0, 1, 0),
+        )
+        g.dispose()
+
+        assertEquals(RED, image.getRGB(1, 1))
+        assertEquals(BLACK, image.getRGB(metrics.cellWidth + 1, 1))
     }
 
     private fun BufferedImage.containsColorInRange(argb: Int, xStart: Int, xEnd: Int): Boolean {

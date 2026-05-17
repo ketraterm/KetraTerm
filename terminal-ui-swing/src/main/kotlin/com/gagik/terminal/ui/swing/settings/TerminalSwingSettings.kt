@@ -22,6 +22,10 @@ import java.util.*
  * @property cursorBlinkMillis cursor blink period in milliseconds.
  * @property textAntialiasing text antialiasing hint used during painting.
  * @property fractionalMetrics fractional font metrics hint used during painting.
+ * @property clipboardHandler host clipboard adapter for copy and paste actions.
+ * @property clipboardShortcuts platform clipboard key bindings.
+ * @property selectionBackground packed ARGB overlay used for visible terminal
+ * selection ranges.
  * @property fallbackFonts ordered fonts used by the complex-text renderer when
  * [font] cannot display a Unicode scalar cell or grapheme cluster.
  * @property useSystemFallbackFonts whether the complex-text renderer may use
@@ -41,6 +45,9 @@ data class TerminalSwingSettings(
     val cursorBlinkMillis: Int = 600,
     val textAntialiasing: Any = RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB,
     val fractionalMetrics: Any = RenderingHints.VALUE_FRACTIONALMETRICS_OFF,
+    val clipboardHandler: TerminalClipboardHandler = TerminalClipboardHandler.SYSTEM,
+    val clipboardShortcuts: TerminalClipboardShortcuts = TerminalClipboardShortcuts.platformDefault(),
+    val selectionBackground: Int = DEFAULT_SELECTION_BACKGROUND,
 ) {
     init {
         require(columns > 0) { "columns must be > 0, was $columns" }
@@ -52,6 +59,7 @@ data class TerminalSwingSettings(
 
     companion object {
         private const val DEFAULT_FONT_SIZE = 16
+        private const val DEFAULT_SELECTION_BACKGROUND = 0x66FFFFFF
         private val preferredDefaultFontFamilies = arrayOf(
             "Cascadia Mono",
             "Cascadia Code",
