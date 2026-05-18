@@ -136,20 +136,20 @@ class TerminalWriterUnicodeTest {
     }
 
     @Test
-    fun `writeCluster_textPresentationSymbolStaysNarrowButEmojiPresentationIsWide`() {
+    fun `writeCluster_textPresentationSymbolStaysNarrowButEmojiVariationSequenceIsWide`() {
         val text = TerminalBuffers.create(width = 6, height = 2)
         val emoji = TerminalBuffers.create(width = 6, height = 2)
 
         text.writeCodepoint(0x2691)
         text.writeCodepoint('X'.code)
 
-        emoji.writeCluster(intArrayOf(0x2691, 0xFE0F))
+        emoji.writeCluster(intArrayOf(0x2764, 0xFE0F))
         emoji.writeCodepoint('X'.code)
 
         assertAll(
-            { assertEquals('X'.code, text.getCodepointAt(1, 0), "Text-presentation flag must consume one cell") },
+            { assertEquals('X'.code, text.getCodepointAt(1, 0), "Text-presentation symbol must consume one cell") },
             { assertEquals(2, text.cursorCol) },
-            { assertEquals(-1, emoji.getCodepointAt(1, 0), "Emoji-presentation flag must reserve a spacer") },
+            { assertEquals(-1, emoji.getCodepointAt(1, 0), "Emoji variation sequence must reserve a spacer") },
             { assertEquals('X'.code, emoji.getCodepointAt(2, 0)) },
             { assertEquals(3, emoji.cursorCol) },
         )

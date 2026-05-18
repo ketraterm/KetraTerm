@@ -71,7 +71,7 @@ internal class TerminalWriterImpl(
 
         val base = codepoints[0]
         val baseWidth =
-            if (hasEmojiPresentationSelector(codepoints, length) && isBmpEmojiPresentationBase(base)) {
+            if (hasEmojiPresentationSelector(codepoints, length) && UnicodeWidth.isEmojiVariationBase(base)) {
                 2
             } else {
                 UnicodeWidth.calculate(base, state.modes.treatAmbiguousAsWide)
@@ -91,8 +91,6 @@ internal class TerminalWriterImpl(
         }
         return false
     }
-
-    private fun isBmpEmojiPresentationBase(codepoint: Int): Boolean = codepoint in 0x2600..0x27BF
 
     override fun newLine() = mutationEngine.newLine()
 

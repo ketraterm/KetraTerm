@@ -208,18 +208,20 @@ Missing:
 
 ### Text and Unicode
 
-- `TODO(parser)`: replace curated seed grapheme tables with generated Unicode
-  data from UAX #29.
-- `TODO(parser)`: full Grapheme_Cluster_Break table coverage.
-- `TODO(parser)`: full Extended_Pictographic table coverage.
-- `TODO(parser)`: versioned Unicode table generation and tests.
+- `DONE(parser)`: generated Unicode 17.0.0 grapheme tables from UAX #29
+  `GraphemeBreakProperty.txt`.
+- `DONE(parser)`: full Grapheme_Cluster_Break table coverage.
+- `DONE(parser)`: full Extended_Pictographic table coverage from
+  `emoji-data.txt`.
+- `DONE(parser)`: versioned Unicode table generation and focused regression
+  tests.
 - `TODO(parser)`: malformed UTF-8 policy tests across all structural boundary
   bytes, not only the current representative hostile cases.
 - `TODO(parser)`: configurable replacement policy if needed by host applications.
 - `TODO(parser)`: broader ISO 2022 charset mapping.
-- `DONE(parser/core)`: curated Thai and Lao combining marks are classified as
+- `DONE(parser/core)`: Thai and Lao combining marks are classified as
   grapheme extenders in parser text segmentation and zero-width marks in core
-  width calculation. Full generated Unicode coverage remains a TODO above.
+  width calculation through generated Unicode tables.
 - `DONE(parser/core/integration)`: live host-output chunks publish complete
   printable prefixes immediately while retaining grapheme context, so a later
   combining mark, variation selector, or ZWJ continuation can extend the
@@ -307,15 +309,17 @@ Missing:
 
 ### Unicode Width
 
-- `TODO(core)`: generated width tables from current Unicode data:
+- `DONE(core)`: generated Unicode 17.0.0 width tables from current Unicode data:
   - EastAsianWidth
   - emoji presentation
   - zero-width and combining ranges
   - ambiguous-width policy
-- `TODO(core)`: width policy for emoji ZWJ clusters and variation-selector
-  presentation should be explicit and versioned.
-- `TODO(core)`: configurable ambiguous-width policy is present, but table coverage
-  should be generated and audited.
+- `DONE(core)`: width policy for emoji presentation selectors is explicit and
+  backed by generated emoji property and variation-sequence tables. Emoji ZWJ
+  cluster width continues to derive from the first scalar, matching the current
+  parser/core contract.
+- `DONE(core)`: configurable ambiguous-width policy is present and backed by
+  generated East Asian Width ambiguous ranges.
 - `DONE(core)`: terminal cell graphics such as box drawing, block elements,
   Braille patterns, and Symbols for Legacy Computing stay single-cell even when
   the host enables East Asian Ambiguous wide mode.
