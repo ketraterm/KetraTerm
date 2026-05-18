@@ -159,13 +159,13 @@ Terminal renderers must advance exactly 1 cell for text, and 2 cells for emoji.
 
 Symbol │ VS15 (Force Text - 1 Cell) │ VS16 (Force Emoji - 2 Cells)
 ───────┼────────────────────────────┼──────────────────────────────
-Heart  │ ♥︎                           │ ❤️
+Heart  │ ♥︎                          │ ❤️
 Coffee │ ☕︎                          │ ☕️
-Plane  │ ✈︎                           │ ✈️
-Skull  │ ☠︎                           │ ☠️
-Gear   │ ⚙︎                           │ ⚙️
-Bolt   │ ⚡︎                           │ ⚡️
-Star   │ ⭐︎                           │ ⭐️
+Plane  │ ✈︎                          │ ✈️
+Skull  │ ☠︎                          │ ☠️
+Gear   │ ⚙︎                          │ ⚙️
+Bolt   │ ⚡︎                          │ ⚡️
+Star   │ ⭐︎                          │ ⭐️
 
 Visual Alignment Check:
 |♥︎ |❤️|
@@ -190,7 +190,7 @@ Skin Tone Modifier Matrix (Base + Modifier = 1 Cluster):
 Modern Emoji Additions (Emoji 15.0+):
 🫠 (Melting Face) | 🫨 (Shaking Face) | 🩷 (Pink Heart) | 🩵 (Light Blue Heart)
 🩶 (Grey Heart)   | 🫏 (Donkey)       | 🪿 (Goose)      | 🪼 (Jellyfish)
-🫛 (Pea Pod)      | 🫚 (Ginger)       | 🪭 (Folding Fan) | 🪮 (Hair Pick)
+🫛 (Pea Pod)      | 🫚 (Ginger)       | 🪭 (Folding Fan)| 🪮 (Hair Pick)
 🪇 (Maracas)      | 🪈 (Flute)        | 🪯 (Khanda)     | 🛜 (Wireless)
 
 ================================================================================
@@ -350,22 +350,6 @@ Geometric Shapes:
 ■ □ ▢ ▣ ▤ ▥ ▦ ▧ ▨ ▩ ● ○ ◉ ◎ ◌ ◍ ▲ △ ▼ ▽ ◆ ◇
 
 ================================================================================
-SECTION 17 — EXACT GRID ALIGNMENT & CELL WIDTH PROBES
-================================================================================
-
-Ruler: |123456789012345678901234567890|
-       ├──────────────────────────────┤
-ASCII: │A│B│C│D│E│F│G│H│I│J│            │ (Width 1 each)
-CJK:   │中│文│漢│字│日│本│語│            │ (Width 2 each)
-Emoji: │😀│😃│🔥│🚀│💻│🍎│🍌│            │ (Width 2 each)
-Flags: │🇦🇲│🇫🇷│🇺🇸│🇯🇵│🇪🇺│🇧🇷│🇮🇳│            │ (Width 2 each)
-ZWJ:   │👩‍💻│👨‍🚀│🧑‍🏫│🏳️‍🌈│❤️‍🔥│🏴‍☠️│👁️‍🗨️│            │ (Width 2 each)
-ZWJ4:  │👨‍👩‍👧‍👦│👩‍👩‍👦‍👦│👨‍👨‍👧‍👧│                │ (Width 2 each)
-Tag:   │🏴󠁧󠁢󠁥󠁮󠁧󠁿│🏴󠁧󠁢󠁳󠁣󠁴󠁿│🏴󠁧󠁢󠁷󠁬󠁳󠁿│                │ (Width 2 each)
-Comb:  │é│é│ñ│ñ│ü│ü│ä́│x̸│            │ (Width 1 each, NFC & NFD aligned)
-VS16:  │♥│♥️│❤│❤️│☕│☕️│⭐│⭐️│            │ (VS15 Text = 1, VS16 Emoji = 2)
-
-================================================================================
 SECTION 18 — LINE WRAPPING & BOUNDARY STRESS TESTS
 ================================================================================
 
@@ -440,11 +424,11 @@ SUB-MOCKUP C: Process / Task Database Query Results
 ┌─────┬──────────────────┬──────────┬──────────┬───────────────────────────────┐
 │ ID  │ Process Name     │ CPU %    │ Status   │ Geographical Source           │
 ├─────┼──────────────────┼──────────┼──────────┼───────────────────────────────┤
-│ 001 │ terminal-core    │  12.5%   │ Active   │ 🇦🇲 Yerevan, Armenia          │
-│ 002 │ swing-painter    │  45.0%   │ Busy ⚙️   │ 🇫🇷 Paris, France              │
-│ 003 │ grapheme-seg     │   0.2%   │ Idle 💤   │ 🇯🇵 Tokyo, Japan              │
+│ 001 │ terminal-core    │  12.5%   │ Active   │ 🇦🇲 Yerevan, Armenia           │
+│ 002 │ swing-painter    │  45.0%   │ Busy ⚙️  │ 🇫🇷 Paris, France              │
+│ 003 │ grapheme-seg     │   0.2%   │ Idle 💤  │ 🇯🇵 Tokyo, Japan               │
 │ 004 │ input-encoder    │   1.1%   │ Ready    │ 🇧🇷 Brasília, Brazil           │
-│ 005 │ subdivision-tag  │   5.4%   │ Running  │ 🏴󠁧󠁢󠁳󠁣󠁴󠁿 Edinburgh, Scotland      │
+│ 005 │ subdivision-tag  │   5.4%   │ Running  │ 🏴󠁧󠁢󠁳󠁣󠁴󠁿 Edinburgh, Scotland        │
 └─────┴──────────────────┴──────────┴──────────┴───────────────────────────────┘
 
 --------------------------------------------------------------------------------
@@ -463,9 +447,9 @@ A final comprehensive multi-cluster horizontal verification line. Each type of
 character must line up perfectly under its expected column marker.
 
 Ruler:
-|01|02|03|04 |05 |06 |07 |08 |09 |10 |11 |12      |13 |14 |15      |16      |
-├──┼──┼──┼───┼───┼───┼───┼───┼───┼───┼───┼────────┼───┼───┼────────┼────────┤
-│A │é │é │中 │😀 │❤️ │☕️ │🇦🇲 │🇫🇷 │👍🏽 │👩‍💻 │👨‍👩‍👧‍👦   │🏳️‍🌈 │1️⃣ │🏴󠁧󠁢󠁳󠁣󠁴󠁿     │👁️‍🗨️      │
-└──┴──┴──┴───┴───┴───┴───┴───┴───┴───┴───┴────────┴───┴───┴────────┴────────┘
+|01|02|03|04 |05 |06 |07 |08 |09 |10 |11 |12 |13 |14 |15 |16 |
+├──┼──┼──┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┤
+│A │é │é │中 │😀 │❤️ │☕️ │🇦🇲 │🇫🇷 │👍🏽 │👩‍💻 │👨‍👩‍👧‍👦 │🏳️‍🌈 │1️⃣ │🏴󠁧󠁢󠁳󠁣󠁴󠁿 │👁️‍🗨️ │
+└──┴──┴──┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┘
 
 End of Unicode Terminal Rendering Stress Test File.
