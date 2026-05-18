@@ -55,7 +55,7 @@ class UnicodeWidthTest {
         }
 
         @ParameterizedTest(name = "Astral zero-width cp=0x{0} returns 0")
-        @ValueSource(ints = [0xE0000, 0xE007F, 0xE0100, 0xE01EF])
+        @ValueSource(ints = [0x1D173, 0xE0001, 0xE007F, 0xE0100, 0xE01EF])
         fun `astral zero-width samples return 0`(cp: Int) {
             assertEquals(0, UnicodeWidth.calculate(cp, ambiguousAsWide = false))
             assertEquals(0, UnicodeWidth.calculate(cp, ambiguousAsWide = true))
@@ -73,7 +73,7 @@ class UnicodeWidthTest {
         }
 
         @ParameterizedTest(name = "Astral wide cp=0x{0} returns 2")
-        @ValueSource(ints = [0x1F600, 0x1F680, 0x20000, 0x2FFFD, 0x30000, 0x3FFFD])
+        @ValueSource(ints = [0x1F600, 0x1FAEA, 0x20000, 0x2FFFD, 0x30000, 0x3FFFD])
         fun `astral wide samples return 2`(cp: Int) {
             assertEquals(2, UnicodeWidth.calculate(cp, ambiguousAsWide = false))
             assertEquals(2, UnicodeWidth.calculate(cp, ambiguousAsWide = true))
@@ -97,6 +97,13 @@ class UnicodeWidthTest {
             assertEquals(1, UnicodeWidth.calculate(cp, ambiguousAsWide = true))
         }
 
+        @ParameterizedTest(name = "Private-use ambiguous cp=0x{0} follows toggle")
+        @ValueSource(ints = [0xE000, 0xF0000])
+        fun `generated private-use ambiguous ranges honor toggle`(cp: Int) {
+            assertEquals(1, UnicodeWidth.calculate(cp, ambiguousAsWide = false))
+            assertEquals(2, UnicodeWidth.calculate(cp, ambiguousAsWide = true))
+        }
+
         @ParameterizedTest(name = "Non-ambiguous cp=0x{0} ignores toggle")
         @MethodSource("com.gagik.core.util.UnicodeWidthTest#nonAmbiguousSamples")
         fun `non-ambiguous classes ignore toggle`(
@@ -112,7 +119,7 @@ class UnicodeWidthTest {
     @DisplayName("Fallback & Range Boundaries")
     inner class FallbackAndBoundaryTests {
         @ParameterizedTest(name = "Default narrow fallback cp=0x{0} returns 1")
-        @ValueSource(ints = [0x0102, 0x0370, 0x10FFFF])
+        @ValueSource(ints = [0x0102, 0x0370, 0x2691, 0x2764, 0x10FFFF])
         fun `default fallback returns narrow width 1`(cp: Int) {
             assertEquals(1, UnicodeWidth.calculate(cp, ambiguousAsWide = false))
             assertEquals(1, UnicodeWidth.calculate(cp, ambiguousAsWide = true))
@@ -152,7 +159,8 @@ class UnicodeWidthTest {
                 Arguments.of(0x3FFFE, 1),
                 // Astral zero-width ranges
                 Arguments.of(0xDFFFF, 1),
-                Arguments.of(0xE0000, 0),
+                Arguments.of(0xE0000, 1),
+                Arguments.of(0xE0001, 0),
                 Arguments.of(0xE007F, 0),
                 Arguments.of(0xE0080, 1),
                 Arguments.of(0xE00FF, 1),

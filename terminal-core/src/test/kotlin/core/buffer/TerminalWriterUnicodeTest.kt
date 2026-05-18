@@ -136,6 +136,96 @@ class TerminalWriterUnicodeTest {
     }
 
     @Test
+    fun `writeCluster_textPresentationSymbolStaysNarrowButEmojiVariationSequenceIsWide`() {
+        val text = TerminalBuffers.create(width = 6, height = 2)
+        val emoji = TerminalBuffers.create(width = 6, height = 2)
+
+        text.writeCluster(intArrayOf(0x2615, 0xFE0E))
+        text.writeCodepoint('X'.code)
+
+        emoji.writeCluster(intArrayOf(0x2764, 0xFE0F))
+        emoji.writeCodepoint('X'.code)
+
+        assertAll(
+            { assertEquals('X'.code, text.getCodepointAt(1, 0), "Text-presentation symbol must consume one cell") },
+            { assertEquals(2, text.cursorCol) },
+            { assertEquals(-1, emoji.getCodepointAt(1, 0), "Emoji variation sequence must reserve a spacer") },
+            { assertEquals('X'.code, emoji.getCodepointAt(2, 0)) },
+            { assertEquals(3, emoji.cursorCol) },
+        )
+    }
+
+    @Test
+    fun `appendToPreviousCluster_textPresentationSelectorShrinksDefaultEmojiToOneCell`() {
+        val buffer = TerminalBuffers.create(width = 6, height = 2)
+
+        buffer.writeCodepoint(0x2615)
+        buffer.appendToPreviousCluster(0xFE0E)
+        buffer.writeCodepoint('X'.code)
+
+        val line = buffer.getLine(0)
+        val clusterBuf = IntArray(4)
+        val clusterLen = line.readCluster(0, clusterBuf)
+
+        assertAll(
+            { assertEquals(2, clusterLen) },
+            { assertEquals(0x2615, clusterBuf[0]) },
+            { assertEquals(0xFE0E, clusterBuf[1]) },
+            { assertEquals('X'.code, buffer.getCodepointAt(1, 0), "VS15 must free the old wide spacer") },
+            { assertEquals(2, buffer.cursorCol) },
+        )
+    }
+
+    @Test
+    fun `symbolHeavyPasteLine_keepsEveryScalarInOneCellAndCursorAfterLastGlyph`() {
+        val buffer = TerminalBuffers.create(width = 120, height = 2)
+        val text = "∀∂∈ℝ∧∪≡∞ ↑↗↨↻⇣ ┐┼╔╘░►☺♀ ﬁ�⑀₂ἠḂӥẄɐː⍎אԱა"
+        val expectedCodepoints = IntArray(text.codePointCount(0, text.length))
+        var charIndex = 0
+        var codepointIndex = 0
+        while (charIndex < text.length) {
+            val codepoint = text.codePointAt(charIndex)
+            expectedCodepoints[codepointIndex++] = codepoint
+            charIndex += Character.charCount(codepoint)
+        }
+
+        buffer.writeText(text)
+
+        assertEquals(expectedCodepoints.size, buffer.cursorCol, "Cursor must land immediately after the pasted text")
+        for (index in expectedCodepoints.indices) {
+            assertEquals(expectedCodepoints[index], buffer.getCodepointAt(index, 0), "Codepoint at cell $index drifted")
+        }
+        assertEquals(0, buffer.getCodepointAt(expectedCodepoints.size, 0), "No wide spacer should follow the sample")
+    }
+
+    @Test
+    fun `junieFooterTextFlagWidthDoesNotPushRedrawCursorOneRowLow`() {
+        val buffer = TerminalBuffers.create(width = 100, height = 30)
+        val footer = "  ~  \u2691 Brave off ctrl + b"
+
+        buffer.positionCursor(col = 0, row = 20)
+        repeat(4) {
+            buffer.carriageReturn()
+            buffer.newLine()
+        }
+        buffer.writeText(footer)
+        repeat(100 - footer.length) {
+            buffer.writeCodepoint(' '.code)
+        }
+
+        buffer.carriageReturn()
+        buffer.cursorUp(4)
+        buffer.cursorRight(6)
+        buffer.writeCodepoint('l'.code)
+
+        assertAll(
+            { assertEquals('l'.code, buffer.getCodepointAt(6, 20)) },
+            { assertEquals(20, buffer.cursorRow) },
+            { assertEquals(7, buffer.cursorCol) },
+        )
+    }
+
+    @Test
     fun `writeCluster_ambiguousWidthCluster_usesCoreModePolicy`() {
         val narrow = TerminalBuffers.create(width = 6, height = 2)
         val wide = TerminalBuffers.create(width = 6, height = 2)

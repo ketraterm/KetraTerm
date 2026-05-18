@@ -28,8 +28,8 @@ import com.gagik.terminal.ui.swing.settings.TerminalSwingMetrics
 import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
 import java.awt.Font
 import java.awt.Graphics2D
-import java.awt.Rectangle
 import java.awt.font.FontRenderContext
+import java.awt.font.TextLayout
 
 /**
  * Paints terminal cell text runs and text-only cursor foreground.
@@ -45,7 +45,6 @@ internal class TerminalTextPainter(
     private val asciiDrawChars = TerminalAsciiDrawCharsCache()
     private val cellPrimitives = TerminalCellPrimitivePainter()
     private val textRun = TerminalTextRunBuffer(INITIAL_TEXT_RUN_CAPACITY)
-    private val clipBoundsScratch = Rectangle()
 
     /**
      * Updates font-dependent caches for a settings snapshot.
@@ -139,7 +138,7 @@ internal class TerminalTextPainter(
 
         val attr = attrWords[index]
         val safeColumnSpan = maxOf(1, columnSpan)
-        val oldClipBounds = g.getClipBounds(clipBoundsScratch) != null
+        val oldClip = g.clip
         try {
             g.clipRect(
                 column * metrics.cellWidth,
@@ -178,6 +177,7 @@ internal class TerminalTextPainter(
                             length = length,
                             fontStyle = terminalFontStyle(attr),
                             x = column * metrics.cellWidth,
+                            cellPixelWidth = metrics.cellWidth * safeColumnSpan,
                             baselineY = baselineY,
                             fontRenderContext = fontRenderContext,
                         )
@@ -199,21 +199,13 @@ internal class TerminalTextPainter(
                     codePoint = codeWord,
                     fontStyle = terminalFontStyle(attr),
                     x = column * metrics.cellWidth,
+                    cellPixelWidth = metrics.cellWidth * safeColumnSpan,
                     baselineY = baselineY,
                     fontRenderContext = fontRenderContext,
                 )
             }
         } finally {
-            if (oldClipBounds) {
-                g.setClip(
-                    clipBoundsScratch.x,
-                    clipBoundsScratch.y,
-                    clipBoundsScratch.width,
-                    clipBoundsScratch.height,
-                )
-            } else {
-                g.setClip(null)
-            }
+            g.clip = oldClip
         }
     }
 
@@ -289,64 +281,78 @@ internal class TerminalTextPainter(
         val foreground = TerminalSwingColors.foreground(palette, attr)
         val fontStyle = terminalFontStyle(attr)
         val endColumn = minOf(cache.columns, column + cellSpan(flags))
+        val oldClip = g.clip
 
         g.font = fontCache.font(fontStyle)
         g.color = colorCache.color(foreground)
 
-        val codeWord = codeWords[index]
-        if (flags and TerminalRenderCellFlags.CLUSTER == 0 && cellPrimitives.canPaint(codeWord)) {
-            cellPrimitives.paint(g, codeWord, column, row, metrics)
-        } else if (flags and TerminalRenderCellFlags.CLUSTER != 0) {
-            val clusterRef = clusterRefs[index]
-            if (clusterRef != 0L) {
-                val offset = cache.clusterOffset(clusterRef)
-                val length = cache.clusterLength(clusterRef)
-                val paintedEmoji =
-                    platformEmojiPainter.paintCluster(
-                        g = g,
-                        codepoints = cache.clusterCodepoints,
-                        offset = offset,
-                        length = length,
-                        column = column,
-                        row = row,
-                        columnSpan = endColumn - column,
-                        metrics = metrics,
-                    )
-                if (!paintedEmoji) {
-                    drawComplexCluster(
-                        g = g,
-                        codepoints = cache.clusterCodepoints,
-                        offset = offset,
-                        length = length,
-                        fontStyle = fontStyle,
-                        x = column * metrics.cellWidth,
-                        baselineY = baselineY,
-                        fontRenderContext = fontRenderContext,
-                    )
-                }
-            }
-        } else if (platformEmojiPainter.paintCodePoint(
-                g = g,
-                codePoint = codeWord,
-                column = column,
-                row = row,
-                columnSpan = endColumn - column,
-                metrics = metrics,
+        try {
+            g.clipRect(
+                column * metrics.cellWidth,
+                row * metrics.cellHeight,
+                metrics.cellWidth * (endColumn - column),
+                metrics.cellHeight,
             )
-        ) {
-            // Painted by the native platform text stack.
-        } else {
-            drawComplexCodePoint(
-                g = g,
-                codePoint = codeWord,
-                fontStyle = fontStyle,
-                x = column * metrics.cellWidth,
-                baselineY = baselineY,
-                fontRenderContext = fontRenderContext,
-            )
-        }
 
-        decorationPainter.paint(g, palette, attr, extraAttr, foreground, column, endColumn, row, metrics)
+            val codeWord = codeWords[index]
+            if (flags and TerminalRenderCellFlags.CLUSTER == 0 && cellPrimitives.canPaint(codeWord)) {
+                cellPrimitives.paint(g, codeWord, column, row, metrics)
+            } else if (flags and TerminalRenderCellFlags.CLUSTER != 0) {
+                val clusterRef = clusterRefs[index]
+                if (clusterRef != 0L) {
+                    val offset = cache.clusterOffset(clusterRef)
+                    val length = cache.clusterLength(clusterRef)
+                    val paintedEmoji =
+                        platformEmojiPainter.paintCluster(
+                            g = g,
+                            codepoints = cache.clusterCodepoints,
+                            offset = offset,
+                            length = length,
+                            column = column,
+                            row = row,
+                            columnSpan = endColumn - column,
+                            metrics = metrics,
+                        )
+                    if (!paintedEmoji) {
+                        drawComplexCluster(
+                            g = g,
+                            codepoints = cache.clusterCodepoints,
+                            offset = offset,
+                            length = length,
+                            fontStyle = fontStyle,
+                            x = column * metrics.cellWidth,
+                            cellPixelWidth = metrics.cellWidth * (endColumn - column),
+                            baselineY = baselineY,
+                            fontRenderContext = fontRenderContext,
+                        )
+                    }
+                }
+            } else if (platformEmojiPainter.paintCodePoint(
+                    g = g,
+                    codePoint = codeWord,
+                    column = column,
+                    row = row,
+                    columnSpan = endColumn - column,
+                    metrics = metrics,
+                )
+            ) {
+                // Painted by the native platform text stack.
+            } else {
+                drawComplexCodePoint(
+                    g = g,
+                    codePoint = codeWord,
+                    fontStyle = fontStyle,
+                    x = column * metrics.cellWidth,
+                    cellPixelWidth = metrics.cellWidth * (endColumn - column),
+                    baselineY = baselineY,
+                    fontRenderContext = fontRenderContext,
+                )
+            }
+
+            decorationPainter.paint(g, palette, attr, extraAttr, foreground, column, endColumn, row, metrics)
+        } finally {
+            g.clip = oldClip
+        }
         return endColumn
     }
 
@@ -383,6 +389,7 @@ internal class TerminalTextPainter(
         length: Int,
         fontStyle: Int,
         x: Int,
+        cellPixelWidth: Int,
         baselineY: Int,
         fontRenderContext: FontRenderContext,
     ) {
@@ -393,8 +400,8 @@ internal class TerminalTextPainter(
         val layout =
             complexTextLayouts
                 .clusterLayout(codepoints, offset, shapedLength, fontStyle, fontRenderContext, fontCache)
-        layout.draw(g, drawX, baseline)
-        drawX += layout.advance
+        drawFittedLayout(g, layout, drawX, baseline, x + cellPixelWidth)
+        drawX += minOf(layout.advance, cellPixelWidth.toFloat())
 
         var index = offset + shapedLength
         val end = offset + length
@@ -402,8 +409,8 @@ internal class TerminalTextPainter(
             val codePointLayout =
                 complexTextLayouts
                     .codePointLayout(codepoints[index], fontStyle, fontRenderContext, fontCache)
-            codePointLayout.draw(g, drawX, baseline)
-            drawX += codePointLayout.advance
+            drawFittedLayout(g, codePointLayout, drawX, baseline, x + cellPixelWidth)
+            drawX += minOf(codePointLayout.advance, maxOf(0f, x + cellPixelWidth - drawX))
             index++
         }
     }
@@ -413,12 +420,40 @@ internal class TerminalTextPainter(
         codePoint: Int,
         fontStyle: Int,
         x: Int,
+        cellPixelWidth: Int,
         baselineY: Int,
         fontRenderContext: FontRenderContext,
     ) {
-        complexTextLayouts
-            .codePointLayout(codePoint, fontStyle, fontRenderContext, fontCache)
-            .draw(g, x.toFloat(), baselineY.toFloat())
+        val layout =
+            complexTextLayouts
+                .codePointLayout(codePoint, fontStyle, fontRenderContext, fontCache)
+        drawFittedLayout(g, layout, x.toFloat(), baselineY.toFloat(), x + cellPixelWidth)
+    }
+
+    private fun drawFittedLayout(
+        g: Graphics2D,
+        layout: TextLayout,
+        x: Float,
+        baselineY: Float,
+        spanEndX: Int,
+    ) {
+        val available = spanEndX - x
+        val advance = layout.advance
+        if (available <= 0f || advance <= 0f) return
+        if (advance <= available) {
+            layout.draw(g, x, baselineY)
+            return
+        }
+
+        val oldTransform = g.transform
+        try {
+            val scaleX = available / advance
+            g.translate(x.toDouble(), 0.0)
+            g.scale(scaleX.toDouble(), 1.0)
+            layout.draw(g, 0f, baselineY)
+        } finally {
+            g.transform = oldTransform
+        }
     }
 
     private fun decorationKey(

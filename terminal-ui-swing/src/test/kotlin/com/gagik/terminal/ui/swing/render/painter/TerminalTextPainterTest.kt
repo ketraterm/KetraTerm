@@ -315,6 +315,121 @@ class TerminalTextPainterTest {
                 "Wide cell did not paint into its trailing column",
             )
         }
+
+        @Test
+        fun `single-width complex glyph is clipped to its core cell span`() {
+            // Arrange
+            val fixture = fixture(width = 40)
+            val narrowMetrics =
+                TerminalSwingMetrics(
+                    cellWidth = 4,
+                    cellHeight = fixture.metrics.cellHeight,
+                    baseline = fixture.metrics.baseline,
+                    underlineY = fixture.metrics.underlineY,
+                    strikethroughY = fixture.metrics.strikethroughY,
+                    overlineY = fixture.metrics.overlineY,
+                    cursorStrokeWidth = fixture.metrics.cursorStrokeWidth,
+                )
+            val cache =
+                renderCache(
+                    TestRenderFrame(
+                        arrayOf(
+                            arrayOf(
+                                TestCell(
+                                    codeWord = 0x221E,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    attr = TerminalRenderAttrs.DEFAULT,
+                                ),
+                                TestCell(),
+                            ),
+                        ),
+                    ),
+                )
+
+            // Act
+            fixture.painter.paintRow(
+                fixture.g,
+                cache,
+                fixture.settings.palette,
+                narrowMetrics,
+                row = 0,
+                fontRenderContext = fixture.g.fontRenderContext,
+            )
+
+            // Assert
+            assertTrue(
+                !fixture.image.containsPaintedPixelInRange(narrowMetrics.cellWidth, narrowMetrics.cellWidth * 2),
+                "Complex glyph escaped the single-cell span owned by core",
+            )
+        }
+
+        @Test
+        fun `symbol heavy narrow row does not paint beyond its core columns`() {
+            // Arrange
+            val text = "∀∂∈ℝ∧∪≡∞ ↑↗↨↻⇣ ┐┼╔╘░►☺♀ ﬁ�⑀₂ἠḂӥẄɐː⍎אԱა"
+            val cellWidth = 4
+            val fixture = fixture(width = text.codePointCount(0, text.length) * cellWidth + cellWidth)
+            val narrowMetrics =
+                TerminalSwingMetrics(
+                    cellWidth = cellWidth,
+                    cellHeight = fixture.metrics.cellHeight,
+                    baseline = fixture.metrics.baseline,
+                    underlineY = fixture.metrics.underlineY,
+                    strikethroughY = fixture.metrics.strikethroughY,
+                    overlineY = fixture.metrics.overlineY,
+                    cursorStrokeWidth = fixture.metrics.cursorStrokeWidth,
+                )
+            val cache = renderCache(TestRenderFrame.text(text))
+
+            // Act
+            fixture.painter.paintRow(
+                fixture.g,
+                cache,
+                fixture.settings.palette,
+                narrowMetrics,
+                row = 0,
+                fontRenderContext = fixture.g.fontRenderContext,
+            )
+
+            // Assert
+            val textEnd = text.codePointCount(0, text.length) * cellWidth
+            assertTrue(
+                !fixture.image.containsPaintedPixelInRange(textEnd, textEnd + cellWidth),
+                "Narrow symbol row painted past the core-owned terminal columns",
+            )
+        }
+
+        @Test
+        fun `fitted complex glyph path restores graphics transform`() {
+            // Arrange
+            val fixture = fixture(width = 40)
+            val initialTransform = AffineTransform.getTranslateInstance(3.0, 5.0)
+            fixture.g.transform = initialTransform
+            val narrowMetrics =
+                TerminalSwingMetrics(
+                    cellWidth = 4,
+                    cellHeight = fixture.metrics.cellHeight,
+                    baseline = fixture.metrics.baseline,
+                    underlineY = fixture.metrics.underlineY,
+                    strikethroughY = fixture.metrics.strikethroughY,
+                    overlineY = fixture.metrics.overlineY,
+                    cursorStrokeWidth = fixture.metrics.cursorStrokeWidth,
+                )
+            val cache = renderCache(TestRenderFrame.text("\u221E"))
+
+            // Act
+            fixture.painter.paintRow(
+                fixture.g,
+                cache,
+                fixture.settings.palette,
+                narrowMetrics,
+                row = 0,
+                fontRenderContext = fixture.g.fontRenderContext,
+            )
+
+            // Assert
+            assertEquals(initialTransform, fixture.g.transform, "Complex glyph fitting leaked a Graphics2D transform")
+        }
     }
 
     @Nested

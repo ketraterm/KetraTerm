@@ -541,7 +541,8 @@ internal class MutationEngine(
 
         val attr = line.getPackedAttr(col)
         val extendedAttr = line.getPackedExtendedAttr(col)
-        val clusterWidth = UnicodeWidth.calculate(clusterScratch[0], state.modes.treatAmbiguousAsWide)
+        val oldWidth = if (col + 1 < width && line.rawCodepoint(col + 1) == TerminalConstants.WIDE_CHAR_SPACER) 2 else 1
+        val clusterWidth = UnicodeWidth.calculateCluster(clusterScratch, existingLength + 1, state.modes.treatAmbiguousAsWide)
 
         if (clusterWidth == 2 && col + 1 <= rightMargin) {
             if (line.rawCodepoint(col + 1) != TerminalConstants.WIDE_CHAR_SPACER) {
@@ -555,8 +556,27 @@ internal class MutationEngine(
         if (clusterWidth == 2 && col + 1 <= rightMargin) {
             line.setCell(col + 1, TerminalConstants.WIDE_CHAR_SPACER, attr, extendedAttr)
         }
+        adjustCursorAfterClusterWidthChange(row, col, oldWidth, clusterWidth)
         state.markLineChanged(line)
         state.rememberPrintableCell(row, col)
+    }
+
+    private fun adjustCursorAfterClusterWidthChange(
+        row: Int,
+        col: Int,
+        oldWidth: Int,
+        newWidth: Int,
+    ) {
+        if (oldWidth == newWidth || state.cursor.row != row || state.cursor.pendingWrap) return
+
+        val oldEnd = col + oldWidth
+        if (state.cursor.col != oldEnd) return
+
+        val newEnd = col + newWidth
+        if (newEnd <= rightMargin) {
+            state.cursor.col = newEnd
+            state.markCursorChanged()
+        }
     }
 
     /**

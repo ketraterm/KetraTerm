@@ -48,6 +48,7 @@ class UnicodeClassTest {
             assertEquals(UnicodeClass.GRAPHEME_ZWJ, UnicodeClass.graphemeBreakClass(0x200D))
             assertEquals(UnicodeClass.GRAPHEME_REGIONAL_INDICATOR, UnicodeClass.graphemeBreakClass(0x1F1FA))
             assertEquals(UnicodeClass.GRAPHEME_SPACING_MARK, UnicodeClass.graphemeBreakClass(0x0903))
+            assertEquals(UnicodeClass.GRAPHEME_SPACING_MARK, UnicodeClass.graphemeBreakClass(0x11F03))
         }
 
         @Test
@@ -56,6 +57,7 @@ class UnicodeClassTest {
             assertEquals(UnicodeClass.GRAPHEME_LF, UnicodeClass.graphemeBreakClass(0x000A))
             assertEquals(UnicodeClass.GRAPHEME_CONTROL, UnicodeClass.graphemeBreakClass(0x0000))
             assertEquals(UnicodeClass.GRAPHEME_CONTROL, UnicodeClass.graphemeBreakClass(0x009F))
+            assertEquals(UnicodeClass.GRAPHEME_CONTROL, UnicodeClass.graphemeBreakClass(0x1D173))
             assertEquals(UnicodeClass.GRAPHEME_PREPEND, UnicodeClass.graphemeBreakClass(0x0600))
         }
 
@@ -77,6 +79,7 @@ class UnicodeClassTest {
             assertTrue(UnicodeClass.isExtendedPictographic(0x1F468))
             assertTrue(UnicodeClass.isExtendedPictographic(0x2764))
             assertTrue(UnicodeClass.isExtendedPictographic(0x00A9))
+            assertTrue(UnicodeClass.isExtendedPictographic(0x1FAE8))
         }
 
         @Test
