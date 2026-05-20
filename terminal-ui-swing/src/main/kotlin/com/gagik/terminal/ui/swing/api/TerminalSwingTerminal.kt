@@ -138,7 +138,7 @@ class TerminalSwingTerminal(
             }
 
             override fun mouseExited(event: MouseEvent) {
-                updateHyperlinkHover(NO_HYPERLINK_ID, activationHover = false)
+                clearHyperlinkHover()
             }
         }
 
@@ -294,7 +294,7 @@ class TerminalSwingTerminal(
         lastResizedRows = NO_RESIZE_DIMENSION
         repaintPlanner.reset()
         renderPending.set(false)
-        updateHyperlinkHover(NO_HYPERLINK_ID, activationHover = false)
+        clearHyperlinkHover()
         resizeSessionToVisibleGridOnEdt()
         repaint()
     }
@@ -309,7 +309,7 @@ class TerminalSwingTerminal(
         lastResizedRows = NO_RESIZE_DIMENSION
         repaintPlanner.reset()
         renderPending.set(false)
-        updateHyperlinkHover(NO_HYPERLINK_ID, activationHover = false)
+        clearHyperlinkHover()
         repaint()
     }
 
@@ -324,7 +324,7 @@ class TerminalSwingTerminal(
         cursorTimer.delay = settings.cursorBlinkMillis
         session?.let { applySettingsToSession(it, settings) }
         clearSelection()
-        updateHyperlinkHover(NO_HYPERLINK_ID, activationHover = false)
+        clearHyperlinkHover()
         resizeSessionToVisibleGridOnEdt()
         revalidate()
         repaint()
@@ -426,7 +426,7 @@ class TerminalSwingTerminal(
 
     private fun handleSelectionMouseMoved(event: MouseEvent) {
         if (handleMouseTracking(event, TerminalMouseEventType.MOTION)) {
-            updateHyperlinkHover(NO_HYPERLINK_ID, activationHover = false)
+            clearHyperlinkHover()
             return
         }
         updateHyperlinkHover(resolvableHyperlinkIdAt(event), activationHover = event.isControlDown)
@@ -678,6 +678,10 @@ class TerminalSwingTerminal(
         if (hoveredHyperlinkId == NO_HYPERLINK_ID || hyperlinkActivationHover == active) return
         hyperlinkActivationHover = active
         repaint()
+    }
+
+    private fun clearHyperlinkHover() {
+        updateHyperlinkHover(NO_HYPERLINK_ID, activationHover = false)
     }
 
     private fun updateHyperlinkHover(
