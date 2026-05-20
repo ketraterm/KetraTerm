@@ -53,8 +53,21 @@ fun interface TerminalHyperlinkHandler {
 private object SystemTerminalHyperlinkHandler : TerminalHyperlinkHandler {
     override fun openHyperlink(uri: String): Boolean {
         if (!Desktop.isDesktopSupported()) return false
-        val desktop = Desktop.getDesktop()
-        if (!desktop.isSupported(Desktop.Action.BROWSE)) return false
+        val desktop =
+            try {
+                Desktop.getDesktop()
+            } catch (_: SecurityException) {
+                return false
+            } catch (_: UnsupportedOperationException) {
+                return false
+            }
+        val browseSupported =
+            try {
+                desktop.isSupported(Desktop.Action.BROWSE)
+            } catch (_: SecurityException) {
+                return false
+            }
+        if (!browseSupported) return false
 
         val parsed =
             try {
