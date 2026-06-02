@@ -79,8 +79,8 @@ surface or maintenance cost without meaningful modern terminal value.
 - `DONE(parser/integration)`: `DECSLRM` left/right margins, usually
   `CSI Pl ; Pr s`, route through parser and integration to core margins.
 - `DONE(parser/integration)`: selective erase dispatch routes to core:
-  - `DECSEL`, selective erase in line.
-  - `DECSED`, selective erase in display.
+    - `DECSEL`, selective erase in line.
+    - `DECSED`, selective erase in display.
 - `DONE(parser/integration)`: `DECSCA` selective-erase protection routes to
   core protected-cell pen state.
 - `DONE(parser/integration)`: `RIS`, `ESC c`, full terminal reset routes to
@@ -88,60 +88,60 @@ surface or maintenance cost without meaningful modern terminal value.
 - `DONE(parser/integration)`: modern/common DEC private mode vocabulary is
   named, parsed, tested, and either routed to durable core state or explicitly
   ignored:
-  - application cursor/keypad modes, cursor blink/visibility, reverse video,
-    origin, auto-wrap, left/right margin mode, and alternate-screen variants
-  - mouse tracking and encoding selectors, focus reporting, and bracketed paste
-  - synchronized output mode `?2026` is recognized and intentionally ignored by
-    integration until core/renderer batching state exists
+    - application cursor/keypad modes, cursor blink/visibility, reverse video,
+      origin, auto-wrap, left/right margin mode, and alternate-screen variants
+    - mouse tracking and encoding selectors, focus reporting, and bracketed paste
+    - synchronized output mode `?2026` is recognized and intentionally ignored by
+      integration until core/renderer batching state exists
 - `DONE(parser/core/integration)`: alternate-screen and cursor-save variants
   are distinguished:
-  - `47`, switch alternate screen without clearing or cursor save/restore
-  - `1047`, switch alternate screen and clear on entry without cursor save/restore
-  - `1048`, save/restore cursor without switching buffers
-  - `1049`, save/restore cursor around a clearing alternate-screen switch
+    - `47`, switch alternate screen without clearing or cursor save/restore
+    - `1047`, switch alternate screen and clear on entry without cursor save/restore
+    - `1048`, save/restore cursor without switching buffers
+    - `1049`, save/restore cursor around a clearing alternate-screen switch
 - `DONE(parser/integration)`: xterm title stack:
-  - `CSI 22 t` push window/icon title
-  - `CSI 23 t` pop window/icon title
-  Shells use this when temporarily changing titles for foreground commands.
+    - `CSI 22 t` push window/icon title
+    - `CSI 23 t` pop window/icon title
+      Shells use this when temporarily changing titles for foreground commands.
 - `DONE(parser/core/integration)`: input-facing durable DEC private mode state
   routes into core mode snapshots for application cursor keys, application
   keypad, cursor blink, focus reporting, bracketed paste, mouse tracking modes,
   and mouse UTF-8/SGR/URXVT encoding selectors.
 - `DONE(parser/core/integration/host)`: `DECSCUSR` cursor style / shape and blinking support (`CSI Ps SP q`) maps to dynamic render cursor shapes (BLOCK, UNDERLINE, BAR).
 - `DONE(parser/core/integration)`: safe xterm window/grid size reports:
-  - `CSI 14 t`, report window size in pixels
-  - `CSI 18 t`, report terminal size in characters
-  Pixel reports are silent until the host supplies positive pixel dimensions.
+    - `CSI 14 t`, report window size in pixels
+    - `CSI 18 t`, report terminal size in characters
+      Pixel reports are silent until the host supplies positive pixel dimensions.
 - `TODO(policy)`: xterm window manipulation:
-  - `CSI 3 t`, move window
-  - `CSI 8 t`, resize window
-  - minimize/maximize/raise/lower variants
-  Many modern terminals ignore or gate these to prevent hostile scripts from
-  controlling the user's window.
+    - `CSI 3 t`, move window
+    - `CSI 8 t`, resize window
+    - minimize/maximize/raise/lower variants
+      Many modern terminals ignore or gate these to prevent hostile scripts from
+      controlling the user's window.
 - `DONE(parser/core/integration)`: terminal-to-host response channel and safe
   baseline responses for:
-  - `DSR 5`, operating status, responding `CSI 0 n`
-  - `CPR` / `DSR 6`, cursor position reports
-  - primary `DA`, using a conservative VT100-compatible identity
-  - secondary `DA2`, using a generic versionless identity
-  - `DA3` is parsed but intentionally silent to avoid exposing a stable unit id
-    without policy.
+    - `DSR 5`, operating status, responding `CSI 0 n`
+    - `CPR` / `DSR 6`, cursor position reports
+    - primary `DA`, using a conservative VT100-compatible identity
+    - secondary `DA2`, using a generic versionless identity
+    - `DA3` is parsed but intentionally silent to avoid exposing a stable unit id
+      without policy.
 - `TODO(parser/core)`: broader DEC-specific status reports beyond the safe
   DSR/CPR/DA baseline.
 - `TODO(parser)`: character attribute/protection commands not covered by SGR:
-  - `DECSACE`
+    - `DECSACE`
 - `TODO(parser)`: full tab-stop and margin variants beyond the current common set.
 - `TODO(parser)`: rectangular area operations:
-  - `DECCRA`
-  - `DECERA`
-  - `DECFRA`
-  - `DECSERA`
-  - `DECSACE`
+    - `DECCRA`
+    - `DECERA`
+    - `DECFRA`
+    - `DECSERA`
+    - `DECSACE`
 - `TODO(parser)`: insert/delete/erase variants with selective protection and rectangular bounds.
 - `TODO(parser)`: scroll variants and xterm extensions not yet routed:
-  - `DECSTBM` is present
-  - `SU` / `SD` are present
-  - left/right-margin-aware variants need broader integration tests
+    - `DECSTBM` is present
+    - `SU` / `SD` are present
+    - left/right-margin-aware variants need broader integration tests
 - `DONE(parser/core/integration)`: erase saved lines / scrollback clear,
   `CSI 3 J`, is currently routed through ED mode 3 to core scrollback clearing.
   Keep this covered with regression tests because shells and clear-screen
@@ -152,13 +152,13 @@ surface or maintenance cost without meaningful modern terminal value.
 - `DONE(parser/integration)`: full reset `ESC c`.
 - `DONE(parser/core/integration)`: DEC alignment test `DECALN`, `ESC # 8`.
 - `DONE(parser)`: common ISO 2022 charset plumbing for G0-G3:
-  - ASCII and DEC Special Graphics designation through `ESC (`, `ESC )`,
-    `ESC *`, and `ESC +`
-  - SO/SI locking shifts and SS2/SS3 single shifts
-  - VT line drawing aliases used by common terminal descriptions
+    - ASCII and DEC Special Graphics designation through `ESC (`, `ESC )`,
+      `ESC *`, and `ESC +`
+    - SO/SI locking shifts and SS2/SS3 single shifts
+    - VT line drawing aliases used by common terminal descriptions
 - `TODO(parser)`: broader ISO 2022 national replacement sets:
-  - UK, US, Dutch, Finnish, French, German, Italian, Norwegian/Danish, Spanish,
-    Swedish, Swiss, Portuguese
+    - UK, US, Dutch, Finnish, French, German, Italian, Norwegian/Danish, Spanish,
+      Swedish, Swiss, Portuguese
 - `TODO(parser)`: 8-bit C1 equivalents for ESC-prefixed controls if raw C1 mode
   is supported later.
 - `TODO(parser)`: save/restore state parity between DEC and SCO cursor save forms,
@@ -246,12 +246,12 @@ Missing:
 - `DONE(core/integration)`: conceal/hidden attribute.
 - `DONE(core/integration)`: strikethrough attribute.
 - `DONE(core/integration)`: underline style beyond boolean underline:
-  - none
-  - single
-  - double
-  - curly
-  - dotted
-  - dashed
+    - none
+    - single
+    - double
+    - curly
+    - dotted
+    - dashed
 - `DONE(core/integration)`: SGR underline color via SGR 58/59.
 - `DONE(core/integration)`: SGR overline.
 - `DONE(core/integration)`: cell-level OSC 8 hyperlink id storage. Core stores
@@ -296,10 +296,10 @@ Missing:
 ### Grid Operations
 
 - `TODO(core)`: rectangular area operations if parser support is added:
-  - copy rectangle
-  - erase rectangle
-  - fill rectangle
-  - selective erase rectangle
+    - copy rectangle
+    - erase rectangle
+    - fill rectangle
+    - selective erase rectangle
 - `TODO(core)`: left/right margin interactions need continued property testing
   across all edit/erase/scroll operations.
 - `TODO(core)`: full DEC protection behavior across all rectangular operations.
@@ -310,10 +310,10 @@ Missing:
 ### Unicode Width
 
 - `DONE(core)`: generated Unicode 17.0.0 width tables from current Unicode data:
-  - EastAsianWidth
-  - emoji presentation
-  - zero-width and combining ranges
-  - ambiguous-width policy
+    - EastAsianWidth
+    - emoji presentation
+    - zero-width and combining ranges
+    - ambiguous-width policy
 - `DONE(core)`: width policy for emoji presentation selectors is explicit and
   backed by generated emoji property and variation-sequence tables. Emoji ZWJ
   cluster width continues to derive from the first scalar, matching the current
@@ -328,18 +328,18 @@ Missing:
 ### Query and Response Channel
 
 - `DONE(core)`: terminal-to-host response queue and safe response generation for:
-  - DSR/CPR
-  - primary DA and secondary DA2
-  - safe xterm grid/pixel size reports
+    - DSR/CPR
+    - primary DA and secondary DA2
+    - safe xterm grid/pixel size reports
 - `DONE(input/session)`: host-bound interactive reports and delimiters for
   mouse events, focus reports, and bracketed paste boundaries are generated by
   `:terminal-input` and serialized through `TerminalSession` with core/parser
   responses.
 - `TODO(policy)`: DA3 terminal unit id behavior.
 - `TODO(core)`: terminal-to-host response/event API for:
-  - XTGETTCAP
-  - OSC queries
-  - future query/response protocols that need core state
+    - XTGETTCAP
+    - OSC queries
+    - future query/response protocols that need core state
 - `TODO(core/host)`: event API for hyperlinks, palette updates, and terminal
   notifications if these move out of integration or render-frame metadata.
 
@@ -400,32 +400,32 @@ Missing:
 - `DONE(input)`: focus in/out reports read core mode bits once per event and
   emit `CSI I` / `CSI O` only when focus reporting is enabled.
 - `DONE(input)`: mouse report encoding:
-  - X10, normal, button-event, and any-event tracking suppression rules
-  - SGR mouse encoding, including button-preserving lowercase-`m` releases
-  - bounded legacy `ESC [ M` encoding with explicit coordinate-limit policy
-  - UTF-8 extended mouse encoding (`?1005`) up to xterm's coordinate limit
-  - URXVT mouse encoding (`?1015`)
+    - X10, normal, button-event, and any-event tracking suppression rules
+    - SGR mouse encoding, including button-preserving lowercase-`m` releases
+    - bounded legacy `ESC [ M` encoding with explicit coordinate-limit policy
+    - UTF-8 extended mouse encoding (`?1005`) up to xterm's coordinate limit
+    - URXVT mouse encoding (`?1015`)
 - `DONE(parser/core/integration/input)`: xterm modifyOtherKeys and
   formatOtherKeys support for ordinary-key input:
-  - modifyOtherKeys mode 1/2/3 consumption from core packed mode bits
-  - original `CSI 27 ; modifier ; codepoint ~` format
-  - `formatOtherKeys=1` / CSI-u `CSI codepoint ; modifier u` format
-  - parser/integration routing for `CSI > 4 ; Pv m` and `CSI > 4 ; Pv f`
-  - regression coverage for modified printable input and control-equivalent
-    Tab/Enter/Backspace/Escape cases
+    - modifyOtherKeys mode 1/2/3 consumption from core packed mode bits
+    - original `CSI 27 ; modifier ; codepoint ~` format
+    - `formatOtherKeys=1` / CSI-u `CSI codepoint ; modifier u` format
+    - parser/integration routing for `CSI > 4 ; Pv m` and `CSI > 4 ; Pv f`
+    - regression coverage for modified printable input and control-equivalent
+      Tab/Enter/Backspace/Escape cases
 - `TODO(input)`: broader modified-key encoding:
-  - xterm modifyOtherKeys subparameter mask support such as `CSI > 4 : 1 m`
-  - query/disable controls for xterm key modifier options if host responses or
-    exact disabled-resource semantics are needed
+    - xterm modifyOtherKeys subparameter mask support such as `CSI > 4 : 1 m`
+    - query/disable controls for xterm key modifier options if host responses or
+      exact disabled-resource semantics are needed
 - `TODO(parser/core/input)`: xterm modified-key policy surface for
   `modifyCursorKeys`, `modifyFunctionKeys`, and `modifyKeypadKeys` if those are
   added. These need protocol/core mode or policy state before input grows more
   branches.
 - `DONE(input)`: keypad fidelity for xterm's stable cell-keyboard vocabulary:
-  - keypad space, tab, equals, comma, separator, and begin/keypad-5 when UI
-    adapters expose them
-  - explicit PF1-PF4 terminal keys rather than permanently overloading physical
-    F1-F4 when a platform can distinguish keypad PF keys
+    - keypad space, tab, equals, comma, separator, and begin/keypad-5 when UI
+      adapters expose them
+    - explicit PF1-PF4 terminal keys rather than permanently overloading physical
+      F1-F4 when a platform can distinguish keypad PF keys
 - `TODO(input/policy)`: additional xterm-compatible key policies when a real
   ambiguity exists, such as Delete behavior and optional eight-bit Meta output.
 - `TODO(input)`: SGR-Pixels mouse mode (`?1016`) if renderer/UI integration
@@ -434,9 +434,9 @@ Missing:
   xterm mouse parity is required; it needs a distinct interaction contract
   rather than simple cell-coordinate event forwarding.
 - `DONE(input/policy)`: paste sanitization policy hook:
-  - raw paste
-  - strip C0 controls except TAB/CR/LF
-  - line-ending normalization
+    - raw paste
+    - strip C0 controls except TAB/CR/LF
+    - line-ending normalization
 - `DONE(integration/host)`: terminal-to-host output ordering contract. UI input
   events and parser/core responses such as DSR/CPR/DA/OSC/DCS replies should be
   serialized through the same terminal actor and `TerminalHostOutput`.
@@ -447,24 +447,75 @@ Missing:
   locked. Keep it as a separate protocol path rather than mixing it into the
   xterm legacy/modifyOtherKeys encoder.
 
+Planned Kitty Keyboard Protocol scope:
+
+- Reference: kitty's "Comprehensive keyboard handling in terminals" protocol,
+  especially progressive enhancement, key-code, modifier, event-type, and
+  associated-text rules.
+- Ownership:
+    - `terminal-protocol`: primitive constants for progressive-enhancement flags,
+      flag-application modes, event types, and functional-key numeric codes used
+      by host-bound encoding.
+    - `terminal-parser`: recognize Kitty keyboard mode controls only. It should
+      emit semantic sink calls for `CSI = flags ; mode u`, `CSI > flags u`,
+      `CSI < number u`, and later `CSI ? u`; it must not encode keyboard input.
+    - `terminal-core`: store input-readable Kitty keyboard flags and a bounded
+      mode stack. The stack must eventually respect kitty's main-screen and
+      alternate-screen separation rule; do not fake this in integration.
+    - `terminal-integration`: map parser semantic mode controls to core APIs,
+      with explicit no-op/TODO behavior for unsupported query responses.
+    - `terminal-input`: add a dedicated Kitty encoder branch selected from core
+      mode bits. Do not mix Kitty progressive-enhancement flags into the xterm
+      legacy/modifyOtherKeys branch.
+- First implementation milestone:
+    - support the five progressive-enhancement flags:
+        - disambiguate escape codes, `1`
+        - report event types, `2`
+        - report alternate keys, `4`
+        - report all keys as escape codes, `8`
+        - report associated text, `16`
+    - support flag application modes for `CSI = flags ; mode u`:
+        - mode `1`: replace active flags
+        - mode `2`: set only the supplied bits
+        - mode `3`: clear only the supplied bits
+    - support push/pop controls with a small bounded stack:
+        - `CSI > flags u`: push current flags, then apply supplied flags
+        - `CSI < number u`: pop one or more stack entries, defaulting to one
+    - encode only key press events at first; report repeat/release events only
+      after UI event vocabulary exposes them distinctly.
+    - implement the high-value input slice first:
+        - printable Unicode scalar keys
+        - Enter, Tab, Backspace, Escape
+        - modifiers already represented by `TerminalModifiers`
+        - no alternate-key or associated-text payload until normalized UI events
+          expose enough layout/text data to do it honestly
+- Deferred Kitty scope:
+    - `CSI ? u` query response and terminal capability identity policy
+    - separate left/right modifier reporting if host event vocabulary grows it
+    - key repeat/release reporting
+    - alternate-key fields and associated text fields
+    - modifier-only key events
+    - complete functional-key numeric table beyond keys already represented by
+      `TerminalKey`
+
 ## Session, Transport, Rendering, and Host Integration Gaps
 
 Rendering is intentionally outside the current core/parser modules, but a
 professional emulator needs explicit contracts for it.
 
 - `DONE(host)`: transport/session split:
-  - `:terminal-transport-api` defines `TerminalConnector` and
-    `TerminalConnectorListener`
-  - `:terminal-session` owns parser/core synchronization, core response
-    draining, input encoding, outbound write ordering, local/remote close state,
-    and idempotent parser cleanup
-  - `:terminal-testkit` provides `MockConnector` for logic tests
+    - `:terminal-transport-api` defines `TerminalConnector` and
+      `TerminalConnectorListener`
+    - `:terminal-session` owns parser/core synchronization, core response
+      draining, input encoding, outbound write ordering, local/remote close state,
+      and idempotent parser cleanup
+    - `:terminal-testkit` provides `MockConnector` for logic tests
 - `DONE(host)`: local PTY process lifecycle:
-  - `:terminal-pty` starts PTY4J-backed processes behind `PtyConnector`
-  - PTY connectors own reader/watcher threads, raw host bytes, stdin writes,
-    resize, local close, read errors, and process exit notification
-  - `TerminalPtySessions` and `TerminalSessions.localPty` return the shared
-    `TerminalSession` rather than a PTY-specific session class
+    - `:terminal-pty` starts PTY4J-backed processes behind `PtyConnector`
+    - PTY connectors own reader/watcher threads, raw host bytes, stdin writes,
+      resize, local close, read errors, and process exit notification
+    - `TerminalPtySessions` and `TerminalSessions.localPty` return the shared
+      `TerminalSession` rather than a PTY-specific session class
 - `DONE(host/integration)`: PTY convenience factory wires integration host event
   callbacks for BEL and OSC icon/window title changes.
 - `DONE(host)`: opt-in native PTY integration tests verify real process output,
@@ -512,17 +563,17 @@ professional emulator needs explicit contracts for it.
   fallback run metrics, and backend painter integrations beyond the current
   Java2D/Swing path.
 - `DONE(host/ui)`: baseline and advanced text selection and clipboard integration:
-  - mouse drag selection over visible render-cache rows
-  - drag autoscroll at the top/bottom viewport edges with distance-proportional velocity acceleration
-  - double-click smart auto-detecting word, path, and URL selection with full Unicode/CLUSTER support
-  - triple-click line selection
-  - selection retention policy while scrolled or when new frames are published
-  - rectangular block selection (via Alt+Drag)
-  - mouse tracking protocol interception (with Shift bypass support)
-  - configurable Swing selection overlay color with a soft white default
-  - platform clipboard shortcuts copy selected visible text through the Swing
-    clipboard abstraction
-  - platform paste shortcuts read clipboard text and send a terminal paste event
+    - mouse drag selection over visible render-cache rows
+    - drag autoscroll at the top/bottom viewport edges with distance-proportional velocity acceleration
+    - double-click smart auto-detecting word, path, and URL selection with full Unicode/CLUSTER support
+    - triple-click line selection
+    - selection retention policy while scrolled or when new frames are published
+    - rectangular block selection (via Alt+Drag)
+    - mouse tracking protocol interception (with Shift bypass support)
+    - configurable Swing selection overlay color with a soft white default
+    - platform clipboard shortcuts copy selected visible text through the Swing
+      clipboard abstraction
+    - platform paste shortcuts read clipboard text and send a terminal paste event
 - `DONE(host/session/ui)`: Swing hyperlink activation hit-tests primitive
   render-cache hyperlink ids outside the paint loop, resolves metadata through
   `TerminalSession`, changes the hover cursor over resolvable links, and opens
