@@ -86,6 +86,10 @@ internal class TerminalModeControllerImpl(
         mutateMode { state.modes.modifyOtherKeysMode = mode }
     }
 
+    override fun setFormatOtherKeysMode(mode: Int) {
+        mutateMode { state.modes.formatOtherKeysMode = mode }
+    }
+
     override fun setReverseVideo(enabled: Boolean) {
         mutateMode {
             if (state.modes.isReverseVideo == enabled) return@mutateMode

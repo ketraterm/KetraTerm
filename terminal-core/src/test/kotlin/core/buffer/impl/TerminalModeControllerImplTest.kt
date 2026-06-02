@@ -93,6 +93,7 @@ class TerminalModeControllerImplTest {
         modeController.setBracketedPasteEnabled(true)
         modeController.setFocusReportingEnabled(true)
         modeController.setModifyOtherKeysMode(2)
+        modeController.setFormatOtherKeysMode(1)
         modeController.setReverseVideo(true)
         modeController.setCursorVisible(false)
         modeController.setCursorBlinking(true)
@@ -105,6 +106,7 @@ class TerminalModeControllerImplTest {
             { assertTrue(state.modes.isBracketedPasteEnabled) },
             { assertTrue(state.modes.isFocusReportingEnabled) },
             { assertEquals(2, state.modes.modifyOtherKeysMode) },
+            { assertEquals(1, state.modes.formatOtherKeysMode) },
             { assertTrue(state.modes.isReverseVideo) },
             { assertFalse(state.modes.isCursorVisible) },
             { assertTrue(state.modes.isCursorBlinking) },
@@ -131,6 +133,7 @@ class TerminalModeControllerImplTest {
         withPendingWrap(modeController, state) { modeController.setBracketedPasteEnabled(true) }
         withPendingWrap(modeController, state) { modeController.setFocusReportingEnabled(true) }
         withPendingWrap(modeController, state) { modeController.setModifyOtherKeysMode(2) }
+        withPendingWrap(modeController, state) { modeController.setFormatOtherKeysMode(1) }
         withPendingWrap(modeController, state) { modeController.setReverseVideo(true) }
         withPendingWrap(modeController, state) { modeController.setCursorVisible(false) }
         withPendingWrap(modeController, state) { modeController.setCursorBlinking(true) }

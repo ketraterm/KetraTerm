@@ -36,7 +36,7 @@ class CoreTerminalRenderFrameTest {
                 { assertEquals(0, frame.cursor.column) },
                 { assertEquals(0, frame.cursor.row) },
                 { assertTrue(frame.cursor.visible) },
-                { assertFalse(frame.cursor.blinking) },
+                { assertTrue(frame.cursor.blinking) },
                 { assertEquals(TerminalRenderCursorShape.BLOCK, frame.cursor.shape) },
             )
         }

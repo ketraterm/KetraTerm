@@ -77,6 +77,12 @@ class GeneratedCsiDispatchTableTest {
         }
 
         @Test
+        fun `xterm key option controls route by greater-than private marker`() {
+            assertEquals(CsiCommand.XTFMTKEYS, lookup('f', privateMarker = '>'.code))
+            assertEquals(CsiCommand.XTMODKEYS, lookup('m', privateMarker = '>'.code))
+        }
+
+        @Test
         fun `DEC selective erase signatures route separately from normal erase`() {
             assertEquals(CsiCommand.DECSED, lookup('J', privateMarker = '?'.code))
             assertEquals(CsiCommand.DECSEL, lookup('K', privateMarker = '?'.code))

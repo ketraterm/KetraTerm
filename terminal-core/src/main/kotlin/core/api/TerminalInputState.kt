@@ -90,5 +90,16 @@ interface TerminalInputState {
                 TerminalModeBits.MODIFY_OTHER_KEYS_MASK,
                 TerminalModeBits.MODIFY_OTHER_KEYS_SHIFT,
             )
+
+        /**
+         * Returns the packed format-other-keys mode value from [bits].
+         */
+        @JvmStatic
+        fun formatOtherKeysMode(bits: Long): Int =
+            TerminalModeBits.packedValue(
+                bits,
+                TerminalModeBits.FORMAT_OTHER_KEYS_MASK,
+                TerminalModeBits.FORMAT_OTHER_KEYS_SHIFT,
+            )
     }
 }

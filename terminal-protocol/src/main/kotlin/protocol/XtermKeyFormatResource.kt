@@ -16,18 +16,14 @@
 package com.gagik.terminal.protocol
 
 /**
- * Xterm modifyOtherKeys mode values stored in core's packed input-mode word.
+ * Xterm XTFMTKEYS resource ids used by `CSI > Pp ; Pv f`.
+ *
+ * Values mirror xterm's control-sequences table for "Set/reset key format
+ * options (XTFMTKEYS)":
+ * <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html>.
+ * In that table, `Pp = 4` selects formatOtherKeys.
  */
-object ModifyOtherKeysMode {
-    /** Do not use modifyOtherKeys encoding. */
-    const val DISABLED: Int = 0
-
-    /** Encode ordinary modified keys whose legacy representation is ambiguous or missing. */
-    const val MODE_1: Int = 1
-
-    /** Encode ordinary modified keys plus xterm's Tab/Enter control-equivalent exceptions. */
-    const val MODE_2: Int = 2
-
-    /** Encode ordinary keys even when no modifiers are active. */
-    const val MODE_3: Int = 3
+object XtermKeyFormatResource {
+    /** formatOtherKeys resource id. */
+    const val FORMAT_OTHER_KEYS: Int = 4
 }

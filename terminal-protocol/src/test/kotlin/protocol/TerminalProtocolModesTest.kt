@@ -93,6 +93,23 @@ class TerminalProtocolModesTest {
             { assertEquals(0, ModifyOtherKeysMode.DISABLED) },
             { assertEquals(1, ModifyOtherKeysMode.MODE_1) },
             { assertEquals(2, ModifyOtherKeysMode.MODE_2) },
+            { assertEquals(3, ModifyOtherKeysMode.MODE_3) },
+        )
+    }
+
+    @Test
+    fun `formatOtherKeys modes expose input and core shared vocabulary`() {
+        assertAll(
+            { assertEquals(0, FormatOtherKeysMode.DEFAULT) },
+            { assertEquals(1, FormatOtherKeysMode.CSI_U) },
+        )
+    }
+
+    @Test
+    fun `xterm key option resource ids match control sequence values`() {
+        assertAll(
+            { assertEquals(4, XtermKeyModifierResource.MODIFY_OTHER_KEYS) },
+            { assertEquals(4, XtermKeyFormatResource.FORMAT_OTHER_KEYS) },
         )
     }
 }

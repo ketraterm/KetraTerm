@@ -24,6 +24,7 @@ import com.gagik.terminal.input.policy.MetaKeyPolicy
 import com.gagik.terminal.input.policy.TerminalInputPolicy
 import com.gagik.terminal.input.policy.UnsupportedModifiedKeyPolicy
 import com.gagik.terminal.protocol.ControlCode
+import com.gagik.terminal.protocol.FormatOtherKeysMode
 import com.gagik.terminal.protocol.ModifyOtherKeysMode
 import com.gagik.terminal.protocol.host.TerminalHostOutput
 
@@ -58,7 +59,7 @@ internal class KeyboardEncoder(
         modeBits: Long,
     ) {
         if (shouldEncodeModifyOtherKey(codepoint, modifiers, modeBits)) {
-            encodeModifyOtherKey(codepoint, modifiers)
+            encodeModifyOtherKey(codepoint, modifiers, modeBits)
             return
         }
 
@@ -105,9 +106,9 @@ internal class KeyboardEncoder(
 
             TerminalKey.TAB -> encodeTab(modifiers, modeBits)
 
-            TerminalKey.BACKSPACE -> encodeBackspace(modifiers)
+            TerminalKey.BACKSPACE -> encodeBackspace(modifiers, modeBits)
 
-            TerminalKey.ESCAPE -> encodeEscape(modifiers)
+            TerminalKey.ESCAPE -> encodeEscape(modifiers, modeBits)
 
             TerminalKey.UP ->
                 encodeArrow(
@@ -206,9 +207,25 @@ internal class KeyboardEncoder(
         }
     }
 
-    private fun encodeBackspace(modifiers: Int) {
+    private fun encodeBackspace(
+        modifiers: Int,
+        modeBits: Long,
+    ) {
+        if (shouldEncodeModifyOtherSpecial(BACKSPACE_CODEPOINT, modifiers, modeBits)) {
+            encodeModifyOtherKey(BACKSPACE_CODEPOINT, modifiers, modeBits)
+            return
+        }
+
         val unsupportedModifier =
-            TerminalModifiers.hasShift(modifiers) || TerminalModifiers.hasCtrl(modifiers)
+            TerminalModifiers.hasShift(modifiers) ||
+                (
+                    TerminalModifiers.hasCtrl(modifiers) &&
+                        (
+                            TerminalModifiers.hasShift(modifiers) ||
+                                TerminalModifiers.hasAlt(modifiers) ||
+                                TerminalModifiers.hasMeta(modifiers)
+                        )
+                )
 
         if (unsupportedModifier) {
             when (policy.unsupportedModifiedKeyPolicy) {
@@ -223,12 +240,17 @@ internal class KeyboardEncoder(
             return
         }
 
-        val byte =
+        val baseByte =
             when (policy.backspacePolicy) {
                 BackspacePolicy.DELETE -> ControlCode.DEL
                 BackspacePolicy.BACKSPACE -> BS
             }
-        output.writeByte(byte)
+
+        if (TerminalModifiers.hasCtrl(modifiers)) {
+            output.writeByte(if (baseByte == ControlCode.DEL) BS else ControlCode.DEL)
+        } else {
+            output.writeByte(baseByte)
+        }
     }
 
     private fun encodeEnter(
@@ -236,7 +258,7 @@ internal class KeyboardEncoder(
         modeBits: Long,
     ) {
         if (shouldEncodeModifyOtherSpecial(ENTER_CODEPOINT, modifiers, modeBits)) {
-            encodeModifyOtherKey(ENTER_CODEPOINT, modifiers)
+            encodeModifyOtherKey(ENTER_CODEPOINT, modifiers, modeBits)
             return
         }
 
@@ -264,7 +286,15 @@ internal class KeyboardEncoder(
         }
     }
 
-    private fun encodeEscape(modifiers: Int) {
+    private fun encodeEscape(
+        modifiers: Int,
+        modeBits: Long,
+    ) {
+        if (shouldEncodeModifyOtherSpecial(ESCAPE_CODEPOINT, modifiers, modeBits)) {
+            encodeModifyOtherKey(ESCAPE_CODEPOINT, modifiers, modeBits)
+            return
+        }
+
         val unsupportedModifier =
             TerminalModifiers.hasShift(modifiers) || TerminalModifiers.hasCtrl(modifiers)
 
@@ -305,7 +335,7 @@ internal class KeyboardEncoder(
         modeBits: Long,
     ) {
         if (shouldEncodeModifyOtherSpecial(TAB_CODEPOINT, modifiers, modeBits)) {
-            encodeModifyOtherKey(TAB_CODEPOINT, modifiers)
+            encodeModifyOtherKey(TAB_CODEPOINT, modifiers, modeBits)
             return
         }
 
@@ -313,43 +343,49 @@ internal class KeyboardEncoder(
     }
 
     /**
-     * Implements xterm's original modifyOtherKeys wire format
-     * `CSI 27 ; modifier ; codepoint ~` for ordinary keys. This intentionally
-     * does not implement `formatOtherKeys=1`/CSI-u or mode 3.
+     * Implements xterm modifyOtherKeys selection for ordinary printable keys.
+     * The actual wire shape is selected by formatOtherKeys at emission time.
      */
     private fun shouldEncodeModifyOtherKey(
         codepoint: Int,
         modifiers: Int,
         modeBits: Long,
-    ): Boolean {
-        if (modifiers == TerminalModifiers.NONE) {
-            return false
-        }
-
-        return when (TerminalInputState.modifyOtherKeysMode(modeBits)) {
+    ): Boolean =
+        when (TerminalInputState.modifyOtherKeysMode(modeBits)) {
             ModifyOtherKeysMode.MODE_1 -> isLegacyAmbiguousOrMissing(codepoint, modifiers)
-            ModifyOtherKeysMode.MODE_2 -> true
+            ModifyOtherKeysMode.MODE_2 -> modifiers != TerminalModifiers.NONE
+            ModifyOtherKeysMode.MODE_3 -> true
             else -> false
         }
-    }
 
     private fun shouldEncodeModifyOtherSpecial(
         codepoint: Int,
         modifiers: Int,
         modeBits: Long,
-    ): Boolean {
-        if (modifiers == TerminalModifiers.NONE) {
-            return false
-        }
-
-        return TerminalInputState.modifyOtherKeysMode(modeBits) == ModifyOtherKeysMode.MODE_2 &&
-            (codepoint == TAB_CODEPOINT || codepoint == ENTER_CODEPOINT)
-    }
+    ): Boolean =
+        when (TerminalInputState.modifyOtherKeysMode(modeBits)) {
+            ModifyOtherKeysMode.MODE_1 ->
+                modifiers != TerminalModifiers.NONE &&
+                    (TerminalModifiers.hasAlt(modifiers) || TerminalModifiers.hasMeta(modifiers))
+            ModifyOtherKeysMode.MODE_2 -> modifiers != TerminalModifiers.NONE
+            ModifyOtherKeysMode.MODE_3 -> true
+            else -> false
+        } &&
+            (
+                codepoint == TAB_CODEPOINT ||
+                    codepoint == ENTER_CODEPOINT ||
+                    codepoint == BACKSPACE_CODEPOINT ||
+                    codepoint == ESCAPE_CODEPOINT
+            )
 
     private fun isLegacyAmbiguousOrMissing(
         codepoint: Int,
         modifiers: Int,
     ): Boolean {
+        if (TerminalModifiers.hasAlt(modifiers) || TerminalModifiers.hasMeta(modifiers)) {
+            return true
+        }
+
         if (TerminalModifiers.hasShift(modifiers) && modifiers != TerminalModifiers.SHIFT) {
             return true
         }
@@ -364,6 +400,18 @@ internal class KeyboardEncoder(
     private fun encodeModifyOtherKey(
         codepoint: Int,
         modifiers: Int,
+        modeBits: Long,
+    ) {
+        if (TerminalInputState.formatOtherKeysMode(modeBits) == FormatOtherKeysMode.CSI_U) {
+            encodeModifyOtherKeyCsiU(codepoint, modifiers)
+        } else {
+            encodeModifyOtherKeyLegacy(codepoint, modifiers)
+        }
+    }
+
+    private fun encodeModifyOtherKeyLegacy(
+        codepoint: Int,
+        modifiers: Int,
     ) {
         scratch.clear()
         scratch.appendByte(ControlCode.ESC)
@@ -374,6 +422,20 @@ internal class KeyboardEncoder(
         scratch.appendByte(';'.code)
         scratch.appendDecimal(codepoint)
         scratch.appendByte('~'.code)
+        scratch.writeTo(output)
+    }
+
+    private fun encodeModifyOtherKeyCsiU(
+        codepoint: Int,
+        modifiers: Int,
+    ) {
+        scratch.clear()
+        scratch.appendByte(ControlCode.ESC)
+        scratch.appendByte('['.code)
+        scratch.appendDecimal(codepoint)
+        scratch.appendByte(';'.code)
+        scratch.appendDecimal(TerminalModifiers.toCsiModifierParam(modifiers))
+        scratch.appendByte('u'.code)
         scratch.writeTo(output)
     }
 
@@ -733,6 +795,8 @@ internal class KeyboardEncoder(
 
     private companion object {
         private const val BS: Int = 0x08
+        private const val BACKSPACE_CODEPOINT: Int = 0x08
+        private const val ESCAPE_CODEPOINT: Int = 0x1b
         private const val ENTER_CODEPOINT: Int = 0x0d
         private const val MODIFY_OTHER_KEYS_PREFIX: Int = 27
         private const val TAB_CODEPOINT: Int = 0x09

@@ -61,11 +61,19 @@ class TerminalModeBitsTest {
                 TerminalModeBits.NEW_LINE_MODE or
                 TerminalModeBits.BRACKETED_PASTE or
                 TerminalModeBits.FOCUS_REPORTING
+        val withFormat =
+            TerminalModeBits.withPackedValue(
+                bits = bits,
+                mask = TerminalModeBits.FORMAT_OTHER_KEYS_MASK,
+                shift = TerminalModeBits.FORMAT_OTHER_KEYS_SHIFT,
+                value = 1,
+            )
 
-        assertTrue(TerminalInputState.isApplicationCursorKeys(bits))
-        assertTrue(TerminalInputState.isApplicationKeypad(bits))
-        assertTrue(TerminalInputState.isNewLineMode(bits))
-        assertTrue(TerminalInputState.isBracketedPasteEnabled(bits))
-        assertTrue(TerminalInputState.isFocusReportingEnabled(bits))
+        assertTrue(TerminalInputState.isApplicationCursorKeys(withFormat))
+        assertTrue(TerminalInputState.isApplicationKeypad(withFormat))
+        assertTrue(TerminalInputState.isNewLineMode(withFormat))
+        assertTrue(TerminalInputState.isBracketedPasteEnabled(withFormat))
+        assertTrue(TerminalInputState.isFocusReportingEnabled(withFormat))
+        assertEquals(1, TerminalInputState.formatOtherKeysMode(withFormat))
     }
 }

@@ -61,6 +61,8 @@ internal object GeneratedCsiDispatchTable {
             116L, // CSI t  xterm window/title operation
             15715L, // CSI = c  DA3
             15971L, // CSI > c  DA2
+            15974L, // CSI > f  XTFMTKEYS
+            15981L, // CSI > m  XTMODKEYS
             16202L, // CSI ? J  DECSED
             16203L, // CSI ? K  DECSEL
             16232L, // CSI ? h  DECSET
@@ -105,6 +107,8 @@ internal object GeneratedCsiDispatchTable {
             CsiCommand.WINDOW_OP,
             CsiCommand.DA_TERTIARY,
             CsiCommand.DA_SECONDARY,
+            CsiCommand.XTFMTKEYS,
+            CsiCommand.XTMODKEYS,
             CsiCommand.DECSED,
             CsiCommand.DECSEL,
             CsiCommand.SM_DEC,

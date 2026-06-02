@@ -21,6 +21,8 @@ import com.gagik.core.model.AttributeColor
 import com.gagik.core.model.UnderlineStyle
 import com.gagik.parser.api.TerminalOutputParser
 import com.gagik.parser.api.TerminalParsers
+import com.gagik.terminal.protocol.FormatOtherKeysMode
+import com.gagik.terminal.protocol.ModifyOtherKeysMode
 import com.gagik.terminal.protocol.MouseEncodingMode
 import com.gagik.terminal.protocol.MouseTrackingMode
 import com.gagik.terminal.render.api.TerminalRenderCursorShape
@@ -256,7 +258,7 @@ class CoreTerminalCommandSinkTest {
                 { assertFalse(snapshot.isOriginMode) },
                 { assertTrue(snapshot.isAutoWrap) },
                 { assertTrue(snapshot.isCursorVisible) },
-                { assertFalse(snapshot.isCursorBlinking) },
+                { assertTrue(snapshot.isCursorBlinking) },
                 { assertFalse(snapshot.isFocusReportingEnabled) },
                 { assertFalse(snapshot.isBracketedPasteEnabled) },
                 { assertEquals(MouseEncodingMode.SGR, snapshot.mouseEncodingMode) },
@@ -412,6 +414,42 @@ class CoreTerminalCommandSinkTest {
             val before = f.terminal.getModeSnapshot()
             f.acceptAscii("\u001B[?2026h")
             f.acceptAscii("\u001B[?2026l")
+
+            assertEquals(before, f.terminal.getModeSnapshot())
+        }
+
+        @Test
+        fun `xterm key option controls update input-facing core mode snapshot`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B[>4;3m")
+            f.acceptAscii("\u001B[>4;1f")
+
+            var snapshot = f.terminal.getModeSnapshot()
+            assertAll(
+                { assertEquals(ModifyOtherKeysMode.MODE_3, snapshot.modifyOtherKeysMode) },
+                { assertEquals(FormatOtherKeysMode.CSI_U, snapshot.formatOtherKeysMode) },
+            )
+
+            f.acceptAscii("\u001B[>4m")
+            f.acceptAscii("\u001B[>4f")
+
+            snapshot = f.terminal.getModeSnapshot()
+            assertAll(
+                { assertEquals(ModifyOtherKeysMode.DISABLED, snapshot.modifyOtherKeysMode) },
+                { assertEquals(FormatOtherKeysMode.DEFAULT, snapshot.formatOtherKeysMode) },
+            )
+        }
+
+        @Test
+        fun `unsupported xterm key option controls leave core mode snapshot unchanged`() {
+            val f = Fixture()
+
+            val before = f.terminal.getModeSnapshot()
+            f.acceptAscii("\u001B[>1;2m")
+            f.acceptAscii("\u001B[>4;9m")
+            f.acceptAscii("\u001B[>1;1f")
+            f.acceptAscii("\u001B[>4;2f")
 
             assertEquals(before, f.terminal.getModeSnapshot())
         }

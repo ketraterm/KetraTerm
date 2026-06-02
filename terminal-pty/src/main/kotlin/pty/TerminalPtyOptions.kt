@@ -82,6 +82,7 @@ data class TerminalPtyOptions(
         fun defaultEnvironment(): Map<String, String> {
             val env = LinkedHashMap(System.getenv())
             env.putIfAbsent("TERM", "xterm-256color")
+            env.putIfAbsent("COLORTERM", "truecolor")
             return env
         }
     }

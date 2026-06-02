@@ -260,7 +260,8 @@ internal object SgrDispatcher {
         startIndex: Int,
         target: ColorTarget,
     ): Int {
-        val colorIndex = startIndex + 2
+        val chainLength = getSubparameterChainLength(state, startIndex)
+        val colorIndex = if (chainLength >= 4) startIndex + 3 else startIndex + 2
         val color = paramOrMissing(state, colorIndex)
         if (color !in 0..255) {
             return colorIndex + 1
@@ -281,15 +282,8 @@ internal object SgrDispatcher {
         startIndex: Int,
         target: ColorTarget,
     ): Int {
-        var redIndex = startIndex + 2
-
-        if (
-            redIndex < state.paramCount &&
-            isColonOpened(state, redIndex) &&
-            state.params[redIndex] < 0
-        ) {
-            redIndex++
-        }
+        val chainLength = getSubparameterChainLength(state, startIndex)
+        val redIndex = if (chainLength >= 6) startIndex + 3 else startIndex + 2
 
         val red = paramOrMissing(state, redIndex)
         val green = paramOrMissing(state, redIndex + 1)
@@ -322,6 +316,17 @@ internal object SgrDispatcher {
         state: ParserState,
         index: Int,
     ): Boolean = index in 0..31 && ((state.subParameterMask ushr index) and 1) != 0
+
+    private fun getSubparameterChainLength(
+        state: ParserState,
+        startIndex: Int,
+    ): Int {
+        var length = 1
+        while (startIndex + length < state.paramCount && isColonOpened(state, startIndex + length)) {
+            length++
+        }
+        return length
+    }
 
     private enum class ColorTarget {
         FOREGROUND,

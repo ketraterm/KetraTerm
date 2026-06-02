@@ -216,6 +216,36 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "setDecMode:$mode:$enable"
     }
 
+    override fun setKeyModifierOption(
+        resource: Int,
+        value: Int,
+    ) {
+        events += "setKeyModifierOption:$resource:$value"
+    }
+
+    override fun resetKeyModifierOption(resource: Int) {
+        events += "resetKeyModifierOption:$resource"
+    }
+
+    override fun resetKeyModifierOptions() {
+        events += "resetKeyModifierOptions"
+    }
+
+    override fun setKeyFormatOption(
+        resource: Int,
+        value: Int,
+    ) {
+        events += "setKeyFormatOption:$resource:$value"
+    }
+
+    override fun resetKeyFormatOption(resource: Int) {
+        events += "resetKeyFormatOption:$resource"
+    }
+
+    override fun resetKeyFormatOptions() {
+        events += "resetKeyFormatOptions"
+    }
+
     override fun requestDeviceStatusReport(
         mode: Int,
         decPrivate: Boolean,

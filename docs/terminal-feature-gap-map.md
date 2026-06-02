@@ -346,7 +346,9 @@ Missing:
 ## Integration Gaps
 
 - `DONE(integration)`: parser SGR inverse, 256-color indexed, and RGB/truecolor
-  attributes are mapped to core pen attributes without clamping.
+  attributes are mapped to core pen attributes without clamping. SGR 38:2/48:2
+  support includes robust subparameter chain length logic to handle explicit
+  and omitted color space IDs in colon-separated sequences.
 - `DONE(integration)`: map faint, blink, conceal, strikethrough, overline,
   underline style, and underline color SGR attributes to core pen storage.
 - `DONE(integration)`: parser DECSTR maps to core `softReset`.
@@ -403,15 +405,18 @@ Missing:
   - bounded legacy `ESC [ M` encoding with explicit coordinate-limit policy
   - UTF-8 extended mouse encoding (`?1005`) up to xterm's coordinate limit
   - URXVT mouse encoding (`?1015`)
-- `DONE(input)`: xterm modifyOtherKeys mode 1/2 consumption from core packed
-  mode bits for the original `CSI 27 ; modifier ; codepoint ~` format,
-  including regression coverage for modified printable input and
-  control-equivalent Tab/Enter cases.
+- `DONE(parser/core/integration/input)`: xterm modifyOtherKeys and
+  formatOtherKeys support for ordinary-key input:
+  - modifyOtherKeys mode 1/2/3 consumption from core packed mode bits
+  - original `CSI 27 ; modifier ; codepoint ~` format
+  - `formatOtherKeys=1` / CSI-u `CSI codepoint ; modifier u` format
+  - parser/integration routing for `CSI > 4 ; Pv m` and `CSI > 4 ; Pv f`
+  - regression coverage for modified printable input and control-equivalent
+    Tab/Enter/Backspace/Escape cases
 - `TODO(input)`: broader modified-key encoding:
-  - `formatOtherKeys=1` / CSI-u
-  - modifyOtherKeys mode 3
-  - parser/integration control sequences for dynamically setting
-    modifyOtherKeys and formatOtherKeys, if not already routed
+  - xterm modifyOtherKeys subparameter mask support such as `CSI > 4 : 1 m`
+  - query/disable controls for xterm key modifier options if host responses or
+    exact disabled-resource semantics are needed
 - `TODO(parser/core/input)`: xterm modified-key policy surface for
   `modifyCursorKeys`, `modifyFunctionKeys`, and `modifyKeypadKeys` if those are
   added. These need protocol/core mode or policy state before input grows more

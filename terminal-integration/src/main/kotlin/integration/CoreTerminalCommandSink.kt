@@ -21,8 +21,12 @@ import com.gagik.core.model.UnderlineStyle
 import com.gagik.parser.spi.TerminalCommandSink
 import com.gagik.terminal.protocol.AnsiMode
 import com.gagik.terminal.protocol.DecPrivateMode
+import com.gagik.terminal.protocol.FormatOtherKeysMode
+import com.gagik.terminal.protocol.ModifyOtherKeysMode
 import com.gagik.terminal.protocol.MouseEncodingMode
 import com.gagik.terminal.protocol.MouseTrackingMode
+import com.gagik.terminal.protocol.XtermKeyFormatResource
+import com.gagik.terminal.protocol.XtermKeyModifierResource
 import com.gagik.terminal.render.api.TerminalRenderCursorShape
 
 /**
@@ -390,6 +394,66 @@ class CoreTerminalCommandSink(
                 // TODO(core-gap): Store synchronized output state once renderer batching exists.
             }
         }
+    }
+
+    override fun setKeyModifierOption(
+        resource: Int,
+        value: Int,
+    ) {
+        when (resource) {
+            XtermKeyModifierResource.MODIFY_OTHER_KEYS -> {
+                if (value in ModifyOtherKeysMode.DISABLED..ModifyOtherKeysMode.MODE_3) {
+                    terminal.setModifyOtherKeysMode(value)
+                }
+            }
+            else -> {
+                // TODO(input): modifyKeyboard/cursor/function/keypad/special resources need separate mode state.
+            }
+        }
+    }
+
+    override fun resetKeyModifierOption(resource: Int) {
+        when (resource) {
+            XtermKeyModifierResource.MODIFY_OTHER_KEYS ->
+                terminal.setModifyOtherKeysMode(ModifyOtherKeysMode.DISABLED)
+            else -> {
+                // TODO(input): reset supported xterm key modifier resources when their mode state exists.
+            }
+        }
+    }
+
+    override fun resetKeyModifierOptions() {
+        terminal.setModifyOtherKeysMode(ModifyOtherKeysMode.DISABLED)
+    }
+
+    override fun setKeyFormatOption(
+        resource: Int,
+        value: Int,
+    ) {
+        when (resource) {
+            XtermKeyFormatResource.FORMAT_OTHER_KEYS -> {
+                if (value == FormatOtherKeysMode.DEFAULT || value == FormatOtherKeysMode.CSI_U) {
+                    terminal.setFormatOtherKeysMode(value)
+                }
+            }
+            else -> {
+                // TODO(input): formatCursor/function/keypad/special resources need separate mode state.
+            }
+        }
+    }
+
+    override fun resetKeyFormatOption(resource: Int) {
+        when (resource) {
+            XtermKeyFormatResource.FORMAT_OTHER_KEYS ->
+                terminal.setFormatOtherKeysMode(FormatOtherKeysMode.DEFAULT)
+            else -> {
+                // TODO(input): reset supported xterm key format resources when their mode state exists.
+            }
+        }
+    }
+
+    override fun resetKeyFormatOptions() {
+        terminal.setFormatOtherKeysMode(FormatOtherKeysMode.DEFAULT)
     }
 
     override fun requestDeviceStatusReport(

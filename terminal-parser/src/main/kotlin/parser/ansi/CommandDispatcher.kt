@@ -152,6 +152,8 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.DSR_DEC -> sink.requestDeviceStatusReport(modeParam(state, 0), decPrivate = true)
             CsiCommand.TBC -> dispatchTabClear(sink, state)
             CsiCommand.WINDOW_OP -> dispatchWindowOperation(sink, state)
+            CsiCommand.XTFMTKEYS -> dispatchKeyFormatOption(sink, state)
+            CsiCommand.XTMODKEYS -> dispatchKeyModifierOption(sink, state)
             CsiCommand.DECSTBM ->
                 sink.setScrollRegion(
                     top = scrollRegionTopParam(state, 0),
@@ -298,7 +300,58 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         }
     }
 
+    private fun dispatchKeyModifierOption(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        dispatchKeyOption(
+            state = state,
+            resetAll = { sink.resetKeyModifierOptions() },
+            resetOne = { resource -> sink.resetKeyModifierOption(resource) },
+            set = { resource, value -> sink.setKeyModifierOption(resource, value) },
+        )
+    }
+
+    private fun dispatchKeyFormatOption(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        dispatchKeyOption(
+            state = state,
+            resetAll = { sink.resetKeyFormatOptions() },
+            resetOne = { resource -> sink.resetKeyFormatOption(resource) },
+            set = { resource, value -> sink.setKeyFormatOption(resource, value) },
+        )
+    }
+
+    private inline fun dispatchKeyOption(
+        state: ParserState,
+        resetAll: () -> Unit,
+        resetOne: (Int) -> Unit,
+        set: (Int, Int) -> Unit,
+    ) {
+        when (state.paramCount) {
+            0 -> resetAll()
+            1 -> {
+                val resource = paramOrMissing(state, 0)
+                if (resource >= 0) resetOne(resource)
+            }
+            else -> {
+                val resource = paramOrMissing(state, 0)
+                val value = paramOrMissing(state, 1)
+                if (resource >= 0 && value >= 0 && !isSubParameter(state, 1)) {
+                    set(resource, value)
+                }
+            }
+        }
+    }
+
     private fun titleStackScopeParam(state: ParserState): Int = modeParam(state, 1)
+
+    private fun isSubParameter(
+        state: ParserState,
+        index: Int,
+    ): Boolean = index in 0..31 && ((state.subParameterMask ushr index) and 1) != 0
 
     private inline fun forEachMaterializedMode(
         state: ParserState,

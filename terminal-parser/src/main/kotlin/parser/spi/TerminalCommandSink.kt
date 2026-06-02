@@ -224,6 +224,46 @@ interface TerminalCommandSink {
         enable: Boolean,
     )
 
+    /**
+     * Xterm key modifier option set, `CSI > Pp ; Pv m`.
+     *
+     * The parser only identifies the resource id and value; the sink owns
+     * deciding which resources are supported and how they affect input-facing
+     * mode state.
+     */
+    fun setKeyModifierOption(
+        resource: Int,
+        value: Int,
+    )
+
+    /**
+     * Resets one xterm key modifier option, `CSI > Pp m`.
+     */
+    fun resetKeyModifierOption(resource: Int)
+
+    /**
+     * Resets all supported xterm key modifier options, `CSI > m`.
+     */
+    fun resetKeyModifierOptions()
+
+    /**
+     * Xterm key format option set, `CSI > Pp ; Pv f`.
+     */
+    fun setKeyFormatOption(
+        resource: Int,
+        value: Int,
+    )
+
+    /**
+     * Resets one xterm key format option, `CSI > Pp f`.
+     */
+    fun resetKeyFormatOption(resource: Int)
+
+    /**
+     * Resets all supported xterm key format options, `CSI > f`.
+     */
+    fun resetKeyFormatOptions()
+
     // -------------------------------------------------------------------------
     // Terminal-to-host responses
     // -------------------------------------------------------------------------

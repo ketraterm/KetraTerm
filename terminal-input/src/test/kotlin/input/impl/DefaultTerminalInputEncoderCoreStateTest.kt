@@ -17,6 +17,7 @@ package com.gagik.terminal.input.impl
 
 import com.gagik.core.TerminalBuffers
 import com.gagik.terminal.input.event.*
+import com.gagik.terminal.protocol.FormatOtherKeysMode
 import com.gagik.terminal.protocol.ModifyOtherKeysMode
 import com.gagik.terminal.protocol.MouseEncodingMode
 import com.gagik.terminal.protocol.MouseTrackingMode
@@ -77,6 +78,23 @@ class DefaultTerminalInputEncoderCoreStateTest {
 
         assertArrayEquals(
             esc("[27;5;233~") + esc("[27;2;13~"),
+            output.bytes,
+        )
+    }
+
+    @Test
+    fun `uses real core formatOtherKeys mode for CSI-u keyboard encoding`() {
+        val terminal = TerminalBuffers.create(width = 4, height = 2)
+        val output = RecordingHostOutput()
+        val encoder = DefaultTerminalInputEncoder(terminal, output)
+
+        terminal.setModifyOtherKeysMode(ModifyOtherKeysMode.MODE_3)
+        encoder.encodeKey(TerminalKeyEvent.codepoint(' '.code))
+        terminal.setFormatOtherKeysMode(FormatOtherKeysMode.CSI_U)
+        encoder.encodeKey(TerminalKeyEvent.codepoint(' '.code))
+
+        assertArrayEquals(
+            esc("[27;1;32~") + esc("[32;1u"),
             output.bytes,
         )
     }

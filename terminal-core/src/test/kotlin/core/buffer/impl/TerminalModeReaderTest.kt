@@ -38,13 +38,14 @@ class TerminalModeReaderTest {
             { assertFalse(snapshot.isLeftRightMarginMode) },
             { assertFalse(snapshot.isReverseVideo) },
             { assertTrue(snapshot.isCursorVisible) },
-            { assertFalse(snapshot.isCursorBlinking) },
+            { assertTrue(snapshot.isCursorBlinking) },
             { assertFalse(snapshot.isBracketedPasteEnabled) },
             { assertFalse(snapshot.isFocusReportingEnabled) },
             { assertFalse(snapshot.treatAmbiguousAsWide) },
             { assertEquals(MouseTrackingMode.OFF, snapshot.mouseTrackingMode) },
             { assertEquals(MouseEncodingMode.DEFAULT, snapshot.mouseEncodingMode) },
             { assertEquals(0, snapshot.modifyOtherKeysMode) },
+            { assertEquals(0, snapshot.formatOtherKeysMode) },
         )
     }
 
@@ -61,9 +62,10 @@ class TerminalModeReaderTest {
         buffer.setBracketedPasteEnabled(true)
         buffer.setFocusReportingEnabled(true)
         buffer.setModifyOtherKeysMode(2)
+        buffer.setFormatOtherKeysMode(1)
         buffer.setReverseVideo(true)
         buffer.setCursorVisible(false)
-        buffer.setCursorBlinking(true)
+        buffer.setCursorBlinking(false)
 
         val afterBits = buffer.getModeBitsSnapshot()
         val inputBits = buffer.getInputModeBits()
@@ -79,9 +81,10 @@ class TerminalModeReaderTest {
             { assertFalse(before.isBracketedPasteEnabled) },
             { assertFalse(before.isFocusReportingEnabled) },
             { assertEquals(0, before.modifyOtherKeysMode) },
+            { assertEquals(0, before.formatOtherKeysMode) },
             { assertFalse(before.isReverseVideo) },
             { assertTrue(before.isCursorVisible) },
-            { assertFalse(before.isCursorBlinking) },
+            { assertTrue(before.isCursorBlinking) },
             { assertTrue(after.isNewLineMode) },
             { assertTrue(after.isApplicationKeypad) },
             { assertEquals(MouseTrackingMode.ANY_EVENT, after.mouseTrackingMode) },
@@ -89,9 +92,10 @@ class TerminalModeReaderTest {
             { assertTrue(after.isBracketedPasteEnabled) },
             { assertTrue(after.isFocusReportingEnabled) },
             { assertEquals(2, after.modifyOtherKeysMode) },
+            { assertEquals(1, after.formatOtherKeysMode) },
             { assertTrue(after.isReverseVideo) },
             { assertFalse(after.isCursorVisible) },
-            { assertTrue(after.isCursorBlinking) },
+            { assertFalse(after.isCursorBlinking) },
         )
     }
 }

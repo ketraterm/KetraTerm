@@ -342,6 +342,36 @@ class ActionEngineTest {
             sinkCalls += "setDecMode:$mode:$enable"
         }
 
+        override fun setKeyModifierOption(
+            resource: Int,
+            value: Int,
+        ) {
+            sinkCalls += "setKeyModifierOption:$resource:$value"
+        }
+
+        override fun resetKeyModifierOption(resource: Int) {
+            sinkCalls += "resetKeyModifierOption:$resource"
+        }
+
+        override fun resetKeyModifierOptions() {
+            sinkCalls += "resetKeyModifierOptions"
+        }
+
+        override fun setKeyFormatOption(
+            resource: Int,
+            value: Int,
+        ) {
+            sinkCalls += "setKeyFormatOption:$resource:$value"
+        }
+
+        override fun resetKeyFormatOption(resource: Int) {
+            sinkCalls += "resetKeyFormatOption:$resource"
+        }
+
+        override fun resetKeyFormatOptions() {
+            sinkCalls += "resetKeyFormatOptions"
+        }
+
         override fun requestDeviceStatusReport(
             mode: Int,
             decPrivate: Boolean,

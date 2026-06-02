@@ -80,7 +80,7 @@ internal class TerminalModes : TerminalInputState {
         get() = TerminalModeBits.hasFlag(currentBits, TerminalModeBits.CURSOR_VISIBLE)
         set(value) = setFlag(TerminalModeBits.CURSOR_VISIBLE, value)
 
-    /** Cursor blink presentation flag. False = steady cursor (default). */
+    /** Cursor blink presentation flag. True = blinking cursor (default). */
     var isCursorBlinking: Boolean
         get() = TerminalModeBits.hasFlag(currentBits, TerminalModeBits.CURSOR_BLINKING)
         set(value) = setFlag(TerminalModeBits.CURSOR_BLINKING, value)
@@ -128,6 +128,22 @@ internal class TerminalModes : TerminalInputState {
                 value.coerceIn(0, 7),
             )
 
+    /**
+     * Format-other-keys wire format.
+     *
+     * `0` means xterm's original modifyOtherKeys format. Values are clamped to
+     * the packed 2-bit range until the protocol contract grows additional
+     * supported formats.
+     */
+    var formatOtherKeysMode: Int
+        get() = TerminalInputState.formatOtherKeysMode(currentBits)
+        set(value) =
+            setPacked(
+                TerminalModeBits.FORMAT_OTHER_KEYS_MASK,
+                TerminalModeBits.FORMAT_OTHER_KEYS_SHIFT,
+                value.coerceIn(0, 3),
+            )
+
     private val currentBits: Long
         get() = modeBits.get()
 
@@ -157,6 +173,7 @@ internal class TerminalModes : TerminalInputState {
             mouseTrackingMode = decodeMouseTracking(bits),
             mouseEncodingMode = decodeMouseEncoding(bits),
             modifyOtherKeysMode = TerminalInputState.modifyOtherKeysMode(bits),
+            formatOtherKeysMode = TerminalInputState.formatOtherKeysMode(bits),
         )
     }
 
@@ -204,7 +221,7 @@ internal class TerminalModes : TerminalInputState {
 
     private companion object {
         private const val DEFAULT_MODE_BITS: Long =
-            TerminalModeBits.AUTO_WRAP or TerminalModeBits.CURSOR_VISIBLE
+            TerminalModeBits.AUTO_WRAP or TerminalModeBits.CURSOR_VISIBLE or TerminalModeBits.CURSOR_BLINKING
         private const val SOFT_RESET_PRESERVE_MASK: Long =
             TerminalModeBits.AMBIGUOUS_WIDE or TerminalModeBits.MOUSE_ENCODING_MASK
         private const val SOFT_RESET_MODE_BITS: Long = DEFAULT_MODE_BITS

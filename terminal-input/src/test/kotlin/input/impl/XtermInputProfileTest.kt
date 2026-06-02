@@ -18,6 +18,7 @@ package com.gagik.terminal.input.impl
 import com.gagik.core.api.TerminalInputState
 import com.gagik.core.api.TerminalModeBits
 import com.gagik.terminal.input.event.*
+import com.gagik.terminal.protocol.FormatOtherKeysMode
 import com.gagik.terminal.protocol.ModifyOtherKeysMode
 import com.gagik.terminal.protocol.host.TerminalHostOutput
 import com.gagik.terminal.protocol.mouse.MouseEncodingMode
@@ -150,6 +151,20 @@ class XtermInputProfileTest {
         }
     }
 
+    @Test
+    fun `formatOtherKeys profile switches modified ordinary keys to CSI-u`() {
+        assertProfileBytes(
+            esc("[233;5u") + esc("[9;3u") + esc("[32;1u"),
+            bits =
+                modifyOtherKeysBits(ModifyOtherKeysMode.MODE_3) or
+                    formatOtherKeysBits(FormatOtherKeysMode.CSI_U),
+        ) {
+            it.encodeKey(TerminalKeyEvent.codepoint(0x00e9, TerminalModifiers.CTRL))
+            it.encodeKey(TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.ALT))
+            it.encodeKey(TerminalKeyEvent.codepoint(' '.code))
+        }
+    }
+
     private fun assertProfileBytes(
         expected: ByteArray,
         bits: Long = 0L,
@@ -196,6 +211,14 @@ class XtermInputProfileTest {
             bits = 0L,
             mask = TerminalModeBits.MODIFY_OTHER_KEYS_MASK,
             shift = TerminalModeBits.MODIFY_OTHER_KEYS_SHIFT,
+            value = mode,
+        )
+
+    private fun formatOtherKeysBits(mode: Int): Long =
+        TerminalModeBits.withPackedValue(
+            bits = 0L,
+            mask = TerminalModeBits.FORMAT_OTHER_KEYS_MASK,
+            shift = TerminalModeBits.FORMAT_OTHER_KEYS_SHIFT,
             value = mode,
         )
 

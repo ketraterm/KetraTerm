@@ -65,4 +65,6 @@ internal object CsiCommand {
     const val DSR_DEC: Int = 37
     const val WINDOW_OP: Int = 38
     const val DECSCUSR: Int = 39
+    const val XTFMTKEYS: Int = 40
+    const val XTMODKEYS: Int = 41
 }

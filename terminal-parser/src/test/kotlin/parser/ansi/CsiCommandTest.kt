@@ -65,6 +65,8 @@ class CsiCommandTest {
             CsiCommand.DSR_DEC,
             CsiCommand.WINDOW_OP,
             CsiCommand.DECSCUSR,
+            CsiCommand.XTFMTKEYS,
+            CsiCommand.XTMODKEYS,
         )
 
     @Nested
@@ -72,7 +74,7 @@ class CsiCommandTest {
     inner class Constants {
         @Test
         fun `command ids are contiguous and stable`() {
-            assertEquals((0..39).toList(), allCommands)
+            assertEquals((0..41).toList(), allCommands)
         }
 
         @Test

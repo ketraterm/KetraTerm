@@ -165,7 +165,7 @@ class TerminalBufferTest {
         buffer.setOriginMode(true)
         buffer.setAutoWrap(false)
         buffer.setCursorVisible(false)
-        buffer.setCursorBlinking(true)
+        buffer.setCursorBlinking(false)
         buffer.setBracketedPasteEnabled(true)
         buffer.setFocusReportingEnabled(true)
         buffer.setMouseTrackingMode(MouseTrackingMode.BUTTON_EVENT)
@@ -198,12 +198,13 @@ class TerminalBufferTest {
             { assertTrue(snapshot.isAutoWrap) },
             { assertFalse(snapshot.isLeftRightMarginMode) },
             { assertTrue(snapshot.isCursorVisible) },
-            { assertFalse(snapshot.isCursorBlinking) },
+            { assertTrue(snapshot.isCursorBlinking) },
             { assertFalse(snapshot.isBracketedPasteEnabled) },
             { assertFalse(snapshot.isFocusReportingEnabled) },
             { assertEquals(MouseTrackingMode.OFF, snapshot.mouseTrackingMode) },
             { assertEquals(MouseEncodingMode.SGR, snapshot.mouseEncodingMode) },
             { assertEquals(0, snapshot.modifyOtherKeysMode) },
+            { assertEquals(0, snapshot.formatOtherKeysMode) },
             { assertEquals(0, state.primaryBuffer.scrollTop) },
             { assertEquals(3, state.primaryBuffer.scrollBottom) },
             { assertEquals(0, state.primaryBuffer.leftMargin) },
@@ -244,7 +245,7 @@ class TerminalBufferTest {
         buffer.setLeftRightMarginMode(true)
         buffer.setReverseVideo(true)
         buffer.setCursorVisible(false)
-        buffer.setCursorBlinking(true)
+        buffer.setCursorBlinking(false)
         buffer.setBracketedPasteEnabled(true)
         buffer.setFocusReportingEnabled(true)
         buffer.setMouseTrackingMode(MouseTrackingMode.BUTTON_EVENT)
@@ -268,13 +269,14 @@ class TerminalBufferTest {
             { assertFalse(snapshot.isLeftRightMarginMode) },
             { assertFalse(snapshot.isReverseVideo) },
             { assertTrue(snapshot.isCursorVisible) },
-            { assertFalse(snapshot.isCursorBlinking) },
+            { assertTrue(snapshot.isCursorBlinking) },
             { assertFalse(snapshot.isBracketedPasteEnabled) },
             { assertFalse(snapshot.isFocusReportingEnabled) },
             { assertFalse(snapshot.treatAmbiguousAsWide) },
             { assertEquals(MouseTrackingMode.OFF, snapshot.mouseTrackingMode) },
             { assertEquals(MouseEncodingMode.DEFAULT, snapshot.mouseEncodingMode) },
             { assertEquals(0, snapshot.modifyOtherKeysMode) },
+            { assertEquals(0, snapshot.formatOtherKeysMode) },
             { assertEquals(0, buffer.cursorCol) },
             { assertEquals(0, buffer.cursorRow) },
         )

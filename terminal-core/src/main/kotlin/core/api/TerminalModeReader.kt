@@ -42,6 +42,7 @@ data class TerminalModeSnapshot(
     val mouseTrackingMode: MouseTrackingMode,
     val mouseEncodingMode: MouseEncodingMode,
     val modifyOtherKeysMode: Int,
+    val formatOtherKeysMode: Int,
 )
 
 /**

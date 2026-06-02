@@ -934,6 +934,18 @@ class CommandDispatcherTest {
         }
 
         @Test
+        fun `CSI colon RGB foreground with explicit color-space id dispatches truecolor foreground`() {
+            assertEquals(
+                listOf("setForegroundRgb:10:20:30"),
+                dispatchCsi(
+                    finalByte = 'm',
+                    params = listOf(38, 2, 1, 10, 20, 30),
+                    subParameterMask = 0b11_1110,
+                ).events,
+            )
+        }
+
+        @Test
         fun `CSI colon RGB foreground supports omitted color-space id`() {
             assertEquals(
                 listOf("setForegroundRgb:10:20:30"),
@@ -941,6 +953,18 @@ class CommandDispatcherTest {
                     finalByte = 'm',
                     params = listOf(38, 2, -1, 10, 20, 30),
                     subParameterMask = 0b11_1110,
+                ).events,
+            )
+        }
+
+        @Test
+        fun `CSI colon indexed foreground with explicit color-space id dispatches indexed foreground`() {
+            assertEquals(
+                listOf("setForegroundIndexed:196"),
+                dispatchCsi(
+                    finalByte = 'm',
+                    params = listOf(38, 5, 1, 196),
+                    subParameterMask = 0b1110,
                 ).events,
             )
         }

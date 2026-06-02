@@ -93,6 +93,16 @@ object TerminalModeBits {
     const val MOUSE_ENCODING_MASK: Long =
         ((1L shl MOUSE_ENCODING_WIDTH) - 1L) shl MOUSE_ENCODING_SHIFT
 
+    /** Starting bit for the packed format-other-keys mode field. */
+    const val FORMAT_OTHER_KEYS_SHIFT: Int = 26
+
+    /** Width in bits of the packed format-other-keys mode field. */
+    const val FORMAT_OTHER_KEYS_WIDTH: Int = 2
+
+    /** Bit mask for the packed format-other-keys mode field. */
+    const val FORMAT_OTHER_KEYS_MASK: Long =
+        ((1L shl FORMAT_OTHER_KEYS_WIDTH) - 1L) shl FORMAT_OTHER_KEYS_SHIFT
+
     /**
      * Returns true when [flag] is set in [bits].
      *

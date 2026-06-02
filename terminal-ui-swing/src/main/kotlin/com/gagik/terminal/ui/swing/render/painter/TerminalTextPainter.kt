@@ -241,10 +241,15 @@ internal class TerminalTextPainter(
         val attr = attrWords[startIndex]
         val extraAttr = extraAttrWords[startIndex]
         val hyperlinkId = hyperlinkIds[startIndex]
-        val hovered = hyperlinkId != NO_HYPERLINK_ID && hyperlinkId == hoveredHyperlinkId
-        val activationHover = hovered && hyperlinkActivationHover
-        val naturalForeground = TerminalSwingColors.foreground(palette, attr)
-        val foreground = if (activationHover) hyperlinkActivationForeground else naturalForeground
+        val hovered = isHoveredHyperlink(hyperlinkId, hoveredHyperlinkId)
+        val foreground =
+            effectiveForeground(
+                palette = palette,
+                attr = attr,
+                hovered = hovered,
+                hyperlinkActivationHover = hyperlinkActivationHover,
+                hyperlinkActivationForeground = hyperlinkActivationForeground,
+            )
         val fontStyle = terminalFontStyle(attr)
         val decoration = decorationKey(attr, extraAttr)
         var column = startColumn
@@ -257,14 +262,15 @@ internal class TerminalTextPainter(
             val currentAttr = attrWords[index]
             val currentExtraAttr = extraAttrWords[index]
             val currentHyperlinkId = hyperlinkIds[index]
-            val currentHovered = currentHyperlinkId != NO_HYPERLINK_ID && currentHyperlinkId == hoveredHyperlinkId
-            val currentActivationHover = currentHovered && hyperlinkActivationHover
+            val currentHovered = isHoveredHyperlink(currentHyperlinkId, hoveredHyperlinkId)
             val currentForeground =
-                if (currentActivationHover) {
-                    hyperlinkActivationForeground
-                } else {
-                    TerminalSwingColors.foreground(palette, currentAttr)
-                }
+                effectiveForeground(
+                    palette = palette,
+                    attr = currentAttr,
+                    hovered = currentHovered,
+                    hyperlinkActivationHover = hyperlinkActivationHover,
+                    hyperlinkActivationForeground = hyperlinkActivationForeground,
+                )
             if (
                 !isFastAsciiCell(flags, codeWord) ||
                 currentForeground != foreground ||
@@ -320,14 +326,15 @@ internal class TerminalTextPainter(
         val attr = attrWords[index]
         val extraAttr = extraAttrWords[index]
         val hyperlinkId = hyperlinkIds[index]
-        val hovered = hyperlinkId != NO_HYPERLINK_ID && hyperlinkId == hoveredHyperlinkId
-        val activationHover = hovered && hyperlinkActivationHover
+        val hovered = isHoveredHyperlink(hyperlinkId, hoveredHyperlinkId)
         val foreground =
-            if (activationHover) {
-                hyperlinkActivationForeground
-            } else {
-                TerminalSwingColors.foreground(palette, attr)
-            }
+            effectiveForeground(
+                palette = palette,
+                attr = attr,
+                hovered = hovered,
+                hyperlinkActivationHover = hyperlinkActivationHover,
+                hyperlinkActivationForeground = hyperlinkActivationForeground,
+            )
         val fontStyle = terminalFontStyle(attr)
         val endColumn = minOf(cache.columns, column + cellSpan(flags))
         val oldClip = g.clip
@@ -414,6 +421,24 @@ internal class TerminalTextPainter(
         }
         return endColumn
     }
+
+    private fun isHoveredHyperlink(
+        hyperlinkId: Int,
+        hoveredHyperlinkId: Int,
+    ): Boolean = hyperlinkId != NO_HYPERLINK_ID && hyperlinkId == hoveredHyperlinkId
+
+    private fun effectiveForeground(
+        palette: TerminalColorPalette,
+        attr: Long,
+        hovered: Boolean,
+        hyperlinkActivationHover: Boolean,
+        hyperlinkActivationForeground: Int,
+    ): Int =
+        if (hovered && hyperlinkActivationHover) {
+            hyperlinkActivationForeground
+        } else {
+            TerminalSwingColors.foreground(palette, attr)
+        }
 
     private fun paintHyperlinkDecoration(
         g: Graphics2D,

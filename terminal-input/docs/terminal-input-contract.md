@@ -142,12 +142,12 @@ Supported modified-key protocol:
 - legacy xterm CSI modifier encodings for cursor, navigation, function, and
   supported keypad/special keys
 - original xterm modifyOtherKeys format,
-  `CSI 27 ; modifier ; codepoint ~`, for mode 1 and mode 2
+  `CSI 27 ; modifier ; codepoint ~`, for mode 1, mode 2, and mode 3
+- xterm `formatOtherKeys=1` / CSI-u format,
+  `CSI codepoint ; modifier u`, when enabled by core input-mode state
 
 Not guaranteed yet:
 
-- `formatOtherKeys=1` / CSI-u
-- modifyOtherKeys mode 3
 - modifyCursorKeys, modifyFunctionKeys, or modifyKeypadKeys resource variants
 - Kitty Keyboard Protocol
 

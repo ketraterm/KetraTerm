@@ -103,7 +103,8 @@ Exposes semantic `enum class` definitions in package `com.gagik.terminal.protoco
 Designed for JIT-friendly performance in hot paths (like input event loops). These constants map high-level core states directly to packed integer bits without producing garbage allocations.
 * **`com.gagik.terminal.protocol.mouse.MouseTrackingMode`**: Defines integer constants (`NONE = 0`, `X10 = 1`, `NORMAL = 2`, `BUTTON_EVENT = 3`, `ANY_EVENT = 4`) matching the packed ordinals in the core decoder.
 * **`com.gagik.terminal.protocol.mouse.MouseEncodingMode`**: Defines integer constants (`DEFAULT = 0`, `UTF8 = 1`, `SGR = 2`, `URXVT = 3`).
-* **`ModifyOtherKeysMode`**: Mapped to `DISABLED = 0`, `MODE_1 = 1` (encode ambiguous keys), and `MODE_2 = 2` (encode all keys with CSI modifier prefixes), matching xterm's modifyOtherKeys states.
+* **`ModifyOtherKeysMode`**: Mapped to `DISABLED = 0`, `MODE_1 = 1` (encode legacy-ambiguous modified keys), `MODE_2 = 2` (encode all modified ordinary keys), and `MODE_3 = 3` (encode ordinary keys even without modifiers), matching xterm's modifyOtherKeys states.
+* **`FormatOtherKeysMode`**: Mapped to `DEFAULT = 0` for `CSI 27 ; modifier ; codepoint ~` and `CSI_U = 1` for `CSI codepoint ; modifier u`.
 
 ---
 

@@ -72,6 +72,9 @@ interface TerminalModeController {
     /** Sets the modify-other-keys reporting level. */
     fun setModifyOtherKeysMode(mode: Int)
 
+    /** Sets the format-other-keys wire format used when modify-other-keys applies. */
+    fun setFormatOtherKeysMode(mode: Int)
+
     /**
      * Toggles reverse-video presentation state (DECSCNM, `CSI ? 5 h` / `CSI ? 5 l`).
      *

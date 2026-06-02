@@ -21,6 +21,8 @@ import com.gagik.parser.fixture.TerminalParserFixture
 import com.gagik.parser.runtime.ParserState
 import com.gagik.terminal.protocol.AnsiMode
 import com.gagik.terminal.protocol.DecPrivateMode
+import com.gagik.terminal.protocol.XtermKeyFormatResource
+import com.gagik.terminal.protocol.XtermKeyModifierResource
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -65,6 +67,16 @@ class ModeDispatchTest {
         mode: Int,
         enable: Boolean,
     ): String = "setDecMode:$mode:$enable"
+
+    private fun keyModifierEvent(
+        resource: Int,
+        value: Int,
+    ): String = "setKeyModifierOption:$resource:$value"
+
+    private fun keyFormatEvent(
+        resource: Int,
+        value: Int,
+    ): String = "setKeyFormatOption:$resource:$value"
 
     @Nested
     @DisplayName("ANSI modes CSI Pn h/l")
@@ -263,6 +275,77 @@ class ModeDispatchTest {
     }
 
     @Nested
+    @DisplayName("xterm key option controls")
+    inner class XtermKeyOptions {
+        @Test
+        fun `CSI greater-than Pp Pv m dispatches key modifier option set`() {
+            assertEquals(
+                listOf(keyModifierEvent(XtermKeyModifierResource.MODIFY_OTHER_KEYS, 3)),
+                dispatchMode(
+                    'm'.code,
+                    XtermKeyModifierResource.MODIFY_OTHER_KEYS,
+                    3,
+                    privateMarker = '>'.code,
+                ).events,
+            )
+        }
+
+        @Test
+        fun `CSI greater-than Pp Pv f dispatches key format option set`() {
+            assertEquals(
+                listOf(keyFormatEvent(XtermKeyFormatResource.FORMAT_OTHER_KEYS, 1)),
+                dispatchMode(
+                    'f'.code,
+                    XtermKeyFormatResource.FORMAT_OTHER_KEYS,
+                    1,
+                    privateMarker = '>'.code,
+                ).events,
+            )
+        }
+
+        @Test
+        fun `CSI greater-than Pp m and f reset one key option resource`() {
+            assertEquals(
+                listOf("resetKeyModifierOption:${XtermKeyModifierResource.MODIFY_OTHER_KEYS}"),
+                dispatchMode(
+                    'm'.code,
+                    XtermKeyModifierResource.MODIFY_OTHER_KEYS,
+                    privateMarker = '>'.code,
+                ).events,
+            )
+            assertEquals(
+                listOf("resetKeyFormatOption:${XtermKeyFormatResource.FORMAT_OTHER_KEYS}"),
+                dispatchMode(
+                    'f'.code,
+                    XtermKeyFormatResource.FORMAT_OTHER_KEYS,
+                    privateMarker = '>'.code,
+                ).events,
+            )
+        }
+
+        @Test
+        fun `CSI greater-than empty m and f reset supported key option families`() {
+            assertEquals(listOf("resetKeyModifierOptions"), dispatchMode('m'.code, privateMarker = '>'.code).events)
+            assertEquals(listOf("resetKeyFormatOptions"), dispatchMode('f'.code, privateMarker = '>'.code).events)
+        }
+
+        @Test
+        fun `colon subparameter modifier mask is ignored until explicitly supported`() {
+            val state = ParserState(maxParams = 32)
+            val sink = RecordingTerminalCommandSink()
+            state.privateMarker = '>'.code
+            state.params[0] = XtermKeyModifierResource.MODIFY_OTHER_KEYS
+            state.params[1] = 1
+            state.paramCount = 2
+            state.subParameterMask = 0b10
+
+            AnsiCommandDispatcher.dispatchCsi(sink, state, 'm'.code)
+
+            assertTrue(sink.events.isEmpty())
+        }
+    }
+
+    @Nested
     @DisplayName("full parser path")
     inner class FullParserPath {
         @Test
@@ -330,6 +413,23 @@ class ModeDispatchTest {
                 listOf(
                     decEvent(DecPrivateMode.CURSOR_VISIBLE, false),
                     decEvent(DecPrivateMode.BRACKETED_PASTE, false),
+                ),
+                fixture.sink.events,
+            )
+        }
+
+        @Test
+        fun `xterm key option controls route through full parser`() {
+            val fixture = TerminalParserFixture()
+
+            fixture.acceptAscii("\u001B[>4;3m\u001B[>4;1f\u001B[>4m\u001B[>4f")
+
+            assertEquals(
+                listOf(
+                    keyModifierEvent(XtermKeyModifierResource.MODIFY_OTHER_KEYS, 3),
+                    keyFormatEvent(XtermKeyFormatResource.FORMAT_OTHER_KEYS, 1),
+                    "resetKeyModifierOption:${XtermKeyModifierResource.MODIFY_OTHER_KEYS}",
+                    "resetKeyFormatOption:${XtermKeyFormatResource.FORMAT_OTHER_KEYS}",
                 ),
                 fixture.sink.events,
             )
