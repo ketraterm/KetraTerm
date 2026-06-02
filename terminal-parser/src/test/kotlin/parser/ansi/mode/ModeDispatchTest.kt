@@ -21,6 +21,7 @@ import com.gagik.parser.fixture.TerminalParserFixture
 import com.gagik.parser.runtime.ParserState
 import com.gagik.terminal.protocol.AnsiMode
 import com.gagik.terminal.protocol.DecPrivateMode
+import com.gagik.terminal.protocol.keyboard.KittyKeyboardFlagApplicationMode
 import com.gagik.terminal.protocol.keyboard.XtermKeyFormatResource
 import com.gagik.terminal.protocol.keyboard.XtermKeyModifierResource
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -77,6 +78,11 @@ class ModeDispatchTest {
         resource: Int,
         value: Int,
     ): String = "setKeyFormatOption:$resource:$value"
+
+    private fun kittyFlagsEvent(
+        flags: Int,
+        applicationMode: Int,
+    ): String = "applyKittyKeyboardFlags:$flags:$applicationMode"
 
     @Nested
     @DisplayName("ANSI modes CSI Pn h/l")
@@ -346,6 +352,83 @@ class ModeDispatchTest {
     }
 
     @Nested
+    @DisplayName("Kitty keyboard controls")
+    inner class KittyKeyboardControls {
+        @Test
+        fun `CSI equals flags u applies Kitty keyboard flags with default replace mode`() {
+            assertEquals(
+                listOf(kittyFlagsEvent(9, KittyKeyboardFlagApplicationMode.REPLACE)),
+                dispatchMode('u'.code, 9, privateMarker = '='.code).events,
+            )
+        }
+
+        @Test
+        fun `CSI equals flags mode u applies supported Kitty keyboard application modes`() {
+            assertEquals(
+                listOf(kittyFlagsEvent(3, KittyKeyboardFlagApplicationMode.SET)),
+                dispatchMode('u'.code, 3, KittyKeyboardFlagApplicationMode.SET, privateMarker = '='.code).events,
+            )
+            assertEquals(
+                listOf(kittyFlagsEvent(1, KittyKeyboardFlagApplicationMode.CLEAR)),
+                dispatchMode('u'.code, 1, KittyKeyboardFlagApplicationMode.CLEAR, privateMarker = '='.code).events,
+            )
+        }
+
+        @Test
+        fun `CSI greater-than flags u dispatches Kitty keyboard push`() {
+            assertEquals(
+                listOf("pushKittyKeyboardFlags:5"),
+                dispatchMode('u'.code, 5, privateMarker = '>'.code).events,
+            )
+        }
+
+        @Test
+        fun `CSI greater-than u pushes without changing active Kitty flags`() {
+            assertEquals(
+                listOf("pushKittyKeyboardFlags:0"),
+                dispatchMode('u'.code, privateMarker = '>'.code).events,
+            )
+        }
+
+        @Test
+        fun `CSI less-than count u dispatches Kitty keyboard pop with defaulted count`() {
+            assertEquals(
+                listOf("popKittyKeyboardFlags:3"),
+                dispatchMode('u'.code, 3, privateMarker = '<'.code).events,
+            )
+            assertEquals(
+                listOf("popKittyKeyboardFlags:1"),
+                dispatchMode('u'.code, privateMarker = '<'.code).events,
+            )
+            assertEquals(
+                listOf("popKittyKeyboardFlags:1"),
+                dispatchMode('u'.code, 0, privateMarker = '<'.code).events,
+            )
+        }
+
+        @Test
+        fun `malformed Kitty keyboard controls are ignored`() {
+            assertTrue(dispatchMode('u'.code, privateMarker = '='.code).events.isEmpty())
+            assertTrue(dispatchMode('u'.code, 1, 9, privateMarker = '='.code).events.isEmpty())
+            assertTrue(dispatchMode('u'.code, 1, 2, 3, privateMarker = '='.code).events.isEmpty())
+            assertTrue(dispatchMode('u'.code, 1, 2, privateMarker = '>'.code).events.isEmpty())
+            assertTrue(dispatchMode('u'.code, 1, 2, privateMarker = '<'.code).events.isEmpty())
+
+            val state = ParserState(maxParams = 32)
+            val sink = RecordingTerminalCommandSink()
+            state.privateMarker = '='.code
+            state.params[0] = 1
+            state.params[1] = KittyKeyboardFlagApplicationMode.SET
+            state.paramCount = 2
+            state.subParameterMask = 0b10
+
+            AnsiCommandDispatcher.dispatchCsi(sink, state, 'u'.code)
+
+            assertTrue(sink.events.isEmpty())
+        }
+    }
+
+    @Nested
     @DisplayName("full parser path")
     inner class FullParserPath {
         @Test
@@ -430,6 +513,25 @@ class ModeDispatchTest {
                     keyFormatEvent(XtermKeyFormatResource.FORMAT_OTHER_KEYS, 1),
                     "resetKeyModifierOption:${XtermKeyModifierResource.MODIFY_OTHER_KEYS}",
                     "resetKeyFormatOption:${XtermKeyFormatResource.FORMAT_OTHER_KEYS}",
+                ),
+                fixture.sink.events,
+            )
+        }
+
+        @Test
+        fun `Kitty keyboard controls route through full parser`() {
+            val fixture = TerminalParserFixture()
+
+            fixture.acceptAscii("\u001B[=9u\u001B[=3;2u\u001B[>5u\u001B[>u\u001B[<2u\u001B[<u")
+
+            assertEquals(
+                listOf(
+                    kittyFlagsEvent(9, KittyKeyboardFlagApplicationMode.REPLACE),
+                    kittyFlagsEvent(3, KittyKeyboardFlagApplicationMode.SET),
+                    "pushKittyKeyboardFlags:5",
+                    "pushKittyKeyboardFlags:0",
+                    "popKittyKeyboardFlags:2",
+                    "popKittyKeyboardFlags:1",
                 ),
                 fixture.sink.events,
             )

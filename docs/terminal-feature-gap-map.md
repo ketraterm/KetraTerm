@@ -443,7 +443,7 @@ Missing:
 - `DONE(input)`: xterm input profile matrix tests covering application
   cursor/keypad, bracketed paste, focus, mouse tracking/encoding combinations,
   and modifyOtherKeys off/mode1/mode2.
-- `DONE(protocol/core)`: Kitty Keyboard Protocol foundation:
+- `DONE(protocol/core/parser)`: Kitty Keyboard Protocol foundation:
     - protocol constants for the five progressive-enhancement flags and flag
       application modes
     - packed core input-mode bits and snapshot helpers for active Kitty
@@ -452,7 +452,11 @@ Missing:
       keyboard flags
     - core tests for defaults, snapshots, reset/soft-reset behavior, masking,
       controller routing, and input-mode bit decoding
-- `TODO(parser/integration/input)`: Kitty Keyboard Protocol behavior, after the
+    - parser recognition and semantic sink dispatch for `CSI = flags ; mode u`,
+      `CSI > flags u`, and `CSI < count u`
+    - parser recording-sink and full byte-stream tests for default parameters,
+      malformed parameters, and structural dispatch
+- `TODO(integration/core/input)`: Kitty Keyboard Protocol behavior, after the
   xterm input profile is locked. Keep it as a separate protocol path rather
   than mixing it into the xterm legacy/modifyOtherKeys encoder.
 
@@ -465,9 +469,10 @@ Planned Kitty Keyboard Protocol scope:
     - `terminal-protocol`: primitive constants for progressive-enhancement flags,
       flag-application modes, event types, and functional-key numeric codes used
       by host-bound encoding.
-    - `terminal-parser`: recognize Kitty keyboard mode controls only. It should
-      emit semantic sink calls for `CSI = flags ; mode u`, `CSI > flags u`,
-      `CSI < number u`, and later `CSI ? u`; it must not encode keyboard input.
+    - `terminal-parser`: recognize Kitty keyboard mode controls only. It emits
+      semantic sink calls for `CSI = flags ; mode u`, `CSI > flags u`, and
+      `CSI < number u`; later `CSI ? u` support needs explicit response
+      policy. It must not encode keyboard input.
     - `terminal-core`: store input-readable Kitty keyboard flags and, once
       push/pop controls are parsed, a bounded mode stack. The stack must
       eventually respect kitty's main-screen and alternate-screen separation

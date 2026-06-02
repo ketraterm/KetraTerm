@@ -456,6 +456,21 @@ class CoreTerminalCommandSink(
         terminal.setFormatOtherKeysMode(FormatOtherKeysMode.DEFAULT)
     }
 
+    override fun applyKittyKeyboardFlags(
+        flags: Int,
+        applicationMode: Int,
+    ) {
+        // TODO(integration): map Kitty keyboard flag application modes to core state.
+    }
+
+    override fun pushKittyKeyboardFlags(flags: Int) {
+        // TODO(integration/core): route once core owns the bounded Kitty keyboard mode stack.
+    }
+
+    override fun popKittyKeyboardFlags(count: Int) {
+        // TODO(integration/core): route once core owns the bounded Kitty keyboard mode stack.
+    }
+
     override fun requestDeviceStatusReport(
         mode: Int,
         decPrivate: Boolean,

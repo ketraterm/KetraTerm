@@ -264,6 +264,33 @@ interface TerminalCommandSink {
      */
     fun resetKeyFormatOptions()
 
+    /**
+     * Kitty keyboard progressive-enhancement flag application,
+     * `CSI = flags ; mode u`.
+     *
+     * The parser only identifies the flag word and application mode. Core and
+     * integration own durable state and unsupported-mode policy.
+     */
+    fun applyKittyKeyboardFlags(
+        flags: Int,
+        applicationMode: Int,
+    )
+
+    /**
+     * Kitty keyboard stack push, `CSI > flags u`.
+     *
+     * The parser only identifies the optional flag word. Core owns stack depth,
+     * screen separation, and flag application semantics.
+     */
+    fun pushKittyKeyboardFlags(flags: Int)
+
+    /**
+     * Kitty keyboard stack pop, `CSI < count u`.
+     *
+     * The parser normalizes omitted or zero counts to one before handoff.
+     */
+    fun popKittyKeyboardFlags(count: Int)
+
     // -------------------------------------------------------------------------
     // Terminal-to-host responses
     // -------------------------------------------------------------------------

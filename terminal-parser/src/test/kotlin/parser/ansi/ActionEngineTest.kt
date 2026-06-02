@@ -372,6 +372,21 @@ class ActionEngineTest {
             sinkCalls += "resetKeyFormatOptions"
         }
 
+        override fun applyKittyKeyboardFlags(
+            flags: Int,
+            applicationMode: Int,
+        ) {
+            sinkCalls += "applyKittyKeyboardFlags:$flags:$applicationMode"
+        }
+
+        override fun pushKittyKeyboardFlags(flags: Int) {
+            sinkCalls += "pushKittyKeyboardFlags:$flags"
+        }
+
+        override fun popKittyKeyboardFlags(count: Int) {
+            sinkCalls += "popKittyKeyboardFlags:$count"
+        }
+
         override fun requestDeviceStatusReport(
             mode: Int,
             decPrivate: Boolean,

@@ -83,6 +83,14 @@ class GeneratedCsiDispatchTableTest {
         }
 
         @Test
+        fun `Kitty keyboard controls route by private marker`() {
+            assertEquals(CsiCommand.KITTY_KEYBOARD_FLAGS, lookup('u', privateMarker = '='.code))
+            assertEquals(CsiCommand.KITTY_KEYBOARD_PUSH, lookup('u', privateMarker = '>'.code))
+            assertEquals(CsiCommand.KITTY_KEYBOARD_POP, lookup('u', privateMarker = '<'.code))
+            assertEquals(CsiCommand.UNKNOWN, lookup('u', privateMarker = '?'.code))
+        }
+
+        @Test
         fun `DEC selective erase signatures route separately from normal erase`() {
             assertEquals(CsiCommand.DECSED, lookup('J', privateMarker = '?'.code))
             assertEquals(CsiCommand.DECSEL, lookup('K', privateMarker = '?'.code))

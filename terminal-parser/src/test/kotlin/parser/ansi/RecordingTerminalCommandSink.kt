@@ -246,6 +246,21 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "resetKeyFormatOptions"
     }
 
+    override fun applyKittyKeyboardFlags(
+        flags: Int,
+        applicationMode: Int,
+    ) {
+        events += "applyKittyKeyboardFlags:$flags:$applicationMode"
+    }
+
+    override fun pushKittyKeyboardFlags(flags: Int) {
+        events += "pushKittyKeyboardFlags:$flags"
+    }
+
+    override fun popKittyKeyboardFlags(count: Int) {
+        events += "popKittyKeyboardFlags:$count"
+    }
+
     override fun requestDeviceStatusReport(
         mode: Int,
         decPrivate: Boolean,

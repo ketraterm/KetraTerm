@@ -59,10 +59,13 @@ internal object GeneratedCsiDispatchTable {
             114L, // CSI r  DECSTBM
             115L, // CSI s  DECSLRM
             116L, // CSI t  xterm window/title operation
+            15477L, // CSI < u  Kitty keyboard pop flags
             15715L, // CSI = c  DA3
+            15733L, // CSI = u  Kitty keyboard apply flags
             15971L, // CSI > c  DA2
             15974L, // CSI > f  XTFMTKEYS
             15981L, // CSI > m  XTMODKEYS
+            15989L, // CSI > u  Kitty keyboard push flags
             16202L, // CSI ? J  DECSED
             16203L, // CSI ? K  DECSEL
             16232L, // CSI ? h  DECSET
@@ -105,10 +108,13 @@ internal object GeneratedCsiDispatchTable {
             CsiCommand.DECSTBM,
             CsiCommand.DECSLRM,
             CsiCommand.WINDOW_OP,
+            CsiCommand.KITTY_KEYBOARD_POP,
             CsiCommand.DA_TERTIARY,
+            CsiCommand.KITTY_KEYBOARD_FLAGS,
             CsiCommand.DA_SECONDARY,
             CsiCommand.XTFMTKEYS,
             CsiCommand.XTMODKEYS,
+            CsiCommand.KITTY_KEYBOARD_PUSH,
             CsiCommand.DECSED,
             CsiCommand.DECSEL,
             CsiCommand.SM_DEC,

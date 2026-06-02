@@ -20,6 +20,7 @@ import com.gagik.parser.charset.CharsetMapper
 import com.gagik.parser.runtime.ParserState
 import com.gagik.parser.spi.TerminalCommandSink
 import com.gagik.terminal.protocol.ControlCode
+import com.gagik.terminal.protocol.keyboard.KittyKeyboardFlagApplicationMode
 
 /**
  * Semantic dispatcher boundary used by ActionEngine.
@@ -154,6 +155,9 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.WINDOW_OP -> dispatchWindowOperation(sink, state)
             CsiCommand.XTFMTKEYS -> dispatchKeyFormatOption(sink, state)
             CsiCommand.XTMODKEYS -> dispatchKeyModifierOption(sink, state)
+            CsiCommand.KITTY_KEYBOARD_FLAGS -> dispatchKittyKeyboardFlags(sink, state)
+            CsiCommand.KITTY_KEYBOARD_PUSH -> dispatchKittyKeyboardPush(sink, state)
+            CsiCommand.KITTY_KEYBOARD_POP -> dispatchKittyKeyboardPop(sink, state)
             CsiCommand.DECSTBM ->
                 sink.setScrollRegion(
                     top = scrollRegionTopParam(state, 0),
@@ -322,6 +326,46 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             resetOne = { resource -> sink.resetKeyFormatOption(resource) },
             set = { resource, value -> sink.setKeyFormatOption(resource, value) },
         )
+    }
+
+    private fun dispatchKittyKeyboardFlags(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        if (state.paramCount > 2) return
+        val flags = paramOrMissing(state, 0)
+        if (flags < 0 || isSubParameter(state, 0) || isSubParameter(state, 1)) return
+
+        val applicationMode =
+            when (val mode = paramOrMissing(state, 1)) {
+                -1 -> KittyKeyboardFlagApplicationMode.REPLACE
+                KittyKeyboardFlagApplicationMode.REPLACE,
+                KittyKeyboardFlagApplicationMode.SET,
+                KittyKeyboardFlagApplicationMode.CLEAR,
+                -> mode
+                else -> return
+            }
+
+        sink.applyKittyKeyboardFlags(flags, applicationMode)
+    }
+
+    private fun dispatchKittyKeyboardPush(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        if (state.paramCount > 1) return
+        if (isSubParameter(state, 0)) return
+        val flags = paramOrMissing(state, 0)
+        sink.pushKittyKeyboardFlags(if (flags < 0) 0 else flags)
+    }
+
+    private fun dispatchKittyKeyboardPop(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        if (state.paramCount > 1) return
+        if (isSubParameter(state, 0)) return
+        sink.popKittyKeyboardFlags(countParam(state, 0))
     }
 
     private inline fun dispatchKeyOption(
