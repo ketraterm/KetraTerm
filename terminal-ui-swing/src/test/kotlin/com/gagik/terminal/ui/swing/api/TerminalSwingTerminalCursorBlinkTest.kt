@@ -62,6 +62,12 @@ class TerminalSwingTerminalCursorBlinkTest {
             // Verify cursor timer is started when component is added
             assertTrue(component.cursorTimer.isRunning)
 
+            // Prevent timer from firing during the test by setting a very large delay
+            SwingUtilities.invokeAndWait {
+                component.cursorTimer.delay = 100_000
+                component.cursorTimer.restart()
+            }
+
             // 1. Manually set cursorBlinkVisible to false to simulate a blinked-out phase
             SwingUtilities.invokeAndWait {
                 component.cursorBlinkVisible = false
