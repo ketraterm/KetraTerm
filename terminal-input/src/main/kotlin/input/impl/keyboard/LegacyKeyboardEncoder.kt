@@ -382,12 +382,13 @@ internal class LegacyKeyboardEncoder(
             ModifyOtherKeysMode.MODE_2 -> modifiers != TerminalModifiers.NONE
             ModifyOtherKeysMode.MODE_3 -> true
             else -> false
-        } && (
-            codepoint == TAB_CODEPOINT ||
-                codepoint == ENTER_CODEPOINT ||
-                codepoint == BACKSPACE_CODEPOINT ||
-                codepoint == ESCAPE_CODEPOINT
-        )
+        } &&
+            (
+                codepoint == TAB_CODEPOINT ||
+                    codepoint == ENTER_CODEPOINT ||
+                    codepoint == BACKSPACE_CODEPOINT ||
+                    codepoint == ESCAPE_CODEPOINT
+            )
 
     private fun isLegacyAmbiguousOrMissing(
         codepoint: Int,
