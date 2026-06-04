@@ -256,7 +256,7 @@ internal class AnsiIntegrationHarnessTest {
         fun `CSI intermediate dispatch preserves intermediate bytes`() {
             val h = AnsiHarness()
 
-            h.acceptAscii("\u001B[1\$q")
+            h.acceptAscii($$"\u001B[1$q")
 
             val csi = h.dispatcher.csi.single()
             assertAll(
@@ -377,7 +377,7 @@ internal class AnsiIntegrationHarnessTest {
         fun `parameter byte after CSI intermediate enters ignore until final`() {
             val h = AnsiHarness()
 
-            h.acceptAscii("\u001B[\$1qX")
+            h.acceptAscii($$"\u001B[$1qX")
 
             assertAll(
                 { assertTrue(h.dispatcher.csi.isEmpty()) },

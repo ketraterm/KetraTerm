@@ -295,7 +295,12 @@ class TerminalRenderPublisherTest {
         override val frameGeneration: Long = text.hashCode().toLong()
         override val structureGeneration: Long = 1L
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
-        override val cursor: TerminalRenderCursor = TerminalRenderCursor(0, 0, true, false, TerminalRenderCursorShape.BLOCK, 1L)
+        override val cursor: TerminalRenderCursor = TerminalRenderCursor(0, 0,
+            visible = true,
+            blinking = false,
+            shape = TerminalRenderCursorShape.BLOCK,
+            generation = 1L
+        )
 
         override fun lineGeneration(row: Int): Long = text.hashCode().toLong()
 

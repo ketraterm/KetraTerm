@@ -234,7 +234,7 @@ internal class ClusterStore {
     ): Int {
         val slot = decodeSlot(handle)
         val length = slotLengths[slot]
-        if (index < 0 || index >= length) {
+        if (index !in 0..<length) {
             throw IndexOutOfBoundsException(
                 "index $index out of bounds for cluster of length $length",
             )

@@ -54,9 +54,9 @@ data class TerminalClipboardShortcuts(
         modifiersEx: Int,
     ): TerminalClipboardAction {
         val normalizedModifiers = modifiersEx and RELEVANT_MODIFIERS
-        return when {
-            keyCode == copyKey && normalizedModifiers == copyModifiers -> TerminalClipboardAction.COPY
-            keyCode == pasteKey && normalizedModifiers == pasteModifiers -> TerminalClipboardAction.PASTE
+        return when (keyCode) {
+            copyKey if normalizedModifiers == copyModifiers -> TerminalClipboardAction.COPY
+            pasteKey if normalizedModifiers == pasteModifiers -> TerminalClipboardAction.PASTE
             else -> TerminalClipboardAction.NONE
         }
     }

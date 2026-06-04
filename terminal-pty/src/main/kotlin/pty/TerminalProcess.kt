@@ -80,6 +80,6 @@ internal class Pty4jTerminalProcess(
         columns: Int,
         rows: Int,
     ) {
-        process.setWinSize(WinSize(columns, rows))
+        process.winSize = WinSize(columns, rows)
     }
 }

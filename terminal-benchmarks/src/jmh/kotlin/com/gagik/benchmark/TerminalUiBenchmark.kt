@@ -180,7 +180,7 @@ open class TerminalSwingPaintBenchmark {
                 },
             )
         component.bind(session)
-        component.setSize(component.preferredSize)
+        component.size = component.preferredSize
 
         image = BufferedImage(component.width, component.height, BufferedImage.TYPE_INT_ARGB)
         graphics = image.createGraphics()

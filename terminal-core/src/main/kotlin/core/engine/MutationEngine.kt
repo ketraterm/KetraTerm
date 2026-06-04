@@ -706,8 +706,7 @@ internal class MutationEngine(
             val safeCount = count.coerceAtMost(rightMargin - cCol + 1)
             val edgeCol = rightMargin - safeCount + 1
 
-            if (edgeCol > cCol &&
-                edgeCol <= rightMargin &&
+            if (edgeCol in (cCol + 1)..rightMargin &&
                 line.rawCodepoint(edgeCol) == TerminalConstants.WIDE_CHAR_SPACER
             ) {
                 annihilateAt(cRow, edgeCol)
