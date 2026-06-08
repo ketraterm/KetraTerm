@@ -682,6 +682,22 @@ class CoreTerminalCommandSink(
         terminal.setHyperlinkId(0)
     }
 
+    override fun setPaletteColor(index: Int, color: Int) {
+        terminal.setPaletteColor(index, color)
+    }
+
+    override fun queryPaletteColor(index: Int) {
+        terminal.queryPaletteColor(index)
+    }
+
+    override fun setDynamicColor(target: Int, color: Int) {
+        terminal.setDynamicColor(target, color)
+    }
+
+    override fun queryDynamicColor(target: Int) {
+        terminal.queryDynamicColor(target)
+    }
+
     /**
      * Returns the OSC 8 URI associated with [hyperlinkId], or `null`.
      *

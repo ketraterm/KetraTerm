@@ -139,6 +139,12 @@ class TerminalRenderCache(
         private set
 
     /**
+     * Last copied color palette.
+     */
+    var palette: TerminalColorPalette = TerminalColorPalette()
+        private set
+
+    /**
      * Last copied cursor column.
      */
     var cursorColumn: Int = 0
@@ -381,6 +387,7 @@ class TerminalRenderCache(
         finishClusterCopy()
 
         activeBuffer = frame.activeBuffer
+        palette = frame.palette
 
         copyCursorFrom(frame)
 

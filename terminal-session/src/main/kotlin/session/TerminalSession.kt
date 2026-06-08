@@ -29,6 +29,7 @@ import com.gagik.terminal.input.event.TerminalMouseEvent
 import com.gagik.terminal.input.event.TerminalPasteEvent
 import com.gagik.terminal.input.impl.DefaultTerminalInputEncoder
 import com.gagik.terminal.input.policy.TerminalInputPolicy
+import com.gagik.terminal.render.api.TerminalColorPalette
 import com.gagik.terminal.render.api.TerminalRenderFrameConsumer
 import com.gagik.terminal.render.api.TerminalRenderFrameReader
 import com.gagik.terminal.render.cache.TerminalRenderCache
@@ -167,6 +168,20 @@ class TerminalSession(
     fun setTreatAmbiguousAsWide(enabled: Boolean) {
         synchronized(mutationLock) {
             terminal.setTreatAmbiguousAsWide(enabled)
+        }
+    }
+
+    /**
+     * Sets the theme-configured color palette for the session.
+     *
+     * This method propagates the theme changes down to the core under the
+     * mutation lock.
+     *
+     * @param palette the theme color palette configuration.
+     */
+    fun setThemePalette(palette: TerminalColorPalette) {
+        synchronized(mutationLock) {
+            terminal.setThemePalette(palette)
         }
     }
 
