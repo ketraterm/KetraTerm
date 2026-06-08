@@ -166,13 +166,6 @@ class TerminalPtyRealProcessTest {
             listOf("/bin/sh", "-lc", "printf '%*s\n' $count '' | tr ' ' '$char'")
         }
 
-    private fun shellCommand(script: String): List<String> =
-        if (isWindows()) {
-            listOf("cmd.exe", "/c", script)
-        } else {
-            listOf("/bin/sh", "-lc", script)
-        }
-
     private fun isWindows(): Boolean = System.getProperty("os.name").lowercase().contains("windows")
 
     private fun waitUntil(

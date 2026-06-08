@@ -160,6 +160,11 @@ internal class TerminalModes : TerminalInputState {
                 value and KittyKeyboardProgressiveFlag.SUPPORTED_MASK,
             )
 
+    /** Synchronized output mode (?2026). True = enabled, false = disabled. */
+    var isSynchronizedOutput: Boolean
+        get() = TerminalModeBits.hasFlag(currentBits, TerminalModeBits.SYNCHRONIZED_OUTPUT)
+        set(value) = setFlag(TerminalModeBits.SYNCHRONIZED_OUTPUT, value)
+
     private val currentBits: Long
         get() = modeBits.get()
 
@@ -191,6 +196,7 @@ internal class TerminalModes : TerminalInputState {
             modifyOtherKeysMode = TerminalInputState.modifyOtherKeysMode(bits),
             formatOtherKeysMode = TerminalInputState.formatOtherKeysMode(bits),
             kittyKeyboardFlags = TerminalInputState.kittyKeyboardFlags(bits),
+            isSynchronizedOutput = TerminalModeBits.hasFlag(bits, TerminalModeBits.SYNCHRONIZED_OUTPUT),
         )
     }
 

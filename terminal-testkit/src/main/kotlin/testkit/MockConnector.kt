@@ -17,6 +17,7 @@ package com.gagik.terminal.testkit
 
 import com.gagik.terminal.transport.TerminalConnector
 import com.gagik.terminal.transport.TerminalConnectorListener
+import com.gagik.terminal.transport.checkBounds
 
 /**
  * In-memory connector for session and transport-adapter tests.
@@ -58,12 +59,7 @@ class MockConnector : TerminalConnector {
         offset: Int,
         length: Int,
     ) {
-        require(offset >= 0) { "offset must be non-negative, got $offset" }
-        require(length >= 0) { "length must be non-negative, got $length" }
-        require(offset <= bytes.size) { "offset $offset exceeds size ${bytes.size}" }
-        require(length <= bytes.size - offset) {
-            "offset + length exceeds size: offset=$offset length=$length size=${bytes.size}"
-        }
+        bytes.checkBounds(offset, length)
 
         if (isClosed) return
 

@@ -45,6 +45,7 @@ class TerminalModesTest {
             { assertEquals(0, modes.modifyOtherKeysMode) },
             { assertEquals(0, modes.formatOtherKeysMode) },
             { assertEquals(0, modes.kittyKeyboardFlags) },
+            { assertFalse(modes.isSynchronizedOutput) },
         )
     }
 
@@ -69,6 +70,7 @@ class TerminalModesTest {
         modes.modifyOtherKeysMode = 2
         modes.formatOtherKeysMode = 1
         modes.kittyKeyboardFlags = KittyKeyboardProgressiveFlag.SUPPORTED_MASK
+        modes.isSynchronizedOutput = true
 
         modes.reset()
 
@@ -91,6 +93,7 @@ class TerminalModesTest {
             { assertEquals(0, modes.modifyOtherKeysMode) },
             { assertEquals(0, modes.formatOtherKeysMode) },
             { assertEquals(0, modes.kittyKeyboardFlags) },
+            { assertFalse(modes.isSynchronizedOutput) },
         )
     }
 
@@ -109,6 +112,7 @@ class TerminalModesTest {
         modes.kittyKeyboardFlags =
             KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
             KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES
+        modes.isSynchronizedOutput = true
 
         val bits = modes.getModeBitsSnapshot()
         val snapshot = modes.getModeSnapshot()
@@ -130,6 +134,7 @@ class TerminalModesTest {
                     snapshot.kittyKeyboardFlags,
                 )
             },
+            { assertTrue(snapshot.isSynchronizedOutput) },
         )
     }
 
@@ -163,6 +168,7 @@ class TerminalModesTest {
         modes.modifyOtherKeysMode = 2
         modes.formatOtherKeysMode = 1
         modes.kittyKeyboardFlags = KittyKeyboardProgressiveFlag.SUPPORTED_MASK
+        modes.isSynchronizedOutput = true
 
         modes.softReset()
 
@@ -185,6 +191,7 @@ class TerminalModesTest {
             { assertEquals(0, modes.modifyOtherKeysMode) },
             { assertEquals(0, modes.formatOtherKeysMode) },
             { assertEquals(0, modes.kittyKeyboardFlags) },
+            { assertFalse(modes.isSynchronizedOutput) },
         )
     }
 }

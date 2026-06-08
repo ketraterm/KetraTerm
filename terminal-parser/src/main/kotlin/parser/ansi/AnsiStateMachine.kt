@@ -379,31 +379,22 @@ internal object AnsiStateMachine {
     }
 
     private fun buildIgnoredStrings() {
-        val sos = AnsiState.SOS_PM_APC_STRING
-        set(sos, ByteClass.INTERMEDIATE, sos, FsmAction.IGNORE)
-        set(sos, ByteClass.PARAM_DIGIT, sos, FsmAction.IGNORE)
-        set(sos, ByteClass.COLON, sos, FsmAction.IGNORE)
-        set(sos, ByteClass.PARAM_SEP, sos, FsmAction.IGNORE)
-        set(sos, ByteClass.PRIVATE_MARKER, sos, FsmAction.IGNORE)
-        set(sos, ByteClass.DCS_INTRO, sos, FsmAction.IGNORE)
-        set(sos, ByteClass.CSI_INTRO, sos, FsmAction.IGNORE)
-        set(sos, ByteClass.ST_INTRO, sos, FsmAction.IGNORE)
-        set(sos, ByteClass.OSC_INTRO, sos, FsmAction.IGNORE)
-        set(sos, ByteClass.SOS_PM_APC_INTRO, sos, FsmAction.IGNORE)
-        set(sos, ByteClass.FINAL_BYTE, sos, FsmAction.IGNORE)
+        setIgnoredStringFallbacks(AnsiState.SOS_PM_APC_STRING)
+        setIgnoredStringFallbacks(AnsiState.IGNORE_UNTIL_ST)
+    }
 
-        val ignore = AnsiState.IGNORE_UNTIL_ST
-        set(ignore, ByteClass.INTERMEDIATE, ignore, FsmAction.IGNORE)
-        set(ignore, ByteClass.PARAM_DIGIT, ignore, FsmAction.IGNORE)
-        set(ignore, ByteClass.COLON, ignore, FsmAction.IGNORE)
-        set(ignore, ByteClass.PARAM_SEP, ignore, FsmAction.IGNORE)
-        set(ignore, ByteClass.PRIVATE_MARKER, ignore, FsmAction.IGNORE)
-        set(ignore, ByteClass.DCS_INTRO, ignore, FsmAction.IGNORE)
-        set(ignore, ByteClass.CSI_INTRO, ignore, FsmAction.IGNORE)
-        set(ignore, ByteClass.ST_INTRO, ignore, FsmAction.IGNORE)
-        set(ignore, ByteClass.OSC_INTRO, ignore, FsmAction.IGNORE)
-        set(ignore, ByteClass.SOS_PM_APC_INTRO, ignore, FsmAction.IGNORE)
-        set(ignore, ByteClass.FINAL_BYTE, ignore, FsmAction.IGNORE)
+    private fun setIgnoredStringFallbacks(state: Int) {
+        set(state, ByteClass.INTERMEDIATE, state, FsmAction.IGNORE)
+        set(state, ByteClass.PARAM_DIGIT, state, FsmAction.IGNORE)
+        set(state, ByteClass.COLON, state, FsmAction.IGNORE)
+        set(state, ByteClass.PARAM_SEP, state, FsmAction.IGNORE)
+        set(state, ByteClass.PRIVATE_MARKER, state, FsmAction.IGNORE)
+        set(state, ByteClass.DCS_INTRO, state, FsmAction.IGNORE)
+        set(state, ByteClass.CSI_INTRO, state, FsmAction.IGNORE)
+        set(state, ByteClass.ST_INTRO, state, FsmAction.IGNORE)
+        set(state, ByteClass.OSC_INTRO, state, FsmAction.IGNORE)
+        set(state, ByteClass.SOS_PM_APC_INTRO, state, FsmAction.IGNORE)
+        set(state, ByteClass.FINAL_BYTE, state, FsmAction.IGNORE)
     }
 
     private fun set(

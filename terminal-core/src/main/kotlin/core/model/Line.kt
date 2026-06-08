@@ -295,8 +295,7 @@ internal class Line(
         defaultAttr: Long,
         defaultExtendedAttr: Long = 0L,
     ) {
-        if (col !in 0 until width || count <= 0) return
-        if (rightInclusive !in 0 until width || col > rightInclusive) return
+        if (isInvalidRange(col, count, rightInclusive)) return
 
         val safeCount = count.coerceAtMost(rightInclusive - col + 1)
         val shiftCount = rightInclusive - col + 1 - safeCount
@@ -347,8 +346,7 @@ internal class Line(
         defaultAttr: Long,
         defaultExtendedAttr: Long = 0L,
     ) {
-        if (col !in 0 until width || count <= 0) return
-        if (rightInclusive !in 0 until width || col > rightInclusive) return
+        if (isInvalidRange(col, count, rightInclusive)) return
 
         val safeCount = count.coerceAtMost(rightInclusive - col + 1)
         val shiftCount = rightInclusive - col + 1 - safeCount
@@ -442,6 +440,13 @@ internal class Line(
         val raw = codepoints[col]
         if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) store.free(raw)
     }
+
+    @Suppress("NOTHING_TO_INLINE")
+    private inline fun isInvalidRange(
+        col: Int,
+        count: Int,
+        rightInclusive: Int,
+    ): Boolean = col !in 0 until width || count <= 0 || rightInclusive !in 0 until width || col > rightInclusive
 }
 
 /**

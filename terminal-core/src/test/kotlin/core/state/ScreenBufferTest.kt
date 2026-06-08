@@ -278,4 +278,87 @@ class ScreenBufferTest {
             { assertFalse(buffer.savedCursor.pendingWrap, "Saved pending wrap MUST be broken if pushed inward") },
         )
     }
+
+    @Test
+    fun `kitty keyboard push pop stack logic`() {
+        val buffer = newBuffer()
+
+        // Initial state
+        assertFalse(buffer.hasSavedInitialFlags)
+        assertEquals(0, buffer.kittyKeyboardFlags)
+
+        // Push 1: initial flags were 0 (currentFlags = 0)
+        // new flags = 5
+        var current = buffer.pushKittyKeyboardFlags(5, 0)
+        assertEquals(5, current)
+        assertEquals(5, buffer.kittyKeyboardFlags)
+        assertTrue(buffer.hasSavedInitialFlags)
+        assertEquals(0, buffer.kittyKeyboardInitialFlags)
+
+        // Push 2: current flags are 5, push 12
+        current = buffer.pushKittyKeyboardFlags(12, 5)
+        assertEquals(12, current)
+        assertEquals(12, buffer.kittyKeyboardFlags)
+
+        // Pop 1 count
+        current = buffer.popKittyKeyboardFlags(1, 12)
+        assertEquals(5, current)
+        assertEquals(5, buffer.kittyKeyboardFlags)
+
+        // Pop 1 count
+        current = buffer.popKittyKeyboardFlags(1, 5)
+        assertEquals(0, current) // Restored initial flags
+        assertEquals(0, buffer.kittyKeyboardFlags)
+
+        // Pop past empty
+        current = buffer.popKittyKeyboardFlags(1, 0)
+        assertEquals(0, current)
+        assertEquals(0, buffer.kittyKeyboardFlags)
+    }
+
+    @Test
+    fun `kitty keyboard stack overflow evicts oldest entries`() {
+        val buffer = newBuffer()
+
+        // Push 33 times. Stack capacity is 32.
+        // First push saves initial flags (say, 999).
+        // Then we push 32 other values.
+        val flags = 100
+        buffer.pushKittyKeyboardFlags(flags, 999) // depth 1, stack[0] = 999
+        for (i in 1..32) {
+            buffer.pushKittyKeyboardFlags(flags + i, flags + i - 1)
+        }
+
+        // At this point, we pushed 33 times.
+        // The first push had currentFlags = 999.
+        // The last push was flags + 32, with currentFlags = flags + 31.
+        // Stack capacity is 32, so one eviction occurred.
+        // The oldest entry (999) should be evicted from the stack array, but the initial flags field (999) is preserved separately.
+        // Let's verify by popping 32 times.
+        var current = flags + 32
+        for (i in 1..32) {
+            current = buffer.popKittyKeyboardFlags(1, current)
+        }
+        // Popping the 32nd time should give us the oldest remaining entry on the stack (which is the state from push 2, i.e., currentFlags = 100).
+        assertEquals(100, current)
+
+        // The 33rd pop (popping past empty) should restore the initial flags (999) because initial flags are stored outside the stack!
+        current = buffer.popKittyKeyboardFlags(1, current)
+        assertEquals(999, current)
+    }
+
+    @Test
+    fun `clearKittyKeyboardStack resets stack state`() {
+        val buffer = newBuffer()
+        buffer.pushKittyKeyboardFlags(5, 1)
+        buffer.pushKittyKeyboardFlags(10, 5)
+
+        buffer.clearKittyKeyboardStack()
+        assertEquals(0, buffer.kittyKeyboardFlags)
+        assertFalse(buffer.hasSavedInitialFlags)
+
+        // Pop should now default to 0 since stack was cleared and hasSavedInitialFlags is false
+        val current = buffer.popKittyKeyboardFlags(1, 0)
+        assertEquals(0, current)
+    }
 }

@@ -20,7 +20,6 @@ import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.font.FontRenderContext
-import java.awt.geom.Rectangle2D
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
@@ -310,9 +309,6 @@ private data class TableRange(
     val offset: Int,
     val length: Int,
 )
-
-private val Rectangle2D.isEmpty: Boolean
-    get() = width <= 0.0 || height <= 0.0
 
 private fun BufferedImage.hasVisiblePixel(): Boolean {
     var y = 0

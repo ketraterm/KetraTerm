@@ -45,6 +45,8 @@ data class TerminalModeSnapshot(
     val formatOtherKeysMode: Int,
     /** Active Kitty keyboard progressive-enhancement flags stored by core. */
     val kittyKeyboardFlags: Int,
+    /** Synchronized output mode (?2026) enabled. */
+    val isSynchronizedOutput: Boolean,
 )
 
 /**

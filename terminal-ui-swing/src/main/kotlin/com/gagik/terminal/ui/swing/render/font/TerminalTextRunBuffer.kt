@@ -89,7 +89,7 @@ internal class TerminalTextRunBuffer(
         while (newCapacity < required) {
             val doubled = newCapacity * 2
             newCapacity =
-                if (doubled <= 0 || doubled > maxCapacity) {
+                if (doubled !in 1..maxCapacity) {
                     maxCapacity
                 } else {
                     doubled

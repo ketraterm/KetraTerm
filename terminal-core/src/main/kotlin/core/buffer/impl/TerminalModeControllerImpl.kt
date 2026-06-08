@@ -91,7 +91,22 @@ internal class TerminalModeControllerImpl(
     }
 
     override fun setKittyKeyboardFlags(flags: Int) {
-        mutateMode { state.modes.kittyKeyboardFlags = flags }
+        mutateMode {
+            state.modes.kittyKeyboardFlags = flags
+            state.activeBuffer.kittyKeyboardFlags = flags
+        }
+    }
+
+    override fun pushKittyKeyboardFlags(flags: Int) {
+        mutateMode {
+            state.modes.kittyKeyboardFlags = state.activeBuffer.pushKittyKeyboardFlags(flags, state.modes.kittyKeyboardFlags)
+        }
+    }
+
+    override fun popKittyKeyboardFlags(count: Int) {
+        mutateMode {
+            state.modes.kittyKeyboardFlags = state.activeBuffer.popKittyKeyboardFlags(count, state.modes.kittyKeyboardFlags)
+        }
     }
 
     override fun setReverseVideo(enabled: Boolean) {
@@ -126,6 +141,10 @@ internal class TerminalModeControllerImpl(
 
     override fun setTreatAmbiguousAsWide(enabled: Boolean) {
         mutateMode { state.modes.treatAmbiguousAsWide = enabled }
+    }
+
+    override fun setSynchronizedOutput(enabled: Boolean) {
+        mutateMode { state.modes.isSynchronizedOutput = enabled }
     }
 
     override fun enterAltBufferWithoutCursorSave(clearBeforeEnter: Boolean) {

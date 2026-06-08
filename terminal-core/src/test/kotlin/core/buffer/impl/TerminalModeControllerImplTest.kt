@@ -29,7 +29,6 @@ import org.junit.jupiter.api.Test
 
 class TerminalModeControllerImplTest {
     private fun withPendingWrap(
-        modeController: TerminalModeControllerImpl,
         state: TerminalState,
         assertion: () -> Unit,
     ) {
@@ -121,29 +120,29 @@ class TerminalModeControllerImplTest {
         val state = TerminalState(8, 4, 2)
         val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
 
-        withPendingWrap(modeController, state) { modeController.setInsertMode(true) }
-        withPendingWrap(modeController, state) { modeController.setAutoWrap(true) }
-        withPendingWrap(modeController, state) { modeController.setAutoWrap(false) }
-        withPendingWrap(modeController, state) { modeController.setOriginMode(true) }
-        withPendingWrap(modeController, state) { modeController.setApplicationCursorKeys(true) }
-        withPendingWrap(modeController, state) { modeController.setApplicationKeypad(true) }
-        withPendingWrap(modeController, state) { modeController.setLeftRightMarginMode(true) }
-        withPendingWrap(modeController, state) { modeController.setLeftRightMarginMode(true) }
-        withPendingWrap(modeController, state) { modeController.setLeftRightMarginMode(false) }
-        withPendingWrap(modeController, state) { modeController.setNewLineMode(true) }
-        withPendingWrap(modeController, state) { modeController.setMouseTrackingMode(MouseTrackingMode.NORMAL) }
-        withPendingWrap(modeController, state) { modeController.setMouseEncodingMode(MouseEncodingMode.SGR) }
-        withPendingWrap(modeController, state) { modeController.setBracketedPasteEnabled(true) }
-        withPendingWrap(modeController, state) { modeController.setFocusReportingEnabled(true) }
-        withPendingWrap(modeController, state) { modeController.setModifyOtherKeysMode(2) }
-        withPendingWrap(modeController, state) { modeController.setFormatOtherKeysMode(1) }
-        withPendingWrap(modeController, state) {
+        withPendingWrap(state) { modeController.setInsertMode(true) }
+        withPendingWrap(state) { modeController.setAutoWrap(true) }
+        withPendingWrap(state) { modeController.setAutoWrap(false) }
+        withPendingWrap(state) { modeController.setOriginMode(true) }
+        withPendingWrap(state) { modeController.setApplicationCursorKeys(true) }
+        withPendingWrap(state) { modeController.setApplicationKeypad(true) }
+        withPendingWrap(state) { modeController.setLeftRightMarginMode(true) }
+        withPendingWrap(state) { modeController.setLeftRightMarginMode(true) }
+        withPendingWrap(state) { modeController.setLeftRightMarginMode(false) }
+        withPendingWrap(state) { modeController.setNewLineMode(true) }
+        withPendingWrap(state) { modeController.setMouseTrackingMode(MouseTrackingMode.NORMAL) }
+        withPendingWrap(state) { modeController.setMouseEncodingMode(MouseEncodingMode.SGR) }
+        withPendingWrap(state) { modeController.setBracketedPasteEnabled(true) }
+        withPendingWrap(state) { modeController.setFocusReportingEnabled(true) }
+        withPendingWrap(state) { modeController.setModifyOtherKeysMode(2) }
+        withPendingWrap(state) { modeController.setFormatOtherKeysMode(1) }
+        withPendingWrap(state) {
             modeController.setKittyKeyboardFlags(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES)
         }
-        withPendingWrap(modeController, state) { modeController.setReverseVideo(true) }
-        withPendingWrap(modeController, state) { modeController.setCursorVisible(false) }
-        withPendingWrap(modeController, state) { modeController.setCursorBlinking(true) }
-        withPendingWrap(modeController, state) { modeController.setTreatAmbiguousAsWide(true) }
+        withPendingWrap(state) { modeController.setReverseVideo(true) }
+        withPendingWrap(state) { modeController.setCursorVisible(false) }
+        withPendingWrap(state) { modeController.setCursorBlinking(true) }
+        withPendingWrap(state) { modeController.setTreatAmbiguousAsWide(true) }
     }
 
     @Test
@@ -325,5 +324,50 @@ class TerminalModeControllerImplTest {
             { assertTrue(state.isAltScreenActive) },
             { assertEquals('A'.code, state.altBuffer.ring[state.resolveRingIndex(0)].getCodepoint(0)) },
         )
+    }
+
+    @Test
+    fun `kitty keyboard push pop via controller updates modes and buffer`() {
+        val state = TerminalState(6, 4, 2)
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+
+        // Initial state
+        assertEquals(0, state.modes.kittyKeyboardFlags)
+        assertEquals(0, state.activeBuffer.kittyKeyboardFlags)
+
+        // Set flags directly
+        modeController.setKittyKeyboardFlags(3)
+        assertEquals(3, state.modes.kittyKeyboardFlags)
+        assertEquals(3, state.activeBuffer.kittyKeyboardFlags)
+
+        // Push flags
+        modeController.pushKittyKeyboardFlags(12)
+        assertEquals(12, state.modes.kittyKeyboardFlags)
+        assertEquals(12, state.activeBuffer.kittyKeyboardFlags)
+
+        // Switch to alternate buffer
+        modeController.enterAltBuffer()
+        assertEquals(0, state.modes.kittyKeyboardFlags)
+        assertEquals(0, state.activeBuffer.kittyKeyboardFlags)
+
+        // Push inside alt screen
+        modeController.pushKittyKeyboardFlags(5)
+        assertEquals(5, state.modes.kittyKeyboardFlags)
+        assertEquals(5, state.activeBuffer.kittyKeyboardFlags)
+
+        // Exit alt buffer
+        modeController.exitAltBuffer()
+        assertEquals(12, state.modes.kittyKeyboardFlags)
+        assertEquals(12, state.activeBuffer.kittyKeyboardFlags)
+
+        // Pop on primary
+        modeController.popKittyKeyboardFlags(1)
+        assertEquals(3, state.modes.kittyKeyboardFlags)
+        assertEquals(3, state.activeBuffer.kittyKeyboardFlags)
+
+        // Pop to baseline
+        modeController.popKittyKeyboardFlags(1)
+        assertEquals(3, state.modes.kittyKeyboardFlags)
+        assertEquals(3, state.activeBuffer.kittyKeyboardFlags)
     }
 }

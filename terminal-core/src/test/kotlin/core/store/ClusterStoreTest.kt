@@ -705,13 +705,12 @@ class ClusterStoreTest {
         fun `reused handles after free are the same negative values as originally issued`() {
             val store = ClusterStore()
             val original = store.alloc(intArrayOf(1, 2, 3))
-            val originalValue = original
 
             store.free(original)
             val reissued = store.alloc(intArrayOf(9, 8, 7))
 
             assertEquals(
-                originalValue,
+                original,
                 reissued,
                 "Reissued handle must have the same numeric value as the freed one",
             )

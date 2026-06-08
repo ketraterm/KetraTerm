@@ -97,7 +97,7 @@ class TerminalSwingSettingsTest {
         var visibleRows = 0
 
         SwingUtilities.invokeAndWait {
-            component.setSize(preferred)
+            component.size = preferred
             val visible = component.visibleGridSize()
             visibleColumns = visible.width
             visibleRows = visible.height

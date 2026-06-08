@@ -111,6 +111,7 @@ internal class TerminalState(
      */
     fun enterAltScreen(clearBeforeEnter: Boolean) {
         if (isAltScreenActive) return
+        activeBuffer.kittyKeyboardFlags = modes.kittyKeyboardFlags
         if (clearBeforeEnter) {
             altBuffer.clearGrid(pen.blankAttr, pen.blankExtendedAttr, dimensions.height)
             altBuffer.resetScrollRegion(dimensions.height)
@@ -119,8 +120,10 @@ internal class TerminalState(
             altBuffer.cursor.row = 0
             altBuffer.cursor.pendingWrap = false
             altBuffer.savedCursor.clear()
+            altBuffer.clearKittyKeyboardStack()
         }
         activeBuffer = altBuffer
+        modes.kittyKeyboardFlags = activeBuffer.kittyKeyboardFlags
     }
 
     /**
@@ -132,7 +135,9 @@ internal class TerminalState(
      */
     fun exitAltScreen() {
         if (!isAltScreenActive) return
+        activeBuffer.kittyKeyboardFlags = modes.kittyKeyboardFlags
         activeBuffer = primaryBuffer
+        modes.kittyKeyboardFlags = activeBuffer.kittyKeyboardFlags
     }
 
     // Transparent engine accessors.

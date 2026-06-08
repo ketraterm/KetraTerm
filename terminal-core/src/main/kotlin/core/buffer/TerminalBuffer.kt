@@ -136,6 +136,8 @@ internal class TerminalBuffer private constructor(
         state.activeBuffer.resetScrollRegion(state.dimensions.height)
         state.primaryBuffer.resetLeftRightMargins(state.dimensions.width)
         state.altBuffer.resetLeftRightMargins(state.dimensions.width)
+        state.primaryBuffer.clearKittyKeyboardStack()
+        state.altBuffer.clearKittyKeyboardStack()
         state.hostResponses.clear()
         state.modes.reset()
         state.tabStops.resetToDefault()
@@ -154,6 +156,8 @@ internal class TerminalBuffer private constructor(
         state.altBuffer.resetScrollRegion(state.dimensions.height)
         state.primaryBuffer.resetLeftRightMargins(state.dimensions.width)
         state.altBuffer.resetLeftRightMargins(state.dimensions.width)
+        state.primaryBuffer.clearKittyKeyboardStack()
+        state.altBuffer.clearKittyKeyboardStack()
         state.primaryBuffer.cursor.pendingWrap = false
         state.altBuffer.cursor.pendingWrap = false
         resetSavedCursorToHome(state.primaryBuffer.savedCursor)

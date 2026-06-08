@@ -19,7 +19,6 @@ import java.awt.Font
 import java.awt.font.FontRenderContext
 import java.awt.font.GlyphVector
 import java.awt.geom.Point2D
-import java.util.*
 
 /**
  * Bounded cache for ASCII glyph vectors with terminal-cell positions.
@@ -65,7 +64,7 @@ internal class TerminalAsciiGlyphVectorCache(
         val cached = layouts[lookupKey]
         if (cached != null) return cached
 
-        val storedChars = Arrays.copyOfRange(chars, offset, offset + length)
+        val storedChars = chars.copyOfRange(offset, offset + length)
         val key = CacheKey(storedChars, font, style, cellWidth)
         val glyphVector = font.createGlyphVector(fontRenderContext, storedChars)
         var glyph = 0

@@ -91,8 +91,7 @@ surface or maintenance cost without meaningful modern terminal value.
     - application cursor/keypad modes, cursor blink/visibility, reverse video,
       origin, auto-wrap, left/right margin mode, and alternate-screen variants
     - mouse tracking and encoding selectors, focus reporting, and bracketed paste
-    - synchronized output mode `?2026` is recognized and intentionally ignored by
-      integration until core/renderer batching state exists
+    - synchronized output mode `?2026` is recognized, routed to core, and implemented with deferred rendering and safety timeouts in the session layer
 - `DONE(parser/core/integration)`: alternate-screen and cursor-save variants
   are distinguished:
     - `47`, switch alternate screen without clearing or cursor save/restore
@@ -283,8 +282,7 @@ Missing:
   durable core modes, render-frame cursor snapshots, and Swing repaint/cursor
   painting logic.
 - `DONE(parser/core/integration/host)`: cursor style protocol support (`DECSCUSR`) parsed, routed, and maps dynamically to render shapes (BLOCK, UNDERLINE, BAR).
-- `TODO(core)`: synchronized output mode state (`?2026`) if renderer integration
-  needs batching semantics.
+- `DONE(core/session)`: synchronized output mode state (`?2026`) defers frame publishing to UI with a safety timeout of 100ms.
 - `DONE(core/integration/host)`: title and icon title state are stored in core,
   advanced through integration metadata, published through render generation,
   and surfaced to hosts through `TerminalHostEventSink`.

@@ -91,13 +91,7 @@ internal object AttributeCodec {
 
         var v = encodeColorCode(fg).toLong()
         v = v or (encodeColorCode(bg).toLong() shl BG_SHIFT)
-        if (bold) v = v or (1L shl BOLD_BIT)
-        if (italic) v = v or (1L shl ITALIC_BIT)
-        if (inverse) v = v or (1L shl INVERSE_BIT)
-        if (blink) v = v or (1L shl BLINK_BIT)
-        if (faint) v = v or (1L shl FAINT_BIT)
-        if (protected) v = v or (1L shl PROTECTED_BIT)
-        return v
+        return v or packFlags(bold, faint, italic, blink, inverse, protected)
     }
 
     fun packColors(
@@ -112,6 +106,19 @@ internal object AttributeCodec {
     ): Long {
         var v = encodeColor(foreground).toLong()
         v = v or (encodeColor(background).toLong() shl BG_SHIFT)
+        return v or packFlags(bold, faint, italic, blink, inverse, protected)
+    }
+
+    @Suppress("NOTHING_TO_INLINE")
+    private inline fun packFlags(
+        bold: Boolean,
+        faint: Boolean,
+        italic: Boolean,
+        blink: Boolean,
+        inverse: Boolean,
+        protected: Boolean,
+    ): Long {
+        var v = 0L
         if (bold) v = v or (1L shl BOLD_BIT)
         if (italic) v = v or (1L shl ITALIC_BIT)
         if (inverse) v = v or (1L shl INVERSE_BIT)

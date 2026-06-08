@@ -17,6 +17,7 @@ package com.gagik.terminal.input.impl
 
 import com.gagik.core.api.TerminalInputState
 import com.gagik.terminal.input.event.TerminalPasteEvent
+import com.gagik.terminal.input.impl.keyboard.CsiWriter
 import com.gagik.terminal.input.policy.PasteSanitizationPolicy
 import com.gagik.terminal.input.policy.TerminalInputPolicy
 import com.gagik.terminal.protocol.host.TerminalHostOutput
@@ -90,33 +91,7 @@ internal class PasteEncoder(
     }
 
     private fun writeUtf8Codepoint(codepoint: Int) {
-        when {
-            codepoint <= 0x7f -> output.writeByte(codepoint)
-
-            codepoint <= 0x7ff -> {
-                scratch.clear()
-                scratch.appendByte(0xc0 or (codepoint shr 6))
-                scratch.appendByte(0x80 or (codepoint and 0x3f))
-                scratch.writeTo(output)
-            }
-
-            codepoint <= 0xffff -> {
-                scratch.clear()
-                scratch.appendByte(0xe0 or (codepoint shr 12))
-                scratch.appendByte(0x80 or ((codepoint shr 6) and 0x3f))
-                scratch.appendByte(0x80 or (codepoint and 0x3f))
-                scratch.writeTo(output)
-            }
-
-            else -> {
-                scratch.clear()
-                scratch.appendByte(0xf0 or (codepoint shr 18))
-                scratch.appendByte(0x80 or ((codepoint shr 12) and 0x3f))
-                scratch.appendByte(0x80 or ((codepoint shr 6) and 0x3f))
-                scratch.appendByte(0x80 or (codepoint and 0x3f))
-                scratch.writeTo(output)
-            }
-        }
+        CsiWriter.writeUtf8Codepoint(scratch, output, codepoint)
     }
 
     private companion object {

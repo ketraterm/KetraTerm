@@ -38,12 +38,6 @@ internal class AnsiPrintableBridgeFixture(
         }
     }
 
-    fun acceptBytes(vararg byteValues: Int) {
-        for (byteValue in byteValues) {
-            acceptByte(byteValue)
-        }
-    }
-
     fun acceptByte(byteValue: Int) {
         val byteClass = ByteClass.classify(byteValue)
         val transition = AnsiStateMachine.transition(state.fsmState, byteClass)

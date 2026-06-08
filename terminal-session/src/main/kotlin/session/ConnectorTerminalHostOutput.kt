@@ -17,6 +17,7 @@ package com.gagik.terminal.session
 
 import com.gagik.terminal.protocol.host.TerminalHostOutput
 import com.gagik.terminal.transport.TerminalConnector
+import com.gagik.terminal.transport.checkBounds
 
 /**
  * A zero-allocation, thread-safe bridge between terminal input encoding and
@@ -49,12 +50,7 @@ internal class ConnectorTerminalHostOutput(
         offset: Int,
         length: Int,
     ) {
-        require(offset >= 0) { "offset must be non-negative, got $offset" }
-        require(length >= 0) { "length must be non-negative, got $length" }
-        require(offset <= bytes.size) { "offset $offset exceeds size ${bytes.size}" }
-        require(length <= bytes.size - offset) {
-            "offset + length exceeds size: offset=$offset length=$length size=${bytes.size}"
-        }
+        bytes.checkBounds(offset, length)
 
         synchronized(writeLock) {
             connector.write(bytes, offset, length)

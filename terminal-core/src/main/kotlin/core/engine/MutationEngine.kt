@@ -309,29 +309,39 @@ internal class MutationEngine(
      * DECSCA therefore affects only selective erase. It does not make a cell
      * immutable to later printable output.
      */
-    private fun selectiveEraseRange(
+    private inline fun withEraseRange(
         row: Int,
         startCol: Int,
         endExclusive: Int,
+        block: (line: Line, from: Int, to: Int) -> Unit,
     ) {
         if (row !in 0 until height) return
         val line = getLine(row)
         val from = startCol.coerceIn(0, width)
         val to = endExclusive.coerceIn(0, width)
         if (from >= to) return
+        block(line, from, to)
+    }
 
-        var col = from
-        while (col < to) {
-            val start = findClusterStart(line, col).coerceIn(0, width - 1)
-            val next = occupantEndExclusive(line, start)
-            if (!isProtectedOccupant(line, start)) {
-                line.clearRange(start, minOf(next, width), blankAttr, blankExtendedAttr)
-                state.markLineChanged(line)
+    private fun selectiveEraseRange(
+        row: Int,
+        startCol: Int,
+        endExclusive: Int,
+    ) {
+        withEraseRange(row, startCol, endExclusive) { line, from, to ->
+            var col = from
+            while (col < to) {
+                val start = findClusterStart(line, col).coerceIn(0, width - 1)
+                val next = occupantEndExclusive(line, start)
+                if (!isProtectedOccupant(line, start)) {
+                    line.clearRange(start, minOf(next, width), blankAttr, blankExtendedAttr)
+                    state.markLineChanged(line)
+                }
+                col = maxOf(col + 1, next)
             }
-            col = maxOf(col + 1, next)
+            line.wrapped = false
+            state.markLineChanged(line)
         }
-        line.wrapped = false
-        state.markLineChanged(line)
     }
 
     /**
@@ -346,19 +356,15 @@ internal class MutationEngine(
         startCol: Int,
         endExclusive: Int,
     ) {
-        if (row !in 0 until height) return
-        val line = getLine(row)
-        val from = startCol.coerceIn(0, width)
-        val to = endExclusive.coerceIn(0, width)
-        if (from >= to) return
-
-        var col = from
-        while (col < to) {
-            val start = findClusterStart(line, col).coerceIn(0, width - 1)
-            val next = occupantEndExclusive(line, start)
-            line.clearRange(start, minOf(next, width), blankAttr, blankExtendedAttr)
-            state.markLineChanged(line)
-            col = maxOf(col + 1, next)
+        withEraseRange(row, startCol, endExclusive) { line, from, to ->
+            var col = from
+            while (col < to) {
+                val start = findClusterStart(line, col).coerceIn(0, width - 1)
+                val next = occupantEndExclusive(line, start)
+                line.clearRange(start, minOf(next, width), blankAttr, blankExtendedAttr)
+                state.markLineChanged(line)
+                col = maxOf(col + 1, next)
+            }
         }
     }
 
@@ -465,8 +471,6 @@ internal class MutationEngine(
         val extendedAttr = state.pen.currentExtendedAttr
         val cCol = state.cursor.col
         val cRow = state.cursor.row
-        val oldCursorCol = cCol
-        val oldCursorRow = cRow
 
         if (!state.modes.isInsertMode &&
             charWidth != 2 &&
@@ -490,7 +494,7 @@ internal class MutationEngine(
                     state.cursor.col = cCol + 1
                     state.cursor.pendingWrap = false
                 }
-                markCursorIfMoved(oldCursorCol, oldCursorRow)
+                markCursorIfMoved(cCol, cRow)
                 return
             }
         }
@@ -672,6 +676,13 @@ internal class MutationEngine(
         }
     }
 
+    @Suppress("NOTHING_TO_INLINE")
+    private inline fun isCursorInMargins(): Boolean {
+        val cCol = state.cursor.col
+        val cRow = state.cursor.row
+        return cRow in 0 until height && cCol in leftMargin..rightMargin
+    }
+
     /**
      * Inserts [count] blank cells at the cursor column, shifting the remainder
      * of the line right and discarding cells pushed past the right margin.
@@ -680,10 +691,9 @@ internal class MutationEngine(
         if (count <= 0) return
 
         structuralMutation {
+            if (!isCursorInMargins()) return@structuralMutation
             val cRow = state.cursor.row
             val cCol = state.cursor.col
-            if (cRow !in 0 until height || cCol !in 0 until width) return@structuralMutation
-            if (cCol !in leftMargin..rightMargin) return@structuralMutation
 
             val line = getLine(cRow)
 
@@ -694,8 +704,7 @@ internal class MutationEngine(
             val safeCount = count.coerceAtMost(rightMargin - cCol + 1)
             val edgeCol = rightMargin - safeCount + 1
 
-            if (edgeCol > cCol &&
-                edgeCol <= rightMargin &&
+            if (edgeCol in (cCol + 1)..rightMargin &&
                 line.rawCodepoint(edgeCol) == TerminalConstants.WIDE_CHAR_SPACER
             ) {
                 annihilateAt(cRow, edgeCol)
@@ -714,10 +723,9 @@ internal class MutationEngine(
         if (count <= 0) return
 
         structuralMutation {
+            if (!isCursorInMargins()) return@structuralMutation
             val cRow = state.cursor.row
             val cCol = state.cursor.col
-            if (cRow !in 0 until height || cCol !in 0 until width) return@structuralMutation
-            if (cCol !in leftMargin..rightMargin) return@structuralMutation
 
             val safeCount = count.coerceAtMost(rightMargin - cCol + 1)
 

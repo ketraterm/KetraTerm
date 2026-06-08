@@ -297,7 +297,6 @@ foreach ($range in $emojiPresentationRanges) {
     Add-Range $wideRanges $range.Start $range.End
 }
 $wideRanges = Merge-Ranges $wideRanges
-$emojiRanges = Read-NamedPropertyRanges $emojiPath "Emoji"
 $emojiVariationBaseRanges = Read-EmojiVariationBases $emojiVariationSequencesPath
 
 $zeroRanges = [System.Collections.Generic.List[object]]::new()
@@ -320,7 +319,6 @@ $wideSplit = Split-Ranges $wideRanges $bitsetLimit
 $zeroSplit = Split-Ranges $zeroRanges $bitsetLimit
 $ambiguousSplit = Split-Ranges $ambiguousRanges $bitsetLimit
 $terminalCellGraphicSplit = Split-Ranges $terminalCellGraphicRanges $bitsetLimit
-$emojiSplit = Split-Ranges $emojiRanges $bitsetLimit
 $emojiVariationBaseSplit = Split-Ranges $emojiVariationBaseRanges $bitsetLimit
 
 $coreParts = [System.Collections.Generic.List[string]]::new()
@@ -349,10 +347,6 @@ $coreParts.Add("") | Out-Null
 $coreParts.Add((Format-IntArray "TERMINAL_CELL_GRAPHIC_RANGES" $terminalCellGraphicSplit.Low "    " "internal")) | Out-Null
 $coreParts.Add("") | Out-Null
 $coreParts.Add((Format-IntArray "TERMINAL_CELL_GRAPHIC_ASTRAL_RANGES" $terminalCellGraphicSplit.High "    " "internal")) | Out-Null
-$coreParts.Add("") | Out-Null
-$coreParts.Add((Format-IntArray "EMOJI_RANGES" $emojiSplit.Low "    " "internal")) | Out-Null
-$coreParts.Add("") | Out-Null
-$coreParts.Add((Format-IntArray "EMOJI_ASTRAL_RANGES" $emojiSplit.High "    " "internal")) | Out-Null
 $coreParts.Add("") | Out-Null
 $coreParts.Add((Format-IntArray "EMOJI_VARIATION_BASE_RANGES" $emojiVariationBaseSplit.Low "    " "internal")) | Out-Null
 $coreParts.Add("") | Out-Null

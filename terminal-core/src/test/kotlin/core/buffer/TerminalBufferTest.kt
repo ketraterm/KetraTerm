@@ -322,4 +322,98 @@ class TerminalBufferTest {
             { assertEquals(16, state.tabStops.getNextStop(10)) },
         )
     }
+
+    @Test
+    fun `reset and softReset clear kitty keyboard stacks on both buffers`() {
+        val buffer = newApiBuffer(width = 8, height = 4, maxHistory = 2)
+        val state = stateOf(buffer)
+
+        // 1. Setup primary buffer stack
+        buffer.setKittyKeyboardFlags(2)
+        buffer.pushKittyKeyboardFlags(4)
+        buffer.pushKittyKeyboardFlags(8)
+
+        // 2. Setup alternate buffer stack
+        buffer.enterAltBuffer()
+        buffer.setKittyKeyboardFlags(1)
+        buffer.pushKittyKeyboardFlags(3)
+        buffer.pushKittyKeyboardFlags(9)
+
+        // Verify state is active in alt buffer
+        assertEquals(9, state.modes.kittyKeyboardFlags)
+        assertEquals(9, state.altBuffer.kittyKeyboardFlags)
+
+        // Reset
+        buffer.reset()
+
+        // Verify primary stack is cleared
+        assertFalse(state.primaryBuffer.hasSavedInitialFlags)
+        assertEquals(0, state.primaryBuffer.kittyKeyboardFlags)
+
+        // Verify alt stack is cleared
+        assertFalse(state.altBuffer.hasSavedInitialFlags)
+        assertEquals(0, state.altBuffer.kittyKeyboardFlags)
+
+        // Verify modes
+        assertEquals(0, state.modes.kittyKeyboardFlags)
+
+        // Now setup again to test softReset
+        buffer.setKittyKeyboardFlags(2)
+        buffer.pushKittyKeyboardFlags(4)
+        buffer.pushKittyKeyboardFlags(8)
+
+        buffer.enterAltBuffer()
+        buffer.setKittyKeyboardFlags(1)
+        buffer.pushKittyKeyboardFlags(3)
+        buffer.pushKittyKeyboardFlags(9)
+
+        buffer.softReset()
+
+        // Verify primary stack is cleared
+        assertFalse(state.primaryBuffer.hasSavedInitialFlags)
+        assertEquals(0, state.primaryBuffer.kittyKeyboardFlags)
+
+        // Verify alt stack is cleared
+        assertFalse(state.altBuffer.hasSavedInitialFlags)
+        assertEquals(0, state.altBuffer.kittyKeyboardFlags)
+
+        // Verify modes
+        assertEquals(0, state.modes.kittyKeyboardFlags)
+    }
+
+    @Test
+    fun `alternate buffer maintains completely isolated kitty keyboard stack`() {
+        val buffer = newApiBuffer(width = 8, height = 4, maxHistory = 2)
+        val state = stateOf(buffer)
+
+        // 1. Push on primary screen
+        buffer.setKittyKeyboardFlags(3)
+        buffer.pushKittyKeyboardFlags(7)
+
+        assertEquals(7, state.modes.kittyKeyboardFlags)
+        assertEquals(7, state.primaryBuffer.kittyKeyboardFlags)
+
+        // 2. Enter alt screen
+        buffer.enterAltBuffer()
+
+        // Alt screen starts with fresh/cleared stack
+        assertEquals(0, state.modes.kittyKeyboardFlags)
+        assertEquals(0, state.altBuffer.kittyKeyboardFlags)
+
+        // Push on alt screen
+        buffer.pushKittyKeyboardFlags(15)
+        assertEquals(15, state.modes.kittyKeyboardFlags)
+        assertEquals(15, state.altBuffer.kittyKeyboardFlags)
+
+        // 3. Exit alt screen
+        buffer.exitAltBuffer()
+
+        // Primary stack is preserved and restored
+        assertEquals(7, state.modes.kittyKeyboardFlags)
+        assertEquals(7, state.primaryBuffer.kittyKeyboardFlags)
+
+        // Pop on primary
+        buffer.popKittyKeyboardFlags(1)
+        assertEquals(3, state.modes.kittyKeyboardFlags)
+    }
 }

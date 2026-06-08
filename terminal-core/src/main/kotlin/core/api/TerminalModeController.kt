@@ -85,6 +85,17 @@ interface TerminalModeController {
     fun setKittyKeyboardFlags(flags: Int)
 
     /**
+     * Pushes the current Kitty keyboard progressive-enhancement flags to the stack,
+     * and sets the new active flags.
+     */
+    fun pushKittyKeyboardFlags(flags: Int)
+
+    /**
+     * Pops the Kitty keyboard flags from the stack up to [count] times.
+     */
+    fun popKittyKeyboardFlags(count: Int)
+
+    /**
      * Toggles reverse-video presentation state (DECSCNM, `CSI ? 5 h` / `CSI ? 5 l`).
      *
      * This is renderer-facing state stored in core because the host controls it.
@@ -110,6 +121,9 @@ interface TerminalModeController {
      * Existing stored content is not reinterpreted when this flag changes.
      */
     fun setTreatAmbiguousAsWide(enabled: Boolean)
+
+    /** Toggles synchronized output mode (DECSET/DECRST `?2026`). */
+    fun setSynchronizedOutput(enabled: Boolean)
 
     /**
      * Switches to the alternate screen buffer without saving the primary

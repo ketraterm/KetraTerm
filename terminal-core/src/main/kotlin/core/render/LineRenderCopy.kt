@@ -70,12 +70,8 @@ internal fun Line.copyToRenderAbi(
             raw <= TerminalConstants.CLUSTER_HANDLE_MAX -> {
                 if (clusterDataSink != null || clusterSink != null) {
                     val length = clusterScratch.readCluster(this, col)
-                    if (clusterDataSink != null) {
-                        clusterDataSink.onCluster(col, clusterScratch.codepoints, 0, length)
-                    }
-                    if (clusterSink != null) {
-                        clusterSink.onCluster(col, String(clusterScratch.codepoints, 0, length))
-                    }
+                    clusterDataSink?.onCluster(col, clusterScratch.codepoints, 0, length)
+                    clusterSink?.onCluster(col, String(clusterScratch.codepoints, 0, length))
                 }
             }
             else -> {

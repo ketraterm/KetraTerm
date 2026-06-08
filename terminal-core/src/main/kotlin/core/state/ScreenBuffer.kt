@@ -52,6 +52,12 @@ internal class ScreenBuffer(
     val cursor = Cursor()
     val savedCursor = SavedCursorState()
 
+    var kittyKeyboardFlags: Int = 0
+    internal val kittyKeyboardStack = IntArray(32)
+    internal var kittyKeyboardDepth = 0
+    internal var kittyKeyboardInitialFlags = 0
+    internal var hasSavedInitialFlags = false
+
     var scrollTop: Int = 0
         private set
     var scrollBottom: Int = initialHeight - 1
@@ -193,5 +199,52 @@ internal class ScreenBuffer(
             savedCursor.row = savedCursor.row.coerceIn(0, maxOf(0, newHeight - 1))
             savedCursor.pendingWrap = false
         }
+    }
+
+    fun pushKittyKeyboardFlags(
+        flags: Int,
+        currentFlags: Int,
+    ): Int {
+        if (!hasSavedInitialFlags) {
+            kittyKeyboardInitialFlags = currentFlags
+            hasSavedInitialFlags = true
+        }
+        if (kittyKeyboardDepth >= kittyKeyboardStack.size) {
+            System.arraycopy(kittyKeyboardStack, 1, kittyKeyboardStack, 0, kittyKeyboardStack.size - 1)
+            kittyKeyboardStack[kittyKeyboardStack.size - 1] = currentFlags
+        } else {
+            kittyKeyboardStack[kittyKeyboardDepth] = currentFlags
+            kittyKeyboardDepth++
+        }
+        kittyKeyboardFlags = flags
+        return flags
+    }
+
+    fun popKittyKeyboardFlags(
+        count: Int,
+        currentFlags: Int,
+    ): Int {
+        var nextFlags = currentFlags
+        repeat(count) {
+            if (kittyKeyboardDepth > 0) {
+                kittyKeyboardDepth--
+                nextFlags = kittyKeyboardStack[kittyKeyboardDepth]
+            } else {
+                if (hasSavedInitialFlags) {
+                    nextFlags = kittyKeyboardInitialFlags
+                } else {
+                    nextFlags = 0
+                }
+            }
+        }
+        kittyKeyboardFlags = nextFlags
+        return nextFlags
+    }
+
+    fun clearKittyKeyboardStack() {
+        kittyKeyboardDepth = 0
+        kittyKeyboardInitialFlags = 0
+        hasSavedInitialFlags = false
+        kittyKeyboardFlags = 0
     }
 }

@@ -409,14 +409,16 @@ class CoreTerminalCommandSinkTest {
         }
 
         @Test
-        fun `synchronized output mode is parsed and explicitly ignored until renderer batching exists`() {
+        fun `synchronized output mode is parsed and updates mode snapshot`() {
             val f = Fixture()
 
-            val before = f.terminal.getModeSnapshot()
-            f.acceptAscii("\u001B[?2026h")
-            f.acceptAscii("\u001B[?2026l")
+            assertFalse(f.terminal.getModeSnapshot().isSynchronizedOutput)
 
-            assertEquals(before, f.terminal.getModeSnapshot())
+            f.acceptAscii("\u001B[?2026h")
+            assertTrue(f.terminal.getModeSnapshot().isSynchronizedOutput)
+
+            f.acceptAscii("\u001B[?2026l")
+            assertFalse(f.terminal.getModeSnapshot().isSynchronizedOutput)
         }
 
         @Test
@@ -499,10 +501,33 @@ class CoreTerminalCommandSinkTest {
             val before = f.terminal.getModeSnapshot()
 
             f.acceptAscii("\u001B[=1;9u")
-            f.acceptAscii("\u001B[>5u")
-            f.acceptAscii("\u001B[<2u")
+            f.acceptAscii("\u001B[>5;2u")
+            f.acceptAscii("\u001B[<2;3u")
 
             assertEquals(before, f.terminal.getModeSnapshot())
+        }
+
+        @Test
+        fun `Kitty keyboard push and pop sequences update core mode snapshot`() {
+            val f = Fixture()
+
+            // 1. Set initial flags to 3: CSI = 3 u
+            f.acceptAscii("\u001B[=3u")
+            assertEquals(3, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+
+            // 2. Push flags 12: CSI > 12 u
+            f.acceptAscii("\u001B[>12u")
+            assertEquals(12, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+
+            // 3. Pop 1 count: CSI < 1 u
+            f.acceptAscii("\u001B[<1u")
+            assertEquals(3, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+
+            // 4. Push 12, then pop using default count (omitted parameter) which defaults to 1: CSI < u
+            f.acceptAscii("\u001B[>12u")
+            assertEquals(12, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            f.acceptAscii("\u001B[<u")
+            assertEquals(3, f.terminal.getModeSnapshot().kittyKeyboardFlags)
         }
 
         @Test

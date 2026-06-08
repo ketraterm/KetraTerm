@@ -212,10 +212,8 @@ private class DemoPtyEventListener(
     ) {
         SwingUtilities.invokeLater {
             frame.title =
-                if (title.isBlank()) {
+                title.ifBlank {
                     "Terminal Swing Demo"
-                } else {
-                    title
                 }
         }
     }

@@ -23,6 +23,7 @@ import com.gagik.terminal.session.TerminalSession
  * Implementations should return quickly. Metadata callbacks are delivered from
  * the connector reader thread as parser output is handled.
  */
+@Suppress("UNUSED_PARAMETER")
 interface TerminalPtyEventListener {
     /**
      * Called when BEL is received from the terminal process.

@@ -353,6 +353,66 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `synchronized output mode defers rendering and flushes on disable`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector)
+        val renderPublished = CountDownLatch(1)
+        val dirtyCalls = AtomicInteger(0)
+        session.onDirty = {
+            dirtyCalls.incrementAndGet()
+            renderPublished.countDown()
+        }
+
+        // Enable synchronized output mode: CSI ? 2026 h
+        connector.feedFromHost("\u001B[?2026h".toByteArray(StandardCharsets.US_ASCII))
+
+        // Write some text to trigger render requests
+        connector.feedFromHost("hello".toByteArray(StandardCharsets.US_ASCII))
+
+        // Verify that no render has been published (wait less than the 100ms safety timeout)
+        assertFalse(renderPublished.await(30, TimeUnit.MILLISECONDS))
+        assertEquals(0, dirtyCalls.get())
+
+        // Disable synchronized output mode: CSI ? 2026 l
+        val renderLatch = CountDownLatch(1)
+        session.onDirty = {
+            dirtyCalls.incrementAndGet()
+            renderLatch.countDown()
+        }
+        connector.feedFromHost("\u001B[?2026l".toByteArray(StandardCharsets.US_ASCII))
+
+        // Verify that rendering immediately occurs
+        assertTrue(renderLatch.await(1, TimeUnit.SECONDS), "render was not published after disable")
+        assertEquals(1, dirtyCalls.get())
+        assertEquals("hello", session.terminal.getLineAsString(0))
+        session.close()
+    }
+
+    @Test
+    fun `synchronized output mode automatically times out and flushes`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector)
+        val renderPublished = CountDownLatch(1)
+        session.onDirty = {
+            renderPublished.countDown()
+        }
+
+        // Enable synchronized output mode and write some text
+        connector.feedFromHost("\u001B[?2026hhello".toByteArray(StandardCharsets.US_ASCII))
+
+        // Verify it doesn't render immediately
+        assertFalse(renderPublished.await(30, TimeUnit.MILLISECONDS))
+
+        // Wait for safety timeout to expire (timeout is 100ms, wait 300ms to be safe)
+        assertTrue(renderPublished.await(300, TimeUnit.MILLISECONDS), "render was not flushed by timeout")
+
+        // Verify synchronized output mode is turned off in the core
+        assertFalse(session.terminal.getModeSnapshot().isSynchronizedOutput)
+        assertEquals("hello", session.terminal.getLineAsString(0))
+        session.close()
+    }
+
+    @Test
     fun `notifyRenderDirty coalesces renders while worker is busy`() {
         val terminal = TerminalBuffers.create(width = 10, height = 3)
         val connector = MockConnector()

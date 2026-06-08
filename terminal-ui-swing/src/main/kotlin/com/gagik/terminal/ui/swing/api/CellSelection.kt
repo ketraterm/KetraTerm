@@ -95,7 +95,7 @@ data class CellSelection(
                 }
             }
 
-            if (end > 0 && end <= columns) {
+            if (end in 1..columns) {
                 val endIdx = rowOffset + (end - 1)
                 if (endIdx in flags.indices && (flags[endIdx] and TerminalRenderCellFlags.WIDE_LEADING) != 0) {
                     end = (end + 1).coerceAtMost(columns)

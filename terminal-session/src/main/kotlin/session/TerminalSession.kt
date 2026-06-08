@@ -35,7 +35,10 @@ import com.gagik.terminal.render.cache.TerminalRenderCache
 import com.gagik.terminal.render.cache.TerminalRenderPublisher
 import com.gagik.terminal.transport.TerminalConnector
 import com.gagik.terminal.transport.TerminalConnectorListener
+import com.gagik.terminal.transport.checkBounds
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -75,8 +78,11 @@ class TerminalSession(
     private val mutationLock = Any()
     private val responseScratch = ByteArray(RESPONSE_BUFFER_SIZE)
 
-    private val renderWorker =
-        Executors.newSingleThreadExecutor { r ->
+    private val timeoutLock = Any()
+    private var synchronizedTimeoutFuture: ScheduledFuture<*>? = null
+
+    private val renderWorker: ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor { r ->
             Thread(r, "terminal-render-worker-${SESSION_COUNTER.getAndIncrement()}").apply { isDaemon = true }
         }
 
@@ -169,6 +175,7 @@ class TerminalSession(
      *
      * Input before [start] is ignored.
      */
+    @Suppress("UNUSED_PARAMETER")
     private inline fun withInputLock(block: TerminalInputEncoder.() -> Unit) {
         synchronized(outboundWriteLock) {
             if (isAcceptingInput()) {
@@ -216,12 +223,7 @@ class TerminalSession(
         offset: Int,
         length: Int,
     ) {
-        require(offset >= 0) { "offset must be non-negative, got $offset" }
-        require(length >= 0) { "length must be non-negative, got $length" }
-        require(offset <= bytes.size) { "offset $offset exceeds size ${bytes.size}" }
-        require(length <= bytes.size - offset) {
-            "offset + length exceeds size: offset=$offset length=$length size=${bytes.size}"
-        }
+        bytes.checkBounds(offset, length)
 
         synchronized(inboundLock) {
             if (isClosed()) return
@@ -284,6 +286,34 @@ class TerminalSession(
         }
     }
 
+    private fun scheduleSynchronizedOutputTimeout() {
+        synchronized(timeoutLock) {
+            if (synchronizedTimeoutFuture == null) {
+                synchronizedTimeoutFuture =
+                    renderWorker.schedule({
+                        synchronized(mutationLock) {
+                            if (terminal.getModeSnapshot().isSynchronizedOutput) {
+                                terminal.setSynchronizedOutput(false)
+                                notifyRenderDirty()
+                            }
+                        }
+                        synchronized(timeoutLock) {
+                            synchronizedTimeoutFuture = null
+                        }
+                    }, SYNCHRONIZED_OUTPUT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            }
+        }
+    }
+
+    private fun cancelSynchronizedOutputTimeout() {
+        synchronized(timeoutLock) {
+            synchronizedTimeoutFuture?.let {
+                it.cancel(false)
+                synchronizedTimeoutFuture = null
+            }
+        }
+    }
+
     private fun drainRenderRequests() {
         var publishedGeneration = -1L
         var failedGeneration = NO_RENDER_GENERATION
@@ -296,6 +326,15 @@ class TerminalSession(
                 val request = pendingRenderRequest.get()
                 val offset = unpackScrollbackOffset(request)
                 val rows = unpackViewportRows(request)
+
+                val modeSnapshot = terminal.getModeSnapshot()
+                if (modeSnapshot.isSynchronizedOutput) {
+                    scheduleSynchronizedOutputTimeout()
+                    publishedGeneration = generation
+                    return
+                }
+
+                cancelSynchronizedOutputTimeout()
 
                 try {
                     publisher.updateAndPublish(this, offset, rows)
@@ -410,6 +449,7 @@ class TerminalSession(
 
     private fun cleanupParser() {
         if (!parserClosed.compareAndSet(false, true)) return
+        cancelSynchronizedOutputTimeout()
         synchronized(mutationLock) {
             parser.endOfInput()
         }
@@ -426,6 +466,7 @@ class TerminalSession(
                 .AtomicInteger(1)
         private const val RESPONSE_BUFFER_SIZE: Int = 1024
         private const val NO_RENDER_GENERATION: Long = -1L
+        private const val SYNCHRONIZED_OUTPUT_TIMEOUT_MS: Long = 100L
 
         private fun packRenderRequest(
             scrollbackOffset: Int,

@@ -63,6 +63,9 @@ object TerminalModeBits {
     /** Ambiguous-width Unicode policy flag. */
     const val AMBIGUOUS_WIDE: Long = 1L shl 12
 
+    /** Synchronized output mode flag (?2026). */
+    const val SYNCHRONIZED_OUTPUT: Long = 1L shl 13
+
     /** Starting bit for the packed modify-other-keys mode field. */
     const val MODIFY_OTHER_KEYS_SHIFT: Int = 16
 
