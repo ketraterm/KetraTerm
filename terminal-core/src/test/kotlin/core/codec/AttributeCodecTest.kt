@@ -33,6 +33,9 @@ class AttributeCodecTest {
             { assertEquals(16, AttributeCodec.MAX_ANSI_COLOR) },
             { assertEquals(256, AttributeCodec.MAX_COLOR) },
             { assertEquals(255, AttributeCodec.MAX_INDEXED_COLOR) },
+            { assertEquals(0, AttributeCodec.COLOR_KIND_DEFAULT) },
+            { assertEquals(1, AttributeCodec.COLOR_KIND_INDEXED) },
+            { assertEquals(2, AttributeCodec.COLOR_KIND_RGB) },
         )
     }
 
@@ -92,6 +95,52 @@ class AttributeCodecTest {
             )
         }
 
+        @Test
+        fun `primitive primary color decode matches object color decode`() {
+            val defaultPacked =
+                AttributeCodec.packColors(
+                    foreground = AttributeColor.DEFAULT,
+                    background = AttributeColor.DEFAULT,
+                )
+            val indexedLowPacked =
+                AttributeCodec.packColors(
+                    foreground = AttributeColor.indexed(0),
+                    background = AttributeColor.indexed(0),
+                )
+            val indexedHighPacked =
+                AttributeCodec.packColors(
+                    foreground = AttributeColor.indexed(255),
+                    background = AttributeColor.indexed(255),
+                )
+            val rgbLowPacked =
+                AttributeCodec.packColors(
+                    foreground = AttributeColor.rgb(0x00_00_00),
+                    background = AttributeColor.rgb(0x00_00_00),
+                )
+            val rgbHighPacked =
+                AttributeCodec.packColors(
+                    foreground = AttributeColor.rgb(0xFF_FF_FF),
+                    background = AttributeColor.rgb(0xFF_FF_FF),
+                )
+
+            assertAll(
+                { assertPrimaryColorDecode(defaultPacked, AttributeColor.DEFAULT, AttributeColor.DEFAULT) },
+                { assertPrimaryColorDecode(indexedLowPacked, AttributeColor.indexed(0), AttributeColor.indexed(0)) },
+                { assertPrimaryColorDecode(indexedHighPacked, AttributeColor.indexed(255), AttributeColor.indexed(255)) },
+                { assertPrimaryColorDecode(rgbLowPacked, AttributeColor.rgb(0x00_00_00), AttributeColor.rgb(0x00_00_00)) },
+                { assertPrimaryColorDecode(rgbHighPacked, AttributeColor.rgb(0xFF_FF_FF), AttributeColor.rgb(0xFF_FF_FF)) },
+            )
+        }
+
+        @Test
+        fun `primitive primary color decode preserves reserved kind fallback`() {
+            val reservedForeground = 3L shl 24
+            val reservedBackground = (3L shl 24) shl 26
+            val packed = reservedForeground or reservedBackground
+
+            assertPrimaryColorDecode(packed, AttributeColor.DEFAULT, AttributeColor.DEFAULT)
+        }
+
         @ParameterizedTest
         @ValueSource(ints = [-1, 257, 1000, Int.MIN_VALUE, Int.MAX_VALUE])
         fun `rejects invalid foreground`(invalidFg: Int) {
@@ -149,6 +198,45 @@ class AttributeCodecTest {
         }
 
         @Test
+        fun `primitive underline color decode matches object color decode`() {
+            val defaultExtended =
+                AttributeCodec.packExtendedColors(
+                    underlineColor = AttributeColor.DEFAULT,
+                )
+            val indexedLowExtended =
+                AttributeCodec.packExtendedColors(
+                    underlineColor = AttributeColor.indexed(0),
+                )
+            val indexedHighExtended =
+                AttributeCodec.packExtendedColors(
+                    underlineColor = AttributeColor.indexed(255),
+                )
+            val rgbLowExtended =
+                AttributeCodec.packExtendedColors(
+                    underlineColor = AttributeColor.rgb(0x00_00_00),
+                )
+            val rgbHighExtended =
+                AttributeCodec.packExtendedColors(
+                    underlineColor = AttributeColor.rgb(0xFF_FF_FF),
+                )
+
+            assertAll(
+                { assertUnderlineColorDecode(defaultExtended, AttributeColor.DEFAULT) },
+                { assertUnderlineColorDecode(indexedLowExtended, AttributeColor.indexed(0)) },
+                { assertUnderlineColorDecode(indexedHighExtended, AttributeColor.indexed(255)) },
+                { assertUnderlineColorDecode(rgbLowExtended, AttributeColor.rgb(0x00_00_00)) },
+                { assertUnderlineColorDecode(rgbHighExtended, AttributeColor.rgb(0xFF_FF_FF)) },
+            )
+        }
+
+        @Test
+        fun `primitive underline color decode preserves reserved kind fallback`() {
+            val extended = 3L shl 24
+
+            assertUnderlineColorDecode(extended, AttributeColor.DEFAULT)
+        }
+
+        @Test
         fun `SGR reset preserves protection and active hyperlink only`() {
             val primary = AttributeCodec.pack(1, 2, bold = true, protected = true)
             val extended =
@@ -172,4 +260,37 @@ class AttributeCodecTest {
             )
         }
     }
+
+    private fun assertPrimaryColorDecode(
+        packed: Long,
+        expectedForeground: AttributeColor,
+        expectedBackground: AttributeColor,
+    ) {
+        assertAll(
+            { assertEquals(expectedForeground, AttributeCodec.foregroundColor(packed)) },
+            { assertEquals(expectedBackground, AttributeCodec.backgroundColor(packed)) },
+            { assertEquals(expectedForeground.kind.toCodecKind(), AttributeCodec.foregroundColorKind(packed)) },
+            { assertEquals(expectedForeground.value, AttributeCodec.foregroundColorValue(packed)) },
+            { assertEquals(expectedBackground.kind.toCodecKind(), AttributeCodec.backgroundColorKind(packed)) },
+            { assertEquals(expectedBackground.value, AttributeCodec.backgroundColorValue(packed)) },
+        )
+    }
+
+    private fun assertUnderlineColorDecode(
+        extended: Long,
+        expected: AttributeColor,
+    ) {
+        assertAll(
+            { assertEquals(expected, AttributeCodec.underlineAttributeColor(extended)) },
+            { assertEquals(expected.kind.toCodecKind(), AttributeCodec.underlineAttributeColorKind(extended)) },
+            { assertEquals(expected.value, AttributeCodec.underlineAttributeColorValue(extended)) },
+        )
+    }
+
+    private fun AttributeColorKind.toCodecKind(): Int =
+        when (this) {
+            AttributeColorKind.DEFAULT -> AttributeCodec.COLOR_KIND_DEFAULT
+            AttributeColorKind.INDEXED -> AttributeCodec.COLOR_KIND_INDEXED
+            AttributeColorKind.RGB -> AttributeCodec.COLOR_KIND_RGB
+        }
 }

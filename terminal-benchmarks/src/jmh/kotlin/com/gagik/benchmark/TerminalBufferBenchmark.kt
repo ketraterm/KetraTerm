@@ -17,6 +17,8 @@ package com.gagik.benchmark
 
 import com.gagik.core.TerminalBuffers
 import com.gagik.core.api.TerminalBufferApi
+import com.gagik.core.model.AttributeColor
+import com.gagik.core.model.UnderlineStyle
 import com.gagik.terminal.render.api.*
 import org.openjdk.jmh.annotations.*
 import java.util.concurrent.TimeUnit
@@ -79,6 +81,116 @@ open class TerminalBufferBenchmark : TerminalRenderFrameConsumer {
     open fun copySingleRowAscii() {
         runSingleRowOnly = true
         reader.readRenderFrame(this)
+    }
+}
+
+@State(Scope.Benchmark)
+@BenchmarkMode(Mode.Throughput)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@Warmup(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
+@Fork(1)
+open class TerminalBufferAttributeBenchmark : TerminalRenderFrameConsumer {
+    @Param("default", "indexed", "rgb")
+    lateinit var workload: String
+
+    @Param("120")
+    var width: Int = 0
+
+    @Param("40")
+    var height: Int = 0
+
+    private lateinit var buffer: TerminalBufferApi
+    private lateinit var reader: TerminalRenderFrameReader
+    private lateinit var codeWords: IntArray
+    private lateinit var attrWords: LongArray
+    private lateinit var extraAttrWords: LongArray
+    private lateinit var flags: IntArray
+
+    private var runWithExtraAttrs = false
+
+    @Setup
+    open fun setup() {
+        buffer = TerminalBuffers.create(width, height)
+        reader = buffer as TerminalRenderFrameReader
+        codeWords = IntArray(width)
+        attrWords = LongArray(width)
+        extraAttrWords = LongArray(width)
+        flags = IntArray(width)
+
+        applyWorkloadPen()
+        for (row in 0 until height) {
+            buffer.positionCursor(0, row)
+            for (col in 0 until width) {
+                buffer.writeCodepoint('A'.code)
+            }
+        }
+    }
+
+    override fun accept(frame: TerminalRenderFrame) {
+        if (runWithExtraAttrs) {
+            for (row in 0 until height) {
+                frame.copyLine(
+                    row = row,
+                    codeWords = codeWords,
+                    codeOffset = 0,
+                    attrWords = attrWords,
+                    attrOffset = 0,
+                    flags = flags,
+                    flagOffset = 0,
+                    extraAttrWords = extraAttrWords,
+                    extraAttrOffset = 0,
+                )
+            }
+        } else {
+            for (row in 0 until height) {
+                frame.copyLine(row, codeWords, 0, attrWords, 0, flags, 0)
+            }
+        }
+    }
+
+    @Benchmark
+    open fun copyFullFrameAttributes() {
+        runWithExtraAttrs = false
+        reader.readRenderFrame(this)
+    }
+
+    @Benchmark
+    open fun copyFullFrameAttributesWithExtraAttrs() {
+        runWithExtraAttrs = true
+        reader.readRenderFrame(this)
+    }
+
+    private fun applyWorkloadPen() {
+        when (workload) {
+            "default" ->
+                buffer.setPenColors(
+                    foreground = AttributeColor.DEFAULT,
+                    background = AttributeColor.DEFAULT,
+                    underlineColor = AttributeColor.DEFAULT,
+                )
+            "indexed" ->
+                buffer.setPenColors(
+                    foreground = AttributeColor.indexed(196),
+                    background = AttributeColor.indexed(17),
+                    underlineColor = AttributeColor.indexed(45),
+                    bold = true,
+                    underlineStyle = UnderlineStyle.SINGLE,
+                    overline = true,
+                )
+            "rgb" ->
+                buffer.setPenColors(
+                    foreground = AttributeColor.rgb(0x12_34_56),
+                    background = AttributeColor.rgb(0x65_43_21),
+                    underlineColor = AttributeColor.rgb(0xAA_BB_CC),
+                    bold = true,
+                    italic = true,
+                    underlineStyle = UnderlineStyle.CURLY,
+                    strikethrough = true,
+                    overline = true,
+                )
+            else -> error("unsupported workload: $workload")
+        }
     }
 }
 

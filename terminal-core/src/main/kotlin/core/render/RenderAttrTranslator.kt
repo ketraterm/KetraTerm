@@ -16,8 +16,6 @@
 package com.gagik.core.render
 
 import com.gagik.core.codec.AttributeCodec
-import com.gagik.core.model.AttributeColor
-import com.gagik.core.model.AttributeColorKind
 import com.gagik.core.model.UnderlineStyle
 import com.gagik.terminal.render.api.TerminalRenderAttrs
 import com.gagik.terminal.render.api.TerminalRenderColorKind
@@ -32,14 +30,12 @@ internal class RenderAttrTranslator {
         primaryAttr: Long,
         extendedAttr: Long,
         reverseVideo: Boolean,
-    ): Long {
-        val foreground = AttributeCodec.foregroundColor(primaryAttr)
-        val background = AttributeCodec.backgroundColor(primaryAttr)
-        return TerminalRenderAttrs.pack(
-            foregroundKind = foreground.toRenderKind(),
-            foregroundValue = foreground.value,
-            backgroundKind = background.toRenderKind(),
-            backgroundValue = background.value,
+    ): Long =
+        TerminalRenderAttrs.pack(
+            foregroundKind = AttributeCodec.foregroundColorKind(primaryAttr).toRenderColorKind(),
+            foregroundValue = AttributeCodec.foregroundColorValue(primaryAttr),
+            backgroundKind = AttributeCodec.backgroundColorKind(primaryAttr).toRenderColorKind(),
+            backgroundValue = AttributeCodec.backgroundColorValue(primaryAttr),
             bold = AttributeCodec.isBold(primaryAttr),
             faint = AttributeCodec.isFaint(primaryAttr),
             italic = AttributeCodec.isItalic(primaryAttr),
@@ -49,22 +45,19 @@ internal class RenderAttrTranslator {
             invisible = AttributeCodec.isConceal(extendedAttr),
             strikethrough = AttributeCodec.isStrikethrough(extendedAttr),
         )
-    }
 
-    fun toRenderExtraAttrWord(extendedAttr: Long): Long {
-        val underlineColor = AttributeCodec.underlineAttributeColor(extendedAttr)
-        return TerminalRenderExtraAttrs.pack(
-            underlineColorKind = underlineColor.toRenderKind(),
-            underlineColorValue = underlineColor.value,
+    fun toRenderExtraAttrWord(extendedAttr: Long): Long =
+        TerminalRenderExtraAttrs.pack(
+            underlineColorKind = AttributeCodec.underlineAttributeColorKind(extendedAttr).toRenderColorKind(),
+            underlineColorValue = AttributeCodec.underlineAttributeColorValue(extendedAttr),
             overline = AttributeCodec.isOverline(extendedAttr),
         )
-    }
 
-    private fun AttributeColor.toRenderKind(): Int =
-        when (kind) {
-            AttributeColorKind.DEFAULT -> TerminalRenderColorKind.DEFAULT
-            AttributeColorKind.INDEXED -> TerminalRenderColorKind.INDEXED
-            AttributeColorKind.RGB -> TerminalRenderColorKind.RGB
+    private fun Int.toRenderColorKind(): Int =
+        when (this) {
+            AttributeCodec.COLOR_KIND_INDEXED -> TerminalRenderColorKind.INDEXED
+            AttributeCodec.COLOR_KIND_RGB -> TerminalRenderColorKind.RGB
+            else -> TerminalRenderColorKind.DEFAULT
         }
 
     private fun UnderlineStyle.toRenderUnderline(): Int =

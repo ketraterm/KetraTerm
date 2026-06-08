@@ -245,16 +245,71 @@ class CoreTerminalRenderFrameTest {
     }
 
     @Test
+    fun `indexed cell colors translate to public render ABI`() {
+        val buffer = TerminalBuffer(initialWidth = 2, initialHeight = 1)
+        buffer.setPenColors(
+            foreground = AttributeColor.indexed(0),
+            background = AttributeColor.indexed(255),
+        )
+        buffer.writeCodepoint('X'.code)
+        val reader = buffer as TerminalRenderFrameReader
+
+        reader.readRenderFrame { frame ->
+            val attr = copyRow(frame).attrWords[0]
+
+            assertAll(
+                { assertEquals(TerminalRenderColorKind.INDEXED, TerminalRenderAttrs.foregroundKind(attr)) },
+                { assertEquals(0, TerminalRenderAttrs.foregroundValue(attr)) },
+                { assertEquals(TerminalRenderColorKind.INDEXED, TerminalRenderAttrs.backgroundKind(attr)) },
+                { assertEquals(255, TerminalRenderAttrs.backgroundValue(attr)) },
+            )
+        }
+    }
+
+    @Test
+    fun `rgb cell colors translate to public render ABI`() {
+        val buffer = TerminalBuffer(initialWidth = 2, initialHeight = 1)
+        buffer.setPenColors(
+            foreground = AttributeColor.rgb(0x00_00_00),
+            background = AttributeColor.rgb(0xFF_FF_FF),
+        )
+        buffer.writeCodepoint('X'.code)
+        val reader = buffer as TerminalRenderFrameReader
+
+        reader.readRenderFrame { frame ->
+            val attr = copyRow(frame).attrWords[0]
+
+            assertAll(
+                { assertEquals(TerminalRenderColorKind.RGB, TerminalRenderAttrs.foregroundKind(attr)) },
+                { assertEquals(0x00_00_00, TerminalRenderAttrs.foregroundValue(attr)) },
+                { assertEquals(TerminalRenderColorKind.RGB, TerminalRenderAttrs.backgroundKind(attr)) },
+                { assertEquals(0xFF_FF_FF, TerminalRenderAttrs.backgroundValue(attr)) },
+            )
+        }
+    }
+
+    @Test
     fun `reverse video is reflected in copied public attrs`() {
         val buffer = TerminalBuffer(initialWidth = 2, initialHeight = 1)
+        buffer.setPenColors(
+            foreground = AttributeColor.rgb(0x12_34_56),
+            background = AttributeColor.indexed(42),
+        )
         buffer.writeCodepoint('X'.code)
         buffer.setReverseVideo(true)
         val reader = buffer as TerminalRenderFrameReader
 
         reader.readRenderFrame { frame ->
             val row = copyRow(frame)
+            val attr = row.attrWords[0]
 
-            assertTrue(TerminalRenderAttrs.isInverse(row.attrWords[0]))
+            assertAll(
+                { assertTrue(TerminalRenderAttrs.isInverse(attr)) },
+                { assertEquals(TerminalRenderColorKind.RGB, TerminalRenderAttrs.foregroundKind(attr)) },
+                { assertEquals(0x12_34_56, TerminalRenderAttrs.foregroundValue(attr)) },
+                { assertEquals(TerminalRenderColorKind.INDEXED, TerminalRenderAttrs.backgroundKind(attr)) },
+                { assertEquals(42, TerminalRenderAttrs.backgroundValue(attr)) },
+            )
         }
     }
 

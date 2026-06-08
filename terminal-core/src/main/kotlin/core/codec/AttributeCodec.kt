@@ -54,11 +54,17 @@ internal object AttributeCodec {
     const val DEFAULT_ATTR: Long = 0L
     const val DEFAULT_EXTENDED_ATTR: Long = 0L
 
+    /** Core-internal color kind for terminal default color slots. */
+    const val COLOR_KIND_DEFAULT = 0
+
+    /** Core-internal color kind for indexed palette color slots. */
+    const val COLOR_KIND_INDEXED = 1
+
+    /** Core-internal color kind for direct RGB color slots. */
+    const val COLOR_KIND_RGB = 2
+
     private const val COLOR_VALUE_MASK = 0xFF_FF_FF
     private const val COLOR_KIND_SHIFT = 24
-    private const val COLOR_KIND_DEFAULT = 0
-    private const val COLOR_KIND_INDEXED = 1
-    private const val COLOR_KIND_RGB = 2
     private const val COLOR_SLOT_MASK = (1L shl 26) - 1L
 
     private const val BG_SHIFT = 26
@@ -173,6 +179,18 @@ internal object AttributeCodec {
 
     fun underlineColor(v: Long): Int = colorCode((v and COLOR_SLOT_MASK).toInt())
 
+    fun foregroundColorKind(v: Long): Int = colorKind((v and COLOR_SLOT_MASK).toInt())
+
+    fun foregroundColorValue(v: Long): Int = colorValue((v and COLOR_SLOT_MASK).toInt())
+
+    fun backgroundColorKind(v: Long): Int = colorKind(((v ushr BG_SHIFT) and COLOR_SLOT_MASK).toInt())
+
+    fun backgroundColorValue(v: Long): Int = colorValue(((v ushr BG_SHIFT) and COLOR_SLOT_MASK).toInt())
+
+    fun underlineAttributeColorKind(v: Long): Int = colorKind((v and COLOR_SLOT_MASK).toInt())
+
+    fun underlineAttributeColorValue(v: Long): Int = colorValue((v and COLOR_SLOT_MASK).toInt())
+
     fun foregroundColor(v: Long): AttributeColor = decodeColor((v and COLOR_SLOT_MASK).toInt())
 
     fun backgroundColor(v: Long): AttributeColor = decodeColor(((v ushr BG_SHIFT) and COLOR_SLOT_MASK).toInt())
@@ -261,19 +279,30 @@ internal object AttributeCodec {
         return (kind shl COLOR_KIND_SHIFT) or color.value
     }
 
-    private fun decodeColor(encoded: Int): AttributeColor {
-        val kind = (encoded ushr COLOR_KIND_SHIFT) and 0b11
-        val value = encoded and COLOR_VALUE_MASK
-        return when (kind) {
-            COLOR_KIND_INDEXED -> AttributeColor.indexed(value and 0xFF)
-            COLOR_KIND_RGB -> AttributeColor.rgb(value)
+    private fun decodeColor(encoded: Int): AttributeColor =
+        when (colorKind(encoded)) {
+            COLOR_KIND_INDEXED -> AttributeColor.indexed(colorValue(encoded))
+            COLOR_KIND_RGB -> AttributeColor.rgb(colorValue(encoded))
             else -> AttributeColor.DEFAULT
         }
-    }
+
+    private fun colorKind(encoded: Int): Int =
+        when ((encoded ushr COLOR_KIND_SHIFT) and 0b11) {
+            COLOR_KIND_INDEXED -> COLOR_KIND_INDEXED
+            COLOR_KIND_RGB -> COLOR_KIND_RGB
+            else -> COLOR_KIND_DEFAULT
+        }
+
+    private fun colorValue(encoded: Int): Int =
+        when (colorKind(encoded)) {
+            COLOR_KIND_INDEXED -> encoded and 0xFF
+            COLOR_KIND_RGB -> encoded and COLOR_VALUE_MASK
+            else -> 0
+        }
 
     private fun colorCode(encoded: Int): Int {
-        val kind = (encoded ushr COLOR_KIND_SHIFT) and 0b11
-        val value = encoded and COLOR_VALUE_MASK
-        return if (kind == COLOR_KIND_INDEXED) (value and 0xFF) + 1 else 0
+        val kind = colorKind(encoded)
+        val value = colorValue(encoded)
+        return if (kind == COLOR_KIND_INDEXED) value + 1 else 0
     }
 }
