@@ -1001,7 +1001,8 @@ internal class TerminalTextPainter(
         private fun isStrongRtl(codePoint: Int): Boolean =
             when (Character.getDirectionality(codePoint)) {
                 Character.DIRECTIONALITY_RIGHT_TO_LEFT,
-                Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC -> true
+                Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC,
+                -> true
                 else -> false
             }
     }

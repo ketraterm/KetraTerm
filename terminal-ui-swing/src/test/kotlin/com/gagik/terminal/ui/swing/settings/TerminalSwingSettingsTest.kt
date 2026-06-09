@@ -77,6 +77,32 @@ class TerminalSwingSettingsTest {
     }
 
     @Test
+    fun fallbackPolicyIncludesInstalledIndicKhmerAndSinhalaFonts() {
+        val families =
+            TerminalSwingSettings.fallbackFontFamiliesForInstalledFonts(
+                arrayOf(
+                    "Nirmala UI",
+                    "Noto Sans Devanagari",
+                    "Noto Sans Bengali",
+                    "Noto Sans Tamil",
+                    "Noto Sans Khmer",
+                    "Noto Sans Sinhala",
+                    "Khmer UI",
+                    "Iskoola Pota",
+                ),
+            )
+
+        assertTrue("Nirmala UI" in families)
+        assertTrue("Noto Sans Devanagari" in families)
+        assertTrue("Noto Sans Bengali" in families)
+        assertTrue("Noto Sans Tamil" in families)
+        assertTrue("Noto Sans Khmer" in families)
+        assertTrue("Noto Sans Sinhala" in families)
+        assertTrue("Khmer UI" in families)
+        assertTrue("Iskoola Pota" in families)
+    }
+
+    @Test
     fun settingsDefaultPaletteOwnsSwingThemeColors() {
         val palette = TerminalSwingSettings.defaultPalette()
 
