@@ -69,6 +69,7 @@ internal class TerminalGridPainter {
         width: Int,
         height: Int,
         cursorBlinkVisible: Boolean,
+        textBlinkVisible: Boolean = true,
         contentYOffset: Double = 0.0,
         selection: CellSelection? = null,
         hoveredHyperlinkId: Int = 0,
@@ -104,6 +105,7 @@ internal class TerminalGridPainter {
                     metrics = metrics,
                     row = row,
                     fontRenderContext = fontRenderContext,
+                    textBlinkVisible = textBlinkVisible,
                     hoveredHyperlinkId = hoveredHyperlinkId,
                     hyperlinkActivationHover = hyperlinkActivationHover,
                     hyperlinkActivationForeground = settings.hyperlinkActivationForeground,
@@ -111,7 +113,7 @@ internal class TerminalGridPainter {
                 row++
             }
 
-            cursorPainter.paint(g, cache, palette, metrics, cursorBlinkVisible, fontRenderContext)
+            cursorPainter.paint(g, cache, palette, metrics, cursorBlinkVisible, textBlinkVisible, fontRenderContext)
         } finally {
             g.translate(0.0, -contentYOffset)
         }

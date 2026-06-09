@@ -241,7 +241,8 @@ Missing:
 - `DONE(core)`: RGB/truecolor foreground/background storage.
 - `DONE(core)`: inverse/reverse-video cell attribute.
 - `DONE(core/integration)`: faint/dim intensity.
-- `DONE(core/integration)`: blink attribute.
+- `DONE(core/integration/render-cache/host)`: blink attribute storage and
+  Swing blink-phase painting with row-scoped repaint scheduling.
 - `DONE(core/integration)`: conceal/hidden attribute.
 - `DONE(core/integration)`: strikethrough attribute.
 - `DONE(core/integration)`: underline style beyond boolean underline:

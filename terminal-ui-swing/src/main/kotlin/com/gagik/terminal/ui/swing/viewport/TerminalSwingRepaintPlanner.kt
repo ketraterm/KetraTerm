@@ -161,6 +161,45 @@ internal class TerminalSwingRepaintPlanner {
         )
     }
 
+    /**
+     * Requests repaints for visible rows containing SGR blinking text.
+     */
+    fun requestBlinkingTextRepaint(
+        cache: TerminalRenderCache,
+        metrics: TerminalSwingMetrics,
+        componentWidth: Int,
+        componentHeight: Int,
+        contentYOffset: Double,
+        repaintSink: TerminalRepaintSink,
+    ) {
+        if (!cache.hasBlinkingText) return
+
+        val visibleRows = visibleRows(cache, metrics, componentHeight)
+        var row = 0
+        while (row < visibleRows) {
+            if (!cache.lineHasBlinkingText[row]) {
+                row++
+                continue
+            }
+
+            val startRow = row
+            row++
+            while (row < visibleRows && cache.lineHasBlinkingText[row]) {
+                row++
+            }
+
+            repaintRowRun(
+                startRow = startRow,
+                endRow = row,
+                metrics = metrics,
+                componentWidth = componentWidth,
+                componentHeight = componentHeight,
+                contentYOffset = contentYOffset,
+                repaintSink = repaintSink,
+            )
+        }
+    }
+
     private fun repaintChangedRows(
         cache: TerminalRenderCache,
         metrics: TerminalSwingMetrics,

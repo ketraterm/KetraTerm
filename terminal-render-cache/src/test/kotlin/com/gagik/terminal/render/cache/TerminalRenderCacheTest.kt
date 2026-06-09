@@ -87,6 +87,61 @@ class TerminalRenderCacheTest {
     }
 
     @Test
+    fun `blink text metadata is copied per row`() {
+        val frame = MutableFrame(columns = 3, rows = 2)
+        frame.setRow(0, "abc")
+        frame.setRow(1, "def")
+        frame.setBlink(row = 1, column = 1, blink = true)
+        val cache = TerminalRenderCache(columns = 3, rows = 2)
+
+        cache.updateFrom(frame.reader)
+
+        assertAll(
+            { assertTrue(cache.hasBlinkingText) },
+            { assertFalse(cache.lineHasBlinkingText[0]) },
+            { assertTrue(cache.lineHasBlinkingText[1]) },
+        )
+    }
+
+    @Test
+    fun `blink text metadata is cleared when a row is recopied without blink`() {
+        val frame = MutableFrame(columns = 3, rows = 2)
+        frame.setRow(0, "abc")
+        frame.setBlink(row = 0, column = 0, blink = true)
+        val cache = TerminalRenderCache(columns = 3, rows = 2)
+        cache.updateFrom(frame.reader)
+
+        frame.setBlink(row = 0, column = 0, blink = false)
+        cache.updateFrom(frame.reader)
+
+        assertAll(
+            { assertFalse(cache.hasBlinkingText) },
+            { assertFalse(cache.lineHasBlinkingText[0]) },
+        )
+    }
+
+    @Test
+    fun `blink text metadata is preserved for unchanged rows`() {
+        val frame = MutableFrame(columns = 3, rows = 2)
+        frame.setRow(0, "abc")
+        frame.setRow(1, "def")
+        frame.setBlink(row = 0, column = 1, blink = true)
+        val cache = TerminalRenderCache(columns = 3, rows = 2)
+        cache.updateFrom(frame.reader)
+
+        frame.setRow(1, "xyz")
+        cache.updateFrom(frame.reader)
+
+        assertAll(
+            { assertTrue(cache.hasBlinkingText) },
+            { assertTrue(cache.lineHasBlinkingText[0]) },
+            { assertFalse(cache.lineHasBlinkingText[1]) },
+            { assertEquals(1, frame.copyCounts[0]) },
+            { assertEquals(2, frame.copyCounts[1]) },
+        )
+    }
+
+    @Test
     fun `structure generation change recopies all rows`() {
         val frame = MutableFrame(columns = 3, rows = 2)
         frame.setRow(0, "abc")
@@ -361,6 +416,7 @@ class TerminalRenderCacheTest {
     ) : TerminalRenderFrame {
         private val codeWords = Array(rows) { IntArray(columns) }
         private val flags = Array(rows) { IntArray(columns) { TerminalRenderCellFlags.EMPTY } }
+        private val attrs = Array(rows) { LongArray(columns) }
         private val clusters = Array(rows) { arrayOfNulls<String>(columns) }
 
         val copyCounts = IntArray(rows)
@@ -398,6 +454,7 @@ class TerminalRenderCacheTest {
                 val code = text.getOrNull(col)?.code ?: 0
                 codeWords[row][col] = code
                 flags[row][col] = if (code == 0) TerminalRenderCellFlags.EMPTY else TerminalRenderCellFlags.CODEPOINT
+                attrs[row][col] = TerminalRenderAttrs.DEFAULT
                 clusters[row][col] = null
                 col++
             }
@@ -416,6 +473,16 @@ class TerminalRenderCacheTest {
             lineGenerations[0]++
             frameGeneration++
             require(text.isNotEmpty())
+        }
+
+        fun setBlink(
+            row: Int,
+            column: Int,
+            blink: Boolean,
+        ) {
+            attrs[row][column] = TerminalRenderAttrs.pack(blink = blink)
+            lineGenerations[row]++
+            frameGeneration++
         }
 
         override fun lineGeneration(row: Int): Long = lineGenerations[row]
@@ -441,7 +508,7 @@ class TerminalRenderCacheTest {
             var col = 0
             while (col < columns) {
                 codeWords[codeOffset + col] = this.codeWords[row][col]
-                attrWords[attrOffset + col] = TerminalRenderAttrs.DEFAULT
+                attrWords[attrOffset + col] = attrs[row][col]
                 flags[flagOffset + col] = this.flags[row][col]
                 extraAttrWords?.set(extraAttrOffset + col, TerminalRenderExtraAttrs.DEFAULT)
                 hyperlinkIds?.set(hyperlinkOffset + col, 0)

@@ -72,11 +72,13 @@ internal class TerminalTextPainter(
         metrics: TerminalSwingMetrics,
         row: Int,
         fontRenderContext: FontRenderContext,
+        textBlinkVisible: Boolean = true,
         hoveredHyperlinkId: Int = NO_HYPERLINK_ID,
         hyperlinkActivationHover: Boolean = false,
         hyperlinkActivationForeground: Int = DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND,
     ) {
         val flagsPlane = cache.flags
+        val attrWords = cache.attrWords
         val codeWords = cache.codeWords
         val rowOffset = cache.rowOffset(row)
         val baselineY = row * metrics.cellHeight + metrics.baseline
@@ -86,6 +88,11 @@ internal class TerminalTextPainter(
             val index = rowOffset + column
             val flags = flagsPlane[index]
             if (!hasDrawableText(flags)) {
+                column++
+                continue
+            }
+
+            if (isBlinkHidden(attrWords[index], textBlinkVisible)) {
                 column++
                 continue
             }
@@ -102,6 +109,7 @@ internal class TerminalTextPainter(
                         startColumn = column,
                         baselineY = baselineY,
                         fontRenderContext = fontRenderContext,
+                        textBlinkVisible = textBlinkVisible,
                         hoveredHyperlinkId = hoveredHyperlinkId,
                         hyperlinkActivationHover = hyperlinkActivationHover,
                         hyperlinkActivationForeground = hyperlinkActivationForeground,
@@ -116,6 +124,7 @@ internal class TerminalTextPainter(
                         column = column,
                         baselineY = baselineY,
                         fontRenderContext = fontRenderContext,
+                        textBlinkVisible = textBlinkVisible,
                         hoveredHyperlinkId = hoveredHyperlinkId,
                         hyperlinkActivationHover = hyperlinkActivationHover,
                         hyperlinkActivationForeground = hyperlinkActivationForeground,
@@ -136,6 +145,7 @@ internal class TerminalTextPainter(
         columnSpan: Int = 1,
         foreground: Int,
         fontRenderContext: FontRenderContext,
+        textBlinkVisible: Boolean = true,
     ) {
         val flagsPlane = cache.flags
         val attrWords = cache.attrWords
@@ -146,6 +156,8 @@ internal class TerminalTextPainter(
         if (!hasDrawableText(flags)) return
 
         val attr = attrWords[index]
+        if (isBlinkHidden(attr, textBlinkVisible)) return
+
         val safeColumnSpan = maxOf(1, columnSpan)
         val oldClip = g.clip
         try {
@@ -227,6 +239,7 @@ internal class TerminalTextPainter(
         startColumn: Int,
         baselineY: Int,
         fontRenderContext: FontRenderContext,
+        textBlinkVisible: Boolean,
         hoveredHyperlinkId: Int,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
@@ -262,6 +275,7 @@ internal class TerminalTextPainter(
             val currentAttr = attrWords[index]
             val currentExtraAttr = extraAttrWords[index]
             val currentHyperlinkId = hyperlinkIds[index]
+            val currentBlinkHidden = isBlinkHidden(currentAttr, textBlinkVisible)
             val currentHovered = isHoveredHyperlink(currentHyperlinkId, hoveredHyperlinkId)
             val currentForeground =
                 effectiveForeground(
@@ -272,6 +286,7 @@ internal class TerminalTextPainter(
                     hyperlinkActivationForeground = hyperlinkActivationForeground,
                 )
             if (
+                currentBlinkHidden ||
                 !isFastAsciiCell(flags, codeWord) ||
                 currentForeground != foreground ||
                 terminalFontStyle(currentAttr) != fontStyle ||
@@ -311,6 +326,7 @@ internal class TerminalTextPainter(
         column: Int,
         baselineY: Int,
         fontRenderContext: FontRenderContext,
+        textBlinkVisible: Boolean,
         hoveredHyperlinkId: Int,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
@@ -324,6 +340,8 @@ internal class TerminalTextPainter(
         val index = cache.rowOffset(row) + column
         val flags = flagsPlane[index]
         val attr = attrWords[index]
+        if (isBlinkHidden(attr, textBlinkVisible)) return endColumnForHiddenCell(cache, flags, column)
+
         val extraAttr = extraAttrWords[index]
         val hyperlinkId = hyperlinkIds[index]
         val hovered = isHoveredHyperlink(hyperlinkId, hoveredHyperlinkId)
@@ -439,6 +457,17 @@ internal class TerminalTextPainter(
         } else {
             TerminalSwingColors.foreground(palette, attr)
         }
+
+    private fun isBlinkHidden(
+        attr: Long,
+        textBlinkVisible: Boolean,
+    ): Boolean = !textBlinkVisible && TerminalRenderAttrs.isBlink(attr)
+
+    private fun endColumnForHiddenCell(
+        cache: TerminalRenderCache,
+        flags: Int,
+        column: Int,
+    ): Int = minOf(cache.columns, column + cellSpan(flags))
 
     private fun paintHyperlinkDecoration(
         g: Graphics2D,

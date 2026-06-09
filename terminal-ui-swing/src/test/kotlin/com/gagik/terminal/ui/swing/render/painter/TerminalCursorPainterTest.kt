@@ -152,11 +152,14 @@ class TerminalCursorPainterTest {
         val painter: TerminalCursorPainter,
         val textPainter: TerminalTextPainter,
     ) {
-        fun paint(cursorBlinkVisible: Boolean = true) {
+        fun paint(
+            cursorBlinkVisible: Boolean = true,
+            textBlinkVisible: Boolean = true,
+        ) {
             textPainter.updateSettings(settings)
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
             g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
-            painter.paint(g, cache, settings.palette, metrics, cursorBlinkVisible, g.fontRenderContext)
+            painter.paint(g, cache, settings.palette, metrics, cursorBlinkVisible, textBlinkVisible, g.fontRenderContext)
         }
     }
 

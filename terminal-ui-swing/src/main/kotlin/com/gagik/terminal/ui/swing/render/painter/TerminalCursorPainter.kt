@@ -41,6 +41,7 @@ internal class TerminalCursorPainter(
         palette: TerminalColorPalette,
         metrics: TerminalSwingMetrics,
         cursorBlinkVisible: Boolean,
+        textBlinkVisible: Boolean,
         fontRenderContext: FontRenderContext,
     ) {
         if (!cache.cursorVisible || (cache.cursorBlinking && !cursorBlinkVisible)) return
@@ -80,6 +81,7 @@ internal class TerminalCursorPainter(
                 columnSpan = columnSpan,
                 foreground = palette.cursorForeground,
                 fontRenderContext = fontRenderContext,
+                textBlinkVisible = textBlinkVisible,
             )
         }
     }

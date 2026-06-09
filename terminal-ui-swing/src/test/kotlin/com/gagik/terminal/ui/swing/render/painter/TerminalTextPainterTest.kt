@@ -179,6 +179,71 @@ class TerminalTextPainterTest {
                 "Second cell underline should be blue",
             )
         }
+
+        @Test
+        fun `blink visible phase paints blinking ascii text`() {
+            val fixture = fixture()
+            val cache =
+                renderCache(
+                    TestRenderFrame.text(
+                        text = "A",
+                        attrs = longArrayOf(TerminalRenderAttrs.pack(blink = true)),
+                    ),
+                )
+
+            fixture.paintRow(cache, textBlinkVisible = true)
+
+            assertTrue(
+                fixture.image.containsColor(TEST_RED, fixture.metrics.cellWidth, fixture.metrics.cellHeight),
+                "Blinking ASCII text was not painted during the visible phase",
+            )
+        }
+
+        @Test
+        fun `blink hidden phase suppresses blinking ascii text and decorations`() {
+            val fixture = fixture(foreground = TEST_WHITE)
+            val cache =
+                renderCache(
+                    TestRenderFrame.text(
+                        text = "A",
+                        attrs = longArrayOf(TerminalRenderAttrs.pack(blink = true, underlineStyle = TerminalRenderUnderline.SINGLE)),
+                    ),
+                )
+
+            fixture.paintRow(cache, textBlinkVisible = false)
+
+            assertTrue(
+                !fixture.image.containsColor(TEST_WHITE, fixture.metrics.cellWidth, fixture.metrics.cellHeight),
+                "Blinking ASCII text or its underline painted during the hidden phase",
+            )
+        }
+
+        @Test
+        fun `blink hidden phase does not hide neighboring non-blinking ascii text`() {
+            val fixture = fixture()
+            val cache =
+                renderCache(
+                    TestRenderFrame.text(
+                        text = "AB",
+                        attrs =
+                            longArrayOf(
+                                TerminalRenderAttrs.pack(blink = true),
+                                TerminalRenderAttrs.DEFAULT,
+                            ),
+                    ),
+                )
+
+            fixture.paintRow(cache, textBlinkVisible = false)
+
+            assertTrue(
+                !fixture.image.containsColorInRange(TEST_RED, 0, fixture.metrics.cellWidth),
+                "Blinking first cell painted during the hidden phase",
+            )
+            assertTrue(
+                fixture.image.containsColorInRange(TEST_RED, fixture.metrics.cellWidth, fixture.metrics.cellWidth * 2),
+                "Non-blinking neighboring cell was hidden with the blinking run",
+            )
+        }
     }
 
     @Nested
@@ -282,6 +347,25 @@ class TerminalTextPainterTest {
             assertTrue(
                 fixture.image.containsColor(TEST_RED, fixture.metrics.cellWidth, fixture.metrics.cellHeight),
                 "Non-ascii codepoint failed to render",
+            )
+        }
+
+        @Test
+        fun `blink hidden phase suppresses blinking complex text`() {
+            val fixture = fixture()
+            val cache =
+                renderCache(
+                    TestRenderFrame.text(
+                        text = "\u03A9",
+                        attrs = longArrayOf(TerminalRenderAttrs.pack(blink = true)),
+                    ),
+                )
+
+            fixture.paintRow(cache, textBlinkVisible = false)
+
+            assertTrue(
+                !fixture.image.containsColor(TEST_RED, fixture.metrics.cellWidth, fixture.metrics.cellHeight),
+                "Blinking complex text painted during the hidden phase",
             )
         }
 
@@ -590,6 +674,34 @@ class TerminalTextPainterTest {
             // Assert
             assertEquals(originalClip, fixture.g.getClipBounds(Rectangle()))
         }
+
+        @Test
+        fun `paintCellForeground respects blinking text hidden phase`() {
+            val fixture = fixture(foreground = TEST_WHITE)
+            val cache =
+                renderCache(
+                    TestRenderFrame.text(
+                        text = "A",
+                        attrs = longArrayOf(TerminalRenderAttrs.pack(blink = true)),
+                    ),
+                )
+
+            fixture.painter.paintCellForeground(
+                fixture.g,
+                cache,
+                fixture.metrics,
+                column = 0,
+                row = 0,
+                foreground = TEST_GREEN,
+                fontRenderContext = fixture.g.fontRenderContext,
+                textBlinkVisible = false,
+            )
+
+            assertTrue(
+                !fixture.image.containsColor(TEST_GREEN, fixture.metrics.cellWidth, fixture.metrics.cellHeight),
+                "Block cursor foreground resurrected hidden blinking text",
+            )
+        }
     }
 
     // --- Testing Utilities & Helpers ---
@@ -604,6 +716,7 @@ class TerminalTextPainterTest {
         fun paintRow(
             cache: TerminalRenderCache,
             row: Int = 0,
+            textBlinkVisible: Boolean = true,
             hoveredHyperlinkId: Int = 0,
             hyperlinkActivationHover: Boolean = false,
             hyperlinkActivationForeground: Int = 0xFF4DA3FF.toInt(),
@@ -617,6 +730,7 @@ class TerminalTextPainterTest {
                 metrics = metrics,
                 row = row,
                 fontRenderContext = g.fontRenderContext,
+                textBlinkVisible = textBlinkVisible,
                 hoveredHyperlinkId = hoveredHyperlinkId,
                 hyperlinkActivationHover = hyperlinkActivationHover,
                 hyperlinkActivationForeground = hyperlinkActivationForeground,

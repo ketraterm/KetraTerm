@@ -303,6 +303,66 @@ class TerminalSwingRepaintPlannerTest {
     }
 
     @Test
+    fun `blinking text repaint coalesces visible blinking row runs`() {
+        val frame = MutableFrame(columns = 4, rows = 4)
+        frame.setBlink(row = 1, column = 0, blink = true)
+        frame.setBlink(row = 2, column = 3, blink = true)
+        val cache = TerminalRenderCache(columns = 4, rows = 4)
+        cache.updateFrom(frame.reader)
+
+        val repaintSink = RecordingRepaintSink()
+        TerminalSwingRepaintPlanner().requestBlinkingTextRepaint(
+            cache = cache,
+            metrics = METRICS,
+            componentWidth = WIDTH,
+            componentHeight = HEIGHT,
+            contentYOffset = 0.0,
+            repaintSink = repaintSink,
+        )
+
+        assertEquals(listOf(Region(0, CELL_HEIGHT, WIDTH, 2 * CELL_HEIGHT)), repaintSink.regions)
+    }
+
+    @Test
+    fun `blinking text repaint ignores non-blinking frames`() {
+        val frame = MutableFrame(columns = 4, rows = 4)
+        val cache = TerminalRenderCache(columns = 4, rows = 4)
+        cache.updateFrom(frame.reader)
+
+        val repaintSink = RecordingRepaintSink(failOnFullRepaint = true)
+        TerminalSwingRepaintPlanner().requestBlinkingTextRepaint(
+            cache = cache,
+            metrics = METRICS,
+            componentWidth = WIDTH,
+            componentHeight = HEIGHT,
+            contentYOffset = 0.0,
+            repaintSink = repaintSink,
+        )
+
+        assertEquals(emptyList(), repaintSink.regions)
+    }
+
+    @Test
+    fun `blinking text repaint uses fractional content offset`() {
+        val frame = MutableFrame(columns = 4, rows = 4)
+        frame.setBlink(row = 1, column = 0, blink = true)
+        val cache = TerminalRenderCache(columns = 4, rows = 4)
+        cache.updateFrom(frame.reader)
+
+        val repaintSink = RecordingRepaintSink()
+        TerminalSwingRepaintPlanner().requestBlinkingTextRepaint(
+            cache = cache,
+            metrics = METRICS,
+            componentWidth = WIDTH,
+            componentHeight = HEIGHT,
+            contentYOffset = -12.0,
+            repaintSink = repaintSink,
+        )
+
+        assertEquals(listOf(Region(0, 4, WIDTH, CELL_HEIGHT)), repaintSink.regions)
+    }
+
+    @Test
     fun `resized render cache requests full repaint`() {
         val cache = TerminalRenderCache(columns = 2, rows = 2)
         val planner = TerminalSwingRepaintPlanner()
@@ -386,6 +446,7 @@ class TerminalSwingRepaintPlannerTest {
             }
         private val lineGenerations = LongArray(rows) { 1L }
         private val cellFlags = Array(rows) { IntArray(columns) { TerminalRenderCellFlags.CODEPOINT } }
+        private val cellAttrs = Array(rows) { LongArray(columns) }
 
         override var frameGeneration: Long = 1L
         override var structureGeneration: Long = 1L
@@ -424,6 +485,17 @@ class TerminalSwingRepaintPlannerTest {
             frameGeneration++
         }
 
+        fun setBlink(
+            row: Int,
+            column: Int,
+            blink: Boolean,
+        ) {
+            textRows[row][column] = 'B'
+            lineGenerations[row]++
+            frameGeneration++
+            cellAttrs[row][column] = TerminalRenderAttrs.pack(blink = blink)
+        }
+
         override fun lineGeneration(row: Int): Long = lineGenerations[row]
 
         override fun lineWrapped(row: Int): Boolean = false
@@ -446,7 +518,7 @@ class TerminalSwingRepaintPlannerTest {
             var column = 0
             while (column < columns) {
                 codeWords[codeOffset + column] = textRows[row][column].code
-                attrWords[attrOffset + column] = TerminalRenderAttrs.DEFAULT
+                attrWords[attrOffset + column] = cellAttrs[row][column]
                 flags[flagOffset + column] = cellFlags[row][column]
                 extraAttrWords?.set(extraAttrOffset + column, TerminalRenderExtraAttrs.DEFAULT)
                 hyperlinkIds?.set(hyperlinkOffset + column, 0)

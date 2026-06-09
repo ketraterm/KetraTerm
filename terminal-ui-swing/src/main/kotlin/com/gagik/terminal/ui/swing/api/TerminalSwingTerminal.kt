@@ -97,7 +97,7 @@ class TerminalSwingTerminal(
     internal val cursorTimer =
         Timer(settings.cursorBlinkMillis) {
             cursorBlinkVisible = !cursorBlinkVisible
-            repaintBlinkingCursor()
+            repaintBlinkState()
         }
 
     private val inputKeyListener =
@@ -268,6 +268,7 @@ class TerminalSwingTerminal(
                         width = width,
                         height = height,
                         cursorBlinkVisible = cursorBlinkVisible,
+                        textBlinkVisible = cursorBlinkVisible,
                         contentYOffset = contentYOffset(cache),
                         selection = getViewportSelection(cache),
                         hoveredHyperlinkId = hoveredHyperlinkId,
@@ -827,15 +828,24 @@ class TerminalSwingTerminal(
         } ?: repaint()
     }
 
-    private fun repaintBlinkingCursor() {
+    private fun repaintBlinkState() {
         val publisher = session?.publisher ?: return
         publisher.readCurrent { cache ->
+            val yOffset = contentYOffset(cache)
             repaintPlanner.requestCursorBlinkRepaint(
                 cache = cache,
                 metrics = metrics,
                 componentWidth = width,
                 componentHeight = height,
-                contentYOffset = contentYOffset(cache),
+                contentYOffset = yOffset,
+                repaintSink = repaintSink,
+            )
+            repaintPlanner.requestBlinkingTextRepaint(
+                cache = cache,
+                metrics = metrics,
+                componentWidth = width,
+                componentHeight = height,
+                contentYOffset = yOffset,
                 repaintSink = repaintSink,
             )
         }
@@ -847,7 +857,7 @@ class TerminalSwingTerminal(
             cursorBlinkVisible = true
             cursorTimer.restart()
             if (forceRepaint && !wasVisible) {
-                repaintBlinkingCursor()
+                repaintBlinkState()
             }
         }
     }

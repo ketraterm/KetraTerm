@@ -121,6 +121,21 @@ class TerminalRenderCache(
         private set
 
     /**
+     * Cached per-row marker for visible cells carrying the SGR blink attribute.
+     *
+     * Renderers use this metadata to schedule blink-phase repaints without
+     * scanning attribute words on timer ticks.
+     */
+    var lineHasBlinkingText: BooleanArray = BooleanArray(0)
+        private set
+
+    /**
+     * Whether any copied visible row contains SGR blinking text.
+     */
+    var hasBlinkingText: Boolean = false
+        private set
+
+    /**
      * Last copied frame generation.
      */
     var frameGeneration: Long = UNINITIALIZED_GENERATION
@@ -342,6 +357,7 @@ class TerminalRenderCache(
         beginClusterCopy()
 
         var row = 0
+        var nextHasBlinkingText = false
         while (row < frame.rows) {
             val lineGeneration = frame.lineGeneration(row)
             val wrapped = frame.lineWrapped(row)
@@ -378,13 +394,16 @@ class TerminalRenderCache(
 
                 lineGenerations[row] = lineGeneration
                 lineWrapped[row] = wrapped
+                lineHasBlinkingText[row] = rowHasBlinkingText(offset)
             } else {
                 preserveClusterRow(row)
             }
 
+            if (lineHasBlinkingText[row]) nextHasBlinkingText = true
             row++
         }
         finishClusterCopy()
+        hasBlinkingText = nextHasBlinkingText
 
         activeBuffer = frame.activeBuffer
         palette = frame.palette
@@ -424,6 +443,8 @@ class TerminalRenderCache(
 
         lineGenerations = LongArray(newRows) { UNINITIALIZED_GENERATION }
         lineWrapped = BooleanArray(newRows)
+        lineHasBlinkingText = BooleanArray(newRows)
+        hasBlinkingText = false
 
         hasCursor = false
         cursorColumn = 0
@@ -441,6 +462,21 @@ class TerminalRenderCache(
         cursorChangedOnLastUpdate = false
         clusterSinkRow = NO_CLUSTER_SINK_ROW
         clusterSinkRefs = EMPTY_LONG_REFS
+    }
+
+    private fun rowHasBlinkingText(offset: Int): Boolean {
+        val end = offset + columns
+        var index = offset
+        while (index < end) {
+            if (
+                flags[index] != TerminalRenderCellFlags.EMPTY &&
+                TerminalRenderAttrs.isBlink(attrWords[index])
+            ) {
+                return true
+            }
+            index++
+        }
+        return false
     }
 
     private fun copyCursorFrom(frame: TerminalRenderFrame) {
