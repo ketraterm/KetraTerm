@@ -22,15 +22,7 @@ import java.awt.CardLayout
 import java.awt.Dimension
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
-import javax.swing.Box
-import javax.swing.ButtonGroup
-import javax.swing.JCheckBoxMenuItem
-import javax.swing.JFrame
-import javax.swing.JMenu
-import javax.swing.JMenuBar
-import javax.swing.JPanel
-import javax.swing.JRadioButtonMenuItem
-import javax.swing.WindowConstants
+import javax.swing.*
 
 /**
  * Creates and wires the standalone terminal window.
@@ -40,15 +32,6 @@ import javax.swing.WindowConstants
  * are active. We place [LatticeTabBar] at the left of the menu bar and the
  * action buttons at the right, with a horizontal glue in between.
  *
- * ```
- * ┌──────────────────────────────────────────────┐
- * │  [tab1] [tab2] [+]        [≡] [⋯]  [ − □ × ]│  ← JMenuBar (title bar)
- * ├──────────────────────────────────────────────┤
- * │                                              │
- * │            terminal content                  │  ← content pane
- * │                                              │
- * └──────────────────────────────────────────────┘
- * ```
  */
 internal class LatticeWindowFactory(
     private val settings: StandaloneTerminalSettings,
@@ -117,16 +100,13 @@ internal class LatticeWindowFactory(
                         val range = tabBar.getSelectedTabXRange()
                         if (range != null) {
                             val (tabStart, tabEnd) = range
-                            // Draw left part of the border
                             if (tabStart > 0) {
                                 g2.drawLine(0, yLine, tabStart, yLine)
                             }
-                            // Draw right part of the border
                             if (tabEnd < width) {
                                 g2.drawLine(tabEnd, yLine, width, yLine)
                             }
                         } else {
-                            // No active tab range, draw full line
                             g2.drawLine(0, yLine, width, yLine)
                         }
                     } finally {
@@ -149,14 +129,14 @@ internal class LatticeWindowFactory(
         tabManager: LatticeTabManager,
     ) {
         val popup =
-            javax.swing.JPopupMenu().apply {
+            JPopupMenu().apply {
                 background = LatticeChrome.popupBackground
-                border = javax.swing.BorderFactory.createLineBorder(LatticeChrome.border)
+                border = BorderFactory.createLineBorder(LatticeChrome.border)
             }
 
         profiles.forEach { profile ->
             val item =
-                javax.swing.JMenuItem(profile.displayName).apply {
+                JMenuItem(profile.displayName).apply {
                     background = LatticeChrome.popupBackground
                     foreground = LatticeChrome.textPrimary
                     addActionListener { tabManager.openTab(profile) }
@@ -176,14 +156,14 @@ internal class LatticeWindowFactory(
         popup.add(settingsMenu)
 
         val commandPaletteItem =
-            javax.swing.JMenuItem("Command palette").apply {
+            JMenuItem("Command palette").apply {
                 background = LatticeChrome.popupBackground
                 foreground = LatticeChrome.textPrimary
             }
         popup.add(commandPaletteItem)
 
         val aboutItem =
-            javax.swing.JMenuItem("About").apply {
+            JMenuItem("About").apply {
                 background = LatticeChrome.popupBackground
                 foreground = LatticeChrome.textPrimary
             }

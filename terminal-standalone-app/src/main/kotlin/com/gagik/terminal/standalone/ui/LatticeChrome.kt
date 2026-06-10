@@ -19,6 +19,7 @@ import com.gagik.terminal.render.api.TerminalColorPalette
 import java.awt.Color
 import java.awt.Dimension
 import javax.swing.UIManager
+import kotlin.math.pow
 
 /**
  * Palette-derived visual constants for the standalone Swing host.
@@ -204,7 +205,7 @@ internal object LatticeChrome {
         return if (channel <= 0.03928) {
             channel / 12.92
         } else {
-            Math.pow((channel + 0.055) / 1.055, 2.4)
+            ((channel + 0.055) / 1.055).pow(2.4)
         }
     }
 
