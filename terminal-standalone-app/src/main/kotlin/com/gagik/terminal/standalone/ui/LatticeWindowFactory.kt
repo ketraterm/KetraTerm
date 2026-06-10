@@ -16,15 +16,20 @@
 package com.gagik.terminal.standalone.ui
 
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
+import com.gagik.terminal.ui.swing.settings.TerminalTheme
 import com.gagik.terminal.workspace.TerminalProfile
 import java.awt.CardLayout
 import java.awt.Dimension
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import javax.swing.Box
+import javax.swing.ButtonGroup
+import javax.swing.JCheckBoxMenuItem
 import javax.swing.JFrame
+import javax.swing.JMenu
 import javax.swing.JMenuBar
 import javax.swing.JPanel
+import javax.swing.JRadioButtonMenuItem
 import javax.swing.WindowConstants
 import javax.swing.border.EmptyBorder
 
@@ -67,17 +72,19 @@ internal class LatticeWindowFactory(
         // Tab bar callbacks reference tabManager; forward via lambda so the
         // lateinit is resolved at call time, not at construction time.
         lateinit var tabManager: LatticeTabManager
-        val tabBar =
+        lateinit var tabBar: LatticeTabBar
+
+        tabBar =
             LatticeTabBar(
                 onTabSelected = { id -> tabManager.onTabSelected(id) },
                 onTabClose = { id -> tabManager.closeTab(id) },
                 onNewTab = { tabManager.openTab(profiles.first()) },
+                onMenuClick = { x, y -> showDropdownMenu(tabBar, x, y, profiles, tabManager) },
             )
 
         tabManager = LatticeTabManager(frame, tabBar, tabContentPanel, settings)
-        val actionsFactory = LatticeTitleBarActionsFactory(settings, tabManager, profiles)
 
-        installMenuBar(frame, tabBar, actionsFactory)
+        installMenuBar(frame, tabBar)
         styleTitleBar(frame)
         frame.contentPane = tabContentPanel
 
@@ -99,7 +106,6 @@ internal class LatticeWindowFactory(
     private fun installMenuBar(
         frame: JFrame,
         tabBar: LatticeTabBar,
-        actionsFactory: LatticeTitleBarActionsFactory,
     ) {
         frame.jMenuBar =
             JMenuBar().apply {
@@ -107,8 +113,58 @@ internal class LatticeWindowFactory(
                 border = EmptyBorder(0, 0, 0, 0)
                 add(tabBar)
                 add(Box.createHorizontalGlue())
-                add(actionsFactory.trailingPanel)
             }
+    }
+
+    private fun showDropdownMenu(
+        invoker: java.awt.Component,
+        x: Int,
+        y: Int,
+        profiles: List<TerminalProfile>,
+        tabManager: LatticeTabManager,
+    ) {
+        val popup =
+            javax.swing.JPopupMenu().apply {
+                background = LatticeChrome.POPUP_BACKGROUND
+                border = javax.swing.BorderFactory.createLineBorder(LatticeChrome.BORDER)
+            }
+
+        profiles.forEach { profile ->
+            val item =
+                javax.swing.JMenuItem(profile.displayName).apply {
+                    background = LatticeChrome.POPUP_BACKGROUND
+                    foreground = LatticeChrome.TEXT_PRIMARY
+                    addActionListener { tabManager.openTab(profile) }
+                }
+            popup.add(item)
+        }
+
+        popup.addSeparator()
+
+        val settingsMenu =
+            JMenu("Settings").apply {
+                background = LatticeChrome.POPUP_BACKGROUND
+                foreground = LatticeChrome.TEXT_PRIMARY
+                add(buildThemeMenu(tabManager))
+                add(buildWidthItem(tabManager))
+            }
+        popup.add(settingsMenu)
+
+        val commandPaletteItem =
+            javax.swing.JMenuItem("Command palette").apply {
+                background = LatticeChrome.POPUP_BACKGROUND
+                foreground = LatticeChrome.TEXT_PRIMARY
+            }
+        popup.add(commandPaletteItem)
+
+        val aboutItem =
+            javax.swing.JMenuItem("About").apply {
+                background = LatticeChrome.POPUP_BACKGROUND
+                foreground = LatticeChrome.TEXT_PRIMARY
+            }
+        popup.add(aboutItem)
+
+        popup.show(invoker, x, y)
     }
 
     /**
@@ -123,6 +179,44 @@ internal class LatticeWindowFactory(
             putClientProperty("JRootPane.titleBarShowTitle", false)
         }
     }
+
+    private fun buildThemeMenu(tabManager: LatticeTabManager): JMenu {
+        val themeMenu =
+            JMenu("Theme").apply {
+                background = LatticeChrome.POPUP_BACKGROUND
+                foreground = LatticeChrome.TEXT_PRIMARY
+            }
+        val themeGroup = ButtonGroup()
+        TerminalTheme.entries.forEach { theme ->
+            val item =
+                JRadioButtonMenuItem(theme.displayName(), theme == settings.theme).apply {
+                    background = LatticeChrome.POPUP_BACKGROUND
+                    foreground = LatticeChrome.TEXT_PRIMARY
+                }
+            themeGroup.add(item)
+            item.addActionListener {
+                settings.theme = theme
+                tabManager.reloadAllPanes()
+            }
+            themeMenu.add(item)
+        }
+        return themeMenu
+    }
+
+    private fun buildWidthItem(tabManager: LatticeTabManager): JCheckBoxMenuItem =
+        JCheckBoxMenuItem("Ambiguous as wide", settings.treatAmbiguousAsWide).apply {
+            background = LatticeChrome.POPUP_BACKGROUND
+            foreground = LatticeChrome.TEXT_PRIMARY
+            addActionListener {
+                settings.treatAmbiguousAsWide = isSelected
+                tabManager.reloadAllPanes()
+            }
+        }
+
+    private fun TerminalTheme.displayName(): String =
+        name.lowercase().split("_").joinToString(" ") {
+            it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() }
+        }
 }
 
 /**

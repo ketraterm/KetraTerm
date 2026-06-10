@@ -21,8 +21,7 @@ import java.awt.Dimension
 /**
  * Visual constants for the standalone Swing host.
  *
- * All colours follow an 80% dark / 20% accent palette, matching the feel
- * of modern terminal applications such as Windows Terminal and VS Code.
+ * All colours follow a sleek, modern dark palette.
  */
 internal object LatticeChrome {
     const val APP_TITLE = "Lattice"
@@ -30,23 +29,21 @@ internal object LatticeChrome {
     // ── Surfaces ──────────────────────────────────────────────────────────────
 
     /** Root window background and deep surface. */
-    val SURFACE: Color = Color(0x0D0D0D)
+    val SURFACE: Color = Color(0x181818)
 
     /** Title bar and tab strip background. */
-    val TOP_BAR_BACKGROUND: Color = Color(0x252526)
+    val TOP_BAR_BACKGROUND: Color = Color(0x181818)
 
-    /** Active terminal content background. Intentionally darker than the bar
-     *  so that the selected tab creates a seamless visual connection. */
-    val TERMINAL_BACKGROUND: Color = Color(0x0D0D0D)
+    /** Active terminal content background. */
+    val TERMINAL_BACKGROUND: Color = Color(0x181818)
 
     // ── Tab states ────────────────────────────────────────────────────────────
 
-    /** Background of the selected tab — matches [TERMINAL_BACKGROUND] so the
-     *  tab blends into the content pane below it. */
-    val TAB_SELECTED_BG: Color = Color(0x0D0D0D)
+    /** Background of the selected tab — a distinct muted blue pill. */
+    val TAB_SELECTED_BG: Color = Color(0x3B4C68)
 
     /** Background shown when hovering over an unselected tab. */
-    val TAB_HOVER_BG: Color = Color(0x2F2F2F)
+    val TAB_HOVER_BG: Color = Color(0x2D2D2D)
 
     // ── Controls ──────────────────────────────────────────────────────────────
 
@@ -58,14 +55,14 @@ internal object LatticeChrome {
     // ── Text ──────────────────────────────────────────────────────────────────
 
     /** Primary text — used for selected tab labels and active UI elements. */
-    val TEXT_PRIMARY: Color = Color(0xE8E8E8)
+    val TEXT_PRIMARY: Color = Color(0xFFFFFF)
 
     /** Secondary text — used for unselected tab labels. */
-    val TEXT_SECONDARY: Color = Color(0x8A8A8A)
+    val TEXT_SECONDARY: Color = Color(0xAAAAAA)
 
     // ── Accent ────────────────────────────────────────────────────────────────
 
-    /** Brand accent — used as the selected-tab indicator line. */
+    /** Brand accent. */
     val ACCENT: Color = Color(0x4DA3FF)
 
     // ── Borders ───────────────────────────────────────────────────────────────
@@ -74,7 +71,7 @@ internal object LatticeChrome {
 
     // ── Scrollbar ─────────────────────────────────────────────────────────────
 
-    val SCROLLBAR_TRACK: Color = Color(0x0D0D0D)
+    val SCROLLBAR_TRACK: Color = Color(0x181818)
     val SCROLLBAR_THUMB: Color = Color(0x555555)
     val SCROLLBAR_THUMB_HOVER: Color = Color(0x707070)
     val SCROLLBAR_THUMB_PRESSED: Color = Color(0x909090)
