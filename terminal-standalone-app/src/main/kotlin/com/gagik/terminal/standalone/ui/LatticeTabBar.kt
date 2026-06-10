@@ -55,6 +55,7 @@ internal class LatticeTabBar(
 ) : JPanel() {
     private val entries = mutableListOf<TabEntry>()
     private var selectedId: String? = null
+    var activeTabBackground: Color? = null
 
     // Layout state
     private var tabWidths: List<Int> = emptyList()
@@ -329,7 +330,7 @@ internal class LatticeTabBar(
         val isTabPressed = activePressedResult == HitResult.Tab(index)
         val bg =
             when {
-                selected -> LatticeChrome.TAB_SELECTED_BG
+                selected -> activeTabBackground ?: LatticeChrome.TAB_SELECTED_BG
                 index == tabHoverIndex -> {
                     if (isTabPressed) {
                         LatticeChrome.CONTROL_PRESSED
@@ -355,8 +356,8 @@ internal class LatticeTabBar(
             g2.fill(path)
         }
 
-        if (selected) {
-            // Draw active tab outline border (top-rounded only)
+        if (selected || index == tabHoverIndex) {
+            // Draw active/hovered tab outline border (top-rounded only)
             g2.color = LatticeChrome.BORDER
             g2.stroke = BasicStroke(1f)
             val borderPath =
@@ -373,7 +374,8 @@ internal class LatticeTabBar(
 
         // Draw vertical divider between inactive tabs
         val nextSelected = entries.getOrNull(index + 1)?.id == selectedId
-        if (!selected && !nextSelected && index < entries.size - 1) {
+        val nextHovered = index + 1 == tabHoverIndex
+        if (!selected && !nextSelected && !nextHovered && index < entries.size - 1 && index != tabHoverIndex) {
             g2.color = LatticeChrome.BORDER
             g2.stroke = BasicStroke(1f)
             val divX = x + w + TAB_GAP / 2
@@ -384,22 +386,97 @@ internal class LatticeTabBar(
         val iconWidth = 20
         val iconY = y + (h + fm.ascent - fm.descent) / 2
 
-        // Draw stylized terminal icon
+        // Draw stylized icon based on shell type
         val iconX = x + TAB_LABEL_PADDING_LEFT
         val iconH = 12
         val iconW = 14
         val iconDrawY = y + (h - iconH) / 2
-        g2.color = if (selected) LatticeChrome.ACCENT else Color(0x9E, 0xA2, 0xA8)
-        g2.stroke = BasicStroke(1.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-        g2.drawRoundRect(iconX, iconDrawY, iconW, iconH, 2, 2)
-        // '>' prompt inside icon
-        g2.drawLine(iconX + 4, iconDrawY + 3, iconX + 7, iconDrawY + 6)
-        g2.drawLine(iconX + 7, iconDrawY + 6, iconX + 4, iconDrawY + 9)
-        // '_' cursor inside icon
-        g2.drawLine(iconX + 9, iconDrawY + 9, iconX + 11, iconDrawY + 9)
+        val shellType = detectShellType(entry.title)
+        val opacity = if (selected || index == tabHoverIndex) 255 else 160
+
+        when (shellType) {
+            ShellType.POWERSHELL -> {
+                g2.color = Color(0x1F, 0x8A, 0xDD, opacity)
+                g2.fillRoundRect(iconX, iconDrawY, iconW, iconH, 3, 3)
+
+                g2.color = Color(255, 255, 255, opacity)
+                g2.stroke = BasicStroke(1.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                // Chevron '>'
+                g2.drawLine(iconX + 4, iconDrawY + 3, iconX + 7, iconDrawY + 6)
+                g2.drawLine(iconX + 7, iconDrawY + 6, iconX + 4, iconDrawY + 9)
+                // Backslash '\'
+                g2.drawLine(iconX + 10, iconDrawY + 3, iconX + 8, iconDrawY + 9)
+            }
+            ShellType.CMD -> {
+                g2.color = Color(0x1E, 0x1E, 0x1E, opacity)
+                g2.fillRoundRect(iconX, iconDrawY, iconW, iconH, 2, 2)
+
+                g2.color = Color(0x8C, 0x90, 0x99, opacity)
+                g2.stroke = BasicStroke(1f)
+                g2.drawRoundRect(iconX, iconDrawY, iconW, iconH, 2, 2)
+
+                g2.color = Color(0xDF, 0xE1, 0xE5, opacity)
+                g2.stroke = BasicStroke(1f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                // 'C'
+                g2.drawLine(iconX + 5, iconDrawY + 4, iconX + 3, iconDrawY + 4)
+                g2.drawLine(iconX + 3, iconDrawY + 4, iconX + 3, iconDrawY + 8)
+                g2.drawLine(iconX + 3, iconDrawY + 8, iconX + 5, iconDrawY + 8)
+                // '>'
+                g2.drawLine(iconX + 7, iconDrawY + 4, iconX + 9, iconDrawY + 6)
+                g2.drawLine(iconX + 9, iconDrawY + 6, iconX + 7, iconDrawY + 8)
+                // '_'
+                g2.drawLine(iconX + 10, iconDrawY + 8, iconX + 11, iconDrawY + 8)
+            }
+            ShellType.GIT_BASH -> {
+                g2.color = Color(0xF1, 0x50, 0x2F, opacity)
+                val diamond = java.awt.Polygon()
+                diamond.addPoint(iconX + 7, iconDrawY)
+                diamond.addPoint(iconX + 14, iconDrawY + 6)
+                diamond.addPoint(iconX + 7, iconDrawY + 12)
+                diamond.addPoint(iconX, iconDrawY + 6)
+                g2.fill(diamond)
+
+                g2.color = Color(255, 255, 255, opacity)
+                g2.stroke = BasicStroke(1.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                // Stem
+                g2.drawLine(iconX + 7, iconDrawY + 3, iconX + 7, iconDrawY + 9)
+                // Branch
+                g2.drawLine(iconX + 7, iconDrawY + 6, iconX + 10, iconDrawY + 4)
+                // Nodes
+                g2.fillOval(iconX + 6, iconDrawY + 2, 2, 2)
+                g2.fillOval(iconX + 6, iconDrawY + 8, 2, 2)
+                g2.fillOval(iconX + 9, iconDrawY + 3, 2, 2)
+            }
+            ShellType.UBUNTU -> {
+                g2.color = Color(0xE9, 0x54, 0x20, opacity)
+                g2.fillOval(iconX + 1, iconDrawY, 12, 12)
+
+                g2.color = Color(255, 255, 255, opacity)
+                g2.stroke = BasicStroke(1f)
+                g2.drawOval(iconX + 4, iconDrawY + 3, 6, 6)
+                g2.fillOval(iconX + 2, iconDrawY + 5, 2, 2)
+                g2.fillOval(iconX + 7, iconDrawY + 2, 2, 2)
+                g2.fillOval(iconX + 7, iconDrawY + 8, 2, 2)
+            }
+            ShellType.DEFAULT -> {
+                g2.color = if (selected) LatticeChrome.ACCENT else Color(0x9E, 0xA2, 0xA8, opacity)
+                g2.stroke = BasicStroke(1.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                g2.drawRoundRect(iconX, iconDrawY, iconW, iconH, 2, 2)
+                // '>' prompt inside icon
+                g2.drawLine(iconX + 4, iconDrawY + 3, iconX + 7, iconDrawY + 6)
+                g2.drawLine(iconX + 7, iconDrawY + 6, iconX + 4, iconDrawY + 9)
+                // '_' cursor inside icon
+                g2.drawLine(iconX + 9, iconDrawY + 9, iconX + 11, iconDrawY + 9)
+            }
+        }
 
         // Draw text
-        val titleFg = if (selected) LatticeChrome.TEXT_PRIMARY else LatticeChrome.TEXT_SECONDARY
+        val titleFg =
+            when {
+                selected -> LatticeChrome.TEXT_PRIMARY
+                index == tabHoverIndex -> Color(0xDF, 0xE1, 0xE5)
+                else -> LatticeChrome.TEXT_SECONDARY
+            }
         g2.color = titleFg
         val labelMaxWidth = w - TAB_LABEL_PADDING_LEFT - iconWidth - CLOSE_BUTTON_SIZE - CLOSE_BUTTON_MARGIN_RIGHT - 4
         if (labelMaxWidth > 10) {
@@ -792,5 +869,24 @@ internal class LatticeTabBar(
         private const val MIN_LABEL_TEXT_WIDTH = 50
         private const val MAX_LABEL_TEXT_WIDTH = 160
         private const val MIN_TAB_WIDTH = 100
+    }
+
+    private enum class ShellType {
+        POWERSHELL,
+        CMD,
+        GIT_BASH,
+        UBUNTU,
+        DEFAULT
+    }
+
+    private fun detectShellType(title: String): ShellType {
+        val t = title.lowercase()
+        return when {
+            t.contains("powershell") || t.contains("pwsh") -> ShellType.POWERSHELL
+            t.contains("cmd") || t.contains("command prompt") -> ShellType.CMD
+            t.contains("git bash") || t.contains("bash") || t.contains("git") || t.contains("mingw") || t.contains("msys") -> ShellType.GIT_BASH
+            t.contains("ubuntu") || t.contains("wsl") || t.contains("debian") || t.contains("linux") -> ShellType.UBUNTU
+            else -> ShellType.DEFAULT
+        }
     }
 }
