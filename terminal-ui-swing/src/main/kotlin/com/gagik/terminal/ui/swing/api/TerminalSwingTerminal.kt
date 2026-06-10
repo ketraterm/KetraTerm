@@ -109,6 +109,8 @@ class TerminalSwingTerminal(
                 repaint(x, y, width, height)
             }
         }
+    private val dirtyListener = { schedulePublishedFrame() }
+
     internal val cursorTimer =
         Timer(settings.cursorBlinkMillis) {
             cursorBlinkVisible = !cursorBlinkVisible
@@ -364,12 +366,10 @@ class TerminalSwingTerminal(
     }
 
     private fun bindOnEdt(session: TerminalSession) {
-        this.session?.onDirty = null
+        this.session?.removeDirtyListener(dirtyListener)
         this.session = session
         applySettingsToSession(session, settings)
-        session.onDirty = {
-            schedulePublishedFrame()
-        }
+        session.addDirtyListener(dirtyListener)
         resetScrollbackState()
         clearSelection()
         stopSelectionDrag()
@@ -384,7 +384,7 @@ class TerminalSwingTerminal(
     }
 
     private fun unbindOnEdt() {
-        session?.onDirty = null
+        session?.removeDirtyListener(dirtyListener)
         session = null
         resetScrollbackState()
         clearSelection()
@@ -611,7 +611,7 @@ class TerminalSwingTerminal(
         return true
     }
 
-    private fun copySelectionToClipboard(): Boolean {
+    fun copySelectionToClipboard(): Boolean {
         val publisher = session?.publisher ?: return false
         val selectedText =
             publisher.readCurrent { cache ->
@@ -623,7 +623,7 @@ class TerminalSwingTerminal(
         return true
     }
 
-    private fun pasteClipboardText(): Boolean {
+    fun pasteClipboardText(): Boolean {
         val text = hostServices.clipboardHandler.readText() ?: return false
         if (text.isEmpty()) return false
         session?.encodePaste(TerminalPasteEvent(text))

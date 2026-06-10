@@ -52,6 +52,7 @@ internal class LatticeTerminalPane private constructor(
         fun create(
             tab: TerminalWorkspaceTab,
             settings: StandaloneTerminalSettings,
+            onContextMenu: (LatticeTerminalPane, Int, Int) -> Unit,
         ): LatticeTerminalPane {
             val scrollbar = JScrollBar(Adjustable.VERTICAL)
             val scrollbarAdapter = TerminalScrollbarAdapter(scrollbar)
@@ -68,13 +69,31 @@ internal class LatticeTerminalPane private constructor(
 
             terminal.bind(tab.session)
 
-            return LatticeTerminalPane(
-                tab = tab,
-                terminal = terminal,
-                component = terminalPanel(terminal, scrollbar),
-            ).also {
-                tab.session.notifyRenderDirty()
-            }
+            val pane =
+                LatticeTerminalPane(
+                    tab = tab,
+                    terminal = terminal,
+                    component = terminalPanel(terminal, scrollbar),
+                )
+
+            terminal.addMouseListener(
+                object : java.awt.event.MouseAdapter() {
+                    override fun mousePressed(e: java.awt.event.MouseEvent) {
+                        if (e.isPopupTrigger) {
+                            onContextMenu(pane, e.x, e.y)
+                        }
+                    }
+
+                    override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                        if (e.isPopupTrigger) {
+                            onContextMenu(pane, e.x, e.y)
+                        }
+                    }
+                },
+            )
+
+            tab.session.notifyRenderDirty()
+            return pane
         }
 
         private fun terminalPanel(
