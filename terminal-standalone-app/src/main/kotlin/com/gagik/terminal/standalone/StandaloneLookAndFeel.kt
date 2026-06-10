@@ -17,7 +17,7 @@ package com.gagik.terminal.standalone
 
 import com.formdev.flatlaf.FlatDarkLaf
 import com.formdev.flatlaf.FlatLaf
-import java.awt.Color
+import com.gagik.terminal.standalone.ui.LatticeChrome
 import java.awt.Insets
 import javax.swing.JDialog
 import javax.swing.JFrame
@@ -45,19 +45,32 @@ internal object StandaloneLookAndFeel {
         UIManager.put("Component.arc", 8)
         UIManager.put("Component.focusWidth", 1)
         UIManager.put("Component.innerFocusWidth", 0)
-        UIManager.put("Button.arc", 8)
+        UIManager.put("Button.arc", 7)
         UIManager.put("CheckBox.arc", 5)
+        UIManager.put("Button.background", LatticeChrome.CONTROL_BACKGROUND)
+        UIManager.put("Button.hoverBackground", LatticeChrome.CONTROL_HOVER)
+        UIManager.put("Button.pressedBackground", LatticeChrome.CONTROL_PRESSED)
+        UIManager.put("Button.foreground", LatticeChrome.TITLE_FOREGROUND)
+        UIManager.put("Panel.background", LatticeChrome.SURFACE)
         UIManager.put("PopupMenu.borderInsets", Insets(6, 6, 6, 6))
-        UIManager.put("MenuBar.background", Color(0x181C22))
-        UIManager.put("MenuBar.foreground", Color(0xD7DEE8))
-        UIManager.put("MenuItem.selectionBackground", Color(0x263241))
-        UIManager.put("MenuItem.selectionForeground", Color(0xFFFFFF))
+        UIManager.put("PopupMenu.background", LatticeChrome.POPUP_BACKGROUND)
+        UIManager.put("MenuItem.selectionBackground", LatticeChrome.CONTROL_HOVER)
+        UIManager.put("MenuItem.selectionForeground", LatticeChrome.TITLE_FOREGROUND)
+        UIManager.put("Separator.foreground", LatticeChrome.BORDER)
         UIManager.put("ScrollBar.showButtons", false)
         UIManager.put("ScrollBar.width", 12)
+        UIManager.put("TabbedPane.background", LatticeChrome.TAB_BAR_BACKGROUND)
+        UIManager.put("TabbedPane.contentAreaColor", LatticeChrome.TERMINAL_BACKGROUND)
+        UIManager.put("TabbedPane.focusColor", LatticeChrome.TAB_SELECTED)
+        UIManager.put("TabbedPane.foreground", LatticeChrome.TEXT_MUTED)
+        UIManager.put("TabbedPane.hoverColor", LatticeChrome.TAB_HOVER)
+        UIManager.put("TabbedPane.underlineColor", LatticeChrome.ACCENT)
+        UIManager.put("TabbedPane.selectedBackground", LatticeChrome.TAB_SELECTED)
+        UIManager.put("TabbedPane.selectedForeground", LatticeChrome.TITLE_FOREGROUND)
         UIManager.put("TitlePane.unifiedBackground", true)
-        UIManager.put("TitlePane.background", Color(0x181C22))
-        UIManager.put("TitlePane.foreground", Color(0xD7DEE8))
-        UIManager.put("TitlePane.inactiveBackground", Color(0x15181D))
-        UIManager.put("TitlePane.inactiveForeground", Color(0x87909C))
+        UIManager.put("TitlePane.background", LatticeChrome.TOP_BAR_BACKGROUND)
+        UIManager.put("TitlePane.foreground", LatticeChrome.TITLE_FOREGROUND)
+        UIManager.put("TitlePane.inactiveBackground", LatticeChrome.TOP_BAR_BACKGROUND)
+        UIManager.put("TitlePane.inactiveForeground", LatticeChrome.TEXT_MUTED)
     }
 }

@@ -66,6 +66,12 @@ internal class LatticeTabManager(
 
         tabs += pane
         tabPane.addTab(profile.displayName, pane.component)
+        tabPane.setTabComponentAt(
+            tabs.lastIndex,
+            LatticeTabComponent(profile.displayName) {
+                closePane(pane)
+            },
+        )
         tabPane.selectedIndex = tabs.lastIndex
         updateFrameTitleFromSelection()
         pane.requestFocus()
@@ -85,9 +91,10 @@ internal class LatticeTabManager(
     }
 
     fun reloadAllPanes() {
+        val palette = settings.current().palette
         var index = 0
         while (index < tabs.size) {
-            tabs[index].reloadSettings()
+            tabs[index].reloadSettings(palette)
             index++
         }
     }
@@ -98,6 +105,11 @@ internal class LatticeTabManager(
         pane.close()
         updateFrameTitleFromSelection()
         selectedPane?.requestFocus()
+    }
+
+    private fun closePane(pane: LatticeTerminalPane) {
+        val index = tabs.indexOf(pane)
+        if (index >= 0) closeTabAt(index)
     }
 
     private fun tabEventListener(profile: StandaloneTerminalProfile): TerminalPtyEventListener =
@@ -136,6 +148,7 @@ internal class LatticeTabManager(
         while (index < tabs.size) {
             if (tabs[index].session === session) {
                 tabPane.setTitleAt(index, title)
+                (tabPane.getTabComponentAt(index) as? LatticeTabComponent)?.title = title
                 if (index == tabPane.selectedIndex) {
                     frame.title = title
                 }

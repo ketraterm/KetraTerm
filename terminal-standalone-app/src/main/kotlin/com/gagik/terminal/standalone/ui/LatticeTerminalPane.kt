@@ -18,6 +18,7 @@ package com.gagik.terminal.standalone.ui
 import com.gagik.terminal.pty.TerminalPtyEventListener
 import com.gagik.terminal.pty.TerminalPtyOptions
 import com.gagik.terminal.pty.TerminalPtySessions
+import com.gagik.terminal.render.api.TerminalColorPalette
 import com.gagik.terminal.session.TerminalSession
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
 import com.gagik.terminal.standalone.profile.StandaloneTerminalProfile
@@ -26,10 +27,8 @@ import com.gagik.terminal.ui.swing.api.TerminalSwingTerminal
 import java.awt.Adjustable
 import java.awt.BorderLayout
 import java.nio.file.Path
-import javax.swing.BorderFactory
 import javax.swing.JPanel
 import javax.swing.JScrollBar
-import javax.swing.border.CompoundBorder
 import javax.swing.border.EmptyBorder
 
 /**
@@ -49,8 +48,9 @@ internal class LatticeTerminalPane private constructor(
         terminal.requestFocusInWindow()
     }
 
-    fun reloadSettings() {
+    fun reloadSettings(palette: TerminalColorPalette) {
         terminal.reloadSettings()
+        session.setThemePalette(palette)
         session.notifyRenderDirty()
     }
 
@@ -108,12 +108,9 @@ internal class LatticeTerminalPane private constructor(
             scrollbar: JScrollBar,
         ): JPanel =
             JPanel(BorderLayout()).apply {
-                background = LatticeChrome.SURFACE
-                border =
-                    CompoundBorder(
-                        EmptyBorder(10, 12, 12, 12),
-                        BorderFactory.createLineBorder(LatticeChrome.BORDER),
-                    )
+                background = LatticeChrome.TERMINAL_BACKGROUND
+                border = EmptyBorder(6, 10, 10, 10)
+                terminal.border = null
                 add(terminal, BorderLayout.CENTER)
                 add(scrollbar, BorderLayout.EAST)
             }

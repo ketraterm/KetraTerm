@@ -19,6 +19,7 @@ import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
 import com.gagik.terminal.standalone.profile.StandaloneTerminalProfile
 import java.awt.BorderLayout
 import java.awt.Dimension
+import java.awt.Insets
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import javax.swing.*
@@ -37,14 +38,20 @@ internal class LatticeWindowFactory(
         val frame =
             JFrame(LatticeChrome.APP_TITLE).apply {
                 defaultCloseOperation = WindowConstants.DISPOSE_ON_CLOSE
-                contentPane = windowPanel()
                 background = LatticeChrome.SURFACE
                 minimumSize = Dimension(720, 420)
-                rootPane.putClientProperty("JRootPane.titleBarBackground", LatticeChrome.SURFACE_RAISED)
+                rootPane.putClientProperty("JRootPane.titleBarBackground", LatticeChrome.TOP_BAR_BACKGROUND)
                 rootPane.putClientProperty("JRootPane.titleBarForeground", LatticeChrome.TITLE_FOREGROUND)
             }
         val tabManager = LatticeTabManager(frame, tabPane, settings)
-        frame.jMenuBar = LatticeMenuBarFactory(settings, tabManager, profiles).create()
+        frame.contentPane =
+            windowPanel(
+                LatticeCommandBarFactory(
+                    settings = settings,
+                    tabManager = tabManager,
+                    profiles = profiles,
+                ).create(),
+            )
         frame.addWindowListener(
             object : WindowAdapter() {
                 override fun windowClosed(event: WindowEvent) {
@@ -55,15 +62,29 @@ internal class LatticeWindowFactory(
         return LatticeWindow(frame, tabManager)
     }
 
-    private fun windowPanel(): JPanel =
+    private fun windowPanel(commandBar: JComponent): JPanel =
         JPanel(BorderLayout()).apply {
             background = LatticeChrome.SURFACE
             border = EmptyBorder(0, 0, 0, 0)
-            tabPane.background = LatticeChrome.SURFACE
-            tabPane.foreground = LatticeChrome.TITLE_FOREGROUND
-            tabPane.isFocusable = false
+            configureTabPane()
+            add(commandBar, BorderLayout.NORTH)
             add(tabPane, BorderLayout.CENTER)
         }
+
+    private fun configureTabPane() {
+        tabPane.background = LatticeChrome.TAB_BAR_BACKGROUND
+        tabPane.foreground = LatticeChrome.TEXT_MUTED
+        tabPane.isFocusable = false
+        tabPane.tabLayoutPolicy = JTabbedPane.SCROLL_TAB_LAYOUT
+        tabPane.putClientProperty("JTabbedPane.tabType", "card")
+        tabPane.putClientProperty("JTabbedPane.hasFullBorder", false)
+        tabPane.putClientProperty("JTabbedPane.showTabSeparators", false)
+        tabPane.putClientProperty("JTabbedPane.tabAreaInsets", Insets(5, 8, 0, 8))
+        tabPane.putClientProperty("JTabbedPane.tabInsets", Insets(7, 12, 7, 10))
+        tabPane.putClientProperty("JTabbedPane.minimumTabWidth", 132)
+        tabPane.putClientProperty("JTabbedPane.maximumTabWidth", 220)
+        tabPane.putClientProperty("JTabbedPane.scrollButtonsPolicy", "asNeeded")
+    }
 }
 
 /**
