@@ -16,7 +16,7 @@
 package com.gagik.terminal.standalone.ui
 
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
-import com.gagik.terminal.standalone.profile.StandaloneTerminalProfile
+import com.gagik.terminal.workspace.TerminalProfile
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Insets
@@ -30,7 +30,7 @@ import javax.swing.border.EmptyBorder
  */
 internal class LatticeWindowFactory(
     private val settings: StandaloneTerminalSettings,
-    private val profiles: List<StandaloneTerminalProfile>,
+    private val profiles: List<TerminalProfile>,
 ) {
     private val tabPane = JTabbedPane()
 

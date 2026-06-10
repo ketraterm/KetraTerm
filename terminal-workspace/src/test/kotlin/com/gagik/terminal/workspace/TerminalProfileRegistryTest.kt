@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.standalone.profile
+package com.gagik.terminal.workspace
 
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class StandaloneTerminalProfileRegistryTest {
+class TerminalProfileRegistryTest {
     @Test
     fun windowsProfilesPreferWindowsPowerShellThenPowerShellThenCommandPrompt() {
         val registry =
-            StandaloneTerminalProfileRegistry(
+            TerminalProfileRegistry(
                 osName = "Windows 11",
                 environment =
                     mapOf(
@@ -50,7 +50,7 @@ class StandaloneTerminalProfileRegistryTest {
     @Test
     fun commandLineArgumentsBecomeOneOffInitialProfile() {
         val registry =
-            StandaloneTerminalProfileRegistry(
+            TerminalProfileRegistry(
                 osName = "Linux",
                 environment = emptyMap(),
             )
@@ -65,7 +65,7 @@ class StandaloneTerminalProfileRegistryTest {
     @Test
     fun nonWindowsRegistryExposesPortableDefaultShellProfile() {
         val registry =
-            StandaloneTerminalProfileRegistry(
+            TerminalProfileRegistry(
                 osName = "Linux",
                 environment = emptyMap(),
             )

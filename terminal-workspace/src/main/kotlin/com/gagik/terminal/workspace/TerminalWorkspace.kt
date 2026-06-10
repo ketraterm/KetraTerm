@@ -1,0 +1,280 @@
+/*
+ * Copyright 2026 Gagik Sargsyan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.gagik.terminal.workspace
+
+import com.gagik.terminal.pty.TerminalPtyEventListener
+import com.gagik.terminal.pty.TerminalPtyOptions
+import com.gagik.terminal.pty.TerminalPtySessions
+import com.gagik.terminal.render.api.TerminalColorPalette
+import com.gagik.terminal.session.TerminalSession
+import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicInteger
+
+/**
+ * Host-neutral workspace that owns local terminal tabs and sessions.
+ *
+ * UI products adapt this model to visual containers such as Swing tabs or IDE
+ * tool-window contents. This class does not know about UI widgets, painting,
+ * input events, or platform actions.
+ */
+class TerminalWorkspace(
+    private val listener: TerminalWorkspaceListener = TerminalWorkspaceListener.NONE,
+) : AutoCloseable {
+    private val tabs = ArrayList<TerminalWorkspaceTab>(INITIAL_TAB_CAPACITY)
+    private val nextTabNumber = AtomicInteger(1)
+    private var selectedTabId: String? = null
+
+    /**
+     * Returns a stable snapshot of currently open tabs.
+     */
+    fun tabSnapshot(): List<TerminalWorkspaceTab> = tabs.toList()
+
+    /**
+     * Returns the currently selected tab, or `null` when no tabs are open.
+     */
+    fun selectedTab(): TerminalWorkspaceTab? = selectedTabId?.let(::tabById)
+
+    /**
+     * Opens a new local PTY-backed tab.
+     *
+     * @param profile launch profile for the new process.
+     * @param options initial session dimensions and terminal policy.
+     * @return opened workspace tab.
+     */
+    fun openTab(
+        profile: TerminalProfile,
+        options: TerminalWorkspaceOpenOptions,
+    ): TerminalWorkspaceTab {
+        val id = "terminal-${nextTabNumber.getAndIncrement()}"
+        val tabEventListener = tabEventListener(id, profile)
+        val session =
+            TerminalPtySessions.start(
+                TerminalPtyOptions(
+                    command = profile.command,
+                    environment = TerminalPtyOptions.defaultEnvironment() + profile.environment,
+                    workingDirectory = profile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY,
+                    columns = options.columns,
+                    rows = options.rows,
+                    treatAmbiguousAsWide = options.treatAmbiguousAsWide,
+                    eventListener = tabEventListener,
+                ),
+            )
+        val tab =
+            TerminalWorkspaceTab(
+                id = id,
+                profile = profile,
+                title = profile.displayName,
+                session = session,
+            )
+        tabs += tab
+        selectTab(id)
+        listener.tabOpened(tab)
+        return tab
+    }
+
+    /**
+     * Selects an existing tab.
+     *
+     * @param id tab id.
+     */
+    fun selectTab(id: String) {
+        require(tabById(id) != null) { "unknown terminal tab id: $id" }
+        selectedTabId = id
+        listener.tabSelected(id)
+    }
+
+    /**
+     * Closes an existing tab and its session.
+     *
+     * @param id tab id.
+     */
+    fun closeTab(id: String) {
+        val index = tabs.indexOfFirst { it.id == id }
+        if (index < 0) return
+        val tab = tabs.removeAt(index)
+        tab.session.close()
+        if (selectedTabId == id) {
+            selectedTabId = tabs.getOrNull(index.coerceAtMost(tabs.lastIndex))?.id
+        }
+        listener.tabClosed(id)
+        selectedTabId?.let(listener::tabSelected)
+    }
+
+    /**
+     * Applies host settings that are shared across all open sessions.
+     *
+     * @param palette terminal color palette.
+     * @param treatAmbiguousAsWide width policy for future writes.
+     */
+    fun applySettings(
+        palette: TerminalColorPalette,
+        treatAmbiguousAsWide: Boolean,
+    ) {
+        for (tab in tabs) {
+            tab.session.setThemePalette(palette)
+            tab.session.setTreatAmbiguousAsWide(treatAmbiguousAsWide)
+            tab.session.notifyRenderDirty()
+        }
+    }
+
+    override fun close() {
+        while (tabs.isNotEmpty()) {
+            closeTab(tabs.last().id)
+        }
+    }
+
+    private fun tabEventListener(
+        tabId: String,
+        profile: TerminalProfile,
+    ): TerminalPtyEventListener =
+        object : TerminalPtyEventListener {
+            override fun bell(session: TerminalSession) {
+                tabBySession(session)?.let { listener.bell(it) }
+            }
+
+            override fun iconTitleChanged(
+                session: TerminalSession,
+                title: String,
+            ) = Unit
+
+            override fun windowTitleChanged(
+                session: TerminalSession,
+                title: String,
+            ) {
+                val nextTitle = title.ifBlank { profile.displayName }
+                val tab = tabById(tabId) ?: return
+                tab.title = nextTitle
+                listener.titleChanged(tab, nextTitle)
+            }
+
+            override fun listenerFailed(
+                session: TerminalSession,
+                exception: Exception,
+            ) {
+                tabBySession(session)?.let { listener.listenerFailed(it, exception) }
+            }
+        }
+
+    private fun tabById(id: String): TerminalWorkspaceTab? = tabs.firstOrNull { it.id == id }
+
+    private fun tabBySession(session: TerminalSession): TerminalWorkspaceTab? = tabs.firstOrNull { it.session === session }
+
+    private companion object {
+        private const val INITIAL_TAB_CAPACITY = 4
+        private val DEFAULT_WORKING_DIRECTORY: Path = Path.of(System.getProperty("user.home"))
+    }
+}
+
+/**
+ * Initial terminal options for a workspace tab.
+ *
+ * @property columns initial terminal width in cells.
+ * @property rows initial terminal height in rows.
+ * @property treatAmbiguousAsWide width policy for future writes.
+ */
+data class TerminalWorkspaceOpenOptions(
+    val columns: Int,
+    val rows: Int,
+    val treatAmbiguousAsWide: Boolean,
+) {
+    init {
+        require(columns > 0) { "columns must be > 0, was $columns" }
+        require(rows > 0) { "rows must be > 0, was $rows" }
+    }
+}
+
+/**
+ * Open workspace tab and its running session.
+ *
+ * @property id stable tab id.
+ * @property profile launch profile used to create this tab.
+ * @property title current host-visible tab title.
+ * @property session running terminal session.
+ */
+class TerminalWorkspaceTab internal constructor(
+    val id: String,
+    val profile: TerminalProfile,
+    title: String,
+    val session: TerminalSession,
+) {
+    /**
+     * Current host-visible title for this tab.
+     */
+    var title: String = title
+        internal set
+}
+
+/**
+ * Host-neutral workspace events.
+ */
+interface TerminalWorkspaceListener {
+    /**
+     * Called after a tab is opened and selected.
+     *
+     * @param tab opened tab.
+     */
+    fun tabOpened(tab: TerminalWorkspaceTab) = Unit
+
+    /**
+     * Called after workspace selection changes.
+     *
+     * @param tabId selected tab id.
+     */
+    fun tabSelected(tabId: String) = Unit
+
+    /**
+     * Called after a tab is closed.
+     *
+     * @param tabId closed tab id.
+     */
+    fun tabClosed(tabId: String) = Unit
+
+    /**
+     * Called when a tab emits a terminal bell event.
+     *
+     * @param tab tab that emitted the bell.
+     */
+    fun bell(tab: TerminalWorkspaceTab) = Unit
+
+    /**
+     * Called when a tab title changes.
+     *
+     * @param tab tab whose title changed.
+     * @param title new title.
+     */
+    fun titleChanged(
+        tab: TerminalWorkspaceTab,
+        title: String,
+    ) = Unit
+
+    /**
+     * Called when the PTY event bridge reports a listener failure.
+     *
+     * @param tab tab associated with the failure.
+     * @param exception failure raised by the listener bridge.
+     */
+    fun listenerFailed(
+        tab: TerminalWorkspaceTab,
+        exception: Exception,
+    ) = Unit
+
+    companion object {
+        /**
+         * Listener implementation that ignores every event.
+         */
+        val NONE: TerminalWorkspaceListener = object : TerminalWorkspaceListener {}
+    }
+}

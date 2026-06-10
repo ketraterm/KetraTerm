@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.standalone.profile
+package com.gagik.terminal.workspace
 
 import com.gagik.terminal.pty.TerminalPtyOptions
 import java.io.File
@@ -22,12 +22,18 @@ import java.nio.file.Path
 import java.util.Locale
 
 /**
- * Discovers built-in standalone launch profiles.
+ * Discovers built-in local terminal launch profiles.
  *
- * Discovery is intentionally startup-only host work. Render and input hot paths
- * never consult this registry.
+ * Discovery is host-neutral startup work. Render and input hot paths never
+ * consult this registry, and UI products may layer their own persisted profile
+ * sources on top of these defaults.
+ *
+ * @property osName operating system name used for platform profile selection.
+ * @property environment process environment used for path and shell discovery.
+ * @property pathSeparator platform path separator.
+ * @property executableExists predicate used to verify discovered executables.
  */
-internal class StandaloneTerminalProfileRegistry(
+class TerminalProfileRegistry(
     private val osName: String = System.getProperty("os.name"),
     private val environment: Map<String, String> = System.getenv(),
     private val pathSeparator: String = File.pathSeparator,
@@ -36,12 +42,12 @@ internal class StandaloneTerminalProfileRegistry(
     /**
      * Returns built-in profiles in menu/default preference order.
      */
-    fun availableProfiles(): List<StandaloneTerminalProfile> =
+    fun availableProfiles(): List<TerminalProfile> =
         if (isWindows()) {
             windowsProfiles()
         } else {
             listOf(
-                StandaloneTerminalProfile(
+                TerminalProfile(
                     id = "default-shell",
                     displayName = "Default Shell",
                     command = TerminalPtyOptions.defaultCommand(),
@@ -52,10 +58,13 @@ internal class StandaloneTerminalProfileRegistry(
     /**
      * Returns the initial profile. Explicit command-line arguments are preserved
      * as a one-off custom profile so app startup remains scriptable.
+     *
+     * @param args command-line arguments passed by the product shell.
+     * @return initial terminal launch profile.
      */
-    fun initialProfile(args: List<String>): StandaloneTerminalProfile =
+    fun initialProfile(args: List<String>): TerminalProfile =
         if (args.isNotEmpty()) {
-            StandaloneTerminalProfile(
+            TerminalProfile(
                 id = "command-line",
                 displayName = args.first(),
                 command = args,
@@ -64,10 +73,10 @@ internal class StandaloneTerminalProfileRegistry(
             availableProfiles().first()
         }
 
-    private fun windowsProfiles(): List<StandaloneTerminalProfile> {
-        val profiles = ArrayList<StandaloneTerminalProfile>(WINDOWS_PROFILE_CAPACITY)
+    private fun windowsProfiles(): List<TerminalProfile> {
+        val profiles = ArrayList<TerminalProfile>(WINDOWS_PROFILE_CAPACITY)
         profiles +=
-            StandaloneTerminalProfile(
+            TerminalProfile(
                 id = "windows-powershell",
                 displayName = "Windows PowerShell",
                 command = windowsPowerShellCommand(),
@@ -76,7 +85,7 @@ internal class StandaloneTerminalProfileRegistry(
         val pwsh = executableOnPath("pwsh.exe")
         if (pwsh != null) {
             profiles +=
-                StandaloneTerminalProfile(
+                TerminalProfile(
                     id = "powershell",
                     displayName = "PowerShell",
                     command = listOf(pwsh.toString(), "-NoLogo"),
@@ -84,7 +93,7 @@ internal class StandaloneTerminalProfileRegistry(
         }
 
         profiles +=
-            StandaloneTerminalProfile(
+            TerminalProfile(
                 id = "cmd",
                 displayName = "Command Prompt",
                 command = listOf(commandPromptExecutable()),

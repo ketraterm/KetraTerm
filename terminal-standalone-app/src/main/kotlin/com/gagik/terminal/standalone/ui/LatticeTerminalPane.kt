@@ -15,18 +15,12 @@
  */
 package com.gagik.terminal.standalone.ui
 
-import com.gagik.terminal.pty.TerminalPtyEventListener
-import com.gagik.terminal.pty.TerminalPtyOptions
-import com.gagik.terminal.pty.TerminalPtySessions
-import com.gagik.terminal.render.api.TerminalColorPalette
-import com.gagik.terminal.session.TerminalSession
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
-import com.gagik.terminal.standalone.profile.StandaloneTerminalProfile
 import com.gagik.terminal.ui.swing.api.TerminalSwingHostServices
 import com.gagik.terminal.ui.swing.api.TerminalSwingTerminal
+import com.gagik.terminal.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
-import java.nio.file.Path
 import javax.swing.JPanel
 import javax.swing.JScrollBar
 import javax.swing.border.EmptyBorder
@@ -34,38 +28,31 @@ import javax.swing.border.EmptyBorder
 /**
  * Owns one terminal pane in the standalone host.
  *
- * A pane is the lifecycle unit behind tabs and future split leaves: it contains
- * one reusable Swing terminal component, one local PTY-backed session, and
- * pane-local viewport chrome such as the scrollbar.
+ * A pane binds a workspace tab's session to one reusable Swing terminal
+ * component and owns pane-local viewport chrome such as the scrollbar.
  */
 internal class LatticeTerminalPane private constructor(
-    val profile: StandaloneTerminalProfile,
+    val tab: TerminalWorkspaceTab,
     val terminal: TerminalSwingTerminal,
-    val session: TerminalSession,
     val component: JPanel,
 ) {
     fun requestFocus() {
         terminal.requestFocusInWindow()
     }
 
-    fun reloadSettings(palette: TerminalColorPalette) {
+    fun reloadSettings() {
         terminal.reloadSettings()
-        session.setThemePalette(palette)
-        session.notifyRenderDirty()
     }
 
     fun close() {
         terminal.unbind()
-        session.close()
     }
 
     internal companion object {
-        fun start(
-            profile: StandaloneTerminalProfile,
+        fun create(
+            tab: TerminalWorkspaceTab,
             settings: StandaloneTerminalSettings,
-            eventListener: TerminalPtyEventListener,
         ): LatticeTerminalPane {
-            val settingsSnapshot = settings.current()
             val scrollbar = JScrollBar(Adjustable.VERTICAL)
             val scrollbarAdapter = TerminalScrollbarAdapter(scrollbar)
             val terminal =
@@ -79,27 +66,14 @@ internal class LatticeTerminalPane private constructor(
             scrollbarAdapter.attach(terminal)
             configureScrollbar(scrollbar)
 
-            val session =
-                TerminalPtySessions.start(
-                    TerminalPtyOptions(
-                        command = profile.command,
-                        environment = TerminalPtyOptions.defaultEnvironment() + profile.environment,
-                        workingDirectory = profile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY,
-                        columns = settingsSnapshot.columns,
-                        rows = settingsSnapshot.rows,
-                        treatAmbiguousAsWide = settingsSnapshot.treatAmbiguousAsWide,
-                        eventListener = eventListener,
-                    ),
-                )
-            terminal.bind(session)
+            terminal.bind(tab.session)
 
             return LatticeTerminalPane(
-                profile = profile,
+                tab = tab,
                 terminal = terminal,
-                session = session,
                 component = terminalPanel(terminal, scrollbar),
             ).also {
-                session.notifyRenderDirty()
+                tab.session.notifyRenderDirty()
             }
         }
 
@@ -123,7 +97,5 @@ internal class LatticeTerminalPane private constructor(
             scrollbar.isVisible = false
             scrollbar.isFocusable = false
         }
-
-        private val DEFAULT_WORKING_DIRECTORY: Path = Path.of(System.getProperty("user.home"))
     }
 }

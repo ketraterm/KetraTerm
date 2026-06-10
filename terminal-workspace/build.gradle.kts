@@ -15,31 +15,22 @@
  */
 
 plugins {
-    application
     kotlin("jvm")
 }
 
 group = "com.gagik"
 version = "1.0-SNAPSHOT"
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
-    implementation("com.formdev:flatlaf:3.6.1")
-    implementation(project(":terminal-ui-swing"))
-    implementation(project(":terminal-workspace"))
+    api(project(":terminal-session"))
+    implementation(project(":terminal-pty"))
+    implementation(project(":terminal-render-api"))
 
     testImplementation(kotlin("test"))
 }
 
 kotlin {
     jvmToolchain(21)
-}
-
-application {
-    mainClass.set("com.gagik.terminal.standalone.LatticeStandaloneAppKt")
 }
 
 tasks.test {

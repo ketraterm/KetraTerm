@@ -16,8 +16,8 @@
 package com.gagik.terminal.standalone.ui
 
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
-import com.gagik.terminal.standalone.profile.StandaloneTerminalProfile
 import com.gagik.terminal.ui.swing.settings.TerminalTheme
+import com.gagik.terminal.workspace.TerminalProfile
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
@@ -40,7 +40,7 @@ import javax.swing.border.EmptyBorder
 internal class LatticeCommandBarFactory(
     private val settings: StandaloneTerminalSettings,
     private val tabManager: LatticeTabManager,
-    private val profiles: List<StandaloneTerminalProfile>,
+    private val profiles: List<TerminalProfile>,
 ) {
     fun create(): JComponent =
         JPanel(BorderLayout()).apply {

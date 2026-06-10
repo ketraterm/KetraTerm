@@ -13,19 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.standalone.profile
+package com.gagik.terminal.workspace
 
 import java.nio.file.Path
 
 /**
- * Host-owned terminal launch profile.
+ * Host-neutral terminal launch profile.
  *
- * A profile describes the process contract for one terminal pane. It deliberately
- * stays outside reusable Swing UI and terminal core modules because shell
- * discovery, working directories, and user-facing names are standalone host
- * policy.
+ * A profile describes the process contract for one terminal workspace tab.
+ * Product shells such as the standalone app and IntelliJ plugin may choose
+ * their own presentation, but should share this process vocabulary to avoid
+ * divergent shell discovery behavior.
+ *
+ * @property id stable profile identifier.
+ * @property displayName user-facing profile name.
+ * @property command command and arguments passed to the local PTY child process.
+ * @property environment environment entries layered on top of PTY defaults.
+ * @property workingDirectory initial process working directory, or `null` for
+ * the platform/user default.
  */
-internal data class StandaloneTerminalProfile(
+data class TerminalProfile(
     val id: String,
     val displayName: String,
     val command: List<String>,

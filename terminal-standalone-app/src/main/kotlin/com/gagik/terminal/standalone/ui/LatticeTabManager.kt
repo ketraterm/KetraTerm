@@ -15,10 +15,12 @@
  */
 package com.gagik.terminal.standalone.ui
 
-import com.gagik.terminal.pty.TerminalPtyEventListener
-import com.gagik.terminal.session.TerminalSession
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
-import com.gagik.terminal.standalone.profile.StandaloneTerminalProfile
+import com.gagik.terminal.workspace.TerminalProfile
+import com.gagik.terminal.workspace.TerminalWorkspace
+import com.gagik.terminal.workspace.TerminalWorkspaceListener
+import com.gagik.terminal.workspace.TerminalWorkspaceOpenOptions
+import com.gagik.terminal.workspace.TerminalWorkspaceTab
 import javax.swing.JFrame
 import javax.swing.JOptionPane
 import javax.swing.JTabbedPane
@@ -37,9 +39,15 @@ internal class LatticeTabManager(
     private val settings: StandaloneTerminalSettings,
 ) {
     private val tabs = ArrayList<LatticeTerminalPane>(INITIAL_TAB_CAPACITY)
+    private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
 
     init {
         tabPane.addChangeListener {
+            selectedPane?.let { pane ->
+                if (workspace.selectedTab()?.id != pane.tab.id) {
+                    workspace.selectTab(pane.tab.id)
+                }
+            }
             updateFrameTitleFromSelection()
             selectedPane?.requestFocus()
         }
@@ -51,19 +59,26 @@ internal class LatticeTabManager(
             return if (selectedIndex in tabs.indices) tabs[selectedIndex] else null
         }
 
-    fun openTab(profile: StandaloneTerminalProfile): Boolean {
-        val pane =
+    fun openTab(profile: TerminalProfile): Boolean {
+        val workspaceTab =
             try {
-                LatticeTerminalPane.start(
+                workspace.openTab(
                     profile = profile,
-                    settings = settings,
-                    eventListener = tabEventListener(profile),
+                    options =
+                        settings.current().let { snapshot ->
+                            TerminalWorkspaceOpenOptions(
+                                columns = snapshot.columns,
+                                rows = snapshot.rows,
+                                treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
+                            )
+                        },
                 )
             } catch (exception: Exception) {
                 showStartError(profile, exception)
                 return false
             }
 
+        val pane = LatticeTerminalPane.create(workspaceTab, settings)
         tabs += pane
         tabPane.addTab(profile.displayName, pane.component)
         tabPane.setTabComponentAt(
@@ -88,21 +103,27 @@ internal class LatticeTabManager(
         while (tabs.isNotEmpty()) {
             closeTabAt(tabs.lastIndex)
         }
+        workspace.close()
     }
 
     fun reloadAllPanes() {
-        val palette = settings.current().palette
+        val snapshot = settings.current()
         var index = 0
         while (index < tabs.size) {
-            tabs[index].reloadSettings(palette)
+            tabs[index].reloadSettings()
             index++
         }
+        workspace.applySettings(
+            palette = snapshot.palette,
+            treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
+        )
     }
 
     private fun closeTabAt(index: Int) {
         val pane = tabs.removeAt(index)
         tabPane.removeTabAt(index)
         pane.close()
+        workspace.closeTab(pane.tab.id)
         updateFrameTitleFromSelection()
         selectedPane?.requestFocus()
     }
@@ -112,41 +133,13 @@ internal class LatticeTabManager(
         if (index >= 0) closeTabAt(index)
     }
 
-    private fun tabEventListener(profile: StandaloneTerminalProfile): TerminalPtyEventListener =
-        object : TerminalPtyEventListener {
-            override fun bell(session: TerminalSession) {
-                SwingUtilities.invokeLater {
-                    frame.toolkit.beep()
-                }
-            }
-
-            override fun iconTitleChanged(
-                session: TerminalSession,
-                title: String,
-            ) = Unit
-
-            override fun windowTitleChanged(
-                session: TerminalSession,
-                title: String,
-            ) {
-                SwingUtilities.invokeLater {
-                    updateTabTitle(session, title.ifBlank { profile.displayName })
-                }
-            }
-
-            override fun listenerFailed(
-                session: TerminalSession,
-                exception: Exception,
-            ) = Unit
-        }
-
     private fun updateTabTitle(
-        session: TerminalSession,
+        tabId: String,
         title: String,
     ) {
         var index = 0
         while (index < tabs.size) {
-            if (tabs[index].session === session) {
+            if (tabs[index].tab.id == tabId) {
                 tabPane.setTitleAt(index, title)
                 (tabPane.getTabComponentAt(index) as? LatticeTabComponent)?.title = title
                 if (index == tabPane.selectedIndex) {
@@ -169,7 +162,7 @@ internal class LatticeTabManager(
     }
 
     private fun showStartError(
-        profile: StandaloneTerminalProfile,
+        profile: TerminalProfile,
         exception: Exception,
     ) {
         JOptionPane.showMessageDialog(
@@ -178,6 +171,23 @@ internal class LatticeTabManager(
             "Unable to start ${profile.displayName}",
             JOptionPane.ERROR_MESSAGE,
         )
+    }
+
+    private inner class StandaloneWorkspaceListener : TerminalWorkspaceListener {
+        override fun bell(tab: TerminalWorkspaceTab) {
+            SwingUtilities.invokeLater {
+                frame.toolkit.beep()
+            }
+        }
+
+        override fun titleChanged(
+            tab: TerminalWorkspaceTab,
+            title: String,
+        ) {
+            SwingUtilities.invokeLater {
+                updateTabTitle(tab.id, title)
+            }
+        }
     }
 
     private companion object {

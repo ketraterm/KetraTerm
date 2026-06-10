@@ -16,8 +16,8 @@
 package com.gagik.terminal.standalone
 
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
-import com.gagik.terminal.standalone.profile.StandaloneTerminalProfileRegistry
 import com.gagik.terminal.standalone.ui.LatticeWindowFactory
+import com.gagik.terminal.workspace.TerminalProfileRegistry
 import javax.swing.SwingUtilities
 
 /**
@@ -34,7 +34,7 @@ private object LatticeStandaloneApp {
         StandaloneLookAndFeel.install()
 
         val settings = StandaloneTerminalSettings()
-        val profileRegistry = StandaloneTerminalProfileRegistry()
+        val profileRegistry = TerminalProfileRegistry()
         val windowFactory = LatticeWindowFactory(settings, profileRegistry.availableProfiles())
         val window = windowFactory.createWindow()
         val frame = window.frame

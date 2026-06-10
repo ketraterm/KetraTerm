@@ -24,6 +24,7 @@
             <option value="$PROJECT_DIR$/terminal-transport-api" />
             <option value="$PROJECT_DIR$/terminal-ui-swing" />
             <option value="$PROJECT_DIR$/terminal-ui-swing-demo" />
+            <option value="$PROJECT_DIR$/terminal-workspace" />
           </set>
         </option>
       </GradleProjectSettings>
