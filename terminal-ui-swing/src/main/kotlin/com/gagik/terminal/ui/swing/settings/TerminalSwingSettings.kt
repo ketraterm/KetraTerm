@@ -49,6 +49,10 @@ import java.util.*
  * linked span currently under Ctrl-hover.
  * @property selectionBackground packed ARGB overlay used for visible terminal
  * selection ranges.
+ * @property searchMatchBackground packed ARGB overlay used for non-active
+ * search result ranges.
+ * @property searchActiveMatchBackground packed ARGB overlay used for the active
+ * search result.
  * @property padding internal margins around the terminal grid in pixels.
  */
 data class TerminalSwingSettings(
@@ -65,6 +69,8 @@ data class TerminalSwingSettings(
     val clipboardShortcuts: TerminalClipboardShortcuts = TerminalClipboardShortcuts.platformDefault(),
     val hyperlinkActivationForeground: Int = DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND,
     val selectionBackground: Int = DEFAULT_SELECTION_BACKGROUND,
+    val searchMatchBackground: Int = DEFAULT_SEARCH_MATCH_BACKGROUND,
+    val searchActiveMatchBackground: Int = DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND,
     val padding: Insets = Insets(12, 12, 12, 12),
 ) {
     init {
@@ -79,6 +85,8 @@ data class TerminalSwingSettings(
         private const val DEFAULT_FONT_SIZE = 16
         private const val DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND = 0xFF4DA3FF.toInt()
         private const val DEFAULT_SELECTION_BACKGROUND = 0x66FFFFFF
+        private const val DEFAULT_SEARCH_MATCH_BACKGROUND = 0x55FFD54F
+        private const val DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND = 0xAAFF8C00.toInt()
         private val preferredDefaultFontFamilies =
             arrayOf(
                 "Cascadia Mono",

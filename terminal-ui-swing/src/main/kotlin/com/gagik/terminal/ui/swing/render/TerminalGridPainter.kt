@@ -20,6 +20,7 @@ import com.gagik.terminal.render.cache.TerminalRenderCache
 import com.gagik.terminal.ui.swing.api.CellSelection
 import com.gagik.terminal.ui.swing.render.cache.AwtColorCache
 import com.gagik.terminal.ui.swing.render.painter.*
+import com.gagik.terminal.ui.swing.search.TerminalSearchViewportHighlights
 import com.gagik.terminal.ui.swing.settings.TerminalSwingMetrics
 import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
 import java.awt.Font
@@ -41,6 +42,7 @@ internal class TerminalGridPainter {
     private val colorCache = AwtColorCache()
     private val backgroundPainter = TerminalBackgroundPainter(colorCache)
     private val selectionPainter = TerminalSelectionPainter(colorCache)
+    private val searchPainter = TerminalSearchPainter(colorCache)
     private val decorationPainter = TerminalDecorationPainter(colorCache)
     private val textPainter = TerminalTextPainter(colorCache, decorationPainter)
     private val cursorPainter = TerminalCursorPainter(colorCache, textPainter)
@@ -72,6 +74,7 @@ internal class TerminalGridPainter {
         textBlinkVisible: Boolean = true,
         contentYOffset: Double = 0.0,
         selection: CellSelection? = null,
+        searchHighlights: TerminalSearchViewportHighlights? = null,
         hoveredHyperlinkId: Int = 0,
         hyperlinkActivationHover: Boolean = false,
     ) {
@@ -98,6 +101,14 @@ internal class TerminalGridPainter {
             var row = firstRow
             while (row < rows) {
                 backgroundPainter.paintRow(g, cache, palette, metrics, row)
+                searchPainter.paint(
+                    g = g,
+                    metrics = metrics,
+                    row = row,
+                    highlights = searchHighlights,
+                    matchBackground = settings.searchMatchBackground,
+                    activeMatchBackground = settings.searchActiveMatchBackground,
+                )
                 selectionPainter.paint(g, cache, metrics, row, selection, settings.selectionBackground)
                 textPainter.paintRow(
                     g = g,

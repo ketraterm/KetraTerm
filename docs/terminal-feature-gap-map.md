@@ -595,6 +595,12 @@ professional emulator needs explicit contracts for it.
   render-cache hyperlink ids outside the paint loop, resolves metadata through
   `TerminalSession`, changes the hover cursor over resolvable links, and opens
   links only through the configured `TerminalHyperlinkHandler`.
+- `DONE(host/ui)`: Swing terminal buffer search is available through
+  Ctrl/Cmd+F and public component methods. It scans retained scrollback plus the
+  live grid from primitive render-cache snapshots, joins soft-wrapped rows for
+  logical-line matching, highlights visible matches through precomputed
+  primitive viewport ranges, scrolls the active match into view, and cycles
+  results with Enter/Shift+Enter or previous/next controls.
 - `DONE(render-api/core/cache/session)`: caller-owned scrollback viewport
   offsets can be requested per render-frame read, clamped by core, copied by
   the primitive render cache, and forwarded through session synchronization.
