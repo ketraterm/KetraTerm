@@ -27,6 +27,7 @@ repositories {
 }
 
 dependencies {
+    implementation("com.formdev:flatlaf:3.6.1")
     implementation(project(":terminal-pty"))
     implementation(project(":terminal-ui-swing"))
 }

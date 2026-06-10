@@ -17,7 +17,9 @@ package com.gagik.terminal.standalone.ui
 
 import java.awt.Dimension
 import java.awt.Graphics
+import java.awt.Graphics2D
 import java.awt.Rectangle
+import java.awt.RenderingHints
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.plaf.basic.BasicScrollBarUI
@@ -47,8 +49,15 @@ internal class LatticeScrollBarUi : BasicScrollBarUI() {
     ) {
         if (!component.isEnabled || thumbBounds.isEmpty) return
 
-        graphics.color = thumbColor
-        graphics.fillRoundRect(
+        val graphics2D = graphics.create() as Graphics2D
+        graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+        graphics2D.color =
+            when {
+                isDragging -> LatticeChrome.SCROLLBAR_THUMB_PRESSED
+                isThumbRollover -> LatticeChrome.SCROLLBAR_THUMB_HOVER
+                else -> thumbColor
+            }
+        graphics2D.fillRoundRect(
             thumbBounds.x + 2,
             thumbBounds.y + 2,
             maxOf(1, thumbBounds.width - 4),
@@ -56,6 +65,7 @@ internal class LatticeScrollBarUi : BasicScrollBarUI() {
             8,
             8,
         )
+        graphics2D.dispose()
     }
 
     override fun createDecreaseButton(orientation: Int): JButton = invisibleButton()

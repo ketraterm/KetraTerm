@@ -19,10 +19,11 @@ import com.gagik.terminal.session.TerminalSession
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
 import com.gagik.terminal.ui.swing.api.TerminalSwingTerminal
 import com.gagik.terminal.ui.swing.settings.TerminalTheme
+import javax.swing.ButtonGroup
 import javax.swing.JCheckBoxMenuItem
 import javax.swing.JMenu
 import javax.swing.JMenuBar
-import javax.swing.JMenuItem
+import javax.swing.JRadioButtonMenuItem
 
 /**
  * Builds standalone application menus and maps menu changes to host settings.
@@ -45,8 +46,10 @@ internal class LatticeMenuBarFactory(
         session: TerminalSession,
     ): JMenu {
         val themeMenu = JMenu("Theme")
+        val themeGroup = ButtonGroup()
         TerminalTheme.entries.forEach { theme ->
-            val item = JMenuItem(theme.displayName())
+            val item = JRadioButtonMenuItem(theme.displayName(), theme == settings.theme)
+            themeGroup.add(item)
             item.addActionListener {
                 settings.theme = theme
                 terminal.reloadSettings()

@@ -24,8 +24,12 @@ import java.awt.Dimension
 internal object LatticeChrome {
     const val APP_TITLE = "Lattice"
     val SURFACE: Color = Color(0x15181D)
-    val BORDER: Color = Color(0x2A3038)
-    val SCROLLBAR_TRACK: Color = Color(0x1B1F25)
-    val SCROLLBAR_THUMB: Color = Color(0x6E7681)
+    val SURFACE_RAISED: Color = Color(0x181C22)
+    val TITLE_FOREGROUND: Color = Color(0xD7DEE8)
+    val BORDER: Color = Color(0x303845)
+    val SCROLLBAR_TRACK: Color = Color(0x15181D)
+    val SCROLLBAR_THUMB: Color = Color(0x657080)
+    val SCROLLBAR_THUMB_HOVER: Color = Color(0x7B8797)
+    val SCROLLBAR_THUMB_PRESSED: Color = Color(0x9AA6B7)
     val SCROLLBAR_SIZE: Dimension = Dimension(12, 1)
 }

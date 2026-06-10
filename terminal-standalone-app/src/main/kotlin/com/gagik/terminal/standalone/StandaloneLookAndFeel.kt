@@ -15,8 +15,13 @@
  */
 package com.gagik.terminal.standalone
 
+import com.formdev.flatlaf.FlatDarkLaf
+import com.formdev.flatlaf.FlatLaf
+import java.awt.Color
+import java.awt.Insets
+import javax.swing.JDialog
+import javax.swing.JFrame
 import javax.swing.UIManager
-import javax.swing.UnsupportedLookAndFeelException
 
 /**
  * Installs the standalone application's Swing look and feel.
@@ -24,11 +29,35 @@ import javax.swing.UnsupportedLookAndFeelException
 internal object StandaloneLookAndFeel {
     fun install() {
         try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
-        } catch (_: ReflectiveOperationException) {
-            // Keep the JDK default rather than failing terminal startup.
-        } catch (_: UnsupportedLookAndFeelException) {
+            System.setProperty("flatlaf.useWindowDecorations", "true")
+            JFrame.setDefaultLookAndFeelDecorated(true)
+            JDialog.setDefaultLookAndFeelDecorated(true)
+
+            FlatDarkLaf.setup()
+            applyDefaults()
+            FlatLaf.updateUI()
+        } catch (_: RuntimeException) {
             // Keep the JDK default rather than failing terminal startup.
         }
+    }
+
+    private fun applyDefaults() {
+        UIManager.put("Component.arc", 8)
+        UIManager.put("Component.focusWidth", 1)
+        UIManager.put("Component.innerFocusWidth", 0)
+        UIManager.put("Button.arc", 8)
+        UIManager.put("CheckBox.arc", 5)
+        UIManager.put("PopupMenu.borderInsets", Insets(6, 6, 6, 6))
+        UIManager.put("MenuBar.background", Color(0x181C22))
+        UIManager.put("MenuBar.foreground", Color(0xD7DEE8))
+        UIManager.put("MenuItem.selectionBackground", Color(0x263241))
+        UIManager.put("MenuItem.selectionForeground", Color(0xFFFFFF))
+        UIManager.put("ScrollBar.showButtons", false)
+        UIManager.put("ScrollBar.width", 12)
+        UIManager.put("TitlePane.unifiedBackground", true)
+        UIManager.put("TitlePane.background", Color(0x181C22))
+        UIManager.put("TitlePane.foreground", Color(0xD7DEE8))
+        UIManager.put("TitlePane.inactiveBackground", Color(0x15181D))
+        UIManager.put("TitlePane.inactiveForeground", Color(0x87909C))
     }
 }

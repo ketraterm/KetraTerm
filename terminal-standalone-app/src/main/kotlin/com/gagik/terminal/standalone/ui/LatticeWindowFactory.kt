@@ -20,9 +20,12 @@ import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
 import com.gagik.terminal.ui.swing.api.TerminalSwingTerminal
 import java.awt.Adjustable
 import java.awt.BorderLayout
+import java.awt.Dimension
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import javax.swing.*
+import javax.swing.border.CompoundBorder
+import javax.swing.border.EmptyBorder
 
 /**
  * Creates and wires the standalone terminal window chrome.
@@ -42,6 +45,9 @@ internal class LatticeWindowFactory(
             defaultCloseOperation = WindowConstants.DISPOSE_ON_CLOSE
             contentPane = terminalPanel(terminal)
             background = LatticeChrome.SURFACE
+            minimumSize = Dimension(720, 420)
+            rootPane.putClientProperty("JRootPane.titleBarBackground", LatticeChrome.SURFACE_RAISED)
+            rootPane.putClientProperty("JRootPane.titleBarForeground", LatticeChrome.TITLE_FOREGROUND)
         }
     }
 
@@ -63,7 +69,11 @@ internal class LatticeWindowFactory(
     private fun terminalPanel(terminal: TerminalSwingTerminal): JPanel =
         JPanel(BorderLayout()).apply {
             background = LatticeChrome.SURFACE
-            border = BorderFactory.createLineBorder(LatticeChrome.BORDER)
+            border =
+                CompoundBorder(
+                    EmptyBorder(10, 12, 12, 12),
+                    BorderFactory.createLineBorder(LatticeChrome.BORDER),
+                )
             add(terminal, BorderLayout.CENTER)
             add(scrollbar, BorderLayout.EAST)
         }
