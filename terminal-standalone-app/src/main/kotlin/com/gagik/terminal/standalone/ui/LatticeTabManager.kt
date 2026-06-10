@@ -17,8 +17,9 @@ package com.gagik.terminal.standalone.ui
 
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
 import com.gagik.terminal.workspace.*
-import java.awt.CardLayout
-import java.awt.Color
+import java.awt.*
+import java.awt.event.InputEvent
+import java.awt.event.KeyEvent
 import javax.swing.JFrame
 import javax.swing.JOptionPane
 import javax.swing.JPanel
@@ -37,12 +38,102 @@ internal class LatticeTabManager(
     val tabBar: LatticeTabBar,
     private val tabContentPanel: JPanel,
     private val settings: StandaloneTerminalSettings,
+    private val defaultProfile: TerminalProfile,
 ) {
     private val panes = ArrayList<LatticeTerminalPane>(INITIAL_TAB_CAPACITY)
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
 
     val selectedPane: LatticeTerminalPane?
         get() = panes.find { it.tab.id == tabBar.selectedId() }
+
+    private val isMac =
+        System
+            .getProperty("os.name")
+            .orEmpty()
+            .lowercase()
+            .contains("mac")
+
+    private val keyEventDispatcher =
+        KeyEventDispatcher { event ->
+            if (event.id == KeyEvent.KEY_PRESSED) {
+                val keyCode = event.keyCode
+                val modifiers = event.modifiersEx
+                val menuShortcutMask = Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+                val isMenuShortcut = (modifiers and menuShortcutMask) == menuShortcutMask
+                val isCtrlPressed = (modifiers and InputEvent.CTRL_DOWN_MASK) == InputEvent.CTRL_DOWN_MASK
+                val isShiftPressed = (modifiers and InputEvent.SHIFT_DOWN_MASK) == InputEvent.SHIFT_DOWN_MASK
+                val hasAlt = (modifiers and InputEvent.ALT_DOWN_MASK) != 0
+
+                // 1. Tab cycling: Ctrl + Tab / Ctrl + Shift + Tab (on all platforms)
+                if (keyCode == KeyEvent.VK_TAB && isCtrlPressed && !hasAlt) {
+                    if (isShiftPressed) {
+                        switchToPrevTab()
+                    } else {
+                        switchToNextTab()
+                    }
+                    return@KeyEventDispatcher true
+                }
+
+                // 2. Open/Close tab:
+                if (isMac) {
+                    if (isMenuShortcut && !hasAlt && !isShiftPressed) {
+                        when (keyCode) {
+                            KeyEvent.VK_T -> {
+                                openTab(defaultProfile)
+                                return@KeyEventDispatcher true
+                            }
+                            KeyEvent.VK_W -> {
+                                selectedPane?.let { closeTab(it.tab.id) }
+                                return@KeyEventDispatcher true
+                            }
+                        }
+                    }
+                } else {
+                    if (isCtrlPressed && isShiftPressed && !hasAlt) {
+                        when (keyCode) {
+                            KeyEvent.VK_T -> {
+                                openTab(defaultProfile)
+                                return@KeyEventDispatcher true
+                            }
+                            KeyEvent.VK_W -> {
+                                selectedPane?.let { closeTab(it.tab.id) }
+                                return@KeyEventDispatcher true
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        }
+
+    init {
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(keyEventDispatcher)
+    }
+
+    fun selectTab(id: String) {
+        tabBar.selectTab(id)
+        onTabSelected(id)
+    }
+
+    private fun switchToNextTab() {
+        if (panes.size <= 1) return
+        val currentId = tabBar.selectedId() ?: return
+        val currentIndex = panes.indexOfFirst { it.tab.id == currentId }
+        if (currentIndex != -1) {
+            val nextIndex = (currentIndex + 1) % panes.size
+            selectTab(panes[nextIndex].tab.id)
+        }
+    }
+
+    private fun switchToPrevTab() {
+        if (panes.size <= 1) return
+        val currentId = tabBar.selectedId() ?: return
+        val currentIndex = panes.indexOfFirst { it.tab.id == currentId }
+        if (currentIndex != -1) {
+            val prevIndex = (currentIndex - 1 + panes.size) % panes.size
+            selectTab(panes[prevIndex].tab.id)
+        }
+    }
 
     /**
      * Opens a new terminal tab backed by [profile].
@@ -87,6 +178,7 @@ internal class LatticeTabManager(
 
     /** Closes every open tab and shuts down the workspace. */
     fun closeAllTabs() {
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(keyEventDispatcher)
         while (panes.isNotEmpty()) {
             closePaneAt(panes.lastIndex)
         }

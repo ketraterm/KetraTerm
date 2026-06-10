@@ -66,7 +66,7 @@ internal class LatticeWindowFactory(
                 onTabRenameRequested = { id, newName -> tabManager.onTabRenameRequested(id, newName) },
             )
 
-        tabManager = LatticeTabManager(frame, tabBar, tabContentPanel, settings)
+        tabManager = LatticeTabManager(frame, tabBar, tabContentPanel, settings, profiles.first())
 
         installMenuBar(frame, tabBar)
         styleTitleBar(frame)

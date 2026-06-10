@@ -195,6 +195,20 @@ internal class LatticeTabBar(
         repaint()
     }
 
+    fun selectTab(id: String) {
+        if (selectedId != id) {
+            val oldId = selectedId
+            selectedId = id
+            startSelectionFade(oldId, id)
+            val index = entries.indexOfFirst { it.id == id }
+            if (index != -1) {
+                scrollToVisible(index)
+            }
+            revalidate()
+            repaint()
+        }
+    }
+
     fun selectedId(): String? = selectedId
 
     fun selectedTitle(): String? = entries.find { it.id == selectedId }?.title
