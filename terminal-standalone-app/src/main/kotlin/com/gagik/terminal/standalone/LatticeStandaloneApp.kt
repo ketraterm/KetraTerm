@@ -18,6 +18,7 @@ package com.gagik.terminal.standalone
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
 import com.gagik.terminal.standalone.ui.LatticeWindowFactory
 import com.gagik.terminal.workspace.TerminalProfileRegistry
+import java.nio.file.Path
 import javax.swing.SwingUtilities
 
 /**
@@ -41,7 +42,24 @@ private object LatticeStandaloneApp {
         val window = windowFactory.createWindow()
         val frame = window.frame
 
-        window.tabManager.openTab(profileRegistry.initialProfile(args))
+        // The initial profile carries the CLI shell command when args are given,
+        // or defaults to the first available profile. Either way, stamp the
+        // configured startDirectory so the user's preference is always honoured
+        // for the first tab (profile.workingDirectory is null for all built-in
+        // profiles, so this only replaces the null default).
+        val initialWorkingDirectory =
+            settings.startDirectory
+                .takeIf { it.isNotBlank() }
+                ?.let { runCatching { Path.of(it) }.getOrNull() }
+        val initialProfile =
+            profileRegistry.initialProfile(args).let { profile ->
+                if (initialWorkingDirectory != null && profile.workingDirectory == null) {
+                    profile.copy(workingDirectory = initialWorkingDirectory)
+                } else {
+                    profile
+                }
+            }
+        window.tabManager.openTab(initialProfile)
         frame.pack()
         frame.setLocationRelativeTo(null)
         frame.isVisible = true

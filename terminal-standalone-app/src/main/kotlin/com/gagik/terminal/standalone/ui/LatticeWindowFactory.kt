@@ -137,7 +137,20 @@ internal class LatticeWindowFactory(
                 JMenuItem(profile.displayName).apply {
                     background = LatticeChrome.popupBackground
                     foreground = LatticeChrome.textPrimary
-                    addActionListener { tabManager.openTab(profile) }
+                    addActionListener {
+                        // Stamp the configured startDirectory onto built-in profiles
+                        // whose workingDirectory is null (i.e. they carry no explicit
+                        // directory preference). Profiles with a profile-level directory
+                        // are left untouched.
+                        val configuredDirectory = defaultProfileProvider().workingDirectory
+                        val effectiveProfile =
+                            if (profile.workingDirectory == null && configuredDirectory != null) {
+                                profile.copy(workingDirectory = configuredDirectory)
+                            } else {
+                                profile
+                            }
+                        tabManager.openTab(effectiveProfile)
+                    }
                 }
             popup.add(item)
         }
