@@ -69,6 +69,7 @@ class TerminalWorkspace(
                     columns = options.columns,
                     rows = options.rows,
                     treatAmbiguousAsWide = options.treatAmbiguousAsWide,
+                    maxHistory = options.maxHistory,
                     eventListener = tabEventListener,
                 ),
             )
@@ -190,10 +191,12 @@ data class TerminalWorkspaceOpenOptions(
     val columns: Int,
     val rows: Int,
     val treatAmbiguousAsWide: Boolean,
+    val maxHistory: Int,
 ) {
     init {
         require(columns > 0) { "columns must be > 0, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
+        require(maxHistory >= 0) { "maxHistory must be >= 0, was $maxHistory" }
     }
 }
 

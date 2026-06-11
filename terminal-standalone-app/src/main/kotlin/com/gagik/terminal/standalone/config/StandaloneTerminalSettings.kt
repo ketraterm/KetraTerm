@@ -145,6 +145,7 @@ internal class StandaloneTerminalSettings(
             useSystemFallbackFonts = config.useSystemFallbackFonts,
             pasteOnMiddleClick = config.pasteOnMiddleClick,
             cursorShape = parseCursorShape(config.cursorShape),
+            scrollbackLines = config.scrollbackLines,
         )
 
     private fun parseCursorShape(shape: String): TerminalRenderCursorShape =

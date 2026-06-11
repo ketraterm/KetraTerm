@@ -162,7 +162,6 @@ class TerminalWorkspaceConfigManager(
         columns = ${config.columns}
         rows = ${config.rows}
         # Maximum number of lines to retain in the scrollback buffer
-        # TODO(scrollback): implement history truncation in the core grid
         scrollback_lines = ${config.scrollbackLines}
         # Window opacity (1.0 = fully opaque, 0.1 = mostly transparent)
         # TODO(opacity): support translucent Swing windows in the UI host

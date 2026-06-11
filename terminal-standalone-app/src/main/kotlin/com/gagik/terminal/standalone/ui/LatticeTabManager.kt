@@ -180,6 +180,7 @@ internal class LatticeTabManager(
                                 columns = snapshot.columns,
                                 rows = snapshot.rows,
                                 treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
+                                maxHistory = snapshot.scrollbackLines,
                             )
                         },
                 )
@@ -317,6 +318,7 @@ internal class LatticeTabManager(
                                 columns = snapshot.columns,
                                 rows = snapshot.rows,
                                 treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
+                                maxHistory = snapshot.scrollbackLines,
                             )
                         },
                 )
