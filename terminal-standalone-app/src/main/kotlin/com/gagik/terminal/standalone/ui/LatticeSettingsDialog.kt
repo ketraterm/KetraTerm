@@ -86,20 +86,35 @@ internal class LatticeSettingsDialog(
         applySizing(this, width)
     }
 
+    private fun detectShells(): Array<String> {
+        val os = System.getProperty("os.name").lowercase(Locale.ROOT)
+        val base =
+            if (os.contains("win")) {
+                arrayOf("powershell.exe", "cmd.exe", "pwsh.exe", "wsl.exe", "git-bash.exe")
+            } else {
+                arrayOf("/bin/bash", "/bin/zsh", "/usr/bin/fish", "/bin/sh")
+            }
+        return base + "Custom..."
+    }
+
+    private val availableShells = detectShells()
+    private val isCustomShell = !availableShells.dropLast(1).contains(settings.shellPath)
+
     // Form Controls - Application
-    private val shellPathField = createTextField(settings.shellPath, 220)
-    private val startDirectoryField = createTextField(settings.startDirectory, 220)
+    private val shellPathCombo = createComboBox(availableShells, if (isCustomShell) "Custom..." else settings.shellPath, 220)
+    private val customShellField = createTextField(if (isCustomShell) settings.shellPath else "", 140) // Will be wrapped with button
+    private val startDirectoryField = createTextField(settings.startDirectory, 140) // Will be wrapped with button
     private val audibleBellCheckbox = JCheckBox("Audible bell", settings.audibleBell)
 
     // Form Controls - Appearance
     private val fontFamilyCombo =
         createComboBox(GraphicsEnvironment.getLocalGraphicsEnvironment().availableFontFamilyNames, settings.fontFamily, 220)
-    private val fontSizeSpinner = createSpinner(settings.fontSize, 8, 72, 1, 70)
-    private val lineHeightSpinner = createFloatSpinner(settings.lineHeight, 0.5, 3.0, 0.1, 70)
-    private val columnsSpinner = createSpinner(settings.columns, 40, 300, 1, 70)
-    private val rowsSpinner = createSpinner(settings.rows, 10, 100, 1, 70)
+    private val fontSizeSpinner = createSpinner(settings.fontSize, 8, 72, 1, 80)
+    private val lineHeightSpinner = createFloatSpinner(settings.lineHeight, 0.5, 3.0, 0.1, 80)
+    private val columnsSpinner = createSpinner(settings.columns, 40, 300, 1, 80)
+    private val rowsSpinner = createSpinner(settings.rows, 10, 100, 1, 80)
     private val scrollbackSpinner = createSpinner(settings.scrollbackLines, 0, 100000, 100, 80)
-    private val windowOpacitySpinner = createFloatSpinner(settings.windowOpacity, 0.1, 1.0, 0.05, 70)
+    private val windowOpacitySpinner = createFloatSpinner(settings.windowOpacity, 0.1, 1.0, 0.05, 80)
     private val themeCombo = createComboBox(TerminalTheme.entries.map { it.name }.toTypedArray(), settings.theme.name, 220)
 
     // Form Controls - Behavior
@@ -191,8 +206,61 @@ internal class LatticeSettingsDialog(
 
         panel.add(LatticeSectionHeader("Project Settings"))
         val projectSection = createSectionPanel()
-        addFormRow(projectSection, 0, "Shell path:", shellPathField)
-        addFormRow(projectSection, 1, "Start directory:", startDirectoryField)
+        addFormRow(projectSection, 0, "Default shell:", shellPathCombo)
+
+        val customShellWrapper =
+            JPanel(BorderLayout(8, 0)).apply {
+                isOpaque = false
+                add(customShellField, BorderLayout.CENTER)
+                val browseBtn =
+                    JButton("Browse...").apply {
+                        preferredSize = Dimension(72, 26)
+                        addActionListener {
+                            val chooser =
+                                JFileChooser(customShellField.text).apply {
+                                    fileSelectionMode = JFileChooser.FILES_ONLY
+                                }
+                            if (chooser.showOpenDialog(this@LatticeSettingsDialog) == JFileChooser.APPROVE_OPTION) {
+                                customShellField.text = chooser.selectedFile.absolutePath
+                            }
+                        }
+                    }
+                add(browseBtn, BorderLayout.EAST)
+            }
+        val customShellLabel = addFormRow(projectSection, 1, "Custom path:", customShellWrapper)
+        customShellLabel.isVisible = isCustomShell
+        customShellWrapper.isVisible = isCustomShell
+
+        shellPathCombo.addItemListener { e ->
+            if (e.stateChange == java.awt.event.ItemEvent.SELECTED) {
+                val isCustom = e.item == "Custom..."
+                customShellLabel.isVisible = isCustom
+                customShellWrapper.isVisible = isCustom
+                projectSection.revalidate()
+                projectSection.repaint()
+            }
+        }
+
+        val startDirWrapper =
+            JPanel(BorderLayout(8, 0)).apply {
+                isOpaque = false
+                add(startDirectoryField, BorderLayout.CENTER)
+                val browseBtn =
+                    JButton("Browse...").apply {
+                        preferredSize = Dimension(72, 26)
+                        addActionListener {
+                            val chooser =
+                                JFileChooser(startDirectoryField.text).apply {
+                                    fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+                                }
+                            if (chooser.showOpenDialog(this@LatticeSettingsDialog) == JFileChooser.APPROVE_OPTION) {
+                                startDirectoryField.text = chooser.selectedFile.absolutePath
+                            }
+                        }
+                    }
+                add(browseBtn, BorderLayout.EAST)
+            }
+        addFormRow(projectSection, 2, "Start directory:", startDirWrapper)
         panel.add(projectSection)
 
         panel.add(LatticeSectionHeader("Application Settings"))
@@ -213,23 +281,13 @@ internal class LatticeSettingsDialog(
         panel.add(LatticeSectionHeader("Typography & Theme"))
         val typoSection = createSectionPanel()
         addFormRow(typoSection, 0, "Font family:", fontFamilyCombo)
-        val lhLabel =
-            JLabel("Line height:").apply {
-                foreground = LatticeChrome.textPrimary
-                font = font.deriveFont(Font.PLAIN, 13f)
-            }
-        addFormRow(typoSection, 1, "Font size:", fontSizeSpinner, Box.createHorizontalStrut(10), lhLabel, lineHeightSpinner)
+        addFormRow(typoSection, 1, "Font size:", fontSizeSpinner, "Line height:", lineHeightSpinner)
         addFormRow(typoSection, 2, "Color theme:", themeCombo)
         panel.add(typoSection)
 
         panel.add(LatticeSectionHeader("Window Layout"))
         val windowSection = createSectionPanel()
-        val rowsLabel =
-            JLabel("Rows:").apply {
-                foreground = LatticeChrome.textPrimary
-                font = font.deriveFont(Font.PLAIN, 13f)
-            }
-        addFormRow(windowSection, 0, "Columns:", columnsSpinner, Box.createHorizontalStrut(10), rowsLabel, rowsSpinner)
+        addFormRow(windowSection, 0, "Columns:", columnsSpinner, "Rows:", rowsSpinner)
         addFormRow(windowSection, 1, "Scrollback lines:", scrollbackSpinner)
         addFormRow(windowSection, 2, "Window opacity:", windowOpacitySpinner)
         panel.add(windowSection)
@@ -285,8 +343,10 @@ internal class LatticeSettingsDialog(
         panel: JPanel,
         row: Int,
         labelText: String,
-        vararg components: Component,
-    ) {
+        comp1: Component,
+        label2Text: String? = null,
+        comp2: Component? = null,
+    ): JLabel {
         val label =
             JLabel(labelText).apply {
                 foreground = LatticeChrome.textPrimary
@@ -300,25 +360,41 @@ internal class LatticeSettingsDialog(
                 anchor = GridBagConstraints.WEST
             }
 
+        // Column 0: First Label
         gbc.gridx = 0
         gbc.weightx = 0.0
+        gbc.gridwidth = 1
         gbc.insets = Insets(6, 0, 6, 12)
         panel.add(label, gbc)
 
+        // Column 1: First Component
         gbc.gridx = 1
-        gbc.weightx = 1.0
+        gbc.weightx = if (label2Text == null) 1.0 else 0.0
+        gbc.gridwidth = if (label2Text == null) 3 else 1
         gbc.insets = Insets(6, 0, 6, 0)
+        panel.add(comp1, gbc)
 
-        if (components.size == 1) {
-            panel.add(components[0], gbc)
-        } else {
-            val wrapper =
-                JPanel(FlowLayout(FlowLayout.LEFT, 10, 0)).apply {
-                    isOpaque = false
+        // Columns 2 & 3: Optional Second Label and Component
+        if (label2Text != null && comp2 != null) {
+            val label2 =
+                JLabel(label2Text).apply {
+                    foreground = LatticeChrome.textPrimary
+                    font = font.deriveFont(Font.PLAIN, 13f)
                 }
-            components.forEach { wrapper.add(it) }
-            panel.add(wrapper, gbc)
+            gbc.gridx = 2
+            gbc.weightx = 0.0
+            gbc.gridwidth = 1
+            gbc.insets = Insets(6, 24, 6, 12) // Generous 24px gap before the second label
+            panel.add(label2, gbc)
+
+            gbc.gridx = 3
+            gbc.weightx = 1.0
+            gbc.gridwidth = 1
+            gbc.insets = Insets(6, 0, 6, 0)
+            panel.add(comp2, gbc)
         }
+
+        return label
     }
 
     private fun addCheckboxRow(
@@ -390,7 +466,11 @@ internal class LatticeSettingsDialog(
         }
 
     private fun applyChanges() {
-        settings.shellPath = shellPathField.text
+        if (shellPathCombo.selectedItem == "Custom...") {
+            settings.shellPath = customShellField.text
+        } else {
+            settings.shellPath = shellPathCombo.selectedItem as String
+        }
         settings.startDirectory = startDirectoryField.text
         settings.audibleBell = audibleBellCheckbox.isSelected
         settings.pasteOnMiddleClick = pasteOnMiddleClickCheckbox.isSelected
