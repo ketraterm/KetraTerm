@@ -60,6 +60,8 @@ internal class TerminalState(
             }
         }
 
+    var defaultCursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
+
     var cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
         set(value) {
             if (field != value) {

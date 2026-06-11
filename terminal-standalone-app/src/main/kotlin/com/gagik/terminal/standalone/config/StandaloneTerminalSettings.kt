@@ -15,6 +15,7 @@
  */
 package com.gagik.terminal.standalone.config
 
+import com.gagik.terminal.render.api.TerminalRenderCursorShape
 import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
 import com.gagik.terminal.ui.swing.settings.TerminalTheme
 import com.gagik.terminal.workspace.config.TerminalConfig
@@ -143,7 +144,15 @@ internal class StandaloneTerminalSettings(
             cursorBlinkMillis = config.cursorBlinkMillis,
             useSystemFallbackFonts = config.useSystemFallbackFonts,
             pasteOnMiddleClick = config.pasteOnMiddleClick,
+            cursorShape = parseCursorShape(config.cursorShape),
         )
+
+    private fun parseCursorShape(shape: String): TerminalRenderCursorShape =
+        when (shape.lowercase(Locale.ROOT)) {
+            "beam" -> TerminalRenderCursorShape.BAR
+            "underline" -> TerminalRenderCursorShape.UNDERLINE
+            else -> TerminalRenderCursorShape.BLOCK
+        }
 
     private fun updateConfig(newConfig: TerminalConfig) {
         config = newConfig

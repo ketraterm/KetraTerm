@@ -190,7 +190,6 @@ class TerminalWorkspaceConfigManager(
         # Cursor blink period in milliseconds
         cursor_blink_millis = ${config.cursorBlinkMillis}
         # Style of the text cursor (block, underline, beam)
-        # TODO(cursor-shape): support rendering beam and underline styles in the UI layer
         cursor_shape = "${config.cursorShape}"
         # Play a system beep when the terminal receives a BEL character
         # TODO(parser/core/integration): in-band BEL (\u0007) byte recognition and dispatch

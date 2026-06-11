@@ -16,6 +16,7 @@
 package com.gagik.terminal.ui.swing.settings
 
 import com.gagik.terminal.render.api.TerminalColorPalette
+import com.gagik.terminal.render.api.TerminalRenderCursorShape
 import com.gagik.terminal.ui.swing.api.TerminalSwingTerminal
 import java.awt.Font
 import java.awt.GraphicsEnvironment
@@ -55,6 +56,7 @@ import java.util.*
  * search result.
  * @property padding internal margins around the terminal grid in pixels.
  * @property pasteOnMiddleClick whether middle mouse button click triggers a clipboard paste.
+ * @property cursorShape default cursor shape configured for the session.
  */
 data class TerminalSwingSettings(
     val font: Font = defaultTerminalFont(),
@@ -74,6 +76,7 @@ data class TerminalSwingSettings(
     val searchActiveMatchBackground: Int = DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND,
     val padding: Insets = Insets(12, 12, 12, 12),
     val pasteOnMiddleClick: Boolean = true,
+    val cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK,
 ) {
     init {
         require(columns > 0) { "columns must be > 0, was $columns" }

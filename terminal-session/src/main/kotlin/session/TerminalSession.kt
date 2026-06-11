@@ -30,6 +30,7 @@ import com.gagik.terminal.input.event.TerminalPasteEvent
 import com.gagik.terminal.input.impl.DefaultTerminalInputEncoder
 import com.gagik.terminal.input.policy.TerminalInputPolicy
 import com.gagik.terminal.render.api.TerminalColorPalette
+import com.gagik.terminal.render.api.TerminalRenderCursorShape
 import com.gagik.terminal.render.api.TerminalRenderFrameConsumer
 import com.gagik.terminal.render.api.TerminalRenderFrameReader
 import com.gagik.terminal.render.cache.TerminalRenderCache
@@ -197,6 +198,16 @@ class TerminalSession(
     fun setThemePalette(palette: TerminalColorPalette) {
         synchronized(mutationLock) {
             terminal.setThemePalette(palette)
+        }
+    }
+
+    /**
+     * Updates the current and default cursor shape for the session.
+     */
+    fun setCursorShape(shape: TerminalRenderCursorShape) {
+        synchronized(mutationLock) {
+            terminal.setDefaultCursorShape(shape)
+            terminal.setCursorShape(shape)
         }
     }
 

@@ -116,6 +116,9 @@ interface TerminalModeController {
     /** Sets the cursor shape/style. */
     fun setCursorShape(shape: TerminalRenderCursorShape)
 
+    /** Sets the default cursor shape/style restored on reset. */
+    fun setDefaultCursorShape(shape: TerminalRenderCursorShape)
+
     /**
      * Controls how East Asian Ambiguous codepoints are measured for future writes.
      *

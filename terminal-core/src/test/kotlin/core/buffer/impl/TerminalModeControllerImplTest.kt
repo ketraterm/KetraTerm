@@ -82,6 +82,37 @@ class TerminalModeControllerImplTest {
     }
 
     @Test
+    fun `default cursor shape can be set and is restored on full and soft reset`() {
+        val buffer = TerminalBuffer(initialWidth = 4, initialHeight = 3)
+        buffer.setDefaultCursorShape(TerminalRenderCursorShape.BAR)
+        buffer.setCursorShape(TerminalRenderCursorShape.BAR)
+
+        var shape: TerminalRenderCursorShape? = null
+        (buffer as TerminalRenderFrameReader).readRenderFrame { frame ->
+            shape = frame.cursor.shape
+        }
+        assertEquals(TerminalRenderCursorShape.BAR, shape)
+
+        buffer.reset()
+        (buffer as TerminalRenderFrameReader).readRenderFrame { frame ->
+            shape = frame.cursor.shape
+        }
+        assertEquals(TerminalRenderCursorShape.BAR, shape)
+
+        buffer.setCursorShape(TerminalRenderCursorShape.UNDERLINE)
+        (buffer as TerminalRenderFrameReader).readRenderFrame { frame ->
+            shape = frame.cursor.shape
+        }
+        assertEquals(TerminalRenderCursorShape.UNDERLINE, shape)
+
+        buffer.softReset()
+        (buffer as TerminalRenderFrameReader).readRenderFrame { frame ->
+            shape = frame.cursor.shape
+        }
+        assertEquals(TerminalRenderCursorShape.BAR, shape)
+    }
+
+    @Test
     fun `new fields round trip into shared state`() {
         val state = TerminalState(4, 3, 2)
         val modeController = TerminalModeControllerImpl(state, CursorEngine(state))

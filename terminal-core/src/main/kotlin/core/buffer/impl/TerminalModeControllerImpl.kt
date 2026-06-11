@@ -140,6 +140,12 @@ internal class TerminalModeControllerImpl(
         }
     }
 
+    override fun setDefaultCursorShape(shape: TerminalRenderCursorShape) {
+        mutateMode {
+            state.defaultCursorShape = shape
+        }
+    }
+
     override fun setTreatAmbiguousAsWide(enabled: Boolean) {
         mutateMode { state.modes.treatAmbiguousAsWide = enabled }
     }

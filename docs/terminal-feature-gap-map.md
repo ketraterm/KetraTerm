@@ -621,6 +621,7 @@ professional emulator needs explicit contracts for it.
   Currently the host listener fires correctly from the PTY process exit path
   but the in-band BEL control character is not yet parsed and dispatched.
 - `DONE(host/swing)`: middle-click paste is now supported, governed by `settings.pasteOnMiddleClick`.
+- `DONE(host)`: cursor shape configuration (`cursorShape`) mapping. Configured cursor shapes (block, underline, beam) are parsed and propagated to the terminal session to serve as the default shape on resets.
 - `TODO(host)`: UI scrollback controls, scrollbar policy, selection behavior
   while scrolled, and auto-follow/offset-retention policy.
 - `TODO(host)`: accessibility/export APIs.

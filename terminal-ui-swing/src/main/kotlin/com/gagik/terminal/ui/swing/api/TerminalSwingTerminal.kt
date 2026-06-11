@@ -581,6 +581,7 @@ class TerminalSwingTerminal(
     ) {
         session.setTreatAmbiguousAsWide(settings.treatAmbiguousAsWide)
         session.setThemePalette(settings.palette)
+        session.setCursorShape(settings.cursorShape)
     }
 
     private fun handleMouseWheel(event: MouseWheelEvent) {
