@@ -42,7 +42,8 @@ import java.util.*
  * @property rows initial preferred row count.
  * @property treatAmbiguousAsWide whether future East Asian Ambiguous
  * codepoints should occupy two terminal cells in core width policy.
- * @property cursorBlinkMillis cursor blink period in milliseconds.
+ * @property cursorBlinkMillis cursor blink period in milliseconds. A value of
+ * zero disables cursor blinking and keeps the cursor visible.
  * @property textAntialiasing text antialiasing hint used during painting.
  * @property fractionalMetrics fractional font metrics hint used during painting.
  * @property clipboardShortcuts platform clipboard key bindings.
@@ -85,8 +86,8 @@ data class TerminalSwingSettings(
     init {
         require(columns > 0) { "columns must be > 0, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
-        require(cursorBlinkMillis > 0) {
-            "cursorBlinkMillis must be > 0, was $cursorBlinkMillis"
+        require(cursorBlinkMillis >= 0) {
+            "cursorBlinkMillis must be >= 0, was $cursorBlinkMillis"
         }
         require(scrollbackLines >= 0) {
             "scrollbackLines must be >= 0, was $scrollbackLines"

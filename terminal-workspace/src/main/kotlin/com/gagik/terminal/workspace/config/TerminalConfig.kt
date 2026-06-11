@@ -20,6 +20,29 @@ package com.gagik.terminal.workspace.config
  *
  * This data class is immutable. For updates, a new instance is created via [copy].
  * The settings are serialized to/from a TOML configuration file on disk.
+ *
+ * All numeric bounds are published in the [Limits] companion object so that the UI
+ * layer, the TOML config manager, and the data class validation all share one source
+ * of truth instead of repeating magic numbers.
+ *
+ * @property theme built-in color theme id, such as `one-dark` or `nord`.
+ * @property treatAmbiguousAsWide whether East Asian Ambiguous characters occupy
+ * two cells in core width policy.
+ * @property fontFamily primary terminal font family name.
+ * @property fontSize primary terminal font size in points.
+ * @property columns preferred initial terminal columns.
+ * @property rows preferred initial terminal rows.
+ * @property cursorBlinkMillis cursor blink period in milliseconds. Zero disables blinking.
+ * @property useSystemFallbackFonts whether Swing rendering may scan installed
+ * system fonts after configured fallback fonts fail.
+ * @property cursorShape default cursor shape id: `block`, `underline`, or `beam`.
+ * @property shellPath command or executable path used when opening a local shell.
+ * @property startDirectory initial working directory for newly opened shells.
+ * @property audibleBell whether host UI should play a system bell for BEL events.
+ * @property pasteOnMiddleClick whether middle mouse click should paste clipboard text.
+ * @property scrollbackLines maximum retained scrollback lines.
+ * @property lineHeight font metric line-height multiplier.
+ * @property windowOpacity requested host window opacity.
  */
 data class TerminalConfig(
     val theme: String = "one-dark",
@@ -40,16 +63,65 @@ data class TerminalConfig(
     val windowOpacity: Float = 1.0f,
 ) {
     init {
-        require(columns > 0) { "columns must be > 0, was $columns" }
-        require(rows > 0) { "rows must be > 0, was $rows" }
-        require(fontSize > 0) { "fontSize must be > 0, was $fontSize" }
-        require(cursorBlinkMillis > 0) { "cursorBlinkMillis must be > 0, was $cursorBlinkMillis" }
+        require(columns in COLUMNS_MIN..COLUMNS_MAX) {
+            "columns must be in ${COLUMNS_MIN}..${COLUMNS_MAX}, was $columns"
+        }
+        require(rows in ROWS_MIN..ROWS_MAX) {
+            "rows must be in ${ROWS_MIN}..${ROWS_MAX}, was $rows"
+        }
+        require(fontSize in FONT_SIZE_MIN..FONT_SIZE_MAX) {
+            "fontSize must be in ${FONT_SIZE_MIN}..${FONT_SIZE_MAX}, was $fontSize"
+        }
+        require(cursorBlinkMillis in CURSOR_BLINK_MIN..CURSOR_BLINK_MAX) {
+            "cursorBlinkMillis must be in ${CURSOR_BLINK_MIN}..${CURSOR_BLINK_MAX}, was $cursorBlinkMillis"
+        }
         require(theme.isNotBlank()) { "theme must not be blank" }
         require(fontFamily.isNotBlank()) { "fontFamily must not be blank" }
         require(cursorShape.isNotBlank()) { "cursorShape must not be blank" }
         require(shellPath.isNotBlank()) { "shellPath must not be blank" }
-        require(scrollbackLines >= 0) { "scrollbackLines must be >= 0, was $scrollbackLines" }
-        require(lineHeight > 0f) { "lineHeight must be > 0, was $lineHeight" }
-        require(windowOpacity in 0.1f..1.0f) { "windowOpacity must be between 0.1 and 1.0, was $windowOpacity" }
+        require(scrollbackLines in SCROLLBACK_MIN..SCROLLBACK_MAX) {
+            "scrollbackLines must be in ${SCROLLBACK_MIN}..${SCROLLBACK_MAX}, was $scrollbackLines"
+        }
+        require(lineHeight in LINE_HEIGHT_MIN..LINE_HEIGHT_MAX) {
+            "lineHeight must be in ${LINE_HEIGHT_MIN}..${LINE_HEIGHT_MAX}, was $lineHeight"
+        }
+        require(windowOpacity in WINDOW_OPACITY_MIN..WINDOW_OPACITY_MAX) {
+            "windowOpacity must be in ${WINDOW_OPACITY_MIN}..${WINDOW_OPACITY_MAX}, was $windowOpacity"
+        }
+    }
+
+    /**
+     * Published bounds for all numeric terminal configuration fields.
+     *
+     * These constants are the single source of truth shared by:
+     * - [TerminalConfig.init] validity assertions.
+     * - [TerminalWorkspaceConfigManager] TOML clamping before constructing a config.
+     * - The standalone settings dialog spinner min/max values.
+     *
+     * If you need to change a limit, change it here and it will be reflected
+     * everywhere automatically.
+     */
+    companion object Limits {
+        const val COLUMNS_MIN: Int = 10
+        const val COLUMNS_MAX: Int = 1000
+
+        const val ROWS_MIN: Int = 10
+        const val ROWS_MAX: Int = 500
+
+        const val FONT_SIZE_MIN: Int = 10
+        const val FONT_SIZE_MAX: Int = 56
+
+        /** Zero disables blinking. */
+        const val CURSOR_BLINK_MIN: Int = 0
+        const val CURSOR_BLINK_MAX: Int = 10_000
+
+        const val SCROLLBACK_MIN: Int = 0
+        const val SCROLLBACK_MAX: Int = 1_000_000
+
+        const val LINE_HEIGHT_MIN: Float = 0.7f
+        const val LINE_HEIGHT_MAX: Float = 1.5f
+
+        const val WINDOW_OPACITY_MIN: Float = 0.1f
+        const val WINDOW_OPACITY_MAX: Float = 1.0f
     }
 }

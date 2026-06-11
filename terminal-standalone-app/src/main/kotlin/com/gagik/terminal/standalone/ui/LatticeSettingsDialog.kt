@@ -17,6 +17,7 @@ package com.gagik.terminal.standalone.ui
 
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
 import com.gagik.terminal.ui.swing.settings.TerminalTheme
+import com.gagik.terminal.workspace.config.TerminalConfig
 import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -109,19 +110,38 @@ internal class LatticeSettingsDialog(
     // Form Controls - Appearance
     private val fontFamilyCombo =
         createComboBox(GraphicsEnvironment.getLocalGraphicsEnvironment().availableFontFamilyNames, settings.fontFamily, 220)
-    private val fontSizeSpinner = createSpinner(settings.fontSize, 8, 72, 1, 80)
-    private val lineHeightSpinner = createFloatSpinner(settings.lineHeight, 0.5, 3.0, 0.1, 80)
-    private val columnsSpinner = createSpinner(settings.columns, 40, 300, 1, 80)
-    private val rowsSpinner = createSpinner(settings.rows, 10, 100, 1, 80)
-    private val scrollbackSpinner = createSpinner(settings.scrollbackLines, 0, 100000, 100, 80)
-    private val windowOpacitySpinner = createFloatSpinner(settings.windowOpacity, 0.1, 1.0, 0.05, 80)
+    private val fontSizeSpinner =
+        createSpinner(settings.fontSize, TerminalConfig.FONT_SIZE_MIN, TerminalConfig.FONT_SIZE_MAX, 1, 80)
+    private val lineHeightSpinner =
+        createFloatSpinner(
+            settings.lineHeight,
+            TerminalConfig.LINE_HEIGHT_MIN.toDouble(),
+            TerminalConfig.LINE_HEIGHT_MAX.toDouble(),
+            0.1,
+            80,
+        )
+    private val columnsSpinner =
+        createSpinner(settings.columns, TerminalConfig.COLUMNS_MIN, TerminalConfig.COLUMNS_MAX, 1, 80)
+    private val rowsSpinner =
+        createSpinner(settings.rows, TerminalConfig.ROWS_MIN, TerminalConfig.ROWS_MAX, 1, 80)
+    private val scrollbackSpinner =
+        createSpinner(settings.scrollbackLines, TerminalConfig.SCROLLBACK_MIN, TerminalConfig.SCROLLBACK_MAX, 100, 80)
+    private val windowOpacitySpinner =
+        createFloatSpinner(
+            settings.windowOpacity,
+            TerminalConfig.WINDOW_OPACITY_MIN.toDouble(),
+            TerminalConfig.WINDOW_OPACITY_MAX.toDouble(),
+            0.05,
+            80,
+        )
     private val themeCombo = createComboBox(TerminalTheme.entries.map { it.name }.toTypedArray(), settings.theme.name, 220)
 
     // Form Controls - Behavior
     private val treatAmbiguousCheckbox = JCheckBox("Treat East Asian ambiguous characters as wide", settings.treatAmbiguousAsWide)
     private val useSystemFallbackCheckbox = JCheckBox("Use system font fallback for missing glyphs", settings.useSystemFallbackFonts)
     private val pasteOnMiddleClickCheckbox = JCheckBox("Paste on middle mouse button click", settings.pasteOnMiddleClick)
-    private val cursorBlinkSpinner = createSpinner(settings.cursorBlinkMillis, 0, 5000, 50, 70)
+    private val cursorBlinkSpinner =
+        createSpinner(settings.cursorBlinkMillis, TerminalConfig.CURSOR_BLINK_MIN, TerminalConfig.CURSOR_BLINK_MAX, 50, 70)
     private val cursorShapeCombo = createComboBox(arrayOf("block", "underline", "beam"), settings.cursorShape.lowercase(Locale.ROOT), 150)
 
     init {

@@ -27,6 +27,7 @@ import com.gagik.terminal.render.cache.TerminalRenderPublisher
 import com.gagik.terminal.session.TerminalSession
 import com.gagik.terminal.transport.TerminalConnector
 import com.gagik.terminal.transport.TerminalConnectorListener
+import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -60,6 +61,32 @@ class TerminalSwingTerminalCursorBlinkTest {
             }
         }
         assertFalse(component.cursorPresentationEnabled)
+    }
+
+    @Test
+    fun `zero cursor blink setting keeps timer stopped and cursor visible`() {
+        val component =
+            TerminalSwingTerminal(
+                settingsProvider = {
+                    TerminalSwingSettings(cursorBlinkMillis = 0)
+                },
+            )
+        val frame = JFrame()
+
+        try {
+            SwingUtilities.invokeAndWait {
+                component.cursorBlinkVisible = false
+                frame.add(component)
+                frame.pack()
+            }
+
+            assertFalse(component.cursorTimer.isRunning)
+            assertTrue(component.cursorBlinkVisible)
+        } finally {
+            SwingUtilities.invokeAndWait {
+                frame.dispose()
+            }
+        }
     }
 
     @Test

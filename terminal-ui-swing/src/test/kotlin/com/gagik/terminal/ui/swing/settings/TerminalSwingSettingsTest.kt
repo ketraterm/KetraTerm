@@ -38,6 +38,13 @@ class TerminalSwingSettingsTest {
     }
 
     @Test
+    fun settingsAllowZeroCursorBlinkToDisableBlinking() {
+        val settings = TerminalSwingSettings(cursorBlinkMillis = 0)
+
+        assertEquals(0, settings.cursorBlinkMillis)
+    }
+
+    @Test
     fun metricsArePositiveForMonospacedFont() {
         val component = Canvas()
         val fontMetrics = component.getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 14))

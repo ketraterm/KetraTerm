@@ -181,7 +181,7 @@ class TerminalSwingTerminal(
     private val dirtyListener = { schedulePublishedFrame() }
 
     internal val cursorTimer =
-        Timer(settings.cursorBlinkMillis) {
+        Timer(cursorTimerDelay(settings)) {
             cursorBlinkVisible = !cursorBlinkVisible
             repaintBlinkState()
         }
@@ -295,6 +295,7 @@ class TerminalSwingTerminal(
         searchOverlay.isVisible = false
         preferredSize = preferredGridSize(settings.columns, settings.rows)
         cursorTimer.isRepeats = true
+        configureCursorTimerOnEdt()
     }
 
     /**
@@ -423,7 +424,7 @@ class TerminalSwingTerminal(
     override fun addNotify() {
         super.addNotify()
         terminalFocused = isFocusOwner
-        cursorTimer.start()
+        configureCursorTimerOnEdt()
     }
 
     override fun removeNotify() {
@@ -521,7 +522,7 @@ class TerminalSwingTerminal(
         isOpaque = true
         metrics = buildMetrics(settings)
         preferredSize = preferredGridSize(settings.columns, settings.rows)
-        cursorTimer.delay = settings.cursorBlinkMillis
+        configureCursorTimerOnEdt()
         session?.let { applySettingsToSession(it, settings) }
         selectionController.clearSelection()
         updateSearchViewportHighlights()
@@ -812,13 +813,24 @@ class TerminalSwingTerminal(
     }
 
     private fun resetCursorBlinkOnEdt(forceRepaint: Boolean) {
-        if (cursorTimer.isRunning) {
-            val wasVisible = cursorBlinkVisible
-            cursorBlinkVisible = true
+        val wasVisible = cursorBlinkVisible
+        cursorBlinkVisible = true
+        if (settings.cursorBlinkMillis > 0) {
             cursorTimer.restart()
-            if (forceRepaint && !wasVisible) {
-                repaintBlinkState()
-            }
+        }
+        if (forceRepaint && !wasVisible) {
+            repaintBlinkState()
+        }
+    }
+
+    private fun configureCursorTimerOnEdt() {
+        cursorTimer.delay = cursorTimerDelay(settings)
+        cursorTimer.initialDelay = cursorTimer.delay
+        cursorBlinkVisible = true
+        if (isDisplayable && settings.cursorBlinkMillis > 0) {
+            cursorTimer.restart()
+        } else {
+            cursorTimer.stop()
         }
     }
 
@@ -1038,6 +1050,9 @@ class TerminalSwingTerminal(
         private const val NO_RESIZE_DIMENSION = -1
         private const val NO_ACTIVE_SEARCH_RESULT = -1
         private const val NO_ACTIVE_SEARCH_ROW = Long.MIN_VALUE
+        private const val MIN_TIMER_DELAY_MILLIS = 1
+
+        private fun cursorTimerDelay(settings: TerminalSwingSettings): Int = maxOf(MIN_TIMER_DELAY_MILLIS, settings.cursorBlinkMillis)
 
         private fun packVisibleGridSize(
             columns: Int,

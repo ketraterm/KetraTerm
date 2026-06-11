@@ -151,6 +151,65 @@ class TerminalConfigTest {
     }
 
     @Test
+    fun `test TerminalWorkspaceConfigManager clamps hand edited numeric values`() {
+        val tempDir = Files.createTempDirectory("lattice-config-test-clamped")
+        val configFile = tempDir.resolve("config.toml")
+        val manager = TerminalWorkspaceConfigManager(configFile)
+
+        Files.writeString(
+            configFile,
+            """
+            [window]
+            columns = 999999
+            rows = -42
+            scrollback_lines = 999999999999999999999999
+            opacity = 12.5
+
+            [font]
+            family = "JetBrains Mono"
+            size = -9
+            line_height = 0.01
+
+            [theme]
+            name = "nord"
+
+            [behavior]
+            cursor_blink_millis = 999999999999999999999999
+            cursor_shape = "beam"
+            """.trimIndent(),
+        )
+
+        val loaded = manager.load()
+
+        assertEquals(TerminalConfig.COLUMNS_MAX, loaded.columns)
+        assertEquals(TerminalConfig.ROWS_MIN, loaded.rows)
+        assertEquals(TerminalConfig.SCROLLBACK_MAX, loaded.scrollbackLines)
+        assertEquals(TerminalConfig.WINDOW_OPACITY_MAX, loaded.windowOpacity)
+        assertEquals(TerminalConfig.FONT_SIZE_MIN, loaded.fontSize)
+        assertEquals(TerminalConfig.LINE_HEIGHT_MIN, loaded.lineHeight)
+        assertEquals(TerminalConfig.CURSOR_BLINK_MAX, loaded.cursorBlinkMillis)
+
+        Files.deleteIfExists(configFile)
+        Files.deleteIfExists(tempDir)
+    }
+
+    @Test
+    fun `test TerminalConfig rejects direct out of bounds values`() {
+        assertFailsWith<IllegalArgumentException> {
+            TerminalConfig(columns = TerminalConfig.COLUMNS_MIN - 1)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            TerminalConfig(rows = TerminalConfig.ROWS_MAX + 1)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            TerminalConfig(scrollbackLines = TerminalConfig.SCROLLBACK_MAX + 1)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            TerminalConfig(lineHeight = TerminalConfig.LINE_HEIGHT_MIN - 0.1f)
+        }
+    }
+
+    @Test
     fun `test TerminalWorkspaceConfigManager fallback on invalid format`() {
         val tempDir = Files.createTempDirectory("lattice-config-test-invalid")
         val configFile = tempDir.resolve("config.toml")

@@ -64,53 +64,83 @@ class TerminalWorkspaceConfigManager(
                 behavior["treat_ambiguous_as_wide"]?.toBooleanStrictOrNull()
                     ?: default.treatAmbiguousAsWide
             val fontFamily = font["family"] ?: default.fontFamily
-            val fontSize = font["size"]?.toIntOrNull() ?: default.fontSize
-            val lineHeight = font["line_height"]?.toFloatOrNull() ?: default.lineHeight
-            val columns = window["columns"]?.toIntOrNull() ?: default.columns
-            val rows = window["rows"]?.toIntOrNull() ?: default.rows
-            val windowOpacity = window["opacity"]?.toFloatOrNull() ?: default.windowOpacity
+            val fontSize =
+                parseIntSetting(
+                    raw = font["size"],
+                    defaultValue = default.fontSize,
+                    min = TerminalConfig.FONT_SIZE_MIN,
+                    max = TerminalConfig.FONT_SIZE_MAX,
+                )
+            val lineHeight =
+                parseFloatSetting(
+                    raw = font["line_height"],
+                    defaultValue = default.lineHeight,
+                    min = TerminalConfig.LINE_HEIGHT_MIN,
+                    max = TerminalConfig.LINE_HEIGHT_MAX,
+                )
+            val columns =
+                parseIntSetting(
+                    raw = window["columns"],
+                    defaultValue = default.columns,
+                    min = TerminalConfig.COLUMNS_MIN,
+                    max = TerminalConfig.COLUMNS_MAX,
+                )
+            val rows =
+                parseIntSetting(
+                    raw = window["rows"],
+                    defaultValue = default.rows,
+                    min = TerminalConfig.ROWS_MIN,
+                    max = TerminalConfig.ROWS_MAX,
+                )
+            val windowOpacity =
+                parseFloatSetting(
+                    raw = window["opacity"],
+                    defaultValue = default.windowOpacity,
+                    min = TerminalConfig.WINDOW_OPACITY_MIN,
+                    max = TerminalConfig.WINDOW_OPACITY_MAX,
+                )
             val cursorBlinkMillis =
-                behavior["cursor_blink_millis"]?.toIntOrNull()
-                    ?: default.cursorBlinkMillis
+                parseIntSetting(
+                    raw = behavior["cursor_blink_millis"],
+                    defaultValue = default.cursorBlinkMillis,
+                    min = TerminalConfig.CURSOR_BLINK_MIN,
+                    max = TerminalConfig.CURSOR_BLINK_MAX,
+                )
             val useSystemFallbackFonts =
                 font["use_system_fallback_fonts"]?.toBooleanStrictOrNull()
                     ?: default.useSystemFallbackFonts
             val cursorShape = behavior["cursor_shape"] ?: default.cursorShape
             val audibleBell = behavior["audible_bell"]?.toBooleanStrictOrNull() ?: default.audibleBell
             val pasteOnMiddleClick = behavior["paste_on_middle_click"]?.toBooleanStrictOrNull() ?: default.pasteOnMiddleClick
-            val scrollbackLines = window["scrollback_lines"]?.toIntOrNull() ?: default.scrollbackLines
-
-            // Clean and validate inputs to ensure safety boundaries are respected
-            val cleanColumns = if (columns > 0) columns else default.columns
-            val cleanRows = if (rows > 0) rows else default.rows
-            val cleanFontSize = if (fontSize > 0) fontSize else default.fontSize
-            val cleanLineHeight = if (lineHeight > 0f) lineHeight else default.lineHeight
-            val cleanCursorBlinkMillis =
-                if (cursorBlinkMillis > 0) cursorBlinkMillis else default.cursorBlinkMillis
+            val scrollbackLines =
+                parseIntSetting(
+                    raw = window["scrollback_lines"],
+                    defaultValue = default.scrollbackLines,
+                    min = TerminalConfig.SCROLLBACK_MIN,
+                    max = TerminalConfig.SCROLLBACK_MAX,
+                )
             val cleanTheme = if (theme.isNotBlank()) theme else default.theme
             val cleanFontFamily = if (fontFamily.isNotBlank()) fontFamily else default.fontFamily
             val cleanCursorShape = if (cursorShape.isNotBlank()) cursorShape else default.cursorShape
             val cleanShellPath = if (shellPath.isNotBlank()) shellPath else default.shellPath
-            val cleanScrollbackLines = if (scrollbackLines >= 0) scrollbackLines else default.scrollbackLines
-            val cleanWindowOpacity = if (windowOpacity in 0.1f..1.0f) windowOpacity else default.windowOpacity
 
             TerminalConfig(
                 theme = cleanTheme,
                 treatAmbiguousAsWide = treatAmbiguousAsWide,
                 fontFamily = cleanFontFamily,
-                fontSize = cleanFontSize,
-                columns = cleanColumns,
-                rows = cleanRows,
-                cursorBlinkMillis = cleanCursorBlinkMillis,
+                fontSize = fontSize,
+                columns = columns,
+                rows = rows,
+                cursorBlinkMillis = cursorBlinkMillis,
                 useSystemFallbackFonts = useSystemFallbackFonts,
                 cursorShape = cleanCursorShape,
                 shellPath = cleanShellPath,
                 startDirectory = startDirectory,
                 audibleBell = audibleBell,
                 pasteOnMiddleClick = pasteOnMiddleClick,
-                scrollbackLines = cleanScrollbackLines,
-                lineHeight = cleanLineHeight,
-                windowOpacity = cleanWindowOpacity,
+                scrollbackLines = scrollbackLines,
+                lineHeight = lineHeight,
+                windowOpacity = windowOpacity,
             )
         } catch (e: Exception) {
             try {
@@ -195,6 +225,44 @@ class TerminalWorkspaceConfigManager(
         # Automatically paste clipboard contents when the middle mouse button is clicked
         paste_on_middle_click = ${config.pasteOnMiddleClick}
         """.trimIndent()
+
+    private fun parseIntSetting(
+        raw: String?,
+        defaultValue: Int,
+        min: Int,
+        max: Int,
+    ): Int {
+        val text = raw?.trim() ?: return defaultValue
+        val parsed = text.toLongOrNull()
+        if (parsed != null) {
+            return parsed.coerceIn(min.toLong(), max.toLong()).toInt()
+        }
+        if (isSignedIntegerText(text)) {
+            return if (text.startsWith("-")) min else max
+        }
+        return defaultValue
+    }
+
+    private fun isSignedIntegerText(text: String): Boolean {
+        val start = if (text.startsWith("-") || text.startsWith("+")) 1 else 0
+        if (start == text.length) return false
+        for (index in start until text.length) {
+            if (!text[index].isDigit()) return false
+        }
+        return true
+    }
+
+    private fun parseFloatSetting(
+        raw: String?,
+        defaultValue: Float,
+        min: Float,
+        max: Float,
+    ): Float {
+        val text = raw?.trim() ?: return defaultValue
+        val parsed = text.toFloatOrNull() ?: return defaultValue
+        if (parsed.isNaN()) return defaultValue
+        return parsed.coerceIn(min, max)
+    }
 
     companion object {
         /**
