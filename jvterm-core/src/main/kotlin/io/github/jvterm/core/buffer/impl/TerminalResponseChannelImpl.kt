@@ -15,7 +15,6 @@
  */
 package io.github.jvterm.core.buffer.impl
 
-import com.gagik.terminal.protocol.ControlCode
 import com.gagik.terminal.render.api.TerminalRenderCursorShape
 import io.github.jvterm.core.api.TerminalResponseChannel
 import io.github.jvterm.core.codec.AttributeCodec
@@ -225,7 +224,7 @@ internal class TerminalResponseChannelImpl(
         status: Int,
         responseData: String,
     ) {
-        state.hostResponses.enqueueByte(ControlCode.ESC)
+        state.hostResponses.enqueueByte(_root_ide_package_.io.github.jvterm.protocol.ControlCode.ESC)
         state.hostResponses.enqueueByte('P'.code)
         state.hostResponses.enqueuePositiveDecimal(status)
         state.hostResponses.enqueueByte('$'.code)
@@ -301,7 +300,7 @@ internal class TerminalResponseChannelImpl(
 
     /** Emits `ESC P [statusChar] + r`. */
     private fun enqueueXtgettcapPrefix(statusChar: Char) {
-        state.hostResponses.enqueueByte(ControlCode.ESC)
+        state.hostResponses.enqueueByte(_root_ide_package_.io.github.jvterm.protocol.ControlCode.ESC)
         state.hostResponses.enqueueByte('P'.code)
         state.hostResponses.enqueueByte(statusChar.code)
         state.hostResponses.enqueueByte('+'.code)
@@ -493,17 +492,17 @@ internal class TerminalResponseChannelImpl(
     }
 
     private fun enqueueOscPrefix() {
-        state.hostResponses.enqueueByte(ControlCode.ESC)
+        state.hostResponses.enqueueByte(_root_ide_package_.io.github.jvterm.protocol.ControlCode.ESC)
         state.hostResponses.enqueueByte(']'.code)
     }
 
     private fun enqueueStSuffix() {
-        state.hostResponses.enqueueByte(ControlCode.ESC)
+        state.hostResponses.enqueueByte(_root_ide_package_.io.github.jvterm.protocol.ControlCode.ESC)
         state.hostResponses.enqueueByte('\\'.code)
     }
 
     private fun enqueueCsiPrefix() {
-        state.hostResponses.enqueueByte(ControlCode.ESC)
+        state.hostResponses.enqueueByte(_root_ide_package_.io.github.jvterm.protocol.ControlCode.ESC)
         state.hostResponses.enqueueByte('['.code)
     }
 

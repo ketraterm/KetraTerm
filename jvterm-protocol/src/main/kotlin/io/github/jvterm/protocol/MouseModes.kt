@@ -13,15 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.protocol.keyboard
+package io.github.jvterm.protocol
 
-/**
- * Xterm formatOtherKeys values stored in core's packed input-mode word.
- */
-object FormatOtherKeysMode {
-    /** Use the original xterm `CSI 27 ; modifier ; codepoint ~` format. */
-    const val DEFAULT: Int = 0
+/** Mouse tracking selection toggled by DECSET private modes. */
+enum class MouseTrackingMode {
+    OFF,
+    X10,
+    NORMAL,
+    BUTTON_EVENT,
+    ANY_EVENT,
+}
 
-    /** Use xterm's compact `CSI codepoint ; modifier u` format. */
-    const val CSI_U: Int = 1
+/** Mouse report encoding selected by xterm private modes. */
+enum class MouseEncodingMode {
+    DEFAULT,
+    UTF8,
+    SGR,
+    URXVT,
 }

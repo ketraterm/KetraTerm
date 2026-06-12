@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.protocol.keyboard
+package io.github.jvterm.protocol.keyboard
 
 /**
  * Kitty keyboard numeric codes for functional keys in the initial input slice.

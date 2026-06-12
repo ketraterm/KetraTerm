@@ -1,4 +1,4 @@
-# Terminal Protocol (`:terminal-protocol`)
+# Terminal Protocol (`:jvterm-protocol`)
 
 The `terminal-protocol` module represents the zero-dependency, immutable core vocabulary of **Lattice Terminal**. It defines the fundamental, standard-aligned constants, enumerations, and interfaces shared by the parser, headless core, host layers, input encoders, and host-bound transports. 
 
@@ -8,20 +8,20 @@ By centralizing ANSI/DEC protocol keys, mode identifiers, and low-level byte sin
 
 ## Architectural Boundaries & Scope
 
-To maintain a strict separation of concerns, `terminal-protocol` operates under clear architectural rules and limits. It contains **no execution logic**.
+To maintain a strict separation of concerns, `jvterm-protocol` operates under clear architectural rules and limits. It contains **no execution logic**.
 
 ```mermaid
 graph TD
     %% Define Module Nodes
-    Sub["terminal-protocol"]
-    Parser[terminal-parser]
+    Sub["jvterm-protocol"]
+    Parser[jvterm-parser]
     style Sub fill:#2c3e50,stroke:#34495e,stroke-width:2px,color:#fff 
-    Parser[terminal-parser]
-    Core[terminal-core]
-    In[terminal-input]
-    Session[terminal-session]
-    Int[terminal-host]
-    UI[terminal-ui-swing]
+    Parser[jvterm-parser]
+    Core[jvterm-core]
+    In[jvterm-input]
+    Session[jvterm-session]
+    Int[jvterm-host]
+    UI[jvterm-ui-swing]
 
     %% Dependencies
     Parser -->|Depends on| Sub

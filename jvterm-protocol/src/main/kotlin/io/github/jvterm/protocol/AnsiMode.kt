@@ -13,17 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.protocol.keyboard
+package io.github.jvterm.protocol
 
 /**
- * Xterm XTMODKEYS resource ids used by `CSI > Pp ; Pv m`.
+ * Standard ANSI modes used in terminal emulation.
  *
- * Values mirror xterm's control-sequences table for "Set/reset key modifier
- * options (XTMODKEYS)":
- * <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html>.
- * In that table, `Pp = 4` selects modifyOtherKeys.
+ * Toggled via CSI Pn h (SM) and CSI Pn l (RM).
  */
-object XtermKeyModifierResource {
-    /** modifyOtherKeys resource id. */
-    const val MODIFY_OTHER_KEYS: Int = 4
+object AnsiMode {
+    const val INSERT: Int = 4
+    const val NEW_LINE: Int = 20
 }

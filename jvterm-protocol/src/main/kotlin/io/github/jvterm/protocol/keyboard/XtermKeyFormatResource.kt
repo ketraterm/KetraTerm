@@ -13,14 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.protocol
+package io.github.jvterm.protocol.keyboard
 
 /**
- * Standard ANSI modes used in terminal emulation.
+ * Xterm XTFMTKEYS resource ids used by `CSI > Pp ; Pv f`.
  *
- * Toggled via CSI Pn h (SM) and CSI Pn l (RM).
+ * Values mirror xterm's control-sequences table for "Set/reset key format
+ * options (XTFMTKEYS)":
+ * <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html>.
+ * In that table, `Pp = 4` selects formatOtherKeys.
  */
-object AnsiMode {
-    const val INSERT: Int = 4
-    const val NEW_LINE: Int = 20
+object XtermKeyFormatResource {
+    /** formatOtherKeys resource id. */
+    const val FORMAT_OTHER_KEYS: Int = 4
 }

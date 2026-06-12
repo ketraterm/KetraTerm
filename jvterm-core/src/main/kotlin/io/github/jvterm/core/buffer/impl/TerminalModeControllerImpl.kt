@@ -15,8 +15,6 @@
  */
 package io.github.jvterm.core.buffer.impl
 
-import com.gagik.terminal.protocol.MouseEncodingMode
-import com.gagik.terminal.protocol.MouseTrackingMode
 import com.gagik.terminal.render.api.TerminalColorPalette
 import com.gagik.terminal.render.api.TerminalRenderCursorShape
 import io.github.jvterm.core.api.TerminalModeController
@@ -67,11 +65,11 @@ internal class TerminalModeControllerImpl(
         mutateMode { state.modes.isNewLineMode = enabled }
     }
 
-    override fun setMouseTrackingMode(mode: MouseTrackingMode) {
+    override fun setMouseTrackingMode(mode: io.github.jvterm.protocol.MouseTrackingMode) {
         mutateMode { state.modes.mouseTrackingMode = mode }
     }
 
-    override fun setMouseEncodingMode(mode: MouseEncodingMode) {
+    override fun setMouseEncodingMode(mode: io.github.jvterm.protocol.MouseEncodingMode) {
         mutateMode { state.modes.mouseEncodingMode = mode }
     }
 

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.protocol.keyboard
+package io.github.jvterm.protocol.keyboard
 
 /**
  * Kitty keyboard progressive-enhancement bit flags used by `CSI = flags ; mode u`.

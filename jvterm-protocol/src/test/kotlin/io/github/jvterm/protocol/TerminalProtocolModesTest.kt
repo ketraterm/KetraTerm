@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.protocol
+package io.github.jvterm.protocol
 
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals

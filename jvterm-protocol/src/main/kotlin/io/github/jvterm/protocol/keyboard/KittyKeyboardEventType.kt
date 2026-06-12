@@ -13,20 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.protocol.keyboard
+package io.github.jvterm.protocol.keyboard
 
 /**
- * Kitty keyboard progressive-enhancement flag application modes.
+ * Kitty keyboard event-type values used in the second CSI-u parameter field.
  *
- * These are the optional second parameter in `CSI = flags ; mode u`.
+ * Values mirror kitty's "Comprehensive keyboard handling in terminals"
+ * protocol:
+ * <https://sw.kovidgoyal.net/kitty/keyboard-protocol/>.
  */
-object KittyKeyboardFlagApplicationMode {
-    /** Replace the active flag word with the supplied flags. */
-    const val REPLACE: Int = 1
+object KittyKeyboardEventType {
+    /** Key press event, the default when no event type subfield is present. */
+    const val PRESS: Int = 1
 
-    /** Set supplied bits and leave omitted bits unchanged. */
-    const val SET: Int = 2
+    /** Key repeat event. */
+    const val REPEAT: Int = 2
 
-    /** Clear supplied bits and leave omitted bits unchanged. */
-    const val CLEAR: Int = 3
+    /** Key release event. */
+    const val RELEASE: Int = 3
 }

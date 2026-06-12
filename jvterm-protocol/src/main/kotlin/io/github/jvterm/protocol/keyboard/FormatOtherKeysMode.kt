@@ -13,22 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.protocol.keyboard
+package io.github.jvterm.protocol.keyboard
 
 /**
- * Kitty keyboard event-type values used in the second CSI-u parameter field.
- *
- * Values mirror kitty's "Comprehensive keyboard handling in terminals"
- * protocol:
- * <https://sw.kovidgoyal.net/kitty/keyboard-protocol/>.
+ * Xterm formatOtherKeys values stored in core's packed input-mode word.
  */
-object KittyKeyboardEventType {
-    /** Key press event, the default when no event type subfield is present. */
-    const val PRESS: Int = 1
+object FormatOtherKeysMode {
+    /** Use the original xterm `CSI 27 ; modifier ; codepoint ~` format. */
+    const val DEFAULT: Int = 0
 
-    /** Key repeat event. */
-    const val REPEAT: Int = 2
-
-    /** Key release event. */
-    const val RELEASE: Int = 3
+    /** Use xterm's compact `CSI codepoint ; modifier u` format. */
+    const val CSI_U: Int = 1
 }

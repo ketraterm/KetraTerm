@@ -13,21 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.protocol
+package io.github.jvterm.protocol.keyboard
 
-/** Mouse tracking selection toggled by DECSET private modes. */
-enum class MouseTrackingMode {
-    OFF,
-    X10,
-    NORMAL,
-    BUTTON_EVENT,
-    ANY_EVENT,
-}
+/**
+ * Kitty keyboard progressive-enhancement flag application modes.
+ *
+ * These are the optional second parameter in `CSI = flags ; mode u`.
+ */
+object KittyKeyboardFlagApplicationMode {
+    /** Replace the active flag word with the supplied flags. */
+    const val REPLACE: Int = 1
 
-/** Mouse report encoding selected by xterm private modes. */
-enum class MouseEncodingMode {
-    DEFAULT,
-    UTF8,
-    SGR,
-    URXVT,
+    /** Set supplied bits and leave omitted bits unchanged. */
+    const val SET: Int = 2
+
+    /** Clear supplied bits and leave omitted bits unchanged. */
+    const val CLEAR: Int = 3
 }

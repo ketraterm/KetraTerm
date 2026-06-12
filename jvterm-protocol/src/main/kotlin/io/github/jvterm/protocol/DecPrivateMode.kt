@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.protocol
+package io.github.jvterm.protocol
 
 /**
  * Common DEC private modes used in terminal emulation.

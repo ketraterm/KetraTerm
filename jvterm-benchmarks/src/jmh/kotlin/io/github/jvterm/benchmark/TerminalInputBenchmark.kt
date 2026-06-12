@@ -15,7 +15,6 @@
  */
 package io.github.jvterm.benchmark
 
-import com.gagik.terminal.protocol.host.TerminalHostOutput
 import io.github.jvterm.core.api.TerminalInputState
 import io.github.jvterm.core.api.TerminalModeBits
 import io.github.jvterm.input.api.TerminalInputEncoder
@@ -171,7 +170,7 @@ private class FixedInputState(
 }
 
 /** Counting output sink that records the number of bytes written. */
-private class CountingHostOutput : TerminalHostOutput {
+private class CountingHostOutput : io.github.jvterm.protocol.host.TerminalHostOutput {
     @JvmField
     var count: Int = 0
 

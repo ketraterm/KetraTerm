@@ -15,9 +15,6 @@
  */
 package io.github.jvterm.core.api
 
-import com.gagik.terminal.protocol.MouseEncodingMode
-import com.gagik.terminal.protocol.MouseTrackingMode
-
 /**
  * Immutable snapshot of the terminal's durable mode state.
  *
@@ -39,8 +36,8 @@ data class TerminalModeSnapshot(
     val isBracketedPasteEnabled: Boolean,
     val isFocusReportingEnabled: Boolean,
     val treatAmbiguousAsWide: Boolean,
-    val mouseTrackingMode: MouseTrackingMode,
-    val mouseEncodingMode: MouseEncodingMode,
+    val mouseTrackingMode: io.github.jvterm.protocol.MouseTrackingMode,
+    val mouseEncodingMode: io.github.jvterm.protocol.MouseEncodingMode,
     val modifyOtherKeysMode: Int,
     val formatOtherKeysMode: Int,
     /** Active Kitty keyboard progressive-enhancement flags stored by core. */

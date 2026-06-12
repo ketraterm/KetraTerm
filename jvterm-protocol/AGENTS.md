@@ -1,6 +1,6 @@
 # Terminal Protocol Agent Guide
 
-`terminal-protocol` holds dependency-free terminal protocol vocabulary shared by
+`jvterm-protocol` holds dependency-free terminal protocol vocabulary shared by
 parser, core, host, input, and host-facing modules.
 
 ## Boundary

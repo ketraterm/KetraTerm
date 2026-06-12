@@ -15,12 +15,12 @@
  */
 package io.github.jvterm.core.model
 
-import com.gagik.terminal.protocol.MouseEncodingMode
-import com.gagik.terminal.protocol.MouseTrackingMode
-import com.gagik.terminal.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.jvterm.core.api.TerminalInputState
 import io.github.jvterm.core.api.TerminalModeBits
 import io.github.jvterm.core.api.TerminalModeSnapshot
+import io.github.jvterm.protocol.MouseEncodingMode
+import io.github.jvterm.protocol.MouseTrackingMode
+import io.github.jvterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import java.util.concurrent.atomic.AtomicLong
 
 /**

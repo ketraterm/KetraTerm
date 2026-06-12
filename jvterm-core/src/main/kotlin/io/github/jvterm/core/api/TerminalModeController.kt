@@ -15,8 +15,6 @@
  */
 package io.github.jvterm.core.api
 
-import com.gagik.terminal.protocol.MouseEncodingMode
-import com.gagik.terminal.protocol.MouseTrackingMode
 import com.gagik.terminal.render.api.TerminalColorPalette
 import com.gagik.terminal.render.api.TerminalRenderCursorShape
 
@@ -59,10 +57,10 @@ interface TerminalModeController {
     fun setNewLineMode(enabled: Boolean)
 
     /** Sets the active mouse tracking mode used by terminal-to-host reporting. */
-    fun setMouseTrackingMode(mode: MouseTrackingMode)
+    fun setMouseTrackingMode(mode: io.github.jvterm.protocol.MouseTrackingMode)
 
     /** Sets the active mouse report encoding mode used by terminal-to-host reporting. */
-    fun setMouseEncodingMode(mode: MouseEncodingMode)
+    fun setMouseEncodingMode(mode: io.github.jvterm.protocol.MouseEncodingMode)
 
     /** Enables or disables bracketed paste reporting (`CSI ? 2004 h` / `CSI ? 2004 l`). */
     fun setBracketedPasteEnabled(enabled: Boolean)
