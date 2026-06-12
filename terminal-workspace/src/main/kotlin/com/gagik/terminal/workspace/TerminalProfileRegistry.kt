@@ -46,13 +46,7 @@ class TerminalProfileRegistry(
         if (isWindows()) {
             windowsProfiles()
         } else {
-            listOf(
-                TerminalProfile(
-                    id = "default-shell",
-                    displayName = "Default Shell",
-                    command = TerminalPtyOptions.defaultCommand(),
-                ),
-            )
+            unixProfiles()
         }
 
     /**
@@ -154,6 +148,70 @@ class TerminalProfileRegistry(
                 displayName = "Command Prompt",
                 command = listOf(commandPromptExecutable()),
             )
+        return profiles
+    }
+
+    private fun unixProfiles(): List<TerminalProfile> {
+        val profiles = ArrayList<TerminalProfile>(5)
+
+        val zsh = executableOnPath("zsh")
+        if (zsh != null) {
+            profiles +=
+                TerminalProfile(
+                    id = "zsh",
+                    displayName = "Zsh",
+                    command = listOf(zsh.toString(), "-l"),
+                )
+        }
+
+        val bash = executableOnPath("bash")
+        if (bash != null) {
+            profiles +=
+                TerminalProfile(
+                    id = "bash",
+                    displayName = "Bash",
+                    command = listOf(bash.toString(), "-l"),
+                )
+        }
+
+        val fish = executableOnPath("fish")
+        if (fish != null) {
+            profiles +=
+                TerminalProfile(
+                    id = "fish",
+                    displayName = "Fish",
+                    command = listOf(fish.toString(), "-l"),
+                )
+        }
+
+        val nu = executableOnPath("nu")
+        if (nu != null) {
+            profiles +=
+                TerminalProfile(
+                    id = "nushell",
+                    displayName = "Nushell",
+                    command = listOf(nu.toString()),
+                )
+        }
+
+        val sh = executableOnPath("sh")
+        if (sh != null) {
+            profiles +=
+                TerminalProfile(
+                    id = "sh",
+                    displayName = "Sh",
+                    command = listOf(sh.toString()),
+                )
+        }
+
+        if (profiles.isEmpty()) {
+            profiles +=
+                TerminalProfile(
+                    id = "default-shell",
+                    displayName = "Default Shell",
+                    command = TerminalPtyOptions.defaultCommand(),
+                )
+        }
         return profiles
     }
 

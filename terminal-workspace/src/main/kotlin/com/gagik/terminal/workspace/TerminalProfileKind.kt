@@ -38,6 +38,21 @@ enum class TerminalProfileKind {
     /** Ubuntu launched directly or through WSL. */
     UBUNTU,
 
+    /** GNU Bash. */
+    BASH,
+
+    /** Z Shell. */
+    ZSH,
+
+    /** Friendly Interactive Shell. */
+    FISH,
+
+    /** Nushell. */
+    NUSHELL,
+
+    /** Windows Subsystem for Linux (WSL) general command. */
+    WSL,
+
     /** Generic POSIX-family interactive shells such as sh, bash, zsh, or fish. */
     UNIX_SHELL,
 
@@ -69,6 +84,11 @@ enum class TerminalProfileKind {
             if (isCommandPrompt(executable, normalizedId, normalizedName)) return COMMAND_PROMPT
             if (isUbuntu(executable, normalizedId, normalizedName, command)) return UBUNTU
             if (isGitBash(executable, fullCommand, normalizedId, normalizedName)) return GIT_BASH
+            if (isWsl(executable, normalizedId, normalizedName)) return WSL
+            if (isBash(executable, normalizedId, normalizedName)) return BASH
+            if (isZsh(executable, normalizedId, normalizedName)) return ZSH
+            if (isFish(executable, normalizedId, normalizedName)) return FISH
+            if (isNushell(executable, normalizedId, normalizedName)) return NUSHELL
             if (isUnixShell(executable)) return UNIX_SHELL
             return DEFAULT
         }
@@ -122,6 +142,58 @@ enum class TerminalProfileKind {
                 executable in gitBashExecutables ||
                 fullCommand.contains("/mingw") ||
                 fullCommand.contains("/msys")
+
+        private fun isWsl(
+            executable: String,
+            id: String,
+            displayName: String,
+        ): Boolean =
+            executable == "wsl.exe" ||
+                executable == "wsl" ||
+                id == "wsl" ||
+                displayName.contains("wsl")
+
+        private fun isBash(
+            executable: String,
+            id: String,
+            displayName: String,
+        ): Boolean =
+            executable == "bash.exe" ||
+                executable == "bash" ||
+                id == "bash" ||
+                displayName.contains("bash")
+
+        private fun isZsh(
+            executable: String,
+            id: String,
+            displayName: String,
+        ): Boolean =
+            executable == "zsh.exe" ||
+                executable == "zsh" ||
+                id == "zsh" ||
+                displayName.contains("zsh")
+
+        private fun isFish(
+            executable: String,
+            id: String,
+            displayName: String,
+        ): Boolean =
+            executable == "fish.exe" ||
+                executable == "fish" ||
+                id == "fish" ||
+                displayName.contains("fish")
+
+        private fun isNushell(
+            executable: String,
+            id: String,
+            displayName: String,
+        ): Boolean =
+            executable == "nu.exe" ||
+                executable == "nu" ||
+                id == "nushell" ||
+                id == "nu" ||
+                displayName.contains("nushell") ||
+                displayName.contains("nu shell")
 
         private fun isUnixShell(executable: String): Boolean = executable in unixShellExecutables
 

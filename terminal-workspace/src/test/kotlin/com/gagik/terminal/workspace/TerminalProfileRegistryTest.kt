@@ -68,7 +68,7 @@ class TerminalProfileRegistryTest {
         assertEquals("command-line", profile.id)
         assertEquals("/bin/zsh", profile.displayName)
         assertEquals(listOf("/bin/zsh", "-l"), profile.command)
-        assertEquals(TerminalProfileKind.UNIX_SHELL, profile.kind)
+        assertEquals(TerminalProfileKind.ZSH, profile.kind)
     }
 
     @Test
@@ -171,7 +171,7 @@ class TerminalProfileRegistryTest {
         assertEquals("configured-shell", profile.id)
         assertEquals("nu.exe", profile.displayName)
         assertEquals(listOf("C:\\tools\\nu.exe"), profile.command)
-        assertEquals(TerminalProfileKind.DEFAULT, profile.kind)
+        assertEquals(TerminalProfileKind.NUSHELL, profile.kind)
     }
 
     @Test
@@ -185,7 +185,7 @@ class TerminalProfileRegistryTest {
         val profile = registry.configuredProfile("/bin/zsh")
 
         assertEquals("configured-shell", profile.id)
-        assertEquals(TerminalProfileKind.UNIX_SHELL, profile.kind)
+        assertEquals(TerminalProfileKind.ZSH, profile.kind)
         assertEquals(listOf("/bin/zsh"), profile.command)
     }
 

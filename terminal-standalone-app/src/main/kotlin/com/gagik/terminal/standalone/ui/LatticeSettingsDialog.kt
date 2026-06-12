@@ -17,10 +17,14 @@ package com.gagik.terminal.standalone.ui
 
 import com.gagik.terminal.standalone.config.StandaloneTerminalSettings
 import com.gagik.terminal.ui.swing.settings.TerminalTheme
+import com.gagik.terminal.workspace.TerminalProfile
+import com.gagik.terminal.workspace.TerminalProfileKind
+import com.gagik.terminal.workspace.TerminalProfileRegistry
 import com.gagik.terminal.workspace.config.TerminalConfig
 import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.nio.file.Path
 import java.util.*
 import javax.swing.*
 import javax.swing.border.EmptyBorder
@@ -31,6 +35,7 @@ import javax.swing.border.EmptyBorder
 internal class LatticeSettingsDialog(
     parent: JFrame,
     private val settings: StandaloneTerminalSettings,
+    private val profileRegistry: TerminalProfileRegistry,
     private val onApply: () -> Unit,
 ) : JDialog(parent, "Terminal Settings", true) {
     private val cardLayout = CardLayout()
@@ -87,22 +92,52 @@ internal class LatticeSettingsDialog(
         applySizing(this, width)
     }
 
-    private fun detectShells(): Array<String> {
-        val os = System.getProperty("os.name").lowercase(Locale.ROOT)
-        val base =
-            if (os.contains("win")) {
-                arrayOf("powershell.exe", "cmd.exe", "pwsh.exe", "wsl.exe", "git-bash.exe")
-            } else {
-                arrayOf("/bin/bash", "/bin/zsh", "/usr/bin/fish", "/bin/sh")
-            }
-        return base + "Custom..."
-    }
-
-    private val availableShells = detectShells()
-    private val isCustomShell = !availableShells.dropLast(1).contains(settings.shellPath)
+    private val availableProfiles = profileRegistry.availableProfiles()
+    private val matchedProfile =
+        availableProfiles.firstOrNull { profile ->
+            val exec = profile.command.firstOrNull() ?: ""
+            exec.equals(settings.shellPath, ignoreCase = true) ||
+                runCatching { Path.of(exec).fileName?.toString() }
+                    .getOrNull()
+                    ?.equals(settings.shellPath, ignoreCase = true) == true
+        }
+    private val isCustomShell = matchedProfile == null
 
     // Form Controls - Application
-    private val shellPathCombo = createComboBox(availableShells, if (isCustomShell) "Custom..." else settings.shellPath, 220)
+    private val shellPathCombo =
+        JComboBox<Any>().apply {
+            availableProfiles.forEach { addItem(it) }
+            addItem("Custom...")
+            selectedItem = matchedProfile ?: "Custom..."
+            renderer =
+                object : DefaultListCellRenderer() {
+                    private val profileIcons = LatticeProfileIcons()
+
+                    override fun getListCellRendererComponent(
+                        list: JList<*>?,
+                        value: Any?,
+                        index: Int,
+                        isSelected: Boolean,
+                        cellHasFocus: Boolean,
+                    ): Component {
+                        val label =
+                            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus) as JLabel
+                        if (value is TerminalProfile) {
+                            label.text = value.displayName
+                            label.icon = profileIcons.icon(value.kind)
+                        } else if (value is String) {
+                            label.text = value
+                            if (value == "Custom...") {
+                                label.icon = profileIcons.icon(TerminalProfileKind.DEFAULT)
+                            } else {
+                                label.icon = null
+                            }
+                        }
+                        return label
+                    }
+                }
+            applySizing(this, 220)
+        }
     private val customShellField = createTextField(if (isCustomShell) settings.shellPath else "", 140) // Will be wrapped with button
     private val startDirectoryField = createTextField(settings.startDirectory, 140) // Will be wrapped with button
     private val audibleBellCheckbox = JCheckBox("Audible bell", settings.audibleBell)
@@ -477,10 +512,11 @@ internal class LatticeSettingsDialog(
         }
 
     private fun applyChanges() {
-        if (shellPathCombo.selectedItem == "Custom...") {
-            settings.shellPath = customShellField.text
+        val selected = shellPathCombo.selectedItem
+        if (selected is TerminalProfile) {
+            settings.shellPath = selected.command.firstOrNull() ?: ""
         } else {
-            settings.shellPath = shellPathCombo.selectedItem as String
+            settings.shellPath = customShellField.text
         }
         settings.startDirectory = startDirectoryField.text
         settings.audibleBell = audibleBellCheckbox.isSelected

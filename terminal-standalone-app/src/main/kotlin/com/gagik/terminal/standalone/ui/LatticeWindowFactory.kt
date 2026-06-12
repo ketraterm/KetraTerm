@@ -132,9 +132,10 @@ internal class LatticeWindowFactory(
                 border = BorderFactory.createLineBorder(LatticeChrome.border)
             }
 
+        val profileIcons = LatticeProfileIcons()
         profiles.forEach { profile ->
             val item =
-                JMenuItem(profile.displayName).apply {
+                JMenuItem(profile.displayName, profileIcons.icon(profile.kind)).apply {
                     background = LatticeChrome.popupBackground
                     foreground = LatticeChrome.textPrimary
                     addActionListener {
@@ -162,7 +163,7 @@ internal class LatticeWindowFactory(
                 background = LatticeChrome.popupBackground
                 foreground = LatticeChrome.textPrimary
                 addActionListener {
-                    LatticeSettingsDialog(frame, settings) {
+                    LatticeSettingsDialog(frame, settings, profileRegistry) {
                         tabManager.reloadAllPanes()
                     }.isVisible = true
                 }

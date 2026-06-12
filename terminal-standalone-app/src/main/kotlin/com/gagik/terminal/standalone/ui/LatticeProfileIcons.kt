@@ -51,7 +51,7 @@ internal class LatticeProfileIcons {
         }
     }
 
-    private fun icon(profileKind: TerminalProfileKind): Icon =
+    internal fun icon(profileKind: TerminalProfileKind): Icon =
         icons.getOrPut(profileKind) {
             FlatSVGIcon(resourcePath(profileKind), ICON_WIDTH, ICON_HEIGHT)
         }
@@ -62,6 +62,11 @@ internal class LatticeProfileIcons {
             TerminalProfileKind.COMMAND_PROMPT -> "$RESOURCE_DIR/profile-command-prompt.svg"
             TerminalProfileKind.GIT_BASH -> "$RESOURCE_DIR/profile-git-bash.svg"
             TerminalProfileKind.UBUNTU -> "$RESOURCE_DIR/profile-ubuntu.svg"
+            TerminalProfileKind.BASH -> "$RESOURCE_DIR/profile-bash.svg"
+            TerminalProfileKind.ZSH -> "$RESOURCE_DIR/profile-zsh.svg"
+            TerminalProfileKind.FISH -> "$RESOURCE_DIR/profile-fish.svg"
+            TerminalProfileKind.NUSHELL -> "$RESOURCE_DIR/profile-nushell.svg"
+            TerminalProfileKind.WSL -> "$RESOURCE_DIR/profile-wsl.svg"
             TerminalProfileKind.UNIX_SHELL,
             TerminalProfileKind.DEFAULT,
             -> "$RESOURCE_DIR/profile-shell.svg"
