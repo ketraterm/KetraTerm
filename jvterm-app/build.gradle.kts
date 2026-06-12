@@ -20,15 +20,21 @@ plugins {
 }
 
 group = "com.gagik"
-version = "1.0-SNAPSHOT"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation(project(":jvterm-pty"))
+    implementation("com.formdev:flatlaf:3.6.1")
+    implementation("com.formdev:flatlaf-extras:3.6.1")
     implementation(project(":jvterm-ui-swing"))
+    implementation(project(":jvterm-workspace"))
+
+    runtimeOnly("org.slf4j:slf4j-nop:2.0.17")
+
+    testImplementation(kotlin("test"))
 }
 
 kotlin {
@@ -36,5 +42,16 @@ kotlin {
 }
 
 application {
-    mainClass.set("com.gagik.terminal.ui.swing.demo.TerminalSwingDemoKt")
+    mainClass.set("com.gagik.terminal.standalone.LatticeStandaloneAppKt")
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
+tasks.processResources {
+    inputs.property("version", project.version)
+    filesMatching("**/version.properties") {
+        expand(mapOf("version" to project.version))
+    }
 }

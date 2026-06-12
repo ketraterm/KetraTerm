@@ -15,26 +15,24 @@
  */
 
 plugins {
-    application
     kotlin("jvm")
 }
 
 group = "com.gagik"
 version = "1.0-SNAPSHOT"
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
+    api(project(":jvterm-session"))
     implementation(project(":jvterm-pty"))
-    implementation(project(":jvterm-ui-swing"))
+    implementation(project(":jvterm-render-api"))
+
+    testImplementation(kotlin("test"))
 }
 
 kotlin {
     jvmToolchain(21)
 }
 
-application {
-    mainClass.set("com.gagik.terminal.ui.swing.demo.TerminalSwingDemoKt")
+tasks.test {
+    useJUnitPlatform()
 }

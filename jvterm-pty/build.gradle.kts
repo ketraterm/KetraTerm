@@ -15,7 +15,7 @@
  */
 
 plugins {
-    application
+    id("java-library")
     kotlin("jvm")
 }
 
@@ -27,14 +27,21 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":jvterm-pty"))
-    implementation(project(":jvterm-ui-swing"))
+    implementation(project(":jvterm-core"))
+    implementation(project(":jvterm-host"))
+    implementation(project(":jvterm-input"))
+    api(project(":jvterm-session"))
+    implementation(project(":jvterm-transport-api"))
+    implementation("org.jetbrains.pty4j:pty4j:0.13.12")
+
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
 }
 
 kotlin {
     jvmToolchain(21)
 }
 
-application {
-    mainClass.set("com.gagik.terminal.ui.swing.demo.TerminalSwingDemoKt")
+tasks.test {
+    useJUnitPlatform()
 }

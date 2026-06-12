@@ -15,7 +15,6 @@
  */
 
 plugins {
-    application
     kotlin("jvm")
 }
 
@@ -27,14 +26,16 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":jvterm-pty"))
-    implementation(project(":jvterm-ui-swing"))
+
+    api(project(":jvterm-render-api"))
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
 }
 
 kotlin {
     jvmToolchain(21)
 }
 
-application {
-    mainClass.set("com.gagik.terminal.ui.swing.demo.TerminalSwingDemoKt")
+tasks.test {
+    useJUnitPlatform()
 }

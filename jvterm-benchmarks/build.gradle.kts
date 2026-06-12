@@ -15,26 +15,38 @@
  */
 
 plugins {
-    application
     kotlin("jvm")
+    id("me.champeau.jmh") version "0.7.3"
 }
-
-group = "com.gagik"
-version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation(project(":jvterm-pty"))
+    implementation(project(":jvterm-core"))
+    implementation(project(":jvterm-host"))
+    implementation(project(":jvterm-parser"))
+    implementation(project(":jvterm-render-api"))
+    implementation(project(":jvterm-render-cache"))
+    implementation(project(":jvterm-protocol"))
+    implementation(project(":jvterm-session"))
+    implementation(project(":jvterm-input"))
     implementation(project(":jvterm-ui-swing"))
+
+    implementation("org.openjdk.jmh:jmh-core:1.37")
+    annotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:1.37")
 }
 
 kotlin {
     jvmToolchain(21)
 }
 
-application {
-    mainClass.set("com.gagik.terminal.ui.swing.demo.TerminalSwingDemoKt")
+jmh {
+    warmupIterations.set(3)
+    iterations.set(5)
+    fork.set(1)
+    benchmarkMode.set(listOf("thrpt"))
+    timeUnit.set("ms")
+    profilers.set(listOf("gc"))
 }
