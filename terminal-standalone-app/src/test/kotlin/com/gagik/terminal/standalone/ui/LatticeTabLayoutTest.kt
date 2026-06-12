@@ -27,8 +27,8 @@ class LatticeTabLayoutTest {
     }
 
     @Test
-    fun preferredTabWidthClampsTextWidthToSupportedRange() {
-        assertEquals(110, LatticeTabLayoutCalculator.preferredTabWidth(0))
+    fun preferredTabWidthIsFixed() {
+        assertEquals(220, LatticeTabLayoutCalculator.preferredTabWidth(0))
         assertEquals(220, LatticeTabLayoutCalculator.preferredTabWidth(300))
     }
 

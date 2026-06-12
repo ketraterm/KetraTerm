@@ -42,6 +42,7 @@ internal object LatticeTabMetrics {
     const val MIN_LABEL_TEXT_WIDTH = 50
     const val MAX_LABEL_TEXT_WIDTH = 160
     const val MIN_TAB_WIDTH = 100
+    const val PREFERRED_TAB_WIDTH = 220
     val HAIRLINE_STROKE: BasicStroke = BasicStroke(1f)
     val DIVIDER_STROKE: BasicStroke = BasicStroke(1.2f)
     val ICON_DETAIL_STROKE: BasicStroke = BasicStroke(1f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
@@ -96,17 +97,7 @@ internal data class LatticeTabLayout(
  */
 internal object LatticeTabLayoutCalculator {
     fun preferredTabWidth(titleTextWidth: Int): Int {
-        val textWidth =
-            titleTextWidth.coerceIn(
-                LatticeTabMetrics.MIN_LABEL_TEXT_WIDTH,
-                LatticeTabMetrics.MAX_LABEL_TEXT_WIDTH,
-            )
-        return LatticeTabMetrics.TAB_LABEL_PADDING_LEFT +
-            LatticeTabMetrics.ICON_TEXT_GAP +
-            textWidth +
-            LatticeTabMetrics.CLOSE_BUTTON_SIZE +
-            LatticeTabMetrics.CLOSE_BUTTON_MARGIN_RIGHT +
-            LatticeTabMetrics.TAB_PADDING_RIGHT
+        return LatticeTabMetrics.PREFERRED_TAB_WIDTH
     }
 
     fun compute(
