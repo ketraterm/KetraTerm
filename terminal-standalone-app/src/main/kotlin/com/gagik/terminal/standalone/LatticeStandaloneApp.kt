@@ -52,12 +52,19 @@ private object LatticeStandaloneApp {
                 .takeIf { it.isNotBlank() }
                 ?.let { runCatching { Path.of(it) }.getOrNull() }
         val initialProfile =
-            profileRegistry.initialProfile(args).let { profile ->
-                if (initialWorkingDirectory != null && profile.workingDirectory == null) {
-                    profile.copy(workingDirectory = initialWorkingDirectory)
-                } else {
-                    profile
+            if (args.isNotEmpty()) {
+                profileRegistry.initialProfile(args).let { profile ->
+                    if (initialWorkingDirectory != null && profile.workingDirectory == null) {
+                        profile.copy(workingDirectory = initialWorkingDirectory)
+                    } else {
+                        profile
+                    }
                 }
+            } else {
+                profileRegistry.configuredProfile(
+                    shellPath = settings.shellPath,
+                    workingDirectory = initialWorkingDirectory,
+                )
             }
         window.tabManager.openTab(initialProfile)
         frame.pack()
