@@ -73,6 +73,13 @@ internal class LatticeTabBar(
     private var scrollLeftHovered = false
     private var scrollRightHovered = false
 
+    // Mouse hover and width lock state
+    private var isMouseOver = false
+    private var lastMouseX = -1
+    private var lastMouseY = -1
+    private var hoverTabWidthLock: Int? = null
+    private var lastWindowWidth = -1
+
     // Pressed state
     private var activePressedResult: HitResult = HitResult.None
 
@@ -92,6 +99,12 @@ internal class LatticeTabBar(
         addComponentListener(
             object : ComponentAdapter() {
                 override fun componentResized(e: ComponentEvent?) {
+                    val window = SwingUtilities.getWindowAncestor(this@LatticeTabBar)
+                    val currentWindowWidth = window?.width ?: -1
+                    if (lastWindowWidth != -1 && currentWindowWidth != lastWindowWidth) {
+                        hoverTabWidthLock = null
+                    }
+                    lastWindowWidth = currentWindowWidth
                     repaint() // trigger layout recalculation
                 }
             },
@@ -103,6 +116,7 @@ internal class LatticeTabBar(
     // -------------------------------------------------------------------------
 
     fun addTab(entry: TabEntry) {
+        hoverTabWidthLock = null
         val oldId = selectedId
         entries += entry
         selectedId = entry.id
@@ -121,6 +135,11 @@ internal class LatticeTabBar(
 
     fun removeTab(id: String) {
         val activeEditId = if (editingIndex in entries.indices) entries[editingIndex].id else null
+        if (isMouseOver && tabWidths.isNotEmpty()) {
+            if (hoverTabWidthLock == null) {
+                hoverTabWidthLock = tabWidths.first()
+            }
+        }
         entries.removeIf { it.id == id }
         if (selectedId == id) {
             selectedId = entries.lastOrNull()?.id
@@ -137,6 +156,11 @@ internal class LatticeTabBar(
         } else if (activeEditId != null) {
             editingIndex = entries.indexOfFirst { it.id == activeEditId }
         }
+        if (entries.isEmpty()) {
+            hoverTabWidthLock = null
+        }
+        val fm = getFontMetrics(font.deriveFont(13f))
+        updateHoverState(lastMouseX, lastMouseY, fm)
         revalidate()
         repaint()
     }
@@ -238,7 +262,13 @@ internal class LatticeTabBar(
 
     override fun getPreferredSize(): Dimension {
         val fm = getFontMetrics(font.deriveFont(13f))
-        val preferredWidths = entries.map { preferredTabWidth(it, fm) }
+        val lock = hoverTabWidthLock
+        val preferredWidths =
+            if (lock != null) {
+                List(entries.size) { lock }
+            } else {
+                entries.map { preferredTabWidth(it, fm) }
+            }
         val totalTabWidth = LatticeTabLayout.totalTabContentWidth(preferredWidths)
         val staticWidth = TAB_START_X + NEW_TAB_BUTTON_WIDTH + MENU_BUTTON_WIDTH + TRAILING_SPACE
         val prefW = totalTabWidth + staticWidth
@@ -259,13 +289,18 @@ internal class LatticeTabBar(
     override fun getMaximumSize(): Dimension = Dimension(preferredSize.width, 32767)
 
     private fun updateLayout(fm: FontMetrics) {
+        val lock = hoverTabWidthLock
         val prefWidths =
-            entries.mapIndexed { i, entry ->
-                val basePref = preferredTabWidth(entry, fm)
-                if (i == editingIndex) {
-                    maxOf(basePref, 220) // Expand the tab being renamed
-                } else {
-                    basePref
+            if (lock != null) {
+                List(entries.size) { lock }
+            } else {
+                entries.mapIndexed { i, entry ->
+                    val basePref = preferredTabWidth(entry, fm)
+                    if (i == editingIndex) {
+                        maxOf(basePref, 220) // Expand the tab being renamed
+                    } else {
+                        basePref
+                    }
                 }
             }
         layout = LatticeTabLayoutCalculator.compute(width, prefWidths, scrollOffset, editingIndex)
@@ -885,47 +920,39 @@ internal class LatticeTabBar(
                     }
                 }
 
+                override fun mouseEntered(e: MouseEvent) {
+                    isMouseOver = true
+                    lastMouseX = e.x
+                    lastMouseY = e.y
+                    val fm = getFontMetrics(font.deriveFont(13f))
+                    updateHoverState(e.x, e.y, fm)
+                }
+
                 override fun mouseExited(e: MouseEvent) {
-                    closeHoverIndex = -1
-                    tabHoverIndex = -1
-                    newTabHovered = false
-                    menuHovered = false
-                    scrollLeftHovered = false
-                    scrollRightHovered = false
+                    isMouseOver = false
+                    lastMouseX = -1
+                    lastMouseY = -1
+                    hoverTabWidthLock = null
+                    val fm = getFontMetrics(font.deriveFont(13f))
+                    updateHoverState(-1, -1, fm)
+                    revalidate()
                     repaint()
                 }
 
                 override fun mouseMoved(e: MouseEvent) {
+                    isMouseOver = true
+                    lastMouseX = e.x
+                    lastMouseY = e.y
                     val fm = getFontMetrics(font.deriveFont(13f))
-                    val hit = hitTest(e.x, e.y, fm)
-
-                    val prevClose = closeHoverIndex
-                    val prevTab = tabHoverIndex
-                    val prevNew = newTabHovered
-                    val prevMenu = menuHovered
-                    val prevScrollL = scrollLeftHovered
-                    val prevScrollR = scrollRightHovered
-
-                    closeHoverIndex = if (hit is HitResult.TabClose) hit.index else -1
-                    tabHoverIndex = if (hit is HitResult.Tab) hit.index else -1
-                    newTabHovered = hit is HitResult.NewTab
-                    menuHovered = hit is HitResult.Menu
-                    scrollLeftHovered = hit is HitResult.ScrollLeft
-                    scrollRightHovered = hit is HitResult.ScrollRight
-
-                    if (prevClose != closeHoverIndex ||
-                        prevTab != tabHoverIndex ||
-                        prevNew != newTabHovered ||
-                        prevMenu != menuHovered ||
-                        prevScrollL != scrollLeftHovered ||
-                        prevScrollR != scrollRightHovered
-                    ) {
-                        repaint()
-                    }
+                    updateHoverState(e.x, e.y, fm)
                 }
 
                 override fun mouseDragged(e: MouseEvent) {
-                    mouseMoved(e)
+                    isMouseOver = true
+                    lastMouseX = e.x
+                    lastMouseY = e.y
+                    val fm = getFontMetrics(font.deriveFont(13f))
+                    updateHoverState(e.x, e.y, fm)
                 }
 
                 override fun mouseWheelMoved(e: MouseWheelEvent) {
@@ -938,6 +965,38 @@ internal class LatticeTabBar(
         addMouseListener(adapter)
         addMouseMotionListener(adapter)
         addMouseWheelListener(adapter)
+    }
+
+    private fun updateHoverState(
+        x: Int,
+        y: Int,
+        fm: FontMetrics,
+    ) {
+        val hit = if (isMouseOver) hitTest(x, y, fm) else HitResult.None
+
+        val prevClose = closeHoverIndex
+        val prevTab = tabHoverIndex
+        val prevNew = newTabHovered
+        val prevMenu = menuHovered
+        val prevScrollL = scrollLeftHovered
+        val prevScrollR = scrollRightHovered
+
+        closeHoverIndex = if (hit is HitResult.TabClose) hit.index else -1
+        tabHoverIndex = if (hit is HitResult.Tab) hit.index else -1
+        newTabHovered = hit is HitResult.NewTab
+        menuHovered = hit is HitResult.Menu
+        scrollLeftHovered = hit is HitResult.ScrollLeft
+        scrollRightHovered = hit is HitResult.ScrollRight
+
+        if (prevClose != closeHoverIndex ||
+            prevTab != tabHoverIndex ||
+            prevNew != newTabHovered ||
+            prevMenu != menuHovered ||
+            prevScrollL != scrollLeftHovered ||
+            prevScrollR != scrollRightHovered
+        ) {
+            repaint()
+        }
     }
 
     private fun showContextMenuIfTabHit(e: MouseEvent) {

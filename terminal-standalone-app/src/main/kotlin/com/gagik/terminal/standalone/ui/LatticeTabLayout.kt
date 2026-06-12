@@ -96,9 +96,7 @@ internal data class LatticeTabLayout(
  * Calculates tab widths and action-button placement for [LatticeTabBar].
  */
 internal object LatticeTabLayoutCalculator {
-    fun preferredTabWidth(titleTextWidth: Int): Int {
-        return LatticeTabMetrics.PREFERRED_TAB_WIDTH
-    }
+    fun preferredTabWidth(titleTextWidth: Int): Int = LatticeTabMetrics.PREFERRED_TAB_WIDTH
 
     fun compute(
         componentWidth: Int,
