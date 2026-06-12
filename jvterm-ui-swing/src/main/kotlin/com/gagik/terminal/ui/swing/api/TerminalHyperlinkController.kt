@@ -15,8 +15,8 @@
  */
 package com.gagik.terminal.ui.swing.api
 
-import com.gagik.terminal.session.TerminalSession
 import io.github.jvterm.render.cache.TerminalRenderCache
+import io.github.jvterm.session.TerminalSession
 import java.awt.Cursor
 import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities

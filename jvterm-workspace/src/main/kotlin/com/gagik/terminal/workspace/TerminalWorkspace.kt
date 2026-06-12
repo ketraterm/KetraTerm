@@ -15,11 +15,11 @@
  */
 package com.gagik.terminal.workspace
 
-import com.gagik.terminal.session.TerminalSession
 import io.github.jvterm.pty.TerminalPtyEventListener
 import io.github.jvterm.pty.TerminalPtyOptions
 import io.github.jvterm.pty.TerminalPtySessions
 import io.github.jvterm.render.api.TerminalColorPalette
+import io.github.jvterm.session.TerminalSession
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 

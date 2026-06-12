@@ -15,9 +15,9 @@
  */
 package io.github.jvterm.pty
 
-import com.gagik.terminal.session.TerminalSession
 import io.github.jvterm.input.event.TerminalKey
 import io.github.jvterm.input.event.TerminalKeyEvent
+import io.github.jvterm.session.TerminalSession
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream

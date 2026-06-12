@@ -15,8 +15,8 @@
  */
 package io.github.jvterm.pty
 
-import com.gagik.terminal.session.TerminalSession
 import io.github.jvterm.core.TerminalBuffers
+import io.github.jvterm.session.TerminalSession
 import java.io.IOException
 
 /**

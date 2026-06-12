@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.session
+package io.github.jvterm.session
 
 import com.gagik.terminal.transport.TerminalConnector
 import com.gagik.terminal.transport.TerminalConnectorListener
@@ -40,6 +40,7 @@ import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.render.cache.TerminalRenderPublisher
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -514,8 +515,7 @@ class TerminalSession(
 
     companion object {
         private val SESSION_COUNTER =
-            java.util.concurrent.atomic
-                .AtomicInteger(1)
+            AtomicInteger(1)
         private const val RESPONSE_BUFFER_SIZE: Int = 1024
         private const val NO_RENDER_GENERATION: Long = -1L
         private const val SYNCHRONIZED_OUTPUT_TIMEOUT_MS: Long = 100L

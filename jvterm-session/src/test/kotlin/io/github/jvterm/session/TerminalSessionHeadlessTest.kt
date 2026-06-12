@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.session
+package io.github.jvterm.session
 
 import com.gagik.terminal.testkit.MockConnector
 import io.github.jvterm.core.TerminalBuffers

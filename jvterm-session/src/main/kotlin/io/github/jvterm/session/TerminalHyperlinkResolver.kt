@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.session
+package io.github.jvterm.session
 
 /**
  * Resolves primitive render-frame hyperlink ids to their OSC 8 target URI.

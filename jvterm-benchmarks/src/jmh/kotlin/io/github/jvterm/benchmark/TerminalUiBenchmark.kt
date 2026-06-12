@@ -15,7 +15,6 @@
  */
 package io.github.jvterm.benchmark
 
-import com.gagik.terminal.session.TerminalSession
 import com.gagik.terminal.transport.TerminalConnector
 import com.gagik.terminal.transport.TerminalConnectorListener
 import com.gagik.terminal.ui.swing.api.TerminalSwingTerminal
@@ -26,6 +25,7 @@ import io.github.jvterm.core.api.TerminalBufferApi
 import io.github.jvterm.host.CoreTerminalCommandSink
 import io.github.jvterm.parser.api.TerminalParsers
 import io.github.jvterm.render.cache.TerminalRenderPublisher
+import io.github.jvterm.session.TerminalSession
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.awt.Graphics2D

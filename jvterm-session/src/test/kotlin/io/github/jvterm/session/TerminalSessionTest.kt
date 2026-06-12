@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.session
+package io.github.jvterm.session
 
 import com.gagik.terminal.testkit.MockConnector
 import com.gagik.terminal.transport.TerminalConnector
 import com.gagik.terminal.transport.TerminalConnectorListener
 import io.github.jvterm.core.TerminalBuffers
+import io.github.jvterm.core.api.TerminalBufferApi
 import io.github.jvterm.input.api.TerminalInputEncoder
 import io.github.jvterm.input.event.TerminalFocusEvent
 import io.github.jvterm.input.event.TerminalKeyEvent
@@ -842,7 +843,7 @@ class TerminalSessionTest {
     }
 
     private class HalfRowParser(
-        private val terminal: io.github.jvterm.core.api.TerminalBufferApi,
+        private val terminal: TerminalBufferApi,
         private val firstWriteDone: CountDownLatch,
         private val releaseSecondWrite: CountDownLatch,
     ) : TerminalOutputParser {

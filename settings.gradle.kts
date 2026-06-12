@@ -17,7 +17,6 @@ include(
     ":jvterm-workspace",
     ":jvterm-app",
     ":jvterm-ui-swing",
-    ":terminal-ui-swing-demo",
     ":jvterm-benchmarks",
     ":jvterm-render-cache",
 )

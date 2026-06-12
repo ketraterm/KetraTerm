@@ -1,6 +1,6 @@
 # Terminal Session
 
-**terminal-session** is the central orchestration hub and runtime synchronization engine of the Lattice Terminal pipeline. It coordinates the data-flow between the asynchronous transport layer, the byte-stream parser, the headless terminal grid, and platform-agnostic keyboard/mouse input encoders. 
+**jvterm-session** is the central orchestration hub and runtime synchronization engine of the Lattice Terminal pipeline. It coordinates the data-flow between the asynchronous transport layer, the byte-stream parser, the headless terminal grid, and platform-agnostic keyboard/mouse input encoders. 
 
 The module is engineered to be highly performant, race-free, and allocation-minimal. It encapsulates the synchronization policies necessary to support concurrent multithreaded execution—ensuring that rapid host output, user keystrokes, window resizing, and UI rendering frames never corrupt the terminal state or produce rendering anomalies.
 

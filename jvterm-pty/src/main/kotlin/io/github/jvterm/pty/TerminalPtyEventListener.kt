@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.pty
 
-import com.gagik.terminal.session.TerminalSession
+import io.github.jvterm.session.TerminalSession
 
 /**
  * Host callbacks for a running PTY-backed terminal session.

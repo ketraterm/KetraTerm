@@ -24,7 +24,6 @@
             <option value="$PROJECT_DIR$/jvterm-transport-api" />
             <option value="$PROJECT_DIR$/jvterm-ui-swing" />
             <option value="$PROJECT_DIR$/jvterm-workspace" />
-            <option value="$PROJECT_DIR$/terminal-ui-swing-demo" />
           </set>
         </option>
       </GradleProjectSettings>

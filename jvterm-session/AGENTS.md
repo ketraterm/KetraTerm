@@ -1,6 +1,6 @@
 # Terminal Session Agent Guide
 
-`terminal-session` owns the runtime synchronization point that connects a
+`jvterm-session` owns the runtime synchronization point that connects a
 transport connector, parser, core buffer, response queue, and input encoder.
 
 ## Boundary
@@ -14,9 +14,9 @@ Session owns:
 - idempotent local close, remote close, and parser cleanup.
 
 It must not own transport threads, parse bytes itself, mutate core internals, or
-encode input outside `terminal-input`.
+encode input outside `jvterm-input`.
 
 ## Testing
 
-Use `terminal-testkit` connectors for lifecycle and ordering tests before PTY or
+Use `jvterm-testkit` connectors for lifecycle and ordering tests before PTY or
 UI tests. Tests should assert exact bytes and idempotent cleanup behavior.
