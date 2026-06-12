@@ -15,8 +15,8 @@
  */
 package io.github.jvterm.benchmark
 
-import com.gagik.parser.api.TerminalOutputParser
-import com.gagik.parser.api.TerminalParsers
+import io.github.jvterm.parser.api.TerminalOutputParser
+import io.github.jvterm.parser.api.TerminalParsers
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.nio.charset.StandardCharsets

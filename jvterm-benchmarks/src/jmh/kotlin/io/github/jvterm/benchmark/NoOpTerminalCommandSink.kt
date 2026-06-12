@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.benchmark
 
-import com.gagik.parser.spi.TerminalCommandSink
+import io.github.jvterm.parser.spi.TerminalCommandSink
 
 /**
  * No-op sink for parser-only benchmarks. Discards all commands to measure
