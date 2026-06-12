@@ -513,11 +513,19 @@ internal class LatticeSettingsDialog(
 
     private fun applyChanges() {
         val selected = shellPathCombo.selectedItem
-        if (selected is TerminalProfile) {
-            settings.shellPath = selected.command.firstOrNull() ?: ""
-        } else {
-            settings.shellPath = customShellField.text
-        }
+        val nextShellPath =
+            if (selected is TerminalProfile) {
+                selected.command.firstOrNull() ?: ""
+            } else {
+                customShellField.text
+            }
+        val finalShellPath =
+            if (profileRegistry.isValidShellPath(nextShellPath)) {
+                nextShellPath
+            } else {
+                TerminalConfig.DEFAULT_SHELL_PATH
+            }
+        settings.shellPath = finalShellPath
         settings.startDirectory = startDirectoryField.text
         settings.audibleBell = audibleBellCheckbox.isSelected
         settings.pasteOnMiddleClick = pasteOnMiddleClickCheckbox.isSelected

@@ -73,16 +73,61 @@ class TerminalProfileRegistry(
      */
     fun configuredProfile(
         shellPath: String,
-        workingDirectory: java.nio.file.Path? = null,
+        workingDirectory: Path? = null,
     ): TerminalProfile {
-        val command = listOf(shellPath)
-        val displayName = resolveDisplayName(shellPath)
+        val basename =
+            try {
+                Path.of(shellPath).fileName?.toString() ?: shellPath
+            } catch (_: RuntimeException) {
+                shellPath.substringAfterLast('\\').substringAfterLast('/')
+            }
+        val basenameLower = basename.lowercase(Locale.ROOT)
+        val builtIn =
+            availableProfiles().firstOrNull { profile ->
+                val profileExec =
+                    try {
+                        Path.of(profile.command.first()).fileName?.toString()
+                    } catch (_: RuntimeException) {
+                        profile.command
+                            .first()
+                            .substringAfterLast('\\')
+                            .substringAfterLast('/')
+                    }
+                profileExec?.lowercase(Locale.ROOT) == basenameLower
+            }
+        val command =
+            if (builtIn != null) {
+                listOf(shellPath) + builtIn.command.drop(1)
+            } else {
+                listOf(shellPath)
+            }
+        val displayName = builtIn?.displayName ?: basename
         return TerminalProfile(
             id = CONFIGURED_SHELL_ID,
             displayName = displayName,
             command = command,
             workingDirectory = workingDirectory,
         )
+    }
+
+    /**
+     * Checks if a shell path is a valid executable file or an executable command on the PATH.
+     */
+    fun isValidShellPath(shellPath: String): Boolean {
+        if (shellPath.isBlank()) return false
+        val path =
+            try {
+                Path.of(shellPath)
+            } catch (_: Exception) {
+                return false
+            }
+        if (path.isAbsolute) {
+            return executableExists(path)
+        }
+        if (executableOnPath(shellPath) != null) {
+            return true
+        }
+        return executableExists(path)
     }
 
     /**
@@ -332,38 +377,6 @@ class TerminalProfileRegistry(
     }
 
     private fun isWindows(): Boolean = osName.lowercase(Locale.ROOT).contains("windows")
-
-    /**
-     * Resolves a human-readable display name for a configured shell path.
-     *
-     * Checks whether the basename of [shellPath] matches the primary executable
-     * of any built-in profile (case-insensitive). When matched, the built-in
-     * profile's polished display name is returned. Otherwise the basename of the
-     * path is used as a reasonable fallback.
-     */
-    private fun resolveDisplayName(shellPath: String): String {
-        val basename =
-            try {
-                Path.of(shellPath).fileName?.toString() ?: shellPath
-            } catch (_: RuntimeException) {
-                shellPath.substringAfterLast('\\').substringAfterLast('/')
-            }
-        val basenameLower = basename.lowercase(Locale.ROOT)
-        val builtIn =
-            availableProfiles().firstOrNull { profile ->
-                val profileExec =
-                    try {
-                        Path.of(profile.command.first()).fileName?.toString()
-                    } catch (_: RuntimeException) {
-                        profile.command
-                            .first()
-                            .substringAfterLast('\\')
-                            .substringAfterLast('/')
-                    }
-                profileExec?.lowercase(Locale.ROOT) == basenameLower
-            }
-        return builtIn?.displayName ?: basename
-    }
 
     private companion object {
         private const val WINDOWS_PROFILE_CAPACITY = 5

@@ -18,6 +18,7 @@ package com.gagik.terminal.workspace
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class TerminalProfileRegistryTest {
@@ -77,6 +78,7 @@ class TerminalProfileRegistryTest {
             TerminalProfileRegistry(
                 osName = "Linux",
                 environment = emptyMap(),
+                executableExists = { false },
             )
 
         val profiles = registry.availableProfiles()
@@ -156,7 +158,7 @@ class TerminalProfileRegistryTest {
 
         assertEquals("configured-shell", profile.id)
         assertEquals("Windows PowerShell", profile.displayName)
-        assertEquals(listOf("powershell.exe"), profile.command)
+        assertEquals(listOf("powershell.exe", "-NoLogo"), profile.command)
         assertEquals(TerminalProfileKind.POWERSHELL, profile.kind)
     }
 
@@ -184,6 +186,7 @@ class TerminalProfileRegistryTest {
             TerminalProfileRegistry(
                 osName = "Linux",
                 environment = emptyMap(),
+                executableExists = { false },
             )
 
         val profile = registry.configuredProfile("/bin/zsh")
@@ -199,11 +202,133 @@ class TerminalProfileRegistryTest {
             TerminalProfileRegistry(
                 osName = "Linux",
                 environment = emptyMap(),
+                executableExists = { false },
             )
         val dir = Path.of("/home/user/projects")
 
         val profile = registry.configuredProfile("/bin/bash", workingDirectory = dir)
 
         assertEquals(dir, profile.workingDirectory)
+    }
+
+    @Test
+    fun configuredProfileResolvesKnownShellCommandArguments() {
+        val registry =
+            TerminalProfileRegistry(
+                osName = "Windows 11",
+                environment =
+                    mapOf(
+                        "SystemRoot" to "C:\\Windows",
+                        "ProgramFiles" to "C:\\Program Files",
+                        "COMSPEC" to "C:\\Windows\\System32\\cmd.exe",
+                    ),
+                pathSeparator = ";",
+                executableExists = { path ->
+                    path == Path.of("C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe") ||
+                        path == Path.of("C:\\Program Files\\Git\\bin\\bash.exe") ||
+                        path == Path.of("C:\\Program Files\\Git\\git-bash.exe")
+                },
+            )
+
+        val pwshProfile = registry.configuredProfile("powershell.exe")
+        assertEquals(listOf("powershell.exe", "-NoLogo"), pwshProfile.command)
+
+        val gitBashProfile = registry.configuredProfile("C:\\Program Files\\Git\\bin\\bash.exe")
+        assertEquals(listOf("C:\\Program Files\\Git\\bin\\bash.exe", "--login", "-i"), gitBashProfile.command)
+    }
+
+    @Test
+    fun configuredProfileResolvesUnixShellCommandArguments() {
+        val registry =
+            TerminalProfileRegistry(
+                osName = "Linux",
+                environment = emptyMap(),
+                executableExists = { path ->
+                    path == Path.of("/bin/zsh")
+                },
+            )
+
+        val profile = registry.configuredProfile("/bin/zsh")
+        assertEquals(listOf("/bin/zsh", "-l"), profile.command)
+    }
+
+    @Test
+    fun unixProfilesDiscoversAvailableShells() {
+        val registry =
+            TerminalProfileRegistry(
+                osName = "Linux",
+                environment = mapOf("PATH" to "/usr/bin:/opt/homebrew/bin"),
+                pathSeparator = ":",
+                executableExists = { path ->
+                    path == Path.of("/usr/bin", "zsh") ||
+                        path == Path.of("/opt/homebrew/bin", "fish") ||
+                        path == Path.of("/bin", "bash")
+                },
+            )
+
+        val profiles = registry.availableProfiles()
+        assertEquals(listOf("zsh", "bash", "fish"), profiles.map { it.id })
+
+        assertEquals(TerminalProfileKind.ZSH, profiles[0].kind)
+        assertEquals(listOf(Path.of("/usr/bin", "zsh").toString(), "-l"), profiles[0].command)
+
+        assertEquals(TerminalProfileKind.BASH, profiles[1].kind)
+        assertEquals(listOf(Path.of("/bin/bash").toString(), "-l"), profiles[1].command)
+
+        assertEquals(TerminalProfileKind.FISH, profiles[2].kind)
+        assertEquals(listOf(Path.of("/opt/homebrew/bin/fish").toString(), "-l"), profiles[2].command)
+    }
+
+    @Test
+    fun windowsProfilesUsesGitBashLauncherIfBashExecutableIsMissing() {
+        val registry =
+            TerminalProfileRegistry(
+                osName = "Windows 11",
+                environment =
+                    mapOf(
+                        "SystemRoot" to "C:\\Windows",
+                        "ProgramFiles" to "C:\\Program Files",
+                        "COMSPEC" to "C:\\Windows\\System32\\cmd.exe",
+                    ),
+                pathSeparator = ";",
+                executableExists = { path ->
+                    path == Path.of("C:\\Program Files", "Git", "git-bash.exe")
+                },
+            )
+
+        val profiles = registry.availableProfiles()
+        val gitBash = profiles.firstOrNull { it.id == "git-bash" }
+        assertNotNull(gitBash)
+        assertEquals(listOf("C:\\Program Files\\Git\\git-bash.exe"), gitBash.command)
+    }
+
+    @Test
+    fun testIsValidShellPath() {
+        val registry =
+            TerminalProfileRegistry(
+                osName = "Linux",
+                environment = mapOf("PATH" to "/usr/bin"),
+                pathSeparator = ":",
+                executableExists = { path ->
+                    path == Path.of("/usr/bin", "zsh") ||
+                        path == Path.of("/bin/bash")
+                },
+            )
+
+        // Blank
+        assertTrue(!registry.isValidShellPath(""))
+        assertTrue(!registry.isValidShellPath("   "))
+
+        // Absolute existing
+        assertTrue(registry.isValidShellPath("/bin/bash"))
+
+        // Absolute missing
+        assertTrue(!registry.isValidShellPath("/bin/missing-shell"))
+
+        // Command on PATH
+        assertTrue(registry.isValidShellPath("zsh"))
+
+        // Command not on PATH
+        assertTrue(!registry.isValidShellPath("missing-shell"))
     }
 }
