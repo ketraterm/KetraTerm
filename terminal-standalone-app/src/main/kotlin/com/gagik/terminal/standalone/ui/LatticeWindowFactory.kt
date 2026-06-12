@@ -161,7 +161,13 @@ internal class LatticeWindowFactory(
 
         val settingsItem =
             JMenuItem("Settings").apply {
-                icon = FlatSVGIcon("com/gagik/terminal/standalone/icons/settings.svg", 16, 16)
+                icon =
+                    FlatSVGIcon("com/gagik/terminal/standalone/icons/settings.svg", 16, 16).apply {
+                        colorFilter =
+                            FlatSVGIcon.ColorFilter().apply {
+                                add(java.awt.Color.BLACK, LatticeChrome.textPrimary)
+                            }
+                    }
                 background = LatticeChrome.popupBackground
                 foreground = LatticeChrome.textPrimary
                 addActionListener {
@@ -174,7 +180,13 @@ internal class LatticeWindowFactory(
 
         val aboutItem =
             JMenuItem("About").apply {
-                icon = FlatSVGIcon("com/gagik/terminal/standalone/icons/about.svg", 16, 16)
+                icon =
+                    FlatSVGIcon("com/gagik/terminal/standalone/icons/about.svg", 16, 16).apply {
+                        colorFilter =
+                            FlatSVGIcon.ColorFilter().apply {
+                                add(java.awt.Color.BLACK, LatticeChrome.textPrimary)
+                            }
+                    }
                 background = LatticeChrome.popupBackground
                 foreground = LatticeChrome.textPrimary
                 addActionListener {
