@@ -73,7 +73,7 @@ internal class ProfileIcons {
         }
 
     private companion object {
-        private const val RESOURCE_DIR = "com/gagik/terminal/standalone/icons"
+        private const val RESOURCE_DIR = "io/github/jvterm/app/icons"
         private const val ICON_WIDTH = 14
         private const val ICON_HEIGHT = 12
         private const val ACTIVE_OPACITY = 1f

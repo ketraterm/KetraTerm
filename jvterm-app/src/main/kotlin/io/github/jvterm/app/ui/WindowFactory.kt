@@ -48,10 +48,10 @@ internal class WindowFactory(
                 minimumSize = Dimension(720, 420)
                 iconImages =
                     listOf(
-                        FlatSVGIcon("com/gagik/terminal/standalone/icons/logo.svg", 16, 16).image,
-                        FlatSVGIcon("com/gagik/terminal/standalone/icons/logo.svg", 32, 32).image,
-                        FlatSVGIcon("com/gagik/terminal/standalone/icons/logo.svg", 48, 48).image,
-                        FlatSVGIcon("com/gagik/terminal/standalone/icons/logo.svg", 128, 128).image,
+                        FlatSVGIcon("io/github/jvterm/app/icons/logo.svg", 16, 16).image,
+                        FlatSVGIcon("io/github/jvterm/app/icons/logo.svg", 32, 32).image,
+                        FlatSVGIcon("io/github/jvterm/app/icons/logo.svg", 48, 48).image,
+                        FlatSVGIcon("io/github/jvterm/app/icons/logo.svg", 128, 128).image,
                     )
             }
 
@@ -169,7 +169,7 @@ internal class WindowFactory(
         val settingsItem =
             JMenuItem("Settings").apply {
                 icon =
-                    FlatSVGIcon("com/gagik/terminal/standalone/icons/settings.svg", 16, 16).apply {
+                    FlatSVGIcon("io/github/jvterm/app/icons/settings.svg", 16, 16).apply {
                         colorFilter =
                             FlatSVGIcon.ColorFilter().apply {
                                 add(java.awt.Color.BLACK, Chrome.textPrimary)
@@ -188,7 +188,7 @@ internal class WindowFactory(
         val aboutItem =
             JMenuItem("About").apply {
                 icon =
-                    FlatSVGIcon("com/gagik/terminal/standalone/icons/about.svg", 16, 16).apply {
+                    FlatSVGIcon("io/github/jvterm/app/icons/about.svg", 16, 16).apply {
                         colorFilter =
                             FlatSVGIcon.ColorFilter().apply {
                                 add(java.awt.Color.BLACK, Chrome.textPrimary)

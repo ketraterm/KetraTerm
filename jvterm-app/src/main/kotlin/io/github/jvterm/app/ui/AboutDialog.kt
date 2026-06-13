@@ -78,7 +78,7 @@ internal class AboutDialog(
             }
 
         // SVG Logo
-        val logoIcon = FlatSVGIcon("com/gagik/terminal/standalone/icons/logo.svg", 48, 48)
+        val logoIcon = FlatSVGIcon("io/github/jvterm/app/icons/logo.svg", 48, 48)
         val logoLabel =
             JLabel(logoIcon).apply {
                 alignmentY = CENTER_ALIGNMENT
@@ -194,7 +194,7 @@ internal class AboutDialog(
             val properties = Properties()
             val inputStream: InputStream? =
                 AboutDialog::class.java.classLoader
-                    .getResourceAsStream("com/gagik/terminal/standalone/version.properties")
+                    .getResourceAsStream("io/github/jvterm/app/version.properties")
             if (inputStream != null) {
                 properties.load(inputStream)
                 properties.getProperty("version") ?: "1.0.0"
