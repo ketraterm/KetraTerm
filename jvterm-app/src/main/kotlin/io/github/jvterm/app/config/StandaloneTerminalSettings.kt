@@ -17,8 +17,8 @@ package io.github.jvterm.app.config
 
 import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
 import com.gagik.terminal.ui.swing.settings.TerminalTheme
-import com.gagik.terminal.workspace.config.TerminalConfig
-import com.gagik.terminal.workspace.config.TerminalWorkspaceConfigManager
+import io.github.jvterm.workspace.config.TerminalConfig
+import io.github.jvterm.workspace.config.TerminalWorkspaceConfigManager
 import java.awt.Font
 import java.util.*
 

@@ -1,6 +1,6 @@
 # Terminal Workspace Agent Guide
 
-`terminal-workspace` owns host-neutral terminal workspace state for products
+`jvterm-workspace` owns host-neutral terminal workspace state for products
 that present one or more local terminal sessions.
 
 ## Responsibility
@@ -9,7 +9,7 @@ This module may:
 
 - define terminal launch profiles and profile discovery policy.
 - track open terminal tabs and selected tab identity.
-- coordinate local PTY-backed session creation through `terminal-pty`.
+- coordinate local PTY-backed session creation through `jvterm-pty`.
 - propagate host-neutral tab events such as title changes, bell, failures, and
   close notifications.
 
@@ -23,5 +23,5 @@ This module must not:
 - encode keyboard, paste, focus, or mouse bytes directly.
 - own PTY stream threads or process implementation details.
 
-PTY process lifecycle stays in `terminal-pty`; session synchronization stays in
-`terminal-session`; UI modules adapt workspace state to visual containers.
+PTY process lifecycle stays in `jvterm-pty`; session synchronization stays in
+`jvterm-session`; UI modules adapt workspace state to visual containers.

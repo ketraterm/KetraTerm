@@ -15,7 +15,6 @@
  */
 package io.github.jvterm.app
 
-import com.gagik.terminal.workspace.TerminalProfileRegistry
 import java.nio.file.Path
 import javax.swing.SwingUtilities
 
@@ -35,7 +34,7 @@ private object LatticeStandaloneApp {
         val settings = _root_ide_package_.io.github.jvterm.app.config.StandaloneTerminalSettings()
         _root_ide_package_.io.github.jvterm.app.ui.LatticeChrome
             .applyPalette(settings.current().palette)
-        val profileRegistry = TerminalProfileRegistry()
+        val profileRegistry = _root_ide_package_.io.github.jvterm.workspace.TerminalProfileRegistry()
         val windowFactory = _root_ide_package_.io.github.jvterm.app.ui.LatticeWindowFactory(settings, profileRegistry)
         val window = windowFactory.createWindow()
         val frame = window.frame
