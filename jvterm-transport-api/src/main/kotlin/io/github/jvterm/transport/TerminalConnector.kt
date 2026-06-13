@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.transport
+package io.github.jvterm.transport
 
 /**
  * Transport-neutral terminal byte connector.

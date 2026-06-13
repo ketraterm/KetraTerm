@@ -1,10 +1,10 @@
 # Terminal Testkit Agent Guide
 
-`terminal-testkit` owns reusable fakes and fixtures for terminal modules.
+`jvterm-testkit` owns reusable fakes and fixtures for terminal modules.
 
 ## Boundary
 
-Testkit may depend on public APIs such as `terminal-transport-api`, but it must
+Testkit may depend on public APIs such as `jvterm-transport-api`, but it must
 not reach into module internals. Fakes should model real contracts, especially
 synchronous byte consumption and lifecycle callbacks.
 

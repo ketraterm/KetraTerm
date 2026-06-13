@@ -15,9 +15,9 @@
  */
 package io.github.jvterm.session
 
-import com.gagik.terminal.transport.TerminalConnector
-import com.gagik.terminal.transport.checkBounds
 import io.github.jvterm.protocol.host.TerminalHostOutput
+import io.github.jvterm.transport.TerminalConnector
+import io.github.jvterm.transport.checkBounds
 
 /**
  * A zero-allocation, thread-safe bridge between terminal input encoding and

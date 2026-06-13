@@ -15,9 +15,6 @@
  */
 package io.github.jvterm.session
 
-import com.gagik.terminal.testkit.MockConnector
-import com.gagik.terminal.transport.TerminalConnector
-import com.gagik.terminal.transport.TerminalConnectorListener
 import io.github.jvterm.core.TerminalBuffers
 import io.github.jvterm.core.api.TerminalBufferApi
 import io.github.jvterm.input.api.TerminalInputEncoder
@@ -28,6 +25,9 @@ import io.github.jvterm.input.event.TerminalPasteEvent
 import io.github.jvterm.parser.api.TerminalOutputParser
 import io.github.jvterm.render.api.*
 import io.github.jvterm.render.cache.TerminalRenderPublisher
+import io.github.jvterm.testkit.MockConnector
+import io.github.jvterm.transport.TerminalConnector
+import io.github.jvterm.transport.TerminalConnectorListener
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.nio.charset.StandardCharsets

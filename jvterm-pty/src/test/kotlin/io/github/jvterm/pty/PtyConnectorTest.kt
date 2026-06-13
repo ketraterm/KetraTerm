@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.pty
 
-import com.gagik.terminal.transport.TerminalConnectorListener
+import io.github.jvterm.transport.TerminalConnectorListener
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.io.*

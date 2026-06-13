@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.pty
 
-import com.gagik.terminal.transport.TerminalConnector
+import io.github.jvterm.transport.TerminalConnector
 import java.io.IOException
 import java.nio.file.Path
 

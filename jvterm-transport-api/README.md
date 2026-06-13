@@ -1,6 +1,6 @@
-# Terminal Transport API (`:terminal-transport-api`)
+# Terminal Transport API (`:jvterm-transport-api`)
 
-The `terminal-transport-api` module defines the transport-neutral, highly performant connection contracts between terminal synchronized runtimes (e.g., `:terminal-session`) and host byte-streams. 
+The `jvterm-transport-api` module defines the transport-neutral, highly performant connection contracts between terminal synchronized runtimes (e.g., `:terminal-session`) and host byte-streams. 
 
 It is designed with strict **Single Responsibility Principles (SRP)** and serves as a **pure vocabulary module**. It has **no** knowledge of byte-stream parsing, escape-sequence interpretation, grid physics, input event encoding, rendering caches, or platform-specific PTY mechanisms. This separation keeps the core abstraction lightweight, decoupled, and easily mockable for deterministic unit testing.
 

@@ -15,10 +15,10 @@
  */
 package io.github.jvterm.pty
 
-import com.gagik.terminal.transport.TerminalConnector
-import com.gagik.terminal.transport.TerminalConnectorListener
 import io.github.jvterm.core.TerminalBuffers
 import io.github.jvterm.session.TerminalSession
+import io.github.jvterm.transport.TerminalConnector
+import io.github.jvterm.transport.TerminalConnectorListener
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test

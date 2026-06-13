@@ -8,7 +8,7 @@ By decoupling testing from physical operating system interfaces (like OS-level p
 
 ## Architectural Scope and Boundaries
 
-To preserve strict layer boundaries and maintain a lightweight testing footprint, **terminal-testkit** operates under a set of design constraints:
+To preserve strict layer boundaries and maintain a lightweight testing footprint, **jvterm-testkit** operates under a set of design constraints:
 
 ### What the Module Owns
 - **[MockConnector](./src/main/kotlin/testkit/MockConnector.kt)**: An in-memory, highly configurable implementation of the `TerminalConnector` interface from [terminal-transport-api](../terminal-transport-api/src/main/kotlin/transport/TerminalConnector.kt).

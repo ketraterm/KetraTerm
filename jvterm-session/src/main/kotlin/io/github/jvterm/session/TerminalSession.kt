@@ -15,9 +15,6 @@
  */
 package io.github.jvterm.session
 
-import com.gagik.terminal.transport.TerminalConnector
-import com.gagik.terminal.transport.TerminalConnectorListener
-import com.gagik.terminal.transport.checkBounds
 import io.github.jvterm.core.api.TerminalBufferApi
 import io.github.jvterm.core.api.TerminalHostResponseReader
 import io.github.jvterm.host.CoreTerminalCommandSink
@@ -38,6 +35,9 @@ import io.github.jvterm.render.api.TerminalRenderFrameConsumer
 import io.github.jvterm.render.api.TerminalRenderFrameReader
 import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.render.cache.TerminalRenderPublisher
+import io.github.jvterm.transport.TerminalConnector
+import io.github.jvterm.transport.TerminalConnectorListener
+import io.github.jvterm.transport.checkBounds
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger

@@ -15,10 +15,10 @@
  */
 package io.github.jvterm.pty
 
-import com.gagik.terminal.transport.TerminalConnector
-import com.gagik.terminal.transport.TerminalConnectorListener
-import com.gagik.terminal.transport.checkBounds
 import com.pty4j.PtyProcess
+import io.github.jvterm.transport.TerminalConnector
+import io.github.jvterm.transport.TerminalConnectorListener
+import io.github.jvterm.transport.checkBounds
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 

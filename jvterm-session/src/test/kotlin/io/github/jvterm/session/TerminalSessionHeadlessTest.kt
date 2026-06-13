@@ -15,9 +15,9 @@
  */
 package io.github.jvterm.session
 
-import com.gagik.terminal.testkit.MockConnector
 import io.github.jvterm.core.TerminalBuffers
 import io.github.jvterm.input.event.*
+import io.github.jvterm.testkit.MockConnector
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test

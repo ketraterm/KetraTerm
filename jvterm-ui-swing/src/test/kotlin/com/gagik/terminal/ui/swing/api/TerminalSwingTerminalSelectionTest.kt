@@ -15,8 +15,6 @@
  */
 package com.gagik.terminal.ui.swing.api
 
-import com.gagik.terminal.transport.TerminalConnector
-import com.gagik.terminal.transport.TerminalConnectorListener
 import com.gagik.terminal.ui.swing.render.TestCell
 import com.gagik.terminal.ui.swing.render.TestRenderFrame
 import com.gagik.terminal.ui.swing.settings.TerminalClipboardHandler
@@ -34,6 +32,8 @@ import io.github.jvterm.render.api.*
 import io.github.jvterm.render.cache.TerminalRenderPublisher
 import io.github.jvterm.session.TerminalHyperlinkResolver
 import io.github.jvterm.session.TerminalSession
+import io.github.jvterm.transport.TerminalConnector
+import io.github.jvterm.transport.TerminalConnectorListener
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Insets

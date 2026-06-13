@@ -1,6 +1,6 @@
 # Terminal Transport API Agent Guide
 
-`terminal-transport-api` owns the transport-neutral connector contract between
+`jvterm-transport-api` owns the transport-neutral connector contract between
 terminal sessions and host byte streams.
 
 ## Boundary

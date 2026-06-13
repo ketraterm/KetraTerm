@@ -18,7 +18,7 @@ plugins {
     kotlin("jvm")
 }
 
-group = "com.gagik"
+group = "io.github.jvterm"
 version = "1.0-SNAPSHOT"
 
 repositories {

@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.gagik.terminal.testkit
+package io.github.jvterm.testkit
 
-import com.gagik.terminal.transport.TerminalConnector
-import com.gagik.terminal.transport.TerminalConnectorListener
-import com.gagik.terminal.transport.checkBounds
+import io.github.jvterm.transport.TerminalConnector
+import io.github.jvterm.transport.TerminalConnectorListener
+import io.github.jvterm.transport.checkBounds
 
 /**
  * In-memory connector for session and transport-adapter tests.
