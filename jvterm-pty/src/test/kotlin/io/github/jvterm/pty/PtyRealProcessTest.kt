@@ -21,14 +21,14 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
-class TerminalPtyRealProcessTest {
+class PtyRealProcessTest {
     @Test
     fun `real PTY echo output reaches terminal core`() {
         assumeNativePty()
 
         val session =
             TerminalSessions.localPty(
-                TerminalPtyOptions(
+                PtyOptions(
                     command = printCommand("hello"),
                     workingDirectory = Path.of(System.getProperty("user.home")),
                     columns = 40,
@@ -49,7 +49,7 @@ class TerminalPtyRealProcessTest {
 
         val session =
             TerminalSessions.localPty(
-                TerminalPtyOptions(
+                PtyOptions(
                     command = sleepCommand(seconds = 2),
                     columns = 40,
                     rows = 5,
@@ -69,7 +69,7 @@ class TerminalPtyRealProcessTest {
 
         val session =
             TerminalSessions.localPty(
-                TerminalPtyOptions(
+                PtyOptions(
                     command = sleepCommand(seconds = 5),
                     columns = 40,
                     rows = 5,
@@ -87,7 +87,7 @@ class TerminalPtyRealProcessTest {
 
         val session =
             TerminalSessions.localPty(
-                TerminalPtyOptions(
+                PtyOptions(
                     command = exitCommand(7),
                     columns = 40,
                     rows = 5,
@@ -106,7 +106,7 @@ class TerminalPtyRealProcessTest {
         val expectedCount = 12_000
         val session =
             TerminalSessions.localPty(
-                TerminalPtyOptions(
+                PtyOptions(
                     command = repeatCommand('x', expectedCount),
                     columns = 200,
                     rows = 80,

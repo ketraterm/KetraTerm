@@ -24,7 +24,7 @@ import io.github.jvterm.session.TerminalSession
  * the connector reader thread as parser output is handled.
  */
 @Suppress("UNUSED_PARAMETER")
-interface TerminalPtyEventListener {
+interface PtyEventListener {
     /**
      * Called when BEL is received from the terminal process.
      *
@@ -86,8 +86,8 @@ interface TerminalPtyEventListener {
          * Listener used when the host does not need PTY callbacks.
          */
         @JvmField
-        val NONE: TerminalPtyEventListener =
-            object : TerminalPtyEventListener {
+        val NONE: PtyEventListener =
+            object : PtyEventListener {
                 override fun bell(session: TerminalSession) = Unit
 
                 override fun iconTitleChanged(

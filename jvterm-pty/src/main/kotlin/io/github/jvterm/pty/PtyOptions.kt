@@ -41,7 +41,7 @@ import java.nio.file.Path
  * @param eventListener host callbacks for parser-discovered PTY metadata
  * events such as BEL and title changes.
  */
-data class TerminalPtyOptions
+data class PtyOptions
     @JvmOverloads
     constructor(
         val command: List<String> = defaultCommand(),
@@ -55,7 +55,7 @@ data class TerminalPtyOptions
         val readBufferSize: Int = 8192,
         val readerThreadName: String = "terminal-pty-reader",
         val watcherThreadName: String = "terminal-pty-watcher",
-        val eventListener: TerminalPtyEventListener = TerminalPtyEventListener.NONE,
+        val eventListener: PtyEventListener = PtyEventListener.NONE,
     ) {
         init {
             require(command.isNotEmpty()) { "PTY command must not be empty" }

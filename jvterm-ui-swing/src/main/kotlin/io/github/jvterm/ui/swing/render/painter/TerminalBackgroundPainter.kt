@@ -17,9 +17,9 @@ package io.github.jvterm.ui.swing.render.painter
 
 import io.github.jvterm.render.api.TerminalColorPalette
 import io.github.jvterm.render.cache.TerminalRenderCache
-import io.github.jvterm.ui.swing.render.TerminalSwingColors
+import io.github.jvterm.ui.swing.render.SwingColors
 import io.github.jvterm.ui.swing.render.cache.AwtColorCache
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
 
 /**
@@ -47,7 +47,7 @@ internal class TerminalBackgroundPainter(
         g: Graphics2D,
         cache: TerminalRenderCache,
         palette: TerminalColorPalette,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         row: Int,
     ) {
         val attrWords = cache.attrWords
@@ -55,13 +55,13 @@ internal class TerminalBackgroundPainter(
         val y = row * metrics.cellHeight
         var column = 0
         while (column < cache.columns) {
-            val background = TerminalSwingColors.background(palette, attrWords[rowOffset + column])
+            val background = SwingColors.background(palette, attrWords[rowOffset + column])
             val start = column
 
             column++
             while (
                 column < cache.columns &&
-                TerminalSwingColors.background(palette, attrWords[rowOffset + column]) == background
+                SwingColors.background(palette, attrWords[rowOffset + column]) == background
             ) {
                 column++
             }

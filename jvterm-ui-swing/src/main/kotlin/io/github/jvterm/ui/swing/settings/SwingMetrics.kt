@@ -28,7 +28,7 @@ import java.awt.FontMetrics
  * @property overlineY overline y offset inside a cell in pixels.
  * @property cursorStrokeWidth stroke width for bar and underline cursors.
  */
-internal data class TerminalSwingMetrics(
+internal data class SwingMetrics(
     val cellWidth: Int,
     val cellHeight: Int,
     val baseline: Int,
@@ -59,14 +59,14 @@ internal data class TerminalSwingMetrics(
         fun from(
             fontMetrics: FontMetrics,
             lineHeight: Float = 1.0f,
-        ): TerminalSwingMetrics {
+        ): SwingMetrics {
             val cellWidth = maxOf(1, fontMetrics.charWidth('W'))
             val originalHeight = fontMetrics.height
             val cellHeight = maxOf(1, (originalHeight * lineHeight).toInt())
             val baseline = (fontMetrics.ascent + (cellHeight - originalHeight) / 2).coerceIn(0, cellHeight)
             val underlineY = minOf(cellHeight - 1, baseline + 1)
             val strikethroughY = maxOf(0, baseline - fontMetrics.ascent / 3)
-            return TerminalSwingMetrics(
+            return SwingMetrics(
                 cellWidth = cellWidth,
                 cellHeight = cellHeight,
                 baseline = baseline,

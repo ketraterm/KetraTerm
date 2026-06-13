@@ -20,10 +20,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class TerminalSwingScrollModelTest {
+class SwingScrollModelTest {
     @Test
     fun `fractional deltas accumulate before crossing a row boundary`() {
-        val model = TerminalSwingScrollModel()
+        val model = SwingScrollModel()
 
         assertTrue(model.scrollBy(0.4, historySize = 10))
         assertEquals(0, model.offset)
@@ -37,7 +37,7 @@ class TerminalSwingScrollModelTest {
 
     @Test
     fun `scroll offset clamps to available history`() {
-        val model = TerminalSwingScrollModel()
+        val model = SwingScrollModel()
 
         assertTrue(model.scrollBy(12.0, historySize = 5))
 
@@ -48,7 +48,7 @@ class TerminalSwingScrollModelTest {
 
     @Test
     fun `absolute scroll preserves fractional offsets for host controls`() {
-        val model = TerminalSwingScrollModel()
+        val model = SwingScrollModel()
 
         assertTrue(model.scrollTo(2.5, historySize = 10))
 
@@ -60,7 +60,7 @@ class TerminalSwingScrollModelTest {
 
     @Test
     fun `zero or clamped deltas report no movement`() {
-        val model = TerminalSwingScrollModel()
+        val model = SwingScrollModel()
 
         assertFalse(model.scrollBy(0.0, historySize = 5))
         assertFalse(model.scrollBy(-1.0, historySize = 5))
@@ -69,7 +69,7 @@ class TerminalSwingScrollModelTest {
 
     @Test
     fun `reset returns to live viewport`() {
-        val model = TerminalSwingScrollModel()
+        val model = SwingScrollModel()
 
         model.scrollBy(3.0, historySize = 5)
         model.reset()
@@ -80,7 +80,7 @@ class TerminalSwingScrollModelTest {
 
     @Test
     fun `fractional scroll requests one overscan row and translated content`() {
-        val model = TerminalSwingScrollModel()
+        val model = SwingScrollModel()
 
         model.scrollBy(0.25, historySize = 10)
 

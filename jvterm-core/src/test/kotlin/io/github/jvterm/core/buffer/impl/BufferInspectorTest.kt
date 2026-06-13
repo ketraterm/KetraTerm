@@ -25,12 +25,12 @@ import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
-class TerminalInspectorImplTest {
+class BufferInspectorTest {
     @Test
     fun `renders visible rows screen and all content`() {
         val state = TerminalState(3, 2, 2)
         val mutation = MutationEngine(state)
-        val inspector = TerminalInspectorImpl(state)
+        val inspector = BufferInspector(state)
 
         mutation.printCodepoint('A'.code, 1)
         mutation.printCodepoint('B'.code, 1)
@@ -50,7 +50,7 @@ class TerminalInspectorImplTest {
     fun `unpacks cell attributes at a visible coordinate`() {
         val state = TerminalState(3, 1, 1)
         val mutation = MutationEngine(state)
-        val inspector = TerminalInspectorImpl(state)
+        val inspector = BufferInspector(state)
 
         state.pen.setAttributes(3, 7, bold = true, italic = true)
         mutation.printCodepoint('X'.code, 1)

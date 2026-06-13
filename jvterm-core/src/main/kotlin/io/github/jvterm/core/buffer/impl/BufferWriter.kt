@@ -23,7 +23,7 @@ import io.github.jvterm.core.model.UnderlineStyle
 import io.github.jvterm.core.state.TerminalState
 import io.github.jvterm.core.util.UnicodeWidth
 
-internal class TerminalWriterImpl(
+internal class BufferWriter(
     private val state: TerminalState,
     private val mutationEngine: MutationEngine,
     private val cursorEngine: CursorEngine,

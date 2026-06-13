@@ -17,8 +17,8 @@ package io.github.jvterm.ui.swing.api
 
 import io.github.jvterm.render.api.*
 import io.github.jvterm.render.cache.TerminalRenderCache
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Insets
@@ -30,9 +30,9 @@ class TerminalSelectionControllerTest {
     private class FakeSelectionHost(
         override val renderCache: TerminalRenderCache,
     ) : TerminalSelectionHost {
-        override val settings = TerminalSwingSettings(padding = Insets(0, 0, 0, 0))
+        override val settings = SwingSettings(padding = Insets(0, 0, 0, 0))
         override val metrics =
-            TerminalSwingMetrics(
+            SwingMetrics(
                 cellWidth = 10,
                 cellHeight = 20,
                 baseline = 15,

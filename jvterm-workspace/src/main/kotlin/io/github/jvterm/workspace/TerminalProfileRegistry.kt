@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.workspace
 
-import io.github.jvterm.pty.TerminalPtyOptions
+import io.github.jvterm.pty.PtyOptions
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -255,7 +255,7 @@ class TerminalProfileRegistry(
                 TerminalProfile(
                     id = "default-shell",
                     displayName = "Default Shell",
-                    command = TerminalPtyOptions.defaultCommand(),
+                    command = PtyOptions.defaultCommand(),
                 )
         }
         return profiles

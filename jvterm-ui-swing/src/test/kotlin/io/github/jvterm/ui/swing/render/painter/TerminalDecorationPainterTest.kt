@@ -21,8 +21,8 @@ import io.github.jvterm.render.api.TerminalRenderExtraAttrs
 import io.github.jvterm.render.api.TerminalRenderUnderline
 import io.github.jvterm.ui.swing.render.*
 import io.github.jvterm.ui.swing.render.cache.AwtColorCache
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.awt.Graphics2D
@@ -199,8 +199,8 @@ class TerminalDecorationPainterTest {
     private data class Fixture(
         val image: BufferedImage,
         val g: Graphics2D,
-        val settings: TerminalSwingSettings,
-        val metrics: TerminalSwingMetrics,
+        val settings: SwingSettings,
+        val metrics: SwingMetrics,
         val painter: TerminalDecorationPainter,
     )
 

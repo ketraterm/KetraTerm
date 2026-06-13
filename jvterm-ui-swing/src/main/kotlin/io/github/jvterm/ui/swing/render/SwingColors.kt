@@ -21,7 +21,7 @@ import io.github.jvterm.render.api.TerminalRenderAttrs
 /**
  * Swing-specific visual interpretation of render colors.
  */
-internal object TerminalSwingColors {
+internal object SwingColors {
     /**
      * Resolves the foreground color Swing should paint for [attrWord].
      */

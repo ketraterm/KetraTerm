@@ -25,11 +25,11 @@ import io.github.jvterm.core.state.TerminalState
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
-class TerminalWriterImplTest {
+class BufferWriterTest {
     @Test
     fun `writes codepoints and advances the cursor`() {
         val state = TerminalState(5, 2, 2)
-        val writer = TerminalWriterImpl(state, MutationEngine(state), CursorEngine(state))
+        val writer = BufferWriter(state, MutationEngine(state), CursorEngine(state))
 
         writer.setPenAttributes(3, 7, bold = true, italic = true)
         writer.writeCodepoint('X'.code)
@@ -59,7 +59,7 @@ class TerminalWriterImplTest {
     @Test
     fun `writes codepoints with explicit rgb indexed and inverse colors`() {
         val state = TerminalState(5, 2, 2)
-        val writer = TerminalWriterImpl(state, MutationEngine(state), CursorEngine(state))
+        val writer = BufferWriter(state, MutationEngine(state), CursorEngine(state))
 
         writer.setPenColors(
             foreground = CellColor.rgb(0x10, 0x20, 0x30),
@@ -86,7 +86,7 @@ class TerminalWriterImplTest {
     @Test
     fun `writes text with supplementary code points literally`() {
         val state = TerminalState(6, 2, 2)
-        val writer = TerminalWriterImpl(state, MutationEngine(state), CursorEngine(state))
+        val writer = BufferWriter(state, MutationEngine(state), CursorEngine(state))
 
         writer.writeText("A\uD83D\uDE00B")
 
@@ -99,7 +99,7 @@ class TerminalWriterImplTest {
     @Test
     fun `writes parser segmented cluster through explicit cluster api`() {
         val state = TerminalState(6, 2, 2)
-        val writer = TerminalWriterImpl(state, MutationEngine(state), CursorEngine(state))
+        val writer = BufferWriter(state, MutationEngine(state), CursorEngine(state))
 
         writer.writeCluster(intArrayOf('e'.code, 0x0301))
 
@@ -118,7 +118,7 @@ class TerminalWriterImplTest {
     fun `clearAll wipes screen history cursor and saved cursor`() {
         val state = TerminalState(4, 2, 2)
         val mutation = MutationEngine(state)
-        val writer = TerminalWriterImpl(state, mutation, CursorEngine(state))
+        val writer = BufferWriter(state, mutation, CursorEngine(state))
 
         writer.writeText("ABCD")
         state.savedCursor.isSaved = true

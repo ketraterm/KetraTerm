@@ -12,7 +12,7 @@ PTY owns:
 - pumping raw process output bytes to `TerminalConnectorListener`.
 - writing host-bound byte ranges to PTY stdin.
 - resizing the PTY process.
-- reporting BEL and title metadata through `TerminalPtyEventListener` when the
+- reporting BEL and title metadata through `PtyEventListener` when the
   convenience session factory wires host host events.
 
 PTY must not:
@@ -32,5 +32,5 @@ behavior. Session-level behavior should go through `TerminalSession` plus a
 Native PTY smoke tests are opt-in because PTY4J startup is platform-sensitive:
 
 ```text
-./gradlew :terminal-pty:test --tests "io.github.jvterm.pty.TerminalPtyRealProcessTest" "-Dterminal.pty.host=true"
+./gradlew :terminal-pty:test --tests "io.github.jvterm.pty.PtyRealProcessTest" "-Dterminal.pty.host=true"
 ```

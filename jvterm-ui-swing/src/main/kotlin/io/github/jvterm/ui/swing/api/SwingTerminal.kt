@@ -19,16 +19,16 @@ import io.github.jvterm.input.event.*
 import io.github.jvterm.protocol.MouseTrackingMode
 import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.session.TerminalSession
-import io.github.jvterm.ui.swing.input.TerminalSwingKeyMapper
+import io.github.jvterm.ui.swing.input.SwingKeyMapper
 import io.github.jvterm.ui.swing.render.TerminalGridPainter
 import io.github.jvterm.ui.swing.search.*
+import io.github.jvterm.ui.swing.settings.SwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingSettings
+import io.github.jvterm.ui.swing.settings.SwingSettingsProvider
 import io.github.jvterm.ui.swing.settings.TerminalClipboardAction
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettingsProvider
+import io.github.jvterm.ui.swing.viewport.SwingRepaintPlanner
+import io.github.jvterm.ui.swing.viewport.SwingScrollModel
 import io.github.jvterm.ui.swing.viewport.TerminalRepaintSink
-import io.github.jvterm.ui.swing.viewport.TerminalSwingRepaintPlanner
-import io.github.jvterm.ui.swing.viewport.TerminalSwingScrollModel
 import java.awt.*
 import java.awt.event.*
 import java.util.concurrent.atomic.AtomicBoolean
@@ -49,16 +49,16 @@ import javax.swing.Timer
  * @param settingsProvider provider for immutable settings snapshots.
  * @param hostServices host-provided non-render services.
  */
-class TerminalSwingTerminal
+class SwingTerminal
     @JvmOverloads
     constructor(
-        private val settingsProvider: TerminalSwingSettingsProvider =
-            TerminalSwingSettingsProvider { TerminalSwingSettings() },
-        private val hostServices: TerminalSwingHostServices = TerminalSwingHostServices(),
+        private val settingsProvider: SwingSettingsProvider =
+            SwingSettingsProvider { SwingSettings() },
+        private val hostServices: SwingHostServices = SwingHostServices(),
     ) : JComponent() {
         private var session: TerminalSession? = null
-        private var settings: TerminalSwingSettings = settingsProvider.currentSettings()
-        private var metrics: TerminalSwingMetrics = buildMetrics(settings)
+        private var settings: SwingSettings = settingsProvider.currentSettings()
+        private var metrics: SwingMetrics = buildMetrics(settings)
         private var terminalFocused: Boolean = false
         internal var cursorBlinkVisible: Boolean = true
         internal val cursorPresentationEnabled: Boolean
@@ -84,61 +84,61 @@ class TerminalSwingTerminal
         private val reloadSettingsRunnable = Runnable { reloadSettingsOnEdt() }
 
         private val painter = TerminalGridPainter()
-        private val repaintPlanner = TerminalSwingRepaintPlanner()
-        private val scrollModel = TerminalSwingScrollModel()
+        private val repaintPlanner = SwingRepaintPlanner()
+        private val scrollModel = SwingScrollModel()
         private val renderCache = TerminalRenderCache(settings.columns, settings.rows)
         private val searchCache = TerminalRenderCache(settings.columns, settings.rows)
-        private val keyMapper = TerminalSwingKeyMapper()
+        private val keyMapper = SwingKeyMapper()
         private val searchModel = TerminalSearchModel()
         private val searchViewportHighlights = TerminalSearchViewportHighlights()
 
         private val selectionController =
             TerminalSelectionController(
                 object : TerminalSelectionHost {
-                    override val settings: TerminalSwingSettings get() = this@TerminalSwingTerminal.settings
-                    override val metrics: TerminalSwingMetrics get() = this@TerminalSwingTerminal.metrics
-                    override val renderCache: TerminalRenderCache get() = this@TerminalSwingTerminal.renderCache
+                    override val settings: SwingSettings get() = this@SwingTerminal.settings
+                    override val metrics: SwingMetrics get() = this@SwingTerminal.metrics
+                    override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
                     override val contentYOffset: Double get() =
-                        this@TerminalSwingTerminal.contentYOffset(
-                            this@TerminalSwingTerminal.renderCache,
+                        this@SwingTerminal.contentYOffset(
+                            this@SwingTerminal.renderCache,
                         )
-                    override val componentWidth: Int get() = this@TerminalSwingTerminal.width
-                    override val componentHeight: Int get() = this@TerminalSwingTerminal.height
+                    override val componentWidth: Int get() = this@SwingTerminal.width
+                    override val componentHeight: Int get() = this@SwingTerminal.height
 
                     override fun cellAt(
                         x: Int,
                         y: Int,
-                    ): Long = this@TerminalSwingTerminal.cellAt(x, y, this@TerminalSwingTerminal.renderCache)
+                    ): Long = this@SwingTerminal.cellAt(x, y, this@SwingTerminal.renderCache)
 
                     override fun scrollViewportBy(
                         delta: Double,
                         historySize: Int,
-                    ): Boolean = this@TerminalSwingTerminal.scrollViewportByOnEdt(delta, historySize)
+                    ): Boolean = this@SwingTerminal.scrollViewportByOnEdt(delta, historySize)
 
-                    override fun repaint() = this@TerminalSwingTerminal.repaint()
+                    override fun repaint() = this@SwingTerminal.repaint()
 
-                    override fun requestFocusInWindow(): Boolean = this@TerminalSwingTerminal.requestFocusInWindow()
+                    override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
                 },
             )
 
         private val hyperlinkController =
             TerminalHyperlinkController(
                 object : TerminalHyperlinkHost {
-                    override val renderCache: TerminalRenderCache get() = this@TerminalSwingTerminal.renderCache
-                    override val session: TerminalSession? get() = this@TerminalSwingTerminal.session
-                    override val hostServices: TerminalSwingHostServices get() = this@TerminalSwingTerminal.hostServices
+                    override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
+                    override val session: TerminalSession? get() = this@SwingTerminal.session
+                    override val hostServices: SwingHostServices get() = this@SwingTerminal.hostServices
                     override var cursor: Cursor
-                        get() = this@TerminalSwingTerminal.cursor
+                        get() = this@SwingTerminal.cursor
                         set(value) {
-                            this@TerminalSwingTerminal.cursor = value
+                            this@SwingTerminal.cursor = value
                         }
 
                     override fun cellAt(
                         x: Int,
                         y: Int,
-                    ): Long = this@TerminalSwingTerminal.cellAt(x, y, this@TerminalSwingTerminal.renderCache)
+                    ): Long = this@SwingTerminal.cellAt(x, y, this@SwingTerminal.renderCache)
 
-                    override fun repaint() = this@TerminalSwingTerminal.repaint()
+                    override fun repaint() = this@SwingTerminal.repaint()
                 },
             )
         private val searchOverlay =
@@ -580,7 +580,7 @@ class TerminalSwingTerminal
 
         private fun applySettingsToSession(
             session: TerminalSession,
-            settings: TerminalSwingSettings,
+            settings: SwingSettings,
         ) {
             session.setTreatAmbiguousAsWide(settings.treatAmbiguousAsWide)
             session.setThemePalette(settings.palette)
@@ -1048,9 +1048,9 @@ class TerminalSwingTerminal
             return scrollModel.contentYOffset(metrics.cellHeight)
         }
 
-        private fun buildMetrics(settings: TerminalSwingSettings): TerminalSwingMetrics {
+        private fun buildMetrics(settings: SwingSettings): SwingMetrics {
             val metricsSource: FontMetrics = getFontMetrics(settings.font)
-            return TerminalSwingMetrics.from(metricsSource, settings.lineHeight)
+            return SwingMetrics.from(metricsSource, settings.lineHeight)
         }
 
         private fun runOnEdt(action: Runnable) {
@@ -1067,7 +1067,7 @@ class TerminalSwingTerminal
             private const val NO_ACTIVE_SEARCH_ROW = Long.MIN_VALUE
             private const val MIN_TIMER_DELAY_MILLIS = 1
 
-            private fun cursorTimerDelay(settings: TerminalSwingSettings): Int = maxOf(MIN_TIMER_DELAY_MILLIS, settings.cursorBlinkMillis)
+            private fun cursorTimerDelay(settings: SwingSettings): Int = maxOf(MIN_TIMER_DELAY_MILLIS, settings.cursorBlinkMillis)
 
             private fun packVisibleGridSize(
                 columns: Int,

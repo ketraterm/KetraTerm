@@ -17,7 +17,7 @@ package io.github.jvterm.ui.swing.render.painter
 
 import io.github.jvterm.render.api.*
 import io.github.jvterm.ui.swing.render.cache.AwtColorCache
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
 
 /**
@@ -38,7 +38,7 @@ internal class TerminalDecorationPainter(
         startColumn: Int,
         endColumn: Int,
         row: Int,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
     ) {
         val underline = TerminalRenderAttrs.underlineStyle(attr)
         val strikethrough = TerminalRenderAttrs.isStrikethrough(attr)
@@ -85,7 +85,7 @@ internal class TerminalDecorationPainter(
         startColumn: Int,
         endColumn: Int,
         row: Int,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         hovered: Boolean,
     ) {
         if (startColumn >= endColumn) return

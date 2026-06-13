@@ -18,8 +18,8 @@ package io.github.jvterm.ui.swing.render
 import io.github.jvterm.render.api.*
 import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.ui.swing.api.CellSelection
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -34,7 +34,7 @@ class TerminalGridPainterTest {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            TerminalSwingSettings(
+            SwingSettings(
                 font = Font(Font.MONOSPACED, Font.PLAIN, 14),
                 palette =
                     TerminalColorPalette(
@@ -44,7 +44,7 @@ class TerminalGridPainterTest {
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
             )
-        val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame(text = "ii", cursorVisible = false, palette = settings.palette))
 
@@ -70,7 +70,7 @@ class TerminalGridPainterTest {
         val image = BufferedImage(120, 40, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            TerminalSwingSettings(
+            SwingSettings(
                 font = Font(Font.SERIF, Font.PLAIN, 18),
                 palette =
                     TerminalColorPalette(
@@ -83,7 +83,7 @@ class TerminalGridPainterTest {
             )
         val fontMetrics = g.getFontMetrics(settings.font)
         val metrics =
-            TerminalSwingMetrics(
+            SwingMetrics(
                 cellWidth = maxOf(1, fontMetrics.charWidth('W')),
                 cellHeight = fontMetrics.height,
                 baseline = fontMetrics.ascent,
@@ -121,7 +121,7 @@ class TerminalGridPainterTest {
         val image = BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            TerminalSwingSettings(
+            SwingSettings(
                 font = Font(Font.MONOSPACED, Font.PLAIN, 14),
                 palette =
                     TerminalColorPalette(
@@ -133,7 +133,7 @@ class TerminalGridPainterTest {
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
             )
-        val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "A", cursorVisible = true, palette = settings.palette))
 
@@ -160,7 +160,7 @@ class TerminalGridPainterTest {
         val image = BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            TerminalSwingSettings(
+            SwingSettings(
                 font = Font(Font.MONOSPACED, Font.PLAIN, 14),
                 palette =
                     TerminalColorPalette(
@@ -170,7 +170,7 @@ class TerminalGridPainterTest {
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
             )
-        val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "\u03A9", cursorVisible = false, palette = settings.palette))
 
@@ -205,7 +205,7 @@ class TerminalGridPainterTest {
         val image = BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            TerminalSwingSettings(
+            SwingSettings(
                 font = Font(Font.MONOSPACED, Font.PLAIN, 14),
                 palette =
                     TerminalColorPalette(
@@ -217,7 +217,7 @@ class TerminalGridPainterTest {
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
             )
-        val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "\u03A9", cursorVisible = true, palette = settings.palette))
 
@@ -244,7 +244,7 @@ class TerminalGridPainterTest {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            TerminalSwingSettings(
+            SwingSettings(
                 font = Font(Font.MONOSPACED, Font.PLAIN, 14),
                 palette =
                     TerminalColorPalette(
@@ -254,7 +254,7 @@ class TerminalGridPainterTest {
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
             )
-        val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(
             TextFrame(
@@ -297,7 +297,7 @@ class TerminalGridPainterTest {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            TerminalSwingSettings(
+            SwingSettings(
                 font = Font(Font.MONOSPACED, Font.PLAIN, 14),
                 palette =
                     TerminalColorPalette(
@@ -307,7 +307,7 @@ class TerminalGridPainterTest {
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
             )
-        val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(
             TextFrame(
@@ -353,7 +353,7 @@ class TerminalGridPainterTest {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            TerminalSwingSettings(
+            SwingSettings(
                 font = Font(Font.MONOSPACED, Font.PLAIN, 14),
                 palette =
                     TerminalColorPalette(
@@ -364,7 +364,7 @@ class TerminalGridPainterTest {
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
             )
-        val metrics = TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame(text = "AB", cursorVisible = false, palette = settings.palette))
 

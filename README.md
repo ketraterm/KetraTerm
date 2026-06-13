@@ -85,7 +85,7 @@ The Lattice codebase is split into highly specialized modules with rigid archite
 | [**terminal-transport-api**](./terminal-transport-api) | Duplex Channel Contract | [TerminalConnector](./terminal-transport-api/src/main/kotlin/transport/TerminalConnector.kt) interface, connection callbacks, size change signaling | Has no thread policies or payload inspection. |
 | [**terminal-session**](./terminal-session) | Pipeline Sync & Event Loop | Synchronized `mutationLock` and `outboundWriteLock`, daemon `renderWorker` coalescing, fast UTF-8 encoder | Does not own transport background threads or paint loops. |
 | [**terminal-pty**](./terminal-pty) | Native Process Host | Cross-platform Pty4J management, daemon reader/watcher threads, system default shell detection | Has no input encoding or grid cell mutations. |
-| [**terminal-ui-swing**](./terminal-ui-swing) | Swing Component | [TerminalSwingTerminal](./terminal-ui-swing/src/main/kotlin/com/gagik/terminal/ui/swing/api/TerminalSwingTerminal.kt) component, bifurcated text rendering, smart double-click path selection | Has no shell process awareness or protocol parsing. |
+| [**terminal-ui-swing**](./terminal-ui-swing) | Swing Component | [SwingTerminal](./terminal-ui-swing/src/main/kotlin/com/gagik/terminal/ui/swing/api/SwingTerminal.kt) component, bifurcated text rendering, smart double-click path selection | Has no shell process awareness or protocol parsing. |
 | [**terminal-testkit**](./terminal-testkit) | Testing Fakes | In-memory [MockConnector](./terminal-testkit/src/main/kotlin/testkit/MockConnector.kt), outbound write capture, remote crash/exit simulators | Has no physical thread spawning or shell requirements. |
 
 ---
@@ -95,10 +95,10 @@ The Lattice codebase is split into highly specialized modules with rigid archite
 One of Lattice's greatest strengths is how easily it integrates into existing desktop systems or custom runtimes. Hooking a local system shell (e.g. bash or cmd) to a fully interactive Swing JComponent requires just a few lines of configuration:
 
 ```kotlin
-import io.github.jvterm.pty.TerminalPtySessions
-import io.github.jvterm.pty.TerminalPtyOptions
-import io.github.jvterm.ui.swing.api.TerminalSwingTerminal
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.pty.TerminalSessions
+import io.github.jvterm.pty.PtyOptions
+import io.github.jvterm.ui.swing.api.SwingTerminal
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.ui.swing.settings.TerminalTheme
 import java.awt.BorderLayout
 import javax.swing.JFrame
@@ -106,7 +106,7 @@ import javax.swing.JPanel
 
 fun spawnTerminalWindow() {
     // 1. Configure the local PTY process (spawns native process via Pty4J)
-    val options = TerminalPtyOptions(
+    val options = PtyOptions(
         command = listOf("bash"),          // or "cmd.exe", "powershell.exe", etc.
         columns = 100,
         rows = 30,
@@ -115,15 +115,15 @@ fun spawnTerminalWindow() {
     )
     
     // 2. Wires up standard components and starts PTY reader daemon threads
-    val session = TerminalPtySessions.localPty(options)
+    val session = TerminalSessions.localPty(options)
     
     // 3. Create JComponent with customizable, immutable visual presets
-    val settings = TerminalSwingSettings(
+    val settings = SwingSettings(
         theme = TerminalTheme.ONE_DARK,
         fontSize = 14,
         fontFamily = "JetBrains Mono"
     )
-    val terminalComponent = TerminalSwingTerminal(
+    val terminalComponent = SwingTerminal(
         settingsProvider = { settings }
     )
     

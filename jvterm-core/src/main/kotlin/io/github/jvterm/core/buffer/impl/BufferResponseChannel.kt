@@ -22,7 +22,7 @@ import io.github.jvterm.core.model.CellColorKind
 import io.github.jvterm.core.model.UnderlineStyle
 import io.github.jvterm.core.state.TerminalState
 
-internal class TerminalResponseChannelImpl(
+internal class BufferResponseChannel(
     private val state: TerminalState,
 ) : TerminalResponseChannel {
     override val pendingResponseBytes: Int

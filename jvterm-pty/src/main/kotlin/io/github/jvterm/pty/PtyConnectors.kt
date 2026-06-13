@@ -40,7 +40,7 @@ object PtyConnectors {
         rows: Int = 24,
     ): TerminalConnector {
         val options =
-            TerminalPtyOptions(
+            PtyOptions(
                 command = command,
                 environment = env,
                 workingDirectory = workingDirectory,
@@ -51,7 +51,7 @@ object PtyConnectors {
     }
 
     internal fun create(
-        options: TerminalPtyOptions,
+        options: PtyOptions,
         processFactory: TerminalProcessFactory,
     ): PtyConnector {
         val process = processFactory.start(options)

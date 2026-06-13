@@ -19,8 +19,8 @@ import io.github.jvterm.render.api.*
 import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.ui.swing.render.*
 import io.github.jvterm.ui.swing.render.cache.AwtColorCache
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.awt.*
@@ -488,7 +488,7 @@ class TerminalTextPainterTest {
             // Arrange
             val fixture = fixture(width = 40)
             val narrowMetrics =
-                TerminalSwingMetrics(
+                SwingMetrics(
                     cellWidth = 4,
                     cellHeight = fixture.metrics.cellHeight,
                     baseline = fixture.metrics.baseline,
@@ -537,7 +537,7 @@ class TerminalTextPainterTest {
             val cellWidth = 4
             val fixture = fixture(width = text.codePointCount(0, text.length) * cellWidth + cellWidth)
             val narrowMetrics =
-                TerminalSwingMetrics(
+                SwingMetrics(
                     cellWidth = cellWidth,
                     cellHeight = fixture.metrics.cellHeight,
                     baseline = fixture.metrics.baseline,
@@ -573,7 +573,7 @@ class TerminalTextPainterTest {
             val initialTransform = AffineTransform.getTranslateInstance(3.0, 5.0)
             fixture.g.transform = initialTransform
             val narrowMetrics =
-                TerminalSwingMetrics(
+                SwingMetrics(
                     cellWidth = 4,
                     cellHeight = fixture.metrics.cellHeight,
                     baseline = fixture.metrics.baseline,
@@ -821,8 +821,8 @@ class TerminalTextPainterTest {
     private data class Fixture(
         val image: BufferedImage,
         val g: Graphics2D,
-        val settings: TerminalSwingSettings,
-        val metrics: TerminalSwingMetrics,
+        val settings: SwingSettings,
+        val metrics: SwingMetrics,
         val painter: TerminalTextPainter,
     ) {
         fun paintRow(
@@ -869,8 +869,8 @@ class TerminalTextPainterTest {
         )
     }
 
-    private fun createMismatchSettings(): TerminalSwingSettings =
-        TerminalSwingSettings(
+    private fun createMismatchSettings(): SwingSettings =
+        SwingSettings(
             font = Font(Font.SERIF, Font.PLAIN, 18),
             palette = defaultTestSettings(foreground = TEST_RED, background = TEST_BLACK).palette,
             textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
@@ -878,12 +878,12 @@ class TerminalTextPainterTest {
             padding = Insets(0, 0, 0, 0),
         )
 
-    private fun createMismatchFixture(settings: TerminalSwingSettings): Triple<BufferedImage, TerminalSwingMetrics, TerminalTextPainter> {
+    private fun createMismatchFixture(settings: SwingSettings): Triple<BufferedImage, SwingMetrics, TerminalTextPainter> {
         val image = BufferedImage(120, 40, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val fontMetrics = g.getFontMetrics(settings.font)
         val metrics =
-            TerminalSwingMetrics(
+            SwingMetrics(
                 cellWidth = maxOf(1, fontMetrics.charWidth('W')),
                 cellHeight = fontMetrics.height,
                 baseline = fontMetrics.ascent,
@@ -904,7 +904,7 @@ class TerminalTextPainterTest {
     }
 
     private fun paintSerifAscii(
-        settings: TerminalSwingSettings,
+        settings: SwingSettings,
         text: String,
     ): BufferedImage {
         val image = BufferedImage(140, 40, BufferedImage.TYPE_INT_ARGB)

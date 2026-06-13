@@ -28,14 +28,14 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-class TerminalPtySessionTest {
+class PtySessionTest {
     @Test
     fun `pty stdout is parsed into terminal core through shared session`() {
         val process = FakeTerminalProcess(inputBytes = "hello\u001B[5n".ascii())
         val session =
-            TerminalPtySessions.start(
+            PtySessions.start(
                 options =
-                    TerminalPtyOptions(
+                    PtyOptions(
                         command = listOf("fake"),
                         columns = 10,
                         rows = 3,
@@ -53,8 +53,8 @@ class TerminalPtySessionTest {
     fun `parser core responses are written back to pty stdin`() {
         val process = FakeTerminalProcess(inputBytes = "\u001B[6n".ascii())
         val session =
-            TerminalPtySessions.start(
-                options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+            PtySessions.start(
+                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -68,8 +68,8 @@ class TerminalPtySessionTest {
     fun `input events are encoded to pty stdin through session serialization point`() {
         val process = FakeTerminalProcess.running()
         val session =
-            TerminalPtySessions.start(
-                options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+            PtySessions.start(
+                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -82,8 +82,8 @@ class TerminalPtySessionTest {
     fun `default pty input policy sends Return as CR even when newline mode is active`() {
         val process = FakeTerminalProcess.running()
         val session =
-            TerminalPtySessions.start(
-                options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+            PtySessions.start(
+                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -97,8 +97,8 @@ class TerminalPtySessionTest {
     fun `resize updates process and terminal dimensions`() {
         val process = FakeTerminalProcess.running()
         val session =
-            TerminalPtySessions.start(
-                options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+            PtySessions.start(
+                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -113,9 +113,9 @@ class TerminalPtySessionTest {
     fun `ambiguous width option is applied before pty output is parsed`() {
         val process = FakeTerminalProcess(inputBytes = "\u20ACX".toByteArray(StandardCharsets.UTF_8))
         val session =
-            TerminalPtySessions.start(
+            PtySessions.start(
                 options =
-                    TerminalPtyOptions(
+                    PtyOptions(
                         command = listOf("fake"),
                         columns = 6,
                         rows = 2,
@@ -138,8 +138,8 @@ class TerminalPtySessionTest {
     fun `close destroys process and does not fake an exit code`() {
         val process = FakeTerminalProcess.running()
         val session =
-            TerminalPtySessions.start(
-                options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+            PtySessions.start(
+                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -153,8 +153,8 @@ class TerminalPtySessionTest {
     fun `process exit is captured on shared session`() {
         val process = FakeTerminalProcess(inputBytes = ByteArray(0), exitCode = 7)
         val session =
-            TerminalPtySessions.start(
-                options = TerminalPtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+            PtySessions.start(
+                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -168,9 +168,9 @@ class TerminalPtySessionTest {
         val text = "x".repeat(20_000) + "\n"
         val process = FakeTerminalProcess(inputBytes = text.ascii())
         val session =
-            TerminalPtySessions.start(
+            PtySessions.start(
                 options =
-                    TerminalPtyOptions(
+                    PtyOptions(
                         command = listOf("fake"),
                         columns = 200,
                         rows = 120,
@@ -190,9 +190,9 @@ class TerminalPtySessionTest {
         val listener = RecordingPtyEventListener()
         val input = "\u0007\u001B]0;both\u001B\\".ascii()
         val process = FakeTerminalProcess(inputBytes = input)
-        TerminalPtySessions.start(
+        PtySessions.start(
             options =
-                TerminalPtyOptions(
+                PtyOptions(
                     command = listOf("fake"),
                     columns = 10,
                     rows = 3,
@@ -211,7 +211,7 @@ class TerminalPtySessionTest {
     @Test
     fun `listener exception is reported through listenerFailed`() {
         val listener =
-            object : TerminalPtyEventListener by TerminalPtyEventListener.NONE {
+            object : PtyEventListener by PtyEventListener.NONE {
                 val failures = mutableListOf<Exception>()
 
                 override fun bell(session: TerminalSession): Unit = throw IllegalStateException("bell failed")
@@ -224,8 +224,8 @@ class TerminalPtySessionTest {
                 }
             }
         val process = FakeTerminalProcess(inputBytes = "\u0007".ascii())
-        TerminalPtySessions.start(
-            options = TerminalPtyOptions(command = listOf("fake"), eventListener = listener),
+        PtySessions.start(
+            options = PtyOptions(command = listOf("fake"), eventListener = listener),
             processFactory = FixedProcessFactory(process),
         )
 
@@ -237,7 +237,7 @@ class TerminalPtySessionTest {
     private class FixedProcessFactory(
         private val process: FakeTerminalProcess,
     ) : TerminalProcessFactory {
-        override fun start(options: TerminalPtyOptions): TerminalProcess = process
+        override fun start(options: PtyOptions): TerminalProcess = process
     }
 
     private class FakeTerminalProcess private constructor(
@@ -334,7 +334,7 @@ class TerminalPtySessionTest {
         }
     }
 
-    private class RecordingPtyEventListener : TerminalPtyEventListener {
+    private class RecordingPtyEventListener : PtyEventListener {
         var bells: Int = 0
         val iconTitles = mutableListOf<String>()
         val windowTitles = mutableListOf<String>()

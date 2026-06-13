@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.app.ui
 
-import io.github.jvterm.ui.swing.api.TerminalSwingTerminal
+import io.github.jvterm.ui.swing.api.SwingTerminal
 import io.github.jvterm.ui.swing.api.TerminalViewportListener
 import java.awt.event.AdjustmentEvent
 import javax.swing.JScrollBar
@@ -27,7 +27,7 @@ import javax.swing.JScrollBar
 internal class TerminalScrollbarAdapter(
     private val scrollbar: JScrollBar,
 ) : TerminalViewportListener {
-    private var terminal: TerminalSwingTerminal? = null
+    private var terminal: SwingTerminal? = null
     private var updatingFromTerminal: Boolean = false
     private var historySize: Int = 0
     private var publishedScrollbarValue: Int = 0
@@ -38,7 +38,7 @@ internal class TerminalScrollbarAdapter(
         }
     }
 
-    fun attach(terminal: TerminalSwingTerminal) {
+    fun attach(terminal: SwingTerminal) {
         this.terminal = terminal
     }
 

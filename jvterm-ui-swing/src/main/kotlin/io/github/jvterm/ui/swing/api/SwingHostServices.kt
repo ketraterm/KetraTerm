@@ -49,7 +49,7 @@ fun interface TerminalUiDispatcher {
 }
 
 /**
- * Host-provided non-render services for [TerminalSwingTerminal].
+ * Host-provided non-render services for [SwingTerminal].
  *
  * These services are intentionally kept out of row painters. Rendering consumes
  * immutable settings and render-cache snapshots, while host integrations supply
@@ -62,7 +62,7 @@ fun interface TerminalUiDispatcher {
  * @property viewportListener host scrollbar adapter notified when the terminal
  * scrollback viewport changes.
  */
-data class TerminalSwingHostServices
+data class SwingHostServices
     @JvmOverloads
     constructor(
         val uiDispatcher: TerminalUiDispatcher = SWING,

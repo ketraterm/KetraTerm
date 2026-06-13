@@ -27,7 +27,7 @@ import io.github.jvterm.render.cache.TerminalRenderPublisher
 import io.github.jvterm.session.TerminalSession
 import io.github.jvterm.transport.TerminalConnector
 import io.github.jvterm.transport.TerminalConnectorListener
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -36,10 +36,10 @@ import java.awt.event.KeyEvent
 import javax.swing.JFrame
 import javax.swing.SwingUtilities
 
-class TerminalSwingTerminalCursorBlinkTest {
+class SwingTerminalCursorBlinkTest {
     @Test
     fun `cursor presentation follows terminal focus`() {
-        val component = TerminalSwingTerminal()
+        val component = SwingTerminal()
 
         SwingUtilities.invokeAndWait {
             component.cursorBlinkVisible = true
@@ -66,9 +66,9 @@ class TerminalSwingTerminalCursorBlinkTest {
     @Test
     fun `zero cursor blink setting keeps timer stopped and cursor visible`() {
         val component =
-            TerminalSwingTerminal(
+            SwingTerminal(
                 settingsProvider = {
-                    TerminalSwingSettings(cursorBlinkMillis = 0)
+                    SwingSettings(cursorBlinkMillis = 0)
                 },
             )
         val frame = JFrame()
@@ -103,7 +103,7 @@ class TerminalSwingTerminalCursorBlinkTest {
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
             )
-        val component = TerminalSwingTerminal()
+        val component = SwingTerminal()
 
         val frame = JFrame()
         try {

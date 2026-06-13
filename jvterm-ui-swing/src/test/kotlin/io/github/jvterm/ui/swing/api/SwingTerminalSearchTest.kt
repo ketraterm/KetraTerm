@@ -27,7 +27,7 @@ import io.github.jvterm.render.cache.TerminalRenderPublisher
 import io.github.jvterm.session.TerminalSession
 import io.github.jvterm.transport.TerminalConnector
 import io.github.jvterm.transport.TerminalConnectorListener
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -36,13 +36,13 @@ import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import javax.swing.SwingUtilities
 
-class TerminalSwingTerminalSearchTest {
+class SwingTerminalSearchTest {
     @Test
     fun `ctrl shift f opens search overlay without sending terminal input`() {
         val input = RecordingInputEncoder()
         val reader = SearchFrameReader()
         val session = testSession(reader, input)
-        val component = TerminalSwingTerminal(settingsProvider = { TerminalSwingSettings(padding = Insets(0, 0, 0, 0)) })
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
             component.setSize(120, 40)
@@ -61,7 +61,7 @@ class TerminalSwingTerminalSearchTest {
     fun `search scrolls active scrollback result into viewport`() {
         val reader = SearchFrameReader()
         val session = testSession(reader)
-        val component = TerminalSwingTerminal(settingsProvider = { TerminalSwingSettings(padding = Insets(0, 0, 0, 0)) })
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
             component.setSize(120, 24)
@@ -92,7 +92,7 @@ class TerminalSwingTerminalSearchTest {
         )
     }
 
-    private fun searchShortcut(component: TerminalSwingTerminal): KeyEvent =
+    private fun searchShortcut(component: SwingTerminal): KeyEvent =
         KeyEvent(
             component,
             KeyEvent.KEY_PRESSED,

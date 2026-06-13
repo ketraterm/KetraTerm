@@ -27,7 +27,7 @@ import java.util.*
  * Immutable Swing terminal UI settings.
  *
  * Hosts can replace this value and call
- * [TerminalSwingTerminal.reloadSettings] to rebuild metrics and repaint.
+ * [SwingTerminal.reloadSettings] to rebuild metrics and repaint.
  *
  * @property font primary terminal font.
  * @property fallbackFonts ordered fonts used by the complex-text renderer when
@@ -60,7 +60,7 @@ import java.util.*
  * @property scrollbackLines maximum scrollback lines retained by the terminal.
  * @property lineHeight vertical line height scaling factor.
  */
-data class TerminalSwingSettings
+data class SwingSettings
     @JvmOverloads
     constructor(
         val font: Font = defaultTerminalFont(),
@@ -419,13 +419,13 @@ enum class TerminalTheme {
 }
 
 /**
- * Provides immutable settings snapshots to [TerminalSwingTerminal].
+ * Provides immutable settings snapshots to [SwingTerminal].
  */
-fun interface TerminalSwingSettingsProvider {
+fun interface SwingSettingsProvider {
     /**
      * Returns the current immutable settings snapshot.
      *
      * @return settings snapshot for metrics, colors, and painting hints.
      */
-    fun currentSettings(): TerminalSwingSettings
+    fun currentSettings(): SwingSettings
 }

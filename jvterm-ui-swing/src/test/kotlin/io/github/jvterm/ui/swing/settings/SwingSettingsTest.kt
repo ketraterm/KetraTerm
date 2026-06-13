@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.ui.swing.settings
 
-import io.github.jvterm.ui.swing.api.TerminalSwingTerminal
+import io.github.jvterm.ui.swing.api.SwingTerminal
 import java.awt.Canvas
 import java.awt.Font
 import java.awt.Insets
@@ -26,20 +26,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-class TerminalSwingSettingsTest {
+class SwingSettingsTest {
     @Test
     fun settingsRejectInvalidGridSizes() {
         assertFailsWith<IllegalArgumentException> {
-            TerminalSwingSettings(columns = 0)
+            SwingSettings(columns = 0)
         }
         assertFailsWith<IllegalArgumentException> {
-            TerminalSwingSettings(rows = 0)
+            SwingSettings(rows = 0)
         }
     }
 
     @Test
     fun settingsAllowZeroCursorBlinkToDisableBlinking() {
-        val settings = TerminalSwingSettings(cursorBlinkMillis = 0)
+        val settings = SwingSettings(cursorBlinkMillis = 0)
 
         assertEquals(0, settings.cursorBlinkMillis)
     }
@@ -48,7 +48,7 @@ class TerminalSwingSettingsTest {
     fun metricsArePositiveForMonospacedFont() {
         val component = Canvas()
         val fontMetrics = component.getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 14))
-        val metrics = TerminalSwingMetrics.from(fontMetrics)
+        val metrics = SwingMetrics.from(fontMetrics)
 
         assertTrue(metrics.cellWidth > 0)
         assertTrue(metrics.cellHeight > 0)
@@ -60,8 +60,8 @@ class TerminalSwingSettingsTest {
     fun metricsScaleCellHeightAndBaselineWithLineHeightMultiplier() {
         val component = Canvas()
         val fontMetrics = component.getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 14))
-        val unscaled = TerminalSwingMetrics.from(fontMetrics, 1.0f)
-        val scaled = TerminalSwingMetrics.from(fontMetrics, 1.5f)
+        val unscaled = SwingMetrics.from(fontMetrics, 1.0f)
+        val scaled = SwingMetrics.from(fontMetrics, 1.5f)
 
         val expectedHeight = (fontMetrics.height * 1.5f).toInt()
         assertEquals(expectedHeight, scaled.cellHeight)
@@ -71,7 +71,7 @@ class TerminalSwingSettingsTest {
         assertEquals(unscaled.cellWidth, scaled.cellWidth)
 
         // Verify that a very small line height (0.5f) does not crash and baseline is coerced
-        val tinyMetrics = TerminalSwingMetrics.from(fontMetrics, 0.5f)
+        val tinyMetrics = SwingMetrics.from(fontMetrics, 0.5f)
         assertTrue(tinyMetrics.cellHeight > 0)
         assertTrue(tinyMetrics.baseline in 0..tinyMetrics.cellHeight)
     }
@@ -89,7 +89,7 @@ class TerminalSwingSettingsTest {
                 val fontMetrics = component.getFontMetrics(font)
                 for (lh in lineHeights) {
                     try {
-                        val metrics = TerminalSwingMetrics.from(fontMetrics, lh)
+                        val metrics = SwingMetrics.from(fontMetrics, lh)
                         assertTrue(metrics.cellWidth > 0, "Width <= 0 for $family $size lh=$lh")
                         assertTrue(metrics.cellHeight > 0, "Height <= 0 for $family $size lh=$lh")
                         assertTrue(metrics.baseline in 0..metrics.cellHeight, "Baseline $metrics out of bounds for $family $size lh=$lh")
@@ -110,7 +110,7 @@ class TerminalSwingSettingsTest {
             println("=== FONT: $family 16 ===")
             println("  height=${fm.height} ascent=${fm.ascent} descent=${fm.descent} leading=${fm.leading}")
             for (lh in listOf(0.5f, 0.6f, 1.0f)) {
-                val m = TerminalSwingMetrics.from(fm, lh)
+                val m = SwingMetrics.from(fm, lh)
                 println(
                     "  lh=$lh -> cellHeight=${m.cellHeight} baseline=${m.baseline} underlineY=${m.underlineY} strikethroughY=${m.strikethroughY}",
                 )
@@ -120,7 +120,7 @@ class TerminalSwingSettingsTest {
 
     @Test
     fun settingsDefaultToHighQualityGridSafeTextHints() {
-        val settings = TerminalSwingSettings()
+        val settings = SwingSettings()
 
         assertEquals(RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB, settings.textAntialiasing)
         assertEquals(RenderingHints.VALUE_FRACTIONALMETRICS_OFF, settings.fractionalMetrics)
@@ -133,14 +133,14 @@ class TerminalSwingSettingsTest {
 
     @Test
     fun settingsAcceptCustomPadding() {
-        val settings = TerminalSwingSettings(padding = Insets(4, 8, 4, 8))
+        val settings = SwingSettings(padding = Insets(4, 8, 4, 8))
         assertEquals(Insets(4, 8, 4, 8), settings.padding)
     }
 
     @Test
     fun fallbackPolicyPrefersInstalledColorEmojiBeforeSymbolFonts() {
         val families =
-            TerminalSwingSettings.fallbackFontFamiliesForInstalledFonts(
+            SwingSettings.fallbackFontFamiliesForInstalledFonts(
                 arrayOf(
                     "Segoe UI Symbol",
                     "Dialog",
@@ -156,7 +156,7 @@ class TerminalSwingSettingsTest {
     @Test
     fun fallbackPolicyIncludesInstalledIndicKhmerAndSinhalaFonts() {
         val families =
-            TerminalSwingSettings.fallbackFontFamiliesForInstalledFonts(
+            SwingSettings.fallbackFontFamiliesForInstalledFonts(
                 arrayOf(
                     "Nirmala UI",
                     "Noto Sans Devanagari",
@@ -181,7 +181,7 @@ class TerminalSwingSettingsTest {
 
     @Test
     fun settingsDefaultPaletteOwnsSwingThemeColors() {
-        val palette = TerminalSwingSettings.defaultPalette()
+        val palette = SwingSettings.defaultPalette()
 
         assertEquals(0xFFF2F2F2.toInt(), palette.defaultForeground)
         assertEquals(0xFF0C0C0C.toInt(), palette.defaultBackground)
@@ -200,8 +200,8 @@ class TerminalSwingSettingsTest {
     @Test
     fun componentReportsVisibleGridFromFrozenMetrics() {
         val component =
-            TerminalSwingTerminal(settingsProvider = {
-                TerminalSwingSettings(columns = 10, rows = 4)
+            SwingTerminal(settingsProvider = {
+                SwingSettings(columns = 10, rows = 4)
             })
         val preferred = component.preferredSize
         var visibleColumns = 0

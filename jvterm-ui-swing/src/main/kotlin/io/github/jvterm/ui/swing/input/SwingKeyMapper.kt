@@ -29,7 +29,7 @@ import java.awt.event.KeyEvent
  * can be applied by the input encoder; their follow-up `KEY_TYPED` event is
  * suppressed to avoid emitting the normal-mode character twice.
  */
-internal class TerminalSwingKeyMapper {
+internal class SwingKeyMapper {
     private var pendingHighSurrogate: Char = NO_PENDING_SURROGATE
     private var pendingHighSurrogateModifiers: Int = TerminalModifiers.NONE
     private var suppressNextKeypadTyped: Boolean = false

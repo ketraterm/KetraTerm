@@ -42,7 +42,7 @@ flowchart TD
     Parser[Parser / UTF-8 Decoder]
     Core[TerminalBuffer / Core State]
     EventBridge[SessionHostEventBridge]
-    Listener[TerminalPtyEventListener]
+    Listener[PtyEventListener]
 
     %% Write/Input Path (Serialized)
     UI -->|Key / Mouse / Paste| Loop
@@ -80,22 +80,22 @@ To facilitate deterministic testing without relying on the native host environme
 - **[Pty4jTerminalProcess](./src/main/kotlin/pty/TerminalProcess.kt)**: The default production wrapper that adapts `com.pty4j.PtyProcess` to the [TerminalProcess](./src/main/kotlin/pty/TerminalProcess.kt) contract, implementing `resize` via `PtyProcess.setWinSize(WinSize(cols, rows))`.
 - **[Pty4jTerminalProcessFactory](./src/main/kotlin/pty/TerminalProcess.kt)**: Initializes a `PtyProcessBuilder` using configured variables. Crucially, it sets `setUseWinConPty(true)` to ensure optimal compatibility with the Windows Pseudo Console (ConPTY) system on modern Windows 10/11 environments.
 
-### 3. PTY Options Configuration ([TerminalPtyOptions](./src/main/kotlin/pty/TerminalPtyOptions.kt))
-[TerminalPtyOptions](./src/main/kotlin/pty/TerminalPtyOptions.kt) is an immutable configuration dataclass that encapsulates all initialization parameters:
+### 3. PTY Options Configuration ([PtyOptions](./src/main/kotlin/pty/PtyOptions.kt))
+[PtyOptions](./src/main/kotlin/pty/PtyOptions.kt) is an immutable configuration dataclass that encapsulates all initialization parameters:
 - **Platform-Default Shell Detection**: Automatically determines the native shell when none is specified:
   - **Windows**: Queries the `%COMSPEC%` environment variable, defaulting to `cmd.exe` if unresolved.
   - **macOS/Linux**: Queries the `$SHELL` environment variable, defaulting to `/bin/sh` with the `-l` (login shell) flag if unresolved.
 - **Environment Context**: Inherits all current JVM environment variables via `System.getenv()`, while explicitly appending `TERM=xterm-256color` to request standard 256-color support from host shells and text-user interfaces (TUIs).
 - **Core Parameters Integration**: Packs dimension bounds (`columns`, `rows`), history limits (`maxHistory`), East Asian ambiguous character policies (`treatAmbiguousAsWide`), thread naming preferences, and stream read buffer capacities.
 
-### 4. PTY Callback Event Listener ([TerminalPtyEventListener](./src/main/kotlin/pty/TerminalPtyEventListener.kt))
-To handle terminal events discovered during escape sequence parsing (like bells and window titles) in a transport-neutral project, this module exposes the [TerminalPtyEventListener](./src/main/kotlin/pty/TerminalPtyEventListener.kt) interface:
+### 4. PTY Callback Event Listener ([PtyEventListener](./src/main/kotlin/pty/PtyEventListener.kt))
+To handle terminal events discovered during escape sequence parsing (like bells and window titles) in a transport-neutral project, this module exposes the [PtyEventListener](./src/main/kotlin/pty/PtyEventListener.kt) interface:
 - **Available Callbacks**:
   - `bell(session)`: Fired when a `BEL` (`\u0007`) byte is parsed.
   - `iconTitleChanged(session, title)`: Fired after receiving OSC icon title sequences.
   - `windowTitleChanged(session, title)`: Fired after receiving OSC window title sequences.
   - `listenerFailed(session, exception)`: Fired if one of the custom consumer callbacks throws an exception, isolating execution from the pump thread.
-- **Null Object Pattern**: Provides [TerminalPtyEventListener.NONE](./src/main/kotlin/pty/TerminalPtyEventListener.kt) as a default no-op listener to eliminate null checks.
+- **Null Object Pattern**: Provides [PtyEventListener.NONE](./src/main/kotlin/pty/PtyEventListener.kt) as a default no-op listener to eliminate null checks.
 
 ### 5. Integration Host Event Bridge ([SessionHostEventBridge](./src/main/kotlin/pty/SessionHostEventBridge.kt))
 [SessionHostEventBridge](./src/main/kotlin/pty/SessionHostEventBridge.kt) connects the `terminal-host` layer with `terminal-pty`:
@@ -106,11 +106,11 @@ To handle terminal events discovered during escape sequence parsing (like bells 
 
 ## Glued Terminal Wiring & Initialization
 
-Spawning a functional local PTY terminal involves coordinating multiple independent modules. **terminal-pty** automates this via [TerminalPtySessions](./src/main/kotlin/pty/TerminalPtySessions.kt):
+Spawning a functional local PTY terminal involves coordinating multiple independent modules. **terminal-pty** automates this via [PtySessions](./src/main/kotlin/pty/PtySessions.kt):
 
 ```kotlin
 val session = TerminalSessions.localPty(
-    TerminalPtyOptions(
+    PtyOptions(
         command = listOf("bash"),
         columns = 80,
         rows = 24,
@@ -120,11 +120,11 @@ val session = TerminalSessions.localPty(
 )
 ```
 
-Behind this simple call, the factory executes the following sequential wiring pipeline inside [TerminalPtySessions.start(...)](./src/main/kotlin/pty/TerminalPtySessions.kt):
+Behind this simple call, the factory executes the following sequential wiring pipeline inside [PtySessions.start(...)](./src/main/kotlin/pty/PtySessions.kt):
 
 1. **Connector Setup**: Spawns the native process via `PtyProcessBuilder` and instantiates the thread-controlled [PtyConnector](./src/main/kotlin/pty/PtyConnector.kt).
 2. **Core Grid Creation**: Creates the headless terminal state [TerminalBuffer](../terminal-core/docs/terminal-core-contract.md) (`:terminal-core`) with the configured dimensions, history capacity, and East Asian Ambiguous width policy.
-3. **Bridge Allocation**: Constructs a [SessionHostEventBridge](./src/main/kotlin/pty/SessionHostEventBridge.kt) using the caller's [TerminalPtyEventListener](./src/main/kotlin/pty/TerminalPtyEventListener.kt).
+3. **Bridge Allocation**: Constructs a [SessionHostEventBridge](./src/main/kotlin/pty/SessionHostEventBridge.kt) using the caller's [PtyEventListener](./src/main/kotlin/pty/PtyEventListener.kt).
 4. **Session Assembly**: Instantiates the standard, thread-synchronized `TerminalSession` (`:terminal-session`) wrapping the core buffer, the PTY connector, and the event bridge.
 5. **Session Attaching**: Attaches the active `TerminalSession` instance to the bridge so that callbacks receive a valid handle to the session.
 6. **Thread Launch**: Triggers `session.start(...)`, which spawns the reader/watcher daemon threads and registers the output write loop, starting the terminal runtime.
@@ -148,16 +148,16 @@ The test suite in `:terminal-pty` verifies both stream-level correctness and nat
 ### 1. Mock-Backed Unit Tests
 To achieve 100% deterministic test coverage, unit tests utilize simulated streams and processes rather than spawning actual OS-level shells:
 - **[PtyConnectorTest](./src/test/kotlin/pty/PtyConnectorTest.kt)**: Exercises stream chunking, write range offsets, process destruction, thread cleanup limits, EOF handling, and reader failure isolation using custom `TestProcess`, `RecordingOutputStream`, and `BlockingInputStream` fakes.
-- **[TerminalPtySessionTest](./src/test/kotlin/pty/TerminalPtySessionTest.kt)**: Asserts the host of the full session pipeline. It verifies that fake PTY stdout is correctly parsed into terminal core lines, core responses are pushed back to PTY stdin, key events are properly encoded and dispatched, and metadata event bridges successfully invoke listener callbacks.
+- **[PtySessionTest](./src/test/kotlin/pty/PtySessionTest.kt)**: Asserts the host of the full session pipeline. It verifies that fake PTY stdout is correctly parsed into terminal core lines, core responses are pushed back to PTY stdin, key events are properly encoded and dispatched, and metadata event bridges successfully invoke listener callbacks.
 - **[SessionHostEventBridgeTest](./src/test/kotlin/pty/SessionHostEventBridgeTest.kt)**: Asserts correct event routing and exception handling/isolation behaviors.
 
 ### 2. Native Smoke Tests
-Actual OS pseudo-terminal execution is validated via **[TerminalPtyRealProcessTest](./src/test/kotlin/pty/TerminalPtyRealProcessTest.kt)**:
+Actual OS pseudo-terminal execution is validated via **[PtyRealProcessTest](./src/test/kotlin/pty/PtyRealProcessTest.kt)**:
 - Automatically detects the host operating system (Windows vs. UNIX) to issue platform-appropriate test commands (e.g., `cmd.exe /c echo` vs. `printf`, `powershell.exe` for high-throughput character repeat testing).
 - Verifies that real PTY outputs reach the terminal core, resizes behave correctly without deadlocks, and native process exit codes are successfully captured.
 - **Opt-In Guard**: Native PTY testing requires downloading system-dependent binaries via PTY4J. These tests are gated behind a system property assumption. To execute them locally, supply the opt-in flag:
   ```bash
-  ./gradlew :terminal-pty:test --tests "io.github.jvterm.pty.TerminalPtyRealProcessTest" "-Dterminal.pty.host=true"
+  ./gradlew :terminal-pty:test --tests "io.github.jvterm.pty.PtyRealProcessTest" "-Dterminal.pty.host=true"
   ```
 
 ---
@@ -170,5 +170,5 @@ Actual OS pseudo-terminal execution is validated via **[TerminalPtyRealProcessTe
   ```
 - **Run all native host PTY tests**:
   ```bash
-  ./gradlew :terminal-pty:test --tests "io.github.jvterm.pty.TerminalPtyRealProcessTest" "-Dterminal.pty.host=true"
+  ./gradlew :terminal-pty:test --tests "io.github.jvterm.pty.PtyRealProcessTest" "-Dterminal.pty.host=true"
   ```

@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.app.config
 
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.ui.swing.settings.TerminalTheme
 import io.github.jvterm.workspace.config.TerminalConfig
 import io.github.jvterm.workspace.config.TerminalWorkspaceConfigManager
@@ -133,8 +133,8 @@ internal class JvTermSettings(
             updateConfig(config.copy(shellRequestResizeWindow = value))
         }
 
-    fun current(): TerminalSwingSettings =
-        TerminalSwingSettings(
+    fun current(): SwingSettings =
+        SwingSettings(
             font = Font(config.fontFamily, Font.PLAIN, config.fontSize),
             columns = config.columns,
             rows = config.rows,

@@ -19,7 +19,7 @@ import io.github.jvterm.core.TerminalBuffers
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
-class TerminalWriterImplContractTest {
+class BufferWriterContractTest {
     @Test
     fun `clearAll_resetsTabStopsToDefault`() {
         val buffer = TerminalBuffers.create(width = 12, height = 2)

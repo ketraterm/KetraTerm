@@ -23,9 +23,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-class TerminalSwingKeyMapperTest {
+class SwingKeyMapperTest {
     private val source = Canvas()
-    private val mapper = TerminalSwingKeyMapper()
+    private val mapper = SwingKeyMapper()
 
     @Test
     fun mapsPrintableTypedCharacter() {

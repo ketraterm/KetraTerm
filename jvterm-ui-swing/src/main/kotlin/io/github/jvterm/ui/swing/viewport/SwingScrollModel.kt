@@ -24,7 +24,7 @@ import kotlin.math.floor
  * line-addressed, but the Swing renderer can request one overscan row and
  * translate the snapshot by sub-row pixels for smooth scrollback composition.
  */
-internal class TerminalSwingScrollModel {
+internal class SwingScrollModel {
     private var preciseOffset: Double = 0.0
     private var committedOffset: Int = 0
     private var renderOffset: Int = 0

@@ -27,7 +27,7 @@ import io.github.jvterm.render.cache.TerminalRenderPublisher
 import io.github.jvterm.session.TerminalSession
 import io.github.jvterm.transport.TerminalConnector
 import io.github.jvterm.transport.TerminalConnectorListener
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Dimension
@@ -41,11 +41,11 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 import kotlin.concurrent.thread
 
-class TerminalSwingTerminalThreadingTest {
+class SwingTerminalThreadingTest {
     @Test
     fun `bind and unbind may be called from a background thread`() {
         val session = testSession()
-        val component = TerminalSwingTerminal()
+        val component = SwingTerminal()
 
         runOffEdt {
             component.bind(session)
@@ -67,9 +67,9 @@ class TerminalSwingTerminalThreadingTest {
         val session = testSession()
         val dispatcher = RecordingDispatcher()
         val component =
-            TerminalSwingTerminal(
+            SwingTerminal(
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         uiDispatcher = dispatcher,
                     ),
             )
@@ -89,7 +89,7 @@ class TerminalSwingTerminalThreadingTest {
     @Test
     fun `bind called off EDT does not wait for EDT execution`() {
         val session = testSession()
-        val component = TerminalSwingTerminal()
+        val component = SwingTerminal()
         val edtBlocked = CountDownLatch(1)
         val releaseEdt = CountDownLatch(1)
         val bindReturned = AtomicBoolean(false)
@@ -133,11 +133,11 @@ class TerminalSwingTerminalThreadingTest {
         val reloadCalledOnEdt = AtomicBoolean(false)
         val calls = AtomicInteger()
         val component =
-            TerminalSwingTerminal(settingsProvider = {
+            SwingTerminal(settingsProvider = {
                 if (calls.incrementAndGet() > 1) {
                     reloadCalledOnEdt.set(SwingUtilities.isEventDispatchThread())
                 }
-                TerminalSwingSettings(
+                SwingSettings(
                     font = Font(Font.MONOSPACED, Font.PLAIN, 18),
                     columns = 100,
                     rows = 30,
@@ -158,7 +158,7 @@ class TerminalSwingTerminalThreadingTest {
 
     @Test
     fun `visibleGridSize called off EDT reads cached grid size without waiting for EDT`() {
-        val component = TerminalSwingTerminal()
+        val component = SwingTerminal()
         val expected =
             edtCall {
                 component.size = Dimension(160, 80)
@@ -204,7 +204,7 @@ class TerminalSwingTerminalThreadingTest {
     fun `bind resizes session to current visible grid when component has bounds`() {
         val connector = RecordingConnector()
         val session = testSession(connector)
-        val component = TerminalSwingTerminal()
+        val component = SwingTerminal()
 
         val expected =
             edtCall {
@@ -227,8 +227,8 @@ class TerminalSwingTerminalThreadingTest {
     fun `bind applies ambiguous width setting to session core`() {
         val session = testSession()
         val component =
-            TerminalSwingTerminal(settingsProvider = {
-                TerminalSwingSettings(treatAmbiguousAsWide = true)
+            SwingTerminal(settingsProvider = {
+                SwingSettings(treatAmbiguousAsWide = true)
             })
 
         component.bind(session)
@@ -243,8 +243,8 @@ class TerminalSwingTerminalThreadingTest {
         val session = testSession()
         var ambiguousAsWide = false
         val component =
-            TerminalSwingTerminal(settingsProvider = {
-                TerminalSwingSettings(treatAmbiguousAsWide = ambiguousAsWide)
+            SwingTerminal(settingsProvider = {
+                SwingSettings(treatAmbiguousAsWide = ambiguousAsWide)
             })
 
         component.bind(session)
@@ -263,7 +263,7 @@ class TerminalSwingTerminalThreadingTest {
     fun `component resize updates session only when visible grid changes`() {
         val connector = RecordingConnector()
         val session = testSession(connector)
-        val component = TerminalSwingTerminal()
+        val component = SwingTerminal()
 
         edtCall {
             component.size = Dimension(160, 80)

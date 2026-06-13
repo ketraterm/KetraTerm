@@ -30,10 +30,10 @@ import io.github.jvterm.transport.TerminalConnector
 import io.github.jvterm.transport.TerminalConnectorListener
 import io.github.jvterm.ui.swing.render.TestCell
 import io.github.jvterm.ui.swing.render.TestRenderFrame
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.jvterm.ui.swing.settings.TerminalClipboardShortcuts
 import io.github.jvterm.ui.swing.settings.TerminalHyperlinkHandler
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Insets
@@ -44,12 +44,12 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 
-class TerminalSwingTerminalSelectionTest {
+class SwingTerminalSelectionTest {
     @Test
     fun `single click clears selection without selecting the clicked cell`() {
         val frame = TestRenderFrame.text("hello")
         val session = testSession(frame = frame)
-        val component = TerminalSwingTerminal(settingsProvider = { TerminalSwingSettings(padding = Insets(0, 0, 0, 0)) })
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
@@ -66,7 +66,7 @@ class TerminalSwingTerminalSelectionTest {
     fun `drag after single click creates selection`() {
         val frame = TestRenderFrame.text("hello")
         val session = testSession(frame = frame)
-        val component = TerminalSwingTerminal(settingsProvider = { TerminalSwingSettings(padding = Insets(0, 0, 0, 0)) })
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
@@ -88,7 +88,7 @@ class TerminalSwingTerminalSelectionTest {
                 frame = ScrollbackFrame(scrollbackOffset = 0, rows = 1),
                 renderReader = renderReader,
             )
-        val component = TerminalSwingTerminal(settingsProvider = { TerminalSwingSettings(padding = Insets(0, 0, 0, 0)) })
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
             component.setSize(60, 20)
@@ -111,7 +111,7 @@ class TerminalSwingTerminalSelectionTest {
     fun `alt drag creates rectangular block selection`() {
         val frame = TestRenderFrame.text("hello world")
         val session = testSession(frame = frame)
-        val component = TerminalSwingTerminal(settingsProvider = { TerminalSwingSettings(padding = Insets(0, 0, 0, 0)) })
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
@@ -195,15 +195,15 @@ class TerminalSwingTerminalSelectionTest {
         val frame = TestRenderFrame.text("hello world")
         val session = testSession(frame = frame)
         val component =
-            TerminalSwingTerminal(
+            SwingTerminal(
                 settingsProvider = {
-                    TerminalSwingSettings(
+                    SwingSettings(
                         clipboardShortcuts = TerminalClipboardShortcuts.windows(),
                         padding = Insets(0, 0, 0, 0),
                     )
                 },
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         clipboardHandler = clipboard,
                     ),
             )
@@ -226,15 +226,15 @@ class TerminalSwingTerminalSelectionTest {
         val frame = TestRenderFrame.text("hello world")
         val session = testSession(frame = frame)
         val component =
-            TerminalSwingTerminal(
+            SwingTerminal(
                 settingsProvider = {
-                    TerminalSwingSettings(
+                    SwingSettings(
                         clipboardShortcuts = TerminalClipboardShortcuts.linuxAndUnix(),
                         padding = Insets(0, 0, 0, 0),
                     )
                 },
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         clipboardHandler = clipboard,
                     ),
             )
@@ -260,15 +260,15 @@ class TerminalSwingTerminalSelectionTest {
         val frame = TestRenderFrame.text("ready")
         val session = testSession(frame = frame, inputEncoder = input)
         val component =
-            TerminalSwingTerminal(
+            SwingTerminal(
                 settingsProvider = {
-                    TerminalSwingSettings(
+                    SwingSettings(
                         clipboardShortcuts = TerminalClipboardShortcuts.windows(),
                         padding = Insets(0, 0, 0, 0),
                     )
                 },
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         clipboardHandler = clipboard,
                     ),
             )
@@ -291,15 +291,15 @@ class TerminalSwingTerminalSelectionTest {
         val frame = TestRenderFrame.text("ready")
         val session = testSession(frame = frame, inputEncoder = input)
         val component =
-            TerminalSwingTerminal(
+            SwingTerminal(
                 settingsProvider = {
-                    TerminalSwingSettings(
+                    SwingSettings(
                         pasteOnMiddleClick = true,
                         padding = Insets(0, 0, 0, 0),
                     )
                 },
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         clipboardHandler = clipboard,
                     ),
             )
@@ -324,15 +324,15 @@ class TerminalSwingTerminalSelectionTest {
         val frame = TestRenderFrame.text("ready")
         val session = testSession(frame = frame, inputEncoder = input)
         val component =
-            TerminalSwingTerminal(
+            SwingTerminal(
                 settingsProvider = {
-                    TerminalSwingSettings(
+                    SwingSettings(
                         pasteOnMiddleClick = false,
                         padding = Insets(0, 0, 0, 0),
                     )
                 },
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         clipboardHandler = clipboard,
                     ),
             )
@@ -357,15 +357,15 @@ class TerminalSwingTerminalSelectionTest {
         val frame = TestRenderFrame.text("ready")
         val session = testSession(frame = frame, inputEncoder = input)
         val component =
-            TerminalSwingTerminal(
+            SwingTerminal(
                 settingsProvider = {
-                    TerminalSwingSettings(
+                    SwingSettings(
                         pasteOnMiddleClick = true,
                         padding = Insets(0, 0, 0, 0),
                     )
                 },
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         clipboardHandler = clipboard,
                     ),
             )
@@ -397,15 +397,15 @@ class TerminalSwingTerminalSelectionTest {
         val frame = TestRenderFrame.text("ready")
         val session = testSession(frame = frame, inputEncoder = input)
         val component =
-            TerminalSwingTerminal(
+            SwingTerminal(
                 settingsProvider = {
-                    TerminalSwingSettings(
+                    SwingSettings(
                         clipboardShortcuts = TerminalClipboardShortcuts.windows(),
                         padding = Insets(0, 0, 0, 0),
                     )
                 },
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         clipboardHandler = clipboard,
                     ),
             )
@@ -446,10 +446,10 @@ class TerminalSwingTerminalSelectionTest {
                     },
             )
         val component =
-            TerminalSwingTerminal(
-                settingsProvider = { TerminalSwingSettings(padding = Insets(0, 0, 0, 0)) },
+            SwingTerminal(
+                settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         hyperlinkHandler =
                             TerminalHyperlinkHandler { uri ->
                                 opened.set(uri)
@@ -493,10 +493,10 @@ class TerminalSwingTerminalSelectionTest {
                 hyperlinkResolver = TerminalHyperlinkResolver { "https://example.com" },
             )
         val component =
-            TerminalSwingTerminal(
-                settingsProvider = { TerminalSwingSettings(padding = Insets(0, 0, 0, 0)) },
+            SwingTerminal(
+                settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         hyperlinkHandler =
                             TerminalHyperlinkHandler {
                                 opened.incrementAndGet()
@@ -542,7 +542,7 @@ class TerminalSwingTerminalSelectionTest {
     }
 
     private fun mousePressed(
-        component: TerminalSwingTerminal,
+        component: SwingTerminal,
         x: Int,
         y: Int,
         clickCount: Int,
@@ -560,7 +560,7 @@ class TerminalSwingTerminalSelectionTest {
         )
 
     private fun mousePressedMiddle(
-        component: TerminalSwingTerminal,
+        component: SwingTerminal,
         x: Int,
         y: Int,
         clickCount: Int,
@@ -578,7 +578,7 @@ class TerminalSwingTerminalSelectionTest {
         )
 
     private fun mouseReleasedMiddle(
-        component: TerminalSwingTerminal,
+        component: SwingTerminal,
         x: Int,
         y: Int,
     ): MouseEvent =
@@ -595,7 +595,7 @@ class TerminalSwingTerminalSelectionTest {
         )
 
     private fun mouseDragged(
-        component: TerminalSwingTerminal,
+        component: SwingTerminal,
         x: Int,
         y: Int,
     ): MouseEvent =
@@ -612,7 +612,7 @@ class TerminalSwingTerminalSelectionTest {
         )
 
     private fun mouseReleased(
-        component: TerminalSwingTerminal,
+        component: SwingTerminal,
         x: Int,
         y: Int,
     ): MouseEvent =
@@ -629,7 +629,7 @@ class TerminalSwingTerminalSelectionTest {
         )
 
     private fun mousePressedWithAlt(
-        component: TerminalSwingTerminal,
+        component: SwingTerminal,
         x: Int,
         y: Int,
     ): MouseEvent =
@@ -646,7 +646,7 @@ class TerminalSwingTerminalSelectionTest {
         )
 
     private fun mousePressedWithCtrl(
-        component: TerminalSwingTerminal,
+        component: SwingTerminal,
         x: Int,
         y: Int,
     ): MouseEvent =
@@ -663,7 +663,7 @@ class TerminalSwingTerminalSelectionTest {
         )
 
     private fun mouseDraggedWithAlt(
-        component: TerminalSwingTerminal,
+        component: SwingTerminal,
         x: Int,
         y: Int,
     ): MouseEvent =
@@ -692,17 +692,17 @@ class TerminalSwingTerminalSelectionTest {
     }
 
     private fun copyKey(
-        component: TerminalSwingTerminal,
+        component: SwingTerminal,
         modifiers: Int,
     ): KeyEvent = clipboardKey(component, KeyEvent.VK_C, modifiers)
 
     private fun pasteKey(
-        component: TerminalSwingTerminal,
+        component: SwingTerminal,
         modifiers: Int,
     ): KeyEvent = clipboardKey(component, KeyEvent.VK_V, modifiers)
 
     private fun clipboardKey(
-        component: TerminalSwingTerminal,
+        component: SwingTerminal,
         keyCode: Int,
         modifiers: Int,
     ): KeyEvent =

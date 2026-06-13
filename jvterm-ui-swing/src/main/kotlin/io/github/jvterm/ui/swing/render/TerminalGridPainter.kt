@@ -21,8 +21,8 @@ import io.github.jvterm.ui.swing.api.CellSelection
 import io.github.jvterm.ui.swing.render.cache.AwtColorCache
 import io.github.jvterm.ui.swing.render.painter.*
 import io.github.jvterm.ui.swing.search.TerminalSearchViewportHighlights
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.Rectangle
@@ -66,8 +66,8 @@ internal class TerminalGridPainter {
     fun paint(
         g: Graphics2D,
         cache: TerminalRenderCache,
-        settings: TerminalSwingSettings,
-        metrics: TerminalSwingMetrics,
+        settings: SwingSettings,
+        metrics: SwingMetrics,
         width: Int,
         height: Int,
         cursorBlinkVisible: Boolean,
@@ -143,7 +143,7 @@ internal class TerminalGridPainter {
 
     private fun firstPaintRow(
         clip: Rectangle?,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         contentYOffset: Double,
         paddingTop: Int,
     ): Int {
@@ -154,7 +154,7 @@ internal class TerminalGridPainter {
     private fun lastPaintRowExclusive(
         clip: Rectangle?,
         cache: TerminalRenderCache,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         componentHeight: Int,
         contentYOffset: Double,
         paddingTop: Int,

@@ -19,7 +19,7 @@ import io.github.jvterm.render.api.TerminalRenderCursorShape
 import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.ui.swing.render.visualCellRangeSpan
 import io.github.jvterm.ui.swing.render.visualCellRangeStart
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingMetrics
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -30,7 +30,7 @@ import kotlin.math.floor
  * painted cursor so cursor-only updates can repaint both the old and new cell
  * without repainting the full terminal surface.
  */
-internal class TerminalSwingRepaintPlanner {
+internal class SwingRepaintPlanner {
     private var lastCursorKnown: Boolean = false
     private var lastCursorColumn: Int = 0
     private var lastCursorRow: Int = 0
@@ -73,7 +73,7 @@ internal class TerminalSwingRepaintPlanner {
      */
     fun requestFrameRepaint(
         cache: TerminalRenderCache,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         componentWidth: Int,
         componentHeight: Int,
         contentYOffset: Double,
@@ -141,7 +141,7 @@ internal class TerminalSwingRepaintPlanner {
      */
     fun requestCursorBlinkRepaint(
         cache: TerminalRenderCache,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         componentWidth: Int,
         componentHeight: Int,
         contentYOffset: Double,
@@ -172,7 +172,7 @@ internal class TerminalSwingRepaintPlanner {
      */
     fun requestCursorRepaint(
         cache: TerminalRenderCache,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         componentWidth: Int,
         componentHeight: Int,
         contentYOffset: Double,
@@ -203,7 +203,7 @@ internal class TerminalSwingRepaintPlanner {
      */
     fun requestBlinkingTextRepaint(
         cache: TerminalRenderCache,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         componentWidth: Int,
         componentHeight: Int,
         contentYOffset: Double,
@@ -241,7 +241,7 @@ internal class TerminalSwingRepaintPlanner {
 
     private fun repaintChangedRows(
         cache: TerminalRenderCache,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         componentWidth: Int,
         componentHeight: Int,
         visibleRows: Int,
@@ -281,7 +281,7 @@ internal class TerminalSwingRepaintPlanner {
         row: Int,
         visible: Boolean,
         cache: TerminalRenderCache,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         componentWidth: Int,
         componentHeight: Int,
         visibleRows: Int,
@@ -322,7 +322,7 @@ internal class TerminalSwingRepaintPlanner {
     private fun repaintRowRun(
         startRow: Int,
         endRow: Int,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         componentWidth: Int,
         componentHeight: Int,
         contentYOffset: Double,
@@ -367,7 +367,7 @@ internal class TerminalSwingRepaintPlanner {
 
     private fun visibleRows(
         cache: TerminalRenderCache,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         componentHeight: Int,
         paddingTop: Int,
         paddingBottom: Int,

@@ -39,7 +39,7 @@ import javax.swing.JComponent
 import javax.swing.RepaintManager
 import javax.swing.SwingUtilities
 
-class TerminalSwingTerminalScrollbackTest {
+class SwingTerminalScrollbackTest {
     @Test
     fun `dirty notifications are coalesced into one pending EDT repaint`() {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
@@ -55,9 +55,9 @@ class TerminalSwingTerminalScrollbackTest {
             )
         val dispatcher = CountingDispatcher()
         val component =
-            TerminalSwingTerminal(
+            SwingTerminal(
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         uiDispatcher = dispatcher,
                     ),
             )
@@ -111,7 +111,7 @@ class TerminalSwingTerminalScrollbackTest {
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
             )
-        val component = TerminalSwingTerminal()
+        val component = SwingTerminal()
 
         SwingUtilities.invokeAndWait {
             component.setSize(30, 20)
@@ -155,7 +155,7 @@ class TerminalSwingTerminalScrollbackTest {
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
             )
-        val component = TerminalSwingTerminal()
+        val component = SwingTerminal()
 
         SwingUtilities.invokeAndWait {
             component.setSize(30, 20)
@@ -203,7 +203,7 @@ class TerminalSwingTerminalScrollbackTest {
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
             )
-        val component = TerminalSwingTerminal()
+        val component = SwingTerminal()
 
         SwingUtilities.invokeAndWait {
             component.setSize(30, 20)
@@ -235,9 +235,9 @@ class TerminalSwingTerminalScrollbackTest {
                 inputEncoder = NoOpInputEncoder,
             )
         val component =
-            TerminalSwingTerminal(
+            SwingTerminal(
                 hostServices =
-                    TerminalSwingHostServices(
+                    SwingHostServices(
                         viewportListener = listener,
                     ),
             )
@@ -271,8 +271,8 @@ class TerminalSwingTerminalScrollbackTest {
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
             )
-        val left = TerminalSwingTerminal()
-        val right = TerminalSwingTerminal()
+        val left = SwingTerminal()
+        val right = SwingTerminal()
 
         SwingUtilities.invokeAndWait {
             left.setSize(30, 20)

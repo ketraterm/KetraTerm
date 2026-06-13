@@ -21,7 +21,7 @@ import io.github.jvterm.core.model.CellAttributes
 import io.github.jvterm.core.model.Line
 import io.github.jvterm.core.state.TerminalState
 
-internal class TerminalInspectorImpl(
+internal class BufferInspector(
     private val state: TerminalState,
 ) : TerminalInspector {
     override fun getAttrAt(

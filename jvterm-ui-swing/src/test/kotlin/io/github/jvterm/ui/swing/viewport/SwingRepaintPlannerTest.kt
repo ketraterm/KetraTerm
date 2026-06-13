@@ -17,16 +17,16 @@ package io.github.jvterm.ui.swing.viewport
 
 import io.github.jvterm.render.api.*
 import io.github.jvterm.render.cache.TerminalRenderCache
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingMetrics
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TerminalSwingRepaintPlannerTest {
+class SwingRepaintPlannerTest {
     @Test
     fun `changed rows repaint only changed row runs`() {
         val frame = MutableFrame(columns = 4, rows = 4)
         val cache = TerminalRenderCache(columns = 4, rows = 4)
-        val planner = TerminalSwingRepaintPlanner()
+        val planner = SwingRepaintPlanner()
 
         cache.updateFrom(frame.reader)
         planner.requestFrameRepaint(cache, METRICS, WIDTH, HEIGHT, 0.0, PADDING, NoOpRepaintSink)
@@ -52,7 +52,7 @@ class TerminalSwingRepaintPlannerTest {
     fun `contiguous changed rows are coalesced into one repaint region`() {
         val frame = MutableFrame(columns = 4, rows = 4)
         val cache = TerminalRenderCache(columns = 4, rows = 4)
-        val planner = TerminalSwingRepaintPlanner()
+        val planner = SwingRepaintPlanner()
 
         cache.updateFrom(frame.reader)
         planner.requestFrameRepaint(cache, METRICS, WIDTH, HEIGHT, 0.0, PADDING, NoOpRepaintSink)
@@ -80,7 +80,7 @@ class TerminalSwingRepaintPlannerTest {
         val frame = MutableFrame(columns = 4, rows = 4)
         val paintedCache = TerminalRenderCache(columns = 4, rows = 4)
         val skippedCache = TerminalRenderCache(columns = 4, rows = 4)
-        val planner = TerminalSwingRepaintPlanner()
+        val planner = SwingRepaintPlanner()
 
         paintedCache.updateFrom(frame.reader)
         planner.requestFrameRepaint(paintedCache, METRICS, WIDTH, HEIGHT, 0.0, PADDING, NoOpRepaintSink)
@@ -108,7 +108,7 @@ class TerminalSwingRepaintPlannerTest {
     fun `cursor-only update repaints old and new cursor cells`() {
         val frame = MutableFrame(columns = 4, rows = 4)
         val cache = TerminalRenderCache(columns = 4, rows = 4)
-        val planner = TerminalSwingRepaintPlanner()
+        val planner = SwingRepaintPlanner()
 
         frame.cursor = cursor(column = 1, row = 0, generation = 1)
         cache.updateFrom(frame.reader)
@@ -143,7 +143,7 @@ class TerminalSwingRepaintPlannerTest {
         val frame = MutableFrame(columns = 4, rows = 4)
         val paintedCache = TerminalRenderCache(columns = 4, rows = 4)
         val skippedCache = TerminalRenderCache(columns = 4, rows = 4)
-        val planner = TerminalSwingRepaintPlanner()
+        val planner = SwingRepaintPlanner()
 
         frame.cursor = cursor(column = 0, row = 0, generation = 1)
         paintedCache.updateFrom(frame.reader)
@@ -183,7 +183,7 @@ class TerminalSwingRepaintPlannerTest {
         cache.updateFrom(frame.reader)
 
         val repaintSink = RecordingRepaintSink()
-        TerminalSwingRepaintPlanner().requestCursorBlinkRepaint(
+        SwingRepaintPlanner().requestCursorBlinkRepaint(
             cache = cache,
             metrics = METRICS,
             componentWidth = WIDTH,
@@ -205,7 +205,7 @@ class TerminalSwingRepaintPlannerTest {
         cache.updateFrom(frame.reader)
 
         val repaintSink = RecordingRepaintSink()
-        TerminalSwingRepaintPlanner().requestCursorBlinkRepaint(
+        SwingRepaintPlanner().requestCursorBlinkRepaint(
             cache = cache,
             metrics = METRICS,
             componentWidth = WIDTH,
@@ -227,7 +227,7 @@ class TerminalSwingRepaintPlannerTest {
         cache.updateFrom(frame.reader)
 
         val repaintSink = RecordingRepaintSink()
-        TerminalSwingRepaintPlanner().requestCursorBlinkRepaint(
+        SwingRepaintPlanner().requestCursorBlinkRepaint(
             cache = cache,
             metrics = METRICS,
             componentWidth = WIDTH,
@@ -244,7 +244,7 @@ class TerminalSwingRepaintPlannerTest {
     fun `fractional content offset shifts changed row repaint bounds`() {
         val frame = MutableFrame(columns = 4, rows = 4)
         val cache = TerminalRenderCache(columns = 4, rows = 4)
-        val planner = TerminalSwingRepaintPlanner()
+        val planner = SwingRepaintPlanner()
 
         cache.updateFrom(frame.reader)
         planner.requestFrameRepaint(cache, METRICS, WIDTH, HEIGHT, 0.0, PADDING, NoOpRepaintSink)
@@ -270,7 +270,7 @@ class TerminalSwingRepaintPlannerTest {
     fun `fractional content offset clips changed row repaint bounds at component top`() {
         val frame = MutableFrame(columns = 4, rows = 4)
         val cache = TerminalRenderCache(columns = 4, rows = 4)
-        val planner = TerminalSwingRepaintPlanner()
+        val planner = SwingRepaintPlanner()
 
         cache.updateFrom(frame.reader)
         planner.requestFrameRepaint(cache, METRICS, WIDTH, HEIGHT, 0.0, PADDING, NoOpRepaintSink)
@@ -300,7 +300,7 @@ class TerminalSwingRepaintPlannerTest {
         cache.updateFrom(frame.reader)
 
         val repaintSink = RecordingRepaintSink()
-        TerminalSwingRepaintPlanner().requestCursorBlinkRepaint(
+        SwingRepaintPlanner().requestCursorBlinkRepaint(
             cache = cache,
             metrics = METRICS,
             componentWidth = WIDTH,
@@ -322,7 +322,7 @@ class TerminalSwingRepaintPlannerTest {
         cache.updateFrom(frame.reader)
 
         val repaintSink = RecordingRepaintSink()
-        TerminalSwingRepaintPlanner().requestBlinkingTextRepaint(
+        SwingRepaintPlanner().requestBlinkingTextRepaint(
             cache = cache,
             metrics = METRICS,
             componentWidth = WIDTH,
@@ -342,7 +342,7 @@ class TerminalSwingRepaintPlannerTest {
         cache.updateFrom(frame.reader)
 
         val repaintSink = RecordingRepaintSink(failOnFullRepaint = true)
-        TerminalSwingRepaintPlanner().requestBlinkingTextRepaint(
+        SwingRepaintPlanner().requestBlinkingTextRepaint(
             cache = cache,
             metrics = METRICS,
             componentWidth = WIDTH,
@@ -363,7 +363,7 @@ class TerminalSwingRepaintPlannerTest {
         cache.updateFrom(frame.reader)
 
         val repaintSink = RecordingRepaintSink()
-        TerminalSwingRepaintPlanner().requestBlinkingTextRepaint(
+        SwingRepaintPlanner().requestBlinkingTextRepaint(
             cache = cache,
             metrics = METRICS,
             componentWidth = WIDTH,
@@ -379,7 +379,7 @@ class TerminalSwingRepaintPlannerTest {
     @Test
     fun `resized render cache requests full repaint`() {
         val cache = TerminalRenderCache(columns = 2, rows = 2)
-        val planner = TerminalSwingRepaintPlanner()
+        val planner = SwingRepaintPlanner()
         val frame = MutableFrame(columns = 3, rows = 3)
         var fullRepaints = 0
 
@@ -549,7 +549,7 @@ class TerminalSwingRepaintPlannerTest {
         private const val WIDTH = 120
         private const val HEIGHT = 80
         private val METRICS =
-            TerminalSwingMetrics(
+            SwingMetrics(
                 cellWidth = CELL_WIDTH,
                 cellHeight = CELL_HEIGHT,
                 baseline = 12,

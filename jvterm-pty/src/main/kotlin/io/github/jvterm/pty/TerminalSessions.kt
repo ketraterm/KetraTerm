@@ -28,5 +28,5 @@ object TerminalSessions {
     @JvmStatic
     @JvmOverloads
     @Throws(IOException::class)
-    fun localPty(options: TerminalPtyOptions = TerminalPtyOptions()): TerminalSession = TerminalPtySessions.start(options)
+    fun localPty(options: PtyOptions = PtyOptions()): TerminalSession = PtySessions.start(options)
 }
