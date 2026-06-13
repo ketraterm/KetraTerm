@@ -1,12 +1,12 @@
 # JvTerm Workspace (`:jvterm-workspace`)
 
-The `jvterm-workspace` module provides a host-neutral session and tab manager for JvTerm Terminal. It coordinates multiple active terminal sessions (tabs) under a unified workspace lifecycle, maps configurations onto file-based profiles, and implements standard TOML-backed settings persistence.
+The `jvterm-workspace` module provides a host-neutral session and tab manager for **JvTerm Terminal**. It coordinates multiple active terminal sessions (tabs) under a unified workspace lifecycle, maps configurations onto file-based profiles, and implements standard TOML-backed settings persistence.
 
 This module is designed to be completely decoupled from any specific UI toolkit, serving as the headless state controller for tabbed desktop terminal interfaces or IDE tool windows.
 
 ---
 
-## Upstream Dependencies
+## 🔌 Upstream Dependencies
 - **`:jvterm-protocol`** (vocabulary, mode IDs, enums)
 - **`:jvterm-render-api`** (render frame primitives and color palettes)
 - **`:jvterm-transport-api`** (duplex connector contracts)
@@ -15,9 +15,9 @@ This module is designed to be completely decoupled from any specific UI toolkit,
 
 ---
 
-## Architectural Role
+## 🏛️ Architectural Role
 
-`TerminalWorkspace` manages a collection of `TerminalWorkspaceTab` instances. Each tab wraps an active, running `TerminalSession` tied to a specific `TerminalProfile` launch configuration.
+`TerminalWorkspace` manages a collection of tabs. Each tab wraps an active, running `TerminalSession` tied to a specific `TerminalProfile` launch configuration.
 
 ```mermaid
 graph TD
@@ -25,20 +25,26 @@ graph TD
     Workspace -->|manages| Tab2["TerminalWorkspaceTab 2"]
     
     Tab1 -->|owns| Session1["TerminalSession"]
-    Tab1 -->|describes| Profile1["TerminalProfile (Local Bash)"]
+    Tab1 -->|describes| Profile1["TerminalProfile"]
     
     Tab2 -->|owns| Session2["TerminalSession"]
-    Tab2 -->|describes| Profile2["TerminalProfile (Local Python)"]
+    Tab2 -->|describes| Profile2["TerminalProfile"]
 
     ConfigManager["TerminalWorkspaceConfigManager"] -->|loads/saves| Config["TerminalConfig"]
     Workspace -.->|updates themes/modes from| Config
 ```
 
 ### Key Components
+* [TerminalWorkspace](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/jvterm-workspace/src/main/kotlin/io/github/jvterm/workspace/TerminalWorkspace.kt): The main lifecycle manager. Handles opening, selecting, closing, and applying settings updates to all open terminal tabs.
+* [TerminalProfile](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/jvterm-workspace/src/main/kotlin/io/github/jvterm/workspace/TerminalProfile.kt): Describes a launch configuration (command, display name, working directory, environment variables).
+* [TerminalWorkspaceConfigManager](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/jvterm-workspace/src/main/kotlin/io/github/jvterm/workspace/config/TerminalWorkspaceConfigManager.kt): Handles loading and saving TOML-based configurations from OS-specific directories, with automatic parsing backups and value clamping.
 
-* **[`TerminalWorkspace`](./src/main/kotlin/io/github/jvterm/workspace/TerminalWorkspace.kt)**: The main lifecycle manager. Handles opening, selecting, closing, and applying settings updates to all open terminal tabs.
-* **[`TerminalProfile`](./src/main/kotlin/io/github/jvterm/workspace/TerminalProfile.kt)**: Describes a launch configuration (command, display name, working directory, environment variables).
-* **[`TerminalWorkspaceConfigManager`](./src/main/kotlin/io/github/jvterm/workspace/config/TerminalWorkspaceConfigManager.kt)**: Handles loading and saving TOML-based configurations from OS-specific directories, with automatic parsing backups and value clamping.
+---
+
+## 📖 Sub-Documentation
+
+For detailed specifications on the persistency configuration format and resolution:
+* [profile-config-toml.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/jvterm-workspace/docs/profile-config-toml.md) - TOML config blocks syntax, configuration properties list, and directory resolution hierarchies per OS.
 
 ---
 
@@ -71,13 +77,9 @@ fun main() {
         override fun tabSelected(id: String) {
             println("Active tab switched to: $id")
         }
-        override fun titleChanged(tab: TerminalWorkspaceTab, title: String) {
-            println("Tab ${tab.id} title changed: $title")
-        }
+        override fun titleChanged(tab: TerminalWorkspaceTab, title: String) {}
         override fun colorChanged(tab: TerminalWorkspaceTab, color: Int) {}
-        override fun bell(tab: TerminalWorkspaceTab) {
-            println("Alert bell in tab ${tab.id}!")
-        }
+        override fun bell(tab: TerminalWorkspaceTab) {}
     }
 
     // 3. Create the workspace manager
@@ -100,9 +102,6 @@ fun main() {
         treatAmbiguousAsWide = config.treatAmbiguousAsWide
     )
     val tab = workspace.openTab(gitProfile, openOptions)
-
-    // ... When shutting down, closing the workspace closes all active tabs
-    workspace.close()
 }
 ```
 
@@ -120,48 +119,11 @@ import javax.swing.JTabbedPane
 class SwingTabAdapter(private val tabbedPane: JTabbedPane) : TerminalWorkspaceListener {
     override fun tabOpened(tab: TerminalWorkspaceTab) {
         // Create Swing component and add tab
-        // tabbedPane.addTab(tab.title, component)
     }
-
-    override fun tabClosed(id: String) {
-        // Remove Swing component matching ID
-    }
-
-    override fun tabSelected(id: String) {
-        // Select tab in Swing pane
-    }
-
-    override fun titleChanged(tab: TerminalWorkspaceTab, title: String) {
-        // Update title of tab
-    }
-
+    override fun tabClosed(id: String) {}
+    override fun tabSelected(id: String) {}
+    override fun titleChanged(tab: TerminalWorkspaceTab, title: String) {}
     override fun colorChanged(tab: TerminalWorkspaceTab, color: Int) {}
     override fun bell(tab: TerminalWorkspaceTab) {}
 }
-```
-
----
-
-## TOML Settings File Resolution
-
-`TerminalWorkspaceConfigManager` resolves default settings file paths dynamically based on the active operating system:
-* **Windows**: `%APPDATA%\JvTerm\config.toml` (falling back to `~/.config/jvterm/config.toml` if env variables are empty).
-* **macOS**: `~/Library/Application Support/JvTerm/config.toml`.
-* **Linux/Other**: `$XDG_CONFIG_HOME/jvterm/config.toml` (falling back to `~/.config/jvterm/config.toml`).
-
-These files can be overridden using:
-- The `jvterm.config.path` JVM system property.
-- The `JVTERM_CONFIG_PATH` environment variable.
-
----
-
-## Testing & Verification
-
-The workspace module has comprehensive unit test coverage under `src/test/kotlin`:
-* **`TerminalConfigTest`**: Verifies dynamic path resolution rules, TOML syntax parsing, value clamping bounds, and file format failure recovery backups.
-* **`TerminalWorkspaceTest`**: Asserts correct tab opening/closing states, settings propagation rules, and event bridge dispatches.
-
-To run checks for this module:
-```bash
-./gradlew :jvterm-workspace:test
 ```

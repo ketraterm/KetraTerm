@@ -6,7 +6,7 @@ A reusable, premium-tier Swing terminal component built in Kotlin/JVM 21.
 
 ---
 
-## Upstream Dependencies
+## 🔌 Upstream Dependencies
 - **`:jvterm-protocol`** (vocabulary, mode IDs, enums)
 - **`:jvterm-render-api`** (render frame primitives and color palettes)
 - **`:jvterm-render-cache`** (triple-buffered cache reader)
@@ -15,7 +15,7 @@ A reusable, premium-tier Swing terminal component built in Kotlin/JVM 21.
 
 ---
 
-## Architecture & System Design
+## 🏛️ Architecture & System Design
 
 The module is built on three core design philosophies:
 1. **Complete Protocol Ignorance:** The UI has zero knowledge of ANSI, VT, ESC, OSC, or DCS bytes. It never parses stream protocols or executes grid mutation rules.
@@ -42,7 +42,7 @@ graph TD
 
     subgraph Pipeline Boundaries
         Cache["TerminalRenderCache (Snapshot)"]
-        SessionBoundary["TerminalSession (Outbound Write Lock)"]
+        SessionBoundary["TerminalSession"]
     end
 
     Host -->|binds| Terminal
@@ -53,33 +53,11 @@ graph TD
 
 ---
 
-## Typography & The Text Rendering Pipeline
+## 📖 Sub-Documentation
 
-In terminal emulators, rendering text is the primary CPU hotspot. `jvterm-ui-swing` implements a **bifurcated text rendering pipeline** to isolate performance-sensitive runs from complex Unicode processing.
-
-```mermaid
-flowchart TD
-    Cell["Cell Inspection"] --> IsAscii{Is Fast ASCII?}
-    IsAscii -->|Yes| BatchRun["Batch Contiguous Run"]
-    BatchRun --> DrawChars["drawChars / drawGlyphVector (Fast Path)"]
-    
-    IsAscii -->|No| IsPrimitive{Is Primitive/Box Glyphs?}
-    IsPrimitive -->|Yes| BoxPainter["Box Drawing / Block Painter (Perfect Pixel)"]
-    
-    IsAscii -->|No| IsEmoji{Is Emoji?}
-    IsEmoji -->|Yes| EmojiPainter["Platform Emoji Rasterizer"]
-    
-    IsEmoji -->|No| ComplexText["TextLayout / Shaped Font Fallback (Slow Path)"]
-```
-
-### 1. The ASCII/Simple Fast Path
-* Contiguous cells containing ASCII characters (`0x00`–`0x7F`) with identical formatting attributes are batched into a single `TerminalTextRunBuffer`.
-* Painted in one operation using `Graphics2D.drawChars` or `drawGlyphVector`, completely bypassing shaping and layout engines.
-
-### 2. The Complex Unicode Fallback Path
-* **Glyph Fallback Chain:** Resolves missing glyphs through a prioritized font chain, prioritizing color emoji fonts to avoid monochrome degradation.
-* **Text Layout Cache:** Renders multi-code-unit grapheme clusters using shaped Java2D `TextLayout` objects.
-* **Pixel-Perfect Primitives:** Custom renderers (`TerminalBoxDrawingPainter` and `TerminalBlockElementPainter`) draw box-drawing characters and block elements programmatically instead of relying on fonts, ensuring zero gaps across different scale factors.
+For detailed specifications on Swing painting and text pipelines:
+* [swing-repaint-optimization.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/jvterm-ui-swing/docs/swing-repaint-optimization.md) - Repaint planner bounds calculations, drag selection matrices, and smart path double-click detection.
+* [bifurcated-text-rendering.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/jvterm-ui-swing/docs/bifurcated-text-rendering.md) - ASCII fast paths, shaped TextLayout caches, prioritized JBR color emoji fallback chains, and pixel-perfect primitive grid painters.
 
 ---
 
@@ -94,7 +72,6 @@ import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.ui.swing.settings.TerminalTheme
 import java.awt.BorderLayout
 import javax.swing.JComponent
-import javax.swing.JFrame
 import javax.swing.JPanel
 
 fun createTerminalView(session: TerminalSession): JComponent {
@@ -126,7 +103,7 @@ fun createTerminalView(session: TerminalSession): JComponent {
 
 ## 🔗 How to Extend: Custom Host Services
 
-To integrate clipboard features, hyperlink clicking, or custom alert overlays into the terminal view, implement the [`SwingHostServices`](./src/main/kotlin/io/github/jvterm/ui/swing/settings/SwingHostServices.kt) interface:
+To integrate clipboard features, hyperlink clicking, or custom alert overlays into the terminal view, implement the [SwingHostServices](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/jvterm-ui-swing/src/main/kotlin/io/github/jvterm/ui/swing/settings/SwingHostServices.kt) interface:
 
 ```kotlin
 import io.github.jvterm.ui.swing.settings.SwingHostServices
@@ -145,21 +122,6 @@ class MyCustomHostServices : SwingHostServices {
 
     override fun openUrl(url: String) {
         println("User clicked hyperlink: $url")
-        // Launch browser or trigger IDE link routing
     }
 }
-```
-
----
-
-## Testing & Verification
-
-Tests in `jvterm-ui-swing` run deterministically without requiring a live process or transport runtime:
-* **Viewport & Scroll Math:** Asserts sub-row pixel calculations and bounds clamping under fractional wheel inputs.
-* **Selective Redraws:** Validates that `SwingRepaintPlanner` isolates dirty rows and avoids full component repaints.
-* **Selection Ranges:** Covers selection sweeps, rectangular blocks, and smart word/URL double-click boundary expansion.
-
-To run checks for this module:
-```bash
-./gradlew :jvterm-ui-swing:test
 ```
