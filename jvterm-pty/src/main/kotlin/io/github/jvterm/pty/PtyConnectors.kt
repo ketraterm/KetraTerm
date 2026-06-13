@@ -47,12 +47,12 @@ object PtyConnectors {
                 columns = columns,
                 rows = rows,
             )
-        return create(options, Pty4jTerminalProcessFactory)
+        return create(options, Pty4jProcessFactory)
     }
 
     internal fun create(
         options: PtyOptions,
-        processFactory: TerminalProcessFactory,
+        processFactory: PtyProcessFactory,
     ): PtyConnector {
         val process = processFactory.start(options)
         return PtyConnector(

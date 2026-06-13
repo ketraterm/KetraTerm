@@ -15,12 +15,12 @@
  */
 package io.github.jvterm.pty
 
-import com.pty4j.PtyProcess
 import io.github.jvterm.transport.TerminalConnector
 import io.github.jvterm.transport.TerminalConnectorListener
 import io.github.jvterm.transport.checkBounds
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
+import com.pty4j.PtyProcess as Pty4jNativeProcess
 
 /**
  * [TerminalConnector] backed by a local PTY process.
@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * `terminal-session` and lower layers.
  */
 class PtyConnector internal constructor(
-    private val process: TerminalProcess,
+    private val process: PtyProcess,
     private val readBufferSize: Int = DEFAULT_READ_BUFFER_SIZE,
     private val readerThreadName: String = DEFAULT_READER_THREAD_NAME,
     private val watcherThreadName: String = DEFAULT_WATCHER_THREAD_NAME,
@@ -69,11 +69,11 @@ class PtyConnector internal constructor(
      * Creates a connector for a raw PTY4J process.
      */
     constructor(
-        process: PtyProcess,
+        process: Pty4jNativeProcess,
         readBufferSize: Int = DEFAULT_READ_BUFFER_SIZE,
         readerThreadName: String = DEFAULT_READER_THREAD_NAME,
         watcherThreadName: String = DEFAULT_WATCHER_THREAD_NAME,
-    ) : this(Pty4jTerminalProcess(process), readBufferSize, readerThreadName, watcherThreadName)
+    ) : this(Pty4jProcess(process), readBufferSize, readerThreadName, watcherThreadName)
 
     init {
         require(readBufferSize > 0) { "readBufferSize must be positive, got $readBufferSize" }

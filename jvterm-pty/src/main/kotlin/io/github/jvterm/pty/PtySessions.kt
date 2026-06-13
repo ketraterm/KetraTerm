@@ -36,11 +36,11 @@ internal object PtySessions {
      * @throws IOException when PTY4J cannot start the process.
      */
     @Throws(IOException::class)
-    fun start(options: PtyOptions = PtyOptions()): TerminalSession = start(options, Pty4jTerminalProcessFactory)
+    fun start(options: PtyOptions = PtyOptions()): TerminalSession = start(options, Pty4jProcessFactory)
 
     internal fun start(
         options: PtyOptions,
-        processFactory: TerminalProcessFactory,
+        processFactory: PtyProcessFactory,
     ): TerminalSession {
         val connector = PtyConnectors.create(options, processFactory)
         val terminal =

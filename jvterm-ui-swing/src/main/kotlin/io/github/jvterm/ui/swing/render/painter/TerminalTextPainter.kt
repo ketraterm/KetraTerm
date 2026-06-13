@@ -39,7 +39,7 @@ internal class TerminalTextPainter(
     private val decorationPainter: TerminalDecorationPainter,
     private val platformEmojiPainter: TerminalPlatformEmojiPainter = TerminalPlatformEmojiPainter(),
 ) {
-    private val fontCache = TerminalFontCache()
+    private val fontCache = FontCache()
     private val complexTextLayouts = TerminalComplexTextLayoutCache()
     private val asciiGlyphVectors = TerminalAsciiGlyphVectorCache()
     private val asciiDrawChars = TerminalAsciiDrawCharsCache()

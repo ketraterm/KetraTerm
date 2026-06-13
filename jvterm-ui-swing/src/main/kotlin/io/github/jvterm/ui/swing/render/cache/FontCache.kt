@@ -29,7 +29,7 @@ import java.util.*
  * **Thread Safety:** Not thread-safe. This cache must only be accessed
  * from the Swing Event Dispatch Thread (EDT).
  */
-internal class TerminalFontCache(
+internal class FontCache(
     codePointFallbackCapacityPerStyle: Int = DEFAULT_CODE_POINT_FALLBACK_CAPACITY_PER_STYLE,
     textFallbackCapacityPerStyle: Int = DEFAULT_TEXT_FALLBACK_CAPACITY_PER_STYLE,
     private val systemFontFamilies: TerminalSystemFontFamilies = TerminalSystemFallbackFonts,
@@ -120,7 +120,7 @@ internal class TerminalFontCache(
 
         val font =
             requireNotNull(baseFont) {
-                "TerminalFontCache.update must be called before font"
+                "FontCache.update must be called before font"
             }.deriveFont(normalizedStyle)
         styleFonts[normalizedStyle] = font
         return font
@@ -332,7 +332,7 @@ internal class TerminalFontCache(
 
         val base =
             requireNotNull(baseFont) {
-                "TerminalFontCache.update must be called before fallbackFont"
+                "FontCache.update must be called before fallbackFont"
             }
         val fallback = fallbackBaseFonts[index]
         val effectiveStyle = if (isEmojiFontFamily(fallback.family)) Font.PLAIN else normalizedStyle
@@ -351,7 +351,7 @@ internal class TerminalFontCache(
 
         val base =
             requireNotNull(baseFont) {
-                "TerminalFontCache.update must be called before systemFallbackFont"
+                "FontCache.update must be called before systemFallbackFont"
             }
         val family = systemFallbackFamilies[index]
         val effectiveStyle = if (isEmojiFontFamily(family)) Font.PLAIN else normalizedStyle

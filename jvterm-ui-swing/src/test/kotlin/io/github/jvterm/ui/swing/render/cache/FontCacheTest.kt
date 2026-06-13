@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import java.awt.Font
 
-class TerminalFontCacheTest {
+class FontCacheTest {
     @Test
     fun `font returns cached primary style variant`() {
         val base = TerminalCacheTestFonts.primary(14f)
-        val cache = TerminalFontCache()
+        val cache = FontCache()
 
         cache.update(base, emptyList(), useSystemFallbackFonts = false)
 
@@ -36,7 +36,7 @@ class TerminalFontCacheTest {
     fun `update reports whether font settings changed`() {
         val base = TerminalCacheTestFonts.primary(14f)
         val fallback = TerminalCacheTestFonts.fallback(14f)
-        val cache = TerminalFontCache()
+        val cache = FontCache()
 
         Assertions.assertTrue(cache.update(base, emptyList(), useSystemFallbackFonts = false))
         Assertions.assertFalse(cache.update(base, emptyList(), useSystemFallbackFonts = false))
@@ -48,7 +48,7 @@ class TerminalFontCacheTest {
     fun `generation changes only when font settings change`() {
         val base = TerminalCacheTestFonts.primary(14f)
         val fallback = TerminalCacheTestFonts.fallback(14f)
-        val cache = TerminalFontCache()
+        val cache = FontCache()
 
         val initialGeneration = cache.generation
         Assertions.assertTrue(cache.update(base, emptyList(), useSystemFallbackFonts = false))
@@ -70,7 +70,7 @@ class TerminalFontCacheTest {
         Assertions.assertTrue(primary.canDisplayUpTo(fallbackOnlyText) >= 0)
         Assertions.assertTrue(fallback.canDisplayUpTo(fallbackOnlyText) < 0)
 
-        val cache = TerminalFontCache()
+        val cache = FontCache()
         cache.update(primary, listOf(fallback), useSystemFallbackFonts = false)
 
         val resolved = cache.fontForText(fallbackOnlyText, Font.BOLD)
@@ -89,7 +89,7 @@ class TerminalFontCacheTest {
         Assertions.assertTrue(primary.canDisplayUpTo(fallbackOnlyText) >= 0)
         Assertions.assertTrue(fallback.canDisplayUpTo(fallbackOnlyText) < 0)
 
-        val cache = TerminalFontCache()
+        val cache = FontCache()
         cache.update(primary, listOf(fallback), useSystemFallbackFonts = false)
 
         val plain = cache.fontForText(fallbackOnlyText, Font.PLAIN)
@@ -108,7 +108,7 @@ class TerminalFontCacheTest {
 
         Assertions.assertTrue(primary.canDisplayUpTo(missing) >= 0)
 
-        val cache = TerminalFontCache()
+        val cache = FontCache()
         cache.update(primary, emptyList(), useSystemFallbackFonts = false)
 
         val resolved = cache.fontForText(missing, Font.PLAIN)
@@ -124,7 +124,7 @@ class TerminalFontCacheTest {
 
         Assertions.assertTrue(primary.canDisplayUpTo(missing) >= 0)
 
-        val cache = TerminalFontCache()
+        val cache = FontCache()
         cache.update(primary, emptyList(), useSystemFallbackFonts = false)
 
         val resolved = cache.fontForText(missing, Font.BOLD)
@@ -137,7 +137,7 @@ class TerminalFontCacheTest {
     @Test
     fun `fontForText evicts old cluster fallback entries`() {
         val primary = TerminalCacheTestFonts.primary(14f)
-        val cache = TerminalFontCache(textFallbackCapacityPerStyle = 2)
+        val cache = FontCache(textFallbackCapacityPerStyle = 2)
         cache.update(primary, emptyList(), useSystemFallbackFonts = false)
 
         cache.fontForText(String(Character.toChars(0x10FFFF)), Font.PLAIN)
@@ -154,7 +154,7 @@ class TerminalFontCacheTest {
 
         Assertions.assertFalse(primary.canDisplay(codePoint))
 
-        val cache = TerminalFontCache(codePointFallbackCapacityPerStyle = 2)
+        val cache = FontCache(codePointFallbackCapacityPerStyle = 2)
         cache.update(primary, emptyList(), useSystemFallbackFonts = false)
 
         val resolved = cache.fontForCodePoint(codePoint, Font.BOLD)
@@ -171,7 +171,7 @@ class TerminalFontCacheTest {
         Assertions.assertFalse(primary.canDisplay(0x10FFFE))
         Assertions.assertFalse(primary.canDisplay(0x10FFFD))
 
-        val cache = TerminalFontCache(codePointFallbackCapacityPerStyle = 2)
+        val cache = FontCache(codePointFallbackCapacityPerStyle = 2)
         cache.update(primary, emptyList(), useSystemFallbackFonts = false)
 
         cache.fontForCodePoint(0x10FFFF, Font.PLAIN)
@@ -190,7 +190,7 @@ class TerminalFontCacheTest {
 
         Assertions.assertTrue(primary.canDisplayUpTo(fallbackOnlyText) >= 0)
 
-        val cache = TerminalFontCache(systemFontFamilies = systemFamilies)
+        val cache = FontCache(systemFontFamilies = systemFamilies)
         cache.update(primary, emptyList(), useSystemFallbackFonts = true)
         Assertions.assertEquals(0, systemFamilies.calls)
 
@@ -201,16 +201,16 @@ class TerminalFontCacheTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun TerminalFontCache.resolvedTextFontCache(style: Int): Map<String, Font> {
-        val field = TerminalFontCache::class.java.getDeclaredField("resolvedTextFonts")
+    private fun FontCache.resolvedTextFontCache(style: Int): Map<String, Font> {
+        val field = FontCache::class.java.getDeclaredField("resolvedTextFonts")
         field.isAccessible = true
         val caches = field.get(this) as Array<Map<String, Font>>
         return caches[style and (Font.BOLD or Font.ITALIC)]
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun TerminalFontCache.resolvedCodePointFontCacheSize(style: Int): Int {
-        val field = TerminalFontCache::class.java.getDeclaredField("resolvedCodePointFonts")
+    private fun FontCache.resolvedCodePointFontCacheSize(style: Int): Int {
+        val field = FontCache::class.java.getDeclaredField("resolvedCodePointFonts")
         field.isAccessible = true
         val caches = field.get(this) as Array<Any>
         val sizeField = caches[style and (Font.BOLD or Font.ITALIC)].javaClass.getDeclaredField("size")

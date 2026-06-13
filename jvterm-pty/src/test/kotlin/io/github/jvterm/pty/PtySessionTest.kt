@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit
 class PtySessionTest {
     @Test
     fun `pty stdout is parsed into terminal core through shared session`() {
-        val process = FakeTerminalProcess(inputBytes = "hello\u001B[5n".ascii())
+        val process = FakePtyProcess(inputBytes = "hello\u001B[5n".ascii())
         val session =
             PtySessions.start(
                 options =
@@ -51,7 +51,7 @@ class PtySessionTest {
 
     @Test
     fun `parser core responses are written back to pty stdin`() {
-        val process = FakeTerminalProcess(inputBytes = "\u001B[6n".ascii())
+        val process = FakePtyProcess(inputBytes = "\u001B[6n".ascii())
         val session =
             PtySessions.start(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
@@ -66,7 +66,7 @@ class PtySessionTest {
 
     @Test
     fun `input events are encoded to pty stdin through session serialization point`() {
-        val process = FakeTerminalProcess.running()
+        val process = FakePtyProcess.running()
         val session =
             PtySessions.start(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
@@ -80,7 +80,7 @@ class PtySessionTest {
 
     @Test
     fun `default pty input policy sends Return as CR even when newline mode is active`() {
-        val process = FakeTerminalProcess.running()
+        val process = FakePtyProcess.running()
         val session =
             PtySessions.start(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
@@ -95,7 +95,7 @@ class PtySessionTest {
 
     @Test
     fun `resize updates process and terminal dimensions`() {
-        val process = FakeTerminalProcess.running()
+        val process = FakePtyProcess.running()
         val session =
             PtySessions.start(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
@@ -111,7 +111,7 @@ class PtySessionTest {
 
     @Test
     fun `ambiguous width option is applied before pty output is parsed`() {
-        val process = FakeTerminalProcess(inputBytes = "\u20ACX".toByteArray(StandardCharsets.UTF_8))
+        val process = FakePtyProcess(inputBytes = "\u20ACX".toByteArray(StandardCharsets.UTF_8))
         val session =
             PtySessions.start(
                 options =
@@ -136,7 +136,7 @@ class PtySessionTest {
 
     @Test
     fun `close destroys process and does not fake an exit code`() {
-        val process = FakeTerminalProcess.running()
+        val process = FakePtyProcess.running()
         val session =
             PtySessions.start(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
@@ -151,7 +151,7 @@ class PtySessionTest {
 
     @Test
     fun `process exit is captured on shared session`() {
-        val process = FakeTerminalProcess(inputBytes = ByteArray(0), exitCode = 7)
+        val process = FakePtyProcess(inputBytes = ByteArray(0), exitCode = 7)
         val session =
             PtySessions.start(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
@@ -166,7 +166,7 @@ class PtySessionTest {
     @Test
     fun `large output is parsed without losing bytes across connector chunks`() {
         val text = "x".repeat(20_000) + "\n"
-        val process = FakeTerminalProcess(inputBytes = text.ascii())
+        val process = FakePtyProcess(inputBytes = text.ascii())
         val session =
             PtySessions.start(
                 options =
@@ -189,7 +189,7 @@ class PtySessionTest {
     fun `bell and title changes are delivered to PTY listener`() {
         val listener = RecordingPtyEventListener()
         val input = "\u0007\u001B]0;both\u001B\\".ascii()
-        val process = FakeTerminalProcess(inputBytes = input)
+        val process = FakePtyProcess(inputBytes = input)
         PtySessions.start(
             options =
                 PtyOptions(
@@ -223,7 +223,7 @@ class PtySessionTest {
                     failures += exception
                 }
             }
-        val process = FakeTerminalProcess(inputBytes = "\u0007".ascii())
+        val process = FakePtyProcess(inputBytes = "\u0007".ascii())
         PtySessions.start(
             options = PtyOptions(command = listOf("fake"), eventListener = listener),
             processFactory = FixedProcessFactory(process),
@@ -235,16 +235,16 @@ class PtySessionTest {
     }
 
     private class FixedProcessFactory(
-        private val process: FakeTerminalProcess,
-    ) : TerminalProcessFactory {
-        override fun start(options: PtyOptions): TerminalProcess = process
+        private val process: FakePtyProcess,
+    ) : PtyProcessFactory {
+        override fun start(options: PtyOptions): PtyProcess = process
     }
 
-    private class FakeTerminalProcess private constructor(
+    private class FakePtyProcess private constructor(
         override val input: InputStream,
         private val inputDrained: CountDownLatch?,
         private val exitCode: Int,
-    ) : TerminalProcess {
+    ) : PtyProcess {
         constructor(
             inputBytes: ByteArray,
             exitCode: Int = 0,
@@ -283,9 +283,9 @@ class PtySessionTest {
         fun outputText(): String = capturedOutput.toString(StandardCharsets.UTF_8)
 
         companion object {
-            fun running(exitCode: Int = 0): FakeTerminalProcess {
+            fun running(exitCode: Int = 0): FakePtyProcess {
                 val input = BlockingInputStream()
-                return FakeTerminalProcess(input, input.released, exitCode)
+                return FakePtyProcess(input, input.released, exitCode)
             }
         }
     }

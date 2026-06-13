@@ -15,13 +15,13 @@
  */
 package io.github.jvterm.pty
 
-import com.pty4j.PtyProcess
 import com.pty4j.PtyProcessBuilder
 import com.pty4j.WinSize
 import java.io.InputStream
 import java.io.OutputStream
+import com.pty4j.PtyProcess as Pty4jNativeProcess
 
-internal interface TerminalProcess {
+internal interface PtyProcess {
     val input: InputStream
     val output: OutputStream
 
@@ -37,12 +37,12 @@ internal interface TerminalProcess {
     )
 }
 
-internal interface TerminalProcessFactory {
-    fun start(options: PtyOptions): TerminalProcess
+internal interface PtyProcessFactory {
+    fun start(options: PtyOptions): PtyProcess
 }
 
-internal object Pty4jTerminalProcessFactory : TerminalProcessFactory {
-    override fun start(options: PtyOptions): TerminalProcess {
+internal object Pty4jProcessFactory : PtyProcessFactory {
+    override fun start(options: PtyOptions): PtyProcess {
         val builder =
             PtyProcessBuilder()
                 .setCommand(options.command.toTypedArray())
@@ -55,13 +55,13 @@ internal object Pty4jTerminalProcessFactory : TerminalProcessFactory {
             builder.setDirectory(directory.toString())
         }
 
-        return Pty4jTerminalProcess(builder.start())
+        return Pty4jProcess(builder.start())
     }
 }
 
-internal class Pty4jTerminalProcess(
-    private val process: PtyProcess,
-) : TerminalProcess {
+internal class Pty4jProcess(
+    private val process: Pty4jNativeProcess,
+) : PtyProcess {
     override val input: InputStream
         get() = process.inputStream
 

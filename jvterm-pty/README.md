@@ -75,10 +75,10 @@ flowchart TD
 - **Idempotent Destruction**: Employs an `AtomicBoolean` guard (`localCloseRequested`) to guarantee process termination and stream closure are executed exactly once, safely avoiding thread leaks or double-close exceptions.
 - **Eof and Watcher Coordination**: When `terminal-pty-reader` hits EOF (read returns `< 0`), it purposefully blocks and waits for `terminal-pty-watcher` to capture the true native exit code, rather than prematurely emitting a `null` exit code to the session listener.
 
-### 2. Process Abstraction & PTY4J Factory ([TerminalProcess](./src/main/kotlin/pty/TerminalProcess.kt))
-To facilitate deterministic testing without relying on the native host environment, the module abstracts the PTY process under the [TerminalProcess](./src/main/kotlin/pty/TerminalProcess.kt) interface:
-- **[Pty4jTerminalProcess](./src/main/kotlin/pty/TerminalProcess.kt)**: The default production wrapper that adapts `com.pty4j.PtyProcess` to the [TerminalProcess](./src/main/kotlin/pty/TerminalProcess.kt) contract, implementing `resize` via `PtyProcess.setWinSize(WinSize(cols, rows))`.
-- **[Pty4jTerminalProcessFactory](./src/main/kotlin/pty/TerminalProcess.kt)**: Initializes a `PtyProcessBuilder` using configured variables. Crucially, it sets `setUseWinConPty(true)` to ensure optimal compatibility with the Windows Pseudo Console (ConPTY) system on modern Windows 10/11 environments.
+### 2. Process Abstraction & PTY4J Factory ([PtyProcess](./src/main/kotlin/pty/PtyProcess.kt))
+To facilitate deterministic testing without relying on the native host environment, the module abstracts the PTY process under the [PtyProcess](./src/main/kotlin/pty/PtyProcess.kt) interface:
+- **[Pty4jProcess](./src/main/kotlin/pty/PtyProcess.kt)**: The default production wrapper that adapts `com.pty4j.PtyProcess` to the [PtyProcess](./src/main/kotlin/pty/PtyProcess.kt) contract, implementing `resize` via `PtyProcess.setWinSize(WinSize(cols, rows))`.
+- **[Pty4jProcessFactory](./src/main/kotlin/pty/PtyProcess.kt)**: Initializes a `PtyProcessBuilder` using configured variables. Crucially, it sets `setUseWinConPty(true)` to ensure optimal compatibility with the Windows Pseudo Console (ConPTY) system on modern Windows 10/11 environments.
 
 ### 3. PTY Options Configuration ([PtyOptions](./src/main/kotlin/pty/PtyOptions.kt))
 [PtyOptions](./src/main/kotlin/pty/PtyOptions.kt) is an immutable configuration dataclass that encapsulates all initialization parameters:

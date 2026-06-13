@@ -373,8 +373,8 @@ class TerminalComplexTextLayoutCacheTest {
         assertNotSame(firstLayout, secondLayout)
     }
 
-    private fun fontCache(): TerminalFontCache {
-        val cache = TerminalFontCache()
+    private fun fontCache(): FontCache {
+        val cache = FontCache()
         cache.update(Font(Font.MONOSPACED, Font.PLAIN, 14), emptyList(), useSystemFallbackFonts = false)
         return cache
     }

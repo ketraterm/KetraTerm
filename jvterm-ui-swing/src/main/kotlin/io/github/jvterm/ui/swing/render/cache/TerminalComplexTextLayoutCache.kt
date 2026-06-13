@@ -81,7 +81,7 @@ internal class TerminalComplexTextLayoutCache(
         codePoint: Int,
         style: Int,
         fontRenderContext: FontRenderContext,
-        fontCache: TerminalFontCache,
+        fontCache: FontCache,
     ): TextLayout {
         fontCache.refreshSystemFallbackFonts()
         prepare(fontRenderContext, fontCache.generation)
@@ -119,7 +119,7 @@ internal class TerminalComplexTextLayoutCache(
         length: Int,
         style: Int,
         fontRenderContext: FontRenderContext,
-        fontCache: TerminalFontCache,
+        fontCache: FontCache,
     ): TextLayout {
         require(length >= 0) { "length must be >= 0, was $length" }
         require(offset >= 0 && codepoints.size - offset >= length) {
@@ -169,7 +169,7 @@ internal class TerminalComplexTextLayoutCache(
         text: String,
         style: Int,
         fontRenderContext: FontRenderContext,
-        fontCache: TerminalFontCache,
+        fontCache: FontCache,
     ): TextLayout {
         val length = copyStringCodepoints(text)
         return clusterLayout(stringClusterScratch, 0, length, style, fontRenderContext, fontCache)

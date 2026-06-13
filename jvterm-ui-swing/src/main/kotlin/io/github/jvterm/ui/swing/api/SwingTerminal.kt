@@ -20,7 +20,7 @@ import io.github.jvterm.protocol.MouseTrackingMode
 import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.session.TerminalSession
 import io.github.jvterm.ui.swing.input.SwingKeyMapper
-import io.github.jvterm.ui.swing.render.TerminalGridPainter
+import io.github.jvterm.ui.swing.render.GridPainter
 import io.github.jvterm.ui.swing.search.*
 import io.github.jvterm.ui.swing.settings.SwingMetrics
 import io.github.jvterm.ui.swing.settings.SwingSettings
@@ -83,7 +83,7 @@ class SwingTerminal
         private val unbindRunnable = Runnable { unbindOnEdt() }
         private val reloadSettingsRunnable = Runnable { reloadSettingsOnEdt() }
 
-        private val painter = TerminalGridPainter()
+        private val painter = GridPainter()
         private val repaintPlanner = SwingRepaintPlanner()
         private val scrollModel = SwingScrollModel()
         private val renderCache = TerminalRenderCache(settings.columns, settings.rows)

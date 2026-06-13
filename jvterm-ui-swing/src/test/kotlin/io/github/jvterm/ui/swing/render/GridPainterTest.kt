@@ -28,7 +28,7 @@ import java.awt.Insets
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 
-class TerminalGridPainterTest {
+class GridPainterTest {
     @Test
     fun `ascii runs paint contiguous measured cells`() {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
@@ -48,7 +48,7 @@ class TerminalGridPainterTest {
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame(text = "ii", cursorVisible = false, palette = settings.palette))
 
-        TerminalGridPainter().paint(
+        GridPainter().paint(
             g = g,
             cache = cache,
             settings = settings,
@@ -95,7 +95,7 @@ class TerminalGridPainterTest {
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame(text = "ii", cursorVisible = false, palette = settings.palette))
 
-        TerminalGridPainter().paint(
+        GridPainter().paint(
             g = g,
             cache = cache,
             settings = settings,
@@ -137,7 +137,7 @@ class TerminalGridPainterTest {
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "A", cursorVisible = true, palette = settings.palette))
 
-        TerminalGridPainter().paint(
+        GridPainter().paint(
             g = g,
             cache = cache,
             settings = settings,
@@ -174,7 +174,7 @@ class TerminalGridPainterTest {
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "\u03A9", cursorVisible = false, palette = settings.palette))
 
-        TerminalGridPainter().paint(
+        GridPainter().paint(
             g = g,
             cache = cache,
             settings = settings,
@@ -183,7 +183,7 @@ class TerminalGridPainterTest {
             height = image.height,
             cursorBlinkVisible = true,
         )
-        TerminalGridPainter().paint(
+        GridPainter().paint(
             g = g,
             cache = cache,
             settings = settings,
@@ -221,7 +221,7 @@ class TerminalGridPainterTest {
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "\u03A9", cursorVisible = true, palette = settings.palette))
 
-        TerminalGridPainter().paint(
+        GridPainter().paint(
             g = g,
             cache = cache,
             settings = settings,
@@ -277,7 +277,7 @@ class TerminalGridPainterTest {
             ),
         )
 
-        TerminalGridPainter().paint(
+        GridPainter().paint(
             g = g,
             cache = cache,
             settings = settings,
@@ -333,7 +333,7 @@ class TerminalGridPainterTest {
             ),
         )
 
-        TerminalGridPainter().paint(
+        GridPainter().paint(
             g = g,
             cache = cache,
             settings = settings,
@@ -368,7 +368,7 @@ class TerminalGridPainterTest {
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame(text = "AB", cursorVisible = false, palette = settings.palette))
 
-        TerminalGridPainter().paint(
+        GridPainter().paint(
             g = g,
             cache = cache,
             settings = settings,

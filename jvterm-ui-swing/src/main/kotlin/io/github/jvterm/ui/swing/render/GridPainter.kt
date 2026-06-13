@@ -38,7 +38,7 @@ import kotlin.math.floor
  * single component-owned painter instance so those caches are reused across
  * paint calls.
  */
-internal class TerminalGridPainter {
+internal class GridPainter {
     private val colorCache = AwtColorCache()
     private val backgroundPainter = TerminalBackgroundPainter(colorCache)
     private val selectionPainter = TerminalSelectionPainter(colorCache)
