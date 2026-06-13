@@ -32,7 +32,7 @@ dependencies {
     implementation(project(":jvterm-ui-swing"))
     implementation(project(":jvterm-workspace"))
 
-    runtimeOnly("org.slf4j:slf4j-nop:2.0.17")
+    runtimeOnly("org.slf4j:slf4j-nop:2.0.18")
 
     testImplementation(kotlin("test"))
 }
