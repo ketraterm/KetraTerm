@@ -18,7 +18,7 @@ package io.github.jvterm.benchmark
 import io.github.jvterm.core.TerminalBuffers
 import io.github.jvterm.core.api.TerminalBuffer
 import io.github.jvterm.core.api.TerminalResponseChannel
-import io.github.jvterm.core.model.AttributeColor
+import io.github.jvterm.core.model.CellColor
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
@@ -51,9 +51,9 @@ open class TerminalResponseBenchmark {
         // Pre-configure a terminal with complex pen for DECRQSS SGR worst case.
         complexBuffer = TerminalBuffers.create(width = 80, height = 24)
         complexBuffer.setPenColors(
-            foreground = AttributeColor.rgb(0xFF, 0x00, 0x00),
-            background = AttributeColor.rgb(0x00, 0xFF, 0x00),
-            underlineColor = AttributeColor.rgb(0x00, 0x00, 0xFF),
+            foreground = CellColor.rgb(0xFF, 0x00, 0x00),
+            background = CellColor.rgb(0x00, 0xFF, 0x00),
+            underlineColor = CellColor.rgb(0x00, 0x00, 0xFF),
             bold = true,
             italic = true,
             strikethrough = true,

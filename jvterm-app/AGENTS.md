@@ -10,10 +10,10 @@ This module may:
 
 - create standalone application windows and menus.
 - start and close local PTY-backed terminal sessions.
-- bind `TerminalSwingTerminal` to `TerminalSession`.
+- bind `SwingTerminal` to `TerminalSession`.
 - provide native Swing/AWT host services such as clipboard, dispatch, hyperlink
   policy, theme settings, and scrollbars.
-- adapt external Swing scrollbars through `TerminalSwingTerminal` viewport APIs.
+- adapt external Swing scrollbars through `SwingTerminal` viewport APIs.
 
 ## Boundary
 

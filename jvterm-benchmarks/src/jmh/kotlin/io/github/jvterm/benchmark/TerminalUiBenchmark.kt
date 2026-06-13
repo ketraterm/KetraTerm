@@ -23,9 +23,9 @@ import io.github.jvterm.render.cache.TerminalRenderPublisher
 import io.github.jvterm.session.TerminalSession
 import io.github.jvterm.transport.TerminalConnector
 import io.github.jvterm.transport.TerminalConnectorListener
-import io.github.jvterm.ui.swing.api.TerminalSwingTerminal
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettingsProvider
+import io.github.jvterm.ui.swing.api.SwingTerminal
+import io.github.jvterm.ui.swing.settings.SwingSettings
+import io.github.jvterm.ui.swing.settings.SwingSettingsProvider
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.awt.Graphics2D
@@ -141,7 +141,7 @@ open class TerminalRenderPublishBenchmark {
 @Warmup(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
-open class TerminalSwingPaintBenchmark {
+open class SwingPaintBenchmark {
     @Param("80", "160", "240")
     var columns: Int = 0
 
@@ -153,7 +153,7 @@ open class TerminalSwingPaintBenchmark {
 
     private lateinit var terminal: TerminalBuffer
     private lateinit var session: TerminalSession
-    private lateinit var component: TerminalSwingTerminal
+    private lateinit var component: SwingTerminal
     private lateinit var image: BufferedImage
     private lateinit var graphics: Graphics2D
 
@@ -171,9 +171,9 @@ open class TerminalSwingPaintBenchmark {
         session.publisher.updateAndPublish(terminal as io.github.jvterm.render.api.TerminalRenderFrameReader)
 
         component =
-            TerminalSwingTerminal(
-                TerminalSwingSettingsProvider {
-                    TerminalSwingSettings(
+            SwingTerminal(
+                SwingSettingsProvider {
+                    SwingSettings(
                         columns = columns,
                         rows = rows,
                         useSystemFallbackFonts = false,

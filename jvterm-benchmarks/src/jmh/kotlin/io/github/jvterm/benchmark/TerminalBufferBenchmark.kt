@@ -17,7 +17,7 @@ package io.github.jvterm.benchmark
 
 import io.github.jvterm.core.TerminalBuffers
 import io.github.jvterm.core.api.TerminalBuffer
-import io.github.jvterm.core.model.AttributeColor
+import io.github.jvterm.core.model.CellColor
 import io.github.jvterm.core.model.UnderlineStyle
 import io.github.jvterm.render.api.TerminalRenderFrame
 import io.github.jvterm.render.api.TerminalRenderFrameConsumer
@@ -167,24 +167,24 @@ open class TerminalBufferAttributeBenchmark : TerminalRenderFrameConsumer {
         when (workload) {
             "default" ->
                 buffer.setPenColors(
-                    foreground = AttributeColor.DEFAULT,
-                    background = AttributeColor.DEFAULT,
-                    underlineColor = AttributeColor.DEFAULT,
+                    foreground = CellColor.DEFAULT,
+                    background = CellColor.DEFAULT,
+                    underlineColor = CellColor.DEFAULT,
                 )
             "indexed" ->
                 buffer.setPenColors(
-                    foreground = AttributeColor.indexed(196),
-                    background = AttributeColor.indexed(17),
-                    underlineColor = AttributeColor.indexed(45),
+                    foreground = CellColor.indexed(196),
+                    background = CellColor.indexed(17),
+                    underlineColor = CellColor.indexed(45),
                     bold = true,
                     underlineStyle = UnderlineStyle.SINGLE,
                     overline = true,
                 )
             "rgb" ->
                 buffer.setPenColors(
-                    foreground = AttributeColor.rgb(0x12_34_56),
-                    background = AttributeColor.rgb(0x65_43_21),
-                    underlineColor = AttributeColor.rgb(0xAA_BB_CC),
+                    foreground = CellColor.rgb(0x12_34_56),
+                    background = CellColor.rgb(0x65_43_21),
+                    underlineColor = CellColor.rgb(0xAA_BB_CC),
                     bold = true,
                     italic = true,
                     underlineStyle = UnderlineStyle.CURLY,

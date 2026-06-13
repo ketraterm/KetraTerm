@@ -85,7 +85,7 @@ Document each gap in `docs/terminal-feature-gap-map.md` until implemented.
 
 ## Response Channel Security
 
-When implementing or extending query/response features (such as `DECRQSS` or `XTGETTCAP`), or when creating new terminal features that can be queried, always update the security allowlist of queried settings or capabilities in `TerminalResponseChannel` (e.g. in `TerminalResponseChannelImpl.kt`), and reject unauthorized or unsupported queries with standard protocol-defined failure responses.
+When implementing or extending query/response features (such as `DECRQSS` or `XTGETTCAP`), or when creating new terminal features that can be queried, always update the security allowlist of queried settings or capabilities in `TerminalResponseChannel` (e.g. in `BufferResponseChannel.kt`), and reject unauthorized or unsupported queries with standard protocol-defined failure responses.
 
 ## Testing
 

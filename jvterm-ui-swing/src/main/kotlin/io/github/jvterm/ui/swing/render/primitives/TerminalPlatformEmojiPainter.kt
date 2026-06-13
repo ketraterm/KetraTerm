@@ -16,7 +16,7 @@
 package io.github.jvterm.ui.swing.render.primitives
 
 import io.github.jvterm.ui.swing.render.platform.TerminalPlatformEmojiRasterizer
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
@@ -45,7 +45,7 @@ internal class TerminalPlatformEmojiPainter(
         column: Int,
         row: Int,
         columnSpan: Int,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
     ): Boolean {
         if (!rasterizer.available || !isDefaultEmojiPresentationCodePoint(codePoint)) return false
         val text = String(Character.toChars(codePoint))
@@ -60,7 +60,7 @@ internal class TerminalPlatformEmojiPainter(
         column: Int,
         row: Int,
         columnSpan: Int,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
     ): Boolean {
         if (!rasterizer.available || !containsEmojiPresentation(codepoints, offset, length)) return false
         val text = String(codepoints, offset, length)
@@ -73,7 +73,7 @@ internal class TerminalPlatformEmojiPainter(
         column: Int,
         row: Int,
         columnSpan: Int,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
     ): Boolean {
         val pixelSize = maxOf(1, min(metrics.cellWidth * columnSpan, metrics.cellHeight))
         val key = EmojiImageKey(text, pixelSize)

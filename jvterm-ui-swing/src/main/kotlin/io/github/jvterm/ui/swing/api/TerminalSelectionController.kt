@@ -16,15 +16,15 @@
 package io.github.jvterm.ui.swing.api
 
 import io.github.jvterm.render.cache.TerminalRenderCache
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 
 internal interface TerminalSelectionHost {
-    val settings: TerminalSwingSettings
-    val metrics: TerminalSwingMetrics
+    val settings: SwingSettings
+    val metrics: SwingMetrics
     val renderCache: TerminalRenderCache
     val contentYOffset: Double
     val componentWidth: Int

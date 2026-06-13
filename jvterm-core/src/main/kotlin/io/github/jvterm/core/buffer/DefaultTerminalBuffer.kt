@@ -40,12 +40,12 @@ internal class DefaultTerminalBuffer private constructor(
 ) : TerminalBuffer,
     io.github.jvterm.render.api.TerminalRenderFrameReader,
     TerminalReader by TerminalReaderImpl(components.state),
-    TerminalWriter by TerminalWriterImpl(components.state, components.mutationEngine, components.cursorEngine),
+    TerminalWriter by BufferWriter(components.state, components.mutationEngine, components.cursorEngine),
     TerminalCursor by TerminalCursorImpl(components.state, components.cursorEngine),
     TerminalModeController by TerminalModeControllerImpl(components.state, components.cursorEngine),
     TerminalModeReader by TerminalModeReaderImpl(components.state),
-    TerminalResponseChannel by TerminalResponseChannelImpl(components.state),
-    TerminalInspector by TerminalInspectorImpl(components.state) {
+    TerminalResponseChannel by BufferResponseChannel(components.state),
+    TerminalInspector by BufferInspector(components.state) {
     private val state: TerminalState
         get() = components.state
     private val renderFrame = CoreTerminalRenderFrame(components.state)

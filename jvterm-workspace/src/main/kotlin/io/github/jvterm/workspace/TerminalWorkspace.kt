@@ -15,9 +15,9 @@
  */
 package io.github.jvterm.workspace
 
-import io.github.jvterm.pty.TerminalPtyEventListener
-import io.github.jvterm.pty.TerminalPtyOptions
-import io.github.jvterm.pty.TerminalPtySessions
+import io.github.jvterm.pty.PtyEventListener
+import io.github.jvterm.pty.PtyOptions
+import io.github.jvterm.pty.TerminalSessions
 import io.github.jvterm.render.api.TerminalColorPalette
 import io.github.jvterm.session.TerminalSession
 import java.nio.file.Path
@@ -61,10 +61,10 @@ class TerminalWorkspace(
         val id = "terminal-${nextTabNumber.getAndIncrement()}"
         val tabEventListener = tabEventListener(id, profile)
         val session =
-            TerminalPtySessions.start(
-                TerminalPtyOptions(
+            TerminalSessions.localPty(
+                PtyOptions(
                     command = profile.command,
-                    environment = TerminalPtyOptions.defaultEnvironment() + profile.environment,
+                    environment = PtyOptions.defaultEnvironment() + profile.environment,
                     workingDirectory = profile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY,
                     columns = options.columns,
                     rows = options.rows,
@@ -142,8 +142,8 @@ class TerminalWorkspace(
     private fun tabEventListener(
         tabId: String,
         profile: TerminalProfile,
-    ): TerminalPtyEventListener =
-        object : TerminalPtyEventListener {
+    ): PtyEventListener =
+        object : PtyEventListener {
             override fun bell(session: TerminalSession) {
                 tabBySession(session)?.let { listener.bell(it) }
             }

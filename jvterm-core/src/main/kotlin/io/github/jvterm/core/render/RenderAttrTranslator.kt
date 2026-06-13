@@ -44,8 +44,8 @@ internal class RenderAttrTranslator {
 
     fun toRenderExtraAttrWord(extendedAttr: Long): Long =
         io.github.jvterm.render.api.TerminalRenderExtraAttrs.pack(
-            underlineColorKind = AttributeCodec.underlineAttributeColorKind(extendedAttr).toRenderColorKind(),
-            underlineColorValue = AttributeCodec.underlineAttributeColorValue(extendedAttr),
+            underlineColorKind = AttributeCodec.underlineColorKind(extendedAttr).toRenderColorKind(),
+            underlineColorValue = AttributeCodec.underlineColorValue(extendedAttr),
             overline = AttributeCodec.isOverline(extendedAttr),
         )
 

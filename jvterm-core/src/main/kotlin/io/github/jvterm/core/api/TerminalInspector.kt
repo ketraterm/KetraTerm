@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.core.api
 
-import io.github.jvterm.core.model.Attributes
+import io.github.jvterm.core.model.CellAttributes
 
 /**
  * Allocating inspection contract for the terminal buffer.
@@ -34,7 +34,7 @@ interface TerminalInspector {
     fun getAttrAt(
         col: Int,
         row: Int,
-    ): Attributes?
+    ): CellAttributes?
 
     /**
      * Returns the content of a visible row as a string, trimming trailing blank

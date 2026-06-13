@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.ui.swing.render.primitives
 
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
 
 /**
@@ -40,7 +40,7 @@ internal class TerminalCellPrimitivePainter {
         codePoint: Int,
         column: Int,
         row: Int,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
     ) {
         val x = column * metrics.cellWidth
         val y = row * metrics.cellHeight

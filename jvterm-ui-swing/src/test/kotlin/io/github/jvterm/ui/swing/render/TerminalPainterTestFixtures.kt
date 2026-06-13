@@ -17,8 +17,8 @@ package io.github.jvterm.ui.swing.render
 
 import io.github.jvterm.render.api.*
 import io.github.jvterm.render.cache.TerminalRenderCache
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import java.awt.Font
 import java.awt.Insets
 import java.awt.RenderingHints
@@ -33,8 +33,8 @@ internal const val TEST_BLUE: Int = 0xFF0000FF.toInt()
 internal fun defaultTestSettings(
     foreground: Int = TEST_WHITE,
     background: Int = TEST_BLACK,
-): TerminalSwingSettings =
-    TerminalSwingSettings(
+): SwingSettings =
+    SwingSettings(
         font = Font(Font.MONOSPACED, Font.PLAIN, 14),
         palette =
             TerminalColorPalette(
@@ -49,11 +49,11 @@ internal fun defaultTestSettings(
 
 internal fun testMetrics(
     image: BufferedImage,
-    settings: TerminalSwingSettings,
-): TerminalSwingMetrics {
+    settings: SwingSettings,
+): SwingMetrics {
     val g = image.createGraphics()
     try {
-        return TerminalSwingMetrics.from(g.getFontMetrics(settings.font))
+        return SwingMetrics.from(g.getFontMetrics(settings.font))
     } finally {
         g.dispose()
     }

@@ -24,8 +24,8 @@ import io.github.jvterm.ui.swing.render.cache.*
 import io.github.jvterm.ui.swing.render.font.TerminalTextRunBuffer
 import io.github.jvterm.ui.swing.render.primitives.TerminalCellPrimitivePainter
 import io.github.jvterm.ui.swing.render.primitives.TerminalPlatformEmojiPainter
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
-import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.SwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.font.FontRenderContext
@@ -39,7 +39,7 @@ internal class TerminalTextPainter(
     private val decorationPainter: TerminalDecorationPainter,
     private val platformEmojiPainter: TerminalPlatformEmojiPainter = TerminalPlatformEmojiPainter(),
 ) {
-    private val fontCache = TerminalFontCache()
+    private val fontCache = FontCache()
     private val complexTextLayouts = TerminalComplexTextLayoutCache()
     private val asciiGlyphVectors = TerminalAsciiGlyphVectorCache()
     private val asciiDrawChars = TerminalAsciiDrawCharsCache()
@@ -56,7 +56,7 @@ internal class TerminalTextPainter(
     /**
      * Updates font-dependent caches for a settings snapshot.
      */
-    fun updateSettings(settings: TerminalSwingSettings) {
+    fun updateSettings(settings: SwingSettings) {
         if (fontCache.update(settings.font, settings.fallbackFonts, settings.useSystemFallbackFonts)) {
             complexTextLayouts.clear()
             asciiGlyphVectors.clear()
@@ -76,7 +76,7 @@ internal class TerminalTextPainter(
         g: Graphics2D,
         cache: TerminalRenderCache,
         palette: TerminalColorPalette,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         row: Int,
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean = true,
@@ -180,7 +180,7 @@ internal class TerminalTextPainter(
     fun paintCellForeground(
         g: Graphics2D,
         cache: TerminalRenderCache,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         column: Int,
         row: Int,
         columnSpan: Int = 1,
@@ -275,7 +275,7 @@ internal class TerminalTextPainter(
         g: Graphics2D,
         cache: TerminalRenderCache,
         palette: TerminalColorPalette,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         row: Int,
         startColumn: Int,
         baselineY: Int,
@@ -362,7 +362,7 @@ internal class TerminalTextPainter(
         g: Graphics2D,
         cache: TerminalRenderCache,
         palette: TerminalColorPalette,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         row: Int,
         column: Int,
         baselineY: Int,
@@ -496,7 +496,7 @@ internal class TerminalTextPainter(
         if (hovered && hyperlinkActivationHover) {
             hyperlinkActivationForeground
         } else {
-            TerminalSwingColors.foreground(palette, attr)
+            SwingColors.foreground(palette, attr)
         }
 
     private fun isBlinkHidden(
@@ -518,7 +518,7 @@ internal class TerminalTextPainter(
         startColumn: Int,
         endColumn: Int,
         row: Int,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
     ) {
         if (hyperlinkId == NO_HYPERLINK_ID) return
         decorationPainter.paintHyperlink(
@@ -534,7 +534,7 @@ internal class TerminalTextPainter(
 
     private fun drawAsciiRun(
         g: Graphics2D,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         startColumn: Int,
         baselineY: Int,
         fontStyle: Int,

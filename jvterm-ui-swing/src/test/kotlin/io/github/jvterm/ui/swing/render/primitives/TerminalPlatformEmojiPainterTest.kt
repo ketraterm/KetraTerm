@@ -18,7 +18,7 @@ package io.github.jvterm.ui.swing.render.primitives
 import io.github.jvterm.ui.swing.render.TEST_RED
 import io.github.jvterm.ui.swing.render.containsColor
 import io.github.jvterm.ui.swing.render.platform.TerminalPlatformEmojiRasterizer
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingMetrics
 import org.junit.jupiter.api.Test
 import java.awt.image.BufferedImage
 import kotlin.test.assertEquals
@@ -92,7 +92,7 @@ class TerminalPlatformEmojiPainterTest {
 
     private companion object {
         private val METRICS =
-            TerminalSwingMetrics(
+            SwingMetrics(
                 cellWidth = 10,
                 cellHeight = 20,
                 baseline = 14,

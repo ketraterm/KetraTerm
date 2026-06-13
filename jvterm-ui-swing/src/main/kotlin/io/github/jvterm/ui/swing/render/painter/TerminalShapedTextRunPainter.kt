@@ -19,13 +19,13 @@ import io.github.jvterm.render.api.TerminalColorPalette
 import io.github.jvterm.render.api.TerminalRenderAttrs
 import io.github.jvterm.render.api.TerminalRenderCellFlags
 import io.github.jvterm.render.cache.TerminalRenderCache
-import io.github.jvterm.ui.swing.render.TerminalSwingColors
+import io.github.jvterm.ui.swing.render.SwingColors
 import io.github.jvterm.ui.swing.render.cache.AwtColorCache
+import io.github.jvterm.ui.swing.render.cache.FontCache
 import io.github.jvterm.ui.swing.render.cache.TerminalComplexTextLayoutCache
-import io.github.jvterm.ui.swing.render.cache.TerminalFontCache
 import io.github.jvterm.ui.swing.render.hasDrawableText
 import io.github.jvterm.ui.swing.render.terminalFontStyle
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
 import java.awt.font.FontRenderContext
 import java.awt.font.TextLayout
@@ -43,7 +43,7 @@ import java.text.Bidi
 internal class TerminalShapedTextRunPainter(
     private val colorCache: AwtColorCache,
     private val decorationPainter: TerminalDecorationPainter,
-    private val fontCache: TerminalFontCache,
+    private val fontCache: FontCache,
     private val complexTextLayouts: TerminalComplexTextLayoutCache,
 ) {
     private var rowChars = CharArray(INITIAL_TEXT_RUN_CAPACITY)
@@ -72,7 +72,7 @@ internal class TerminalShapedTextRunPainter(
         g: Graphics2D,
         cache: TerminalRenderCache,
         palette: TerminalColorPalette,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         row: Int,
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean,
@@ -135,7 +135,7 @@ internal class TerminalShapedTextRunPainter(
         g: Graphics2D,
         cache: TerminalRenderCache,
         palette: TerminalColorPalette,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         row: Int,
         startColumn: Int,
         baselineY: Int,
@@ -354,7 +354,7 @@ internal class TerminalShapedTextRunPainter(
         g: Graphics2D,
         cache: TerminalRenderCache,
         palette: TerminalColorPalette,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         row: Int,
         startColumn: Int,
         endColumn: Int,
@@ -574,7 +574,7 @@ internal class TerminalShapedTextRunPainter(
         if (hovered && hyperlinkActivationHover) {
             hyperlinkActivationForeground
         } else {
-            TerminalSwingColors.foreground(palette, attr)
+            SwingColors.foreground(palette, attr)
         }
 
     private fun isBlinkHidden(
@@ -590,7 +590,7 @@ internal class TerminalShapedTextRunPainter(
         startColumn: Int,
         endColumn: Int,
         row: Int,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
     ) {
         if (hyperlinkId == NO_HYPERLINK_ID) return
         decorationPainter.paintHyperlink(

@@ -19,7 +19,7 @@ import io.github.jvterm.host.HostEventSink
 import io.github.jvterm.session.TerminalSession
 
 internal class SessionHostEventBridge(
-    private val listener: TerminalPtyEventListener,
+    private val listener: PtyEventListener,
 ) : HostEventSink {
     private var attachedSession: TerminalSession? = null
 

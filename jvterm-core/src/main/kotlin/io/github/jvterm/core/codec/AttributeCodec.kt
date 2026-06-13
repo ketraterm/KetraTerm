@@ -15,9 +15,9 @@
  */
 package io.github.jvterm.core.codec
 
-import io.github.jvterm.core.model.AttributeColor
-import io.github.jvterm.core.model.AttributeColorKind
-import io.github.jvterm.core.model.Attributes
+import io.github.jvterm.core.model.CellAttributes
+import io.github.jvterm.core.model.CellColor
+import io.github.jvterm.core.model.CellColorKind
 import io.github.jvterm.core.model.UnderlineStyle
 
 /**
@@ -101,8 +101,8 @@ internal object AttributeCodec {
     }
 
     fun packColors(
-        foreground: AttributeColor = AttributeColor.DEFAULT,
-        background: AttributeColor = AttributeColor.DEFAULT,
+        foreground: CellColor = CellColor.DEFAULT,
+        background: CellColor = CellColor.DEFAULT,
         bold: Boolean = false,
         faint: Boolean = false,
         italic: Boolean = false,
@@ -156,7 +156,7 @@ internal object AttributeCodec {
     }
 
     fun packExtendedColors(
-        underlineColor: AttributeColor = AttributeColor.DEFAULT,
+        underlineColor: CellColor = CellColor.DEFAULT,
         underlineStyle: UnderlineStyle = UnderlineStyle.NONE,
         strikethrough: Boolean = false,
         overline: Boolean = false,
@@ -177,7 +177,7 @@ internal object AttributeCodec {
 
     fun background(v: Long): Int = colorCode(((v ushr BG_SHIFT) and COLOR_SLOT_MASK).toInt())
 
-    fun underlineColor(v: Long): Int = colorCode((v and COLOR_SLOT_MASK).toInt())
+    fun underline(v: Long): Int = colorCode((v and COLOR_SLOT_MASK).toInt())
 
     fun foregroundColorKind(v: Long): Int = colorKind((v and COLOR_SLOT_MASK).toInt())
 
@@ -187,15 +187,15 @@ internal object AttributeCodec {
 
     fun backgroundColorValue(v: Long): Int = colorValue(((v ushr BG_SHIFT) and COLOR_SLOT_MASK).toInt())
 
-    fun underlineAttributeColorKind(v: Long): Int = colorKind((v and COLOR_SLOT_MASK).toInt())
+    fun underlineColorKind(v: Long): Int = colorKind((v and COLOR_SLOT_MASK).toInt())
 
-    fun underlineAttributeColorValue(v: Long): Int = colorValue((v and COLOR_SLOT_MASK).toInt())
+    fun underlineColorValue(v: Long): Int = colorValue((v and COLOR_SLOT_MASK).toInt())
 
-    fun foregroundColor(v: Long): AttributeColor = decodeColor((v and COLOR_SLOT_MASK).toInt())
+    fun foregroundColor(v: Long): CellColor = decodeColor((v and COLOR_SLOT_MASK).toInt())
 
-    fun backgroundColor(v: Long): AttributeColor = decodeColor(((v ushr BG_SHIFT) and COLOR_SLOT_MASK).toInt())
+    fun backgroundColor(v: Long): CellColor = decodeColor(((v ushr BG_SHIFT) and COLOR_SLOT_MASK).toInt())
 
-    fun underlineAttributeColor(v: Long): AttributeColor = decodeColor((v and COLOR_SLOT_MASK).toInt())
+    fun underlineColor(v: Long): CellColor = decodeColor((v and COLOR_SLOT_MASK).toInt())
 
     fun isBold(v: Long): Boolean = v and (1L shl BOLD_BIT) != 0L
 
@@ -242,11 +242,11 @@ internal object AttributeCodec {
     fun unpack(
         primary: Long,
         extended: Long = DEFAULT_EXTENDED_ATTR,
-    ): Attributes =
-        Attributes(
+    ): CellAttributes =
+        CellAttributes(
             foreground = foregroundColor(primary),
             background = backgroundColor(primary),
-            underlineColor = underlineAttributeColor(extended),
+            underlineColor = underlineColor(extended),
             bold = isBold(primary),
             faint = isFaint(primary),
             italic = isItalic(primary),
@@ -267,23 +267,23 @@ internal object AttributeCodec {
             (COLOR_KIND_INDEXED shl COLOR_KIND_SHIFT) or (code - 1)
         }
 
-    private fun colorFromCode(code: Int): AttributeColor = if (code == 0) AttributeColor.DEFAULT else AttributeColor.indexed(code - 1)
+    private fun colorFromCode(code: Int): CellColor = if (code == 0) CellColor.DEFAULT else CellColor.indexed(code - 1)
 
-    private fun encodeColor(color: AttributeColor): Int {
+    private fun encodeColor(color: CellColor): Int {
         val kind =
             when (color.kind) {
-                AttributeColorKind.DEFAULT -> COLOR_KIND_DEFAULT
-                AttributeColorKind.INDEXED -> COLOR_KIND_INDEXED
-                AttributeColorKind.RGB -> COLOR_KIND_RGB
+                CellColorKind.DEFAULT -> COLOR_KIND_DEFAULT
+                CellColorKind.INDEXED -> COLOR_KIND_INDEXED
+                CellColorKind.RGB -> COLOR_KIND_RGB
             }
         return (kind shl COLOR_KIND_SHIFT) or color.value
     }
 
-    private fun decodeColor(encoded: Int): AttributeColor =
+    private fun decodeColor(encoded: Int): CellColor =
         when (colorKind(encoded)) {
-            COLOR_KIND_INDEXED -> AttributeColor.indexed(colorValue(encoded))
-            COLOR_KIND_RGB -> AttributeColor.rgb(colorValue(encoded))
-            else -> AttributeColor.DEFAULT
+            COLOR_KIND_INDEXED -> CellColor.indexed(colorValue(encoded))
+            COLOR_KIND_RGB -> CellColor.rgb(colorValue(encoded))
+            else -> CellColor.DEFAULT
         }
 
     private fun colorKind(encoded: Int): Int =

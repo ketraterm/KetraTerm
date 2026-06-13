@@ -62,7 +62,7 @@ class SessionHostEventBridgeTest {
     @Test
     fun `listener failures are reported and isolated`() {
         val listener =
-            object : TerminalPtyEventListener by TerminalPtyEventListener.NONE {
+            object : PtyEventListener by PtyEventListener.NONE {
                 val failures = mutableListOf<String?>()
 
                 override fun bell(session: TerminalSession): Unit = throw IllegalStateException("bell failed")
@@ -85,7 +85,7 @@ class SessionHostEventBridgeTest {
     @Test
     fun `listenerFailed failures are ignored`() {
         val listener =
-            object : TerminalPtyEventListener by TerminalPtyEventListener.NONE {
+            object : PtyEventListener by PtyEventListener.NONE {
                 override fun bell(session: TerminalSession): Unit = throw IllegalStateException("bell failed")
 
                 override fun listenerFailed(
@@ -104,7 +104,7 @@ class SessionHostEventBridgeTest {
         return TerminalSession.create(terminal = terminal, connector = NoopConnector)
     }
 
-    private class RecordingListener : TerminalPtyEventListener {
+    private class RecordingListener : PtyEventListener {
         val events = mutableListOf<String>()
 
         override fun bell(session: TerminalSession) {

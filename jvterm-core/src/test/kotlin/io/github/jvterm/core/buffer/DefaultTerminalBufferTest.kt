@@ -17,8 +17,8 @@ package io.github.jvterm.core.buffer
 
 import io.github.jvterm.core.TerminalBuffers
 import io.github.jvterm.core.api.TerminalBuffer
-import io.github.jvterm.core.model.AttributeColor
-import io.github.jvterm.core.model.Attributes
+import io.github.jvterm.core.model.CellAttributes
+import io.github.jvterm.core.model.CellColor
 import io.github.jvterm.core.model.UnderlineStyle
 import io.github.jvterm.core.state.TerminalState
 import io.github.jvterm.protocol.MouseEncodingMode
@@ -111,13 +111,13 @@ class DefaultTerminalBufferTest {
             { assertEquals('X'.code, buffer.getCodepointAt(2, 1)) },
             {
                 assertEquals(
-                    Attributes(
-                        foreground = AttributeColor.indexed(2),
-                        background = AttributeColor.indexed(6),
+                    CellAttributes(
+                        foreground = CellColor.indexed(2),
+                        background = CellColor.indexed(6),
                         bold = true,
                         italic = true,
                         underlineStyle = UnderlineStyle.DASHED,
-                        underlineColor = AttributeColor.indexed(8),
+                        underlineColor = CellColor.indexed(8),
                     ),
                     buffer.getAttrAt(2, 1),
                 )
@@ -175,8 +175,8 @@ class DefaultTerminalBufferTest {
         buffer.setKittyKeyboardFlags(KittyKeyboardProgressiveFlag.SUPPORTED_MASK)
         buffer.setSelectiveEraseProtection(true)
         buffer.setPenColors(
-            foreground = AttributeColor.indexed(196),
-            background = AttributeColor.indexed(17),
+            foreground = CellColor.indexed(196),
+            background = CellColor.indexed(17),
             bold = true,
             underlineStyle = UnderlineStyle.CURLY,
         )
@@ -219,8 +219,8 @@ class DefaultTerminalBufferTest {
         val attr = buffer.getAttrAt(4, 2)
         assertAll(
             { assertEquals('C'.code, buffer.getCodepointAt(4, 2)) },
-            { assertEquals(AttributeColor.DEFAULT, attr?.foreground) },
-            { assertEquals(AttributeColor.DEFAULT, attr?.background) },
+            { assertEquals(CellColor.DEFAULT, attr?.foreground) },
+            { assertEquals(CellColor.DEFAULT, attr?.background) },
             { assertFalse(attr?.bold == true) },
             { assertFalse(attr?.selectiveEraseProtected == true) },
         )

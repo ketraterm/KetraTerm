@@ -16,8 +16,8 @@
 package io.github.jvterm.app.ui
 
 import io.github.jvterm.app.config.JvTermSettings
-import io.github.jvterm.ui.swing.api.TerminalSwingHostServices
-import io.github.jvterm.ui.swing.api.TerminalSwingTerminal
+import io.github.jvterm.ui.swing.api.SwingHostServices
+import io.github.jvterm.ui.swing.api.SwingTerminal
 import io.github.jvterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
@@ -32,7 +32,7 @@ import javax.swing.JScrollBar
  */
 internal class TerminalPane private constructor(
     val tab: TerminalWorkspaceTab,
-    val terminal: TerminalSwingTerminal,
+    val terminal: SwingTerminal,
     val component: JPanel,
 ) {
     fun requestFocus() {
@@ -57,10 +57,10 @@ internal class TerminalPane private constructor(
             val scrollbar = JScrollBar(Adjustable.VERTICAL)
             val scrollbarAdapter = TerminalScrollbarAdapter(scrollbar)
             val terminal =
-                TerminalSwingTerminal(
+                SwingTerminal(
                     settingsProvider = { settings.current() },
                     hostServices =
-                        TerminalSwingHostServices(
+                        SwingHostServices(
                             viewportListener = scrollbarAdapter,
                         ),
                 )
@@ -97,7 +97,7 @@ internal class TerminalPane private constructor(
         }
 
         private fun terminalPanel(
-            terminal: TerminalSwingTerminal,
+            terminal: SwingTerminal,
             scrollbar: JScrollBar,
         ): JPanel =
             JPanel(BorderLayout()).apply {

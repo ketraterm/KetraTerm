@@ -16,7 +16,7 @@
 package io.github.jvterm.core.render
 
 import io.github.jvterm.core.buffer.DefaultTerminalBuffer
-import io.github.jvterm.core.model.AttributeColor
+import io.github.jvterm.core.model.CellColor
 import io.github.jvterm.core.model.UnderlineStyle
 import io.github.jvterm.render.api.*
 import org.junit.jupiter.api.Assertions.*
@@ -203,9 +203,9 @@ class CoreTerminalRenderFrameTest {
     fun `cell attributes translate to public render ABI`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 2, initialHeight = 1)
         buffer.setPenColors(
-            foreground = AttributeColor.rgb(0x12_34_56),
-            background = AttributeColor.indexed(42),
-            underlineColor = AttributeColor.rgb(0x65_43_21),
+            foreground = CellColor.rgb(0x12_34_56),
+            background = CellColor.indexed(42),
+            underlineColor = CellColor.rgb(0x65_43_21),
             bold = true,
             faint = true,
             italic = true,
@@ -248,8 +248,8 @@ class CoreTerminalRenderFrameTest {
     fun `indexed cell colors translate to public render ABI`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 2, initialHeight = 1)
         buffer.setPenColors(
-            foreground = AttributeColor.indexed(0),
-            background = AttributeColor.indexed(255),
+            foreground = CellColor.indexed(0),
+            background = CellColor.indexed(255),
         )
         buffer.writeCodepoint('X'.code)
         val reader = buffer as TerminalRenderFrameReader
@@ -270,8 +270,8 @@ class CoreTerminalRenderFrameTest {
     fun `rgb cell colors translate to public render ABI`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 2, initialHeight = 1)
         buffer.setPenColors(
-            foreground = AttributeColor.rgb(0x00_00_00),
-            background = AttributeColor.rgb(0xFF_FF_FF),
+            foreground = CellColor.rgb(0x00_00_00),
+            background = CellColor.rgb(0xFF_FF_FF),
         )
         buffer.writeCodepoint('X'.code)
         val reader = buffer as TerminalRenderFrameReader
@@ -292,8 +292,8 @@ class CoreTerminalRenderFrameTest {
     fun `reverse video is reflected in copied public attrs`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 2, initialHeight = 1)
         buffer.setPenColors(
-            foreground = AttributeColor.rgb(0x12_34_56),
-            background = AttributeColor.indexed(42),
+            foreground = CellColor.rgb(0x12_34_56),
+            background = CellColor.indexed(42),
         )
         buffer.writeCodepoint('X'.code)
         buffer.setReverseVideo(true)

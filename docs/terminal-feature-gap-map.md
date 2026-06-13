@@ -533,7 +533,7 @@ professional emulator needs explicit contracts for it.
     - `:terminal-pty` starts PTY4J-backed processes behind `PtyConnector`
     - PTY connectors own reader/watcher threads, raw host bytes, stdin writes,
       resize, local close, read errors, and process exit notification
-    - `TerminalPtySessions` and `TerminalSessions.localPty` return the shared
+    - `PtySessions` and `TerminalSessions.localPty` return the shared
       `TerminalSession` rather than a PTY-specific session class
 - `DONE(host/host)`: PTY convenience factory wires host host event
   callbacks for BEL and OSC icon/window title changes.

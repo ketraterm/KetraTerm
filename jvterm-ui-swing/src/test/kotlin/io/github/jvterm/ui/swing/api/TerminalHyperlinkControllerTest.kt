@@ -43,7 +43,7 @@ class TerminalHyperlinkControllerTest {
     private class FakeHyperlinkHost(
         override val renderCache: TerminalRenderCache,
         override val session: TerminalSession?,
-        override val hostServices: TerminalSwingHostServices,
+        override val hostServices: SwingHostServices,
     ) : TerminalHyperlinkHost {
         override var cursor: Cursor = Cursor.getDefaultCursor()
         var repaints = 0
@@ -121,7 +121,7 @@ class TerminalHyperlinkControllerTest {
     @Test
     fun `hover over cell without hyperlink keeps default cursor`() {
         val cache = TerminalRenderCache(10, 10)
-        val host = FakeHyperlinkHost(cache, null, TerminalSwingHostServices())
+        val host = FakeHyperlinkHost(cache, null, SwingHostServices())
         val controller = TerminalHyperlinkController(host)
 
         val button = JButton()
@@ -150,7 +150,7 @@ class TerminalHyperlinkControllerTest {
                 inputEncoder = NoOpInputEncoder,
                 hyperlinkResolver = { id -> if (id == 5) "https://example.com" else null },
             )
-        val host = FakeHyperlinkHost(cache, session, TerminalSwingHostServices())
+        val host = FakeHyperlinkHost(cache, session, SwingHostServices())
         val controller = TerminalHyperlinkController(host)
 
         val button = JButton()
@@ -179,7 +179,7 @@ class TerminalHyperlinkControllerTest {
                 inputEncoder = NoOpInputEncoder,
                 hyperlinkResolver = { id -> if (id == 5) "https://example.com" else null },
             )
-        val host = FakeHyperlinkHost(cache, session, TerminalSwingHostServices())
+        val host = FakeHyperlinkHost(cache, session, SwingHostServices())
         val controller = TerminalHyperlinkController(host)
 
         val button = JButton()
@@ -216,7 +216,7 @@ class TerminalHyperlinkControllerTest {
                 openedUri.set(uri)
                 true
             }
-        val host = FakeHyperlinkHost(cache, session, TerminalSwingHostServices(hyperlinkHandler = handler))
+        val host = FakeHyperlinkHost(cache, session, SwingHostServices(hyperlinkHandler = handler))
         val controller = TerminalHyperlinkController(host)
 
         val button = JButton()

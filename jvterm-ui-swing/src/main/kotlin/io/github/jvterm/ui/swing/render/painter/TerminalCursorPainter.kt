@@ -21,7 +21,7 @@ import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.ui.swing.render.cache.AwtColorCache
 import io.github.jvterm.ui.swing.render.visualCellRangeSpan
 import io.github.jvterm.ui.swing.render.visualCellRangeStart
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
 import java.awt.font.FontRenderContext
 
@@ -39,7 +39,7 @@ internal class TerminalCursorPainter(
         g: Graphics2D,
         cache: TerminalRenderCache,
         palette: TerminalColorPalette,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         cursorBlinkVisible: Boolean,
         textBlinkVisible: Boolean,
         fontRenderContext: FontRenderContext,

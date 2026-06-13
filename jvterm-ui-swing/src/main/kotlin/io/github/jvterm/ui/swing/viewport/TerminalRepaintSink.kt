@@ -16,7 +16,7 @@
 package io.github.jvterm.ui.swing.viewport
 
 /**
- * Receives repaint requests computed by [TerminalSwingRepaintPlanner].
+ * Receives repaint requests computed by [SwingRepaintPlanner].
  *
  * This interface keeps repaint coordinates as JVM primitives and avoids
  * allocating Kotlin function objects for each published render frame.

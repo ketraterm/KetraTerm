@@ -247,7 +247,7 @@ class PtyConnectorTest {
         private val exitCode: Int = 0,
         private val blockWaitFor: Boolean = false,
         private val waitForRelease: CountDownLatch? = null,
-    ) : TerminalProcess {
+    ) : PtyProcess {
         var destroyed: Boolean = false
             private set
         val sizes = mutableListOf<Pair<Int, Int>>()

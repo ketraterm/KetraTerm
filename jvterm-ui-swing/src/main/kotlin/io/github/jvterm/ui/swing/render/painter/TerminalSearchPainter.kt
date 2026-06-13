@@ -17,7 +17,7 @@ package io.github.jvterm.ui.swing.render.painter
 
 import io.github.jvterm.ui.swing.render.cache.AwtColorCache
 import io.github.jvterm.ui.swing.search.TerminalSearchViewportHighlights
-import io.github.jvterm.ui.swing.settings.TerminalSwingMetrics
+import io.github.jvterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
 
 /**
@@ -28,7 +28,7 @@ internal class TerminalSearchPainter(
 ) {
     fun paint(
         g: Graphics2D,
-        metrics: TerminalSwingMetrics,
+        metrics: SwingMetrics,
         row: Int,
         highlights: TerminalSearchViewportHighlights?,
         matchBackground: Int,

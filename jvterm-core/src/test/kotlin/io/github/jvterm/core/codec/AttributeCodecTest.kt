@@ -15,8 +15,8 @@
  */
 package io.github.jvterm.core.codec
 
-import io.github.jvterm.core.model.AttributeColor
-import io.github.jvterm.core.model.AttributeColorKind
+import io.github.jvterm.core.model.CellColor
+import io.github.jvterm.core.model.CellColorKind
 import io.github.jvterm.core.model.UnderlineStyle
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
@@ -71,8 +71,8 @@ class AttributeCodecTest {
         fun `packColors preserves indexed rgb and primary flags`() {
             val packed =
                 AttributeCodec.packColors(
-                    foreground = AttributeColor.indexed(244),
-                    background = AttributeColor.rgb(0x12, 0x34, 0x56),
+                    foreground = CellColor.indexed(244),
+                    background = CellColor.rgb(0x12, 0x34, 0x56),
                     bold = true,
                     faint = true,
                     italic = false,
@@ -82,9 +82,9 @@ class AttributeCodecTest {
             val unpacked = AttributeCodec.unpack(packed)
 
             assertAll(
-                { assertEquals(AttributeColorKind.INDEXED, unpacked.foreground.kind) },
+                { assertEquals(CellColorKind.INDEXED, unpacked.foreground.kind) },
                 { assertEquals(244, unpacked.foreground.value) },
-                { assertEquals(AttributeColorKind.RGB, unpacked.background.kind) },
+                { assertEquals(CellColorKind.RGB, unpacked.background.kind) },
                 { assertEquals(0x12_34_56, unpacked.background.value) },
                 { assertEquals(245, AttributeCodec.foreground(packed)) },
                 { assertEquals(0, AttributeCodec.background(packed)) },
@@ -99,36 +99,36 @@ class AttributeCodecTest {
         fun `primitive primary color decode matches object color decode`() {
             val defaultPacked =
                 AttributeCodec.packColors(
-                    foreground = AttributeColor.DEFAULT,
-                    background = AttributeColor.DEFAULT,
+                    foreground = CellColor.DEFAULT,
+                    background = CellColor.DEFAULT,
                 )
             val indexedLowPacked =
                 AttributeCodec.packColors(
-                    foreground = AttributeColor.indexed(0),
-                    background = AttributeColor.indexed(0),
+                    foreground = CellColor.indexed(0),
+                    background = CellColor.indexed(0),
                 )
             val indexedHighPacked =
                 AttributeCodec.packColors(
-                    foreground = AttributeColor.indexed(255),
-                    background = AttributeColor.indexed(255),
+                    foreground = CellColor.indexed(255),
+                    background = CellColor.indexed(255),
                 )
             val rgbLowPacked =
                 AttributeCodec.packColors(
-                    foreground = AttributeColor.rgb(0x00_00_00),
-                    background = AttributeColor.rgb(0x00_00_00),
+                    foreground = CellColor.rgb(0x00_00_00),
+                    background = CellColor.rgb(0x00_00_00),
                 )
             val rgbHighPacked =
                 AttributeCodec.packColors(
-                    foreground = AttributeColor.rgb(0xFF_FF_FF),
-                    background = AttributeColor.rgb(0xFF_FF_FF),
+                    foreground = CellColor.rgb(0xFF_FF_FF),
+                    background = CellColor.rgb(0xFF_FF_FF),
                 )
 
             assertAll(
-                { assertPrimaryColorDecode(defaultPacked, AttributeColor.DEFAULT, AttributeColor.DEFAULT) },
-                { assertPrimaryColorDecode(indexedLowPacked, AttributeColor.indexed(0), AttributeColor.indexed(0)) },
-                { assertPrimaryColorDecode(indexedHighPacked, AttributeColor.indexed(255), AttributeColor.indexed(255)) },
-                { assertPrimaryColorDecode(rgbLowPacked, AttributeColor.rgb(0x00_00_00), AttributeColor.rgb(0x00_00_00)) },
-                { assertPrimaryColorDecode(rgbHighPacked, AttributeColor.rgb(0xFF_FF_FF), AttributeColor.rgb(0xFF_FF_FF)) },
+                { assertPrimaryColorDecode(defaultPacked, CellColor.DEFAULT, CellColor.DEFAULT) },
+                { assertPrimaryColorDecode(indexedLowPacked, CellColor.indexed(0), CellColor.indexed(0)) },
+                { assertPrimaryColorDecode(indexedHighPacked, CellColor.indexed(255), CellColor.indexed(255)) },
+                { assertPrimaryColorDecode(rgbLowPacked, CellColor.rgb(0x00_00_00), CellColor.rgb(0x00_00_00)) },
+                { assertPrimaryColorDecode(rgbHighPacked, CellColor.rgb(0xFF_FF_FF), CellColor.rgb(0xFF_FF_FF)) },
             )
         }
 
@@ -138,7 +138,7 @@ class AttributeCodecTest {
             val reservedBackground = (3L shl 24) shl 26
             val packed = reservedForeground or reservedBackground
 
-            assertPrimaryColorDecode(packed, AttributeColor.DEFAULT, AttributeColor.DEFAULT)
+            assertPrimaryColorDecode(packed, CellColor.DEFAULT, CellColor.DEFAULT)
         }
 
         @ParameterizedTest
@@ -173,7 +173,7 @@ class AttributeCodecTest {
                 )
 
             assertAll(
-                { assertEquals(200, AttributeCodec.underlineColor(extended)) },
+                { assertEquals(200, AttributeCodec.underline(extended)) },
                 { assertEquals(UnderlineStyle.DASHED, AttributeCodec.underlineStyle(extended)) },
                 { assertTrue(AttributeCodec.isStrikethrough(extended)) },
                 { assertTrue(AttributeCodec.isOverline(extended)) },
@@ -186,13 +186,13 @@ class AttributeCodecTest {
         fun `packExtendedColors preserves rgb underline color`() {
             val extended =
                 AttributeCodec.packExtendedColors(
-                    underlineColor = AttributeColor.rgb(1, 2, 3),
+                    underlineColor = CellColor.rgb(1, 2, 3),
                     underlineStyle = UnderlineStyle.CURLY,
                 )
             val unpacked = AttributeCodec.unpack(0, extended)
 
             assertAll(
-                { assertEquals(AttributeColor.rgb(1, 2, 3), unpacked.underlineColor) },
+                { assertEquals(CellColor.rgb(1, 2, 3), unpacked.underlineColor) },
                 { assertEquals(UnderlineStyle.CURLY, unpacked.underlineStyle) },
             )
         }
@@ -201,31 +201,31 @@ class AttributeCodecTest {
         fun `primitive underline color decode matches object color decode`() {
             val defaultExtended =
                 AttributeCodec.packExtendedColors(
-                    underlineColor = AttributeColor.DEFAULT,
+                    underlineColor = CellColor.DEFAULT,
                 )
             val indexedLowExtended =
                 AttributeCodec.packExtendedColors(
-                    underlineColor = AttributeColor.indexed(0),
+                    underlineColor = CellColor.indexed(0),
                 )
             val indexedHighExtended =
                 AttributeCodec.packExtendedColors(
-                    underlineColor = AttributeColor.indexed(255),
+                    underlineColor = CellColor.indexed(255),
                 )
             val rgbLowExtended =
                 AttributeCodec.packExtendedColors(
-                    underlineColor = AttributeColor.rgb(0x00_00_00),
+                    underlineColor = CellColor.rgb(0x00_00_00),
                 )
             val rgbHighExtended =
                 AttributeCodec.packExtendedColors(
-                    underlineColor = AttributeColor.rgb(0xFF_FF_FF),
+                    underlineColor = CellColor.rgb(0xFF_FF_FF),
                 )
 
             assertAll(
-                { assertUnderlineColorDecode(defaultExtended, AttributeColor.DEFAULT) },
-                { assertUnderlineColorDecode(indexedLowExtended, AttributeColor.indexed(0)) },
-                { assertUnderlineColorDecode(indexedHighExtended, AttributeColor.indexed(255)) },
-                { assertUnderlineColorDecode(rgbLowExtended, AttributeColor.rgb(0x00_00_00)) },
-                { assertUnderlineColorDecode(rgbHighExtended, AttributeColor.rgb(0xFF_FF_FF)) },
+                { assertUnderlineColorDecode(defaultExtended, CellColor.DEFAULT) },
+                { assertUnderlineColorDecode(indexedLowExtended, CellColor.indexed(0)) },
+                { assertUnderlineColorDecode(indexedHighExtended, CellColor.indexed(255)) },
+                { assertUnderlineColorDecode(rgbLowExtended, CellColor.rgb(0x00_00_00)) },
+                { assertUnderlineColorDecode(rgbHighExtended, CellColor.rgb(0xFF_FF_FF)) },
             )
         }
 
@@ -233,7 +233,7 @@ class AttributeCodecTest {
         fun `primitive underline color decode preserves reserved kind fallback`() {
             val extended = 3L shl 24
 
-            assertUnderlineColorDecode(extended, AttributeColor.DEFAULT)
+            assertUnderlineColorDecode(extended, CellColor.DEFAULT)
         }
 
         @Test
@@ -253,7 +253,7 @@ class AttributeCodecTest {
             assertAll(
                 { assertTrue(unpacked.selectiveEraseProtected) },
                 { assertEquals(7, unpacked.hyperlinkId) },
-                { assertEquals(AttributeColor.DEFAULT, unpacked.foreground) },
+                { assertEquals(CellColor.DEFAULT, unpacked.foreground) },
                 { assertEquals(UnderlineStyle.NONE, unpacked.underlineStyle) },
                 { assertFalse(unpacked.bold) },
                 { assertFalse(unpacked.strikethrough) },
@@ -263,8 +263,8 @@ class AttributeCodecTest {
 
     private fun assertPrimaryColorDecode(
         packed: Long,
-        expectedForeground: AttributeColor,
-        expectedBackground: AttributeColor,
+        expectedForeground: CellColor,
+        expectedBackground: CellColor,
     ) {
         assertAll(
             { assertEquals(expectedForeground, AttributeCodec.foregroundColor(packed)) },
@@ -278,19 +278,19 @@ class AttributeCodecTest {
 
     private fun assertUnderlineColorDecode(
         extended: Long,
-        expected: AttributeColor,
+        expected: CellColor,
     ) {
         assertAll(
-            { assertEquals(expected, AttributeCodec.underlineAttributeColor(extended)) },
-            { assertEquals(expected.kind.toCodecKind(), AttributeCodec.underlineAttributeColorKind(extended)) },
-            { assertEquals(expected.value, AttributeCodec.underlineAttributeColorValue(extended)) },
+            { assertEquals(expected, AttributeCodec.underlineColor(extended)) },
+            { assertEquals(expected.kind.toCodecKind(), AttributeCodec.underlineColorKind(extended)) },
+            { assertEquals(expected.value, AttributeCodec.underlineColorValue(extended)) },
         )
     }
 
-    private fun AttributeColorKind.toCodecKind(): Int =
+    private fun CellColorKind.toCodecKind(): Int =
         when (this) {
-            AttributeColorKind.DEFAULT -> AttributeCodec.COLOR_KIND_DEFAULT
-            AttributeColorKind.INDEXED -> AttributeCodec.COLOR_KIND_INDEXED
-            AttributeColorKind.RGB -> AttributeCodec.COLOR_KIND_RGB
+            CellColorKind.DEFAULT -> AttributeCodec.COLOR_KIND_DEFAULT
+            CellColorKind.INDEXED -> AttributeCodec.COLOR_KIND_INDEXED
+            CellColorKind.RGB -> AttributeCodec.COLOR_KIND_RGB
         }
 }

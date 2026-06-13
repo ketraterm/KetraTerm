@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.core.api
 
-import io.github.jvterm.core.model.AttributeColor
+import io.github.jvterm.core.model.CellColor
 import io.github.jvterm.core.model.UnderlineStyle
 
 /**
@@ -317,7 +317,7 @@ interface TerminalWriter {
     /**
      * Sets the active pen attributes using explicit default, indexed, or RGB colors.
      *
-     * [underlineColor] uses [AttributeColor.DEFAULT] to mean the renderer should
+     * [underlineColor] uses [CellColor.DEFAULT] to mean the renderer should
      * derive the underline color from the effective foreground color.
      *
      * @param foreground Foreground color descriptor.
@@ -334,9 +334,9 @@ interface TerminalWriter {
      * @param conceal `true` to mark text as concealed/hidden.
      */
     fun setPenColors(
-        foreground: AttributeColor,
-        background: AttributeColor,
-        underlineColor: AttributeColor = AttributeColor.DEFAULT,
+        foreground: CellColor,
+        background: CellColor,
+        underlineColor: CellColor = CellColor.DEFAULT,
         bold: Boolean = false,
         faint: Boolean = false,
         italic: Boolean = false,

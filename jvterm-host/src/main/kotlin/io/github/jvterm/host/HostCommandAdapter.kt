@@ -16,7 +16,7 @@
 package io.github.jvterm.host
 
 import io.github.jvterm.core.api.TerminalBuffer
-import io.github.jvterm.core.model.AttributeColor
+import io.github.jvterm.core.model.CellColor
 import io.github.jvterm.core.model.UnderlineStyle
 import io.github.jvterm.parser.spi.TerminalCommandSink
 import io.github.jvterm.protocol.AnsiMode
@@ -54,9 +54,9 @@ class HostCommandAdapter(
     private val windowTitleStack = ArrayDeque<String>()
     private val iconTitleStack = ArrayDeque<String>()
 
-    private var foreground: AttributeColor = AttributeColor.DEFAULT
-    private var background: AttributeColor = AttributeColor.DEFAULT
-    private var underlineColor: AttributeColor = AttributeColor.DEFAULT
+    private var foreground: CellColor = CellColor.DEFAULT
+    private var background: CellColor = CellColor.DEFAULT
+    private var underlineColor: CellColor = CellColor.DEFAULT
     private var bold: Boolean = false
     private var faint: Boolean = false
     private var italic: Boolean = false
@@ -530,9 +530,9 @@ class HostCommandAdapter(
     }
 
     private fun resetPenMirror() {
-        foreground = AttributeColor.DEFAULT
-        background = AttributeColor.DEFAULT
-        underlineColor = AttributeColor.DEFAULT
+        foreground = CellColor.DEFAULT
+        background = CellColor.DEFAULT
+        underlineColor = CellColor.DEFAULT
         bold = false
         faint = false
         italic = false
@@ -594,35 +594,35 @@ class HostCommandAdapter(
     }
 
     override fun setForegroundDefault() {
-        foreground = AttributeColor.DEFAULT
+        foreground = CellColor.DEFAULT
         applyPen()
     }
 
     override fun setBackgroundDefault() {
-        background = AttributeColor.DEFAULT
+        background = CellColor.DEFAULT
         applyPen()
     }
 
     override fun setUnderlineColorDefault() {
-        underlineColor = AttributeColor.DEFAULT
+        underlineColor = CellColor.DEFAULT
         applyPen()
     }
 
     override fun setForegroundIndexed(index: Int) {
         if (index !in 0..255) return
-        foreground = AttributeColor.indexed(index)
+        foreground = CellColor.indexed(index)
         applyPen()
     }
 
     override fun setBackgroundIndexed(index: Int) {
         if (index !in 0..255) return
-        background = AttributeColor.indexed(index)
+        background = CellColor.indexed(index)
         applyPen()
     }
 
     override fun setUnderlineColorIndexed(index: Int) {
         if (index !in 0..255) return
-        underlineColor = AttributeColor.indexed(index)
+        underlineColor = CellColor.indexed(index)
         applyPen()
     }
 
@@ -631,7 +631,7 @@ class HostCommandAdapter(
         green: Int,
         blue: Int,
     ) {
-        foreground = AttributeColor.rgb(red, green, blue)
+        foreground = CellColor.rgb(red, green, blue)
         applyPen()
     }
 
@@ -640,7 +640,7 @@ class HostCommandAdapter(
         green: Int,
         blue: Int,
     ) {
-        background = AttributeColor.rgb(red, green, blue)
+        background = CellColor.rgb(red, green, blue)
         applyPen()
     }
 
@@ -649,7 +649,7 @@ class HostCommandAdapter(
         green: Int,
         blue: Int,
     ) {
-        underlineColor = AttributeColor.rgb(red, green, blue)
+        underlineColor = CellColor.rgb(red, green, blue)
         applyPen()
     }
 

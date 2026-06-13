@@ -15,7 +15,7 @@
  */
 package io.github.jvterm.core.buffer
 
-import io.github.jvterm.core.model.AttributeColor
+import io.github.jvterm.core.model.CellColor
 import io.github.jvterm.render.api.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -302,8 +302,8 @@ class BrutalDefaultTerminalBufferTest {
     fun `6-3 Attr - RGB fg and bg`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 10, initialHeight = 1)
         buffer.setPenColors(
-            foreground = AttributeColor.rgb(0xFF, 0x00, 0x00),
-            background = AttributeColor.rgb(0x00, 0xFF, 0x00),
+            foreground = CellColor.rgb(0xFF, 0x00, 0x00),
+            background = CellColor.rgb(0x00, 0xFF, 0x00),
         )
         buffer.writeCodepoint('X'.code)
 

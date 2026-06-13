@@ -14,7 +14,7 @@ The core operates as a headless coordinate and physics processor. Mutations are 
 graph TD
     %% Node definitions
     Facade[TerminalBufferFacade]
-    Writer[TerminalWriterImpl]
+    Writer[BufferWriter]
     Cursor[TerminalCursorImpl]
     ModeCtrl[TerminalModeControllerImpl]
     State[TerminalState]

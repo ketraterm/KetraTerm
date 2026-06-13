@@ -181,7 +181,7 @@ class TerminalModeControllerImplTest {
         val state = TerminalState(4, 2, 1)
         val cursorEngine = CursorEngine(state)
         val modeController = TerminalModeControllerImpl(state, cursorEngine)
-        val writer = TerminalWriterImpl(state, MutationEngine(state), cursorEngine)
+        val writer = BufferWriter(state, MutationEngine(state), cursorEngine)
 
         writer.writeText("ABCD")
         assertTrue(state.cursor.pendingWrap)

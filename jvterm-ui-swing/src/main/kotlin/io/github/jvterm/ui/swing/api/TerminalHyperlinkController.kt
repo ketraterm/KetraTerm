@@ -24,7 +24,7 @@ import javax.swing.SwingUtilities
 internal interface TerminalHyperlinkHost {
     val renderCache: TerminalRenderCache
     val session: TerminalSession?
-    val hostServices: TerminalSwingHostServices
+    val hostServices: SwingHostServices
     var cursor: Cursor
 
     fun cellAt(

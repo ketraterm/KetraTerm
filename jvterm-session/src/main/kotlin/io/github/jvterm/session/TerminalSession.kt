@@ -81,7 +81,7 @@ class TerminalSession(
     private val timeoutLock = Any()
     private var synchronizedTimeoutFuture: ScheduledFuture<*>? = null
 
-    private val renderWorker: ScheduledExecutorService =
+    internal val renderWorker: ScheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor { r ->
             Thread(r, "terminal-render-worker-${SESSION_COUNTER.getAndIncrement()}").apply { isDaemon = true }
         }

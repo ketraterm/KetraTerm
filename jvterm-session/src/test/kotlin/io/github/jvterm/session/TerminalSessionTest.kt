@@ -370,8 +370,10 @@ class TerminalSessionTest {
         // Write some text to trigger render requests
         connector.feedFromHost("hello".toByteArray(StandardCharsets.US_ASCII))
 
-        // Verify that no render has been published (wait less than the 100ms safety timeout)
-        assertFalse(renderPublished.await(30, TimeUnit.MILLISECONDS))
+        // Verify that no render has been published yet.
+        // We submit a no-op task to the single-threaded renderWorker and await its completion.
+        // This guarantees that the render drain task has executed on the worker queue.
+        session.renderWorker.submit {}.get(1, TimeUnit.SECONDS)
         assertEquals(0, dirtyCalls.get())
 
         // Disable synchronized output mode: CSI ? 2026 l
@@ -402,10 +404,11 @@ class TerminalSessionTest {
         connector.feedFromHost("\u001B[?2026hhello".toByteArray(StandardCharsets.US_ASCII))
 
         // Verify it doesn't render immediately
-        assertFalse(renderPublished.await(30, TimeUnit.MILLISECONDS))
+        session.renderWorker.submit {}.get(1, TimeUnit.SECONDS)
+        assertEquals(1, renderPublished.count)
 
-        // Wait for safety timeout to expire (timeout is 100ms, wait 300ms to be safe)
-        assertTrue(renderPublished.await(300, TimeUnit.MILLISECONDS), "render was not flushed by timeout")
+        // Wait for safety timeout to expire (timeout is 100ms, wait 1 second to be safe on slow CI)
+        assertTrue(renderPublished.await(1, TimeUnit.SECONDS), "render was not flushed by timeout")
 
         // Verify synchronized output mode is turned off in the core
         assertFalse(session.terminal.getModeSnapshot().isSynchronizedOutput)

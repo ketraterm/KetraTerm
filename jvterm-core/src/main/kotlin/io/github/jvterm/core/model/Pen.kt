@@ -75,9 +75,9 @@ internal class Pen {
     }
 
     fun setColors(
-        foreground: AttributeColor,
-        background: AttributeColor,
-        underlineColor: AttributeColor = AttributeColor.DEFAULT,
+        foreground: CellColor,
+        background: CellColor,
+        underlineColor: CellColor = CellColor.DEFAULT,
         bold: Boolean = false,
         faint: Boolean = false,
         italic: Boolean = false,

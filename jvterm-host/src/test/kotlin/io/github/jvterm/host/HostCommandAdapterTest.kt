@@ -17,7 +17,7 @@ package io.github.jvterm.host
 
 import io.github.jvterm.core.TerminalBuffers
 import io.github.jvterm.core.api.TerminalBuffer
-import io.github.jvterm.core.model.AttributeColor
+import io.github.jvterm.core.model.CellColor
 import io.github.jvterm.core.model.UnderlineStyle
 import io.github.jvterm.parser.api.TerminalOutputParser
 import io.github.jvterm.parser.api.TerminalParsers
@@ -229,7 +229,7 @@ class HostCommandAdapterTest {
                 { assertEquals(1, f.terminal.cursorCol) },
                 { assertEquals(0, f.terminal.cursorRow) },
                 { assertTrue(f.terminal.getModeSnapshot().isAutoWrap) },
-                { assertEquals(AttributeColor.DEFAULT, attr?.foreground) },
+                { assertEquals(CellColor.DEFAULT, attr?.foreground) },
                 { assertEquals(false, attr?.bold) },
             )
         }
@@ -263,7 +263,7 @@ class HostCommandAdapterTest {
                 { assertFalse(snapshot.isFocusReportingEnabled) },
                 { assertFalse(snapshot.isBracketedPasteEnabled) },
                 { assertEquals(MouseEncodingMode.SGR, snapshot.mouseEncodingMode) },
-                { assertEquals(AttributeColor.DEFAULT, attr?.foreground) },
+                { assertEquals(CellColor.DEFAULT, attr?.foreground) },
                 { assertFalse(attr?.bold == true) },
                 { assertFalse(attr?.selectiveEraseProtected == true) },
             )
@@ -733,8 +733,8 @@ class HostCommandAdapterTest {
             val attr = f.terminal.getAttrAt(0, 0)
 
             assertAll(
-                { assertEquals(AttributeColor.indexed(196), attr?.foreground) },
-                { assertEquals(AttributeColor.indexed(17), attr?.background) },
+                { assertEquals(CellColor.indexed(196), attr?.foreground) },
+                { assertEquals(CellColor.indexed(17), attr?.background) },
                 { assertEquals(true, attr?.bold) },
                 { assertEquals(true, attr?.faint) },
                 { assertEquals(true, attr?.italic) },
@@ -759,9 +759,9 @@ class HostCommandAdapterTest {
             val second = f.terminal.getAttrAt(1, 0)
 
             assertAll(
-                { assertEquals(AttributeColor.rgb(1, 2, 3), first?.underlineColor) },
+                { assertEquals(CellColor.rgb(1, 2, 3), first?.underlineColor) },
                 { assertEquals(UnderlineStyle.DASHED, first?.underlineStyle) },
-                { assertEquals(AttributeColor.DEFAULT, second?.underlineColor) },
+                { assertEquals(CellColor.DEFAULT, second?.underlineColor) },
                 { assertEquals(UnderlineStyle.NONE, second?.underlineStyle) },
             )
         }
@@ -779,10 +779,10 @@ class HostCommandAdapterTest {
 
             assertAll(
                 { assertEquals(true, first?.bold) },
-                { assertEquals(AttributeColor.indexed(1), first?.foreground) },
+                { assertEquals(CellColor.indexed(1), first?.foreground) },
                 { assertEquals(false, second?.bold) },
-                { assertEquals(AttributeColor.DEFAULT, second?.foreground) },
-                { assertEquals(AttributeColor.DEFAULT, second?.background) },
+                { assertEquals(CellColor.DEFAULT, second?.foreground) },
+                { assertEquals(CellColor.DEFAULT, second?.background) },
             )
         }
 
@@ -796,8 +796,8 @@ class HostCommandAdapterTest {
             val attr = f.terminal.getAttrAt(0, 0)
 
             assertAll(
-                { assertEquals(AttributeColor.rgb(10, 20, 30), attr?.foreground) },
-                { assertEquals(AttributeColor.rgb(40, 50, 60), attr?.background) },
+                { assertEquals(CellColor.rgb(10, 20, 30), attr?.foreground) },
+                { assertEquals(CellColor.rgb(40, 50, 60), attr?.background) },
             )
         }
 
@@ -813,12 +813,12 @@ class HostCommandAdapterTest {
             val second = f.terminal.getAttrAt(1, 0)
 
             assertAll(
-                { assertEquals(AttributeColor.indexed(196), first?.foreground) },
-                { assertEquals(AttributeColor.rgb(40, 50, 60), first?.background) },
+                { assertEquals(CellColor.indexed(196), first?.foreground) },
+                { assertEquals(CellColor.rgb(40, 50, 60), first?.background) },
                 { assertEquals(true, first?.bold) },
                 { assertEquals(true, first?.inverse) },
-                { assertEquals(AttributeColor.DEFAULT, second?.foreground) },
-                { assertEquals(AttributeColor.DEFAULT, second?.background) },
+                { assertEquals(CellColor.DEFAULT, second?.foreground) },
+                { assertEquals(CellColor.DEFAULT, second?.background) },
                 { assertEquals(true, second?.bold) },
                 { assertEquals(false, second?.inverse) },
             )
