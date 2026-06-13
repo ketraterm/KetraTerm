@@ -27,8 +27,8 @@ repositories {
 }
 
 dependencies {
-    implementation("com.formdev:flatlaf:3.6.1")
-    implementation("com.formdev:flatlaf-extras:3.6.1")
+    implementation("com.formdev:flatlaf:3.7.1")
+    implementation("com.formdev:flatlaf-extras:3.7.1")
     implementation(project(":jvterm-ui-swing"))
     implementation(project(":jvterm-workspace"))
 
