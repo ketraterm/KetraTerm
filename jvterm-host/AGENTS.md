@@ -1,9 +1,9 @@
 # Terminal Integration Agent Guide
 
-`jvterm-host` is the bridge between `terminal-parser` and
-`terminal-core`.
+`jvterm-host` is the bridge between `jvterm-parser` and
+`jvterm-core`.
 
-It maps `TerminalCommandSink` calls to `TerminalBufferApi` calls and host-facing
+It maps `TerminalCommandSink` calls to `TerminalBuffer` calls and host-facing
 metadata. It must stay thin, explicit, and honest about unsupported behavior.
 
 ## Integration Boundary
@@ -49,8 +49,8 @@ method calls.
 Prefer tests that:
 
 - feed real bytes through `TerminalOutputParser`.
-- use `CoreTerminalCommandSink`.
-- assert public `TerminalBufferApi` state.
+- use `HostCommandAdapter`.
+- assert public `TerminalBuffer` state.
 - include mode-dependent behavior such as origin mode, auto-wrap, newline mode,
   alternate screen, mouse/focus/bracketed paste flags, and SGR attributes once
   core supports them.

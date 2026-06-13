@@ -1,6 +1,6 @@
 # Terminal Standalone App Agent Guide
 
-`jvterm-app` owns the product standalone Swing host for Lattice.
+`jvterm-app` owns the product standalone Swing host for JvTerm.
 It wires reusable terminal UI, local PTY sessions, app chrome, host services,
 and process lifecycle.
 

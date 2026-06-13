@@ -8,10 +8,10 @@ same terminal-emulator workflows instead of rediscovering the architecture.
 Available skills:
 
 - `.agents/skills/terminal-feature-work/SKILL.md`
-- `.agents/skills/terminal-parser-fsm/SKILL.md`
-- `.agents/skills/terminal-core-grid-physics/SKILL.md`
-- `.agents/skills/terminal-host-adapter/SKILL.md`
-- `.agents/skills/terminal-input-encoder/SKILL.md`
+- `.agents/skills/jvterm-parser-fsm/SKILL.md`
+- `.agents/skills/jvterm-core-grid-physics/SKILL.md`
+- `.agents/skills/jvterm-host-adapter/SKILL.md`
+- `.agents/skills/jvterm-input-encoder/SKILL.md`
 - `.agents/skills/terminal-unicode-text/SKILL.md`
 - `.agents/skills/terminal-test-suite/SKILL.md`
 - `.agents/skills/terminal-gap-map/SKILL.md`

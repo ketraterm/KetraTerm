@@ -1,5 +1,5 @@
 ---
-name: terminal-parser-fsm
+name: jvterm-parser-fsm
 description: Parser FSM and protocol dispatch guidance for this terminal emulator. Use when touching ByteClass, AnsiStateMachine, ActionEngine, ParserState, CSI/ESC/OSC/DCS handling, SGR dispatch, charset mapping, UTF-8 recovery, or TerminalParser full byte-stream behavior.
 ---
 

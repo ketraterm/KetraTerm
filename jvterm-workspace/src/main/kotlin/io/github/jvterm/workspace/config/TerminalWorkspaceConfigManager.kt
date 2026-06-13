@@ -172,7 +172,7 @@ class TerminalWorkspaceConfigManager(
 
     private fun generateToml(config: TerminalConfig): String =
         """
-        # Lattice Terminal Emulator Configuration File
+        # JvTerm Terminal Emulator Configuration File
         # Power users can edit this file directly to customize behavior.
         # Changes will take effect on next application launch.
 
@@ -267,13 +267,13 @@ class TerminalWorkspaceConfigManager(
             userHome: String = System.getProperty("user.home"),
         ): Path {
             // 1. System property override
-            val sysProp = System.getProperty("lattice.config.path")
+            val sysProp = System.getProperty("jvterm.config.path")
             if (!sysProp.isNullOrBlank()) {
                 return Path.of(sysProp)
             }
 
             // 2. Env variable override
-            val envVar = env["LATTICE_CONFIG_PATH"]
+            val envVar = env["JVTERM_CONFIG_PATH"]
             if (!envVar.isNullOrBlank()) {
                 return Path.of(envVar)
             }
@@ -284,20 +284,20 @@ class TerminalWorkspaceConfigManager(
                 os.contains("windows") -> {
                     val appData = env["APPDATA"]
                     if (!appData.isNullOrBlank()) {
-                        Path.of(appData, "Lattice", "config.toml")
+                        Path.of(appData, "JvTerm", "config.toml")
                     } else {
-                        Path.of(userHome, ".config", "lattice", "config.toml")
+                        Path.of(userHome, ".config", "jvterm", "config.toml")
                     }
                 }
                 os.contains("mac") -> {
-                    Path.of(userHome, "Library", "Application Support", "Lattice", "config.toml")
+                    Path.of(userHome, "Library", "Application Support", "JvTerm", "config.toml")
                 }
                 else -> {
                     val xdgConfig = env["XDG_CONFIG_HOME"]
                     if (!xdgConfig.isNullOrBlank()) {
-                        Path.of(xdgConfig, "lattice", "config.toml")
+                        Path.of(xdgConfig, "jvterm", "config.toml")
                     } else {
-                        Path.of(userHome, ".config", "lattice", "config.toml")
+                        Path.of(userHome, ".config", "jvterm", "config.toml")
                     }
                 }
             }

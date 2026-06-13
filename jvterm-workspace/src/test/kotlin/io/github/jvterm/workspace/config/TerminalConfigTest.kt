@@ -64,27 +64,27 @@ class TerminalConfigTest {
     fun `test TerminalWorkspaceConfigManager path resolution`() {
         // Overrides
         // Clean default system property check (which might be set or not during tests, but we can verify our overrides work)
-        System.setProperty("lattice.config.path", "/custom/sys/path.toml")
+        System.setProperty("jvterm.config.path", "/custom/sys/path.toml")
         assertEquals(Path.of("/custom/sys/path.toml"), TerminalWorkspaceConfigManager.getDefaultPath(osName = "Windows 11"))
-        System.clearProperty("lattice.config.path")
+        System.clearProperty("jvterm.config.path")
 
         // Env override
-        val env = mapOf("LATTICE_CONFIG_PATH" to "/custom/env/path.toml")
+        val env = mapOf("JVTERM_CONFIG_PATH" to "/custom/env/path.toml")
         assertEquals(Path.of("/custom/env/path.toml"), TerminalWorkspaceConfigManager.getDefaultPath(osName = "Windows 11", env = env))
 
         // Windows resolution
         val winEnv = mapOf("APPDATA" to "C:\\Users\\User\\AppData\\Roaming")
         val winPath = TerminalWorkspaceConfigManager.getDefaultPath(osName = "Windows 11", env = winEnv)
-        assertEquals(Path.of("C:\\Users\\User\\AppData\\Roaming", "Lattice", "config.toml"), winPath)
+        assertEquals(Path.of("C:\\Users\\User\\AppData\\Roaming", "JvTerm", "config.toml"), winPath)
 
         // Mac resolution
         val macPath = TerminalWorkspaceConfigManager.getDefaultPath(osName = "macOS Big Sur", userHome = "/Users/username")
-        assertEquals(Path.of("/Users/username/Library/Application Support/Lattice/config.toml"), macPath)
+        assertEquals(Path.of("/Users/username/Library/Application Support/JvTerm/config.toml"), macPath)
 
         // Linux resolution
         val linuxEnv = mapOf("XDG_CONFIG_HOME" to "/home/username/.custom_config")
         val linuxPath = TerminalWorkspaceConfigManager.getDefaultPath(osName = "Linux", env = linuxEnv)
-        assertEquals(Path.of("/home/username/.custom_config/lattice/config.toml"), linuxPath)
+        assertEquals(Path.of("/home/username/.custom_config/jvterm/config.toml"), linuxPath)
 
         val linuxFallbackPath =
             TerminalWorkspaceConfigManager.getDefaultPath(
@@ -92,12 +92,12 @@ class TerminalConfigTest {
                 env = emptyMap(),
                 userHome = "/home/username",
             )
-        assertEquals(Path.of("/home/username/.config/lattice/config.toml"), linuxFallbackPath)
+        assertEquals(Path.of("/home/username/.config/jvterm/config.toml"), linuxFallbackPath)
     }
 
     @Test
     fun `test TerminalWorkspaceConfigManager load default config if file does not exist`() {
-        val tempDir = Files.createTempDirectory("lattice-config-test")
+        val tempDir = Files.createTempDirectory("jvterm-config-test")
         val configFile = tempDir.resolve("config.toml")
         val manager = TerminalWorkspaceConfigManager(configFile)
 
@@ -129,7 +129,7 @@ class TerminalConfigTest {
 
     @Test
     fun `test TerminalWorkspaceConfigManager saves and loads custom config correctly`() {
-        val tempDir = Files.createTempDirectory("lattice-config-test-custom")
+        val tempDir = Files.createTempDirectory("jvterm-config-test-custom")
         val configFile = tempDir.resolve("config.toml")
         val manager = TerminalWorkspaceConfigManager(configFile)
 
@@ -160,7 +160,7 @@ class TerminalConfigTest {
 
     @Test
     fun `test TerminalWorkspaceConfigManager clamps hand edited numeric values`() {
-        val tempDir = Files.createTempDirectory("lattice-config-test-clamped")
+        val tempDir = Files.createTempDirectory("jvterm-config-test-clamped")
         val configFile = tempDir.resolve("config.toml")
         val manager = TerminalWorkspaceConfigManager(configFile)
 
@@ -217,7 +217,7 @@ class TerminalConfigTest {
 
     @Test
     fun `test TerminalWorkspaceConfigManager fallback on invalid format`() {
-        val tempDir = Files.createTempDirectory("lattice-config-test-invalid")
+        val tempDir = Files.createTempDirectory("jvterm-config-test-invalid")
         val configFile = tempDir.resolve("config.toml")
         val brokenFile = tempDir.resolve("config.toml.broken")
         val manager = TerminalWorkspaceConfigManager(configFile)

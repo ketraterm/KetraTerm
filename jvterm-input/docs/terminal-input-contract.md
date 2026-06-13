@@ -1,6 +1,6 @@
 # Terminal Input Contract
 
-This document defines the public behavioral contract of `:terminal-input`.
+This document defines the public behavioral contract of `:jvterm-input`.
 
 It is the host-bound input boundary for normalized keyboard, mouse, paste, and
 focus events. If code outside the input module depends on behavior not described
@@ -110,7 +110,7 @@ This is intentional:
 The intended host-bound ordering model is:
 
 ```text
-UI adapter -> terminal actor -> terminal-input -> TerminalHostOutput -> PTY stdin
+UI adapter -> terminal actor -> jvterm-input -> TerminalHostOutput -> PTY stdin
 parser/core responses -> same terminal actor -> TerminalHostOutput -> PTY stdin
 ```
 
@@ -278,8 +278,8 @@ Likely to evolve before 1.0:
 - SGR-Pixels mouse event vocabulary if renderer/UI host supplies pixel
   coordinates
 - paste policy surface if host host needs stricter security defaults
-- a future `:terminal-core-api` split for input-facing mode reads
+- a future `:jvterm-core-api` split for input-facing mode reads
 
 The runtime semantics described in this document are the current intended
-contract for integrating UI adapters, `:terminal-core`, and host-bound terminal
+contract for integrating UI adapters, `:jvterm-core`, and host-bound terminal
 input.

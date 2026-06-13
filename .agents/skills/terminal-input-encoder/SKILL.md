@@ -1,17 +1,17 @@
 ---
-name: terminal-input-encoder
-description: Input encoder guidance for this Kotlin terminal repository. Use when adding or changing terminal-input keyboard, paste, focus, mouse, host-output, or input mode-bit behavior.
+name: jvterm-input-encoder
+description: Input encoder guidance for this Kotlin terminal repository. Use when adding or changing jvterm-input keyboard, paste, focus, mouse, host-output, or input mode-bit behavior.
 ---
 
 # Terminal Input Encoder
 
-Use this skill for work in `:terminal-input` or shared API needed by input.
+Use this skill for work in `:jvterm-input` or shared API needed by input.
 
 ## Workflow
 
-1. Read root `AGENTS.md`, then `terminal-input/AGENTS.md`.
-2. Follow `terminal-input/docs/terminal-input-implementation-plan.md`.
-3. Keep `TerminalHostOutput` in `:terminal-protocol`.
+1. Read root `AGENTS.md`, then `jvterm-input/AGENTS.md`.
+2. Follow `jvterm-input/docs/jvterm-input-implementation-plan.md`.
+3. Keep `TerminalHostOutput` in `:jvterm-protocol`.
 4. Read packed mode bits once per event through core's input-readable API.
 5. Add tests before or alongside each behavior slice.
 6. Keep mouse deferred until keyboard, paste, and focus are implemented and

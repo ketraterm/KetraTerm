@@ -1,58 +1,52 @@
-# Terminal Render API (`:jvterm-render-api`)
+# JvTerm Render API (`:jvterm-render-api`)
 
-**terminal-render-api** defines the strictly bounded, dependency-free public render contract and vocabulary shared across the terminal pipeline. It acts as the immutable, allocation-conscious bridge between the stateful terminal cores, synchronization sessions, rendering caches, and specific UI drawing modules (such as Swing).
+The `jvterm-render-api` module defines the strictly bounded, dependency-free public render contract and vocabulary shared across the terminal pipeline. It acts as the immutable, allocation-conscious bridge between stateful terminal state providers, frame caches, and UI rendering modules.
 
-This module is designed under a rigid **Single Responsibility Principle (SRP)**: it owns the stable representation of viewport frames, cursor states, cell flags, underline styles, color palettes, and attribute packing/decoding logic. It has **no** knowledge of grid physics, cursor clamping, terminal resize/reflow, text input encoding, font selections, or AWT/Swing/Compose painting lifecycles.
+This module is designed under a rigid **Single Responsibility Principle (SRP)**: it owns the stable representation of viewport frames, cursor states, cell flags, underline styles, color palettes, and attribute packing/decoding logic. It has no knowledge of grid physics, text input encoding, font selections, or specific platform painting lifecycles.
 
 ---
 
-## Architectural Overview & Pipeline Flow
+## Upstream Dependencies
+* **None**. This is a standalone, zero-dependency module compiling against the bare-metal Kotlin Standard Library.
 
-The rendering system decouples terminal state mutation from screen painting using a push-based row copying paradigm. Rather than exposing internal, mutable data grids, the terminal core delivers temporary, read-only snapshots to consumers through `TerminalRenderFrame`.
+---
+
+## Architectural Role
 
 ```mermaid
-graph TD
-    subgraph Core Module [:jvterm-core]
-        Core[Terminal State & Grid Storage]
-    end
-    
-    subgraph Render API Module [:jvterm-render-api]
-        Reader[TerminalRenderFrameReader]
-        Frame[TerminalRenderFrame]
-        Palette[TerminalColorPalette]
-        Attrs[TerminalRenderAttrs]
-        Flags[TerminalRenderCellFlags]
-    end
-    
-    subgraph Render Cache Module [:jvterm-render-cache]
-        Cache[TerminalRenderCache]
-    end
-    
-    subgraph Swing UI Module [:jvterm-ui-swing]
-        Painter[Swing Terminal Painter]
-    end
-    
-    %% Core & Adapter Flow
-    Core -.->|Implements / Exposes| Reader
-    Cache -->|1. readRenderFrame| Reader
-    Reader -->|2. Invokes| Frame
-    Cache -->|3. copyLine / copyCursor| Frame
-    
-    %% Bitwise / Value Helpers
-    Frame -->|Resolves colors via| Palette
-    Frame -->|Decodes styles via| Attrs
-    Frame -->|Inspects cell states via| Flags
-    
-    %% Handoff
-    Cache -.->|Copies row data into cache buffers| Cache
-    Painter -->|Reads stable cached frame| Cache
+classDiagram
+    direction TB
+    class TerminalRenderFrameReader {
+        <<interface>>
+        +readRenderFrame(consumer: TerminalRenderFrameConsumer)
+        +readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer)
+        +readRenderFrame(scrollbackOffset: Int, viewportRows: Int, consumer: TerminalRenderFrameConsumer)
+    }
+    class TerminalRenderFrame {
+        <<interface>>
+        +columns: Int
+        +rows: Int
+        +cursor: TerminalRenderCursor
+        +frameGeneration: Long
+        +structureGeneration: Long
+        +copyLine(...)
+        +copyCursor(sink: TerminalRenderCursorSink)
+    }
+    class TerminalColorPalette {
+        +foreground(attr: Long): Int
+        +background(attr: Long): Int
+    }
+    class TerminalRenderAttrs {
+        <<utility>>
+        +pack(...)
+        +foregroundKind(...)
+        +foregroundValue(...)
+    }
+
+    TerminalRenderFrameReader --> TerminalRenderFrame : delivers
+    TerminalRenderFrame --> TerminalColorPalette : resolved via
+    TerminalRenderFrame --> TerminalRenderAttrs : attributes decoded via
 ```
-
----
-
-## Architectural Scope and Boundaries
-
-To prevent dependency creep and maintain a lightweight rendering boundary, `:terminal-render-api` adheres to strict architectural constraints:
 
 ### What the Module Owns
 - **Stable Primitives & Encodings**: Value objects and interfaces representing frames, cursors, buffer kinds, and cursor shapes.
@@ -63,24 +57,20 @@ To prevent dependency creep and maintain a lightweight rendering boundary, `:ter
 ### What the Module Does NOT Own
 - **Core Internal Storage**: It never exposes or holds references to mutable ring buffers, cell objects, cursor coordinates, or grid physics.
 - **UI Platform Classes**: It does not depend on AWT, Swing, Compose, Skia, JavaFX, or any host windowing module.
-- **Glyph Runs & Paint Caches**: It defines raw, visual text data, but does not choose fonts, calculate pixel metrics, or cache platform drawing objects.
-- **State Mutation**: The API is strictly read-only for external consumers; all interfaces are built to pull data from state owners.
+- **Glyph Runs & Paint Caches**: It defines raw visual text data, but does not choose fonts, calculate pixel metrics, or cache platform drawing objects.
 
 ---
 
 ## 🗃️ Core Vocabulary & Primitive Structures
 
 ### 1. Stable Packed Attributes (`TerminalRenderAttrs`)
-To minimize memory footprint and support rapid drawing, standard text formatting attributes (bold, faint, italic, underline, blink, inverse, strikethrough, and colors) are packed into a single 64-bit `Long` word. 
-
-> [!NOTE]
-> This stable public layout is strictly decoupled from the internal storage representation in `:terminal-core` to allow core optimization work without breaking the renderer contract.
+To minimize memory footprint and support rapid drawing, standard text formatting attributes (bold, faint, italic, underline, blink, inverse, strikethrough, and colors) are packed into a single 64-bit `Long` word.
 
 | Bit Range | Size | Field Name | Description |
 | :--- | :--- | :--- | :--- |
 | **0..1** | 2 bits | **Foreground Color Kind** | Maps to [TerminalRenderColorKind](./src/main/kotlin/com/gagik/terminal/render/api/TerminalRenderColorKind.kt) (Default, Indexed, RGB) |
 | **2..25** | 24 bits | **Foreground Color Value** | Direct `0xRRGGBB` RGB, indexed `0..255`, or `0` for default |
-| **26..27** | 2 bits | **Background Color Kind** | Maps to [TerminalRenderColorKind](./src/main/kotlin/com/gagik/terminal/render/api/TerminalRenderColorKind.kt) (Default, Indexed, RGB) |
+| **26..27** | 2 bits | **Background Color Kind** | Maps to [TerminalRenderColorKind](./src/main/kotlin/com/gagik/terminal/render/api/TerminalRenderColorKind.kt) |
 | **28..51** | 24 bits | **Background Color Value** | Direct `0xRRGGBB` RGB, indexed `0..255`, or `0` for default |
 | **52** | 1 bit | **Bold** | High intensity / bright ANSI rendering trigger |
 | **53** | 1 bit | **Faint** | Low intensity / dim rendering trigger |
@@ -90,67 +80,37 @@ To minimize memory footprint and support rapid drawing, standard text formatting
 | **59** | 1 bit | **Inverse** | Swap visual foreground and background colors |
 | **60** | 1 bit | **Invisible** | Text is hidden but spacing is preserved |
 | **61** | 1 bit | **Strikethrough** | Center-line deletion text decoration |
-| **62..63** | 2 bits | **Reserved** | Must be currently zero |
+| **62..63** | 2 bits | **Reserved** | Must currently be zero |
 
-### 2. Extended Packed Attributes (`TerminalRenderExtraAttrs`)
-A secondary 64-bit `Long` word carries less common visual properties (e.g., custom underline colors and overline decorations). 
-
-> [!TIP]
-> This split separation allows basic renderers to completely omit extra attributes by passing `null` arrays during viewport copies, eliminating unnecessary copy operations.
-
-- **Bits 0..1**: Underline color kind (`TerminalRenderColorKind`).
-- **Bits 2..25**: Underline color value (`0xRRGGBB` RGB or `0..255` indexed).
-- **Bit 26**: Overline decoration flag.
-- **Bits 27..63**: Reserved (must be zero).
-
-### 3. Cell-Level State Flags (`TerminalRenderCellFlags`)
+### 2. Cell-Level State Flags (`TerminalRenderCellFlags`)
 Every character cell on the screen is associated with a 32-bit `Int` flags mask describing its layout state and width metrics:
 - **`EMPTY`** (`1 shl 0`): No glyph should be drawn (used for background fills and spacer margins).
 - **`CODEPOINT`** (`1 shl 1`): Cell contains a single, direct Unicode scalar value.
-- **`CLUSTER`** (`1 shl 2`): Cell contains a multi-codepoint Unicode grapheme cluster (e.g., complex emojis, combining accents) retrieved via a cluster sink.
+- **`CLUSTER`** (`1 shl 2`): Cell contains a multi-codepoint Unicode grapheme cluster.
 - **`WIDE_LEADING`** (`1 shl 3`): Cell is the visual anchor of a double-width character.
-- **`WIDE_TRAILING`** (`1 shl 4`): Cell is the blank placeholder continuation cell of a double-width character. Renderers must not draw text here.
-
-*Valid combinations for cells are strictly verified:*
-```kotlin
-fun isValidCombination(flags: Int): Boolean = when (flags) {
-    EMPTY,
-    CODEPOINT,
-    CODEPOINT or WIDE_LEADING,
-    CLUSTER,
-    CLUSTER or WIDE_LEADING,
-    WIDE_TRAILING,
-    -> true
-    else -> false
-}
-```
+- **`WIDE_TRAILING`** (`1 shl 4`): Cell is the blank placeholder continuation cell of a double-width character.
 
 ---
 
 ## 🏎️ High-Performance Frame Handoff & Synchronization
 
-Rendering terminals requires high-speed, thread-safe data transfer from the fast-mutating terminal event loop to the platform-bound drawing thread. The API provides three core elements to facilitate this:
+Rendering terminals requires high-speed, thread-safe data transfer from the state provider to the drawing system. The API provides three core elements to facilitate this:
 
 ### 1. `TerminalRenderFrameReader`
-This synchronization gateway controls access to the underlying screen buffer. It defines a synchronous read callback that ensures consistent state access:
+This synchronization gateway controls access to the underlying screen buffer:
 ```kotlin
 interface TerminalRenderFrameReader {
-    // 1. Basic viewport read (bottom-pinned, live view)
     fun readRenderFrame(consumer: TerminalRenderFrameConsumer)
-
-    // 2. Scrollback-offset viewport read
     fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer)
-
-    // 3. Overscan viewport read (provides extra rows for pixel-smooth scrolling)
     fun readRenderFrame(scrollbackOffset: Int, viewportRows: Int, consumer: TerminalRenderFrameConsumer)
 }
 ```
 
 > [!IMPORTANT]
-> **Short-Lived Frame Invariant:** The `TerminalRenderFrame` instance delivered to `TerminalRenderFrameConsumer` is **valid only for the duration of the callback**. The state provider may hold a terminal mutation lock or reuse internal frame objects, meaning consumers **must never** retain references to the frame or its internal data beyond the lifecycle of the consumer callback.
+> **Short-Lived Frame Invariant:** The `TerminalRenderFrame` instance delivered to `TerminalRenderFrameConsumer` is **valid only for the duration of the callback**. State providers may hold internal write locks or reuse frame objects. Consumers **must never** retain references to the frame or its internal data beyond the lifecycle of the consumer callback.
 
 ### 2. `TerminalRenderFrame`
-Represents the read-only, layout-decoupled view of the viewport. Rather than returning arrays, the interface provides an optimized, push-based copying mechanism:
+Represents the read-only, layout-decoupled view of the viewport. Rather than returning allocating arrays, it provides an optimized, push-based copying mechanism:
 ```kotlin
 interface TerminalRenderFrame {
     val columns: Int
@@ -158,18 +118,15 @@ interface TerminalRenderFrame {
     val historySize: Int
     val scrollbackOffset: Int
     val discardedCount: Long
-    
-    // Change detection keys
-    val frameGeneration: Long       // Advances on any visual change (cursor, cells, styles)
-    val structureGeneration: Long   // Advances on structural shifts (resize, reset, scrolling, reflow)
-
+    val frameGeneration: Long
+    val structureGeneration: Long
     val activeBuffer: TerminalRenderBufferKind
     val cursor: TerminalRenderCursor
 
     fun lineGeneration(row: Int): Long
     fun lineWrapped(row: Int): Boolean
 
-    // The core zero-allocation row copy contract
+    // The zero-allocation row copy contract
     fun copyLine(
         row: Int,
         codeWords: IntArray,
@@ -190,37 +147,127 @@ interface TerminalRenderFrame {
 }
 ```
 
-### 3. Allocation-Conscious Handoff Sinks
-To avoid allocating strings and value objects for every rendering loop iteration, the copying mechanisms rely on functional interfaces:
-
-- **[TerminalRenderCursorSink](./src/main/kotlin/com/gagik/terminal/render/api/TerminalRenderCursorSink.kt)**: Delivers all visual cursor properties (`column`, `row`, `visible`, `blinking`, `shape`, `generation`) as direct primitives without allocating a `TerminalRenderCursor` object.
-- **[TerminalRenderClusterDataSink](./src/main/kotlin/com/gagik/terminal/render/api/TerminalRenderClusterSink.kt)**: Delivers multi-codepoint grapheme clusters as sliced primitive arrays (`codepoints: IntArray`, `offset: Int`, `length: Int`). Caches can copy these raw codepoints directly without allocating heap `String` objects, avoiding garbage collection overhead.
-
 ---
 
-## 🎨 Fast Color Resolution (`TerminalColorPalette`)
+## 🔗 How to Use
 
-The [TerminalColorPalette](./src/main/kotlin/com/gagik/terminal/render/api/TerminalColorPalette.kt) class is an immutable, optimized color mapping system. It stores the default, selection, cursor, and 256 indexed ANSI colors as packed ARGB `Int` values (`0xAARRGGBB`).
+The following example shows how a custom drawing canvas consumes a `TerminalRenderFrame` to copy cell data and draw to a screen:
 
-During drawing, the UI painter resolves cell colors by querying the palette with the packed 64-bit attribute word:
 ```kotlin
-val fgColorArgb = palette.foreground(attrWord)
-val bgColorArgb = palette.background(attrWord)
+import io.github.jvterm.render.api.TerminalRenderFrame
+import io.github.jvterm.render.api.TerminalRenderFrameConsumer
+import io.github.jvterm.render.api.TerminalRenderFrameReader
+import io.github.jvterm.render.api.TerminalColorPalette
+
+class CanvasPainter(
+    private val reader: TerminalRenderFrameReader,
+    private val palette: TerminalColorPalette
+) {
+    fun repaint() {
+        reader.readRenderFrame(object : TerminalRenderFrameConsumer {
+            override fun accept(frame: TerminalRenderFrame) {
+                val cols = frame.columns
+                val rows = frame.rows
+                
+                // Reusable buffers to avoid dynamic allocation per-frame
+                val codeWords = IntArray(cols)
+                val attrWords = LongArray(cols)
+                val flags = IntArray(cols)
+                
+                for (r in 0 until rows) {
+                    frame.copyLine(r, codeWords, 0, attrWords, 0, flags, 0)
+                    for (c in 0 until cols) {
+                        val flag = flags[c]
+                        val attr = attrWords[c]
+                        
+                        val fgColor = palette.foreground(attr)
+                        val bgColor = palette.background(attr)
+                        
+                        // Render cell 'c' with resolved ARGB colors
+                    }
+                }
+            }
+        })
+    }
+}
 ```
 
-The color resolver handles advanced terminal color semantics automatically:
-1. **Inverse Processing**: Merges standard color kinds with the `inverse` bitmask to swap active colors on-the-fly.
-2. **Concealment (Invisible)**: Resolves the foreground color to match the background color so text matches the surrounding grid.
-3. **Bold intensity**: Automatically maps index colors `0..7` to their bright equivalents `8..15` if `boldAsBright` is enabled.
+---
+
+## 🔗 How to Extend: Custom State Provider
+
+To expose a custom data structure (such as a remote SSH buffer or custom grid implementation) for rendering, implement the `TerminalRenderFrame` and `TerminalRenderFrameReader` interfaces:
+
+```kotlin
+import io.github.jvterm.render.api.*
+
+class CustomFrameReader : TerminalRenderFrameReader {
+    private val frame = CustomFrame()
+
+    override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+        synchronized(this) {
+            consumer.accept(frame)
+        }
+    }
+
+    override fun readRenderFrame(scrollbackOffset: Int, consumer: TerminalRenderFrameConsumer) {
+        readRenderFrame(consumer)
+    }
+
+    override fun readRenderFrame(scrollbackOffset: Int, viewportRows: Int, consumer: TerminalRenderFrameConsumer) {
+        readRenderFrame(consumer)
+    }
+}
+
+class CustomFrame : TerminalRenderFrame {
+    override val columns: Int get() = 80
+    override val rows: Int get() = 24
+    override val historySize: Int get() = 0
+    override val scrollbackOffset: Int get() = 0
+    override val discardedCount: Long get() = 0L
+    override val frameGeneration: Long get() = 1L
+    override val structureGeneration: Long get() = 1L
+    override val activeBuffer: TerminalRenderBufferKind get() = TerminalRenderBufferKind.MAIN
+    override val cursor: TerminalRenderCursor = TerminalRenderCursor(0, 0, true, true, TerminalRenderCursorShape.BLOCK)
+
+    override fun lineGeneration(row: Int): Long = 1L
+    override fun lineWrapped(row: Int): Boolean = false
+
+    override fun copyLine(
+        row: Int,
+        codeWords: IntArray,
+        codeOffset: Int,
+        attrWords: LongArray,
+        attrOffset: Int,
+        flags: IntArray,
+        flagOffset: Int,
+        extraAttrWords: LongArray?,
+        extraAttrOffset: Int,
+        hyperlinkIds: IntArray?,
+        hyperlinkOffset: Int,
+        clusterSink: TerminalRenderClusterSink?,
+        clusterDataSink: TerminalRenderClusterDataSink?
+    ) {
+        // Copy cell data into target arrays
+    }
+
+    override fun copyCursor(sink: TerminalRenderCursorSink) {
+        sink.accept(cursor.column, cursor.row, cursor.visible, cursor.blinking, cursor.shape, 1L)
+    }
+}
+```
 
 ---
 
-## Testing and Verification
+## Testing & Verification
 
-The module has full test coverage under `src/test/kotlin` to guarantee that bitwise invariants and API boundaries are never broken:
+The module has unit tests to guarantee that bitwise invariants and API boundaries are never broken:
+* **`TerminalRenderAttrsTest`**: Validates standard attribute packing, bit layouts, range boundary checks, and underline styles.
+* **`TerminalRenderExtraAttrsTest`**: Assures exact bit placements for overlines and custom underline colors.
+* **`TerminalRenderCellFlagsTest`**: Enforces that only valid cell-state combinations can exist.
+* **`TerminalColorPaletteTest`**: Tests ARGB mapping, index palettes, and `boldAsBright` resolution rules.
 
-- **[TerminalRenderAttrsTest](./src/test/kotlin/com/gagik/terminal/render/api/TerminalRenderAttrsTest.kt)**: Validates standard attribute packing, bit layouts, range boundary checks, and underline styles.
-- **[TerminalRenderExtraAttrsTest](./src/test/kotlin/com/gagik/terminal/render/api/TerminalRenderExtraAttrsTest.kt)**: Assures exact bit placements for overlines and custom underline colors.
-- **[TerminalRenderCellFlagsTest](./src/test/kotlin/com/gagik/terminal/render/api/TerminalRenderCellFlagsTest.kt)**: Enforces that only valid cell-state combinations can exist.
-- **[TerminalColorPaletteTest](./src/test/kotlin/com/gagik/terminal/render/api/TerminalColorPaletteTest.kt)**: Tests ARGB mapping, index palettes, and `boldAsBright` resolution rules.
-- **[TerminalRenderFrameReaderTest](./src/test/kotlin/com/gagik/terminal/render/api/TerminalRenderFrameReaderTest.kt)**: Exercises frame-read closures and correct delegation of overscan/viewport functions.
+To run the render API module checks:
+```bash
+./gradlew :jvterm-render-api:test
+```

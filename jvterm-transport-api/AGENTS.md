@@ -17,5 +17,5 @@ synchronization and terminal-to-host ordering.
 
 ## Testing
 
-Keep contract tests in connector implementations or `terminal-testkit`. This
+Keep contract tests in connector implementations or `jvterm-testkit`. This
 module should stay dependency-light and vocabulary-only.

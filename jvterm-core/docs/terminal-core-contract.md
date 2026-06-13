@@ -1,8 +1,8 @@
 # Terminal Core Contract
 
-This document defines the public behavioral contract of `:terminal-core`.
+This document defines the public behavioral contract of `:jvterm-core`.
 
-It is the handoff boundary for future `:terminal-parser` and `:terminal-input`
+It is the handoff boundary for future `:jvterm-parser` and `:jvterm-input`
 modules. If code outside the core depends on behavior not described here, that
 behavior is not yet guaranteed.
 
@@ -38,7 +38,7 @@ The core does not own:
 
 ## Public API surfaces
 
-`TerminalBufferApi` composes these narrower contracts:
+`TerminalBuffer` composes these narrower contracts:
 
 - `TerminalWriter`
 - `TerminalCursor`
@@ -80,7 +80,7 @@ Not guaranteed:
 - deciding whether a codepoint is a combining mark, variation selector, or ZWJ
   continuation
 
-Those belong to `:terminal-parser`.
+Those belong to `:jvterm-parser`.
 
 ### Erase and edit commands
 
@@ -133,7 +133,7 @@ The core does not save or restore:
 - locking shifts
 - parser-owned shift state
 
-Those remain parser state and must be handled outside `:terminal-core`.
+Those remain parser state and must be handled outside `:jvterm-core`.
 
 If no save slot exists, `restoreCursor()` falls back to the core's documented
 absolute home plus pen reset behavior.
@@ -308,4 +308,4 @@ Likely to evolve before 1.0:
 - parser-facing docs around charset ownership and Unicode ingestion
 
 The runtime semantics described in this document are the current intended
-contract for integrating `:terminal-parser` and `:terminal-input`.
+contract for integrating `:jvterm-parser` and `:jvterm-input`.

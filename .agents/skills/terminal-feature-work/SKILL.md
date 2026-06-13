@@ -10,9 +10,9 @@ Use this skill for any new terminal protocol or behavior in this repository.
 ## Workflow
 
 1. Identify the owning layer:
-   - `terminal-parser` recognizes byte/protocol syntax and emits semantic commands.
-   - `terminal-core` owns grid physics, modes, width, attributes, storage, and state.
-   - `terminal-host` maps existing parser semantics to existing core APIs.
+   - `jvterm-parser` recognizes byte/protocol syntax and emits semantic commands.
+   - `jvterm-core` owns grid physics, modes, width, attributes, storage, and state.
+   - `jvterm-host` maps existing parser semantics to existing core APIs.
 2. Read the relevant module `AGENTS.md`.
 3. Add tests that describe real terminal behavior before or alongside code.
 4. Implement the smallest layer-correct behavior.

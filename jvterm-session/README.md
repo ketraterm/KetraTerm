@@ -1,47 +1,36 @@
-# Terminal Session
+# JvTerm Session (`:jvterm-session`)
 
-**jvterm-session** is the central orchestration hub and runtime synchronization engine of the Lattice Terminal pipeline. It coordinates the data-flow between the asynchronous transport layer, the byte-stream parser, the headless terminal grid, and platform-agnostic keyboard/mouse input encoders. 
+The `jvterm-session` module is the central orchestration hub and runtime synchronization engine of the JvTerm Terminal pipeline. It coordinates the data-flow between the asynchronous transport layer, the byte-stream parser, the headless terminal grid, and platform-agnostic keyboard/mouse input encoders.
 
-The module is engineered to be highly performant, race-free, and allocation-minimal. It encapsulates the synchronization policies necessary to support concurrent multithreaded execution—ensuring that rapid host output, user keystrokes, window resizing, and UI rendering frames never corrupt the terminal state or produce rendering anomalies.
+The module encapsulates the synchronization policies necessary to support concurrent multithreaded execution—ensuring that rapid host output, user keystrokes, window resizing, and UI rendering frames never corrupt the terminal state.
 
 ---
 
-## Architectural Scope and Boundaries
-
-To maintain a strict separation of concerns, **terminal-session** operates under clear design rules that protect its boundaries:
-
-### What the Module Owns
-- **Runtime Orchestration**: Binding [TerminalBufferApi](../terminal-core/src/main/kotlin/core/api/TerminalBufferApi.kt), [TerminalOutputParser](../terminal-parser/src/main/kotlin/parser/api/TerminalOutputParser.kt), [TerminalInputEncoder](../terminal-input/src/main/kotlin/input/api/TerminalInputEncoder.kt), [TerminalRenderPublisher](../terminal-render-cache/src/main/kotlin/com/gagik/terminal/render/cache/TerminalRenderPublisher.kt), and the active [TerminalConnector](../terminal-transport-api/src/main/kotlin/transport/TerminalConnector.kt) into a cohesive, running session.
-- **Parser & Core Synchronization**: Enforcing absolute serialized access to parser mutations, coordinate conversions, and buffer writes via a dedicated internal lock (`mutationLock`).
-- **Safe Read-Only Frame Copying**: Providing safe access for UI layers to copy state out of the grid ([readRenderFrame](./src/main/kotlin/session/TerminalSession.kt)) without racing against background PTY inbound parser threads or resize operations.
-- **Asynchronous Coalesced Rendering**: Offloading heavy copying tasks to a dedicated background daemon worker (`renderWorker`) that merges rapid UI-repaint requests and publishes them to the render-cache.
-- **Outbound Stream Serialization**: Synchronizing user input (keys, focus, mouse, paste) and terminal-generated replies (DSR, CPR, DA queries) through a single outbound write lock (`outboundWriteLock`).
-- **Zero-Allocation Host Buffering**: Managing preallocated scratch buffers ([ConnectorTerminalHostOutput](./src/main/kotlin/session/ConnectorTerminalHostOutput.kt)) for manual, allocation-free ASCII and UTF-8 encoding on the hot input path.
-- **Orderly Session Shutdown**: Guiding graceful, idempotent close lifecycles for both locally initiated exits, remote process termination (tracking exit codes), and socket/transport errors.
-
-### What the Module Does NOT Own
-- **Transport I/O Threads**: It does not own or spawn transport reading loops. The [TerminalConnector](../terminal-transport-api/src/main/kotlin/transport/TerminalConnector.kt) is entirely responsible for spawning and managing its own reading and writing threads.
-- **Byte-Stream Parsing**: It never parses terminal streams itself, delegating all ANSI/DEC state mutations to the parsed command sink and [TerminalOutputParser](../terminal-parser/src/main/kotlin/parser/api/TerminalOutputParser.kt).
-- **Core State Physics**: It has no knowledge of wrap policies, margins, scrollback buffers, tab stops, or SGR pen attributes—all grid physics are kept strictly inside [terminal-core](../terminal-core).
-- **Input Encoding Logic**: It does not define how keystrokes are converted to escape codes, relying entirely on the [TerminalInputEncoder](../terminal-input/src/main/kotlin/input/api/TerminalInputEncoder.kt) contract.
-- **Swing/UI Painting**: It does not choose fonts, render borders, process scrollbar views, or manage platform windows.
+## Upstream Dependencies
+- **`:jvterm-protocol`** (vocabulary, mode IDs, enums)
+- **`:jvterm-render-api`** (render frame contracts)
+- **`:jvterm-render-cache`** (triple-buffered frame publication)
+- **`:jvterm-transport-api`** (duplex connector contracts)
+- **`:jvterm-parser`** (byte-stream parser)
+- **`:jvterm-core`** (headless terminal grid)
+- **`:jvterm-host`** (command mapping and security policies)
+- **`:jvterm-input`** (keyboard/mouse encoding and policies)
+- **`:jvterm-testkit`** (test connector doubles)
 
 ---
 
 ## Concurrency and Locking Architecture
 
-In a modern multithreaded environment, terminal events arrive concurrently from three directions: the host PTY (background read thread), the host OS (resize and window focus events), and the local UI (event dispatch thread). To prevent state corruption, [TerminalSession](./src/main/kotlin/session/TerminalSession.kt) coordinates concurrency through three highly focused locks:
+In a multithreaded runtime, events arrive concurrently from three directions: the host transport (background read thread), the host OS (resize and window focus events), and the local UI drawing loop. To prevent state corruption, `TerminalSession` coordinates concurrency through three locks:
 
-1. **`inboundLock`**: Guards the entry of raw host bytes on [onBytes](./src/main/kotlin/session/TerminalSession.kt). It ensures bytes are fed to the parser in absolute sequential stream order and prevents concurrent processing if multiple read buffers are delivered.
-2. **`mutationLock`**: The core-critical section. It locks during all [TerminalOutputParser.accept](../terminal-parser/src/main/kotlin/parser/api/TerminalOutputParser.kt) parser steps, [TerminalBufferApi.resize](../terminal-core/src/main/kotlin/core/api/TerminalBufferApi.kt) operations, and render copying steps.
+1. **`inboundLock`**: Guards the entry of raw host bytes on `onBytes`. It ensures bytes are fed to the parser in absolute sequential stream order.
+2. **`mutationLock`**: The core-critical section. It locks during all parser `accept()` steps, core `resize()` operations, and render copying steps.
    > [!NOTE]
-   > While `mutationLock` is held by a thread copying the current screen state (like `readRenderFrame`), background PTY data-processing and resizing are blocked. This guarantees that UI drawing loops never view a half-mutated row, mismatched width, or corrupted Unicode surrogate sequence.
-3. **`outboundWriteLock`**: Synchronizes all writes to PTY stdin. It guarantees that user keystrokes, paste payloads, mouse tracking reports, and synchronous terminal replies (like CPR/DSR queries triggered by the parser thread) are written atomically and do not interleave on the transport channel.
-
-### Threading & Concurrency Flow
+   > While `mutationLock` is held by a thread copying the screen state, background data-processing and resizing are blocked. This guarantees that UI drawing loops never view a half-mutated row or mismatched dimensions.
+3. **`outboundWriteLock`**: Synchronizes all writes to PTY stdin. It guarantees that user keystrokes, paste payloads, mouse tracking reports, and synchronous terminal replies are written atomically and do not interleave.
 
 ```text
-                                  Lattice Terminal Pipeline Runtime Context
+                                  JvTerm Terminal Pipeline Runtime Context
                                  
       PTY Inbound Thread              UI Thread / Repaint Thread              Keypress / Paste Event
      ┌──────────────────┐                ┌──────────────────────┐              ┌──────────────────────┐
@@ -77,7 +66,7 @@ In a modern multithreaded environment, terminal events arrive concurrently from 
      └─────────┬────────────────┘
                │
                ▼
-         connector.write()
+          connector.write()
      ┌──────────────────────────┐
      │  Writes responses under  │
      │  outboundWriteLock       │
@@ -88,72 +77,96 @@ In a modern multithreaded environment, terminal events arrive concurrently from 
 
 ## Asynchronous Render Publisher & Coalescing
 
-Rendering a terminal grid onto a UI component involves copying primitive arrays of codepoints, attributes, and styles. Performing this work on either the critical PTY reading thread or the Swing UI Event Dispatch Thread (EDT) causes performance bottlenecks.
+Rendering a terminal grid onto a UI component involves copying primitive arrays. Performing this work on either the critical transport reading thread or the UI Event Dispatch Thread causes performance bottlenecks. `TerminalSession` offloads rendering copies to a background worker:
 
-[TerminalSession](./src/main/kotlin/session/TerminalSession.kt) resolves this by offloading rendering copies to a single-threaded background daemon worker (`renderWorker`):
-
-- **Bitwise Request Packing**: To eliminate GC allocations, render requests are packed into a single atomic `Long` (`pendingRenderRequest`):
-  - **Upper 32 bits**: `scrollbackOffset` (allowing the UI to scroll back without allocating scroll states).
-  - **Lower 32 bits**: `viewportRows` (specifying overscan rows for UI layout calculations).
-- **Request Coalescing**: A generation counter (`pendingRenderGeneration`) tracks requested renders. If the host is streaming text at a high frequency and triggers multiple render dirty signals before the `renderWorker` completes its current frame copy, the worker skips obsolete intermediates. It publishes exactly **one** render frame representing the absolute latest terminal state. This prevents rendering backlogs and reduces UI overhead.
-- **Publish Callback**: Once a render frame is safely copied and cached in the [TerminalRenderPublisher](../terminal-render-cache/src/main/kotlin/com/gagik/terminal/render/cache/TerminalRenderPublisher.kt), the `onDirty` callback is executed on the background worker thread. UI frameworks hook into this callback to queue light repaint operations (e.g. `repaint()` in Swing) on the EDT.
+* **Coalescing**: If the host streams text at high frequency and triggers multiple dirty signals before the worker completes its current copy, the worker skips obsolete intermediate frames. It publishes exactly **one** render frame representing the latest terminal state, preventing rendering backlogs.
+* **Publish Callback (`onDirty`)**: Once a render frame is copied, the `onDirty` callback is executed on the background thread. UI frameworks hook into this callback to queue light paint/repaint operations.
 
 ---
 
-## Zero-Allocation Host Output Bridge
+## 🔗 How to Use
 
-User inputs (like key presses) and large paste operations must be transmitted to the connector as raw byte streams. Instantiating new arrays or formatting strings for every keypress causes massive memory churn on the JVM.
+The following example shows how to create and start a `TerminalSession` by wiring together the core, transport, host, and input elements:
 
-The [ConnectorTerminalHostOutput](./src/main/kotlin/session/ConnectorTerminalHostOutput.kt) internal component operates as a zero-allocation bridge:
+```kotlin
+import io.github.jvterm.core.TerminalBuffers
+import io.github.jvterm.session.TerminalSession
+import io.github.jvterm.transport.TerminalConnector
+import io.github.jvterm.host.TerminalHostEventSink
+import io.github.jvterm.host.TerminalHostPolicy
+import io.github.jvterm.input.policy.TerminalInputPolicy
 
-- **Pre-allocated Buffers**:
-  - **1-byte Array**: For individual control characters and fast ASCII writes.
-  - **ASCII Buffer (1024 bytes)**: For normal string inputs.
-  - **UTF-8 Buffer (8192 bytes)**: For pasting clipboard text and multibyte inputs.
-- **Manual Fast UTF-8 Encoder**:
-  Rather than calling Java's string encoding routines (which allocate byte arrays), [ConnectorTerminalHostOutput.writeUtf8](./src/main/kotlin/session/ConnectorTerminalHostOutput.kt) encodes string characters directly into the pre-allocated buffer on the fly. It resolves high-/low-surrogate unicode codepoints, writes multibyte sequences directly, and flushes the buffer to the connector only when it becomes full or the writing concludes.
-- **Synchronized Writes**: All output streams are locked under `outboundWriteLock` to maintain proper packet ordering.
+fun setupSession(connector: TerminalConnector) {
+    // 1. Create the backend core buffer
+    val terminal = TerminalBuffers.create(width = 80, height = 24)
+
+    // 2. Define a host event sink for titles and bell
+    val hostEventSink = object : TerminalHostEventSink {
+        override fun bell() { println("Bell!") }
+        override fun iconTitleChanged(title: String) {}
+        override fun windowTitleChanged(title: String) {}
+    }
+
+    // 3. Create the session instance using the factory builder
+    val session = TerminalSession.create(
+        terminal = terminal,
+        connector = connector,
+        eventSink = hostEventSink,
+        hostPolicy = TerminalHostPolicy(),
+        inputPolicy = TerminalInputPolicy.DEFAULT
+    )
+
+    // 4. Hook into the render dirty callback
+    session.onDirty = {
+        // Trigger UI repaints here based on published cached frames
+        println("Render cache updated. Frame generation: ${session.publisher.current()?.frameGeneration}")
+    }
+
+    // 5. Start the session and allocate resources
+    session.start(columns = 80, rows = 24)
+
+    // ... When resizing the window:
+    session.resize(columns = 100, rows = 30)
+
+    // ... When pasting clipboard content:
+    session.pasteText("Pasted text")
+
+    // ... When shutting down:
+    session.close()
+}
+```
 
 ---
 
-## Public API Surface
+## 🔗 How to Extend: Custom Key/Mouse Events
 
-The primary public API of the module centers around [TerminalSession](./src/main/kotlin/session/TerminalSession.kt):
+To inject user inputs into the running session from an event listener loop, map UI events to the session's input encoding surface:
 
-### Configuration and Properties
-- `terminal`: The underlying headless [TerminalBufferApi](../terminal-core/src/main/kotlin/core/api/TerminalBufferApi.kt) representing the current screen.
-- `publisher`: The [TerminalRenderPublisher](../terminal-render-cache/src/main/kotlin/com/gagik/terminal/render/cache/TerminalRenderPublisher.kt) holding cached frames.
-- `exitCode`: A volatile integer capturing the remote process exit code (populated upon normal PTY closure).
-- `failure`: A volatile throwable holding any transport-level exception that led to session closure.
-- `onDirty`: A callback invoked from the background worker thread after a new render frame has been successfully published to the cache.
+```kotlin
+import io.github.jvterm.input.event.TerminalKeyEvent
+import io.github.jvterm.input.event.TerminalKey
+import io.github.jvterm.input.event.TerminalModifiers
 
-### Operational Lifecycle Methods
-- **[start(columns, rows)](./src/main/kotlin/session/TerminalSession.kt)**: Configures the terminal dimensions, resizes the underlying PTY connector, starts transport threads, and transitions the session to an active, input-accepting state.
-- **[resize(columns, rows)](./src/main/kotlin/session/TerminalSession.kt)**: Resizes the core terminal grid and the transport PTY atomically under `mutationLock`, triggering a render dirty notification.
-- **[setTreatAmbiguousAsWide(enabled)](./src/main/kotlin/session/TerminalSession.kt)**: Changes East Asian Ambiguous width handling policy for future parser writes.
-- **[requestRender(scrollbackOffset, viewportRows)](./src/main/kotlin/session/TerminalSession.kt)**: Submits an asynchronous render task to publish the given viewport window.
-- **[readRenderFrame(scrollbackOffset, viewportRows, consumer)](./src/main/kotlin/session/TerminalSession.kt)**: Directly reads a synchronous frame under `mutationLock`. Use this when rendering or copying state to prevent concurrent parser writes.
-- **[close()](./src/main/kotlin/session/TerminalSession.kt)**: Shuts down the local connector, signals the parser that input has concluded, terminates the background worker, and cleans up resources idempotently.
-
-### Wiring Factory
-- **[TerminalSession.create(...)](./src/main/kotlin/session/TerminalSession.kt)**: Wires the standard pipeline components together. It creates a production session instance by wrapping:
-  - The [TerminalBufferApi](../terminal-core/src/main/kotlin/core/api/TerminalBufferApi.kt) core buffer.
-  - The [TerminalConnector](../terminal-transport-api/src/main/kotlin/transport/TerminalConnector.kt) transport connector.
-  - A [TerminalHostEventSink](../terminal-integration/src/main/kotlin/integration/TerminalHostEventSink.kt) adapter for handling sound, title changes, or custom clipboard events.
-  - A [TerminalHostPolicy](../terminal-integration/src/main/kotlin/integration/TerminalHostPolicy.kt) for terminal gap maps and behavior control.
-  - A [TerminalInputPolicy](../terminal-input/src/main/kotlin/input/policy/TerminalInputPolicy.kt) to configure Backspace mapping and paste sanitization.
+fun handleKeyPress(session: TerminalSession, char: Char) {
+    if (char == '\n') {
+        // Encode enter key
+        session.encodeKey(TerminalKeyEvent(TerminalKey.ENTER, 0, TerminalModifiers.NONE))
+    } else {
+        // Encode ordinary printable key
+        session.encodeKey(TerminalKeyEvent(TerminalKey.NONE, char.code, TerminalModifiers.NONE))
+    }
+}
+```
 
 ---
 
-## Testing Boundaries and Mocking Doctrine
+## Testing & Verification
 
-Ensuring race-free synchronization and precise protocol ordering requires tests that evaluate physical concurrency:
+The session test suite asserts race-free synchronization and precise protocol ordering under high-frequency writes and concurrent reads:
+* **`TerminalSessionHeadlessTest`**: Validates basic input/output byte flows, bracketed paste mode, and mouse tracking state mappings.
+* **`TerminalSessionTest`**: Uses multi-threaded constructs to prove locks prevent coordinate-tearing and check that render dirty events coalesce cleanly.
 
-- **Headless Pipeline Tests**: [TerminalSessionHeadlessTest.kt](./src/test/kotlin/session/TerminalSessionHeadlessTest.kt) validates that host-bound printable bytes mutate the headless state correctly, control sequences parse flawlessly across chunked transport buffers, and modes (like bracketed paste and mouse tracking) apply correctly before input transmission.
-- **Concurrency Integration Tests**: [TerminalSessionTest.kt](./src/test/kotlin/session/TerminalSessionTest.kt) uses strict thread synchronization constructs (`CountDownLatch`, multi-threaded execution runnables) to prove:
-  - PTY replies and user inputs do not interleave on the write channel.
-  - UI reading blocks concurrent host mutations.
-  - Resize operations are serialized relative to row copy routines.
-  - High-frequency dirty notifications are correctly coalesced.
-  - Render publish failures recover cleanly upon subsequent generations.
-- **Mocking Strategy**: The session test suite uses [MockConnector](../terminal-testkit/src/main/kotlin/testkit/MockConnector.kt) from the testkit module. This avoids spinning up real system PTYs or running complex subprocesses for unit level verification, while still asserting exact byte-level transmission and transition codes.
+To run checks for this module:
+```bash
+./gradlew :jvterm-session:test
+```

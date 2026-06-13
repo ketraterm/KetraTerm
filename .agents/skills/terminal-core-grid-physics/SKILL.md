@@ -1,11 +1,11 @@
 ---
-name: terminal-core-grid-physics
-description: Core terminal grid/state guidance for this repository. Use when changing terminal-core grid mutation, cursor movement, scrollback, resize/reflow, clusters, tab stops, margins, modes, width policy, pen attributes, or TerminalBufferApi behavior.
+name: jvterm-core-grid-physics
+description: Core terminal grid/state guidance for this repository. Use when changing jvterm-core grid mutation, cursor movement, scrollback, resize/reflow, clusters, tab stops, margins, modes, width policy, pen attributes, or TerminalBuffer behavior.
 ---
 
 # Terminal Core Grid Physics
 
-Use this skill when touching `terminal-core`.
+Use this skill when touching `jvterm-core`.
 
 ## Boundary
 

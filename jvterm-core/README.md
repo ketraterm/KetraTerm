@@ -1,12 +1,18 @@
-# Terminal Core (`:terminal-core`)
+# JvTerm Core (`:jvterm-core`)
 
-The `terminal-core` module is a high-performance, strictly bounded, and allocation-conscious terminal grid engine. It implements the headless screen-state engine, coordinates all spatial grid mutations, manages cursor physics, scrollback margins, and controls alternate/primary screen switches.
+The `jvterm-core` module is a high-performance, strictly bounded, and allocation-conscious terminal grid engine. It implements the headless screen-state engine, coordinates all spatial grid mutations, manages cursor physics, scrollback margins, and controls alternate/primary screen switches.
 
-Designed under strict **Single Responsibility Principles (SRP)**, this module owns coordinates, margins, cell styling attributes, tab stops, and cluster-aware storage. It possesses **no** awareness of escape-sequence parsing, byte stream UTF-8 decoding, input event encoding, mouse tracking, or Swing UI rendering.
+Designed under strict **Single Responsibility Principles (SRP)**, this module owns coordinates, margins, cell styling attributes, tab stops, and cluster-aware storage. It possesses no awareness of escape-sequence parsing, byte stream UTF-8 decoding, input event encoding, mouse tracking, or windowing/painting lifecycles.
 
 ---
 
-## Architectural Overview & Data Flow
+## Upstream Dependencies
+* **`:jvterm-protocol`** (for shared control codes, modes, and primitive constants).
+* **`:jvterm-render-api`** (for visual frames, color palette, and cell flags).
+
+---
+
+## Architectural Role & Grid Storage
 
 The core operates as a headless coordinate and physics processor. Mutations are triggered via dedicated, role-specific public APIs, orchestrated by a thin facade, and translated into parallel primitive array mutations inside circular history rings.
 
@@ -66,78 +72,90 @@ graph TD
 
 ## Key Architectural Components
 
-### 1. Global Hardware Context ([TerminalState](./src/main/kotlin/core/state/TerminalState.kt))
-Tracks global hardware switches and routes all active mutations to the correct [ScreenBuffer](./src/main/kotlin/core/state/ScreenBuffer.kt) via the `activeBuffer` hot-swap pointer.
+### 1. Global State ([`TerminalState`](./src/main/kotlin/core/state/TerminalState.kt))
+Tracks global hardware switches and routes all active mutations to the correct `ScreenBuffer` via the `activeBuffer` hot-swap pointer.
 * **Double Buffering:** Manages the separate memory arenas of `primaryBuffer` (with active history scrollback) and `altBuffer` (with zero scrollback) to prevent mutations in one buffer from corrupting the other.
 * **Visual Generation Flags:** Exposes generational counters (`frameGeneration`, `structureGeneration`, `cursorGeneration`) allowing external rendering loops to detect precise content changes and skip redraws when no visual mutations occur.
 
-### 2. Screen Arenas ([ScreenBuffer](./src/main/kotlin/core/state/ScreenBuffer.kt))
-Encapsulates a single coordinate universe.
-* **Margins:** Implements vertical scroll margins (`DECSTBM`) and horizontal left/right margins (`DECLRMM`).
-* **Co-owned Storage Rule:** The [HistoryRing](./src/main/kotlin/core/buffer/HistoryRing.kt) and [ClusterStore](./src/main/kotlin/core/store/ClusterStore.kt) are co-owned. They are always replaced atomically via `replaceStorage` to prevent any stale cell indices from referencing orphaned memory pools.
-
-### 3. Array-Packed Cell Storage ([Line](./src/main/kotlin/core/model/Line.kt))
+### 2. Array-Packed Cell Storage ([`Line`](./src/main/kotlin/core/model/Line.kt))
 To eliminate object-per-cell overhead and guarantee memory locality on the JVM, each physical line stores its column data in three parallel primitive arrays:
-* `codepoints` (`IntArray`): Stores raw scalar values:
-  * `0`: Empty cell sentinel.
-  * `> 0`: Unicode scalar codepoints.
-  * `-1`: Wide-character spacer sentinel.
-  * `<= -2`: Bounded cluster handles pointing into the [ClusterStore](./src/main/kotlin/core/store/ClusterStore.kt).
+* `codepoints` (`IntArray`): Stores raw scalar values (e.g. `0` for empty cells, `> 0` for Unicode scalars, `-1` for wide-character continuation spacers, and `<= -2` for grapheme cluster handles).
 * `attrs` (`LongArray`): Primary packed cell styling attributes (colors, bold, italic).
 * `extendedAttrs` (`LongArray`): Extended packed cell styling attributes (underlines, conceal, hyperlinks).
-* `wrapped`: Soft-wrap flag set when the cursor overflows the active right margin, designating a physical line as a visual continuation of the previous line.
 
-### 4. Attribute Bit-Packing ([AttributeCodec](./src/main/kotlin/core/codec/AttributeCodec.kt))
-Styling properties are stored inside two 64-bit `Long` values.
+### 3. Lock-Free Grapheme Allocator ([`ClusterStore`](./src/main/kotlin/core/store/ClusterStore.kt))
+Manages multi-codepoint grapheme clusters (combining marks, variation selectors, ZWJ sequences) in a flat, buffer-scoped memory arena. Reclaims space in $O(1)$ by pushing freed slot indices onto a head-popping singly-linked freelist.
 
-| Target Word | Bits | Attribute | Purpose |
-| :--- | :--- | :--- | :--- |
-| **Primary Word** | `0..25` | Foreground Color | Packed default/indexed/RGB color |
-| | `26..51` | Background Color | Packed default/indexed/RGB color |
-| | `52` | Bold | Text thickness flag |
-| | `53` | Italic | Slanted text style |
-| | `54` | Inverse | Invert foreground and background |
-| | `55` | Blink | Blinking text flag |
-| | `56` | Faint | Dimmed color presentation |
-| | `57` | Selective-Erase Protection | Cells skipped by DECSEL/DECSED |
-| **Extended Word** | `0..25` | Underline Color | Underline-specific tagged color |
-| | `26..28` | Underline Style | None, Single, Double, Curly, Dotted, Dashed |
-| | `29` | Strikethrough | Horizontal line through text |
-| | `30` | Overline | Horizontal line above text |
-| | `31` | Conceal | Hidden character flag |
-| | `32..63` | Hyperlink ID | Clickable URI mapping |
-
-### 5. Lock-Free Grapheme Allocator ([ClusterStore](./src/main/kotlin/core/store/ClusterStore.kt))
-Manages multi-codepoint grapheme clusters (combining marks, variation selectors, ZWJ sequences) in a flat, buffer-scoped memory arena.
-* **Layout:** Employs parallel primitive arrays (`slotStarts`, `slotLengths`, `nextFree`, `isLive`) indexing into a flat contiguous codepoints pool `clusterData`.
-* **Singly-Linked Freelist:** Reclaims space in $O(1)$ by pushing freed slot indices onto a head-popping singly-linked freelist. It immediately catches double-free anomalies, throwing explicit exceptions to safeguard allocator indices.
-* **Zero-Allocation Handoff:** Provides `readInto` for simple, zero-allocation copies directly into rendering buffers.
-
-### 6. Spatial Grid Physics ([MutationEngine](./src/main/kotlin/core/engine/MutationEngine.kt))
+### 4. Spatial Grid Physics ([`MutationEngine`](./src/main/kotlin/core/engine/MutationEngine.kt))
 Calculates and executes all spatial grid transformations.
 * **Wide-Character Annihilation Invariant:**
-  > [!IMPORTANT]
-  > Overwriting any part of a wide character or cluster (either the leader or its spacer) automatically erases the *entire* visual occupant. This prevents orphaned spacers or split leader cells from corrupting the grid.
+  Overwriting any part of a wide character or cluster (either the leader or its spacer) automatically erases the *entire* visual occupant to prevent orphaned spacers from corrupting the grid.
 * **Margins Constraints:** Restricts character insert/delete (`ICH`/`DCH`) and line insert/delete (`IL`/`DL`) within active vertical and horizontal margins.
-* **Selective Erase (DECSEL/DECSED):** Evaluates selective-erase protection bit flags, skipping protected cells during selective erases while allowing normal prints to overwrite them.
-* **Interactive Continuation:** Implements `appendToPreviousCluster` to support live rendering on chunk boundaries by appending combiners to the preceding grid coordinate.
 
-### 7. Reflow & Wrap Resizer ([TerminalResizer](./src/main/kotlin/core/engine/TerminalResizer.kt))
-Handles terminal resizing with a three-phase reflow strategy:
-1. **Logical-Line Reconstruction:** Reconstructs full logical lines by joining physical rows that carry the `wrapped` flag.
-2. **Re-wrapping:** Re-wraps cells into the new physical width.
-3. **Cursor Relocation:** Relocates and bounds the cursor into the reflowed coordinates.
-Surviving clusters are deep-copied into a fresh, resized buffer arena, ensuring no memory references leak between old and new state stores.
+### 5. East Asian Width Engine ([`UnicodeWidth`](./src/main/kotlin/core/util/UnicodeWidth.kt))
+Determines grid cell occupancy (0, 1, or 2) for any Unicode scalar using standard ASCII fast paths, BMP/SMP `BitSet` lookups, and range binary searches.
 
-### 8. East Asian Width Engine ([UnicodeWidth](./src/main/kotlin/core/util/UnicodeWidth.kt))
-Determines grid cell occupancy (0, 1, or 2) for any Unicode scalar:
-* **Double-Fast Path:** Employs standard ASCII printable fast checks, followed by triple `BitSet` lookups (`zero`, `wide`, `ambiguous`) for $O(1)$ BMP and SMP lookups.
-* **Astral Binary Search:** Uses binary search ranges for $O(\log N)$ astral wide and zero-width calculations.
-* **Ambiguous Width Support:** Respects Ambiguous East Asian Width settings, switching cells dynamically between narrow and wide layouts.
+---
 
-### 9. VT Tab Stops ([TabStops](./src/main/kotlin/core/model/TabStops.kt))
-Tracks VT100-style tab stops inside a dense `BooleanArray`.
-* **Dynamic Expansion:** Non-destructively grows or shrinks tab stops during resizes. Newly exposed columns are automatically seeded with the standard VT100 8-column rhythm.
+## 🔗 How to Use
+
+The following example shows how to create a `TerminalBuffer`, write text, move the cursor, and read cell content.
+
+```kotlin
+import io.github.jvterm.core.TerminalBuffers
+import io.github.jvterm.core.api.TerminalBuffer
+import io.github.jvterm.core.codec.AttributeCodec
+
+fun main() {
+    // 1. Create a terminal buffer of size 80x24 with 1000 lines of scrollback history
+    val buffer: TerminalBuffer = TerminalBuffers.create(width = 80, height = 24, maxHistory = 1000)
+
+    // 2. Write simple text using current pen attributes
+    buffer.writeText("Hello, JvTerm Core!")
+
+    // 3. Mutate pen attributes and write styled text
+    val styledPen = AttributeCodec.pack(
+        fgKind = AttributeCodec.COLOR_INDEXED, fgVal = 2, // ANSI Green
+        bgKind = AttributeCodec.COLOR_DEFAULT, bgVal = 0,
+        bold = true
+    )
+    buffer.setPenAttributes(styledPen)
+    buffer.writeText("\nThis is green bold text.")
+
+    // 4. Move the cursor relatively or absolutely
+    buffer.cursorPosition(column = 10, row = 5)
+
+    // 5. Read back cell content
+    val line = buffer.getLine(row = 5)
+    val codepoint = line.getCodepoint(column = 10)
+    val attrs = line.getAttributes(column = 10)
+    
+    println("Read back codepoint: ${codepoint.toChar()} with attributes: $attrs")
+}
+```
+
+---
+
+## 🔗 How to Extend: Custom Response Channel
+
+To handle terminal queries (such as Device Status Report `DSR` or Device Attributes `DA`) generated by the parser and needing to be piped back to the host, implement the [`TerminalResponseChannel`](./src/main/kotlin/io/github/jvterm/core/api/TerminalResponseChannel.kt) interface:
+
+```kotlin
+import io.github.jvterm.core.api.TerminalResponseChannel
+
+class ConsoleResponseChannel : TerminalResponseChannel {
+    override fun writeResponseBytes(bytes: ByteArray, offset: Int, length: Int) {
+        // Pipe bytes directly back into PTY stdout or socket streams
+        System.out.write(bytes, offset, length)
+        System.out.flush()
+    }
+
+    override fun writeResponseString(response: String) {
+        val bytes = response.toByteArray(Charsets.US_ASCII)
+        writeResponseBytes(bytes, 0, bytes.size)
+    }
+}
+```
 
 ---
 
@@ -149,20 +167,14 @@ Tracks VT100-style tab stops inside a dense `BooleanArray`.
 
 ---
 
-## Testing Doctrine
+## Testing & Verification
 
-The tests inside `src/test/kotlin` verify strict terminal invariants across complex state changes:
-* **`MutationEngineTest` / `MutationEngineProtectionTest`**: Validate wrapping mechanics, spatial erases, and selective-erase protect behavior.
-* **`TerminalResizerTest` / `TerminalResizerLongClusterTest`**: Ensure logical line re-wrapping and cluster deep-copies never lose content or corrupt cursors during rapid window resizes.
-* **`UnicodeWidthTest` / `TabStopsTest`**: Prove complete compliance with East Asian Width policies and VT100 horizontal tabs.
-* **`TerminalInvariantPropertyTest`**: Property-based tests verifying structural invariants (no orphaned wide spacers, correct history sizes) over thousands of random grid writes.
+The core test suite verifies strict terminal invariants across complex state changes:
+* **`MutationEngineTest`**: Validates wrapping mechanics, spatial erases, and protected cells.
+* **`TerminalResizerTest`**: Ensures logical line re-wrapping and cluster deep-copies during window resizes.
+* **`TerminalInvariantPropertyTest`**: Property-based tests verifying structural invariants over random writes.
 
----
-
-## Developer Guides & References
-
-* **Detailed Public Contract:** Read [docs/terminal-core-contract.md](docs/terminal-core-contract.md) to understand the formal public APIs (`TerminalWriter`, `TerminalCursor`, `TerminalReader`, etc.).
-* **Testing Command:** Run the core test suite locally via:
-  ```bash
-  ./gradlew :terminal-core:test
-  ```
+To run the core checks:
+```bash
+./gradlew :jvterm-core:test
+```

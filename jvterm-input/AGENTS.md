@@ -4,7 +4,7 @@
 paste, focus, and mouse events into bytes written to the terminal host input
 stream.
 
-Read `docs/terminal-input-contract.md` before changing public input behavior.
+Read `docs/jvterm-input-contract.md` before changing public input behavior.
 
 Keyboard, paste, focus, and cell-coordinate mouse encoding are implemented.
 Richer keyboard protocols and pixel-coordinate mouse reporting remain future
@@ -30,7 +30,7 @@ Input must not:
 The intended dependency shape is:
 
 ```text
-UI adapter -> terminal actor -> terminal-input -> TerminalHostOutput -> PTY stdin
+UI adapter -> terminal actor -> jvterm-input -> TerminalHostOutput -> PTY stdin
 parser/core responses -> same terminal actor -> TerminalHostOutput -> PTY stdin
 ```
 
@@ -51,7 +51,7 @@ on `:jvterm-core` until that API split exists.
 
 ## Implementation Rules
 
-- Add `TerminalHostOutput` to `:terminal-protocol` before adding encoders.
+- Add `TerminalHostOutput` to `:jvterm-protocol` before adding encoders.
 - Keep `KeyboardEncoder` stateless with respect to modes; pass packed mode bits
   into each encode call.
 - Do not add a `TerminalInputModeSnapshot` data class.

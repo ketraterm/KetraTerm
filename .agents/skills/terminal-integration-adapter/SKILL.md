@@ -1,11 +1,11 @@
 ---
-name: terminal-host-adapter
-description: Integration adapter guidance for mapping terminal-parser TerminalCommandSink semantics to terminal-core TerminalBufferApi. Use when changing CoreTerminalCommandSink, parser-to-core wiring, module dependencies, coordinate conversion, or explicit TODO gap handling.
+name: jvterm-host-adapter
+description: Integration adapter guidance for mapping jvterm-parser TerminalCommandSink semantics to jvterm-core TerminalBuffer. Use when changing HostCommandAdapter, parser-to-core wiring, module dependencies, coordinate conversion, or explicit TODO gap handling.
 ---
 
 # Terminal Integration Adapter
 
-Use this skill when changing `terminal-host` or parser-to-core wiring.
+Use this skill when changing `jvterm-host` or parser-to-core wiring.
 
 ## Boundary
 
@@ -39,7 +39,7 @@ It must not:
 ## Testing
 
 Prefer parser-to-core tests using real byte streams, `TerminalOutputParser`,
-`CoreTerminalCommandSink`, and public `TerminalBufferApi` assertions.
+`HostCommandAdapter`, and public `TerminalBuffer` assertions.
 
 Adapter-only tests may assert honest documented no-op behavior for unsupported
 features, but never assert degraded behavior as if it were terminal-correct.

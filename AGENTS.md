@@ -11,31 +11,31 @@ for the module you touch.
 
 The project is split into strict layers:
 
-- `terminal-protocol`: shared protocol constants and small vocabulary types with
+- `jvterm-protocol`: shared protocol constants and small vocabulary types with
   no dependency on parser, core, host, or input.
-- `terminal-parser`: byte stream to semantic terminal commands.
-- `terminal-core`: headless terminal state, grid physics, modes, attributes,
+- `jvterm-parser`: byte stream to semantic terminal commands.
+- `jvterm-core`: headless terminal state, grid physics, modes, attributes,
   scrollback, width policy, and storage.
-- `terminal-host`: adapters that map parser semantic commands to core
+- `jvterm-host`: adapters that map parser semantic commands to core
   APIs.
-- `terminal-input`: host-bound input encoding for keyboard, paste, focus, and
+- `jvterm-input`: host-bound input encoding for keyboard, paste, focus, and
   future mouse reports.
-- `terminal-render-api`: dependency-free primitive render frame, cursor, cell,
+- `jvterm-render-api`: dependency-free primitive render frame, cursor, cell,
   cluster, and attribute vocabulary.
-- `terminal-render-cache`: renderer-side cache that copies primitive render
+- `jvterm-render-cache`: renderer-side cache that copies primitive render
   frames for UI consumers.
-- `terminal-transport-api`: dependency-free connector contract for byte-stream
+- `jvterm-transport-api`: dependency-free connector contract for byte-stream
   transports.
-- `terminal-session`: runtime synchronization point that connects transport,
+- `jvterm-session`: runtime synchronization point that connects transport,
   parser, host, core response queues, and input encoding.
-- `terminal-ui-swing`: reusable Swing terminal UI component, painting,
+- `jvterm-ui-swing`: reusable Swing terminal UI component, painting,
   selection, input event handling, clipboard/font/settings abstractions, and
   viewport/scrollbar model.
-- `terminal-ui-swing-demo`: standalone Swing demo host that wires the reusable
+- `jvterm-ui-swing-demo`: standalone Swing demo host that wires the reusable
   UI component to a local PTY-backed session for manual testing.
-- `terminal-testkit`: reusable public test fakes for connector/session tests.
-- `terminal-pty`: local PTY process lifecycle exposed as transport connectors.
-- `terminal-benchmarks`: JMH benchmarks for performance-sensitive terminal
+- `jvterm-testkit`: reusable public test fakes for connector/session tests.
+- `jvterm-pty`: local PTY process lifecycle exposed as transport connectors.
+- `jvterm-benchmarks`: JMH benchmarks for performance-sensitive terminal
   paths.
 
 Keep these boundaries intact:
@@ -63,10 +63,10 @@ Keep these boundaries intact:
 - Swing UI displays and interacts. It must not import IntelliJ APIs, contain
   PTY-specific code, parse terminal output, or know whether bytes come from PTY,
   SSH, tests, or another transport.
-  It may use `terminal-input` event vocabulary but must send encoded intent
+  It may use `jvterm-input` event vocabulary but must send encoded intent
   through `TerminalSession` rather than writing host bytes directly.
 - Swing demo hosts. It may start PTY sessions and create windows, but reusable
-  rendering and input behavior still belong in `terminal-ui-swing`.
+  rendering and input behavior still belong in `jvterm-ui-swing`.
 - PTY hosts. It starts local pseudo-terminal processes and exposes them through
   `TerminalConnector`. It must not parse protocols, encode input itself, or
   mutate core internals.
@@ -152,16 +152,16 @@ A change is not done until:
 
 - Full test suite: `./gradlew test`
 - Format Kotlin and Gradle files: `./gradlew spotlessApply`
-- Parser tests: `./gradlew :terminal-parser:test`
-- Core tests: `./gradlew :terminal-core:test`
-- Integration tests: `./gradlew :terminal-host:test`
-- Session tests: `./gradlew :terminal-session:test`
-- Render cache tests: `./gradlew :terminal-render-cache:test`
-- Swing UI tests: `./gradlew :terminal-ui-swing:test`
-- Swing UI demo: `./gradlew :terminal-ui-swing-demo:run`
-  - Custom shell: `./gradlew :terminal-ui-swing-demo:run --args="cmd.exe"`
-- PTY tests: `./gradlew :terminal-pty:test`
-- Benchmarks: `./gradlew :terminal-benchmarks:jmh`
+- Parser tests: `./gradlew :jvterm-parser:test`
+- Core tests: `./gradlew :jvterm-core:test`
+- Integration tests: `./gradlew :jvterm-host:test`
+- Session tests: `./gradlew :jvterm-session:test`
+- Render cache tests: `./gradlew :jvterm-render-cache:test`
+- Swing UI tests: `./gradlew :jvterm-ui-swing:test`
+- Swing UI demo: `./gradlew :jvterm-ui-swing-demo:run`
+  - Custom shell: `./gradlew :jvterm-ui-swing-demo:run --args="cmd.exe"`
+- PTY tests: `./gradlew :jvterm-pty:test`
+- Benchmarks: `./gradlew :jvterm-benchmarks:jmh`
 
 In sandboxed sessions, Gradle may need approval because wrapper/cache writes can
 leave the workspace.
@@ -169,6 +169,6 @@ leave the workspace.
 ## Start Here
 
 - Feature backlog: `docs/terminal-feature-gap-map.md`
-- Core contract: `terminal-core/docs/terminal-core-contract.md`
+- Core contract: `jvterm-core/docs/terminal-core-contract.md`
 - Project skills index: `docs/agent-skills.md`
 - Repo-local Codex skills: `.agents/skills/*/SKILL.md`
