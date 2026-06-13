@@ -1,11 +1,11 @@
 ---
-name: terminal-integration-adapter
+name: terminal-host-adapter
 description: Integration adapter guidance for mapping terminal-parser TerminalCommandSink semantics to terminal-core TerminalBufferApi. Use when changing CoreTerminalCommandSink, parser-to-core wiring, module dependencies, coordinate conversion, or explicit TODO gap handling.
 ---
 
 # Terminal Integration Adapter
 
-Use this skill when changing `terminal-integration` or parser-to-core wiring.
+Use this skill when changing `terminal-host` or parser-to-core wiring.
 
 ## Boundary
 

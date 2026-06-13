@@ -15,7 +15,7 @@ Lattice is structured to keep terminal state mutation, SSH/PTY I/O, event encodi
                                     
   Inbound Path:
   ┌─────────────┐  Raw Bytes  ┌─────────────────┐  Commands  ┌──────────────────────┐  Mutations  ┌───────────────┐
-  │ PTY / SSH   ├────────────►│ terminal-parser ├───────────►│ terminal-integration ├────────────►│ terminal-core │
+  │ PTY / SSH   ├────────────►│ terminal-parser ├───────────►│ terminal-host ├────────────►│ terminal-core │
   └─────────────┘             └─────────────────┘            └──────────────────────┘             └───────┬───────┘
                                                                                                  Snapshot │ 
   Rendering Path (Triple-Buffered):                                                                       ▼
@@ -78,7 +78,7 @@ The Lattice codebase is split into highly specialized modules with rigid archite
 | [**terminal-protocol**](./terminal-protocol) | Shared Vocabulary | C0/C1 constants, `AnsiMode`, `DecPrivateMode`, mouse modes, [TerminalHostOutput](./terminal-protocol/src/main/kotlin/protocol/host/TerminalHostOutput.kt) | Has no execution logic or sub-dependencies. |
 | [**terminal-parser**](./terminal-parser) | Stream Parsing | UTF-8 streaming decoder, table-driven [AnsiStateMachine](./terminal-parser/src/main/kotlin/parser/impl/TerminalParser.kt), DEC charset remapping, UAX #29 segmentation | Has no grid physics, cursor calculations, or UI state. |
 | [**terminal-core**](./terminal-core) | Headless Grid Engine | Circular scrollback history, parallel array cells ([Line](./terminal-core/src/main/kotlin/core/model/Line.kt)), wide-character erasure, margins, resizing reflow | Has no byte stream parsing, input encoding, or UI code. |
-| [**terminal-integration**](./terminal-integration) | Translation Adapter | [CoreTerminalCommandSink](./terminal-integration/src/main/kotlin/integration/CoreTerminalCommandSink.kt) adapter, SGR Pen state, OSC 8 Hyperlink LRU registry, DECSTR/RIS resets | Has no byte parsing or state duplication. |
+| [**terminal-host**](./terminal-integration) | Translation Adapter | [CoreTerminalCommandSink](./terminal-integration/src/main/kotlin/integration/CoreTerminalCommandSink.kt) adapter, SGR Pen state, OSC 8 Hyperlink LRU registry, DECSTR/RIS resets | Has no byte parsing or state duplication. |
 | [**terminal-input**](./terminal-input) | Event Encoding | physical key arrow/numpad maps, xterm `modifyOtherKeys`, SGR/legacy mouse coordinate mapping, bracketed paste | Has no screen mutation or output parsing logic. |
 | [**terminal-render-api**](./terminal-render-api) | Rendering Contract | Viewport frame models, cursor shapes, cell state flags ([TerminalRenderCellFlags](./terminal-render-api/src/main/kotlin/com/gagik/terminal/render/api/TerminalRenderCellFlags.kt)), packed color ARGB resolution | Has no UI frame painting or glyph metrics. |
 | [**terminal-render-cache**](./terminal-render-cache) | Frame Snapshotting | [TerminalRenderCache](./terminal-render-cache/src/main/kotlin/com/gagik/terminal/render/cache/TerminalRenderCache.kt) double-buffering, [TerminalRenderPublisher](./terminal-render-cache/src/main/kotlin/com/gagik/terminal/render/cache/TerminalRenderPublisher.kt) triple-buffering | Agnostic to UI paint platforms (AWT/Swing/Compose). |
@@ -95,11 +95,11 @@ The Lattice codebase is split into highly specialized modules with rigid archite
 One of Lattice's greatest strengths is how easily it integrates into existing desktop systems or custom runtimes. Hooking a local system shell (e.g. bash or cmd) to a fully interactive Swing JComponent requires just a few lines of configuration:
 
 ```kotlin
-import com.gagik.terminal.pty.TerminalPtySessions
-import com.gagik.terminal.pty.TerminalPtyOptions
-import com.gagik.terminal.ui.swing.api.TerminalSwingTerminal
-import com.gagik.terminal.ui.swing.settings.TerminalSwingSettings
-import com.gagik.terminal.ui.swing.settings.TerminalTheme
+import io.github.jvterm.pty.TerminalPtySessions
+import io.github.jvterm.pty.TerminalPtyOptions
+import io.github.jvterm.ui.swing.api.TerminalSwingTerminal
+import io.github.jvterm.ui.swing.settings.TerminalSwingSettings
+import io.github.jvterm.ui.swing.settings.TerminalTheme
 import java.awt.BorderLayout
 import javax.swing.JFrame
 import javax.swing.JPanel
@@ -214,8 +214,8 @@ When resizing a terminal window, a simple coordinate truncation cuts off text. L
 
 We treat terminal testing as a critical engineering discipline:
 1. **No Faked Quirks**: Tests assert standard-aligned ANSI/DEC protocol states and real screen results, rather than current parser implementation hacks.
-2. **Deterministic Multi-threading**: The integration and session test suites employ synchronized latches to stress-test high-volume updates, proving that resizes, writes, and renders are race-free.
-3. **In-Memory Fakes**: By leveraging `:terminal-testkit`'s [MockConnector](./terminal-testkit/src/main/kotlin/testkit/MockConnector.kt), developers can run complete, bidirectional I/O integration tests with exact byte assertions, completely independent of local OS PTY subsystems.
+2. **Deterministic Multi-threading**: The host and session test suites employ synchronized latches to stress-test high-volume updates, proving that resizes, writes, and renders are race-free.
+3. **In-Memory Fakes**: By leveraging `:terminal-testkit`'s [MockConnector](./terminal-testkit/src/main/kotlin/testkit/MockConnector.kt), developers can run complete, bidirectional I/O host tests with exact byte assertions, completely independent of local OS PTY subsystems.
 
 ---
 

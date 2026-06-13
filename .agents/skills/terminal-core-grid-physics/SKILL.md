@@ -43,4 +43,4 @@ Cover wide cells and clusters in:
 - pen attribute reset and storage.
 
 If an attribute or operation is unsupported, document it as a core gap. Do not
-let integration fake it.
+let host fake it.

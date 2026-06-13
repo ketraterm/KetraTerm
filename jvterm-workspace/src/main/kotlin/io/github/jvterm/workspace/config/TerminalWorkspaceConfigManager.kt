@@ -1,0 +1,311 @@
+/*
+ * Copyright 2026 Gagik Sargsyan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.github.jvterm.workspace.config
+
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.*
+
+/**
+ * Manages loading and saving the [TerminalConfig] TOML file.
+ *
+ * It resolves standard OS-specific directories for config files unless overridden
+ * by a system property or environment variable.
+ *
+ * @property configPath the path to the configuration TOML file on disk.
+ */
+class TerminalWorkspaceConfigManager(
+    val configPath: Path,
+) {
+    /**
+     * Loads the configuration from the TOML file.
+     *
+     * If the file does not exist, it creates a default configuration file with comments
+     * and returns the default settings. If the file is invalid or unreadable, it falls back
+     * gracefully to default settings.
+     */
+    fun load(): TerminalConfig {
+        if (!Files.exists(configPath)) {
+            val defaultConfig = TerminalConfig()
+            save(defaultConfig)
+            return defaultConfig
+        }
+
+        return try {
+            val content = Files.readString(configPath)
+            val parsed = TomlParser.parse(content)
+
+            val window = parsed["window"] ?: emptyMap()
+            val font = parsed["font"] ?: emptyMap()
+            val themeSection = parsed["theme"] ?: emptyMap()
+            val behavior = parsed["behavior"] ?: emptyMap()
+            val shell = parsed["shell"] ?: emptyMap()
+
+            val default = TerminalConfig()
+
+            val theme = themeSection["name"] ?: default.theme
+            val shellPath = shell["path"] ?: default.shellPath
+            val startDirectory = shell["start_directory"] ?: default.startDirectory
+            val treatAmbiguousAsWide =
+                behavior["treat_ambiguous_as_wide"]?.toBooleanStrictOrNull()
+                    ?: default.treatAmbiguousAsWide
+            val fontFamily = font["family"] ?: default.fontFamily
+            val fontSize =
+                parseIntSetting(
+                    raw = font["size"],
+                    defaultValue = default.fontSize,
+                    min = TerminalConfig.FONT_SIZE_MIN,
+                    max = TerminalConfig.FONT_SIZE_MAX,
+                )
+            val lineHeight =
+                parseFloatSetting(
+                    raw = font["line_height"],
+                    defaultValue = default.lineHeight,
+                    min = TerminalConfig.LINE_HEIGHT_MIN,
+                    max = TerminalConfig.LINE_HEIGHT_MAX,
+                )
+            val columns =
+                parseIntSetting(
+                    raw = window["columns"],
+                    defaultValue = default.columns,
+                    min = TerminalConfig.COLUMNS_MIN,
+                    max = TerminalConfig.COLUMNS_MAX,
+                )
+            val rows =
+                parseIntSetting(
+                    raw = window["rows"],
+                    defaultValue = default.rows,
+                    min = TerminalConfig.ROWS_MIN,
+                    max = TerminalConfig.ROWS_MAX,
+                )
+            val cursorBlinkMillis =
+                parseIntSetting(
+                    raw = behavior["cursor_blink_millis"],
+                    defaultValue = default.cursorBlinkMillis,
+                    min = TerminalConfig.CURSOR_BLINK_MIN,
+                    max = TerminalConfig.CURSOR_BLINK_MAX,
+                )
+            val useSystemFallbackFonts =
+                font["use_system_fallback_fonts"]?.toBooleanStrictOrNull()
+                    ?: default.useSystemFallbackFonts
+            val cursorShape = behavior["cursor_shape"] ?: default.cursorShape
+            val audibleBell = behavior["audible_bell"]?.toBooleanStrictOrNull() ?: default.audibleBell
+            val pasteOnMiddleClick = behavior["paste_on_middle_click"]?.toBooleanStrictOrNull() ?: default.pasteOnMiddleClick
+            val shellRequestResizeWindow =
+                behavior["shell_request_resize_window"]?.toBooleanStrictOrNull() ?: default.shellRequestResizeWindow
+            val scrollbackLines =
+                parseIntSetting(
+                    raw = window["scrollback_lines"],
+                    defaultValue = default.scrollbackLines,
+                    min = TerminalConfig.SCROLLBACK_MIN,
+                    max = TerminalConfig.SCROLLBACK_MAX,
+                )
+            val cleanTheme = if (theme.isNotBlank()) theme else default.theme
+            val cleanFontFamily = if (fontFamily.isNotBlank()) fontFamily else default.fontFamily
+            val cleanCursorShape = if (cursorShape.isNotBlank()) cursorShape else default.cursorShape
+            val cleanShellPath = if (shellPath.isNotBlank()) shellPath else default.shellPath
+
+            TerminalConfig(
+                theme = cleanTheme,
+                treatAmbiguousAsWide = treatAmbiguousAsWide,
+                fontFamily = cleanFontFamily,
+                fontSize = fontSize,
+                columns = columns,
+                rows = rows,
+                cursorBlinkMillis = cursorBlinkMillis,
+                useSystemFallbackFonts = useSystemFallbackFonts,
+                cursorShape = cleanCursorShape,
+                shellPath = cleanShellPath,
+                startDirectory = startDirectory,
+                audibleBell = audibleBell,
+                pasteOnMiddleClick = pasteOnMiddleClick,
+                scrollbackLines = scrollbackLines,
+                lineHeight = lineHeight,
+                shellRequestResizeWindow = shellRequestResizeWindow,
+            )
+        } catch (e: Exception) {
+            try {
+                val backupPath = configPath.resolveSibling("${configPath.fileName}.broken")
+                Files.move(configPath, backupPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                System.err.println("Configuration file was malformed and has been backed up to $backupPath")
+            } catch (ioe: IOException) {
+                System.err.println("Failed to back up malformed configuration file: ${ioe.message}")
+            }
+            val defaultConfig = TerminalConfig()
+            save(defaultConfig)
+            defaultConfig
+        }
+    }
+
+    /**
+     * Saves the provided configuration to the TOML file.
+     *
+     * Creates any missing parent directories before writing. Writes the values
+     * mapped onto a documented TOML template for power user readability.
+     */
+    fun save(config: TerminalConfig) {
+        try {
+            val parent = configPath.parent
+            if (parent != null && !Files.exists(parent)) {
+                Files.createDirectories(parent)
+            }
+            val toml = generateToml(config)
+            Files.writeString(configPath, toml)
+        } catch (e: IOException) {
+            System.err.println("Failed to save configuration to $configPath: ${e.message}")
+        }
+    }
+
+    private fun generateToml(config: TerminalConfig): String =
+        """
+        # Lattice Terminal Emulator Configuration File
+        # Power users can edit this file directly to customize behavior.
+        # Changes will take effect on next application launch.
+
+        [shell]
+        # Command or path to the shell executable to run
+        path = "${config.shellPath}"
+        # Initial working directory when opening a new tab
+        start_directory = "${config.startDirectory}"
+
+        [window]
+        # Preferred default terminal size in columns and rows
+        columns = ${config.columns}
+        rows = ${config.rows}
+        # Maximum number of lines to retain in the scrollback buffer
+        scrollback_lines = ${config.scrollbackLines}
+
+        [font]
+        # Primary monospace font family
+        family = "${config.fontFamily}"
+        # Font size in points
+        size = ${config.fontSize}
+        # Line height multiplier
+        line_height = ${config.lineHeight}
+        # Whether the complex-text renderer may use installed system fonts as fallback
+        use_system_fallback_fonts = ${config.useSystemFallbackFonts}
+
+        [theme]
+        # Resolved terminal color palette theme.
+        # Supported themes: campbell, one-dark, nord, tokyo-night, everforest
+        name = "${config.theme}"
+
+        [behavior]
+        # Whether East Asian Ambiguous characters should occupy two terminal cells in width policy
+        treat_ambiguous_as_wide = ${config.treatAmbiguousAsWide}
+        # Cursor blink period in milliseconds
+        cursor_blink_millis = ${config.cursorBlinkMillis}
+        # Style of the text cursor (block, underline, beam)
+        cursor_shape = "${config.cursorShape}"
+        # Play a system beep when the terminal receives a BEL character
+        audible_bell = ${config.audibleBell}
+        # Automatically paste clipboard contents when the middle mouse button is clicked
+        paste_on_middle_click = ${config.pasteOnMiddleClick}
+        # Whether terminal window should resize when the shell requests a grid resize
+        shell_request_resize_window = ${config.shellRequestResizeWindow}
+        """.trimIndent()
+
+    private fun parseIntSetting(
+        raw: String?,
+        defaultValue: Int,
+        min: Int,
+        max: Int,
+    ): Int {
+        val text = raw?.trim() ?: return defaultValue
+        val parsed = text.toLongOrNull()
+        if (parsed != null) {
+            return parsed.coerceIn(min.toLong(), max.toLong()).toInt()
+        }
+        if (isSignedIntegerText(text)) {
+            return if (text.startsWith("-")) min else max
+        }
+        return defaultValue
+    }
+
+    private fun isSignedIntegerText(text: String): Boolean {
+        val start = if (text.startsWith("-") || text.startsWith("+")) 1 else 0
+        if (start == text.length) return false
+        for (index in start until text.length) {
+            if (!text[index].isDigit()) return false
+        }
+        return true
+    }
+
+    private fun parseFloatSetting(
+        raw: String?,
+        defaultValue: Float,
+        min: Float,
+        max: Float,
+    ): Float {
+        val text = raw?.trim() ?: return defaultValue
+        val parsed = text.toFloatOrNull() ?: return defaultValue
+        if (parsed.isNaN()) return defaultValue
+        return parsed.coerceIn(min, max)
+    }
+
+    companion object {
+        /**
+         * Resolves the default configuration path on disk for this operating system.
+         */
+        fun getDefaultPath(
+            osName: String = System.getProperty("os.name"),
+            env: Map<String, String> = System.getenv(),
+            userHome: String = System.getProperty("user.home"),
+        ): Path {
+            // 1. System property override
+            val sysProp = System.getProperty("lattice.config.path")
+            if (!sysProp.isNullOrBlank()) {
+                return Path.of(sysProp)
+            }
+
+            // 2. Env variable override
+            val envVar = env["LATTICE_CONFIG_PATH"]
+            if (!envVar.isNullOrBlank()) {
+                return Path.of(envVar)
+            }
+
+            // 3. OS-specific default configuration directories
+            val os = osName.lowercase(Locale.ROOT)
+            return when {
+                os.contains("windows") -> {
+                    val appData = env["APPDATA"]
+                    if (!appData.isNullOrBlank()) {
+                        Path.of(appData, "Lattice", "config.toml")
+                    } else {
+                        Path.of(userHome, ".config", "lattice", "config.toml")
+                    }
+                }
+                os.contains("mac") -> {
+                    Path.of(userHome, "Library", "Application Support", "Lattice", "config.toml")
+                }
+                else -> {
+                    val xdgConfig = env["XDG_CONFIG_HOME"]
+                    if (!xdgConfig.isNullOrBlank()) {
+                        Path.of(xdgConfig, "lattice", "config.toml")
+                    } else {
+                        Path.of(userHome, ".config", "lattice", "config.toml")
+                    }
+                }
+            }
+        }
+
+        /**
+         * Returns a manager configured with the OS-specific default configuration path.
+         */
+        fun getDefault(): TerminalWorkspaceConfigManager = TerminalWorkspaceConfigManager(getDefaultPath())
+    }
+}

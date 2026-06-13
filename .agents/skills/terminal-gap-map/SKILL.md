@@ -1,6 +1,6 @@
 ---
 name: terminal-gap-map
-description: Terminal feature gap-map maintenance guidance. Use when documenting missing parser/core/integration/input/policy/host support, closing TODOs, classifying modern terminal features, or deciding whether a protocol belongs in scope.
+description: Terminal feature gap-map maintenance guidance. Use when documenting missing parser/core/host/input/policy/host support, closing TODOs, classifying modern terminal features, or deciding whether a protocol belongs in scope.
 ---
 
 # Terminal Gap Map
@@ -12,7 +12,7 @@ to classify terminal support.
 
 - Keep gaps explicit. Missing support should be documented, not hidden behind
   silent no-ops.
-- Mark ownership with `TODO(parser)`, `TODO(core)`, `TODO(integration)`,
+- Mark ownership with `TODO(parser)`, `TODO(core)`, `TODO(host)`,
   `TODO(input)`, `TODO(host)`, or `TODO(policy)`.
 - Move items to `DONE(...)` only when the claimed scope has implementation and
   tests.

@@ -1,6 +1,6 @@
 ---
 name: terminal-test-suite
-description: Test design guidance for this terminal emulator. Use when adding, reviewing, hardening, or refactoring tests across parser, core, integration, Unicode, ANSI protocols, mode handling, SGR/OSC/DCS, or terminal feature work.
+description: Test design guidance for this terminal emulator. Use when adding, reviewing, hardening, or refactoring tests across parser, core, host, Unicode, ANSI protocols, mode handling, SGR/OSC/DCS, or terminal feature work.
 ---
 
 # Terminal Test Suite
@@ -42,7 +42,7 @@ Cover:
 - command dispatcher recording-sink tests.
 - parser full byte-stream tests.
 - core public API and invariant tests.
-- parser-to-core integration tests.
+- parser-to-core host tests.
 
 DRY is good only while expectations remain readable. A little repetition is
 better than hiding the behavior under test.

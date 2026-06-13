@@ -21,7 +21,7 @@ Use this skill for work in `:terminal-input` or shared API needed by input.
 
 - Input encodes host-bound bytes; it does not parse terminal output.
 - Input may depend on protocol vocabulary and core API mode reads.
-- Input must not depend on parser, integration, grid storage, cursor internals,
+- Input must not depend on parser, host, grid storage, cursor internals,
   renderer state, or UI toolkit types.
 - Do not decode mode bit positions inside input. Add missing helper methods to
   the core API first.
@@ -40,4 +40,4 @@ Use this skill for work in `:terminal-input` or shared API needed by input.
 Assert exact bytes for every encoded event. Include validation failures,
 modifier CSI parameters, UTF-8 printable codepoints, Ctrl/Alt combinations,
 application cursor/keypad modes, bracketed paste wrappers, focus reporting, and
-one real core mode-bit integration case.
+one real core mode-bit host case.

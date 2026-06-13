@@ -17,7 +17,7 @@ Status labels:
 
 - `TODO(parser)`: byte/protocol recognition or semantic dispatch is missing.
 - `TODO(core)`: terminal state, grid physics, pen storage, or public API is missing.
-- `TODO(integration)`: parser and core both have enough shape, but the bridge is incomplete.
+- `TODO(host)`: parser and core both have enough shape, but the bridge is incomplete.
 - `TODO(input)`: host-bound keyboard/mouse/paste encoding is missing.
 - `TODO(host)`: session, transport, render, UI, or embedding behavior is missing.
 - `TODO(policy)`: feature needs an explicit security or compatibility policy before implementation.
@@ -40,14 +40,14 @@ shells and TUIs well.
 
 ### Tier 2: Useful
 
-These unlock richer app compatibility and better shell integration, but should
+These unlock richer app compatibility and better shell host, but should
 remain policy-gated where they can produce terminal-to-host responses.
 
 - DSR, CPR, DA, DA2, and DA3 with a safe response policy.
 - OSC palette queries and updates.
 - DECRQSS and XTGETTCAP with an allowlist.
 - Generated Unicode grapheme and width tables.
-- Shell integration markers, including OSC 133 and common notification markers.
+- Shell host markers, including OSC 133 and common notification markers.
 - Xterm title stack push/pop.
 - Window/grid size queries.
 
@@ -76,38 +76,38 @@ surface or maintenance cost without meaningful modern terminal value.
 
 ### CSI Protocols
 
-- `DONE(parser/integration)`: `DECSLRM` left/right margins, usually
-  `CSI Pl ; Pr s`, route through parser and integration to core margins.
-- `DONE(parser/integration)`: selective erase dispatch routes to core:
+- `DONE(parser/host)`: `DECSLRM` left/right margins, usually
+  `CSI Pl ; Pr s`, route through parser and host to core margins.
+- `DONE(parser/host)`: selective erase dispatch routes to core:
     - `DECSEL`, selective erase in line.
     - `DECSED`, selective erase in display.
-- `DONE(parser/integration)`: `DECSCA` selective-erase protection routes to
+- `DONE(parser/host)`: `DECSCA` selective-erase protection routes to
   core protected-cell pen state.
-- `DONE(parser/integration)`: `RIS`, `ESC c`, full terminal reset routes to
+- `DONE(parser/host)`: `RIS`, `ESC c`, full terminal reset routes to
   `TerminalBufferApi.reset`.
-- `DONE(parser/integration)`: modern/common DEC private mode vocabulary is
+- `DONE(parser/host)`: modern/common DEC private mode vocabulary is
   named, parsed, tested, and either routed to durable core state or explicitly
   ignored:
     - application cursor/keypad modes, cursor blink/visibility, reverse video,
       origin, auto-wrap, left/right margin mode, and alternate-screen variants
     - mouse tracking and encoding selectors, focus reporting, and bracketed paste
     - synchronized output mode `?2026` is recognized, routed to core, and implemented with deferred rendering and safety timeouts in the session layer
-- `DONE(parser/core/integration)`: alternate-screen and cursor-save variants
+- `DONE(parser/core/host)`: alternate-screen and cursor-save variants
   are distinguished:
     - `47`, switch alternate screen without clearing or cursor save/restore
     - `1047`, switch alternate screen and clear on entry without cursor save/restore
     - `1048`, save/restore cursor without switching buffers
     - `1049`, save/restore cursor around a clearing alternate-screen switch
-- `DONE(parser/integration)`: xterm title stack:
+- `DONE(parser/host)`: xterm title stack:
     - `CSI 22 t` push window/icon title
     - `CSI 23 t` pop window/icon title
       Shells use this when temporarily changing titles for foreground commands.
-- `DONE(parser/core/integration)`: input-facing durable DEC private mode state
+- `DONE(parser/core/host)`: input-facing durable DEC private mode state
   routes into core mode snapshots for application cursor keys, application
   keypad, cursor blink, focus reporting, bracketed paste, mouse tracking modes,
   and mouse UTF-8/SGR/URXVT encoding selectors.
-- `DONE(parser/core/integration/host)`: `DECSCUSR` cursor style / shape and blinking support (`CSI Ps SP q`) maps to dynamic render cursor shapes (BLOCK, UNDERLINE, BAR).
-- `DONE(parser/core/integration)`: safe xterm window/grid size reports:
+- `DONE(parser/core/host/host)`: `DECSCUSR` cursor style / shape and blinking support (`CSI Ps SP q`) maps to dynamic render cursor shapes (BLOCK, UNDERLINE, BAR).
+- `DONE(parser/core/host)`: safe xterm window/grid size reports:
     - `CSI 14 t`, report window size in pixels
     - `CSI 18 t`, report terminal size in characters
       Pixel reports are silent until the host supplies positive pixel dimensions.
@@ -117,7 +117,7 @@ surface or maintenance cost without meaningful modern terminal value.
     - minimize/maximize/raise/lower variants
       Many modern terminals ignore or gate these to prevent hostile scripts from
       controlling the user's window.
-- `DONE(parser/core/integration)`: terminal-to-host response channel and safe
+- `DONE(parser/core/host)`: terminal-to-host response channel and safe
   baseline responses for:
     - `DSR 5`, operating status, responding `CSI 0 n`
     - `CPR` / `DSR 6`, cursor position reports
@@ -140,16 +140,16 @@ surface or maintenance cost without meaningful modern terminal value.
 - `TODO(parser)`: scroll variants and xterm extensions not yet routed:
     - `DECSTBM` is present
     - `SU` / `SD` are present
-    - left/right-margin-aware variants need broader integration tests
-- `DONE(parser/core/integration)`: erase saved lines / scrollback clear,
+    - left/right-margin-aware variants need broader host tests
+- `DONE(parser/core/host)`: erase saved lines / scrollback clear,
   `CSI 3 J`, is currently routed through ED mode 3 to core scrollback clearing.
   Keep this covered with regression tests because shells and clear-screen
   shortcuts rely on it.
 
 ### ESC Protocols
 
-- `DONE(parser/integration)`: full reset `ESC c`.
-- `DONE(parser/core/integration)`: DEC alignment test `DECALN`, `ESC # 8`.
+- `DONE(parser/host)`: full reset `ESC c`.
+- `DONE(parser/core/host)`: DEC alignment test `DECALN`, `ESC # 8`.
 - `DONE(parser)`: common ISO 2022 charset plumbing for G0-G3:
     - ASCII and DEC Special Graphics designation through `ESC (`, `ESC )`,
       `ESC *`, and `ESC +`
@@ -175,12 +175,12 @@ Missing:
 
 - `TODO(policy)`: OSC 52 clipboard support. This needs an explicit permission
   and security policy before implementation.
-- `DONE(parser/core/integration/host)`: OSC 4 / 10 / 11 / 12 color palette queries and updates.
+- `DONE(parser/core/host/host)`: OSC 4 / 10 / 11 / 12 color palette queries and updates.
 - `TODO(parser)`: OSC 7 current directory.
 - `TODO(parser)`: OSC 9 / 9;9 desktop notifications, if desired.
 - `TODO(parser)`: OSC 777 desktop notifications. Common in shell integrations
   and long-running command completion hooks.
-- `TODO(parser)`: OSC 133 shell integration markers.
+- `TODO(parser)`: OSC 133 shell host markers.
 - `TODO(parser)`: OSC 1337/iTerm2 extensions, if desired.
 - `TODO(parser)`: OSC query responses. Requires terminal-to-host output.
 - `TODO(parser)`: payload encoding policy for non-UTF-8 or invalid UTF-8 OSC data.
@@ -221,7 +221,7 @@ Missing:
 - `DONE(parser/core)`: Thai and Lao combining marks are classified as
   grapheme extenders in parser text segmentation and zero-width marks in core
   width calculation through generated Unicode tables.
-- `DONE(parser/core/integration)`: live host-output chunks publish complete
+- `DONE(parser/core/host)`: live host-output chunks publish complete
   printable prefixes immediately while retaining grapheme context, so a later
   combining mark, variation selector, or ZWJ continuation can extend the
   already written core cell without moving the cursor.
@@ -240,29 +240,29 @@ Missing:
 - `DONE(core)`: 256-color indexed foreground/background storage.
 - `DONE(core)`: RGB/truecolor foreground/background storage.
 - `DONE(core)`: inverse/reverse-video cell attribute.
-- `DONE(core/integration)`: faint/dim intensity.
-- `DONE(core/integration/render-cache/host)`: blink attribute storage and
+- `DONE(core/host)`: faint/dim intensity.
+- `DONE(core/host/render-cache/host)`: blink attribute storage and
   Swing blink-phase painting with row-scoped repaint scheduling.
-- `DONE(core/integration)`: conceal/hidden attribute.
-- `DONE(core/integration)`: strikethrough attribute.
-- `DONE(core/integration)`: underline style beyond boolean underline:
+- `DONE(core/host)`: conceal/hidden attribute.
+- `DONE(core/host)`: strikethrough attribute.
+- `DONE(core/host)`: underline style beyond boolean underline:
     - none
     - single
     - double
     - curly
     - dotted
     - dashed
-- `DONE(core/integration)`: SGR underline color via SGR 58/59.
-- `DONE(core/integration)`: SGR overline.
-- `DONE(core/integration)`: cell-level OSC 8 hyperlink id storage. Core stores
-  the numeric id; integration owns the URL/id pool for now.
+- `DONE(core/host)`: SGR underline color via SGR 58/59.
+- `DONE(core/host)`: SGR overline.
+- `DONE(core/host)`: cell-level OSC 8 hyperlink id storage. Core stores
+  the numeric id; host owns the URL/id pool for now.
 - `DONE(render-api/host)`: immutable renderer-facing palette model for default
   foreground/background, selection colors, cursor colors, ANSI 16, indexed
   256-color, RGB passthrough, and bold-as-bright policy.
 - `DONE(render-api/host)`: renderer-facing effective color calculation for
   default/indexed/RGB foreground and background, reverse video, conceal, and
   bold-as-bright policy.
-- `DONE(parser/core/integration/host)`: OSC palette query/update protocols and host
+- `DONE(parser/core/host/host)`: OSC palette query/update protocols and host
   policy for mutating or reporting palette state.
 
 ### Reset and Mode Semantics
@@ -271,24 +271,24 @@ Missing:
   a single atomic packed word. Core exposes both a typed mode snapshot and an
   opaque packed snapshot without making grid, cursor, or history state
   multi-reader.
-- `DONE(core/integration)`: DECSTR soft reset API. `CSI ! p` now routes to a
+- `DONE(core/host)`: DECSTR soft reset API. `CSI ! p` now routes to a
   core soft reset that preserves visible content, scrollback, tab stops,
   dimensions, and active screen selection while resetting soft mode/write state,
   margins, pen attributes, selective-erase write protection, pending wrap, and
   saved-cursor restore targets.
-- `DONE(core/integration)`: alternate-screen variants distinguish switch-only,
+- `DONE(core/host)`: alternate-screen variants distinguish switch-only,
   clearing switch-only, cursor save/restore-only, and 1049-style combined
   behavior.
 - `DONE(core/host/ui)`: cursor visibility and blink state are exposed through
   durable core modes, render-frame cursor snapshots, and Swing repaint/cursor
   painting logic.
-- `DONE(parser/core/integration/host)`: cursor style protocol support (`DECSCUSR`) parsed, routed, and maps dynamically to render shapes (BLOCK, UNDERLINE, BAR).
+- `DONE(parser/core/host/host)`: cursor style protocol support (`DECSCUSR`) parsed, routed, and maps dynamically to render shapes (BLOCK, UNDERLINE, BAR).
 - `DONE(core/session)`: synchronized output mode state (`?2026`) defers frame publishing to UI with a safety timeout of 100ms.
-- `DONE(core/integration/host)`: title and icon title state are stored in core,
-  advanced through integration metadata, published through render generation,
+- `DONE(core/host/host)`: title and icon title state are stored in core,
+  advanced through host metadata, published through render generation,
   and surfaced to hosts through `TerminalHostEventSink`.
-- `DONE(integration/host)`: BEL is surfaced through `TerminalHostEventSink`.
-- `DONE(parser/core/integration/host)`: DEC private modes 1042 (`bellIsUrgent`) and 1043 (`popOnBell`) parsed, routed, and mapped to Taskbar attention request and window raise features in the UI.
+- `DONE(host/host)`: BEL is surfaced through `TerminalHostEventSink`.
+- `DONE(parser/core/host/host)`: DEC private modes 1042 (`bellIsUrgent`) and 1043 (`popOnBell`) parsed, routed, and mapped to Taskbar attention request and window raise features in the UI.
 
 - `TODO(core/host)`: richer event API for hyperlink metadata, palette changes,
   terminal notifications, and any future host-observable state that should not
@@ -342,38 +342,38 @@ Missing:
     - OSC queries
     - future query/response protocols that need core state
 - `TODO(core/host)`: event API for hyperlinks, palette updates, and terminal
-  notifications if these move out of integration or render-frame metadata.
+  notifications if these move out of host or render-frame metadata.
 
 ## Integration Gaps
 
-- `DONE(integration)`: parser SGR inverse, 256-color indexed, and RGB/truecolor
+- `DONE(host)`: parser SGR inverse, 256-color indexed, and RGB/truecolor
   attributes are mapped to core pen attributes without clamping. SGR 38:2/48:2
   support includes robust subparameter chain length logic to handle explicit
   and omitted color space IDs in colon-separated sequences.
-- `DONE(integration)`: map faint, blink, conceal, strikethrough, overline,
+- `DONE(host)`: map faint, blink, conceal, strikethrough, overline,
   underline style, and underline color SGR attributes to core pen storage.
-- `DONE(integration)`: parser DECSTR maps to core `softReset`.
-- `DONE(integration)`: map alternate-screen `47`, `1047`, `1048`, and `1049`
+- `DONE(host)`: parser DECSTR maps to core `softReset`.
+- `DONE(host)`: map alternate-screen `47`, `1047`, `1048`, and `1049`
   to distinct core semantics.
-- `DONE(integration)`: parser RIS maps to core `reset`.
-- `DONE(integration)`: parser DECSLRM maps to core left/right margins.
-- `DONE(integration)`: parser DECSEL/DECSED/DECSCA map to core selective erase
+- `DONE(host)`: parser RIS maps to core `reset`.
+- `DONE(host)`: parser DECSLRM maps to core left/right margins.
+- `DONE(host)`: parser DECSEL/DECSED/DECSCA map to core selective erase
   and protection commands.
-- `DONE(integration)`: OSC 8 active hyperlink metadata maps to core cell
-  hyperlink ids using an integration-owned URL/id pool.
-- `DONE(integration/policy)`: OSC 8 hyperlink id pool is bounded by
+- `DONE(host)`: OSC 8 active hyperlink metadata maps to core cell
+  hyperlink ids using an host-owned URL/id pool.
+- `DONE(host/policy)`: OSC 8 hyperlink id pool is bounded by
   `TerminalHostPolicy`, rejects overlong URI/id payloads, and evicts
   least-recently-used entries instead of growing without limit.
-- `DONE(integration/session/ui)`: OSC 8 hyperlink ids can be resolved through
+- `DONE(host/session/ui)`: OSC 8 hyperlink ids can be resolved through
   session metadata and activated by Swing only after explicit Ctrl-left-click
   through a host-replaceable hyperlink handler.
-- `DONE(core/integration/host)`: OSC title state is stored in core, mirrored as
-  integration metadata for title stack behavior, and reported to hosts through
+- `DONE(core/host/host)`: OSC title state is stored in core, mirrored as
+  host metadata for title stack behavior, and reported to hosts through
   `TerminalHostEventSink`.
-- `DONE(integration/host)`: host callback/event sink exists for BEL and OSC
+- `DONE(host/host)`: host callback/event sink exists for BEL and OSC
   icon/window title changes. Device responses use the core response queue, and
   UI input reports use `TerminalSession` host output serialization.
-- `TODO(integration/host/policy)`: host callbacks or policy surfaces for
+- `TODO(host/host/policy)`: host callbacks or policy surfaces for
   palette updates, terminal notifications, mouse-report policy, and clipboard
   policy.
 
@@ -406,12 +406,12 @@ Missing:
     - bounded legacy `ESC [ M` encoding with explicit coordinate-limit policy
     - UTF-8 extended mouse encoding (`?1005`) up to xterm's coordinate limit
     - URXVT mouse encoding (`?1015`)
-- `DONE(parser/core/integration/input)`: xterm modifyOtherKeys and
+- `DONE(parser/core/host/input)`: xterm modifyOtherKeys and
   formatOtherKeys support for ordinary-key input:
     - modifyOtherKeys mode 1/2/3 consumption from core packed mode bits
     - original `CSI 27 ; modifier ; codepoint ~` format
     - `formatOtherKeys=1` / CSI-u `CSI codepoint ; modifier u` format
-    - parser/integration routing for `CSI > 4 ; Pv m` and `CSI > 4 ; Pv f`
+    - parser/host routing for `CSI > 4 ; Pv m` and `CSI > 4 ; Pv f`
     - regression coverage for modified printable input and control-equivalent
       Tab/Enter/Backspace/Escape cases
 - `TODO(input)`: broader modified-key encoding:
@@ -429,7 +429,7 @@ Missing:
       F1-F4 when a platform can distinguish keypad PF keys
 - `TODO(input/policy)`: additional xterm-compatible key policies when a real
   ambiguity exists, such as Delete behavior and optional eight-bit Meta output.
-- `TODO(input)`: SGR-Pixels mouse mode (`?1016`) if renderer/UI integration
+- `TODO(input)`: SGR-Pixels mouse mode (`?1016`) if renderer/UI host
   provides pixel-coordinate mouse events.
 - `TODO(parser/core/input)`: xterm highlight mouse tracking (`?1001`) if full
   xterm mouse parity is required; it needs a distinct interaction contract
@@ -438,13 +438,13 @@ Missing:
     - raw paste
     - strip C0 controls except TAB/CR/LF
     - line-ending normalization
-- `DONE(integration/host)`: terminal-to-host output ordering contract. UI input
+- `DONE(host/host)`: terminal-to-host output ordering contract. UI input
   events and parser/core responses such as DSR/CPR/DA/OSC/DCS replies should be
   serialized through the same terminal actor and `TerminalHostOutput`.
 - `DONE(input)`: xterm input profile matrix tests covering application
   cursor/keypad, bracketed paste, focus, mouse tracking/encoding combinations,
   and modifyOtherKeys off/mode1/mode2.
-- `DONE(protocol/core/parser/integration)`: Kitty Keyboard Protocol foundation:
+- `DONE(protocol/core/parser/host)`: Kitty Keyboard Protocol foundation:
     - protocol constants for the five progressive-enhancement flags and flag
       application modes
     - packed core input-mode bits and snapshot helpers for active Kitty
@@ -457,7 +457,7 @@ Missing:
       `CSI > flags u`, and `CSI < count u`
     - parser recording-sink and full byte-stream tests for default parameters,
       malformed parameters, and structural dispatch
-    - integration routing for `CSI = flags ; mode u` replace/set/clear
+    - host routing for `CSI = flags ; mode u` replace/set/clear
       semantics into core's active Kitty keyboard flag state
 - `DONE(core/input)`: Kitty Keyboard Protocol behavior (expanded key coverage for printables, control keys, arrows, navigation keys, function keys, and numeric keypad keys). Implemented as a clean, separate protocol path.
 
@@ -477,8 +477,8 @@ Planned Kitty Keyboard Protocol scope:
     - `terminal-core`: store input-readable Kitty keyboard flags and, once
       push/pop controls are parsed, a bounded mode stack. The stack must
       eventually respect kitty's main-screen and alternate-screen separation
-      rule; do not fake this in integration.
-    - `terminal-integration`: maps active flag application and stack controls
+      rule; do not fake this in host.
+    - `terminal-host`: maps active flag application and stack controls
       to core APIs, with explicit no-op/TODO behavior for unsupported query
       responses until policy exists.
     - `terminal-input`: add a dedicated Kitty encoder branch selected from core
@@ -498,7 +498,7 @@ Planned Kitty Keyboard Protocol scope:
     - support push/pop controls with a small bounded stack:
         - `CSI > flags u`: push current flags, then apply supplied flags
         - `CSI < number u`: pop one or more stack entries, defaulting to one
-      - `DONE(core)`: add bounded stack state when parser/integration starts
+      - `DONE(core)`: add bounded stack state when parser/host starts
         routing push/pop controls.
     - encode only key press events at first; report repeat/release events only
       after UI event vocabulary exposes them distinctly.
@@ -535,12 +535,12 @@ professional emulator needs explicit contracts for it.
       resize, local close, read errors, and process exit notification
     - `TerminalPtySessions` and `TerminalSessions.localPty` return the shared
       `TerminalSession` rather than a PTY-specific session class
-- `DONE(host/integration)`: PTY convenience factory wires integration host event
+- `DONE(host/host)`: PTY convenience factory wires host host event
   callbacks for BEL and OSC icon/window title changes.
-- `DONE(host)`: opt-in native PTY integration tests verify real process output,
+- `DONE(host)`: opt-in native PTY host tests verify real process output,
   resize, local close, process exit codes, and large output flow through PTY4J,
-  connector, session, parser, integration, and core. They are gated by
-  `-Dterminal.pty.integration=true` to keep default tests deterministic.
+  connector, session, parser, host, and core. They are gated by
+  `-Dterminal.pty.host=true` to keep default tests deterministic.
 - `DONE(core/host)`: primitive renderer frame API and core adapter for visible
   rows, stable public cell/attribute encodings, cursor visibility/blink state,
   reverse-video translation, hyperlinks ids, clusters, wrap flags, and
@@ -565,7 +565,7 @@ professional emulator needs explicit contracts for it.
 - `DONE(host/ui)`: Swing text rendering quality hints are host-configurable via
   immutable settings, including text antialiasing and fractional-metrics policy.
 - `TODO(host)`: richer font fallback policy, bundled/host-provided font
-  resolver integration, script/run-level shaping, and fallback cache eviction.
+  resolver host, script/run-level shaping, and fallback cache eviction.
 - `DONE(host/ui)`: native platform emoji presentation has a Windows
   `Segoe UI Emoji` COLR/CPAL rasterizer for platform color glyphs, with a
   Java2D fallback when native color glyph data is unavailable.
@@ -581,7 +581,7 @@ professional emulator needs explicit contracts for it.
 - `TODO(host)`: richer font measurement policy for script/run-level shaping,
   fallback run metrics, and backend painter integrations beyond the current
   Java2D/Swing path.
-- `DONE(host/ui)`: baseline and advanced text selection and clipboard integration:
+- `DONE(host/ui)`: baseline and advanced text selection and clipboard host:
     - mouse drag selection over visible render-cache rows
     - drag autoscroll at the top/bottom viewport edges with distance-proportional velocity acceleration
     - double-click smart auto-detecting word, path, and URL selection with full Unicode/CLUSTER support
@@ -617,8 +617,8 @@ professional emulator needs explicit contracts for it.
 - `DONE(host)`: audible bell setting (`audibleBell`) is now respected — the
   standalone app guards `Toolkit.beep()` with the current `settings.audibleBell`
   value, read live on each bell event.
-- `DONE(parser/core/integration)`: BEL (`\u0007`) byte recognition and
-  dispatch through the parser/core/integration pipeline to the host event sink.
+- `DONE(parser/core/host)`: BEL (`\u0007`) byte recognition and
+  dispatch through the parser/core/host pipeline to the host event sink.
 
 - `DONE(host/swing)`: middle-click paste is now supported, governed by `settings.pasteOnMiddleClick`.
 - `DONE(host)`: cursor shape configuration (`cursorShape`) mapping. Configured cursor shapes (block, underline, beam) are parsed and propagated to the terminal session to serve as the default shape on resets.
@@ -633,7 +633,7 @@ professional emulator needs explicit contracts for it.
 - `TODO(policy)`: OSC 52 clipboard permission model.
 - `DONE(policy)`: DCS/OSC query response allowlist.
 - `TODO(policy)`: richer hyperlink validation and display policy beyond
-  integration resource limits and Swing's explicit-activation handler.
+  host resource limits and Swing's explicit-activation handler.
 - `DONE(parser)`: OSC/DCS string payload accumulation is bounded by parser
   state and overflowed payloads are discarded safely.
 - `TODO(policy)`: protocol-family-specific payload limits and host-configurable

@@ -9,22 +9,21 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/terminal-benchmarks" />
-            <option value="$PROJECT_DIR$/terminal-core" />
-            <option value="$PROJECT_DIR$/terminal-input" />
-            <option value="$PROJECT_DIR$/terminal-integration" />
-            <option value="$PROJECT_DIR$/terminal-parser" />
-            <option value="$PROJECT_DIR$/terminal-protocol" />
-            <option value="$PROJECT_DIR$/terminal-pty" />
-            <option value="$PROJECT_DIR$/terminal-render-api" />
-            <option value="$PROJECT_DIR$/terminal-render-cache" />
-            <option value="$PROJECT_DIR$/terminal-session" />
-            <option value="$PROJECT_DIR$/terminal-standalone-app" />
-            <option value="$PROJECT_DIR$/terminal-testkit" />
-            <option value="$PROJECT_DIR$/terminal-transport-api" />
-            <option value="$PROJECT_DIR$/terminal-ui-swing" />
-            <option value="$PROJECT_DIR$/terminal-ui-swing-demo" />
-            <option value="$PROJECT_DIR$/terminal-workspace" />
+            <option value="$PROJECT_DIR$/jvterm-app" />
+            <option value="$PROJECT_DIR$/jvterm-benchmarks" />
+            <option value="$PROJECT_DIR$/jvterm-core" />
+            <option value="$PROJECT_DIR$/jvterm-host" />
+            <option value="$PROJECT_DIR$/jvterm-input" />
+            <option value="$PROJECT_DIR$/jvterm-parser" />
+            <option value="$PROJECT_DIR$/jvterm-protocol" />
+            <option value="$PROJECT_DIR$/jvterm-pty" />
+            <option value="$PROJECT_DIR$/jvterm-render-api" />
+            <option value="$PROJECT_DIR$/jvterm-render-cache" />
+            <option value="$PROJECT_DIR$/jvterm-session" />
+            <option value="$PROJECT_DIR$/jvterm-testkit" />
+            <option value="$PROJECT_DIR$/jvterm-transport-api" />
+            <option value="$PROJECT_DIR$/jvterm-ui-swing" />
+            <option value="$PROJECT_DIR$/jvterm-workspace" />
           </set>
         </option>
       </GradleProjectSettings>

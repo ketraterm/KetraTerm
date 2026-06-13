@@ -12,11 +12,11 @@ for the module you touch.
 The project is split into strict layers:
 
 - `terminal-protocol`: shared protocol constants and small vocabulary types with
-  no dependency on parser, core, integration, or input.
+  no dependency on parser, core, host, or input.
 - `terminal-parser`: byte stream to semantic terminal commands.
 - `terminal-core`: headless terminal state, grid physics, modes, attributes,
   scrollback, width policy, and storage.
-- `terminal-integration`: adapters that map parser semantic commands to core
+- `terminal-host`: adapters that map parser semantic commands to core
   APIs.
 - `terminal-input`: host-bound input encoding for keyboard, paste, focus, and
   future mouse reports.
@@ -27,7 +27,7 @@ The project is split into strict layers:
 - `terminal-transport-api`: dependency-free connector contract for byte-stream
   transports.
 - `terminal-session`: runtime synchronization point that connects transport,
-  parser, integration, core response queues, and input encoding.
+  parser, host, core response queues, and input encoding.
 - `terminal-ui-swing`: reusable Swing terminal UI component, painting,
   selection, input event handling, clipboard/font/settings abstractions, and
   viewport/scrollbar model.
@@ -51,7 +51,7 @@ Keep these boundaries intact:
 - Input encodes. It reads stable input-facing mode state and writes host-bound
   bytes without parsing terminal output or touching grid/cursor internals.
 - Render API exposes primitive frame contracts only. It must not depend on UI,
-  Swing, PTY, parser, integration, or core internals.
+  Swing, PTY, parser, host, or core internals.
 - Render cache copies render frame data for consumers. It must not choose host
   fonts, parse terminal bytes, or own Swing painting policy.
 - Transport connects. Connectors own host I/O threads, deliver raw bytes in
@@ -99,7 +99,7 @@ missing, intentionally deferred, and policy-gated features.
 - Do not use regex, ICU, `BreakIterator`, or object-heavy parsing in parser/core
   hot paths.
 - Do not fake unsupported behavior. Add a `TODO(parser-gap)`,
-  `TODO(core-gap)`, `TODO(integration)`, or `TODO(policy)` and document it in
+  `TODO(core-gap)`, `TODO(host)`, or `TODO(policy)` and document it in
   the gap map.
 - Keep behavior table-driven where appropriate, especially CSI/SGR/Unicode
   classification.
@@ -126,7 +126,7 @@ If the implementation is wrong, the test should fail.
 For every behavior change:
 
 - Add or update focused unit tests for the responsible component.
-- Add integration tests for real byte streams when parser behavior is involved.
+- Add host tests for real byte streams when parser behavior is involved.
 - Cover normal cases, omitted/default parameters, malformed input, overflow,
   boundary values, recovery behavior, and chunking where relevant.
 - Use recording fixtures to keep assertions explicit, but do not hide the
@@ -139,7 +139,7 @@ For every behavior change:
 A change is not done until:
 
 - It is implemented in the correct layer.
-- Relevant parser/core/integration tests exist and pass.
+- Relevant parser/core/host tests exist and pass.
 - Edge and hostile cases are covered, not only the happy path.
 - Unsupported parts are explicit TODOs, not silent no-ops pretending to work.
 - `docs/terminal-feature-gap-map.md` is updated when capability or scope
@@ -154,7 +154,7 @@ A change is not done until:
 - Format Kotlin and Gradle files: `./gradlew spotlessApply`
 - Parser tests: `./gradlew :terminal-parser:test`
 - Core tests: `./gradlew :terminal-core:test`
-- Integration tests: `./gradlew :terminal-integration:test`
+- Integration tests: `./gradlew :terminal-host:test`
 - Session tests: `./gradlew :terminal-session:test`
 - Render cache tests: `./gradlew :terminal-render-cache:test`
 - Swing UI tests: `./gradlew :terminal-ui-swing:test`

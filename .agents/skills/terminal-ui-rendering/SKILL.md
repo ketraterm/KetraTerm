@@ -1,6 +1,6 @@
 ---
 name: terminal-ui-rendering
-description: Use when implementing or reviewing terminal UI/rendering work such as Swing painting, render-frame consumption, text runs, fonts, colors, cursor rendering, selection, viewport/scrollback behavior, standalone host wiring, or IDE host integration.
+description: Use when implementing or reviewing terminal UI/rendering work such as Swing painting, render-frame consumption, text runs, fonts, colors, cursor rendering, selection, viewport/scrollback behavior, standalone host wiring, or IDE host host.
 ---
 
 # Terminal UI Rendering
@@ -173,5 +173,5 @@ Before accepting a UI/rendering change, verify:
 - settings, metrics, and palette are snapshotted.
 - Swing state stays on the EDT.
 - off-EDT buffers, if any, have clear ownership.
-- host integration remains adapter-only.
+- host host remains adapter-only.
 - deterministic tests cover the behavior.
