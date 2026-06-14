@@ -18,19 +18,12 @@ plugins {
     kotlin("jvm")
 }
 
-group = "io.github.jvterm"
-version = "1.0-SNAPSHOT"
-
 dependencies {
     api(project(":jvterm-session"))
     implementation(project(":jvterm-pty"))
     implementation(project(":jvterm-render-api"))
 
     testImplementation(kotlin("test"))
-}
-
-kotlin {
-    jvmToolchain(21)
 }
 
 tasks.test {

@@ -19,9 +19,6 @@ plugins {
     kotlin("jvm")
 }
 
-group = "io.github.jvterm"
-version = "1.0.0"
-
 repositories {
     mavenCentral()
 }
@@ -35,10 +32,6 @@ dependencies {
     runtimeOnly("org.slf4j:slf4j-nop:2.0.18")
 
     testImplementation(kotlin("test"))
-}
-
-kotlin {
-    jvmToolchain(21)
 }
 
 application {

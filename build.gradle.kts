@@ -25,12 +25,21 @@ dependencies {
 }
 
 subprojects {
+    group = "io.github.jvterm"
+    version = "0.1.0"
+
     repositories {
         mavenCentral()
     }
 
-    apply(plugin = "com.diffplug.spotless")
-    apply(plugin = "org.jetbrains.dokka")
+    plugins.withId("org.jetbrains.kotlin.jvm") {
+        extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
+            jvmToolchain(21)
+        }
+    }
+
+    plugins.apply("com.diffplug.spotless")
+    plugins.apply("org.jetbrains.dokka")
 
     plugins.withId("org.jetbrains.dokka") {
         if (file("Module.md").exists()) {

@@ -38,10 +38,6 @@ dependencies {
     annotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:1.37")
 }
 
-kotlin {
-    jvmToolchain(21)
-}
-
 jmh {
     warmupIterations.set(3)
     iterations.set(5)
