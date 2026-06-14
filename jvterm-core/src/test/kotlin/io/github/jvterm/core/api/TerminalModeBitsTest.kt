@@ -58,10 +58,10 @@ class TerminalModeBitsTest {
     fun `TerminalInputState helpers decode input mode bits`() {
         val bits =
             TerminalModeBits.APPLICATION_CURSOR_KEYS or
-                    TerminalModeBits.APPLICATION_KEYPAD or
-                    TerminalModeBits.NEW_LINE_MODE or
-                    TerminalModeBits.BRACKETED_PASTE or
-                    TerminalModeBits.FOCUS_REPORTING
+                TerminalModeBits.APPLICATION_KEYPAD or
+                TerminalModeBits.NEW_LINE_MODE or
+                TerminalModeBits.BRACKETED_PASTE or
+                TerminalModeBits.FOCUS_REPORTING
         val withFormat =
             TerminalModeBits.withPackedValue(
                 bits = bits,
@@ -76,7 +76,7 @@ class TerminalModeBitsTest {
                 shift = TerminalModeBits.KITTY_KEYBOARD_FLAGS_SHIFT,
                 value =
                     KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
-                            KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
+                        KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
             )
 
         assertTrue(TerminalInputState.isApplicationCursorKeys(withKittyFlags))
@@ -87,7 +87,7 @@ class TerminalModeBitsTest {
         assertEquals(1, TerminalInputState.formatOtherKeysMode(withKittyFlags))
         assertEquals(
             KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
-                    KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
+                KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
             TerminalInputState.kittyKeyboardFlags(withKittyFlags),
         )
     }

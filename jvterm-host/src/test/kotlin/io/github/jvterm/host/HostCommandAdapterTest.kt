@@ -496,22 +496,22 @@ class HostCommandAdapterTest {
             f.acceptAscii("\u001B[=9u")
             assertEquals(
                 KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
-                        KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
+                    KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
                 f.terminal.getModeSnapshot().kittyKeyboardFlags,
             )
 
             f.acceptAscii("\u001B[=2;2u")
             assertEquals(
                 KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
-                        KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES or
-                        KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
+                    KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES or
+                    KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
                 f.terminal.getModeSnapshot().kittyKeyboardFlags,
             )
 
             f.acceptAscii("\u001B[=1;3u")
             assertEquals(
                 KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES or
-                        KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
+                    KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
                 f.terminal.getModeSnapshot().kittyKeyboardFlags,
             )
         }

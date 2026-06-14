@@ -800,7 +800,7 @@ class HostCommandAdapter(
         id: String?,
     ): Boolean =
         uri.length <= hostPolicy.maxHyperlinkUriLength &&
-                (id?.length ?: 0) <= hostPolicy.maxHyperlinkIdLength
+            (id?.length ?: 0) <= hostPolicy.maxHyperlinkIdLength
 
     private fun nextHyperlinkIdAfter(current: Int): Int = if (current == Int.MAX_VALUE) 1 else current + 1
 

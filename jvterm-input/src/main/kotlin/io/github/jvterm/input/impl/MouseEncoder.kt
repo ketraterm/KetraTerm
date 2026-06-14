@@ -65,23 +65,23 @@ internal class MouseEncoder(
 
             MouseTrackingMode.NORMAL ->
                 event.type == TerminalMouseEventType.PRESS ||
-                        event.type == TerminalMouseEventType.RELEASE ||
-                        event.type == TerminalMouseEventType.WHEEL
+                    event.type == TerminalMouseEventType.RELEASE ||
+                    event.type == TerminalMouseEventType.WHEEL
 
             MouseTrackingMode.BUTTON_EVENT ->
                 event.type == TerminalMouseEventType.PRESS ||
-                        event.type == TerminalMouseEventType.RELEASE ||
-                        event.type == TerminalMouseEventType.WHEEL ||
-                        (
-                                event.type == TerminalMouseEventType.MOTION &&
-                                        event.button != TerminalMouseButton.NONE
-                                )
+                    event.type == TerminalMouseEventType.RELEASE ||
+                    event.type == TerminalMouseEventType.WHEEL ||
+                    (
+                        event.type == TerminalMouseEventType.MOTION &&
+                            event.button != TerminalMouseButton.NONE
+                    )
 
             MouseTrackingMode.ANY_EVENT ->
                 event.type == TerminalMouseEventType.PRESS ||
-                        event.type == TerminalMouseEventType.RELEASE ||
-                        event.type == TerminalMouseEventType.WHEEL ||
-                        event.type == TerminalMouseEventType.MOTION
+                    event.type == TerminalMouseEventType.RELEASE ||
+                    event.type == TerminalMouseEventType.WHEEL ||
+                    event.type == TerminalMouseEventType.MOTION
 
             else -> false
         }
@@ -251,7 +251,7 @@ internal class MouseEncoder(
 
                 TerminalMouseEventType.PRESS,
                 TerminalMouseEventType.MOTION,
-                    -> {
+                -> {
                     if (event.button == TerminalMouseButton.NONE) {
                         if (event.type == TerminalMouseEventType.MOTION) {
                             3

@@ -385,10 +385,10 @@ class MouseEncoderTest {
         return when (encoding) {
             MouseEncodingMode.DEFAULT,
             MouseEncodingMode.UTF8,
-                -> esc("[M") + bytes(code, 33, 33)
+            -> esc("[M") + bytes(code, 33, 33)
             MouseEncodingMode.SGR,
             MouseEncodingMode.SGR_PIXELS,
-                -> esc("[<${code - 32};1;1M")
+            -> esc("[<${code - 32};1;1M")
             MouseEncodingMode.URXVT -> esc("[$code;1;1M")
             else -> bytes()
         }
