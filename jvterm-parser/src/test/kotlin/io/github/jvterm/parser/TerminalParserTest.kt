@@ -472,7 +472,7 @@ class TerminalParserTest {
             val clipboard = TerminalParserFixture()
 
             malformed.acceptAscii("\u001B]x;title\u0007")
-            unsupported.acceptAscii("\u001B]9;title\u001B\\")
+            unsupported.acceptAscii("\u001B]99;title\u001B\\")
             overflowed.acceptAscii("\u001B]0;too-long\u0007")
             clipboard.acceptAscii("\u001B]52;c;SGVsbG8=\u001B\\")
 
@@ -508,6 +508,38 @@ class TerminalParserTest {
                     )
                 },
                 { assertEquals(listOf("endHyperlink"), end.sink.events) },
+            )
+        }
+
+        @Test
+        fun `OSC 9 and OSC 777 desktop notifications through the full parser`() {
+            val osc9 = TerminalParserFixture()
+            val osc777 = TerminalParserFixture()
+            val osc777Warning = TerminalParserFixture()
+
+            osc9.acceptAscii("\u001B]9;Hello from full parser\u0007")
+            osc777.acceptAscii("\u001B]777;notify;Full Title;Full Body\u001B\\")
+            osc777Warning.acceptAscii("\u001B]777;notify;Attention;Low Disk;warning\u0007")
+
+            assertAll(
+                {
+                    assertEquals(
+                        listOf("showNotification::Hello from full parser:INFO"),
+                        osc9.sink.events,
+                    )
+                },
+                {
+                    assertEquals(
+                        listOf("showNotification:Full Title:Full Body:INFO"),
+                        osc777.sink.events,
+                    )
+                },
+                {
+                    assertEquals(
+                        listOf("showNotification:Attention:Low Disk:WARNING"),
+                        osc777Warning.sink.events,
+                    )
+                },
             )
         }
 

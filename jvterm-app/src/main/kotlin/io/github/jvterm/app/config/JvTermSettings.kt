@@ -133,6 +133,12 @@ internal class JvTermSettings(
             updateConfig(config.copy(shellRequestResizeWindow = value))
         }
 
+    var desktopNotificationsEnabled: Boolean
+        get() = config.desktopNotificationsEnabled
+        set(value) {
+            updateConfig(config.copy(desktopNotificationsEnabled = value))
+        }
+
     fun current(): SwingSettings =
         SwingSettings(
             font = Font(config.fontFamily, Font.PLAIN, config.fontSize),

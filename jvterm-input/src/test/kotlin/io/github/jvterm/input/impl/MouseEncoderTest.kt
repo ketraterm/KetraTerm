@@ -75,6 +75,7 @@ class MouseEncoderTest {
         assertTrackingMatrix(MouseEncodingMode.UTF8, esc("[M") + bytes(32, 33, 33))
         assertTrackingMatrix(MouseEncodingMode.SGR, esc("[<0;1;1M"))
         assertTrackingMatrix(MouseEncodingMode.URXVT, esc("[32;1;1M"))
+        assertTrackingMatrix(MouseEncodingMode.SGR_PIXELS, esc("[<0;1;1M"))
     }
 
     @Test
@@ -92,6 +93,29 @@ class MouseEncoderTest {
         assertMouseBytes(esc("[<65;3;4M"), wheel(TerminalMouseButton.WHEEL_DOWN, column = 2, row = 3))
         assertMouseBytes(esc("[<66;3;4M"), wheel(TerminalMouseButton.WHEEL_LEFT, column = 2, row = 3))
         assertMouseBytes(esc("[<67;3;4M"), wheel(TerminalMouseButton.WHEEL_RIGHT, column = 2, row = 3))
+    }
+
+    @Test
+    fun `encodes SGR-Pixels coordinates correctly with pixel coordinates`() {
+        assertMouseBytes(
+            esc("[<0;11;21M"),
+            pressPixel(TerminalMouseButton.LEFT, column = 0, row = 0, pixelX = 10, pixelY = 20),
+            encoding = MouseEncodingMode.SGR_PIXELS,
+        )
+        assertMouseBytes(
+            esc("[<0;11;21m"),
+            releasePixel(TerminalMouseButton.LEFT, column = 0, row = 0, pixelX = 10, pixelY = 20),
+            encoding = MouseEncodingMode.SGR_PIXELS,
+        )
+    }
+
+    @Test
+    fun `encodes SGR-Pixels coordinates falling back to cell coordinates if negative`() {
+        assertMouseBytes(
+            esc("[<0;1;1M"),
+            pressPixel(TerminalMouseButton.LEFT, column = 0, row = 0, pixelX = -1, pixelY = -1),
+            encoding = MouseEncodingMode.SGR_PIXELS,
+        )
     }
 
     @Test
@@ -362,7 +386,9 @@ class MouseEncoderTest {
             MouseEncodingMode.DEFAULT,
             MouseEncodingMode.UTF8,
             -> esc("[M") + bytes(code, 33, 33)
-            MouseEncodingMode.SGR -> esc("[<${code - 32};1;1M")
+            MouseEncodingMode.SGR,
+            MouseEncodingMode.SGR_PIXELS,
+            -> esc("[<${code - 32};1;1M")
             MouseEncodingMode.URXVT -> esc("[$code;1;1M")
             else -> bytes()
         }
@@ -409,11 +435,28 @@ class MouseEncoderTest {
         modifiers: Int = TerminalModifiers.NONE,
     ): TerminalMouseEvent = TerminalMouseEvent(column, row, button, TerminalMouseEventType.PRESS, modifiers)
 
+    private fun pressPixel(
+        button: TerminalMouseButton = TerminalMouseButton.LEFT,
+        column: Int = 0,
+        row: Int = 0,
+        pixelX: Int = -1,
+        pixelY: Int = -1,
+        modifiers: Int = TerminalModifiers.NONE,
+    ): TerminalMouseEvent = TerminalMouseEvent(column, row, button, TerminalMouseEventType.PRESS, modifiers, pixelX, pixelY)
+
     private fun release(
         button: TerminalMouseButton = TerminalMouseButton.LEFT,
         column: Int = 0,
         row: Int = 0,
     ): TerminalMouseEvent = TerminalMouseEvent(column, row, button, TerminalMouseEventType.RELEASE)
+
+    private fun releasePixel(
+        button: TerminalMouseButton = TerminalMouseButton.LEFT,
+        column: Int = 0,
+        row: Int = 0,
+        pixelX: Int = -1,
+        pixelY: Int = -1,
+    ): TerminalMouseEvent = TerminalMouseEvent(column, row, button, TerminalMouseEventType.RELEASE, pixelX = pixelX, pixelY = pixelY)
 
     private fun motion(
         button: TerminalMouseButton,

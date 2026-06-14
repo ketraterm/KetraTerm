@@ -54,4 +54,7 @@ object MouseEncodingMode {
 
     /** URXVT mouse encoding, currently policy-gated in input. */
     const val URXVT: Int = 3
+
+    /** SGR pixel mouse encoding. */
+    const val SGR_PIXELS: Int = 4
 }

@@ -96,14 +96,14 @@ object TerminalModeBits {
     const val MOUSE_ENCODING_SHIFT: Int = 24
 
     /** Width in bits of the packed mouse encoding mode field. */
-    const val MOUSE_ENCODING_WIDTH: Int = 2
+    const val MOUSE_ENCODING_WIDTH: Int = 3
 
     /** Bit mask for the packed mouse encoding mode field. */
     const val MOUSE_ENCODING_MASK: Long =
         ((1L shl MOUSE_ENCODING_WIDTH) - 1L) shl MOUSE_ENCODING_SHIFT
 
     /** Starting bit for the packed format-other-keys mode field. */
-    const val FORMAT_OTHER_KEYS_SHIFT: Int = 26
+    const val FORMAT_OTHER_KEYS_SHIFT: Int = 27
 
     /** Width in bits of the packed format-other-keys mode field. */
     const val FORMAT_OTHER_KEYS_WIDTH: Int = 2
@@ -113,7 +113,7 @@ object TerminalModeBits {
         ((1L shl FORMAT_OTHER_KEYS_WIDTH) - 1L) shl FORMAT_OTHER_KEYS_SHIFT
 
     /** Starting bit for the packed Kitty keyboard progressive-enhancement flags. */
-    const val KITTY_KEYBOARD_FLAGS_SHIFT: Int = 28
+    const val KITTY_KEYBOARD_FLAGS_SHIFT: Int = 29
 
     /** Width in bits of the packed Kitty keyboard progressive-enhancement flags. */
     const val KITTY_KEYBOARD_FLAGS_WIDTH: Int = 5

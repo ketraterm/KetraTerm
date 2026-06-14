@@ -16,6 +16,7 @@
 package io.github.jvterm.app.ui
 
 import io.github.jvterm.app.config.JvTermSettings
+import io.github.jvterm.protocol.NotificationLevel
 import io.github.jvterm.workspace.*
 import java.awt.*
 import java.awt.event.InputEvent
@@ -590,6 +591,17 @@ internal class TabManager(
         ) {
             SwingUtilities.invokeLater {
                 updateTabColor(tab.id, color)
+            }
+        }
+
+        override fun showNotification(
+            tab: TerminalWorkspaceTab,
+            title: String,
+            body: String,
+            level: NotificationLevel,
+        ) {
+            if (settings.desktopNotificationsEnabled) {
+                DesktopNotificationManager.showNotification(title, body, level)
             }
         }
 

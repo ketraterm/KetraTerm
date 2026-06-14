@@ -30,4 +30,5 @@ enum class MouseEncodingMode {
     UTF8,
     SGR,
     URXVT,
+    SGR_PIXELS,
 }

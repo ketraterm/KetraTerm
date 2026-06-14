@@ -23,6 +23,7 @@ import io.github.jvterm.protocol.AnsiMode
 import io.github.jvterm.protocol.DecPrivateMode
 import io.github.jvterm.protocol.MouseEncodingMode
 import io.github.jvterm.protocol.MouseTrackingMode
+import io.github.jvterm.protocol.NotificationLevel
 import io.github.jvterm.protocol.keyboard.*
 import io.github.jvterm.render.api.TerminalRenderCursorShape
 
@@ -365,6 +366,10 @@ class HostCommandAdapter(
             DecPrivateMode.MOUSE_URXVT ->
                 terminal.setMouseEncodingMode(
                     if (enable) MouseEncodingMode.URXVT else MouseEncodingMode.DEFAULT,
+                )
+            DecPrivateMode.MOUSE_SGR_PIXELS ->
+                terminal.setMouseEncodingMode(
+                    if (enable) MouseEncodingMode.SGR_PIXELS else MouseEncodingMode.DEFAULT,
                 )
             DecPrivateMode.ALT_SCREEN -> {
                 if (enable) {
@@ -719,6 +724,16 @@ class HostCommandAdapter(
 
     override fun queryTerminfo(rawPayload: String) {
         terminal.queryTerminfo(rawPayload)
+    }
+
+    override fun showNotification(
+        title: String,
+        body: String,
+        level: NotificationLevel,
+    ) {
+        val clampedTitle = title.take(hostPolicy.maxNotificationTitleLength)
+        val clampedBody = body.take(hostPolicy.maxNotificationBodyLength)
+        hostEvents.showNotification(clampedTitle, clampedBody, level)
     }
 
     /**

@@ -23,6 +23,7 @@ import io.github.jvterm.parser.api.TerminalOutputParser
 import io.github.jvterm.parser.api.TerminalParsers
 import io.github.jvterm.protocol.MouseEncodingMode
 import io.github.jvterm.protocol.MouseTrackingMode
+import io.github.jvterm.protocol.NotificationLevel
 import io.github.jvterm.protocol.keyboard.FormatOtherKeysMode
 import io.github.jvterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.jvterm.protocol.keyboard.ModifyOtherKeysMode
@@ -38,9 +39,11 @@ class HostCommandAdapterTest {
     private data class Fixture(
         val terminal: TerminalBuffer = TerminalBuffers.create(width = 10, height = 5),
         val hostPolicy: HostPolicy = HostPolicy(),
+        val events: RecordingHostEventSink = RecordingHostEventSink(),
         val sink: HostCommandAdapter =
             HostCommandAdapter(
                 terminal = terminal,
+                hostEvents = events,
                 hostPolicy = hostPolicy,
             ),
         val parser: TerminalOutputParser = TerminalParsers.create(sink),
@@ -111,7 +114,7 @@ class HostCommandAdapterTest {
 
         @Test
         fun `symbol heavy paste split byte by byte leaves cursor after visual cells`() {
-            val text = "∀∂∈ℝ∧∪≡∞ ↑↗↨↻⇣ ┐┼╔╘░►☺♀ ﬁ�⑀₂ἠḂӥẄɐː⍎אԱა"
+            val text = "∀∂∈ℝ∧∪≡∞ ↑↗↨↻⇣ ┐┼╔╘░►☺♀ ﬁ⑀₂ἠḂӥẄɐː⍎אԱა"
             val bytes = text.encodeToByteArray()
             val expectedCodepoints = text.codePointCount(0, text.length)
             val f = Fixture(terminal = TerminalBuffers.create(width = 120, height = 3))
@@ -405,6 +408,17 @@ class HostCommandAdapterTest {
             assertEquals(MouseEncodingMode.URXVT, f.terminal.getModeSnapshot().mouseEncodingMode)
 
             f.acceptAscii("\u001B[?1015l")
+            assertEquals(MouseEncodingMode.DEFAULT, f.terminal.getModeSnapshot().mouseEncodingMode)
+        }
+
+        @Test
+        fun `SGR-Pixels mouse encoding mode updates core snapshot`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B[?1016h")
+            assertEquals(MouseEncodingMode.SGR_PIXELS, f.terminal.getModeSnapshot().mouseEncodingMode)
+
+            f.acceptAscii("\u001B[?1016l")
             assertEquals(MouseEncodingMode.DEFAULT, f.terminal.getModeSnapshot().mouseEncodingMode)
         }
 
@@ -1214,6 +1228,38 @@ class HostCommandAdapterTest {
         }
     }
 
+    @Nested
+    @DisplayName("desktop notifications")
+    inner class DesktopNotifications {
+        @Test
+        fun `notifications are forwarded to the event sink`() {
+            val f = Fixture()
+            f.acceptAscii("\u001B]9;Hello from Host\u0007")
+            f.acceptAscii("\u001B]777;notify;Warning!;Disk space low;warning\u0007")
+            assertEquals(
+                listOf(
+                    Triple("", "Hello from Host", NotificationLevel.INFO),
+                    Triple("Warning!", "Disk space low", NotificationLevel.WARNING),
+                ),
+                f.events.notifications,
+            )
+        }
+
+        @Test
+        fun `notifications are clamped by host policy`() {
+            val f =
+                Fixture(
+                    hostPolicy =
+                        HostPolicy(
+                            maxNotificationTitleLength = 5,
+                            maxNotificationBodyLength = 10,
+                        ),
+                )
+            f.acceptAscii("\u001B]777;notify;1234567;1234567890123;error\u0007")
+            assertEquals(listOf(Triple("12345", "1234567890", NotificationLevel.ERROR)), f.events.notifications)
+        }
+    }
+
     private class RecordingHostEventSink : HostEventSink {
         var bells: Int = 0
         val iconTitles = mutableListOf<String>()
@@ -1236,6 +1282,16 @@ class HostCommandAdapterTest {
             columns: Int,
         ) {
             // No-op for tests unless assertions need it
+        }
+
+        val notifications = mutableListOf<Triple<String, String, NotificationLevel>>()
+
+        override fun showNotification(
+            title: String,
+            body: String,
+            level: NotificationLevel,
+        ) {
+            notifications += Triple(title, body, level)
         }
     }
 }

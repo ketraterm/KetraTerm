@@ -107,6 +107,8 @@ class TerminalWorkspaceConfigManager(
             val pasteOnMiddleClick = behavior["paste_on_middle_click"]?.toBooleanStrictOrNull() ?: default.pasteOnMiddleClick
             val shellRequestResizeWindow =
                 behavior["shell_request_resize_window"]?.toBooleanStrictOrNull() ?: default.shellRequestResizeWindow
+            val desktopNotificationsEnabled =
+                behavior["desktop_notifications_enabled"]?.toBooleanStrictOrNull() ?: default.desktopNotificationsEnabled
             val scrollbackLines =
                 parseIntSetting(
                     raw = window["scrollback_lines"],
@@ -136,6 +138,7 @@ class TerminalWorkspaceConfigManager(
                 scrollbackLines = scrollbackLines,
                 lineHeight = lineHeight,
                 shellRequestResizeWindow = shellRequestResizeWindow,
+                desktopNotificationsEnabled = desktopNotificationsEnabled,
             )
         } catch (e: Exception) {
             try {
@@ -217,6 +220,8 @@ class TerminalWorkspaceConfigManager(
         paste_on_middle_click = ${config.pasteOnMiddleClick}
         # Whether terminal window should resize when the shell requests a grid resize
         shell_request_resize_window = ${config.shellRequestResizeWindow}
+        # Whether to enable desktop notifications when the terminal receives OSC 9 or OSC 777 sequences
+        desktop_notifications_enabled = ${config.desktopNotificationsEnabled}
         """.trimIndent()
 
     private fun parseIntSetting(

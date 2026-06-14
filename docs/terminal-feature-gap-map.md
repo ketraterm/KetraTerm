@@ -177,9 +177,8 @@ Missing:
   and security policy before implementation.
 - `DONE(parser/core/host/host)`: OSC 4 / 10 / 11 / 12 color palette queries and updates.
 - `TODO(parser)`: OSC 7 current directory.
-- `TODO(parser)`: OSC 9 / 9;9 desktop notifications, if desired.
-- `TODO(parser)`: OSC 777 desktop notifications. Common in shell integrations
-  and long-running command completion hooks.
+- `DONE(parser/core/host/app)`: OSC 9 desktop notifications (iTerm2 style). See [specification](file:///c:/Users/gagik/IdeaProjects/JvTerm/docs/desktop-notifications.md).
+- `DONE(parser/core/host/app)`: OSC 777 desktop notifications (urxvt notify style) with custom severity levels. See [specification](file:///c:/Users/gagik/IdeaProjects/JvTerm/docs/desktop-notifications.md).
 - `TODO(parser)`: OSC 133 shell host markers.
 - `TODO(parser)`: OSC 1337/iTerm2 extensions, if desired.
 - `TODO(parser)`: OSC query responses. Requires terminal-to-host output.
@@ -406,6 +405,7 @@ Missing:
     - bounded legacy `ESC [ M` encoding with explicit coordinate-limit policy
     - UTF-8 extended mouse encoding (`?1005`) up to xterm's coordinate limit
     - URXVT mouse encoding (`?1015`)
+    - SGR-Pixels mouse encoding (`?1016`) utilizing high-precision pixel coordinates
 - `DONE(parser/core/host/input)`: xterm modifyOtherKeys and
   formatOtherKeys support for ordinary-key input:
     - modifyOtherKeys mode 1/2/3 consumption from core packed mode bits
@@ -429,8 +429,7 @@ Missing:
       F1-F4 when a platform can distinguish keypad PF keys
 - `TODO(input/policy)`: additional xterm-compatible key policies when a real
   ambiguity exists, such as Delete behavior and optional eight-bit Meta output.
-- `TODO(input)`: SGR-Pixels mouse mode (`?1016`) if renderer/UI host
-  provides pixel-coordinate mouse events.
+- `DONE(input)`: SGR-Pixels mouse mode (`?1016`) supported in input and mapped from Swing UI.
 - `TODO(parser/core/input)`: xterm highlight mouse tracking (`?1001`) if full
   xterm mouse parity is required; it needs a distinct interaction contract
   rather than simple cell-coordinate event forwarding.
@@ -498,8 +497,8 @@ Planned Kitty Keyboard Protocol scope:
     - support push/pop controls with a small bounded stack:
         - `CSI > flags u`: push current flags, then apply supplied flags
         - `CSI < number u`: pop one or more stack entries, defaulting to one
-      - `DONE(core)`: add bounded stack state when parser/host starts
-        routing push/pop controls.
+        - `DONE(core)`: add bounded stack state when parser/host starts
+          routing push/pop controls.
     - encode only key press events at first; report repeat/release events only
       after UI event vocabulary exposes them distinctly.
     - implement the high-value input slice first:
@@ -643,5 +642,4 @@ professional emulator needs explicit contracts for it.
 - `TODO(policy)`: terminal capability identity. Claiming xterm compatibility
   requires implementing enough behavior to make that claim true.
 - `TODO(policy)`: window manipulation allow/deny behavior for xterm window ops.
-- `TODO(policy)`: desktop notification allow/deny behavior for OSC 777 and
-  related notification protocols.
+- `DONE(policy)`: desktop notification allow/deny setting (desktop_notifications_enabled) for OSC 9 and OSC 777.

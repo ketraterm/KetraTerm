@@ -33,10 +33,14 @@ data class TerminalMouseEvent(
     val button: TerminalMouseButton,
     val type: TerminalMouseEventType,
     val modifiers: Int = TerminalModifiers.NONE,
+    val pixelX: Int = -1,
+    val pixelY: Int = -1,
 ) {
     init {
         require(column >= 0) { "column must be non-negative: $column" }
         require(row >= 0) { "row must be non-negative: $row" }
+        require(pixelX >= -1) { "pixelX must be non-negative or -1: $pixelX" }
+        require(pixelY >= -1) { "pixelY must be non-negative or -1: $pixelY" }
         require(TerminalModifiers.isValid(modifiers)) {
             "invalid modifier bitmask: $modifiers"
         }

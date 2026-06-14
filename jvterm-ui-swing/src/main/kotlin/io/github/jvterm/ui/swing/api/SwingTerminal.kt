@@ -634,6 +634,12 @@ class SwingTerminal
             if (event.isControlDown) mods = mods or TerminalModifiers.CTRL
             if (event.isMetaDown) mods = mods or TerminalModifiers.META
 
+            val padding = settings.padding
+            val gridWidth = renderCache.columns * metrics.cellWidth
+            val gridHeight = renderCache.rows * metrics.cellHeight
+            val pixelX = (event.x - padding.left).coerceIn(0, gridWidth - 1)
+            val pixelY = (event.y - padding.top - contentYOffset(renderCache)).toInt().coerceIn(0, gridHeight - 1)
+
             val mouseEvent =
                 TerminalMouseEvent(
                     column = column,
@@ -641,6 +647,8 @@ class SwingTerminal
                     button = button,
                     type = type,
                     modifiers = mods,
+                    pixelX = pixelX,
+                    pixelY = pixelY,
                 )
             boundSession.encodeMouse(mouseEvent)
             event.consume()

@@ -15,6 +15,7 @@
  */
 package io.github.jvterm.workspace
 
+import io.github.jvterm.protocol.NotificationLevel
 import io.github.jvterm.pty.PtyEventListener
 import io.github.jvterm.pty.PtyOptions
 import io.github.jvterm.pty.TerminalSessions
@@ -168,6 +169,15 @@ class TerminalWorkspace(
                 columns: Int,
             ) {
                 tabBySession(session)?.let { listener.resizeWindow(it, rows, columns) }
+            }
+
+            override fun showNotification(
+                session: TerminalSession,
+                title: String,
+                body: String,
+                level: NotificationLevel,
+            ) {
+                tabBySession(session)?.let { listener.showNotification(it, title, body, level) }
             }
 
             override fun listenerFailed(
@@ -340,6 +350,20 @@ interface TerminalWorkspaceListener {
     fun listenerFailed(
         tab: TerminalWorkspaceTab,
         exception: Exception,
+    ) = Unit
+
+    /**
+     * Called when a tab requests a desktop notification.
+     *
+     * @param tab tab that requested the notification.
+     * @param title notification title.
+     * @param level notification severity level.
+     */
+    fun showNotification(
+        tab: TerminalWorkspaceTab,
+        title: String,
+        body: String,
+        level: NotificationLevel,
     ) = Unit
 
     companion object {

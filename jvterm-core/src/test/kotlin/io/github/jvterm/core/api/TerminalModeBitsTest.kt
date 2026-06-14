@@ -49,7 +49,7 @@ class TerminalModeBitsTest {
                 bits = 0L,
                 mask = TerminalModeBits.MOUSE_ENCODING_MASK,
                 shift = TerminalModeBits.MOUSE_ENCODING_SHIFT,
-                value = 4,
+                value = 8,
             )
         }
     }

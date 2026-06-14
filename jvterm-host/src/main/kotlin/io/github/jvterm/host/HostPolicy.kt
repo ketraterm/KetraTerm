@@ -33,6 +33,8 @@ data class HostPolicy(
     val maxHyperlinkEntries: Int = 4096,
     val maxHyperlinkUriLength: Int = 4096,
     val maxHyperlinkIdLength: Int = 256,
+    val maxNotificationTitleLength: Int = 256,
+    val maxNotificationBodyLength: Int = 1024,
 ) {
     init {
         require(maxHyperlinkEntries > 0) {
@@ -43,6 +45,12 @@ data class HostPolicy(
         }
         require(maxHyperlinkIdLength >= 0) {
             "maxHyperlinkIdLength must be non-negative, got $maxHyperlinkIdLength"
+        }
+        require(maxNotificationTitleLength >= 0) {
+            "maxNotificationTitleLength must be non-negative, got $maxNotificationTitleLength"
+        }
+        require(maxNotificationBodyLength >= 0) {
+            "maxNotificationBodyLength must be non-negative, got $maxNotificationBodyLength"
         }
     }
 }

@@ -43,6 +43,7 @@ object DecPrivateMode {
     const val MOUSE_UTF8: Int = 1005
     const val MOUSE_SGR: Int = 1006
     const val MOUSE_URXVT: Int = 1015
+    const val MOUSE_SGR_PIXELS: Int = 1016
 
     const val BRACKETED_PASTE: Int = 2004
 

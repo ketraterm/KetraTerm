@@ -122,14 +122,11 @@ class SwingTerminalCursorBlinkTest {
                 component.cursorTimer.restart()
             }
 
-            // 1. Manually set cursorBlinkVisible to false to simulate a blinked-out phase
+            // 1. Manually set cursorBlinkVisible to false and verify, then dispatch key event and verify, then set back to false and verify
             SwingUtilities.invokeAndWait {
                 component.cursorBlinkVisible = false
-            }
-            assertFalse(component.cursorBlinkVisible)
+                assertFalse(component.cursorBlinkVisible)
 
-            // 2. Dispatch a key event and verify cursorBlinkVisible becomes true
-            SwingUtilities.invokeAndWait {
                 val keyEvent =
                     KeyEvent(
                         component,
@@ -142,14 +139,11 @@ class SwingTerminalCursorBlinkTest {
                 for (listener in component.keyListeners) {
                     listener.keyPressed(keyEvent)
                 }
-            }
-            assertTrue(component.cursorBlinkVisible)
+                assertTrue(component.cursorBlinkVisible)
 
-            // 3. Set cursorBlinkVisible to false again
-            SwingUtilities.invokeAndWait {
                 component.cursorBlinkVisible = false
+                assertFalse(component.cursorBlinkVisible)
             }
-            assertFalse(component.cursorBlinkVisible)
 
             // 4. Trigger a session dirty update to simulate a frame update
             session.requestRender(scrollbackOffset = 0)
