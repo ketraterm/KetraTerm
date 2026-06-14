@@ -25,8 +25,17 @@ dependencies {
 }
 
 subprojects {
+    group = "io.github.jvterm"
+    version = "0.1.0"
+
     repositories {
         mavenCentral()
+    }
+
+    plugins.withId("org.jetbrains.kotlin.jvm") {
+        extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
+            jvmToolchain(21)
+        }
     }
 
     apply(plugin = "com.diffplug.spotless")

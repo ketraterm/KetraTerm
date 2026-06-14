@@ -197,11 +197,11 @@ internal class AboutDialog(
                     .getResourceAsStream("io/github/jvterm/app/version.properties")
             if (inputStream != null) {
                 properties.load(inputStream)
-                properties.getProperty("version") ?: "1.0.0"
+                properties.getProperty("version") ?: "0.1.0"
             } else {
-                "1.0.0"
+                "0.1.0"
             }
         } catch (e: Exception) {
-            "1.0.0"
+            "0.1.0"
         }
 }

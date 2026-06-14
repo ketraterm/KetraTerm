@@ -19,9 +19,6 @@ plugins {
     kotlin("jvm")
 }
 
-group = "io.github.jvterm"
-version = "1.0-SNAPSHOT"
-
 repositories {
     mavenCentral()
 }
@@ -34,10 +31,6 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
-}
-
-kotlin {
-    jvmToolchain(21)
 }
 
 tasks.test {
