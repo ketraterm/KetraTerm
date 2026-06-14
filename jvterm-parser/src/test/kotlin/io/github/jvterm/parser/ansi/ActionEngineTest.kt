@@ -564,6 +564,13 @@ class ActionEngineTest {
         override fun queryTerminfo(rawPayload: String) {
             sinkCalls += "queryTerminfo:$rawPayload"
         }
+
+        override fun showNotification(
+            title: String,
+            body: String,
+        ) {
+            sinkCalls += "showNotification:$title:$body"
+        }
     }
 
     private fun dirtySequenceState(state: ParserState) {

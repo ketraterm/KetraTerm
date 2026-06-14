@@ -38,9 +38,11 @@ class HostCommandAdapterTest {
     private data class Fixture(
         val terminal: TerminalBuffer = TerminalBuffers.create(width = 10, height = 5),
         val hostPolicy: HostPolicy = HostPolicy(),
+        val events: RecordingHostEventSink = RecordingHostEventSink(),
         val sink: HostCommandAdapter =
             HostCommandAdapter(
                 terminal = terminal,
+                hostEvents = events,
                 hostPolicy = hostPolicy,
             ),
         val parser: TerminalOutputParser = TerminalParsers.create(sink),
@@ -1225,6 +1227,31 @@ class HostCommandAdapterTest {
         }
     }
 
+    @Nested
+    @DisplayName("desktop notifications")
+    inner class DesktopNotifications {
+        @Test
+        fun `notifications are forwarded to the event sink`() {
+            val f = Fixture()
+            f.acceptAscii("\u001B]9;Hello from Host\u0007")
+            assertEquals(listOf(Pair("", "Hello from Host")), f.events.notifications)
+        }
+
+        @Test
+        fun `notifications are clamped by host policy`() {
+            val f =
+                Fixture(
+                    hostPolicy =
+                        HostPolicy(
+                            maxNotificationTitleLength = 5,
+                            maxNotificationBodyLength = 10,
+                        ),
+                )
+            f.acceptAscii("\u001B]777;notify;1234567;1234567890123\u0007")
+            assertEquals(listOf(Pair("12345", "1234567890")), f.events.notifications)
+        }
+    }
+
     private class RecordingHostEventSink : HostEventSink {
         var bells: Int = 0
         val iconTitles = mutableListOf<String>()
@@ -1247,6 +1274,15 @@ class HostCommandAdapterTest {
             columns: Int,
         ) {
             // No-op for tests unless assertions need it
+        }
+
+        val notifications = mutableListOf<Pair<String, String>>()
+
+        override fun showNotification(
+            title: String,
+            body: String,
+        ) {
+            notifications += Pair(title, body)
         }
     }
 }

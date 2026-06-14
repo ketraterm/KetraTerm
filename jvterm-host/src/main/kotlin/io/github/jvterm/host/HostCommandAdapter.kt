@@ -725,6 +725,15 @@ class HostCommandAdapter(
         terminal.queryTerminfo(rawPayload)
     }
 
+    override fun showNotification(
+        title: String,
+        body: String,
+    ) {
+        val clampedTitle = title.take(hostPolicy.maxNotificationTitleLength)
+        val clampedBody = body.take(hostPolicy.maxNotificationBodyLength)
+        hostEvents.showNotification(clampedTitle, clampedBody)
+    }
+
     /**
      * Returns the OSC 8 URI associated with [hyperlinkId], or `null`.
      *

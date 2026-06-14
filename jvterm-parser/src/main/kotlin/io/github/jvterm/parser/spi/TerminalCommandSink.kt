@@ -441,4 +441,15 @@ interface TerminalCommandSink {
 
     /** Queries terminfo capabilities (XTGETTCAP). */
     fun queryTerminfo(rawPayload: String)
+
+    /**
+     * Requests a desktop notification.
+     *
+     * @param title notification title.
+     * @param body notification body.
+     */
+    fun showNotification(
+        title: String,
+        body: String,
+    )
 }

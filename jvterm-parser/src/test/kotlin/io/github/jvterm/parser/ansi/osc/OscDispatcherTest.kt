@@ -161,6 +161,55 @@ class OscDispatcherTest {
     }
 
     @Nested
+    @DisplayName("notifications")
+    inner class Notifications {
+        @Test
+        fun `OSC 9 dispatches desktop notification`() {
+            assertEquals(
+                listOf("showNotification::Hello World"),
+                dispatch("9;Hello World").events,
+            )
+        }
+
+        @Test
+        fun `OSC 9 ignores ConEmu progress and working directory commands`() {
+            assertTrue(dispatch("9;4;1;50").events.isEmpty())
+            assertTrue(dispatch("9;9;C:\\some\\directory").events.isEmpty())
+            assertTrue(dispatch("9;1;state").events.isEmpty())
+            assertTrue(dispatch("9;0").events.isEmpty())
+        }
+
+        @Test
+        fun `OSC 777 notify dispatches notification with title and body`() {
+            assertEquals(
+                listOf("showNotification:Task finished:success"),
+                dispatch("777;notify;Task finished;success").events,
+            )
+        }
+
+        @Test
+        fun `OSC 777 notify handles body with semicolons`() {
+            assertEquals(
+                listOf("showNotification:Build:success; code 0; done"),
+                dispatch("777;notify;Build;success; code 0; done").events,
+            )
+        }
+
+        @Test
+        fun `OSC 777 notify handles omitted body`() {
+            assertEquals(
+                listOf("showNotification:Only Title:"),
+                dispatch("777;notify;Only Title").events,
+            )
+        }
+
+        @Test
+        fun `OSC 777 ignores other subcommands`() {
+            assertTrue(dispatch("777;random_subcommand;title;body").events.isEmpty())
+        }
+    }
+
+    @Nested
     @DisplayName("ignored payloads")
     inner class IgnoredPayloads {
         @Test
@@ -173,7 +222,7 @@ class OscDispatcherTest {
 
         @Test
         fun `unsupported command is ignored`() {
-            assertTrue(dispatch("9;ignored").events.isEmpty())
+            assertTrue(dispatch("99;ignored").events.isEmpty())
         }
 
         @Test

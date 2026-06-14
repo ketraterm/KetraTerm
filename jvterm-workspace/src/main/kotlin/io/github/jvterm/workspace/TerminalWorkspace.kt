@@ -170,6 +170,14 @@ class TerminalWorkspace(
                 tabBySession(session)?.let { listener.resizeWindow(it, rows, columns) }
             }
 
+            override fun showNotification(
+                session: TerminalSession,
+                title: String,
+                body: String,
+            ) {
+                tabBySession(session)?.let { listener.showNotification(it, title, body) }
+            }
+
             override fun listenerFailed(
                 session: TerminalSession,
                 exception: Exception,
@@ -340,6 +348,19 @@ interface TerminalWorkspaceListener {
     fun listenerFailed(
         tab: TerminalWorkspaceTab,
         exception: Exception,
+    ) = Unit
+
+    /**
+     * Called when a tab requests a desktop notification.
+     *
+     * @param tab tab that requested the notification.
+     * @param title notification title.
+     * @param body notification body.
+     */
+    fun showNotification(
+        tab: TerminalWorkspaceTab,
+        title: String,
+        body: String,
     ) = Unit
 
     companion object {

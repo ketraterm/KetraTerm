@@ -438,4 +438,11 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
     override fun queryTerminfo(rawPayload: String) {
         events += "queryTerminfo:$rawPayload"
     }
+
+    override fun showNotification(
+        title: String,
+        body: String,
+    ) {
+        events += "showNotification:$title:$body"
+    }
 }

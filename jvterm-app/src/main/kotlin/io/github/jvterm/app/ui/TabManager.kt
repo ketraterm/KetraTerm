@@ -593,6 +593,16 @@ internal class TabManager(
             }
         }
 
+        override fun showNotification(
+            tab: TerminalWorkspaceTab,
+            title: String,
+            body: String,
+        ) {
+            if (settings.desktopNotificationsEnabled) {
+                DesktopNotificationManager.showNotification(title, body)
+            }
+        }
+
         override fun resizeWindow(
             tab: TerminalWorkspaceTab,
             rows: Int,

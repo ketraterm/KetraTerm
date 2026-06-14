@@ -43,6 +43,7 @@ class SessionHostEventBridgeTest {
         assertThrows(IllegalStateException::class.java) { bridge.bell() }
         assertThrows(IllegalStateException::class.java) { bridge.iconTitleChanged("icon") }
         assertThrows(IllegalStateException::class.java) { bridge.windowTitleChanged("window") }
+        assertThrows(IllegalStateException::class.java) { bridge.showNotification("title", "body") }
     }
 
     @Test
@@ -55,8 +56,9 @@ class SessionHostEventBridgeTest {
         bridge.iconTitleChanged("icon")
         bridge.windowTitleChanged("window")
         bridge.resizeWindow(24, 80)
+        bridge.showNotification("title", "body")
 
-        assertEquals(listOf("bell", "icon:icon", "window:window", "resizeWindow:24:80"), listener.events)
+        assertEquals(listOf("bell", "icon:icon", "window:window", "resizeWindow:24:80", "showNotification:title:body"), listener.events)
     }
 
     @Test
@@ -131,6 +133,14 @@ class SessionHostEventBridgeTest {
             columns: Int,
         ) {
             events += "resizeWindow:$rows:$columns"
+        }
+
+        override fun showNotification(
+            session: TerminalSession,
+            title: String,
+            body: String,
+        ) {
+            events += "showNotification:$title:$body"
         }
 
         override fun listenerFailed(

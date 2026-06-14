@@ -60,6 +60,12 @@ internal object OscDispatcher {
                 }
             }
             8 -> dispatchHyperlink(sink, payload, length, commandEnd + 1)
+            9 -> {
+                val payloadStr = decodePayload(payload, commandEnd + 1, length)
+                if (!isConEmuCommand(payloadStr)) {
+                    sink.showNotification(title = "", body = payloadStr)
+                }
+            }
             10, 11, 12 -> {
                 val payloadStr = decodePayload(payload, commandEnd + 1, length)
                 val parts = payloadStr.split(';')
@@ -77,7 +83,29 @@ internal object OscDispatcher {
                     target++
                 }
             }
+            777 -> {
+                val payloadStr = decodePayload(payload, commandEnd + 1, length)
+                if (payloadStr.startsWith("notify;")) {
+                    val parts = payloadStr.split(';')
+                    if (parts.size >= 2) {
+                        val title = parts[1]
+                        val body =
+                            if (parts.size >= 3) {
+                                parts.subList(2, parts.size).joinToString(";")
+                            } else {
+                                ""
+                            }
+                        sink.showNotification(title = title, body = body)
+                    }
+                }
+            }
         }
+    }
+
+    private fun isConEmuCommand(payload: String): Boolean {
+        val firstSemi = payload.indexOf(';')
+        val firstPart = if (firstSemi >= 0) payload.substring(0, firstSemi) else payload
+        return firstPart == "0" || firstPart == "1" || firstPart == "2" || firstPart == "3" || firstPart == "4" || firstPart == "9"
     }
 
     private fun dispatchHyperlink(

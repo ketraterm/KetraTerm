@@ -81,6 +81,19 @@ interface PtyEventListener {
         columns: Int,
     )
 
+    /**
+     * Called when the shell requests a desktop notification.
+     *
+     * @param session session that received the event.
+     * @param title notification title.
+     * @param body notification body.
+     */
+    fun showNotification(
+        session: TerminalSession,
+        title: String,
+        body: String,
+    ) = Unit
+
     companion object {
         /**
          * Listener used when the host does not need PTY callbacks.
@@ -104,6 +117,12 @@ interface PtyEventListener {
                     session: TerminalSession,
                     rows: Int,
                     columns: Int,
+                ) = Unit
+
+                override fun showNotification(
+                    session: TerminalSession,
+                    title: String,
+                    body: String,
                 ) = Unit
 
                 override fun listenerFailed(

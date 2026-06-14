@@ -52,6 +52,17 @@ interface HostEventSink {
         columns: Int,
     )
 
+    /**
+     * Called when the shell requests a desktop notification.
+     *
+     * @param title notification title (can be empty if not provided).
+     * @param body notification body text.
+     */
+    fun showNotification(
+        title: String,
+        body: String,
+    ) = Unit
+
     companion object {
         /**
          * Event sink used when the host does not need metadata callbacks.
@@ -68,6 +79,11 @@ interface HostEventSink {
                 override fun resizeWindow(
                     rows: Int,
                     columns: Int,
+                ) = Unit
+
+                override fun showNotification(
+                    title: String,
+                    body: String,
                 ) = Unit
             }
     }

@@ -145,6 +145,7 @@ class TerminalConfigTest {
                 useSystemFallbackFonts = true,
                 cursorShape = "beam",
                 shellRequestResizeWindow = true,
+                desktopNotificationsEnabled = false,
             )
 
         manager.save(customConfig)

@@ -177,9 +177,8 @@ Missing:
   and security policy before implementation.
 - `DONE(parser/core/host/host)`: OSC 4 / 10 / 11 / 12 color palette queries and updates.
 - `TODO(parser)`: OSC 7 current directory.
-- `TODO(parser)`: OSC 9 / 9;9 desktop notifications, if desired.
-- `TODO(parser)`: OSC 777 desktop notifications. Common in shell integrations
-  and long-running command completion hooks.
+- `DONE(parser/core/host/app)`: OSC 9 desktop notifications (iTerm2 style).
+- `DONE(parser/core/host/app)`: OSC 777 desktop notifications (urxvt notify style).
 - `TODO(parser)`: OSC 133 shell host markers.
 - `TODO(parser)`: OSC 1337/iTerm2 extensions, if desired.
 - `TODO(parser)`: OSC query responses. Requires terminal-to-host output.
@@ -643,5 +642,4 @@ professional emulator needs explicit contracts for it.
 - `TODO(policy)`: terminal capability identity. Claiming xterm compatibility
   requires implementing enough behavior to make that claim true.
 - `TODO(policy)`: window manipulation allow/deny behavior for xterm window ops.
-- `TODO(policy)`: desktop notification allow/deny behavior for OSC 777 and
-  related notification protocols.
+- `DONE(policy)`: desktop notification allow/deny setting (desktop_notifications_enabled) for OSC 9 and OSC 777.
