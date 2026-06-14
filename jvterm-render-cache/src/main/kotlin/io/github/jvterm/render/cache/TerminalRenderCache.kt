@@ -338,6 +338,12 @@ class TerminalRenderCache(
         }
     }
 
+    /**
+     * Copies row data, cursor state, active buffer kind, and color palette
+     * from the given [frame] into this cache's primitive storage.
+     *
+     * @param frame the short-lived render frame snapshot to copy from.
+     */
     override fun accept(frame: TerminalRenderFrame) {
         resizedOnLastUpdate = false
 
@@ -591,6 +597,10 @@ class TerminalRenderCache(
      *
      * Rendering should consume [clusterRefs] and [clusterCodepoints] directly so
      * repeated paint passes do not allocate strings for cache hits.
+     *
+     * @param row zero-based row index.
+     * @param column zero-based column index.
+     * @return the string representing the grapheme cluster, or null if no cluster exists.
      */
     fun clusterText(
         row: Int,
@@ -603,16 +613,25 @@ class TerminalRenderCache(
 
     /**
      * Returns the row-major base offset for [row] in flattened cell planes.
+     *
+     * @param row zero-based row index.
+     * @return the flat index pointing to the start of the row.
      */
     fun rowOffset(row: Int): Int = row * columns
 
     /**
      * Returns the codepoint offset encoded in [ref].
+     *
+     * @param ref packed cluster reference.
+     * @return the starting index of the cluster in [clusterCodepoints].
      */
     fun clusterOffset(ref: Long): Int = (ref ushr 32).toInt()
 
     /**
      * Returns the codepoint length encoded in [ref].
+     *
+     * @param ref packed cluster reference.
+     * @return the number of codepoints in the cluster.
      */
     fun clusterLength(ref: Long): Int = (ref and 0xFFFF_FFFFL).toInt()
 

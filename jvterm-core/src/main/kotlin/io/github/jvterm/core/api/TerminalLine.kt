@@ -35,6 +35,9 @@ interface TerminalLine {
      * - Returns [io.github.jvterm.core.model.TerminalConstants.EMPTY] (0) for blank cells.
      * - Returns [io.github.jvterm.core.model.TerminalConstants.WIDE_CHAR_SPACER] (-1)
      *   for the right half of a 2-cell wide character; renderers should skip such cells.
+     *
+     * @param col Column index (0-based).
+     * @return The base Unicode codepoint at the specified column, or a spacer/empty sentinel.
      */
     fun getCodepoint(col: Int): Int
 
@@ -72,6 +75,9 @@ interface TerminalLine {
      *
      * Defaults to `false` so that [io.github.jvterm.core.model.VoidLine] and simple
      * stub implementations need not override it.
+     *
+     * @param col Column index (0-based).
+     * @return `true` if the cell holds a grapheme cluster, `false` otherwise.
      */
     fun isCluster(col: Int): Boolean = false
 

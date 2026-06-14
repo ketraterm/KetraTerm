@@ -27,6 +27,8 @@ interface TerminalConnector : AutoCloseable {
      * Starts delivering transport events to [listener].
      *
      * Implementations may call listener methods from transport-owned threads.
+     *
+     * @param listener callback sink for transport events.
      */
     fun start(listener: TerminalConnectorListener)
 
@@ -35,6 +37,10 @@ interface TerminalConnector : AutoCloseable {
      *
      * The range must be synchronously consumed or copied before this method
      * returns because callers may immediately reuse [bytes].
+     *
+     * @param bytes byte array containing data to write.
+     * @param offset starting index in the byte array.
+     * @param length number of bytes to write.
      */
     fun write(
         bytes: ByteArray,
@@ -44,6 +50,9 @@ interface TerminalConnector : AutoCloseable {
 
     /**
      * Resizes the remote terminal transport in character cells.
+     *
+     * @param columns new column width count.
+     * @param rows new row height count.
      */
     fun resize(
         columns: Int,

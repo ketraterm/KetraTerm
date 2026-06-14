@@ -36,23 +36,61 @@ object KittyKeyboardFunctionalKeyCode {
     const val BACKSPACE: Int = 0x7f
 
     // Keypad keys (mapped to Private Use Area)
+
+    /** Keypad 0. */
     const val KP_0: Int = 57399
+
+    /** Keypad 1. */
     const val KP_1: Int = 57400
+
+    /** Keypad 2. */
     const val KP_2: Int = 57401
+
+    /** Keypad 3. */
     const val KP_3: Int = 57402
+
+    /** Keypad 4. */
     const val KP_4: Int = 57403
+
+    /** Keypad 5. */
     const val KP_5: Int = 57404
+
+    /** Keypad 6. */
     const val KP_6: Int = 57405
+
+    /** Keypad 7. */
     const val KP_7: Int = 57406
+
+    /** Keypad 8. */
     const val KP_8: Int = 57407
+
+    /** Keypad 9. */
     const val KP_9: Int = 57408
+
+    /** Keypad decimal point. */
     const val KP_DECIMAL: Int = 57409
+
+    /** Keypad division sign. */
     const val KP_DIVIDE: Int = 57410
+
+    /** Keypad multiplication sign. */
     const val KP_MULTIPLY: Int = 57411
+
+    /** Keypad subtraction sign. */
     const val KP_SUBTRACT: Int = 57412
+
+    /** Keypad addition sign. */
     const val KP_ADD: Int = 57413
+
+    /** Keypad enter key. */
     const val KP_ENTER: Int = 57414
+
+    /** Keypad equal sign. */
     const val KP_EQUAL: Int = 57415
+
+    /** Keypad separator. */
     const val KP_SEPARATOR: Int = 57416
+
+    /** Keypad begin key (center button of 5-keypad). */
     const val KP_BEGIN: Int = 57427
 }

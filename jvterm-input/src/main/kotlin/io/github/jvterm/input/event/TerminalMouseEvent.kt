@@ -26,6 +26,8 @@ package io.github.jvterm.input.event
  * @property button button or wheel direction associated with this event.
  * @property type mouse event family.
  * @property modifiers active keyboard modifiers using [TerminalModifiers] bits.
+ * @property pixelX optional pixel-level column coordinate (zero-based).
+ * @property pixelY optional pixel-level row coordinate (zero-based).
  */
 data class TerminalMouseEvent(
     val column: Int,

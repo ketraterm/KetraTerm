@@ -40,11 +40,15 @@ class TerminalWorkspace(
 
     /**
      * Returns a stable snapshot of currently open tabs.
+     *
+     * @return a list containing all currently open [TerminalWorkspaceTab]s.
      */
     fun tabSnapshot(): List<TerminalWorkspaceTab> = tabs.toList()
 
     /**
      * Returns the currently selected tab, or `null` when no tabs are open.
+     *
+     * @return the selected [TerminalWorkspaceTab], or null if none.
      */
     fun selectedTab(): TerminalWorkspaceTab? = selectedTabId?.let(::tabById)
 
@@ -204,6 +208,7 @@ class TerminalWorkspace(
  * @property columns initial terminal width in cells.
  * @property rows initial terminal height in rows.
  * @property treatAmbiguousAsWide width policy for future writes.
+ * @property maxHistory max scrollback lines retained by the core buffer.
  */
 data class TerminalWorkspaceOpenOptions(
     val columns: Int,
@@ -357,6 +362,7 @@ interface TerminalWorkspaceListener {
      *
      * @param tab tab that requested the notification.
      * @param title notification title.
+     * @param body notification message body.
      * @param level notification severity level.
      */
     fun showNotification(

@@ -17,18 +17,36 @@ package io.github.jvterm.protocol
 
 /** Mouse tracking selection toggled by DECSET private modes. */
 enum class MouseTrackingMode {
+    /** Mouse tracking is disabled. */
     OFF,
+
+    /** X10 compatibility tracking: report button presses only. */
     X10,
+
+    /** Normal tracking: report button presses and releases. */
     NORMAL,
+
+    /** Button event tracking: report button presses, releases, and drag events. */
     BUTTON_EVENT,
+
+    /** Any event tracking: report button presses, releases, drag events, and motion/hover events. */
     ANY_EVENT,
 }
 
 /** Mouse report encoding selected by xterm private modes. */
 enum class MouseEncodingMode {
+    /** Standard X11 byte-value encoding. */
     DEFAULT,
+
+    /** UTF-8 coordinate encoding (legacy extension). */
     UTF8,
+
+    /** Modern standard SGR mouse encoding. */
     SGR,
+
+    /** urxvt-style decimal mouse encoding (legacy extension). */
     URXVT,
+
+    /** SGR-style pixel-level coordinate mouse encoding. */
     SGR_PIXELS,
 }

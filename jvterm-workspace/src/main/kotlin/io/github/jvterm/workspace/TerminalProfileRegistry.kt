@@ -41,6 +41,8 @@ class TerminalProfileRegistry(
 ) {
     /**
      * Returns built-in profiles in menu/default preference order.
+     *
+     * @return a list of discovered built-in [TerminalProfile]s.
      */
     fun availableProfiles(): List<TerminalProfile> =
         if (isWindows()) {
@@ -103,6 +105,9 @@ class TerminalProfileRegistry(
 
     /**
      * Checks if a shell path is a valid executable file or an executable command on the PATH.
+     *
+     * @param shellPath shell path to validate.
+     * @return true if the shell path exists and is executable, false otherwise.
      */
     fun isValidShellPath(shellPath: String): Boolean {
         if (shellPath.isBlank()) return false

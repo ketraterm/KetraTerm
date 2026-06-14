@@ -24,6 +24,10 @@ import java.io.IOException
 object TerminalSessions {
     /**
      * Starts a local PTY and returns the shared transport-neutral session type.
+     *
+     * @param options options configuration for the PTY session.
+     * @return running terminal session.
+     * @throws IOException if the process cannot be started.
      */
     @JvmStatic
     @JvmOverloads

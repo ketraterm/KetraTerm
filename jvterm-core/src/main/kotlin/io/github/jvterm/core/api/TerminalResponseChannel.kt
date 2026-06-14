@@ -23,25 +23,54 @@ package io.github.jvterm.core.api
  * response contents that depend on core state such as cursor position.
  */
 interface TerminalResponseChannel : TerminalHostResponseReader {
+    /**
+     * The number of queued response bytes currently waiting to be read.
+     */
     val pendingResponseBytes: Int
 
+    /**
+     * Discards all queued response bytes from this channel.
+     */
     fun clearResponseBytes()
 
+    /**
+     * Enqueues a device status report (DSR) response.
+     *
+     * @param mode The DSR mode parameter (e.g. 5 for status, 6 for cursor position).
+     * @param decPrivate `true` if this is a DEC private DSR (? prefix), `false` for standard ANSI.
+     */
     fun requestDeviceStatusReport(
         mode: Int,
         decPrivate: Boolean,
     )
 
+    /**
+     * Enqueues a device attributes (DA) report response.
+     *
+     * @param kind The device attributes query type (primary, secondary, or tertiary).
+     * @param parameter The request parameter/subtype (usually 0).
+     */
     fun requestDeviceAttributes(
         kind: Int,
         parameter: Int,
     )
 
+    /**
+     * Updates the recorded window size in pixels.
+     *
+     * @param width Width in pixels.
+     * @param height Height in pixels.
+     */
     fun setWindowSizePixels(
         width: Int,
         height: Int,
     )
 
+    /**
+     * Enqueues a window report response.
+     *
+     * @param mode The window report mode (e.g. [WINDOW_REPORT_PIXELS] or [WINDOW_REPORT_GRID_CELLS]).
+     */
     fun requestWindowReport(mode: Int)
 
     /**

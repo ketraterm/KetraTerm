@@ -49,6 +49,8 @@ enum class TerminalMouseButton {
 
 /**
  * Returns true when this button represents a wheel report.
+ *
+ * @return true if this is a wheel button, false otherwise.
  */
 fun TerminalMouseButton.isWheel(): Boolean =
     this == TerminalMouseButton.WHEEL_UP ||

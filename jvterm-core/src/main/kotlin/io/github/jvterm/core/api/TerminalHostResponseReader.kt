@@ -26,7 +26,10 @@ interface TerminalHostResponseReader {
     /**
      * Reads up to [length] queued response bytes into [dst].
      *
-     * @return number of bytes copied, or `0` when no response is pending.
+     * @param dst The destination byte array to copy response bytes into.
+     * @param offset The starting offset in [dst] at which to begin writing bytes.
+     * @param length The maximum number of bytes to read from the queue.
+     * @return Number of bytes copied, or `0` when no response is pending.
      */
     fun readResponseBytes(
         dst: ByteArray,

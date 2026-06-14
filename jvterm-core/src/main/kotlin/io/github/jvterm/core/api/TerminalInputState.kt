@@ -21,6 +21,8 @@ package io.github.jvterm.core.api
 interface TerminalInputState {
     /**
      * Returns one coherent snapshot of all input-readable terminal mode bits.
+     *
+     * @return A packed 64-bit word containing the state of all input-facing terminal modes.
      */
     fun getInputModeBits(): Long
 
@@ -30,36 +32,54 @@ interface TerminalInputState {
     companion object {
         /**
          * Returns true when application cursor keys mode is enabled in [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return `true` if application cursor keys mode (DECCKM) is enabled, `false` otherwise.
          */
         @JvmStatic
         fun isApplicationCursorKeys(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.APPLICATION_CURSOR_KEYS)
 
         /**
          * Returns true when application keypad mode is enabled in [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return `true` if application keypad mode (DECNKM) is enabled, `false` otherwise.
          */
         @JvmStatic
         fun isApplicationKeypad(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.APPLICATION_KEYPAD)
 
         /**
          * Returns true when new-line mode is enabled in [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return `true` if new-line mode (LNM) is enabled, `false` otherwise.
          */
         @JvmStatic
         fun isNewLineMode(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.NEW_LINE_MODE)
 
         /**
          * Returns true when bracketed paste mode is enabled in [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return `true` if bracketed paste mode (?2004) is enabled, `false` otherwise.
          */
         @JvmStatic
         fun isBracketedPasteEnabled(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.BRACKETED_PASTE)
 
         /**
          * Returns true when focus reporting mode is enabled in [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return `true` if focus reporting mode (?1004) is enabled, `false` otherwise.
          */
         @JvmStatic
         fun isFocusReportingEnabled(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.FOCUS_REPORTING)
 
         /**
          * Returns the packed mouse tracking mode ordinal from [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return The ordinal integer of the active [io.github.jvterm.protocol.MouseTrackingMode].
          */
         @JvmStatic
         fun mouseTrackingMode(bits: Long): Int =
@@ -71,6 +91,9 @@ interface TerminalInputState {
 
         /**
          * Returns the packed mouse encoding mode ordinal from [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return The ordinal integer of the active [io.github.jvterm.protocol.MouseEncodingMode].
          */
         @JvmStatic
         fun mouseEncodingMode(bits: Long): Int =
@@ -82,6 +105,9 @@ interface TerminalInputState {
 
         /**
          * Returns the packed modify-other-keys mode value from [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return The active modify-other-keys mode level (typically 0, 1, or 2).
          */
         @JvmStatic
         fun modifyOtherKeysMode(bits: Long): Int =
@@ -93,6 +119,9 @@ interface TerminalInputState {
 
         /**
          * Returns the packed format-other-keys mode value from [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return The active format-other-keys mode level.
          */
         @JvmStatic
         fun formatOtherKeysMode(bits: Long): Int =
@@ -104,6 +133,9 @@ interface TerminalInputState {
 
         /**
          * Returns the packed Kitty keyboard progressive-enhancement flags from [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return The active Kitty keyboard progressive-enhancement flag bitmask.
          */
         @JvmStatic
         fun kittyKeyboardFlags(bits: Long): Int =

@@ -37,6 +37,8 @@ class TerminalWorkspaceConfigManager(
      * If the file does not exist, it creates a default configuration file with comments
      * and returns the default settings. If the file is invalid or unreadable, it falls back
      * gracefully to default settings.
+     *
+     * @return the loaded [TerminalConfig] instance.
      */
     fun load(): TerminalConfig {
         if (!Files.exists(configPath)) {
@@ -159,6 +161,8 @@ class TerminalWorkspaceConfigManager(
      *
      * Creates any missing parent directories before writing. Writes the values
      * mapped onto a documented TOML template for power user readability.
+     *
+     * @param config the configuration to save.
      */
     fun save(config: TerminalConfig) {
         try {
@@ -265,6 +269,11 @@ class TerminalWorkspaceConfigManager(
     companion object {
         /**
          * Resolves the default configuration path on disk for this operating system.
+         *
+         * @param osName operating system name used for platform selection.
+         * @param env environment variables map.
+         * @param userHome current user's home directory path.
+         * @return the resolved [Path] to the configuration file on disk.
          */
         fun getDefaultPath(
             osName: String = System.getProperty("os.name"),
@@ -310,6 +319,8 @@ class TerminalWorkspaceConfigManager(
 
         /**
          * Returns a manager configured with the OS-specific default configuration path.
+         *
+         * @return a default [TerminalWorkspaceConfigManager] instance.
          */
         fun getDefault(): TerminalWorkspaceConfigManager = TerminalWorkspaceConfigManager(getDefaultPath())
     }

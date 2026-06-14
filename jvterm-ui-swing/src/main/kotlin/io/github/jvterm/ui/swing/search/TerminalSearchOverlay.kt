@@ -21,18 +21,45 @@ import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
+/**
+ * Listener for user interaction events from [TerminalSearchOverlay].
+ */
 interface SearchOverlayListener {
+    /**
+     * Invoked when the search query text changes.
+     *
+     * @param query the new search query.
+     */
     fun onQueryChanged(query: String)
 
+    /**
+     * Invoked when the user requests finding the next match.
+     */
     fun onFindNext()
 
+    /**
+     * Invoked when the user requests finding the previous match.
+     */
     fun onFindPrevious()
 
+    /**
+     * Invoked when the user requests closing the search overlay.
+     */
     fun onCloseSearch()
 
+    /**
+     * Invoked when case sensitivity toggles.
+     *
+     * @param ignoreCase `true` if case-insensitive, `false` otherwise.
+     */
     fun onCaseSensitivityChanged(ignoreCase: Boolean)
 }
 
+/**
+ * An overlay panel showing search input and result navigation actions.
+ *
+ * @param listener listener for search interaction events.
+ */
 class TerminalSearchOverlay(
     private val listener: SearchOverlayListener,
 ) : JPanel(GridBagLayout()) {
@@ -218,6 +245,11 @@ class TerminalSearchOverlay(
         super.paintComponent(graphics)
     }
 
+    /**
+     * Programmatically sets the query text in the search input field.
+     *
+     * @param query the search query string to set.
+     */
     fun setQueryText(query: String) {
         if (queryField.text == query) return
         suppressDocumentEvents = true
@@ -228,6 +260,12 @@ class TerminalSearchOverlay(
         }
     }
 
+    /**
+     * Updates the visual counter displaying active match index out of total matches.
+     *
+     * @param resultCount total number of matches.
+     * @param activeResultIndex zero-based active match index, or `-1` if none.
+     */
     fun updateResultCounter(
         resultCount: Int,
         activeResultIndex: Int,
@@ -240,6 +278,9 @@ class TerminalSearchOverlay(
             }
     }
 
+    /**
+     * Focuses the search input field and selects all query text.
+     */
     fun focusQuery() {
         queryField.requestFocusInWindow()
         queryField.selectAll()

@@ -19,6 +19,9 @@ package io.github.jvterm.transport
  * Validates array bounds checks for buffer offset and length parameters.
  * Marked as inline so that validation compiles directly into call sites, leaving
  * zero runtime method frame overhead.
+ *
+ * @param offset the starting index in the byte array.
+ * @param length the number of bytes to validate.
  */
 @Suppress("NOTHING_TO_INLINE")
 inline fun ByteArray.checkBounds(

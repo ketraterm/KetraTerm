@@ -34,8 +34,19 @@ interface TerminalCommandSink {
     // Printable ingress
     // -------------------------------------------------------------------------
 
+    /**
+     * Writes a single Unicode codepoint to the grid at the cursor position.
+     *
+     * @param codepoint The Unicode codepoint to write.
+     */
     fun writeCodepoint(codepoint: Int)
 
+    /**
+     * Writes a pre-segmented multi-codepoint grapheme cluster to the grid.
+     *
+     * @param codepoints The array of Unicode codepoints forming the cluster.
+     * @param length The number of valid codepoints in the array.
+     */
     fun writeCluster(
         codepoints: IntArray,
         length: Int,
@@ -50,6 +61,8 @@ interface TerminalCommandSink {
      * byte proves that the grapheme continues with a combining mark, variation
      * selector, ZWJ sequence member, or similar continuation. The sink/core owns
      * locating and mutating the previous cell.
+     *
+     * @param codepoint Unicode codepoint to append to the previous grapheme.
      */
     fun appendToPreviousCluster(codepoint: Int)
 
@@ -57,18 +70,39 @@ interface TerminalCommandSink {
     // C0 / ESC structural controls
     // -------------------------------------------------------------------------
 
+    /**
+     * Triggers the terminal bell/alert sound (BEL, `0x07`).
+     */
     fun bell()
 
+    /**
+     * Moves the cursor one column to the left (BS, `0x08`).
+     */
     fun backspace()
 
+    /**
+     * Advances the cursor to the next tab stop (HT, `0x09`).
+     */
     fun tab()
 
+    /**
+     * Executes a line feed (LF, `0x0A`), moving the cursor down one row.
+     */
     fun lineFeed()
 
+    /**
+     * Moves the cursor to the left margin on the current row (CR, `0x0D`).
+     */
     fun carriageReturn()
 
+    /**
+     * Executes a reverse index (RI, `ESC M`), moving the cursor up one row.
+     */
     fun reverseIndex()
 
+    /**
+     * Moves the cursor to the left margin on the next row (NEL, `ESC E`).
+     */
     fun nextLine()
 
     /**
@@ -92,47 +126,105 @@ interface TerminalCommandSink {
      */
     fun decaln()
 
+    /**
+     * Saves the current cursor position, SGR attributes, wrap state, and origin mode.
+     */
     fun saveCursor()
 
+    /**
+     * Restores the cursor position, SGR attributes, wrap state, and origin mode.
+     */
     fun restoreCursor()
 
+    /**
+     * Sets the shape/style of the cursor.
+     *
+     * @param style The shape/style code.
+     */
     fun setCursorStyle(style: Int)
 
     // -------------------------------------------------------------------------
     // Cursor navigation
     // -------------------------------------------------------------------------
 
+    /**
+     * Moves the cursor up by [n] rows.
+     *
+     * @param n Number of rows to move up.
+     */
     fun cursorUp(n: Int)
 
+    /**
+     * Moves the cursor down by [n] rows.
+     *
+     * @param n Number of rows to move down.
+     */
     fun cursorDown(n: Int)
 
+    /**
+     * Moves the cursor forward (right) by [n] columns.
+     *
+     * @param n Number of columns to move forward.
+     */
     fun cursorForward(n: Int)
 
+    /**
+     * Moves the cursor backward (left) by [n] columns.
+     *
+     * @param n Number of columns to move backward.
+     */
     fun cursorBackward(n: Int)
 
+    /**
+     * Moves the cursor down by [n] lines and positions it at the beginning of the line.
+     *
+     * @param n Number of lines to move down.
+     */
     fun cursorNextLine(n: Int)
 
+    /**
+     * Moves the cursor up by [n] lines and positions it at the beginning of the line.
+     *
+     * @param n Number of lines to move up.
+     */
     fun cursorPreviousLine(n: Int)
 
+    /**
+     * Moves the cursor forward (right) by [n] tab stops.
+     *
+     * @param n Number of tab stops to move forward.
+     */
     fun cursorForwardTabs(n: Int)
 
+    /**
+     * Moves the cursor backward (left) by [n] tab stops.
+     *
+     * @param n Number of tab stops to move backward.
+     */
     fun cursorBackwardTabs(n: Int)
 
     /**
      * Column is parser-translated to zero-origin before handoff.
      * The core may clamp; the parser must not.
+     *
+     * @param col The zero-based column index.
      */
     fun setCursorColumn(col: Int)
 
     /**
      * Row is parser-translated to zero-origin before handoff.
      * The core may clamp; the parser must not.
+     *
+     * @param row The zero-based row index.
      */
     fun setCursorRow(row: Int)
 
     /**
      * Row and column are parser-translated to zero-origin before handoff.
      * The core may clamp; the parser must not.
+     *
+     * @param row The zero-based row index.
+     * @param col The zero-based column index.
      */
     fun setCursorAbsolute(
         row: Int,
@@ -145,6 +237,9 @@ interface TerminalCommandSink {
      * Top and bottom are parser-translated to zero-origin before handoff.
      * A bottom value of -1 means the sequence omitted the bottom margin, so the
      * core should use the terminal's current last row.
+     *
+     * @param top The zero-based top row index.
+     * @param bottom The zero-based bottom row index, or -1 to use the bottom of the terminal.
      */
     fun setScrollRegion(
         top: Int,
@@ -157,6 +252,9 @@ interface TerminalCommandSink {
      * Left and right are parser-translated to zero-origin before handoff.
      * A right value of -1 means the sequence omitted the right margin, so the
      * core should use the terminal's current last column.
+     *
+     * @param left The zero-based left column index.
+     * @param right The zero-based right column index, or -1 to use the right edge of the terminal.
      */
     fun setLeftRightMargins(
         left: Int,
@@ -167,38 +265,94 @@ interface TerminalCommandSink {
     // Erase / edit / scroll
     // -------------------------------------------------------------------------
 
+    /**
+     * Erases cells in the viewport (ED / DECSED).
+     *
+     * @param mode The erase mode (0 = cursor to end, 1 = start to cursor, 2 = entire screen, 3 = screen and scrollback).
+     * @param selective `true` if this is a selective erase (DECSED) that respects protection attributes.
+     */
     fun eraseInDisplay(
         mode: Int,
         selective: Boolean,
     )
 
+    /**
+     * Erases cells in the active line (EL / DECSEL).
+     *
+     * @param mode The erase mode (0 = cursor to end, 1 = start to cursor, 2 = entire line).
+     * @param selective `true` if this is a selective erase (DECSEL) that respects protection attributes.
+     */
     fun eraseInLine(
         mode: Int,
         selective: Boolean,
     )
 
+    /**
+     * Inserts [n] blank lines at the cursor row (IL).
+     *
+     * @param n Number of lines to insert.
+     */
     fun insertLines(n: Int)
 
+    /**
+     * Deletes [n] lines starting at the cursor row (DL).
+     *
+     * @param n Number of lines to delete.
+     */
     fun deleteLines(n: Int)
 
+    /**
+     * Inserts [n] blank characters at the cursor position (ICH).
+     *
+     * @param n Number of characters to insert.
+     */
     fun insertCharacters(n: Int)
 
+    /**
+     * Deletes [n] characters starting at the cursor position (DCH).
+     *
+     * @param n Number of characters to delete.
+     */
     fun deleteCharacters(n: Int)
 
+    /**
+     * Erases [n] characters starting at the cursor position (ECH).
+     *
+     * @param n Number of characters to erase.
+     */
     fun eraseCharacters(n: Int)
 
+    /**
+     * Scrolls the active scroll region up by [n] lines (SU).
+     *
+     * @param n Number of lines to scroll up.
+     */
     fun scrollUp(n: Int)
 
+    /**
+     * Scrolls the active scroll region down by [n] lines (SD).
+     *
+     * @param n Number of lines to scroll down.
+     */
     fun scrollDown(n: Int)
 
     // -------------------------------------------------------------------------
     // Tab stops
     // -------------------------------------------------------------------------
 
+    /**
+     * Sets a tab stop at the current cursor column (HTS).
+     */
     fun setTabStop()
 
+    /**
+     * Clears the tab stop at the current cursor column (TBC 0).
+     */
     fun clearTabStop()
 
+    /**
+     * Clears all tab stops (TBC 3).
+     */
     fun clearAllTabStops()
 
     // -------------------------------------------------------------------------
@@ -209,6 +363,9 @@ interface TerminalCommandSink {
      * ANSI mode set/reset.
      *
      * Mode ids use the shared [AnsiMode] vocabulary.
+     *
+     * @param mode The ANSI mode identifier.
+     * @param enable `true` to enable the mode, `false` to disable.
      */
     fun setAnsiMode(
         mode: Int,
@@ -219,6 +376,9 @@ interface TerminalCommandSink {
      * DEC private mode set/reset.
      *
      * Mode ids use the shared [DecPrivateMode] vocabulary.
+     *
+     * @param mode The DEC private mode identifier.
+     * @param enable `true` to enable the mode, `false` to disable.
      */
     fun setDecMode(
         mode: Int,
@@ -231,6 +391,9 @@ interface TerminalCommandSink {
      * The parser only identifies the resource id and value; the sink owns
      * deciding which resources are supported and how they affect input-facing
      * mode state.
+     *
+     * @param resource The resource/modifier identifier.
+     * @param value The value to assign to the key modifier option.
      */
     fun setKeyModifierOption(
         resource: Int,
@@ -239,6 +402,8 @@ interface TerminalCommandSink {
 
     /**
      * Resets one xterm key modifier option, `CSI > Pp m`.
+     *
+     * @param resource The resource/modifier identifier to reset.
      */
     fun resetKeyModifierOption(resource: Int)
 
@@ -249,6 +414,9 @@ interface TerminalCommandSink {
 
     /**
      * Xterm key format option set, `CSI > Pp ; Pv f`.
+     *
+     * @param resource The resource/format identifier.
+     * @param value The value to assign to the key format option.
      */
     fun setKeyFormatOption(
         resource: Int,
@@ -257,6 +425,8 @@ interface TerminalCommandSink {
 
     /**
      * Resets one xterm key format option, `CSI > Pp f`.
+     *
+     * @param resource The resource/format identifier to reset.
      */
     fun resetKeyFormatOption(resource: Int)
 
@@ -271,6 +441,9 @@ interface TerminalCommandSink {
      *
      * The parser only identifies the flag word and application mode. Core and
      * host own durable state and unsupported-mode policy.
+     *
+     * @param flags Kitty keyboard progressive-enhancement flags.
+     * @param applicationMode The application mode parameter (0 = replace, 1 = push, 2 = pop).
      */
     fun applyKittyKeyboardFlags(
         flags: Int,
@@ -282,6 +455,8 @@ interface TerminalCommandSink {
      *
      * The parser only identifies the optional flag word. Core owns stack depth,
      * screen separation, and flag application semantics.
+     *
+     * @param flags Kitty keyboard flags to push and activate.
      */
     fun pushKittyKeyboardFlags(flags: Int)
 
@@ -289,6 +464,8 @@ interface TerminalCommandSink {
      * Kitty keyboard stack pop, `CSI < count u`.
      *
      * The parser normalizes omitted or zero counts to one before handoff.
+     *
+     * @param count Number of times to pop from the stack.
      */
     fun popKittyKeyboardFlags(count: Int)
 
@@ -298,6 +475,9 @@ interface TerminalCommandSink {
 
     /**
      * DSR/CPR request: CSI Ps n or CSI ? Ps n.
+     *
+     * @param mode The DSR mode parameter (e.g. 5 for status, 6 for cursor position).
+     * @param decPrivate `true` if this is a DEC private DSR (? prefix), `false` for standard ANSI.
      */
     fun requestDeviceStatusReport(
         mode: Int,
@@ -311,6 +491,9 @@ interface TerminalCommandSink {
      * - 0: primary DA, CSI Ps c
      * - 1: secondary DA, CSI > Ps c
      * - 2: tertiary DA, CSI = Ps c
+     *
+     * @param kind The device attributes query type (primary, secondary, or tertiary).
+     * @param parameter The request parameter/subtype (usually 0).
      */
     fun requestDeviceAttributes(
         kind: Int,
@@ -322,6 +505,8 @@ interface TerminalCommandSink {
      *
      * Supported modes are owned by the sink/core. Window manipulation requests
      * must not be represented here.
+     *
+     * @param mode The window report mode parameter (e.g. 14 for pixels, 18 for grid cells).
      */
     fun requestWindowReport(mode: Int)
 
@@ -341,61 +526,166 @@ interface TerminalCommandSink {
      * - 0: icon and window title
      * - 1: icon title
      * - 2: window title
+     *
+     * @param scope The title stack target scope (0, 1, or 2).
      */
     fun pushTitleStack(scope: Int)
 
+    /**
+     * Pops the xterm title stack for the given scope.
+     *
+     * @param scope The title stack target scope (0, 1, or 2).
+     */
     fun popTitleStack(scope: Int)
 
     // -------------------------------------------------------------------------
     // SGR / pen attributes
     // -------------------------------------------------------------------------
 
+    /**
+     * Resets all active pen attributes to defaults (SGR 0).
+     */
     fun resetAttributes()
 
+    /**
+     * Sets bold weight.
+     *
+     * @param enabled `true` to enable bold, `false` to disable.
+     */
     fun setBold(enabled: Boolean)
 
+    /**
+     * Sets faint (dim) weight.
+     *
+     * @param enabled `true` to enable faint, `false` to disable.
+     */
     fun setFaint(enabled: Boolean)
 
+    /**
+     * Sets italic style.
+     *
+     * @param enabled `true` to enable italic, `false` to disable.
+     */
     fun setItalic(enabled: Boolean)
 
+    /**
+     * Sets underline style.
+     *
+     * @param style The underline style code (0 = none, 1 = single, 2 = double, etc.).
+     */
     fun setUnderlineStyle(style: Int)
 
+    /**
+     * Sets blinking style.
+     *
+     * @param enabled `true` to enable blinking, `false` to disable.
+     */
     fun setBlink(enabled: Boolean)
 
+    /**
+     * Sets inverse (reverse-video) style.
+     *
+     * @param enabled `true` to enable inverse, `false` to disable.
+     */
     fun setInverse(enabled: Boolean)
 
+    /**
+     * Sets conceal style.
+     *
+     * @param enabled `true` to enable conceal, `false` to disable.
+     */
     fun setConceal(enabled: Boolean)
 
+    /**
+     * Sets strikethrough decoration.
+     *
+     * @param enabled `true` to enable strikethrough, `false` to disable.
+     */
     fun setStrikethrough(enabled: Boolean)
 
+    /**
+     * Sets overline decoration.
+     *
+     * @param enabled `true` to enable overline, `false` to disable.
+     */
     fun setOverline(enabled: Boolean)
 
+    /**
+     * Sets selective erase protection (DECSCA).
+     *
+     * @param enabled `true` to protect cells from erasure, `false` to disable protection.
+     */
     fun setSelectiveEraseProtection(enabled: Boolean)
 
+    /**
+     * Resets foreground color to the default.
+     */
     fun setForegroundDefault()
 
+    /**
+     * Resets background color to the default.
+     */
     fun setBackgroundDefault()
 
+    /**
+     * Resets underline color to the default.
+     */
     fun setUnderlineColorDefault()
 
+    /**
+     * Sets foreground indexed color.
+     *
+     * @param index Palette index (0..255).
+     */
     fun setForegroundIndexed(index: Int)
 
+    /**
+     * Sets background indexed color.
+     *
+     * @param index Palette index (0..255).
+     */
     fun setBackgroundIndexed(index: Int)
 
+    /**
+     * Sets underline indexed color.
+     *
+     * @param index Palette index (0..255).
+     */
     fun setUnderlineColorIndexed(index: Int)
 
+    /**
+     * Sets foreground RGB color.
+     *
+     * @param red Red component (0..255).
+     * @param green Green component (0..255).
+     * @param blue Blue component (0..255).
+     */
     fun setForegroundRgb(
         red: Int,
         green: Int,
         blue: Int,
     )
 
+    /**
+     * Sets background RGB color.
+     *
+     * @param red Red component (0..255).
+     * @param green Green component (0..255).
+     * @param blue Blue component (0..255).
+     */
     fun setBackgroundRgb(
         red: Int,
         green: Int,
         blue: Int,
     )
 
+    /**
+     * Sets underline RGB color.
+     *
+     * @param red Red component (0..255).
+     * @param green Green component (0..255).
+     * @param blue Blue component (0..255).
+     */
     fun setUnderlineColorRgb(
         red: Int,
         green: Int,
@@ -406,41 +696,91 @@ interface TerminalCommandSink {
     // OSC
     // -------------------------------------------------------------------------
 
+    /**
+     * Sets the window title.
+     *
+     * @param title The new window title.
+     */
     fun setWindowTitle(title: String)
 
+    /**
+     * Sets the icon title.
+     *
+     * @param title The new icon title.
+     */
     fun setIconTitle(title: String)
 
+    /**
+     * Sets both icon and window titles.
+     *
+     * @param title The new title.
+     */
     fun setIconAndWindowTitle(title: String)
 
+    /**
+     * Starts an OSC 8 hyperlink context.
+     *
+     * @param uri Target URI.
+     * @param id Optional hyperlink identifier.
+     */
     fun startHyperlink(
         uri: String,
         id: String?,
     )
 
+    /**
+     * Ends the active OSC 8 hyperlink context.
+     */
     fun endHyperlink()
 
-    /** Sets a specific ANSI indexed color. */
+    /**
+     * Sets a specific ANSI indexed color.
+     *
+     * @param index Color index (0..255).
+     * @param color The packed ARGB color value.
+     */
     fun setPaletteColor(
         index: Int,
         color: Int,
     )
 
-    /** Queries an individual color in the active 256-color palette. */
+    /**
+     * Queries an individual color in the active 256-color palette.
+     *
+     * @param index Color index to query.
+     */
     fun queryPaletteColor(index: Int)
 
-    /** Sets a dynamic color (foreground, background, or cursor color). */
+    /**
+     * Sets a dynamic color (foreground, background, or cursor color).
+     *
+     * @param target Target color identifier (10 for foreground, 11 for background, 12 for cursor).
+     * @param color The packed ARGB color value.
+     */
     fun setDynamicColor(
         target: Int,
         color: Int,
     )
 
-    /** Queries a dynamic color (foreground, background, or cursor color). */
+    /**
+     * Queries a dynamic color.
+     *
+     * @param target Target color identifier to query (10 for foreground, 11 for background, 12 for cursor).
+     */
     fun queryDynamicColor(target: Int)
 
-    /** Queries a status string (DECRQSS). */
+    /**
+     * Queries a status string (DECRQSS).
+     *
+     * @param query The status parameter query string.
+     */
     fun queryStatusString(query: String)
 
-    /** Queries terminfo capabilities (XTGETTCAP). */
+    /**
+     * Queries terminfo capabilities (XTGETTCAP).
+     *
+     * @param rawPayload Semicolon-separated capability names payload.
+     */
     fun queryTerminfo(rawPayload: String)
 
     /**

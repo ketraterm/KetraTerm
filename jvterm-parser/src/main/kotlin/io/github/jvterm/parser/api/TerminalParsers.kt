@@ -22,6 +22,13 @@ import io.github.jvterm.parser.spi.TerminalCommandSink
  * Factory for terminal output parsers.
  */
 object TerminalParsers {
+    /**
+     * Creates a new instance of [TerminalOutputParser] that routes parsed
+     * commands to the specified [sink].
+     *
+     * @param sink The command sink where parsed terminal commands will be delivered.
+     * @return A newly initialized [TerminalOutputParser] instance.
+     */
     @JvmStatic
     fun create(sink: TerminalCommandSink): TerminalOutputParser = TerminalParser(sink)
 }

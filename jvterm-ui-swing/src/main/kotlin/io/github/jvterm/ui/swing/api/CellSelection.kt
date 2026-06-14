@@ -31,6 +31,7 @@ import io.github.jvterm.ui.swing.api.CellSelection.Companion.NO_RANGE
  * @property anchorRow zero-based anchor row.
  * @property caretColumn zero-based moving caret column.
  * @property caretRow zero-based moving row.
+ * @property isBlock whether the selection is a rectangular block selection.
  */
 data class CellSelection(
     val anchorColumn: Int,
@@ -58,6 +59,7 @@ data class CellSelection(
      *
      * @param row visible render-cache row.
      * @param columns visible render-cache column count.
+     * @param cache optional terminal render cache used to adjust selection boundaries for wide characters.
      * @return packed half-open range, or [NO_RANGE].
      */
     fun packedColumnRange(
@@ -142,6 +144,10 @@ data class CellSelection(
 
         /**
          * Packs a half-open column range.
+         *
+         * @param startColumn the starting column index.
+         * @param endColumn the ending column index (exclusive).
+         * @return packed column range as a [Long].
          */
         fun packRange(
             startColumn: Int,
@@ -150,11 +156,17 @@ data class CellSelection(
 
         /**
          * Extracts the start column from a packed range.
+         *
+         * @param range packed column range [Long].
+         * @return start column index.
          */
         fun rangeStart(range: Long): Int = (range ushr 32).toInt()
 
         /**
          * Extracts the end-exclusive column from a packed range.
+         *
+         * @param range packed column range [Long].
+         * @return end-exclusive column index.
          */
         fun rangeEnd(range: Long): Int = range.toInt()
     }

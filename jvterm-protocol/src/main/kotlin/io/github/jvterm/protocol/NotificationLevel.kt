@@ -38,6 +38,9 @@ enum class NotificationLevel {
         /**
          * Resolves the notification level from a string.
          * Falls back to null if unresolved or blank.
+         *
+         * @param value raw string to resolve.
+         * @return resolved [NotificationLevel], or null if unresolved or blank.
          */
         @JvmStatic
         fun parseOrNull(value: String): NotificationLevel? {

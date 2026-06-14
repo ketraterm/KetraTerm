@@ -43,12 +43,27 @@ class HostCommandAdapter(
     private val hostEvents: HostEventSink = HostEventSink.NONE,
     private val hostPolicy: HostPolicy = HostPolicy(),
 ) : TerminalCommandSink {
+    /**
+     * The current window title reported by the shell or application.
+     */
     var windowTitle: String = ""
         private set
+
+    /**
+     * The current icon title reported by the shell or application.
+     */
     var iconTitle: String = ""
         private set
+
+    /**
+     * The URI of the currently active hyperlink (OSC 8), or `null` if none.
+     */
     var activeHyperlinkUri: String? = null
         private set
+
+    /**
+     * The client-provided ID of the currently active hyperlink (OSC 8), or `null` if none.
+     */
     var activeHyperlinkId: String? = null
         private set
 

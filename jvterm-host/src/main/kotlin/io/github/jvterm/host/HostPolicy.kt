@@ -28,6 +28,8 @@ package io.github.jvterm.host
  * @property maxHyperlinkIdLength maximum accepted OSC 8 `id=` parameter length
  * in UTF-16 code units. Longer IDs are ignored and mapped to no active
  * hyperlink.
+ * @property maxNotificationTitleLength maximum accepted character length for desktop notification titles.
+ * @property maxNotificationBodyLength maximum accepted character length for desktop notification bodies.
  */
 data class HostPolicy(
     val maxHyperlinkEntries: Int = 4096,

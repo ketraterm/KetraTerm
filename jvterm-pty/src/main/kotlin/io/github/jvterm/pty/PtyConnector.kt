@@ -29,6 +29,14 @@ import com.pty4j.PtyProcess as Pty4jNativeProcess
  * lifecycle events between the PTY process and a connector listener; parser,
  * core, cursor, attribute, and input-encoder behavior are owned by
  * `terminal-session` and lower layers.
+ *
+ * @param process the underlying PTY process.
+ * @param readBufferSize size of the read buffer in bytes.
+ * @param readerThreadName name for the daemon PTY stdout reader thread.
+ * @param watcherThreadName name for the daemon process exit watcher thread.
+ * @property failure Captured transport read failure, or `null` when no reader failure occurred.
+ * @property exitCode Process exit code after the watcher observes process termination.
+ * @property isAlive Returns true while the underlying PTY process reports it is alive.
  */
 class PtyConnector internal constructor(
     private val process: PtyProcess,
@@ -67,6 +75,11 @@ class PtyConnector internal constructor(
 
     /**
      * Creates a connector for a raw PTY4J process.
+     *
+     * @param process raw native PTY process wrapper.
+     * @param readBufferSize stdout reader buffer size.
+     * @param readerThreadName thread name for reading process stdout.
+     * @param watcherThreadName thread name for waiting on process exit.
      */
     constructor(
         process: Pty4jNativeProcess,
@@ -153,6 +166,9 @@ class PtyConnector internal constructor(
 
     /**
      * Waits for the child process to exit and returns its exit code.
+     *
+     * @return exit code of the process.
+     * @throws InterruptedException if thread waiting is interrupted.
      */
     @Throws(InterruptedException::class)
     fun waitFor(): Int = process.waitFor()

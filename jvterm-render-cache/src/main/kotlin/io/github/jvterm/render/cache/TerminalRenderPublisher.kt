@@ -29,6 +29,9 @@ import kotlin.concurrent.withLock
  *
  * Writer and UI never touch the same buffer simultaneously when UI consumers
  * access the front buffer through [readCurrent].
+ *
+ * @param columns initial cache width in cells.
+ * @param rows initial cache height in rows.
  */
 class TerminalRenderPublisher(
     columns: Int,
@@ -52,6 +55,8 @@ class TerminalRenderPublisher(
     /**
      * Called from render worker thread only.
      * Reads from [reader], updates back buffer, publishes as new front.
+     *
+     * @param reader source of the short-lived render frame.
      */
     fun updateAndPublish(reader: TerminalRenderFrameReader) {
         updateAndPublish(reader, scrollbackOffset = 0)
@@ -62,6 +67,9 @@ class TerminalRenderPublisher(
      *
      * [scrollbackOffset] is caller-owned viewport state in lines above the live
      * bottom viewport. The source reader clamps it before rows are copied.
+     *
+     * @param reader source of the short-lived render frame.
+     * @param scrollbackOffset requested lines above the live bottom viewport.
      */
     fun updateAndPublish(
         reader: TerminalRenderFrameReader,
@@ -76,6 +84,10 @@ class TerminalRenderPublisher(
      * [viewportRows] requests render-only overscan rows for UI composition. It
      * does not resize terminal state; the source reader clamps the resolved
      * frame height before rows are copied.
+     *
+     * @param reader source of the short-lived render frame.
+     * @param scrollbackOffset requested lines above the live bottom viewport.
+     * @param viewportRows requested render rows, or zero for the reader default.
      */
     fun updateAndPublish(
         reader: TerminalRenderFrameReader,
@@ -112,6 +124,8 @@ class TerminalRenderPublisher(
      * This is intended for short polling and tests that do not retain the
      * returned cache or require multi-field snapshot stability. Paint and
      * repaint-planning code should use [readCurrent].
+     *
+     * @return the latest published [TerminalRenderCache] snapshot, or null if no frame has been published yet.
      */
     fun current(): TerminalRenderCache? = frontRef.get()
 

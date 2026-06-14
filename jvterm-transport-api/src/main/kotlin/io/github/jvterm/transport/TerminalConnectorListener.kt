@@ -26,6 +26,10 @@ interface TerminalConnectorListener {
      * Connectors may reuse [bytes] after this callback returns.
      * Connectors must invoke this callback serially and in stream order for one
      * started listener.
+     *
+     * @param bytes byte array containing the received data.
+     * @param offset starting index of valid data in the byte array.
+     * @param length number of valid bytes to consume.
      */
     fun onBytes(
         bytes: ByteArray,
@@ -43,6 +47,8 @@ interface TerminalConnectorListener {
 
     /**
      * Reports a remote transport failure.
+     *
+     * @param error the transport exception or failure.
      */
     fun onError(error: Throwable)
 }

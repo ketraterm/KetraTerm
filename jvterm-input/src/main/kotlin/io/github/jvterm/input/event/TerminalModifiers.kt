@@ -42,32 +42,49 @@ object TerminalModifiers {
 
     /**
      * Returns true when Shift is present in [modifiers].
+     *
+     * @param modifiers active modifier bitmask.
+     * @return true if Shift is active, false otherwise.
      */
     fun hasShift(modifiers: Int): Boolean = (modifiers and SHIFT) != 0
 
     /**
      * Returns true when Alt is present in [modifiers].
+     *
+     * @param modifiers active modifier bitmask.
+     * @return true if Alt is active, false otherwise.
      */
     fun hasAlt(modifiers: Int): Boolean = (modifiers and ALT) != 0
 
     /**
      * Returns true when Control is present in [modifiers].
+     *
+     * @param modifiers active modifier bitmask.
+     * @return true if Control is active, false otherwise.
      */
     fun hasCtrl(modifiers: Int): Boolean = (modifiers and CTRL) != 0
 
     /**
      * Returns true when Meta is present in [modifiers].
+     *
+     * @param modifiers active modifier bitmask.
+     * @return true if Meta is active, false otherwise.
      */
     fun hasMeta(modifiers: Int): Boolean = (modifiers and META) != 0
 
     /**
      * Returns true when [modifiers] contains only supported modifier bits.
+     *
+     * @param modifiers active modifier bitmask.
+     * @return true if valid, false otherwise.
      */
     fun isValid(modifiers: Int): Boolean = (modifiers and VALID_MASK.inv()) == 0
 
     /**
      * Converts internal modifier bits to an xterm-style CSI modifier parameter.
      *
+     * @param modifiers active modifier bitmask.
+     * @return 1-based xterm CSI modifier parameter value.
      * @throws IllegalArgumentException when [modifiers] contains unsupported
      * bits.
      */

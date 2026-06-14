@@ -50,6 +50,10 @@ interface TerminalBuffer :
      *
      * @param newWidth New terminal width in cells. Must be > 0.
      * @param newHeight New terminal height in rows. Must be > 0.
+     * @param oldScrollbackOffset The active scrollback offset before the resize.
+     * @return A [Pair] of (newScrollbackOffset, newHistorySize), allowing the caller to
+     *   re-anchor a scrollback viewport that was active at [oldScrollbackOffset] before
+     *   the reflow.
      * @throws IllegalArgumentException if either dimension is <= 0.
      */
     fun resize(
@@ -99,6 +103,8 @@ interface TerminalBuffer :
      * When the alternate screen is active, DECCOLM follows the xterm-style
      * policy used by [resize]: the alternate screen is wiped at the new width
      * while the primary screen is reflowed in the background.
+     *
+     * @param newWidth The target width, either 80 or 132 columns.
      */
     fun executeDeccolm(newWidth: Int)
 }

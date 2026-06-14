@@ -28,6 +28,14 @@ object PtyConnectors {
      *
      * Callers should depend on [TerminalConnector] instead of PTY4J process
      * classes.
+     *
+     * @param command command and arguments passed to the PTY child process.
+     * @param env environment variables for the child process.
+     * @param workingDirectory initial working directory, or `null` for platform default.
+     * @param columns initial terminal width in cells.
+     * @param rows initial terminal height in cells.
+     * @return running terminal connector.
+     * @throws IOException if the process cannot be started.
      */
     @JvmStatic
     @JvmOverloads

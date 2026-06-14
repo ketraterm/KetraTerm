@@ -22,10 +22,18 @@ package io.github.jvterm.core.api
  * They do not expose the underlying storage model to the parser.
  */
 interface TerminalModeController {
-    /** Enables or disables Insert Replace Mode (IRM, `CSI 4 h` / `CSI 4 l`). */
+    /**
+     * Enables or disables Insert Replace Mode (IRM, `CSI 4 h` / `CSI 4 l`).
+     *
+     * @param enabled `true` to enable insert mode, `false` for replace mode.
+     */
     fun setInsertMode(enabled: Boolean)
 
-    /** Enables or disables DECAWM auto-wrap (`CSI ? 7 h` / `CSI ? 7 l`). */
+    /**
+     * Enables or disables DECAWM auto-wrap (`CSI ? 7 h` / `CSI ? 7 l`).
+     *
+     * @param enabled `true` to enable auto-wrap, `false` to disable.
+     */
     fun setAutoWrap(enabled: Boolean)
 
     /**
@@ -33,13 +41,23 @@ interface TerminalModeController {
      *
      * When enabled, cursor-home semantics become relative to the active scroll
      * region rather than the full viewport.
+     *
+     * @param enabled `true` to enable origin mode, `false` to disable.
      */
     fun setOriginMode(enabled: Boolean)
 
-    /** Toggles application cursor key mode (DECCKM, `CSI ? 1 h` / `CSI ? 1 l`). */
+    /**
+     * Toggles application cursor key mode (DECCKM, `CSI ? 1 h` / `CSI ? 1 l`).
+     *
+     * @param enabled `true` to enable application cursor keys, `false` to disable.
+     */
     fun setApplicationCursorKeys(enabled: Boolean)
 
-    /** Toggles application keypad mode (DECNKM). */
+    /**
+     * Toggles application keypad mode (DECNKM).
+     *
+     * @param enabled `true` to enable application keypad, `false` to disable.
+     */
     fun setApplicationKeypad(enabled: Boolean)
 
     /**
@@ -47,28 +65,58 @@ interface TerminalModeController {
      *
      * The mode flag is global, while the actual horizontal margins are stored
      * per screen buffer. Enabling or disabling the mode homes the cursor.
+     *
+     * @param enabled `true` to enable left/right margin mode, `false` to disable.
      */
     fun setLeftRightMarginMode(enabled: Boolean)
 
-    /** Enables or disables New Line Mode (LNM, `CSI 20 h` / `CSI 20 l`). */
+    /**
+     * Enables or disables New Line Mode (LNM, `CSI 20 h` / `CSI 20 l`).
+     *
+     * @param enabled `true` to enable new-line mode, `false` to disable.
+     */
     fun setNewLineMode(enabled: Boolean)
 
-    /** Sets the active mouse tracking mode used by terminal-to-host reporting. */
+    /**
+     * Sets the active mouse tracking mode used by terminal-to-host reporting.
+     *
+     * @param mode The mouse tracking mode to set.
+     */
     fun setMouseTrackingMode(mode: io.github.jvterm.protocol.MouseTrackingMode)
 
-    /** Sets the active mouse report encoding mode used by terminal-to-host reporting. */
+    /**
+     * Sets the active mouse report encoding mode used by terminal-to-host reporting.
+     *
+     * @param mode The mouse encoding mode to set.
+     */
     fun setMouseEncodingMode(mode: io.github.jvterm.protocol.MouseEncodingMode)
 
-    /** Enables or disables bracketed paste reporting (`CSI ? 2004 h` / `CSI ? 2004 l`). */
+    /**
+     * Enables or disables bracketed paste reporting (`CSI ? 2004 h` / `CSI ? 2004 l`).
+     *
+     * @param enabled `true` to enable bracketed paste, `false` to disable.
+     */
     fun setBracketedPasteEnabled(enabled: Boolean)
 
-    /** Enables or disables focus in/out reporting (`CSI ? 1004 h` / `CSI ? 1004 l`). */
+    /**
+     * Enables or disables focus in/out reporting (`CSI ? 1004 h` / `CSI ? 1004 l`).
+     *
+     * @param enabled `true` to enable focus reporting, `false` to disable.
+     */
     fun setFocusReportingEnabled(enabled: Boolean)
 
-    /** Sets the modify-other-keys reporting level. */
+    /**
+     * Sets the modify-other-keys reporting level.
+     *
+     * @param mode The modify-other-keys mode level (0, 1, or 2).
+     */
     fun setModifyOtherKeysMode(mode: Int)
 
-    /** Sets the format-other-keys wire format used when modify-other-keys applies. */
+    /**
+     * Sets the format-other-keys wire format used when modify-other-keys applies.
+     *
+     * @param mode The format-other-keys mode (typically 4 or 5).
+     */
     fun setFormatOtherKeysMode(mode: Int)
 
     /**
@@ -77,17 +125,23 @@ interface TerminalModeController {
      * Core stores the supported bit subset in its packed input-mode word so the
      * input encoder can read one coherent snapshot without touching core
      * internals.
+     *
+     * @param flags Kitty keyboard progressive-enhancement flags.
      */
     fun setKittyKeyboardFlags(flags: Int)
 
     /**
      * Pushes the current Kitty keyboard progressive-enhancement flags to the stack,
      * and sets the new active flags.
+     *
+     * @param flags Kitty keyboard flags to push and activate.
      */
     fun pushKittyKeyboardFlags(flags: Int)
 
     /**
      * Pops the Kitty keyboard flags from the stack up to [count] times.
+     *
+     * @param count Number of times to pop from the stack.
      */
     fun popKittyKeyboardFlags(count: Int)
 
@@ -95,6 +149,8 @@ interface TerminalModeController {
      * Toggles reverse-video presentation state (DECSCNM, `CSI ? 5 h` / `CSI ? 5 l`).
      *
      * This is renderer-facing state stored in core because the host controls it.
+     *
+     * @param enabled `true` to enable reverse-video mode, `false` to disable.
      */
     fun setReverseVideo(enabled: Boolean)
 
@@ -102,26 +158,46 @@ interface TerminalModeController {
      * Toggles cursor visibility presentation state (DECTCEM, `CSI ? 25 h` / `CSI ? 25 l`).
      *
      * This is renderer-facing state stored in core because the host controls it.
+     *
+     * @param enabled `true` to make the cursor visible, `false` to hide it.
      */
     fun setCursorVisible(enabled: Boolean)
 
-    /** Toggles cursor blink presentation state. */
+    /**
+     * Toggles cursor blink presentation state.
+     *
+     * @param enabled `true` to make the cursor blink, `false` to disable blinking.
+     */
     fun setCursorBlinking(enabled: Boolean)
 
-    /** Sets the cursor shape/style. */
+    /**
+     * Sets the cursor shape/style.
+     *
+     * @param shape The cursor shape to set.
+     */
     fun setCursorShape(shape: io.github.jvterm.render.api.TerminalRenderCursorShape)
 
-    /** Sets the default cursor shape/style restored on reset. */
+    /**
+     * Sets the default cursor shape/style restored on reset.
+     *
+     * @param shape The default cursor shape to restore.
+     */
     fun setDefaultCursorShape(shape: io.github.jvterm.render.api.TerminalRenderCursorShape)
 
     /**
      * Controls how East Asian Ambiguous codepoints are measured for future writes.
      *
      * Existing stored content is not reinterpreted when this flag changes.
+     *
+     * @param enabled `true` to treat East Asian ambiguous-width characters as double-width.
      */
     fun setTreatAmbiguousAsWide(enabled: Boolean)
 
-    /** Toggles synchronized output mode (DECSET/DECRST `?2026`). */
+    /**
+     * Toggles synchronized output mode (DECSET/DECRST `?2026`).
+     *
+     * @param enabled `true` to enable synchronized output, `false` to disable.
+     */
     fun setSynchronizedOutput(enabled: Boolean)
 
     /**
@@ -199,9 +275,17 @@ interface TerminalModeController {
         color: Int,
     )
 
-    /** Toggles urgent bell mode (?1042). */
+    /**
+     * Toggles urgent bell mode (?1042).
+     *
+     * @param enabled `true` to enable urgent bell mode, `false` to disable.
+     */
     fun setBellIsUrgent(enabled: Boolean)
 
-    /** Toggles pop on bell mode (?1043). */
+    /**
+     * Toggles pop on bell mode (?1043).
+     *
+     * @param enabled `true` to enable pop on bell mode, `false` to disable.
+     */
     fun setPopOnBell(enabled: Boolean)
 }

@@ -29,7 +29,7 @@ object TerminalInputEncoders {
      * Creates a terminal input encoder.
      *
      * @param inputState read-only core mode state used for input decisions.
-     * @param hostOutput host-bound byte sink.
+     * @param output host-bound byte sink.
      * @param policy policy for ambiguous or unsupported keyboard encodings.
      * @return a new terminal input encoder instance.
      */

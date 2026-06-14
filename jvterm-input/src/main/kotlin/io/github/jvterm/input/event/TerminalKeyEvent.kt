@@ -67,6 +67,7 @@ data class TerminalKeyEvent(
          *
          * @param key non-printable terminal key.
          * @param modifiers active keyboard modifiers.
+         * @return a new [TerminalKeyEvent] instance.
          */
         fun key(
             key: TerminalKey,
@@ -82,6 +83,7 @@ data class TerminalKeyEvent(
          *
          * @param codepoint Unicode scalar value to encode.
          * @param modifiers active keyboard modifiers.
+         * @return a new [TerminalKeyEvent] instance.
          */
         fun codepoint(
             codepoint: Int,

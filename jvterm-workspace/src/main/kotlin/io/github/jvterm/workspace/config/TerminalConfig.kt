@@ -62,6 +62,8 @@ private fun defaultFontFamily(): String {
  * @property pasteOnMiddleClick whether middle mouse click should paste clipboard text.
  * @property scrollbackLines maximum retained scrollback lines.
  * @property lineHeight font metric line-height multiplier.
+ * @property shellRequestResizeWindow whether shell application window/grid resize requests are honored.
+ * @property desktopNotificationsEnabled whether desktop notifications are enabled.
  */
 data class TerminalConfig(
     val theme: String = DEFAULT_THEME,

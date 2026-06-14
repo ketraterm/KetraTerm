@@ -51,6 +51,7 @@ import java.util.concurrent.atomic.AtomicLong
  * serialization and all host-bound write ordering.
  *
  * @property terminal public terminal buffer mutated by host output.
+ * @property publisher the render publisher responsible for frames updates.
  */
 class TerminalSession(
     val terminal: TerminalBuffer,
@@ -103,12 +104,20 @@ class TerminalSession(
             legacyOnDirty = value
         }
 
-    /** Registers a listener to be notified when the session needs a render repaint. */
+    /**
+     * Registers a listener to be notified when the session needs a render repaint.
+     *
+     * @param listener the callback listener to add.
+     */
     fun addDirtyListener(listener: () -> Unit) {
         dirtyListeners.add(listener)
     }
 
-    /** Unregisters a previously registered render repaint listener. */
+    /**
+     * Unregisters a previously registered render repaint listener.
+     *
+     * @param listener the callback listener to remove.
+     */
     fun removeDirtyListener(listener: () -> Unit) {
         dirtyListeners.remove(listener)
     }
@@ -136,13 +145,16 @@ class TerminalSession(
      * and returns `null` when metadata is unavailable or was evicted by policy.
      *
      * @param hyperlinkId cell hyperlink id; `0` means no hyperlink.
-     * @return target URI, or `null`.
+     * @return target URI, or `null` if none.
      */
     fun hyperlinkUri(hyperlinkId: Int): String? = hyperlinkResolver.uriForHyperlinkId(hyperlinkId)
 
     /**
      * Starts the connector after resizing core and transport to [columns] x
      * [rows].
+     *
+     * @param columns initial terminal width count.
+     * @param rows initial terminal height count.
      */
     fun start(
         columns: Int,
@@ -162,6 +174,8 @@ class TerminalSession(
     /**
      * Resizes core, publisher, and the active connector.
      *
+     * @param columns target terminal column width.
+     * @param rows target terminal row height.
      * @param oldScrollbackOffset The scrollback offset that was active in the UI before this resize.
      *   Pass 0 if the viewport was at the live screen (no scrollback).
      * @return A [Pair] of (newScrollbackOffset, newHistorySize) that the UI should apply to
@@ -189,6 +203,8 @@ class TerminalSession(
      *
      * Existing stored content keeps its current cell shape; changing this
      * setting does not reinterpret already-written rows.
+     *
+     * @param enabled whether ambiguous codepoints occupy two cells.
      */
     fun setTreatAmbiguousAsWide(enabled: Boolean) {
         synchronized(mutationLock) {
@@ -300,6 +316,8 @@ class TerminalSession(
      * The offset is transient render request state, not terminal state. UI
      * layers own scrollback policy and pass the desired offset for each
      * publication they need.
+     *
+     * @param scrollbackOffset logical whole-row offset from live viewport.
      */
     fun requestRender(scrollbackOffset: Int) {
         requestRender(scrollbackOffset, viewportRows = 0)
@@ -312,6 +330,9 @@ class TerminalSession(
      * [viewportRows] greater than zero asks the render reader to expose that
      * many rows when possible. This is UI composition state and must not resize
      * the terminal or connector.
+     *
+     * @param scrollbackOffset logical whole-row offset from live viewport.
+     * @param viewportRows row count requested from the render cache.
      */
     fun requestRender(
         scrollbackOffset: Int,
@@ -428,11 +449,19 @@ class TerminalSession(
      * UI callers should use this session-level reader rather than reading the
      * core buffer directly, so parser output and resize cannot mutate the grid
      * while a renderer copies primitive row data.
+     *
+     * @param consumer the frame consumer to invoke.
      */
     override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
         readRenderFrame(scrollbackOffset = 0, consumer = consumer)
     }
 
+    /**
+     * Reads a render frame with a specified scrollback offset.
+     *
+     * @param scrollbackOffset whole-row offset from the live viewport.
+     * @param consumer the frame consumer to invoke.
+     */
     override fun readRenderFrame(
         scrollbackOffset: Int,
         consumer: TerminalRenderFrameConsumer,
@@ -442,6 +471,13 @@ class TerminalSession(
         }
     }
 
+    /**
+     * Reads a render frame with a specified scrollback offset and viewport rows limit.
+     *
+     * @param scrollbackOffset whole-row offset from the live viewport.
+     * @param viewportRows row count requested.
+     * @param consumer the frame consumer to invoke.
+     */
     override fun readRenderFrame(
         scrollbackOffset: Int,
         viewportRows: Int,
@@ -464,6 +500,8 @@ class TerminalSession(
     /**
      * Records transport failure and treats it as remote closure without a
      * process exit code.
+     *
+     * @param error the transport failure exception.
      */
     override fun onError(error: Throwable) {
         if (!remoteClosed.compareAndSet(false, true)) return
@@ -532,6 +570,13 @@ class TerminalSession(
         /**
          * Creates a production session with the standard parser, host
          * sink, and default input encoder.
+         *
+         * @param terminal core buffer to mutate.
+         * @param connector transport connector.
+         * @param hostEvents metadata events target.
+         * @param hostPolicy safety policy.
+         * @param inputPolicy key-encoding policy.
+         * @return standard production terminal session.
          */
         @JvmStatic
         @JvmOverloads

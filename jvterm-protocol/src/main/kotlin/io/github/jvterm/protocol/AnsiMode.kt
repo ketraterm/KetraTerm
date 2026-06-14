@@ -21,6 +21,9 @@ package io.github.jvterm.protocol
  * Toggled via CSI Pn h (SM) and CSI Pn l (RM).
  */
 object AnsiMode {
+    /** Keyboard Action / Insertion Mode (KAM / IRM). */
     const val INSERT: Int = 4
+
+    /** Line Feed / New Line Mode (LFM / LNM). */
     const val NEW_LINE: Int = 20
 }

@@ -71,6 +71,8 @@ data class PtyOptions
         companion object {
             /**
              * Returns the platform default interactive shell command.
+             *
+             * @return default interactive shell command.
              */
             @JvmStatic
             fun defaultCommand(): List<String> {
@@ -85,6 +87,8 @@ data class PtyOptions
 
             /**
              * Returns a process environment suitable for contemporary shells and TUIs.
+             *
+             * @return default process environment variables.
              */
             @JvmStatic
             fun defaultEnvironment(): Map<String, String> {
@@ -96,6 +100,8 @@ data class PtyOptions
 
             /**
              * Returns the default input policy for local PTY-backed sessions.
+             *
+             * @return default terminal input policy.
              */
             @JvmStatic
             fun defaultInputPolicy(): TerminalInputPolicy =
