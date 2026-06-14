@@ -363,6 +363,8 @@ interface TerminalWriter {
      * Sets the xterm window title.
      *
      * Changes to the title advance the render frame generation.
+     *
+     * @param title The window title to set.
      */
     fun setWindowTitle(title: String)
 
@@ -370,6 +372,8 @@ interface TerminalWriter {
      * Sets the xterm icon title.
      *
      * Changes to the title advance the render frame generation.
+     *
+     * @param title The icon title to set.
      */
     fun setIconTitle(title: String)
 
@@ -377,6 +381,8 @@ interface TerminalWriter {
      * Enables or disables selective-erase protection on future printed cells (DECSCA).
      *
      * This affects DECSEL/DECSED only. Normal writes still overwrite protected cells.
+     *
+     * @param enabled `true` to enable selective-erase protection, `false` to disable.
      */
     fun setSelectiveEraseProtection(enabled: Boolean)
 

@@ -25,6 +25,11 @@ object TerminalBuffers {
     /**
      * Creates a terminal buffer with the requested visible dimensions and
      * scrollback capacity.
+     *
+     * @param width Visible width in cells. Must be > 0.
+     * @param height Visible height in rows. Must be > 0.
+     * @param maxHistory Maximum number of history lines to retain in scrollback.
+     * @return A new [TerminalBuffer] instance initialized with the given dimensions.
      */
     @JvmStatic
     @JvmOverloads

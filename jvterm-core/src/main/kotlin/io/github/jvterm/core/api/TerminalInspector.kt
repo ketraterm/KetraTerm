@@ -47,12 +47,16 @@ interface TerminalInspector {
 
     /**
      * Returns the visible screen as a newline-joined string, top to bottom.
+     *
+     * @return The text content of the entire visible screen.
      */
     fun getScreenAsString(): String
 
     /**
      * Returns scrollback history followed by the visible screen as a
      * newline-joined string, oldest line first.
+     *
+     * @return The text content of both history and the visible screen.
      */
     fun getAllAsString(): String
 }

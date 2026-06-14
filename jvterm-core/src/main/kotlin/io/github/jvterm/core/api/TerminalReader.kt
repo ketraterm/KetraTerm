@@ -44,7 +44,12 @@ interface TerminalReader {
     /** Number of retained off-screen history lines in the active buffer. */
     val historySize: Int
 
-    /** Returns the visible line at [row], or a shared void line when [row] is out of bounds. */
+    /**
+     * Returns the visible line at [row], or a shared void line when [row] is out of bounds.
+     *
+     * @param row Zero-based row index.
+     * @return The [TerminalLine] at the specified row, or a dummy blank line if out of bounds.
+     */
     fun getLine(row: Int): TerminalLine
 
     /**
@@ -54,6 +59,10 @@ interface TerminalReader {
      * - Cluster cells return the leading codepoint of the grapheme sequence.
      * - Wide-character spacer cells return `-1`.
      * - Blank cells and out-of-bounds probes return `0`.
+     *
+     * @param col Column index (0-based).
+     * @param row Row index (0-based).
+     * @return The codepoint at the specified coordinate, or a sentinel/spacer value.
      */
     fun getCodepointAt(
         col: Int,

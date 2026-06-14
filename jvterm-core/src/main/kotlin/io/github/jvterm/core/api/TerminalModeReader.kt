@@ -21,6 +21,28 @@ package io.github.jvterm.core.api
  * This is the handoff contract for parser, input, and UI layers that need to
  * read mode flags without mutating the core's internal `TerminalModes`
  * instance.
+ *
+ * @property isInsertMode `true` when insert mode (IRM) is active, `false` for replace mode.
+ * @property isAutoWrap `true` when DECAWM auto-wrap mode is active.
+ * @property isApplicationCursorKeys `true` when application cursor keys mode (DECCKM) is active.
+ * @property isApplicationKeypad `true` when application keypad mode (DECNKM) is active.
+ * @property isOriginMode `true` when origin mode (DECOM) is active.
+ * @property isNewLineMode `true` when new-line mode (LNM) is active.
+ * @property isLeftRightMarginMode `true` when left/right margins (DECLRMM) are active.
+ * @property isReverseVideo `true` when reverse-video presentation (DECSCNM) is active.
+ * @property isCursorVisible `true` when the cursor presentation is visible (DECTCEM).
+ * @property isCursorBlinking `true` when the cursor blink presentation is active.
+ * @property isBracketedPasteEnabled `true` when bracketed paste mode (?2004) is enabled.
+ * @property isFocusReportingEnabled `true` when focus in/out reporting (?1004) is enabled.
+ * @property treatAmbiguousAsWide `true` when East Asian Ambiguous characters are measured as wide (2 cells).
+ * @property mouseTrackingMode The active mouse tracking mode.
+ * @property mouseEncodingMode The active mouse report encoding mode.
+ * @property modifyOtherKeysMode The active modify-other-keys reporting level.
+ * @property formatOtherKeysMode The active format-other-keys wire format.
+ * @property kittyKeyboardFlags Active Kitty keyboard progressive-enhancement flags.
+ * @property isSynchronizedOutput `true` when synchronized output mode (?2026) is active.
+ * @property isBellIsUrgent `true` when urgent bell mode (?1042) is active.
+ * @property isPopOnBell `true` when pop on bell mode (?1043) is active.
  */
 data class TerminalModeSnapshot(
     val isInsertMode: Boolean,
@@ -40,13 +62,9 @@ data class TerminalModeSnapshot(
     val mouseEncodingMode: io.github.jvterm.protocol.MouseEncodingMode,
     val modifyOtherKeysMode: Int,
     val formatOtherKeysMode: Int,
-    /** Active Kitty keyboard progressive-enhancement flags stored by core. */
     val kittyKeyboardFlags: Int,
-    /** Synchronized output mode (?2026) enabled. */
     val isSynchronizedOutput: Boolean,
-    /** Urgent bell mode (?1042) enabled. */
     val isBellIsUrgent: Boolean,
-    /** Pop on bell mode (?1043) enabled. */
     val isPopOnBell: Boolean,
 )
 
@@ -64,6 +82,8 @@ interface TerminalModeReader : TerminalInputState {
      * The current bit layout is owned by core and should be treated as opaque
      * outside optimized input/render handoff code. General callers should
      * prefer [getModeSnapshot].
+     *
+     * @return A packed 64-bit word containing a snapshot of all active modes.
      */
     fun getModeBitsSnapshot(): Long
 
@@ -72,9 +92,15 @@ interface TerminalModeReader : TerminalInputState {
      *
      * This is the same coherent mode word returned by [getModeBitsSnapshot],
      * exposed through the narrower [TerminalInputState] contract.
+     *
+     * @return A packed 64-bit word containing a snapshot of input modes.
      */
     override fun getInputModeBits(): Long = getModeBitsSnapshot()
 
-    /** Returns an immutable snapshot of the current durable mode flags. */
+    /**
+     * Returns an immutable snapshot of the current durable mode flags.
+     *
+     * @return A detached [TerminalModeSnapshot] instance containing all active mode state.
+     */
     fun getModeSnapshot(): TerminalModeSnapshot
 }

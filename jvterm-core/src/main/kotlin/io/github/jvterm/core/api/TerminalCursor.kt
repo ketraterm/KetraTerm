@@ -169,6 +169,8 @@ interface TerminalCursor {
      * if fewer than [count] stops remain, movement clamps at the active right
      * boundary. With DECLRMM off, that boundary is `width - 1`; with
      * DECLRMM on, it is the active horizontal right margin.
+     *
+     * @param count Number of tab stops to advance.
      */
     fun cursorForwardTab(count: Int = 1)
 
@@ -179,6 +181,8 @@ interface TerminalCursor {
      * if fewer than [count] stops exist to the left, movement clamps at the
      * active left boundary. With DECLRMM off, that boundary is column `0`;
      * with DECLRMM on, it is the active horizontal left margin.
+     *
+     * @param count Number of tab stops to move backward.
      */
     fun cursorBackwardTab(count: Int = 1)
 }
