@@ -8,6 +8,22 @@ repositories {
     mavenCentral()
 }
 
+dependencies {
+    dokka(project(":jvterm-protocol"))
+    dokka(project(":jvterm-parser"))
+    dokka(project(":jvterm-core"))
+    dokka(project(":jvterm-host"))
+    dokka(project(":jvterm-input"))
+    dokka(project(":jvterm-render-api"))
+    dokka(project(":jvterm-render-cache"))
+    dokka(project(":jvterm-transport-api"))
+    dokka(project(":jvterm-session"))
+    dokka(project(":jvterm-ui-swing"))
+    dokka(project(":jvterm-testkit"))
+    dokka(project(":jvterm-pty"))
+    dokka(project(":jvterm-workspace"))
+}
+
 subprojects {
     repositories {
         mavenCentral()
