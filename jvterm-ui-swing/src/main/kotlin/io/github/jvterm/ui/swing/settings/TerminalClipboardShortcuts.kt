@@ -64,6 +64,8 @@ data class TerminalClipboardShortcuts(
     companion object {
         /**
          * Returns the default terminal clipboard shortcuts for this JVM host.
+         *
+         * @return default clipboard shortcuts.
          */
         @JvmStatic
         fun platformDefault(): TerminalClipboardShortcuts = platformDefault(System.getProperty("os.name").orEmpty())
@@ -79,6 +81,8 @@ data class TerminalClipboardShortcuts(
 
         /**
          * Windows terminal-style clipboard shortcuts.
+         *
+         * @return Windows clipboard shortcuts.
          */
         @JvmStatic
         fun windows(): TerminalClipboardShortcuts =
@@ -91,6 +95,8 @@ data class TerminalClipboardShortcuts(
 
         /**
          * macOS menu-shortcut clipboard bindings.
+         *
+         * @return macOS clipboard shortcuts.
          */
         @JvmStatic
         fun macOs(): TerminalClipboardShortcuts =
@@ -103,6 +109,8 @@ data class TerminalClipboardShortcuts(
 
         /**
          * Linux and Unix terminal clipboard bindings.
+         *
+         * @return Linux/Unix clipboard shortcuts.
          */
         @JvmStatic
         fun linuxAndUnix(): TerminalClipboardShortcuts {

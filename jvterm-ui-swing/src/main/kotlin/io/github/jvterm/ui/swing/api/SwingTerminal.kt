@@ -569,6 +569,8 @@ class SwingTerminal
 
         /**
          * Returns the current search UI and result snapshot.
+         *
+         * @return current terminal search state.
          */
         fun currentSearchState(): TerminalSearchState =
             TerminalSearchState(
@@ -677,6 +679,11 @@ class SwingTerminal
             return true
         }
 
+        /**
+         * Copies the current terminal text selection to the host clipboard.
+         *
+         * @return `true` if selection was successfully copied to clipboard, `false` otherwise.
+         */
         fun copySelectionToClipboard(): Boolean {
             if (session == null) return false
             val selectedText = selectionController.getSelectedText(renderCache) ?: return false
@@ -684,6 +691,11 @@ class SwingTerminal
             return true
         }
 
+        /**
+         * Pastes text from the host clipboard into the active terminal session.
+         *
+         * @return `true` if clipboard text was read and sent to the session, `false` otherwise.
+         */
         fun pasteClipboardText(): Boolean {
             val text = hostServices.clipboardHandler.readText() ?: return false
             if (text.isEmpty()) return false

@@ -59,6 +59,7 @@ import java.util.*
  * @property cursorShape default cursor shape configured for the session.
  * @property scrollbackLines maximum scrollback lines retained by the terminal.
  * @property lineHeight vertical line height scaling factor.
+ * @property shellRequestResizeWindow whether the terminal panel requests window resizing.
  */
 data class SwingSettings
     @JvmOverloads
@@ -121,6 +122,8 @@ data class SwingSettings
              *
              * The preferred families match common modern Windows terminal defaults,
              * with the logical monospaced font as a portable fallback.
+             *
+             * @return default terminal font.
              */
             @JvmStatic
             fun defaultTerminalFont(): Font = resolvedDefaultTerminalFont
@@ -132,6 +135,8 @@ data class SwingSettings
              * native color emoji family is installed.
              *
              * Hosts can replace this list with their own font resolver policy.
+             *
+             * @return list of fallback fonts.
              */
             @JvmStatic
             fun defaultFallbackFonts(): List<Font> {
@@ -178,6 +183,8 @@ data class SwingSettings
              *
              * Theme colors live in the Swing layer so the dependency-free render
              * API can remain renderer-neutral.
+             *
+             * @return default terminal color palette.
              */
             @JvmStatic
             fun defaultPalette(): TerminalColorPalette = TerminalTheme.CAMPBELL.createPalette()
@@ -252,6 +259,11 @@ enum class TerminalTheme {
     EVERFOREST,
     ;
 
+    /**
+     * Creates the [TerminalColorPalette] for this theme.
+     *
+     * @return terminal color palette instance.
+     */
     fun createPalette(): TerminalColorPalette =
         when (this) {
             CAMPBELL ->
