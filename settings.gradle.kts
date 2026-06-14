@@ -2,7 +2,7 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-rootProject.name = "Lattice"
+rootProject.name = "JvTerm"
 include(
     ":jvterm-core",
     ":jvterm-render-api",
