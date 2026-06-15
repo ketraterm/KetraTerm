@@ -43,8 +43,9 @@ tasks.test {
 }
 
 tasks.processResources {
-    inputs.property("version", project.version)
+    val appVersion = project.version.toString()
+    inputs.property("version", appVersion)
     filesMatching("**/version.properties") {
-        expand(mapOf("version" to project.version))
+        expand(mapOf("version" to appVersion))
     }
 }
