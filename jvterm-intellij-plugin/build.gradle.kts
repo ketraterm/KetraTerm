@@ -11,7 +11,11 @@ private val jvtermVersion = "0.1.0-alpha01-SNAPSHOT"
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
     implementation("io.github.jvterm:jvterm-ui-swing:$jvtermVersion")
-    implementation("io.github.jvterm:jvterm-workspace:$jvtermVersion")
+    implementation("io.github.jvterm:jvterm-workspace:$jvtermVersion") {
+        exclude(group = "org.jetbrains.pty4j", module = "pty4j")
+        exclude(group = "net.java.dev.jna", module = "jna")
+        exclude(group = "net.java.dev.jna", module = "jna-platform")
+    }
     runtimeOnly("org.slf4j:slf4j-nop:2.0.18")
 
     testImplementation(libs.junit)

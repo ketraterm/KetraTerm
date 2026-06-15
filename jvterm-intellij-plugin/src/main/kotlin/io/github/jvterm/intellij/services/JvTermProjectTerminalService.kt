@@ -20,16 +20,19 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.ui.content.Content
 import io.github.jvterm.intellij.settings.JvTermIntellijSettings
 import io.github.jvterm.intellij.ui.JvTermTerminalPane
+import io.github.jvterm.intellij.ui.JvTermTerminalStartupView
 import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.workspace.TerminalWorkspace
 import io.github.jvterm.workspace.TerminalWorkspaceListener
 import io.github.jvterm.workspace.TerminalWorkspaceOpenOptions
 import io.github.jvterm.workspace.TerminalWorkspaceTab
+import java.awt.BorderLayout
+import java.util.concurrent.atomic.AtomicInteger
+import javax.swing.JPanel
 
 /**
  * Project-level owner for IntelliJ-hosted JvTerm tabs and sessions.
@@ -45,14 +48,18 @@ class JvTermProjectTerminalService(
     private val project: Project,
 ) : Disposable {
     private val contentsByTabId = LinkedHashMap<String, Content>()
+    private val pendingTabsById = LinkedHashMap<String, PendingTerminalTab>()
     private val panesByTabId = LinkedHashMap<String, JvTermTerminalPane>()
     private val workspace = TerminalWorkspace(IntellijWorkspaceListener())
+    private val workspaceLock = Any()
+    private val nextPendingTabNumber = AtomicInteger(1)
+    private val ptyRuntime = IntelliJPtyRuntime()
     private var disposed = false
 
     /**
      * Returns true when this project already has an open terminal tab.
      */
-    fun hasOpenTabs(): Boolean = contentsByTabId.isNotEmpty()
+    fun hasOpenTabs(): Boolean = contentsByTabId.isNotEmpty() || pendingTabsById.isNotEmpty()
 
     /**
      * Opens the initial terminal tab if no terminal content exists yet.
@@ -68,50 +75,48 @@ class JvTermProjectTerminalService(
      * Opens one local terminal tab in [toolWindow].
      *
      * @param toolWindow target IntelliJ tool window.
-     * @return created content, or `null` if the PTY could not start.
+     * @return created content tab containing either a pending, running, or failure state.
      */
-    fun openDefaultTab(toolWindow: ToolWindow): Content? {
+    fun openDefaultTab(toolWindow: ToolWindow): Content {
         check(!disposed) { "JvTerm project terminal service is disposed" }
-
-        JvTermNativeLibrarySetup.install()
 
         val profile = JvTermDefaultProfileFactory.defaultProfile(project)
         val settings = JvTermIntellijSettings.current()
-        val workspaceTab =
-            try {
-                workspace.openTab(
-                    profile = profile,
-                    options = openOptions(settings),
-                )
-            } catch (exception: Exception) {
-                Messages.showErrorDialog(
-                    project,
-                    exception.message ?: exception.javaClass.name,
-                    "Unable to start ${profile.displayName}",
-                )
-                return null
+        val pendingId = "pending-terminal-${nextPendingTabNumber.getAndIncrement()}"
+        val container =
+            JPanel(BorderLayout()).apply {
+                border = null
+                add(JvTermTerminalStartupView.starting(profile.displayName), BorderLayout.CENTER)
             }
-
-        val pane = JvTermTerminalPane.create(workspaceTab)
         val contentManager = toolWindow.contentManager
         val content =
             contentManager.factory.createContent(
-                pane.component,
-                workspaceTab.title,
+                container,
+                profile.displayName,
                 false,
             )
-        val tabDisposable = TerminalTabDisposable(workspaceTab.id)
 
         content.isCloseable = true
-        content.setPreferredFocusableComponent(pane.terminal)
-        content.setDisposer(tabDisposable)
+        content.setDisposer(PendingTerminalTabDisposable(pendingId))
 
-        contentsByTabId[workspaceTab.id] = content
-        panesByTabId[workspaceTab.id] = pane
+        pendingTabsById[pendingId] = PendingTerminalTab(content, container)
 
         contentManager.addContent(content)
         contentManager.setSelectedContent(content, true)
-        pane.requestFocus()
+
+        startTerminalTabInBackground(
+            pendingId = pendingId,
+            profileName = profile.displayName,
+            start = {
+                synchronized(workspaceLock) {
+                    ptyRuntime.openWorkspaceTab(
+                        workspace = workspace,
+                        profile = profile,
+                        options = openOptions(settings),
+                    )
+                }
+            },
+        )
         return content
     }
 
@@ -122,11 +127,14 @@ class JvTermProjectTerminalService(
         val panes = panesByTabId.values.toList()
         panesByTabId.clear()
         contentsByTabId.clear()
+        pendingTabsById.clear()
 
         for (pane in panes) {
             pane.close()
         }
-        workspace.close()
+        synchronized(workspaceLock) {
+            workspace.close()
+        }
     }
 
     private fun closeTabFromContent(tabId: String) {
@@ -134,7 +142,93 @@ class JvTermProjectTerminalService(
 
         panesByTabId.remove(tabId)?.close()
         contentsByTabId.remove(tabId)
-        workspace.closeTab(tabId)
+        synchronized(workspaceLock) {
+            workspace.closeTab(tabId)
+        }
+    }
+
+    private fun closePendingTab(pendingId: String) {
+        pendingTabsById.remove(pendingId)
+    }
+
+    private fun startTerminalTabInBackground(
+        pendingId: String,
+        profileName: String,
+        start: () -> TerminalWorkspaceTab,
+    ) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val result =
+                try {
+                    TerminalStartupResult.Started(start())
+                } catch (exception: Exception) {
+                    TerminalStartupResult.Failed(exception)
+                } catch (error: LinkageError) {
+                    TerminalStartupResult.Failed(error)
+                }
+            invokeLaterIfAlive {
+                publishTerminalStartupResult(pendingId, profileName, result)
+            }
+        }
+    }
+
+    private fun publishTerminalStartupResult(
+        pendingId: String,
+        profileName: String,
+        result: TerminalStartupResult,
+    ) {
+        val pendingTab = pendingTabsById[pendingId]
+        if (pendingTab == null) {
+            if (result is TerminalStartupResult.Started) {
+                synchronized(workspaceLock) {
+                    workspace.closeTab(result.tab.id)
+                }
+            }
+            return
+        }
+
+        when (result) {
+            is TerminalStartupResult.Started -> {
+                pendingTabsById.remove(pendingId)
+                bindStartedTab(pendingTab, result.tab)
+            }
+            is TerminalStartupResult.Failed -> showStartupFailure(pendingTab, profileName, result.error)
+        }
+    }
+
+    private fun bindStartedTab(
+        pendingTab: PendingTerminalTab,
+        workspaceTab: TerminalWorkspaceTab,
+    ) {
+        val pane = JvTermTerminalPane.create(workspaceTab)
+        replaceContent(pendingTab.container, pane.component)
+        pendingTab.content.displayName = workspaceTab.title
+        pendingTab.content.setPreferredFocusableComponent(pane.terminal)
+        pendingTab.content.setDisposer(TerminalTabDisposable(workspaceTab.id))
+        contentsByTabId[workspaceTab.id] = pendingTab.content
+        panesByTabId[workspaceTab.id] = pane
+        pane.requestFocus()
+    }
+
+    private fun showStartupFailure(
+        pendingTab: PendingTerminalTab,
+        profileName: String,
+        error: Throwable,
+    ) {
+        pendingTab.content.displayName = "Failed: $profileName"
+        replaceContent(
+            pendingTab.container,
+            JvTermTerminalStartupView.failure(profileName, error),
+        )
+    }
+
+    private fun replaceContent(
+        container: JPanel,
+        component: java.awt.Component,
+    ) {
+        container.removeAll()
+        container.add(component, BorderLayout.CENTER)
+        container.revalidate()
+        container.repaint()
     }
 
     private fun openOptions(settings: SwingSettings): TerminalWorkspaceOpenOptions =
@@ -150,6 +244,14 @@ class JvTermProjectTerminalService(
     ) : Disposable {
         override fun dispose() {
             closeTabFromContent(tabId)
+        }
+    }
+
+    private inner class PendingTerminalTabDisposable(
+        private val pendingId: String,
+    ) : Disposable {
+        override fun dispose() {
+            closePendingTab(pendingId)
         }
     }
 
@@ -187,5 +289,20 @@ class JvTermProjectTerminalService(
          * @return project terminal service.
          */
         fun getInstance(project: Project): JvTermProjectTerminalService = project.service()
+    }
+
+    private data class PendingTerminalTab(
+        val content: Content,
+        val container: JPanel,
+    )
+
+    private sealed interface TerminalStartupResult {
+        data class Started(
+            val tab: TerminalWorkspaceTab,
+        ) : TerminalStartupResult
+
+        data class Failed(
+            val error: Throwable,
+        ) : TerminalStartupResult
     }
 }
