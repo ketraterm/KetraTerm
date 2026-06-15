@@ -189,11 +189,30 @@ data class SwingSettings
             @JvmStatic
             fun defaultPalette(): TerminalColorPalette = TerminalTheme.CAMPBELL.createPalette()
 
-            private fun resolveDefaultFontFamily(): String {
+            /**
+             * Resolves the font family name. If the requested font family name is installed on the
+             * system (case-insensitively), it returns the exact matched system font family name.
+             * Otherwise, it falls back to the first available font from the preferred default monospace
+             * font families chain.
+             *
+             * @param requestedFamily the name of the font family requested.
+             * @return the resolved font family name.
+             */
+            @JvmStatic
+            fun resolveFontFamily(requestedFamily: String): String {
                 val installedFamilies =
                     GraphicsEnvironment
                         .getLocalGraphicsEnvironment()
                         .availableFontFamilyNames
+                for (installedFamily in installedFamilies) {
+                    if (installedFamily.equals(requestedFamily, ignoreCase = true)) {
+                        return installedFamily
+                    }
+                }
+                return resolveDefaultFontFamily(installedFamilies)
+            }
+
+            private fun resolveDefaultFontFamily(installedFamilies: Array<String>): String {
                 for (preferredFamily in preferredDefaultFontFamilies) {
                     for (installedFamily in installedFamilies) {
                         if (installedFamily.equals(preferredFamily, ignoreCase = true)) {
@@ -202,6 +221,14 @@ data class SwingSettings
                     }
                 }
                 return Font.MONOSPACED
+            }
+
+            private fun resolveDefaultFontFamily(): String {
+                val installedFamilies =
+                    GraphicsEnvironment
+                        .getLocalGraphicsEnvironment()
+                        .availableFontFamilyNames
+                return resolveDefaultFontFamily(installedFamilies)
             }
 
             private const val DEFAULT_FALLBACK_FONT_FAMILY_CAPACITY = 16

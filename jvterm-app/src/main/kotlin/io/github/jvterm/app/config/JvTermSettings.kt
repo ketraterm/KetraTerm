@@ -139,9 +139,10 @@ internal class JvTermSettings(
             updateConfig(config.copy(desktopNotificationsEnabled = value))
         }
 
-    fun current(): SwingSettings =
-        SwingSettings(
-            font = Font(config.fontFamily, Font.PLAIN, config.fontSize),
+    fun current(): SwingSettings {
+        val resolvedFamily = SwingSettings.resolveFontFamily(config.fontFamily)
+        return SwingSettings(
+            font = Font(resolvedFamily, Font.PLAIN, config.fontSize),
             columns = config.columns,
             rows = config.rows,
             palette = theme.createPalette(),
@@ -154,6 +155,7 @@ internal class JvTermSettings(
             lineHeight = config.lineHeight,
             shellRequestResizeWindow = config.shellRequestResizeWindow,
         )
+    }
 
     private fun parseCursorShape(shape: String): io.github.jvterm.render.api.TerminalRenderCursorShape =
         when (shape.lowercase(Locale.ROOT)) {

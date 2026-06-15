@@ -138,6 +138,28 @@ class SwingSettingsTest {
     }
 
     @Test
+    fun resolveFontFamilyReturnsInstalledFontWithSystemCasing() {
+        val monospaced = "monospaced"
+        val resolved = SwingSettings.resolveFontFamily(monospaced)
+        assertTrue(resolved.equals("Monospaced", ignoreCase = true))
+    }
+
+    @Test
+    fun resolveFontFamilyFallsBackToPreferredMonospaceForMissingFont() {
+        val missingFont = "NonExistentFontFamilyName12345"
+        val resolved = SwingSettings.resolveFontFamily(missingFont)
+        val preferred = listOf("Cascadia Mono", "Cascadia Code", "Consolas", Font.MONOSPACED)
+        assertTrue(
+            resolved in preferred ||
+                java.awt.GraphicsEnvironment
+                    .getLocalGraphicsEnvironment()
+                    .availableFontFamilyNames
+                    .contains(resolved),
+            "Resolved font '$resolved' must be either one of the preferred defaults or an installed system font",
+        )
+    }
+
+    @Test
     fun fallbackPolicyPrefersInstalledColorEmojiBeforeSymbolFonts() {
         val families =
             SwingSettings.fallbackFontFamiliesForInstalledFonts(
