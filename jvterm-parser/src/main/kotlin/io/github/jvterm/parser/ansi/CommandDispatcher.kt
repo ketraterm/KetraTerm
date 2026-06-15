@@ -292,12 +292,33 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         state: ParserState,
     ) {
         when (modeParam(state, 0)) {
-            8 -> {
-                val rows = modeParam(state, 1)
-                val cols = modeParam(state, 2)
-                sink.resizeWindow(rows = rows, columns = cols)
+            1 -> sink.deminimizeWindow()
+            2 -> sink.minimizeWindow()
+            3 -> {
+                val x = paramOrMissing(state, 1)
+                val y = paramOrMissing(state, 2)
+                if (x >= 0 && y >= 0) {
+                    sink.moveWindow(x = x, y = y)
+                }
             }
-            14, 18 -> sink.requestWindowReport(modeParam(state, 0))
+            5 -> sink.raiseWindow()
+            6 -> sink.lowerWindow()
+            8 -> {
+                val rows = paramOrMissing(state, 1)
+                val cols = paramOrMissing(state, 2)
+                if (rows >= 0 && cols >= 0) {
+                    sink.resizeWindow(rows = rows, columns = cols)
+                }
+            }
+            9 -> {
+                val maximizeParam = paramOrMissing(state, 1)
+                if (maximizeParam == 0) {
+                    sink.setMaximized(false)
+                } else if (maximizeParam in 1..3) {
+                    sink.setMaximized(true)
+                }
+            }
+            11, 14, 18, 19 -> sink.requestWindowReport(modeParam(state, 0))
             22 -> {
                 val scope = titleStackScopeParam(state)
                 if (scope in 0..2) sink.pushTitleStack(scope)

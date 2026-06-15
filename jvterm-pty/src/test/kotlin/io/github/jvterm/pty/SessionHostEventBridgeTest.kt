@@ -57,10 +57,30 @@ class SessionHostEventBridgeTest {
         bridge.iconTitleChanged("icon")
         bridge.windowTitleChanged("window")
         bridge.resizeWindow(24, 80)
+        bridge.moveWindow(100, 200)
+        bridge.minimizeWindow()
+        bridge.deminimizeWindow()
+        bridge.raiseWindow()
+        bridge.lowerWindow()
+        bridge.setMaximized(true)
+        bridge.setMaximized(false)
         bridge.showNotification("title", "body", NotificationLevel.INFO)
 
         assertEquals(
-            listOf("bell", "icon:icon", "window:window", "resizeWindow:24:80", "showNotification:title:body:INFO"),
+            listOf(
+                "bell",
+                "icon:icon",
+                "window:window",
+                "resizeWindow:24:80",
+                "moveWindow:100:200",
+                "minimizeWindow",
+                "deminimizeWindow",
+                "raiseWindow",
+                "lowerWindow",
+                "setMaximized:true",
+                "setMaximized:false",
+                "showNotification:title:body:INFO",
+            ),
             listener.events,
         )
     }
@@ -137,6 +157,37 @@ class SessionHostEventBridgeTest {
             columns: Int,
         ) {
             events += "resizeWindow:$rows:$columns"
+        }
+
+        override fun moveWindow(
+            session: TerminalSession,
+            x: Int,
+            y: Int,
+        ) {
+            events += "moveWindow:$x:$y"
+        }
+
+        override fun minimizeWindow(session: TerminalSession) {
+            events += "minimizeWindow"
+        }
+
+        override fun deminimizeWindow(session: TerminalSession) {
+            events += "deminimizeWindow"
+        }
+
+        override fun raiseWindow(session: TerminalSession) {
+            events += "raiseWindow"
+        }
+
+        override fun lowerWindow(session: TerminalSession) {
+            events += "lowerWindow"
+        }
+
+        override fun setMaximized(
+            session: TerminalSession,
+            maximize: Boolean,
+        ) {
+            events += "setMaximized:$maximize"
         }
 
         override fun showNotification(

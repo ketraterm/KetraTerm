@@ -141,6 +141,34 @@ class TerminalResponseChannelTest {
     }
 
     @Test
+    fun `window state report returns normal or minimized based on host state`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+
+        // Default: normal (not minimized)
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_STATE)
+        assertEquals("\u001B[1t", drain(buffer))
+
+        // Update to minimized
+        buffer.setWindowMinimized(true)
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_STATE)
+        assertEquals("\u001B[2t", drain(buffer))
+
+        // Update back to normal
+        buffer.setWindowMinimized(false)
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_STATE)
+        assertEquals("\u001B[1t", drain(buffer))
+    }
+
+    @Test
+    fun `screen size report returns grid dimensions`() {
+        val buffer = TerminalBuffers.create(width = 120, height = 40)
+
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_SCREEN_SIZE)
+
+        assertEquals("\u001B[9;40;120t", drain(buffer))
+    }
+
+    @Test
     fun `hard reset clears pending host responses`() {
         val buffer = TerminalBuffers.create(width = 10, height = 5)
 

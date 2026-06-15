@@ -1260,10 +1260,39 @@ class HostCommandAdapterTest {
         }
     }
 
+    @Nested
+    @DisplayName("window manipulation")
+    inner class WindowManipulation {
+        @Test
+        fun `window manipulations are forwarded to the event sink`() {
+            val f = Fixture()
+            f.sink.moveWindow(100, 200)
+            f.sink.minimizeWindow()
+            f.sink.deminimizeWindow()
+            f.sink.raiseWindow()
+            f.sink.lowerWindow()
+            f.sink.setMaximized(true)
+            f.sink.setMaximized(false)
+
+            assertEquals(listOf(100 to 200), f.events.moves)
+            assertEquals(1, f.events.minimizes)
+            assertEquals(1, f.events.deminimizes)
+            assertEquals(1, f.events.raises)
+            assertEquals(1, f.events.lowers)
+            assertEquals(listOf(true, false), f.events.maximisedStates)
+        }
+    }
+
     private class RecordingHostEventSink : HostEventSink {
         var bells: Int = 0
         val iconTitles = mutableListOf<String>()
         val windowTitles = mutableListOf<String>()
+        val moves = mutableListOf<Pair<Int, Int>>()
+        var minimizes = 0
+        var deminimizes = 0
+        var raises = 0
+        var lowers = 0
+        val maximisedStates = mutableListOf<Boolean>()
 
         override fun bell() {
             bells++
@@ -1282,6 +1311,33 @@ class HostCommandAdapterTest {
             columns: Int,
         ) {
             // No-op for tests unless assertions need it
+        }
+
+        override fun moveWindow(
+            x: Int,
+            y: Int,
+        ) {
+            moves += x to y
+        }
+
+        override fun minimizeWindow() {
+            minimizes++
+        }
+
+        override fun deminimizeWindow() {
+            deminimizes++
+        }
+
+        override fun raiseWindow() {
+            raises++
+        }
+
+        override fun lowerWindow() {
+            lowers++
+        }
+
+        override fun setMaximized(maximize: Boolean) {
+            maximisedStates += maximize
         }
 
         val notifications = mutableListOf<Triple<String, String, NotificationLevel>>()

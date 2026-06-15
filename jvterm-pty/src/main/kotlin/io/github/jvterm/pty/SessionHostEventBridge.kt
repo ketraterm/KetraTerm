@@ -50,6 +50,33 @@ internal class SessionHostEventBridge(
         safeDispatch { session -> listener.resizeWindow(session, rows, columns) }
     }
 
+    override fun moveWindow(
+        x: Int,
+        y: Int,
+    ) {
+        safeDispatch { session -> listener.moveWindow(session, x, y) }
+    }
+
+    override fun minimizeWindow() {
+        safeDispatch { session -> listener.minimizeWindow(session) }
+    }
+
+    override fun deminimizeWindow() {
+        safeDispatch { session -> listener.deminimizeWindow(session) }
+    }
+
+    override fun raiseWindow() {
+        safeDispatch { session -> listener.raiseWindow(session) }
+    }
+
+    override fun lowerWindow() {
+        safeDispatch { session -> listener.lowerWindow(session) }
+    }
+
+    override fun setMaximized(maximize: Boolean) {
+        safeDispatch { session -> listener.setMaximized(session, maximize) }
+    }
+
     override fun showNotification(
         title: String,
         body: String,

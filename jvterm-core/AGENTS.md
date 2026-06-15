@@ -81,7 +81,8 @@ High-priority gaps:
 - faint, blink, conceal, strikethrough
 - richer underline styles and underline color
 
-Document each gap in `docs/terminal-feature-gap-map.md` until implemented.
+Document each gap in `docs/terminal-feature-gap-map.md` until implemented, and
+move it to `docs/terminal-feature-map.md` once complete.
 
 ## Response Channel Security
 

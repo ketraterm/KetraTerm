@@ -86,8 +86,9 @@ Do not add these unless the product direction explicitly changes:
 - Unbounded or unaudited OSC/DCS query responses.
 - "Everything xterm ever accepted" compatibility.
 
-Use `docs/terminal-feature-gap-map.md` as the living source for supported,
-missing, intentionally deferred, and policy-gated features.
+Use `docs/terminal-feature-map.md` as the living source for supported features,
+and `docs/terminal-feature-gap-map.md` for missing, intentionally deferred,
+and policy-gated features.
 
 ## Engineering Rules
 
@@ -142,8 +143,8 @@ A change is not done until:
 - Relevant parser/core/host tests exist and pass.
 - Edge and hostile cases are covered, not only the happy path.
 - Unsupported parts are explicit TODOs, not silent no-ops pretending to work.
-- `docs/terminal-feature-gap-map.md` is updated when capability or scope
-  changes.
+- `docs/terminal-feature-map.md` and `docs/terminal-feature-gap-map.md` are
+  updated when capability or scope changes.
 - `./gradlew spotlessApply` has been run after edits and before final
   verification.
 - No unrelated formatting churn or architecture drift is introduced.
@@ -168,6 +169,7 @@ leave the workspace.
 
 ## Start Here
 
+- Feature directory: `docs/terminal-feature-map.md`
 - Feature backlog: `docs/terminal-feature-gap-map.md`
 - Core contract: `jvterm-core/docs/terminal-core-contract.md`
 - Project skills index: `docs/agent-skills.md`

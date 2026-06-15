@@ -522,6 +522,44 @@ interface TerminalCommandSink {
     )
 
     /**
+     * Moves the terminal window to the specified screen coordinates in pixels.
+     *
+     * @param x The target x-coordinate on the screen.
+     * @param y The target y-coordinate on the screen.
+     */
+    fun moveWindow(
+        x: Int,
+        y: Int,
+    )
+
+    /**
+     * Minimizes (iconifies) the terminal window.
+     */
+    fun minimizeWindow()
+
+    /**
+     * De-minimizes (restores/de-iconifies) the terminal window.
+     */
+    fun deminimizeWindow()
+
+    /**
+     * Raises the terminal window to the front of the window stack.
+     */
+    fun raiseWindow()
+
+    /**
+     * Lowers the terminal window to the bottom of the window stack.
+     */
+    fun lowerWindow()
+
+    /**
+     * Maximizes or restores the terminal window.
+     *
+     * @param maximize true to maximize, false to restore.
+     */
+    fun setMaximized(maximize: Boolean)
+
+    /**
      * Xterm title stack push/pop scopes:
      * - 0: icon and window title
      * - 1: icon title

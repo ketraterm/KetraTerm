@@ -49,6 +49,7 @@ class SettingsModelTest {
         assertEquals(settings.columns, state.columns)
         assertEquals(settings.shellPath, state.shellPath)
         assertEquals(settings.shellRequestResizeWindow, state.shellRequestResizeWindow)
+        assertEquals(settings.shellRequestWindowManipulation, state.shellRequestWindowManipulation)
         assertFalse(model.hasChanges(state))
     }
 
@@ -69,7 +70,13 @@ class SettingsModelTest {
     @Test
     fun testApplyChangesSavesToSettingsAndUpdatesSnapshot() {
         val state = model.getSettingsState()
-        val modifiedState = state.copy(fontSize = 22, columns = 120, shellRequestResizeWindow = true)
+        val modifiedState =
+            state.copy(
+                fontSize = 22,
+                columns = 120,
+                shellRequestResizeWindow = true,
+                shellRequestWindowManipulation = true,
+            )
 
         assertTrue(model.hasChanges(modifiedState))
 
@@ -82,6 +89,7 @@ class SettingsModelTest {
         assertEquals(22, settings.fontSize)
         assertEquals(120, settings.columns)
         assertTrue(settings.shellRequestResizeWindow)
+        assertTrue(settings.shellRequestWindowManipulation)
 
         // Snapshot should be updated, so it shouldn't show changes against modified state anymore
         assertFalse(model.hasChanges(modifiedState))

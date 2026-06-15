@@ -17,7 +17,8 @@ Use this skill for any new terminal protocol or behavior in this repository.
 3. Add tests that describe real terminal behavior before or alongside code.
 4. Implement the smallest layer-correct behavior.
 5. Add full-path tests when bytes should flow through the parser.
-6. Update `docs/terminal-feature-gap-map.md` when support or scope changes.
+6. Update `docs/terminal-feature-map.md` and `docs/terminal-feature-gap-map.md`
+   when support or scope changes.
 
 ## Rules
 

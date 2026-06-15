@@ -45,6 +45,7 @@ internal class SettingsModel(
             scrollbackLines = settings.scrollbackLines,
             lineHeight = settings.lineHeight.toDouble(),
             shellRequestResizeWindow = settings.shellRequestResizeWindow,
+            shellRequestWindowManipulation = settings.shellRequestWindowManipulation,
         )
 
     fun hasChanges(uiState: SettingsState): Boolean = uiState != initialUiState
@@ -69,6 +70,7 @@ internal class SettingsModel(
         settings.scrollbackLines = uiState.scrollbackLines
         settings.lineHeight = uiState.lineHeight.toFloat()
         settings.shellRequestResizeWindow = uiState.shellRequestResizeWindow
+        settings.shellRequestWindowManipulation = uiState.shellRequestWindowManipulation
 
         settings.fontFamily = uiState.fontFamily
         settings.fontSize = uiState.fontSize
@@ -103,4 +105,5 @@ internal data class SettingsState(
     val scrollbackLines: Int,
     val lineHeight: Double,
     val shellRequestResizeWindow: Boolean,
+    val shellRequestWindowManipulation: Boolean,
 )

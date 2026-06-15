@@ -133,15 +133,22 @@ internal class JvTermSettings(
             updateConfig(config.copy(shellRequestResizeWindow = value))
         }
 
+    var shellRequestWindowManipulation: Boolean
+        get() = config.shellRequestWindowManipulation
+        set(value) {
+            updateConfig(config.copy(shellRequestWindowManipulation = value))
+        }
+
     var desktopNotificationsEnabled: Boolean
         get() = config.desktopNotificationsEnabled
         set(value) {
             updateConfig(config.copy(desktopNotificationsEnabled = value))
         }
 
-    fun current(): SwingSettings =
-        SwingSettings(
-            font = Font(config.fontFamily, Font.PLAIN, config.fontSize),
+    fun current(): SwingSettings {
+        val resolvedFamily = SwingSettings.resolveFontFamily(config.fontFamily)
+        return SwingSettings(
+            font = Font(resolvedFamily, Font.PLAIN, config.fontSize),
             columns = config.columns,
             rows = config.rows,
             palette = theme.createPalette(),
@@ -153,7 +160,9 @@ internal class JvTermSettings(
             scrollbackLines = config.scrollbackLines,
             lineHeight = config.lineHeight,
             shellRequestResizeWindow = config.shellRequestResizeWindow,
+            shellRequestWindowManipulation = config.shellRequestWindowManipulation,
         )
+    }
 
     private fun parseCursorShape(shape: String): io.github.jvterm.render.api.TerminalRenderCursorShape =
         when (shape.lowercase(Locale.ROOT)) {

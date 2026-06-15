@@ -38,8 +38,8 @@ belongs:
 - `TODO(host)`: both sides exist, adapter mapping is missing.
 - `TODO(policy)`: security or compatibility policy is required.
 
-Also update `docs/terminal-feature-gap-map.md` when a gap is discovered,
-closed, or reclassified.
+Also update `docs/terminal-feature-map.md` and `docs/terminal-feature-gap-map.md`
+when a gap is discovered, closed, or reclassified.
 
 ## Testing
 

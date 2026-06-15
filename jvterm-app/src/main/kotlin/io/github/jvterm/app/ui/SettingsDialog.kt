@@ -16,6 +16,7 @@
 package io.github.jvterm.app.ui
 
 import io.github.jvterm.app.config.JvTermSettings
+import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.ui.swing.settings.TerminalTheme
 import io.github.jvterm.workspace.TerminalProfile
 import io.github.jvterm.workspace.TerminalProfileKind
@@ -146,7 +147,14 @@ internal class SettingsDialog(
 
     // Form Controls - Appearance
     private val fontFamilyCombo =
-        createComboBox(GraphicsEnvironment.getLocalGraphicsEnvironment().availableFontFamilyNames, settings.fontFamily, 220)
+        run {
+            val monospaceFamilies = SwingSettings.getMonospaceFontFamilies().toMutableList()
+            val currentFamily = settings.fontFamily
+            if (currentFamily.isNotEmpty() && monospaceFamilies.none { it.equals(currentFamily, ignoreCase = true) }) {
+                monospaceFamilies.add(0, currentFamily)
+            }
+            createComboBox(monospaceFamilies.toTypedArray(), currentFamily, 220)
+        }
     private val fontSizeSpinner =
         createSpinner(settings.fontSize, TerminalConfig.FONT_SIZE_MIN, TerminalConfig.FONT_SIZE_MAX, 1, 80)
     private val lineHeightSpinner =
@@ -170,6 +178,8 @@ internal class SettingsDialog(
     private val useSystemFallbackCheckbox = JCheckBox("Use system font fallback for missing glyphs", settings.useSystemFallbackFonts)
     private val pasteOnMiddleClickCheckbox = JCheckBox("Paste on middle mouse button click", settings.pasteOnMiddleClick)
     private val shellRequestResizeWindowCheckbox = JCheckBox("Allow window resize from shell", settings.shellRequestResizeWindow)
+    private val shellRequestWindowManipulationCheckbox =
+        JCheckBox("Allow window manipulation from shell", settings.shellRequestWindowManipulation)
     private val cursorBlinkSpinner =
         createSpinner(settings.cursorBlinkMillis, TerminalConfig.CURSOR_BLINK_MIN, TerminalConfig.CURSOR_BLINK_MAX, 50, 70)
     private val cursorShapeCombo = createComboBox(arrayOf("block", "underline", "beam"), settings.cursorShape.lowercase(Locale.ROOT), 150)
@@ -229,6 +239,7 @@ internal class SettingsDialog(
         registerChangeListener(useSystemFallbackCheckbox, updateApplyState)
         registerChangeListener(pasteOnMiddleClickCheckbox, updateApplyState)
         registerChangeListener(shellRequestResizeWindowCheckbox, updateApplyState)
+        registerChangeListener(shellRequestWindowManipulationCheckbox, updateApplyState)
         registerChangeListener(cursorBlinkSpinner, updateApplyState)
         registerChangeListener(cursorShapeCombo, updateApplyState)
     }
@@ -401,6 +412,12 @@ internal class SettingsDialog(
             5,
             shellRequestResizeWindowCheckbox,
             "Allow the terminal window to resize itself when the shell requests a grid resize.",
+        )
+        addCheckboxRow(
+            behaviorSection,
+            7,
+            shellRequestWindowManipulationCheckbox,
+            "Allow the shell to move, minimize, maximize, raise, or lower the terminal window.",
         )
         panel.add(behaviorSection)
 
@@ -588,6 +605,7 @@ internal class SettingsDialog(
         useSystemFallbackCheckbox.isSelected = TerminalConfig.DEFAULT_USE_SYSTEM_FALLBACK_FONTS
         pasteOnMiddleClickCheckbox.isSelected = TerminalConfig.DEFAULT_PASTE_ON_MIDDLE_CLICK
         shellRequestResizeWindowCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_RESIZE_WINDOW
+        shellRequestWindowManipulationCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
         cursorBlinkSpinner.value = TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS
         cursorShapeCombo.selectedItem = TerminalConfig.DEFAULT_CURSOR_SHAPE
     }
@@ -646,6 +664,7 @@ internal class SettingsDialog(
             scrollbackLines = scrollbackSpinner.value as? Int ?: TerminalConfig.DEFAULT_SCROLLBACK_LINES,
             lineHeight = lineHeightSpinner.value as? Double ?: TerminalConfig.DEFAULT_LINE_HEIGHT.toDouble(),
             shellRequestResizeWindow = shellRequestResizeWindowCheckbox.isSelected,
+            shellRequestWindowManipulation = shellRequestWindowManipulationCheckbox.isSelected,
         )
     }
 

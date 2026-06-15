@@ -175,6 +175,37 @@ class TerminalWorkspace(
                 tabBySession(session)?.let { listener.resizeWindow(it, rows, columns) }
             }
 
+            override fun moveWindow(
+                session: TerminalSession,
+                x: Int,
+                y: Int,
+            ) {
+                tabBySession(session)?.let { listener.moveWindow(it, x, y) }
+            }
+
+            override fun minimizeWindow(session: TerminalSession) {
+                tabBySession(session)?.let { listener.minimizeWindow(it) }
+            }
+
+            override fun deminimizeWindow(session: TerminalSession) {
+                tabBySession(session)?.let { listener.deminimizeWindow(it) }
+            }
+
+            override fun raiseWindow(session: TerminalSession) {
+                tabBySession(session)?.let { listener.raiseWindow(it) }
+            }
+
+            override fun lowerWindow(session: TerminalSession) {
+                tabBySession(session)?.let { listener.lowerWindow(it) }
+            }
+
+            override fun setMaximized(
+                session: TerminalSession,
+                maximize: Boolean,
+            ) {
+                tabBySession(session)?.let { listener.setMaximized(it, maximize) }
+            }
+
             override fun showNotification(
                 session: TerminalSession,
                 title: String,
@@ -333,6 +364,58 @@ interface TerminalWorkspaceListener {
         tab: TerminalWorkspaceTab,
         rows: Int,
         columns: Int,
+    ) = Unit
+
+    /**
+     * Called when the shell requests moving the terminal window.
+     *
+     * @param tab tab that received the request.
+     * @param x target x position on screen.
+     * @param y target y position on screen.
+     */
+    fun moveWindow(
+        tab: TerminalWorkspaceTab,
+        x: Int,
+        y: Int,
+    ) = Unit
+
+    /**
+     * Called when the shell requests minimizing the terminal window.
+     *
+     * @param tab tab that received the request.
+     */
+    fun minimizeWindow(tab: TerminalWorkspaceTab) = Unit
+
+    /**
+     * Called when the shell requests deminimizing (restoring) the terminal window.
+     *
+     * @param tab tab that received the request.
+     */
+    fun deminimizeWindow(tab: TerminalWorkspaceTab) = Unit
+
+    /**
+     * Called when the shell requests raising the terminal window.
+     *
+     * @param tab tab that received the request.
+     */
+    fun raiseWindow(tab: TerminalWorkspaceTab) = Unit
+
+    /**
+     * Called when the shell requests lowering the terminal window.
+     *
+     * @param tab tab that received the request.
+     */
+    fun lowerWindow(tab: TerminalWorkspaceTab) = Unit
+
+    /**
+     * Called when the shell requests maximizing or restoring the terminal window.
+     *
+     * @param tab tab that received the request.
+     * @param maximize true to maximize, false to restore.
+     */
+    fun setMaximized(
+        tab: TerminalWorkspaceTab,
+        maximize: Boolean,
     ) = Unit
 
     /**

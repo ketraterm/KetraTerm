@@ -67,6 +67,13 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
     )
 
     /**
+     * Updates the recorded window minimization state.
+     *
+     * @param minimized `true` if minimized, `false` otherwise.
+     */
+    fun setWindowMinimized(minimized: Boolean)
+
+    /**
      * Enqueues a window report response.
      *
      * @param mode The window report mode (e.g. [WINDOW_REPORT_PIXELS] or [WINDOW_REPORT_GRID_CELLS]).
@@ -106,7 +113,9 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
         const val DEVICE_ATTRIBUTES_SECONDARY: Int = 1
         const val DEVICE_ATTRIBUTES_TERTIARY: Int = 2
 
+        const val WINDOW_REPORT_STATE: Int = 11
         const val WINDOW_REPORT_PIXELS: Int = 14
         const val WINDOW_REPORT_GRID_CELLS: Int = 18
+        const val WINDOW_REPORT_SCREEN_SIZE: Int = 19
     }
 }

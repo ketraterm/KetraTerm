@@ -506,8 +506,10 @@ class CommandDispatcherTest {
 
         @Test
         fun `CSI t dispatches safe window reports, title stack, and window resize operations`() {
+            assertEquals(listOf("requestWindowReport:11"), dispatchCsi('t', params = listOf(11)).events)
             assertEquals(listOf("requestWindowReport:14"), dispatchCsi('t', params = listOf(14)).events)
             assertEquals(listOf("requestWindowReport:18"), dispatchCsi('t', params = listOf(18)).events)
+            assertEquals(listOf("requestWindowReport:19"), dispatchCsi('t', params = listOf(19)).events)
             assertEquals(listOf("resizeWindow:40:120"), dispatchCsi('t', params = listOf(8, 40, 120)).events)
             assertEquals(listOf("pushTitleStack:0"), dispatchCsi('t', params = listOf(22)).events)
             assertEquals(listOf("pushTitleStack:1"), dispatchCsi('t', params = listOf(22, 1)).events)
@@ -515,6 +517,16 @@ class CommandDispatcherTest {
             assertEquals(listOf("popTitleStack:0"), dispatchCsi('t', params = listOf(23)).events)
             assertEquals(listOf("popTitleStack:1"), dispatchCsi('t', params = listOf(23, 1)).events)
             assertEquals(listOf("popTitleStack:2"), dispatchCsi('t', params = listOf(23, 2)).events)
+
+            assertEquals(listOf("deminimizeWindow"), dispatchCsi('t', params = listOf(1)).events)
+            assertEquals(listOf("minimizeWindow"), dispatchCsi('t', params = listOf(2)).events)
+            assertEquals(listOf("moveWindow:150:250"), dispatchCsi('t', params = listOf(3, 150, 250)).events)
+            assertEquals(listOf("raiseWindow"), dispatchCsi('t', params = listOf(5)).events)
+            assertEquals(listOf("lowerWindow"), dispatchCsi('t', params = listOf(6)).events)
+            assertEquals(listOf("setMaximized:false"), dispatchCsi('t', params = listOf(9, 0)).events)
+            assertEquals(listOf("setMaximized:true"), dispatchCsi('t', params = listOf(9, 1)).events)
+            assertEquals(listOf("setMaximized:true"), dispatchCsi('t', params = listOf(9, 2)).events)
+            assertEquals(listOf("setMaximized:true"), dispatchCsi('t', params = listOf(9, 3)).events)
         }
 
         @Test

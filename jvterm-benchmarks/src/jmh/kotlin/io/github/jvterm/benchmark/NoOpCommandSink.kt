@@ -16,6 +16,7 @@
 package io.github.jvterm.benchmark
 
 import io.github.jvterm.parser.spi.TerminalCommandSink
+import io.github.jvterm.protocol.NotificationLevel
 
 /**
  * No-op sink for parser-only benchmarks. Discards all commands to measure
@@ -176,6 +177,21 @@ internal class NoOpCommandSink : TerminalCommandSink {
         columns: Int,
     ) {}
 
+    override fun moveWindow(
+        x: Int,
+        y: Int,
+    ) {}
+
+    override fun minimizeWindow() {}
+
+    override fun deminimizeWindow() {}
+
+    override fun raiseWindow() {}
+
+    override fun lowerWindow() {}
+
+    override fun setMaximized(maximize: Boolean) {}
+
     override fun pushTitleStack(scope: Int) {}
 
     override fun popTitleStack(scope: Int) {}
@@ -262,4 +278,10 @@ internal class NoOpCommandSink : TerminalCommandSink {
     override fun queryStatusString(query: String) {}
 
     override fun queryTerminfo(rawPayload: String) {}
+
+    override fun showNotification(
+        title: String,
+        body: String,
+        level: NotificationLevel,
+    ) {}
 }

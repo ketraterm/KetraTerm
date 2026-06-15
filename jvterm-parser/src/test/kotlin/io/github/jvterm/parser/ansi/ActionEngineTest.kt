@@ -413,6 +413,33 @@ class ActionEngineTest {
             sinkCalls += "resizeWindow:$rows:$columns"
         }
 
+        override fun moveWindow(
+            x: Int,
+            y: Int,
+        ) {
+            sinkCalls += "moveWindow:$x:$y"
+        }
+
+        override fun minimizeWindow() {
+            sinkCalls += "minimizeWindow"
+        }
+
+        override fun deminimizeWindow() {
+            sinkCalls += "deminimizeWindow"
+        }
+
+        override fun raiseWindow() {
+            sinkCalls += "raiseWindow"
+        }
+
+        override fun lowerWindow() {
+            sinkCalls += "lowerWindow"
+        }
+
+        override fun setMaximized(maximize: Boolean) {
+            sinkCalls += "setMaximized:$maximize"
+        }
+
         override fun pushTitleStack(scope: Int) {
             sinkCalls += "pushTitleStack:$scope"
         }

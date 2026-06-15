@@ -629,6 +629,65 @@ internal class TabManager(
                 }
             }
         }
+
+        override fun moveWindow(
+            tab: TerminalWorkspaceTab,
+            x: Int,
+            y: Int,
+        ) {
+            if (settings.shellRequestWindowManipulation) {
+                SwingUtilities.invokeLater {
+                    frame.setLocation(x, y)
+                }
+            }
+        }
+
+        override fun minimizeWindow(tab: TerminalWorkspaceTab) {
+            if (settings.shellRequestWindowManipulation) {
+                SwingUtilities.invokeLater {
+                    frame.state = Frame.ICONIFIED
+                }
+            }
+        }
+
+        override fun deminimizeWindow(tab: TerminalWorkspaceTab) {
+            if (settings.shellRequestWindowManipulation) {
+                SwingUtilities.invokeLater {
+                    frame.state = Frame.NORMAL
+                }
+            }
+        }
+
+        override fun raiseWindow(tab: TerminalWorkspaceTab) {
+            if (settings.shellRequestWindowManipulation) {
+                SwingUtilities.invokeLater {
+                    frame.toFront()
+                }
+            }
+        }
+
+        override fun lowerWindow(tab: TerminalWorkspaceTab) {
+            if (settings.shellRequestWindowManipulation) {
+                SwingUtilities.invokeLater {
+                    frame.toBack()
+                }
+            }
+        }
+
+        override fun setMaximized(
+            tab: TerminalWorkspaceTab,
+            maximize: Boolean,
+        ) {
+            if (settings.shellRequestWindowManipulation) {
+                SwingUtilities.invokeLater {
+                    if (maximize) {
+                        frame.extendedState = Frame.MAXIMIZED_BOTH
+                    } else {
+                        frame.extendedState = Frame.NORMAL
+                    }
+                }
+            }
+        }
     }
 
     private companion object {

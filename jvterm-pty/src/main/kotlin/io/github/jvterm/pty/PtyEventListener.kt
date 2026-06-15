@@ -83,6 +83,58 @@ interface PtyEventListener {
     )
 
     /**
+     * Called when the shell requests moving the window.
+     *
+     * @param session session that received the event.
+     * @param x target x position in pixels.
+     * @param y target y position in pixels.
+     */
+    fun moveWindow(
+        session: TerminalSession,
+        x: Int,
+        y: Int,
+    ) = Unit
+
+    /**
+     * Called when the shell requests minimizing the window.
+     *
+     * @param session session that received the event.
+     */
+    fun minimizeWindow(session: TerminalSession) = Unit
+
+    /**
+     * Called when the shell requests deminimizing (restoring) the window.
+     *
+     * @param session session that received the event.
+     */
+    fun deminimizeWindow(session: TerminalSession) = Unit
+
+    /**
+     * Called when the shell requests raising the window.
+     *
+     * @param session session that received the event.
+     */
+    fun raiseWindow(session: TerminalSession) = Unit
+
+    /**
+     * Called when the shell requests lowering the window.
+     *
+     * @param session session that received the event.
+     */
+    fun lowerWindow(session: TerminalSession) = Unit
+
+    /**
+     * Called when the shell requests maximizing or restoring the window.
+     *
+     * @param session session that received the event.
+     * @param maximize true to maximize, false to restore.
+     */
+    fun setMaximized(
+        session: TerminalSession,
+        maximize: Boolean,
+    ) = Unit
+
+    /**
      * Called when the shell requests a desktop notification.
      *
      * @param session session that received the event.

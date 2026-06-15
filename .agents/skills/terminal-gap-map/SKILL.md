@@ -1,11 +1,11 @@
 ---
 name: terminal-gap-map
-description: Terminal feature gap-map maintenance guidance. Use when documenting missing parser/core/host/input/policy/host support, closing TODOs, classifying modern terminal features, or deciding whether a protocol belongs in scope.
+description: Terminal feature and gap-map maintenance guidance. Use when documenting missing parser/core/host/input/policy/host support, closing TODOs, classifying modern terminal features, or deciding whether a protocol belongs in scope.
 ---
 
 # Terminal Gap Map
 
-Use this skill when updating `docs/terminal-feature-gap-map.md` or deciding how
+Use this skill when updating `docs/terminal-feature-map.md` or `docs/terminal-feature-gap-map.md`, or deciding how
 to classify terminal support.
 
 ## Rules

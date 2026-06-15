@@ -522,6 +522,33 @@ class HostCommandAdapter(
         hostEvents.resizeWindow(rows, columns)
     }
 
+    override fun moveWindow(
+        x: Int,
+        y: Int,
+    ) {
+        hostEvents.moveWindow(x, y)
+    }
+
+    override fun minimizeWindow() {
+        hostEvents.minimizeWindow()
+    }
+
+    override fun deminimizeWindow() {
+        hostEvents.deminimizeWindow()
+    }
+
+    override fun raiseWindow() {
+        hostEvents.raiseWindow()
+    }
+
+    override fun lowerWindow() {
+        hostEvents.lowerWindow()
+    }
+
+    override fun setMaximized(maximize: Boolean) {
+        hostEvents.setMaximized(maximize)
+    }
+
     override fun pushTitleStack(scope: Int) {
         when (scope) {
             0 -> {

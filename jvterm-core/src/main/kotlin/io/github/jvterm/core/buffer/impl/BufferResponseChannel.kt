@@ -83,8 +83,14 @@ internal class BufferResponseChannel(
         state.windowPixelHeight = height
     }
 
+    override fun setWindowMinimized(minimized: Boolean) {
+        state.isMinimized = minimized
+    }
+
     override fun requestWindowReport(mode: Int) {
         when (mode) {
+            TerminalResponseChannel.WINDOW_REPORT_STATE ->
+                enqueueWindowStateReport(state.isMinimized)
             TerminalResponseChannel.WINDOW_REPORT_PIXELS -> {
                 if (state.windowPixelWidth > 0 && state.windowPixelHeight > 0) {
                     enqueueWindowReport(
@@ -100,6 +106,8 @@ internal class BufferResponseChannel(
                     height = state.dimensions.height,
                     width = state.dimensions.width,
                 )
+            TerminalResponseChannel.WINDOW_REPORT_SCREEN_SIZE ->
+                enqueueScreenSizeReport(state.dimensions.height, state.dimensions.width)
         }
     }
 
@@ -147,6 +155,25 @@ internal class BufferResponseChannel(
     ) {
         enqueueCsiPrefix()
         state.hostResponses.enqueuePositiveDecimal(reportType)
+        state.hostResponses.enqueueByte(';'.code)
+        state.hostResponses.enqueuePositiveDecimal(height)
+        state.hostResponses.enqueueByte(';'.code)
+        state.hostResponses.enqueuePositiveDecimal(width)
+        state.hostResponses.enqueueByte('t'.code)
+    }
+
+    private fun enqueueWindowStateReport(minimized: Boolean) {
+        enqueueCsiPrefix()
+        state.hostResponses.enqueueByte(if (minimized) '2'.code else '1'.code)
+        state.hostResponses.enqueueByte('t'.code)
+    }
+
+    private fun enqueueScreenSizeReport(
+        height: Int,
+        width: Int,
+    ) {
+        enqueueCsiPrefix()
+        state.hostResponses.enqueueByte('9'.code)
         state.hostResponses.enqueueByte(';'.code)
         state.hostResponses.enqueuePositiveDecimal(height)
         state.hostResponses.enqueueByte(';'.code)
