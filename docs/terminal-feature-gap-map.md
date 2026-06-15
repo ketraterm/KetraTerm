@@ -50,11 +50,6 @@ These are not badges of compatibility for this project. They expand attack surfa
 ## Parser Gaps
 
 ### CSI Protocols
-- `TODO(policy)`: xterm window manipulation:
-  - `CSI 3 t`, move window
-  - `CSI 8 t`, resize window
-  - minimize/maximize/raise/lower variants
-  Many modern terminals ignore or gate these to prevent hostile scripts from controlling the user's window.
 - `TODO(parser/core)`: broader DEC-specific status reports beyond the safe DSR/CPR/DA baseline.
 - `TODO(parser)`: character attribute/protection commands not covered by SGR:
   - `DECSACE`
@@ -162,4 +157,3 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(policy)`: whether title/icon updates are always accepted or host-gated.
 - `TODO(policy)`: paste sanitization and bracketed paste defaults.
 - `TODO(policy)`: terminal capability identity policies.
-- `TODO(policy)`: window manipulation allow/deny behavior for xterm window ops.

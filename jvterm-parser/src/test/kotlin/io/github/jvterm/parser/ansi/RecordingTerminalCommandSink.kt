@@ -287,6 +287,33 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "resizeWindow:$rows:$columns"
     }
 
+    override fun moveWindow(
+        x: Int,
+        y: Int,
+    ) {
+        events += "moveWindow:$x:$y"
+    }
+
+    override fun minimizeWindow() {
+        events += "minimizeWindow"
+    }
+
+    override fun deminimizeWindow() {
+        events += "deminimizeWindow"
+    }
+
+    override fun raiseWindow() {
+        events += "raiseWindow"
+    }
+
+    override fun lowerWindow() {
+        events += "lowerWindow"
+    }
+
+    override fun setMaximized(maximize: Boolean) {
+        events += "setMaximized:$maximize"
+    }
+
     override fun pushTitleStack(scope: Int) {
         events += "pushTitleStack:$scope"
     }

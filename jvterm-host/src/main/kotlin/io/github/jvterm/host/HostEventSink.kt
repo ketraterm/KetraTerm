@@ -55,6 +55,44 @@ interface HostEventSink {
     )
 
     /**
+     * Called when the shell requests moving the window.
+     *
+     * @param x target x position in pixels.
+     * @param y target y position in pixels.
+     */
+    fun moveWindow(
+        x: Int,
+        y: Int,
+    ) = Unit
+
+    /**
+     * Called when the shell requests minimizing the window.
+     */
+    fun minimizeWindow() = Unit
+
+    /**
+     * Called when the shell requests deminimizing (restoring) the window.
+     */
+    fun deminimizeWindow() = Unit
+
+    /**
+     * Called when the shell requests raising the window.
+     */
+    fun raiseWindow() = Unit
+
+    /**
+     * Called when the shell requests lowering the window.
+     */
+    fun lowerWindow() = Unit
+
+    /**
+     * Called when the shell requests maximizing or restoring the window.
+     *
+     * @param maximize true to maximize, false to restore.
+     */
+    fun setMaximized(maximize: Boolean) = Unit
+
+    /**
      * Called when the shell requests a desktop notification.
      *
      * @param title notification title (can be empty if not provided).

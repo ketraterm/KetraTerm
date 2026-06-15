@@ -60,6 +60,7 @@ import java.util.*
  * @property scrollbackLines maximum scrollback lines retained by the terminal.
  * @property lineHeight vertical line height scaling factor.
  * @property shellRequestResizeWindow whether the terminal panel requests window resizing.
+ * @property shellRequestWindowManipulation whether the terminal panel allows shell window manipulation.
  */
 data class SwingSettings
     @JvmOverloads
@@ -85,6 +86,7 @@ data class SwingSettings
         val scrollbackLines: Int = 1000,
         val lineHeight: Float = 1.0f,
         val shellRequestResizeWindow: Boolean = false,
+        val shellRequestWindowManipulation: Boolean = false,
     ) {
         init {
             require(columns > 0) { "columns must be > 0, was $columns" }

@@ -82,6 +82,7 @@ data class TerminalConfig(
     val scrollbackLines: Int = DEFAULT_SCROLLBACK_LINES,
     val lineHeight: Float = DEFAULT_LINE_HEIGHT,
     val shellRequestResizeWindow: Boolean = DEFAULT_SHELL_REQUEST_RESIZE_WINDOW,
+    val shellRequestWindowManipulation: Boolean = DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION,
     val desktopNotificationsEnabled: Boolean = DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED,
 ) {
     init {
@@ -135,6 +136,7 @@ data class TerminalConfig(
         const val DEFAULT_SCROLLBACK_LINES: Int = 1000
         const val DEFAULT_LINE_HEIGHT: Float = 1.0f
         const val DEFAULT_SHELL_REQUEST_RESIZE_WINDOW: Boolean = false
+        const val DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION: Boolean = false
         const val DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED: Boolean = true
 
         val DEFAULT_FONT_FAMILY: String get() = defaultFontFamily()

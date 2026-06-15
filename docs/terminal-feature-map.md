@@ -30,6 +30,7 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   - Cursor shape styling (`DECSCUSR` / `CSI Ps SP q`) supporting Blinking Block (`1`), Steady Block (`2`), Blinking Underline (`3`), Steady Underline (`4`), Blinking Bar (`5`), and Steady Bar (`6`).
 - **Resets**: Hard Reset (`RIS` / `ESC c`) and Soft Reset (`DECSTR` / `CSI ! p`).
 - **DEC Alignment Test**: Renders DEC alignment test character grid (`DECALN` / `ESC # 8`).
+- **Window Manipulation**: Support for standard xterm window manipulation sequences (`CSI 1 t` de-minimize, `CSI 2 t` minimize, `CSI 3 ; x ; y t` move, `CSI 5 t` raise, `CSI 6 t` lower, `CSI 8 ; rows ; cols t` resize, `CSI 9 ; mode t` maximize/restore) gated by a secure user setting (`shell_request_window_manipulation`).
 - **ISO 2022 Charsets**: G0-G3 designation sets (ASCII and DEC Special Graphics) with locking shifts (`SO`/`SI`) and single shifts (`SS2`/`SS3`).
 
 ---

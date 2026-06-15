@@ -121,6 +121,7 @@ class TerminalConfigTest {
         assertFalse(config.useSystemFallbackFonts)
         assertEquals("block", config.cursorShape)
         assertFalse(config.shellRequestResizeWindow)
+        assertFalse(config.shellRequestWindowManipulation)
 
         // Clean up
         Files.deleteIfExists(configFile)
@@ -145,6 +146,7 @@ class TerminalConfigTest {
                 useSystemFallbackFonts = true,
                 cursorShape = "beam",
                 shellRequestResizeWindow = true,
+                shellRequestWindowManipulation = true,
                 desktopNotificationsEnabled = false,
             )
 

@@ -133,6 +133,12 @@ internal class JvTermSettings(
             updateConfig(config.copy(shellRequestResizeWindow = value))
         }
 
+    var shellRequestWindowManipulation: Boolean
+        get() = config.shellRequestWindowManipulation
+        set(value) {
+            updateConfig(config.copy(shellRequestWindowManipulation = value))
+        }
+
     var desktopNotificationsEnabled: Boolean
         get() = config.desktopNotificationsEnabled
         set(value) {
@@ -154,6 +160,7 @@ internal class JvTermSettings(
             scrollbackLines = config.scrollbackLines,
             lineHeight = config.lineHeight,
             shellRequestResizeWindow = config.shellRequestResizeWindow,
+            shellRequestWindowManipulation = config.shellRequestWindowManipulation,
         )
     }
 
