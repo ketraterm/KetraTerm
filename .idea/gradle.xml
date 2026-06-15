@@ -27,6 +27,10 @@
           </set>
         </option>
       </GradleProjectSettings>
+      <GradleProjectSettings>
+        <option name="externalProjectPath" value="$PROJECT_DIR$/jvterm-intellij-plugin" />
+        <option name="gradleJvm" value="jbr-21" />
+      </GradleProjectSettings>
     </option>
   </component>
 </project>
