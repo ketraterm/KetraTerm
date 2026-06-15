@@ -68,7 +68,7 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 - **Operating Status**: Responds operating status `CSI 0 n` on `DSR 5`.
 - **Cursor Position Reports**: Responds active coordinate position on `CPR` / `DSR 6`.
 - **Device Attributes**: VT100-compatible primary attribute response (`DA`) and generic secondary attribute response (`DA2`).
-- **Window Size Reporting**: Responds grid dimensions in characters (`CSI 18 t`) or pixel dimensions (`CSI 14 t`).
+- **Window Size/State Reporting**: Responds window minimized/normal state (`CSI 11 t`), screen size in cells (`CSI 19 t`), grid dimensions in characters (`CSI 18 t`), or pixel dimensions (`CSI 14 t`).
 
 ---
 

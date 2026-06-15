@@ -278,9 +278,10 @@ internal class NoOpCommandSink : TerminalCommandSink {
     override fun queryStatusString(query: String) {}
 
     override fun queryTerminfo(rawPayload: String) {}
+
     override fun showNotification(
         title: String,
         body: String,
-        level: NotificationLevel
+        level: NotificationLevel,
     ) {}
 }

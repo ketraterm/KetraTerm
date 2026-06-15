@@ -429,16 +429,20 @@ class TerminalParserTest {
         fun `safe xterm window reports and title stack operations dispatch through the full parser`() {
             val f = TerminalParserFixture()
 
+            f.acceptAscii("\u001B[11t")
             f.acceptAscii("\u001B[14t")
             f.acceptAscii("\u001B[18t")
+            f.acceptAscii("\u001B[19t")
             f.acceptAscii("\u001B[22t")
             f.acceptAscii("\u001B[22;1t")
             f.acceptAscii("\u001B[23;2t")
 
             assertEquals(
                 listOf(
+                    "requestWindowReport:11",
                     "requestWindowReport:14",
                     "requestWindowReport:18",
+                    "requestWindowReport:19",
                     "pushTitleStack:0",
                     "pushTitleStack:1",
                     "popTitleStack:2",

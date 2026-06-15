@@ -280,6 +280,22 @@ class SwingTerminal
                 }
             }
 
+        private var ancestorWindow: Window? = null
+
+        private val windowStateListener =
+            WindowStateListener { event ->
+                val iconified = (event.newState and Frame.ICONIFIED) != 0
+                session?.terminal?.setWindowMinimized(iconified)
+            }
+
+        private fun updateMinimizedStateFromAncestor() {
+            val window = ancestorWindow ?: SwingUtilities.getWindowAncestor(this)
+            if (window is Frame) {
+                val iconified = (window.extendedState and Frame.ICONIFIED) != 0
+                session?.terminal?.setWindowMinimized(iconified)
+            }
+        }
+
         init {
             font = settings.font
             background = Color(settings.palette.defaultBackground, true)
@@ -427,12 +443,23 @@ class SwingTerminal
             super.addNotify()
             terminalFocused = isFocusOwner
             configureCursorTimerOnEdt()
+
+            val window = SwingUtilities.getWindowAncestor(this)
+            if (window != null) {
+                ancestorWindow = window
+                window.addWindowStateListener(windowStateListener)
+                updateMinimizedStateFromAncestor()
+            }
         }
 
         override fun removeNotify() {
             terminalFocused = false
             cursorTimer.stop()
             selectionController.stopSelectionDrag()
+
+            ancestorWindow?.removeWindowStateListener(windowStateListener)
+            ancestorWindow = null
+
             super.removeNotify()
         }
 
@@ -483,6 +510,7 @@ class SwingTerminal
         private fun bindOnEdt(session: TerminalSession) {
             this.session?.removeDirtyListener(dirtyListener)
             this.session = session
+            updateMinimizedStateFromAncestor()
             applySettingsToSession(session, settings)
             session.addDirtyListener(dirtyListener)
             resetScrollbackState()
@@ -525,7 +553,10 @@ class SwingTerminal
             metrics = buildMetrics(settings)
             preferredSize = preferredGridSize(settings.columns, settings.rows)
             configureCursorTimerOnEdt()
-            session?.let { applySettingsToSession(it, settings) }
+            session?.let {
+                updateMinimizedStateFromAncestor()
+                applySettingsToSession(it, settings)
+            }
             selectionController.clearSelection()
             updateSearchViewportHighlights()
             hyperlinkController.clearHyperlinkHover()

@@ -22,10 +22,9 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 - *No outstanding CSI cursor, SGR color, alternate screen, or basic input gaps.*
 
 ### Tier 2: Useful (Under consideration / partial gaps)
-- SAFE terminal-to-host query-response extensions (DSR, CPR, DA, DA2, DA3).
+- SAFE terminal-to-host query-response extensions (DSR, CPR, DA, DA2).
 - `DECRQSS` and `XTGETTCAP` allowlist expansions.
 - Push/pop xterm title stack expansion.
-- Window and grid size query policy.
 
 ### Tier 3: Optional (Graphics & advanced features)
 - Sixel or modern graphics protocols (e.g. Kitty graphics protocol).
@@ -44,6 +43,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 - Blind OSC 52 clipboard writes.
 - Unbounded or unaudited DCS/OSC responses.
 - Literal "everything xterm ever accepted" parity.
+- Tertiary Device Attributes (`DA3` / `CSI = c`) query response (excluded to prevent unique hardware serial number leak/user fingerprinting).
+- Window position reporting (`CSI 13 t`) query response (excluded to prevent screen pixel coordinate leak/clickjacking).
 
 ---
 
@@ -107,7 +108,6 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(core)`: invalid/unassigned codepoint width policy.
 
 ### Query and Response Channel
-- `TODO(policy)`: DA3 terminal unit id behavior.
 - `TODO(core)`: terminal-to-host response/event API for `XTGETTCAP`, OSC queries, and future query/response protocols.
 - `TODO(core/host)`: event API for hyperlinks, palette updates, and terminal notifications if these move out of host or render-frame metadata.
 
