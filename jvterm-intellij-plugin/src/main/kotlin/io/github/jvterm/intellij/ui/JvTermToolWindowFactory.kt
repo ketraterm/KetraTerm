@@ -27,6 +27,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.openapi.wm.ex.ToolWindowManagerListener
 import com.intellij.openapi.wm.ex.ToolWindowEx
 import io.github.jvterm.intellij.JvTermBundle
 import io.github.jvterm.intellij.services.JvTermProjectTerminalService
@@ -45,6 +46,7 @@ class JvTermToolWindowFactory : ToolWindowFactory, DumbAware {
     ) {
         val terminalService = JvTermProjectTerminalService.getInstance(project)
         installTitleActions(project, toolWindow, terminalService)
+        installEmptyToolWindowReopenListener(project, toolWindow, terminalService)
         terminalService.ensureInitialTab(toolWindow)
     }
 
@@ -60,6 +62,25 @@ class JvTermToolWindowFactory : ToolWindowFactory, DumbAware {
             NewTerminalProfileGroup(project, toolWindow, terminalService),
         )
         toolWindow.setAdditionalGearActions(TerminalGearActionsGroup(project))
+    }
+
+    private fun installEmptyToolWindowReopenListener(
+        project: Project,
+        toolWindow: ToolWindow,
+        terminalService: JvTermProjectTerminalService,
+    ) {
+        project.messageBus
+            .connect(toolWindow.disposable)
+            .subscribe(
+                ToolWindowManagerListener.TOPIC,
+                object : ToolWindowManagerListener {
+                    override fun toolWindowShown(shownToolWindow: ToolWindow) {
+                        if (shownToolWindow.id == toolWindow.id) {
+                            terminalService.ensureInitialTab(shownToolWindow)
+                        }
+                    }
+                },
+            )
     }
 
     private class NewTerminalAction(
