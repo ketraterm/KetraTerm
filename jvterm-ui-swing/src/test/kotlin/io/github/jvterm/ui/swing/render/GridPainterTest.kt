@@ -384,6 +384,131 @@ class GridPainterTest {
         assertEquals(BLACK, image.getRGB(metrics.cellWidth + 1, 1))
     }
 
+    @Test
+    fun `shell integration prompt marker paints configurable divider in left gutter and grid`() {
+        val image = BufferedImage(120, 80, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val settings =
+            SwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = WHITE,
+                        defaultBackground = BLACK,
+                    ),
+                shellIntegrationPromptDividerColor = GREEN,
+                shellIntegrationDecorationGutterWidth = 8,
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+                padding = Insets(0, 8, 0, 0),
+            )
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
+        val cache = TerminalRenderCache(columns = 3, rows = 3)
+        cache.updateFrom(TextRowsFrame(lines = arrayOf("abc", "def", "ghi"), palette = settings.palette))
+        val decorations = TerminalShellIntegrationDecorations()
+        decorations.recordPromptStart(1)
+
+        GridPainter().paint(
+            g = g,
+            cache = cache,
+            settings = settings,
+            metrics = metrics,
+            width = image.width,
+            height = image.height,
+            cursorBlinkVisible = true,
+            shellIntegrationDecorations = decorations,
+        )
+        g.dispose()
+
+        assertEquals(GREEN, image.getRGB(0, metrics.cellHeight))
+        assertEquals(GREEN, image.getRGB(settings.padding.left, metrics.cellHeight))
+    }
+
+    @Test
+    fun `shell integration failed command paints configurable rail only for non zero exit code`() {
+        val image = BufferedImage(120, 80, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val settings =
+            SwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = WHITE,
+                        defaultBackground = BLACK,
+                    ),
+                shellIntegrationFailedCommandRailColor = RED,
+                shellIntegrationFailedCommandRailWidth = 3,
+                shellIntegrationDecorationGutterWidth = 8,
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+                padding = Insets(0, 8, 0, 0),
+            )
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
+        val cache = TerminalRenderCache(columns = 3, rows = 3)
+        cache.updateFrom(TextRowsFrame(lines = arrayOf("abc", "def", "ghi"), palette = settings.palette))
+        val decorations = TerminalShellIntegrationDecorations()
+        decorations.recordCommandStart(0)
+        decorations.recordCommandFinished(2, exitCode = 2)
+
+        GridPainter().paint(
+            g = g,
+            cache = cache,
+            settings = settings,
+            metrics = metrics,
+            width = image.width,
+            height = image.height,
+            cursorBlinkVisible = true,
+            shellIntegrationDecorations = decorations,
+        )
+        g.dispose()
+
+        assertEquals(RED, image.getRGB(0, metrics.cellHeight + 1))
+        assertEquals(RED, image.getRGB(2, metrics.cellHeight * 2 + 1))
+        assertEquals(BLACK, image.getRGB(3, metrics.cellHeight + 1))
+    }
+
+    @Test
+    fun `shell integration decorations honor visibility settings`() {
+        val image = BufferedImage(120, 80, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val settings =
+            SwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = WHITE,
+                        defaultBackground = BLACK,
+                    ),
+                shellIntegrationPromptDividersVisible = false,
+                shellIntegrationFailedCommandRailsVisible = false,
+                shellIntegrationPromptDividerColor = GREEN,
+                shellIntegrationFailedCommandRailColor = RED,
+                shellIntegrationDecorationGutterWidth = 8,
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+                padding = Insets(0, 8, 0, 0),
+            )
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
+        val cache = TerminalRenderCache(columns = 3, rows = 3)
+        cache.updateFrom(TextRowsFrame(lines = arrayOf("abc", "def", "ghi"), palette = settings.palette))
+        val decorations = TerminalShellIntegrationDecorations()
+        decorations.recordPromptStart(1)
+        decorations.recordCommandStart(0)
+        decorations.recordCommandFinished(2, exitCode = 1)
+
+        GridPainter().paint(
+            g = g,
+            cache = cache,
+            settings = settings,
+            metrics = metrics,
+            width = image.width,
+            height = image.height,
+            cursorBlinkVisible = true,
+            shellIntegrationDecorations = decorations,
+        )
+        g.dispose()
+
+        assertEquals(BLACK, image.getRGB(0, metrics.cellHeight))
+        assertEquals(BLACK, image.getRGB(0, metrics.cellHeight + 1))
+    }
+
     private fun BufferedImage.containsColorInRange(
         argb: Int,
         xStart: Int,
@@ -470,6 +595,68 @@ class GridPainterTest {
                 attrWords[attrOffset + column] = attrs[column]
                 flags[flagOffset + column] = TerminalRenderCellFlags.CODEPOINT
                 extraAttrWords?.set(extraAttrOffset + column, extraAttrs[column])
+                hyperlinkIds?.set(hyperlinkOffset + column, 0)
+                column++
+            }
+        }
+    }
+
+    private class TextRowsFrame(
+        private val lines: Array<String>,
+        override val palette: TerminalColorPalette,
+    ) : TerminalRenderFrameReader,
+        TerminalRenderFrame {
+        override val columns: Int = lines.maxOf { it.length }
+        override val rows: Int = lines.size
+        override val frameGeneration: Long = 1
+        override val structureGeneration: Long = 1
+        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
+        override val cursor: TerminalRenderCursor =
+            TerminalRenderCursor(
+                column = 0,
+                row = 0,
+                visible = false,
+                blinking = false,
+                shape = TerminalRenderCursorShape.BLOCK,
+                generation = 1,
+            )
+
+        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+            consumer.accept(this)
+        }
+
+        override fun lineGeneration(row: Int): Long = 1
+
+        override fun lineWrapped(row: Int): Boolean = false
+
+        override fun copyLine(
+            row: Int,
+            codeWords: IntArray,
+            codeOffset: Int,
+            attrWords: LongArray,
+            attrOffset: Int,
+            flags: IntArray,
+            flagOffset: Int,
+            extraAttrWords: LongArray?,
+            extraAttrOffset: Int,
+            hyperlinkIds: IntArray?,
+            hyperlinkOffset: Int,
+            clusterSink: TerminalRenderClusterSink?,
+            clusterDataSink: TerminalRenderClusterDataSink?,
+        ) {
+            val line = lines[row]
+            var column = 0
+            while (column < columns) {
+                val offset = codeOffset + column
+                if (column < line.length) {
+                    codeWords[offset] = line[column].code
+                    flags[flagOffset + column] = TerminalRenderCellFlags.CODEPOINT
+                } else {
+                    codeWords[offset] = 0
+                    flags[flagOffset + column] = TerminalRenderCellFlags.EMPTY
+                }
+                attrWords[attrOffset + column] = TerminalRenderAttrs.DEFAULT
+                extraAttrWords?.set(extraAttrOffset + column, TerminalRenderExtraAttrs.DEFAULT)
                 hyperlinkIds?.set(hyperlinkOffset + column, 0)
                 column++
             }

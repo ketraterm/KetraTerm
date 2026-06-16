@@ -128,7 +128,27 @@ class SwingSettingsTest {
         assertEquals(false, settings.useSystemFallbackFonts)
         assertEquals(false, settings.treatAmbiguousAsWide)
         assertEquals(0xFF4DA3FF.toInt(), settings.hyperlinkActivationForeground)
+        assertEquals(true, settings.shellIntegrationPromptDividersVisible)
+        assertEquals(true, settings.shellIntegrationFailedCommandRailsVisible)
+        assertEquals(0x33FFFFFF, settings.shellIntegrationPromptDividerColor)
+        assertEquals(0xFFE74856.toInt(), settings.shellIntegrationFailedCommandRailColor)
+        assertEquals(1, settings.shellIntegrationPromptDividerThickness)
+        assertEquals(3, settings.shellIntegrationFailedCommandRailWidth)
+        assertEquals(8, settings.shellIntegrationDecorationGutterWidth)
         assertEquals(Insets(12, 12, 12, 12), settings.padding)
+    }
+
+    @Test
+    fun settingsRejectInvalidShellIntegrationDecorationDimensions() {
+        assertFailsWith<IllegalArgumentException> {
+            SwingSettings(shellIntegrationPromptDividerThickness = 0)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            SwingSettings(shellIntegrationFailedCommandRailWidth = 0)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            SwingSettings(shellIntegrationDecorationGutterWidth = -1)
+        }
     }
 
     @Test

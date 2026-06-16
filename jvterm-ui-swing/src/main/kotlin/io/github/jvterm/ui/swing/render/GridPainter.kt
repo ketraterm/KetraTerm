@@ -43,6 +43,7 @@ internal class GridPainter {
     private val backgroundPainter = TerminalBackgroundPainter(colorCache)
     private val selectionPainter = TerminalSelectionPainter(colorCache)
     private val searchPainter = TerminalSearchPainter(colorCache)
+    private val shellIntegrationDecorationPainter = TerminalShellIntegrationDecorationPainter(colorCache)
     private val decorationPainter = TerminalDecorationPainter(colorCache)
     private val textPainter = TerminalTextPainter(colorCache, decorationPainter)
     private val cursorPainter = TerminalCursorPainter(colorCache, textPainter)
@@ -76,6 +77,7 @@ internal class GridPainter {
         contentYOffset: Double = 0.0,
         selection: CellSelection? = null,
         searchHighlights: TerminalSearchViewportHighlights? = null,
+        shellIntegrationDecorations: TerminalShellIntegrationDecorations? = null,
         hoveredHyperlinkId: Int = 0,
         hyperlinkActivationHover: Boolean = false,
     ) {
@@ -99,9 +101,19 @@ internal class GridPainter {
         val rows = lastPaintRowExclusive(clip, cache, metrics, height, contentYOffset, padding.top, padding.bottom)
         g.translate(padding.left.toDouble(), padding.top.toDouble() + contentYOffset)
         try {
+            val gridWidth = cache.columns * metrics.cellWidth
             var row = firstRow
             while (row < rows) {
                 backgroundPainter.paintRow(g, cache, palette, metrics, row)
+                shellIntegrationDecorationPainter.paint(
+                    g = g,
+                    settings = settings,
+                    metrics = metrics,
+                    decorations = shellIntegrationDecorations,
+                    row = row,
+                    absoluteRow = absoluteRow(cache, row),
+                    gridWidth = gridWidth,
+                )
                 searchPainter.paint(
                     g = g,
                     metrics = metrics,
@@ -168,6 +180,11 @@ internal class GridPainter {
         val clippedRows = ceil((clipBottom - paddingTop - contentYOffset) / metrics.cellHeight).toInt()
         return clippedRows.coerceIn(0, visibleRows)
     }
+
+    private fun absoluteRow(
+        cache: TerminalRenderCache,
+        row: Int,
+    ): Long = cache.discardedCount + cache.historySize - cache.scrollbackOffset + row
 
     private companion object {
         private const val TEXT_LCD_CONTRAST = 140
