@@ -95,7 +95,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ### Reset and Mode Semantics
 - `TODO(core/host)`: richer event API for hyperlink metadata, palette changes, terminal notifications, and any future host-observable state that should not be read from render frames.
-- `TODO(session/host/ui)`: shell integration command text extraction, persistent command history, command navigation, prompt click actions, command output selection, current-directory metadata, rich command metadata, and durable command-range re-anchoring across resize/reflow on top of the existing OSC 133 marker event backbone and basic Swing prompt/failure decorations.
+- `TODO(session/host/ui)`: shell integration command text extraction, persistent command history, command navigation, prompt click actions, command output selection, current-directory metadata, rich command metadata, non-PowerShell shell bootstraps (`bash`, `zsh`, `fish`, and shell-specific WSL/Git Bash handling), and durable command-range re-anchoring across resize/reflow on top of the existing OSC 133 marker event backbone, PowerShell bootstrap, and basic Swing prompt/failure decorations.
 
 ### Grid Operations
 - `TODO(core)`: rectangular area operations if parser support is added (copy, erase, fill, selective erase).

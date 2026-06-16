@@ -252,12 +252,17 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
         profile: TerminalProfile,
         options: TerminalWorkspaceOpenOptions,
         eventListener: PtyEventListener,
-    ): TerminalSession =
-        TerminalSessions.localPty(
+    ): TerminalSession {
+        val launchProfile =
+            TerminalShellIntegrationBootstrap.apply(
+                profile = profile,
+                enabled = options.shellIntegrationEnabled,
+            )
+        return TerminalSessions.localPty(
             PtyOptions(
-                command = profile.command,
-                environment = PtyOptions.defaultEnvironment() + profile.environment,
-                workingDirectory = profile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY,
+                command = launchProfile.command,
+                environment = PtyOptions.defaultEnvironment() + launchProfile.environment,
+                workingDirectory = launchProfile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY,
                 columns = options.columns,
                 rows = options.rows,
                 treatAmbiguousAsWide = options.treatAmbiguousAsWide,
@@ -265,6 +270,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
                 eventListener = eventListener,
             ),
         )
+    }
 
     private val DEFAULT_WORKING_DIRECTORY: Path = Path.of(System.getProperty("user.home"))
 }
@@ -276,12 +282,15 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
  * @property rows initial terminal height in rows.
  * @property treatAmbiguousAsWide width policy for future writes.
  * @property maxHistory max scrollback lines retained by the core buffer.
+ * @property shellIntegrationEnabled whether supported launch profiles should
+ * install shell hooks that emit OSC 133 markers.
  */
 data class TerminalWorkspaceOpenOptions(
     val columns: Int,
     val rows: Int,
     val treatAmbiguousAsWide: Boolean,
     val maxHistory: Int,
+    val shellIntegrationEnabled: Boolean = true,
 ) {
     init {
         require(columns > 0) { "columns must be > 0, was $columns" }
