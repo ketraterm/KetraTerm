@@ -58,6 +58,15 @@ class JvTermIntellijSettings :
     fun current(): SwingSettings = JvTermIntellijSettingsMapper.toSwingSettings(state)
 
     /**
+     * Replaces persisted IDE terminal settings with a normalized state.
+     *
+     * @param nextState new settings state produced by the IntelliJ settings UI.
+     */
+    fun replaceState(nextState: State) {
+        updateState { JvTermIntellijSettingsNormalizer.normalize(nextState) }
+    }
+
+    /**
      * Persistent XML state for IntelliJ-hosted terminal preferences.
      *
      * Empty [fontFamily] and zero [fontSize] mean "use the plugin default
@@ -124,6 +133,54 @@ class JvTermIntellijSettings :
 }
 
 /**
+ * Normalizes persisted IntelliJ settings before they are saved or mapped.
+ */
+internal object JvTermIntellijSettingsNormalizer {
+    /**
+     * Returns a state with validated bounds and canonical identifiers.
+     *
+     * @param state persisted or UI-produced state.
+     * @return normalized state safe to persist.
+     */
+    fun normalize(state: JvTermIntellijSettings.State): JvTermIntellijSettings.State =
+        state.copy(
+            themeId = JvTermIntellijSettings.normalizeThemeId(state.themeId),
+            fontSize =
+                if (state.fontSize == 0) {
+                    0
+                } else {
+                    state.fontSize.coerceIn(TerminalConfig.FONT_SIZE_MIN, TerminalConfig.FONT_SIZE_MAX)
+                },
+            columns = state.columns.coerceIn(TerminalConfig.COLUMNS_MIN, TerminalConfig.COLUMNS_MAX),
+            rows = state.rows.coerceIn(TerminalConfig.ROWS_MIN, TerminalConfig.ROWS_MAX),
+            cursorBlinkMillis = state.cursorBlinkMillis.coerceIn(
+                TerminalConfig.CURSOR_BLINK_MIN,
+                TerminalConfig.CURSOR_BLINK_MAX,
+            ),
+            cursorShape = normalizeCursorShape(state.cursorShape),
+            scrollbackLines = state.scrollbackLines.coerceIn(
+                TerminalConfig.SCROLLBACK_MIN,
+                TerminalConfig.SCROLLBACK_MAX,
+            ),
+            lineHeight = coerceLineHeight(state.lineHeight),
+        )
+
+    private fun normalizeCursorShape(shape: String): String =
+        when (shape.lowercase(Locale.ROOT)) {
+            "beam", "bar" -> "beam"
+            "underline" -> "underline"
+            else -> "block"
+        }
+
+    private fun coerceLineHeight(lineHeight: Float): Float =
+        if (lineHeight.isFinite()) {
+            lineHeight.coerceIn(TerminalConfig.LINE_HEIGHT_MIN, TerminalConfig.LINE_HEIGHT_MAX)
+        } else {
+            TerminalConfig.DEFAULT_LINE_HEIGHT
+        }
+}
+
+/**
  * Converts IntelliJ persisted state into host-neutral Swing terminal settings.
  */
 internal object JvTermIntellijSettingsMapper {
@@ -134,36 +191,31 @@ internal object JvTermIntellijSettingsMapper {
      * @return immutable Swing terminal settings.
      */
     fun toSwingSettings(state: JvTermIntellijSettings.State): SwingSettings {
+        val normalized = JvTermIntellijSettingsNormalizer.normalize(state)
         val fontSize =
-            if (state.fontSize == 0) {
+            if (normalized.fontSize == 0) {
                 SwingSettings.defaultTerminalFont().size
             } else {
-                state.fontSize.coerceIn(TerminalConfig.FONT_SIZE_MIN, TerminalConfig.FONT_SIZE_MAX)
+                normalized.fontSize
             }
         val fontFamily =
-            state.fontFamily
+            normalized.fontFamily
                 .takeIf { it.isNotBlank() }
                 ?.let(SwingSettings::resolveFontFamily)
                 ?: SwingSettings.defaultTerminalFont().family
 
         return SwingSettings(
             font = JBFont.create(Font(fontFamily, Font.PLAIN, fontSize)),
-            columns = state.columns.coerceIn(TerminalConfig.COLUMNS_MIN, TerminalConfig.COLUMNS_MAX),
-            rows = state.rows.coerceIn(TerminalConfig.ROWS_MIN, TerminalConfig.ROWS_MAX),
-            palette = paletteForThemeId(state.themeId),
-            treatAmbiguousAsWide = state.treatAmbiguousAsWide,
-            cursorBlinkMillis = state.cursorBlinkMillis.coerceIn(
-                TerminalConfig.CURSOR_BLINK_MIN,
-                TerminalConfig.CURSOR_BLINK_MAX,
-            ),
-            useSystemFallbackFonts = state.useSystemFallbackFonts,
-            pasteOnMiddleClick = state.pasteOnMiddleClick,
-            cursorShape = parseCursorShape(state.cursorShape),
-            scrollbackLines = state.scrollbackLines.coerceIn(
-                TerminalConfig.SCROLLBACK_MIN,
-                TerminalConfig.SCROLLBACK_MAX,
-            ),
-            lineHeight = coerceLineHeight(state.lineHeight),
+            columns = normalized.columns,
+            rows = normalized.rows,
+            palette = paletteForThemeId(normalized.themeId),
+            treatAmbiguousAsWide = normalized.treatAmbiguousAsWide,
+            cursorBlinkMillis = normalized.cursorBlinkMillis,
+            useSystemFallbackFonts = normalized.useSystemFallbackFonts,
+            pasteOnMiddleClick = normalized.pasteOnMiddleClick,
+            cursorShape = parseCursorShape(normalized.cursorShape),
+            scrollbackLines = normalized.scrollbackLines,
+            lineHeight = normalized.lineHeight,
             padding = JBUI.insets(8),
             shellRequestResizeWindow = false,
             shellRequestWindowManipulation = false,
@@ -181,12 +233,5 @@ internal object JvTermIntellijSettingsMapper {
             "beam", "bar" -> TerminalRenderCursorShape.BAR
             "underline" -> TerminalRenderCursorShape.UNDERLINE
             else -> TerminalRenderCursorShape.BLOCK
-        }
-
-    private fun coerceLineHeight(lineHeight: Float): Float =
-        if (lineHeight.isFinite()) {
-            lineHeight.coerceIn(TerminalConfig.LINE_HEIGHT_MIN, TerminalConfig.LINE_HEIGHT_MAX)
-        } else {
-            TerminalConfig.DEFAULT_LINE_HEIGHT
         }
 }

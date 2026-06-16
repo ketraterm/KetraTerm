@@ -19,6 +19,7 @@ import io.github.jvterm.render.api.TerminalRenderCursorShape
 import io.github.jvterm.ui.swing.settings.TerminalTheme
 import io.github.jvterm.workspace.config.TerminalConfig
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
@@ -75,6 +76,34 @@ class JvTermIntellijSettingsTest {
         assertEquals(TerminalConfig.CURSOR_BLINK_MIN, settings.cursorBlinkMillis)
         assertEquals(TerminalConfig.SCROLLBACK_MAX, settings.scrollbackLines)
         assertEquals(TerminalConfig.DEFAULT_LINE_HEIGHT, settings.lineHeight)
+        assertFalse(settings.shellRequestResizeWindow)
+        assertFalse(settings.shellRequestWindowManipulation)
+    }
+
+    @Test
+    fun `normalizer canonicalizes persisted ui state`() {
+        val state =
+            JvTermIntellijSettingsNormalizer.normalize(
+                JvTermIntellijSettings.State(
+                    themeId = "TOKYO-NIGHT",
+                    fontSize = 1,
+                    columns = 1,
+                    rows = Int.MAX_VALUE,
+                    cursorBlinkMillis = Int.MAX_VALUE,
+                    cursorShape = "bar",
+                    scrollbackLines = -1,
+                    lineHeight = Float.POSITIVE_INFINITY,
+                ),
+            )
+
+        assertEquals("tokyo-night", state.themeId)
+        assertEquals(TerminalConfig.FONT_SIZE_MIN, state.fontSize)
+        assertEquals(TerminalConfig.COLUMNS_MIN, state.columns)
+        assertEquals(TerminalConfig.ROWS_MAX, state.rows)
+        assertEquals(TerminalConfig.CURSOR_BLINK_MAX, state.cursorBlinkMillis)
+        assertEquals("beam", state.cursorShape)
+        assertEquals(TerminalConfig.SCROLLBACK_MIN, state.scrollbackLines)
+        assertEquals(TerminalConfig.DEFAULT_LINE_HEIGHT, state.lineHeight)
     }
 
     @Test

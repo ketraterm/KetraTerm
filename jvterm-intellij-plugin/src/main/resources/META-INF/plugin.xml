@@ -14,6 +14,12 @@
     <resource-bundle>messages.MyMessageBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
+        <applicationConfigurable parentId="tools"
+                                 instance="io.github.jvterm.intellij.settings.JvTermSettingsConfigurable"
+                                 id="io.github.jvterm.terminal.settings"
+                                 key="settings.jvterm.displayName"
+                                 bundle="messages.MyMessageBundle"/>
+
         <toolWindow id="JvTerm"
                     anchor="bottom"
                     canCloseContents="true"
