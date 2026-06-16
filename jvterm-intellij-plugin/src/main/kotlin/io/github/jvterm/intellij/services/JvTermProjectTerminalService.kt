@@ -26,6 +26,7 @@ import io.github.jvterm.intellij.settings.JvTermIntellijSettings
 import io.github.jvterm.intellij.ui.JvTermTerminalPane
 import io.github.jvterm.intellij.ui.JvTermTerminalStartupView
 import io.github.jvterm.ui.swing.settings.SwingSettings
+import io.github.jvterm.workspace.TerminalProfile
 import io.github.jvterm.workspace.TerminalWorkspace
 import io.github.jvterm.workspace.TerminalWorkspaceListener
 import io.github.jvterm.workspace.TerminalWorkspaceOpenOptions
@@ -89,6 +90,49 @@ class JvTermProjectTerminalService(
         val settingsState = settingsService.state
         val profile = JvTermDefaultProfileFactory.defaultProfile(project, settingsState)
         val settings = settingsService.current()
+        return openTab(toolWindow, profile, settings)
+    }
+
+    /**
+     * Opens one local terminal tab for an explicitly selected profile.
+     *
+     * @param toolWindow target IntelliJ tool window.
+     * @param profile selected shell profile discovered by the shared profile registry.
+     * @return created content tab.
+     */
+    fun openProfileTab(
+        toolWindow: ToolWindow,
+        profile: TerminalProfile,
+    ): Content {
+        check(!disposed) { "JvTerm project terminal service is disposed" }
+
+        val settingsState = JvTermIntellijSettings.getInstance().state
+        val configuredProfile =
+            JvTermDefaultProfileFactory.profileForSelectedShell(project, profile, settingsState)
+        val settings = JvTermIntellijSettings.getInstance().current()
+        return openTab(toolWindow, configuredProfile, settings)
+    }
+
+    /**
+     * Closes all open and pending terminal tabs.
+     */
+    fun closeAllTabs() {
+        if (disposed) return
+
+        val contentManager =
+            contentsByTabId.values.firstOrNull()?.manager
+                ?: pendingTabsById.values.firstOrNull()?.content?.manager
+        val contents = contentsByTabId.values.toList() + pendingTabsById.values.map { it.content }
+        for (content in contents) {
+            contentManager?.removeContent(content, true)
+        }
+    }
+
+    private fun openTab(
+        toolWindow: ToolWindow,
+        profile: TerminalProfile,
+        settings: SwingSettings,
+    ): Content {
         val pendingId = "pending-terminal-${nextPendingTabNumber.getAndIncrement()}"
         val container =
             JPanel(BorderLayout()).apply {

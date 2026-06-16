@@ -61,6 +61,40 @@ internal object JvTermDefaultProfileFactory {
             )
     }
 
+    /**
+     * Applies IntelliJ launch settings to a shell profile selected from the shared registry.
+     *
+     * @param project current IntelliJ project.
+     * @param profile selected discovered shell profile.
+     * @param settings persisted IntelliJ terminal settings.
+     * @return launch profile with IDE working directory and environment settings applied.
+     */
+    fun profileForSelectedShell(
+        project: Project,
+        profile: TerminalProfile,
+        settings: JvTermIntellijSettings.State = JvTermIntellijSettings.getInstance().state,
+    ): TerminalProfile = profileForSelectedShell(project.basePath, profile, settings)
+
+    /**
+     * Applies IntelliJ launch settings to a selected shell profile.
+     *
+     * @param basePath project base path, or `null` when the IDE has no local project path.
+     * @param profile selected discovered shell profile.
+     * @param settings persisted IntelliJ terminal settings.
+     * @return launch profile with IDE working directory and environment settings applied.
+     */
+    fun profileForSelectedShell(
+        basePath: String?,
+        profile: TerminalProfile,
+        settings: JvTermIntellijSettings.State = JvTermIntellijSettings.State(),
+    ): TerminalProfile {
+        val normalized = JvTermIntellijSettingsNormalizer.normalize(settings)
+        return profile.copy(
+            workingDirectory = workingDirectory(basePath, normalized.startDirectory),
+            environment = JvTermIntellijSettingsNormalizer.parseEnvironmentVariables(normalized.environmentVariables),
+        )
+    }
+
     private fun workingDirectory(
         basePath: String?,
         configuredStartDirectory: String,
