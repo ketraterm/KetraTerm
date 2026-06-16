@@ -27,10 +27,15 @@ import com.intellij.ui.dsl.builder.panel
 import io.github.jvterm.intellij.JvTermBundle
 import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.ui.swing.settings.TerminalTheme
+import io.github.jvterm.workspace.TerminalProfile
 import io.github.jvterm.workspace.TerminalProfileRegistry
 import io.github.jvterm.workspace.config.TerminalConfig
+import java.awt.Component
 import java.util.Locale
+import javax.swing.DefaultListCellRenderer
 import javax.swing.JComponent
+import javax.swing.JLabel
+import javax.swing.JList
 import javax.swing.JSpinner
 import javax.swing.SpinnerNumberModel
 
@@ -62,7 +67,12 @@ class JvTermSettingsConfigurable : SearchableConfigurable {
             TerminalConfig.LINE_HEIGHT_MIN.toDouble(),
             TerminalConfig.LINE_HEIGHT_MAX.toDouble(),
         )
-    private val shellPathCombo = ComboBox(shellPathOptions()).apply { isEditable = true }
+    private val shellPathCombo =
+        ComboBox<Any>(shellPathOptions()).apply {
+            isEditable = true
+            renderer = ShellPathOptionRenderer()
+            prototypeDisplayValue = "Windows PowerShell"
+        }
     private val startDirectoryField = TextFieldWithBrowseButton()
     private val environmentVariablesField = JBTextField()
     private val defaultTabNameField = JBTextField()
@@ -200,7 +210,7 @@ class JvTermSettingsConfigurable : SearchableConfigurable {
         scrollbackSpinner.value = normalized.scrollbackLines
         cursorBlinkSpinner.value = normalized.cursorBlinkMillis
         lineHeightSpinner.value = normalized.lineHeight.toDouble()
-        shellPathCombo.selectedItem = normalized.shellPath
+        shellPathCombo.selectedItem = shellPathOptionFor(normalized.shellPath) ?: normalized.shellPath
         startDirectoryField.text = normalized.startDirectory
         environmentVariablesField.text = normalized.environmentVariables
         defaultTabNameField.text = normalized.defaultTabName
@@ -225,7 +235,7 @@ class JvTermSettingsConfigurable : SearchableConfigurable {
             pasteOnMiddleClick = pasteOnMiddleClickCheckBox.isSelected,
             scrollbackLines = spinnerValue(scrollbackSpinner),
             lineHeight = spinnerDoubleValue(lineHeightSpinner).toFloat(),
-            shellPath = selectedString(shellPathCombo),
+            shellPath = selectedShellPath(),
             startDirectory = startDirectoryField.text.trim(),
             environmentVariables = environmentVariablesField.text.trim(),
             defaultTabName = defaultTabNameField.text.trim(),
@@ -238,6 +248,14 @@ class JvTermSettingsConfigurable : SearchableConfigurable {
         (cursorShapeCombo.selectedItem as? CursorShapeOption)?.id ?: "block"
 
     private fun selectedString(comboBox: ComboBox<String>): String = comboBox.selectedItem?.toString()?.trim().orEmpty()
+
+    private fun selectedShellPath(): String {
+        val selected = shellPathCombo.selectedItem
+        return when (selected) {
+            is ShellPathOption -> selected.profile.command.first()
+            else -> shellPathCombo.editor.item?.toString()?.trim().orEmpty()
+        }
+    }
 
     private fun spinnerValue(spinner: JSpinner): Int = (spinner.value as Number).toInt()
 
@@ -283,18 +301,61 @@ private data class CursorShapeOption(
     override fun toString(): String = label
 }
 
+private data class ShellPathOption(
+    val profile: TerminalProfile,
+) {
+    override fun toString(): String = profile.displayName
+}
+
+private class ShellPathOptionRenderer : DefaultListCellRenderer() {
+    private val profileIcons = JvTermIntellijProfileIcons()
+
+    override fun getListCellRendererComponent(
+        list: JList<*>?,
+        value: Any?,
+        index: Int,
+        isSelected: Boolean,
+        cellHasFocus: Boolean,
+    ): Component {
+        val label =
+            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus) as JLabel
+        when (value) {
+            is ShellPathOption -> {
+                label.text = value.profile.displayName
+                label.icon = profileIcons.icon(value.profile.kind)
+            }
+            else -> {
+                label.text = value?.toString().orEmpty()
+                label.icon = null
+            }
+        }
+        return label
+    }
+}
+
 private fun fontFamilyOptions(): Array<String> =
     LinkedHashSet<String>().apply {
         add(JvTermIntellijSettings.DEFAULT_FONT_FAMILY)
         addAll(SwingSettings.getMonospaceFontFamilies())
     }.toTypedArray()
 
-private fun shellPathOptions(): Array<String> =
+private fun shellPathOptions(): Array<Any> =
     TerminalProfileRegistry()
         .availableProfiles()
-        .map { it.command.first() }
-        .distinct()
+        .map(::ShellPathOption)
         .toTypedArray()
+
+private fun shellPathOptionFor(shellPath: String): ShellPathOption? =
+    shellPathOptions()
+        .asSequence()
+        .filterIsInstance<ShellPathOption>()
+        .firstOrNull { option -> option.profile.command.first().shellPathMatches(shellPath) }
+
+private fun String.shellPathMatches(shellPath: String): Boolean {
+    if (equals(shellPath, ignoreCase = true)) return true
+    val executableName = substringAfterLast('\\').substringAfterLast('/')
+    return executableName.equals(shellPath, ignoreCase = true)
+}
 
 private fun themeOptions(): Array<ThemeOption> =
     arrayOf(
