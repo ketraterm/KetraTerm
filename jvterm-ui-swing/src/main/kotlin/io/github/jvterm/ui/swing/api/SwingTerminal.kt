@@ -19,6 +19,7 @@ import io.github.jvterm.input.event.*
 import io.github.jvterm.protocol.MouseTrackingMode
 import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.session.TerminalSession
+import io.github.jvterm.session.TerminalShellIntegrationCommandRecord
 import io.github.jvterm.ui.swing.input.SwingKeyMapper
 import io.github.jvterm.ui.swing.render.GridPainter
 import io.github.jvterm.ui.swing.render.TerminalShellIntegrationViewportDecorations
@@ -437,6 +438,38 @@ class SwingTerminal
             runOnEdt(
                 Runnable {
                     scrollViewportByOnEdt(deltaLines)
+                },
+            )
+        }
+
+        /**
+         * Scrolls to the nearest previous shell command.
+         *
+         * The component uses session-owned OSC 133 command metadata and reveals
+         * the command's prompt-start line when present, otherwise its command
+         * start line. This method may be called from any thread; component state
+         * is updated asynchronously on the EDT.
+         */
+        fun scrollToPreviousCommand() {
+            runOnEdt(
+                Runnable {
+                    scrollToCommandOnEdt(previous = true)
+                },
+            )
+        }
+
+        /**
+         * Scrolls to the nearest next shell command.
+         *
+         * The component uses session-owned OSC 133 command metadata and reveals
+         * the command's prompt-start line when present, otherwise its command
+         * start line. This method may be called from any thread; component state
+         * is updated asynchronously on the EDT.
+         */
+        fun scrollToNextCommand() {
+            runOnEdt(
+                Runnable {
+                    scrollToCommandOnEdt(previous = false)
                 },
             )
         }
@@ -1003,6 +1036,76 @@ class SwingTerminal
             scrollViewportToOnEdt(desiredOffset.toDouble())
         }
 
+        private fun scrollToCommandOnEdt(previous: Boolean): Boolean {
+            val boundSession = session ?: return false
+            refreshRenderCacheFromSession(boundSession)
+            refreshShellIntegrationDecorations(boundSession)
+
+            val anchorLineId = currentCommandNavigationLineId() ?: return false
+            val shellState = boundSession.shellIntegrationState
+            val ownerRecordId = shellState.commandRecordIdAtLine(anchorLineId)
+            val targetRecordId =
+                if (previous) {
+                    if (ownerRecordId != TerminalShellIntegrationCommandRecord.NONE) {
+                        ownerRecordId
+                    } else {
+                        shellState.previousCommandRecordIdBeforeLine(anchorLineId)
+                    }
+                } else {
+                    if (ownerRecordId != TerminalShellIntegrationCommandRecord.NONE) {
+                        shellState.nextCommandRecordId(ownerRecordId)
+                    } else {
+                        shellState.nextCommandRecordIdAfterLine(anchorLineId)
+                    }
+                }
+            if (targetRecordId == TerminalShellIntegrationCommandRecord.NONE) return false
+
+            val targetLineId = shellState.commandAnchorLineId(targetRecordId)
+            if (targetLineId == NO_LINE_ID) return false
+
+            refreshCommandNavigationCache(boundSession)
+            val targetAbsoluteRow = absoluteRowForLineId(searchCache, targetLineId)
+            if (targetAbsoluteRow == NO_COMMAND_ABSOLUTE_ROW) return false
+
+            val desiredOffset = searchCache.discardedCount + searchCache.historySize - targetAbsoluteRow
+            return scrollViewportToOnEdt(desiredOffset.toDouble(), historySize = searchCache.historySize, boundSession = boundSession)
+        }
+
+        private fun currentCommandNavigationLineId(): Long? {
+            val row = currentCommandNavigationRow()
+            if (row !in 0 until renderCache.rows) return null
+            val lineId = renderCache.lineIds[row]
+            return if (lineId == NO_LINE_ID) null else lineId
+        }
+
+        private fun currentCommandNavigationRow(): Int {
+            val visibleRows = visibleGridRows()
+            if (renderCache.rows > visibleRows && renderCache.scrollbackOffset > scrollModel.offset) return 1
+            return 0
+        }
+
+        private fun refreshCommandNavigationCache(boundSession: TerminalSession) {
+            val historySize = renderCache.historySize
+            searchCache.updateFrom(
+                reader = boundSession,
+                scrollbackOffset = historySize,
+                viewportRows = (historySize + visibleGridRows()).coerceAtLeast(1),
+            )
+        }
+
+        private fun absoluteRowForLineId(
+            cache: TerminalRenderCache,
+            lineId: Long,
+        ): Long {
+            val firstAbsoluteRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+            var row = 0
+            while (row < cache.rows) {
+                if (cache.lineIds[row] == lineId) return firstAbsoluteRow + row
+                row++
+            }
+            return NO_COMMAND_ABSOLUTE_ROW
+        }
+
         private fun updateSearchViewportHighlights() {
             val highlights = searchHighlights
             if (highlights == null) {
@@ -1132,6 +1235,8 @@ class SwingTerminal
             private const val NO_RESIZE_DIMENSION = -1
             private const val NO_ACTIVE_SEARCH_RESULT = -1
             private const val NO_ACTIVE_SEARCH_ROW = Long.MIN_VALUE
+            private const val NO_COMMAND_ABSOLUTE_ROW = Long.MIN_VALUE
+            private const val NO_LINE_ID = 0L
             private const val MIN_TIMER_DELAY_MILLIS = 1
 
             private fun cursorTimerDelay(settings: SwingSettings): Int = maxOf(MIN_TIMER_DELAY_MILLIS, settings.cursorBlinkMillis)

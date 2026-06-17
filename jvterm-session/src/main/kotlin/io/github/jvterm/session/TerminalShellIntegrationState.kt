@@ -295,6 +295,28 @@ class TerminalShellIntegrationState(
     }
 
     /**
+     * Returns the preferred navigation anchor line for [recordId].
+     *
+     * Commands with a prompt marker navigate to the prompt start. Orphan
+     * command records navigate to the command-output start. Prompt-only records
+     * and evicted records return `0`.
+     *
+     * @param recordId retained command record id.
+     * @return stable line id to reveal, or `0` when unavailable.
+     */
+    fun commandAnchorLineId(recordId: Int): Long {
+        if (recordId == TerminalShellIntegrationCommandRecord.NONE) return NO_LINE_ID
+        synchronized(lock) {
+            val index = indexForRecordIdLocked(recordId)
+            if (index == NO_INDEX || !isCommandRecordLocked(index)) return NO_LINE_ID
+
+            val promptStart = promptStartLineIds[index]
+            if (promptStart != NO_LINE_ID) return promptStart
+            return commandStartLineIds[index]
+        }
+    }
+
+    /**
      * Returns the retained command record that owns [lineId].
      *
      * Ownership uses the same prompt and command range rules as viewport

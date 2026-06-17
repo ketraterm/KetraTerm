@@ -332,6 +332,42 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `command anchor line prefers prompt start and falls back to orphan command start`() {
+        val state = TerminalShellIntegrationState()
+        val records = RecordColumns(capacity = 3)
+
+        state.recordPromptStart(10)
+        state.recordPromptEnd(10)
+        state.recordCommandStart(11, includeLine = true)
+        state.recordCommandFinished(12, exitCode = 0)
+        state.recordCommandStart(20, includeLine = true)
+        state.recordCommandFinished(21, exitCode = 0)
+        state.recordPromptStart(30)
+
+        records.copyFrom(state)
+
+        assertEquals(10, state.commandAnchorLineId(records.recordIds[0]))
+        assertEquals(20, state.commandAnchorLineId(records.recordIds[1]))
+        assertEquals(0, state.commandAnchorLineId(records.recordIds[2]))
+        assertEquals(0, state.commandAnchorLineId(999))
+    }
+
+    @Test
+    fun `command anchor line forgets evicted records`() {
+        val state = TerminalShellIntegrationState(capacity = 1)
+        val records = RecordColumns(capacity = 1)
+
+        state.recordCommandStart(10, includeLine = true)
+        records.copyFrom(state)
+        val evictedRecordId = records.recordIds[0]
+        state.recordCommandStart(20, includeLine = true)
+        records.copyFrom(state)
+
+        assertEquals(0, state.commandAnchorLineId(evictedRecordId))
+        assertEquals(20, state.commandAnchorLineId(records.recordIds[0]))
+    }
+
+    @Test
     fun `previous and next command record ids skip prompt only records`() {
         val state = TerminalShellIntegrationState()
         val records = RecordColumns(capacity = 3)
