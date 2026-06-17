@@ -64,7 +64,7 @@ internal object TerminalShellIntegrationBootstrap {
     private fun hasExplicitPowerShellEntryPoint(command: List<String>): Boolean {
         var index = 1
         while (index < command.size) {
-            if (normalizedPowerShellArgument(command[index]) in explicitEntryPointArguments) return true
+            if (powerShellArgumentName(command[index]) in explicitEntryPointArguments) return true
             index++
         }
         return false
@@ -77,7 +77,7 @@ internal object TerminalShellIntegrationBootstrap {
         val normalizedExpected = normalizedPowerShellArgument(expected)
         var index = 1
         while (index < command.size) {
-            if (normalizedPowerShellArgument(command[index]) == normalizedExpected) return true
+            if (powerShellArgumentName(command[index]) == normalizedExpected) return true
             index++
         }
         return false
@@ -88,6 +88,19 @@ internal object TerminalShellIntegrationBootstrap {
             .trim()
             .lowercase(Locale.ROOT)
             .let { value -> if (value.startsWith('/')) "-${value.substring(1)}" else value }
+
+    private fun powerShellArgumentName(argument: String): String {
+        val normalized = normalizedPowerShellArgument(argument)
+        val colon = normalized.indexOf(':')
+        val equals = normalized.indexOf('=')
+        val separator =
+            when {
+                colon < 0 -> equals
+                equals < 0 -> colon
+                else -> minOf(colon, equals)
+            }
+        return if (separator < 0) normalized else normalized.substring(0, separator)
+    }
 
     private val explicitEntryPointArguments =
         setOf(
@@ -124,9 +137,12 @@ internal object TerminalShellIntegrationBootstrap {
                     ${'$'}global:__JvTermCommandStarted = ${'$'}false
                 }
                 global:__JvTermOsc133 'A'
-                ${'$'}promptText = & ${'$'}global:__JvTermOriginalPrompt
-                if (${'$'}nativeExitCode -is [int]) {
-                    ${'$'}global:LASTEXITCODE = ${'$'}nativeExitCode
+                try {
+                    ${'$'}promptText = & ${'$'}global:__JvTermOriginalPrompt
+                } finally {
+                    if (${'$'}nativeExitCode -is [int]) {
+                        ${'$'}global:LASTEXITCODE = ${'$'}nativeExitCode
+                    }
                 }
                 ${'$'}promptText + ([string][char]27) + ']133;B' + ([string][char]7)
             }

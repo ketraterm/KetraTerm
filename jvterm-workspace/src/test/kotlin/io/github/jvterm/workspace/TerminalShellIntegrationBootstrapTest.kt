@@ -55,6 +55,14 @@ class TerminalShellIntegrationBootstrapTest {
             script.indexOf("if (\$nativeExitCode -is [int]") < script.indexOf("elseif (\$success)"),
             "native LASTEXITCODE branch must be evaluated before PowerShell success fallback",
         )
+    }
+
+    @Test
+    fun `PowerShell bootstrap restores native exit code even when user prompt fails`() {
+        val script = integratedPowerShellScript()
+
+        assertTrue(script.indexOf("try {") < script.indexOf("\$promptText = & \$global:__JvTermOriginalPrompt"))
+        assertTrue(script.indexOf("} finally {") < script.indexOf("\$global:LASTEXITCODE = \$nativeExitCode"))
         assertTrue(script.contains("\$global:LASTEXITCODE = \$nativeExitCode"))
     }
 
@@ -82,6 +90,20 @@ class TerminalShellIntegrationBootstrapTest {
                 id = "powershell",
                 displayName = "PowerShell",
                 command = listOf("pwsh.exe", "-NoLogo", "-Command", "Write-Host already-custom"),
+            )
+
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+
+        assertSame(profile, integrated)
+    }
+
+    @Test
+    fun `explicit PowerShell entrypoint with inline value is not rewritten`() {
+        val profile =
+            TerminalProfile(
+                id = "powershell",
+                displayName = "PowerShell",
+                command = listOf("pwsh.exe", "/Command:Write-Host already-custom"),
             )
 
         val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
