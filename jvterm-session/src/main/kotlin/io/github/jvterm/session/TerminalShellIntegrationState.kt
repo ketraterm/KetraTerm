@@ -490,7 +490,31 @@ class TerminalShellIntegrationState(
 
         val promptStart = promptStartLineIds[index]
         if (promptStart != NO_LINE_ID) {
-            projectRecordLine(lineIds, rowCount, commandRecordIds, commandLifecycleStates, destinationOffset, promptStart, id, lifecycle)
+            val promptEnd = promptEndLineIds[index]
+            if (promptEnd != NO_LINE_ID) {
+                projectLineRange(
+                    lineIds,
+                    rowCount,
+                    commandRecordIds,
+                    commandLifecycleStates,
+                    destinationOffset,
+                    promptStart,
+                    promptEnd,
+                    id,
+                    lifecycle,
+                )
+            } else {
+                projectRecordLine(
+                    lineIds,
+                    rowCount,
+                    commandRecordIds,
+                    commandLifecycleStates,
+                    destinationOffset,
+                    promptStart,
+                    id,
+                    lifecycle,
+                )
+            }
         }
 
         val start = commandStartLineIds[index]
@@ -521,7 +545,7 @@ class TerminalShellIntegrationState(
     ): Boolean {
         val first = minOf(start, end)
         val last = maxOf(start, end)
-        if (lineId !in first..last) return false
+        if (lineId < first || lineId > last) return false
         return hasFlag(index, FLAG_COMMAND_START_INCLUSIVE) || lineId != start
     }
 
@@ -550,11 +574,6 @@ class TerminalShellIntegrationState(
         private const val NO_OBSERVED_ROW = Long.MIN_VALUE
         private const val NO_EXIT_CODE = Int.MIN_VALUE
 
-        private const val STATE_EMPTY = 0
-        private const val STATE_PROMPT_STARTED = 1 shl 0
-        private const val STATE_PROMPT_ENDED = 1 shl 1
-        private const val STATE_COMMAND_STARTED = 1 shl 2
-        private const val STATE_COMMAND_FINISHED = 1 shl 3
         private const val FLAG_COMMAND_START_INCLUSIVE = 1 shl 0
 
         private fun clearViewport(
@@ -614,6 +633,31 @@ class TerminalShellIntegrationState(
                     commandRecordIds[destinationIndex] = commandRecordId
                     commandLifecycleStates[destinationIndex] = lifecycle
                     return
+                }
+                row++
+            }
+        }
+
+        private fun projectLineRange(
+            lineIds: LongArray,
+            rowCount: Int,
+            commandRecordIds: IntArray,
+            commandLifecycleStates: IntArray,
+            destinationOffset: Int,
+            startLineId: Long,
+            endLineId: Long,
+            commandRecordId: Int,
+            lifecycle: Int,
+        ) {
+            val first = minOf(startLineId, endLineId)
+            val last = maxOf(startLineId, endLineId)
+            var row = 0
+            while (row < rowCount) {
+                val lineId = lineIds[row]
+                if (lineId >= first && lineId <= last) {
+                    val destinationIndex = destinationOffset + row
+                    commandRecordIds[destinationIndex] = commandRecordId
+                    commandLifecycleStates[destinationIndex] = lifecycle
                 }
                 row++
             }

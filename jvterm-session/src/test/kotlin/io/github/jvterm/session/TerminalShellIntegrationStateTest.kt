@@ -17,6 +17,7 @@ package io.github.jvterm.session
 
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -205,6 +206,33 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `duplicate command start marks previous command as abandoned and keeps newest command active`() {
+        val state = TerminalShellIntegrationState()
+
+        state.recordCommandStart(1, includeLine = true)
+        state.recordCommandStart(3, includeLine = true)
+        state.recordCommandFinished(4, exitCode = 2)
+
+        val projection = state.project(longArrayOf(1, 2, 3, 4))
+
+        assertTrue(projection.commandRecordIds[0] != TerminalShellIntegrationCommandRecord.NONE)
+        assertEquals(TerminalShellIntegrationCommandRecord.NONE, projection.commandRecordIds[1])
+        assertTrue(projection.commandRecordIds[2] != TerminalShellIntegrationCommandRecord.NONE)
+        assertEquals(projection.commandRecordIds[2], projection.commandRecordIds[3])
+        assertTrue(projection.commandRecordIds[0] != projection.commandRecordIds[2])
+        assertContentEquals(
+            intArrayOf(
+                TerminalShellIntegrationCommandLifecycle.ABANDONED,
+                TerminalShellIntegrationCommandLifecycle.NONE,
+                TerminalShellIntegrationCommandLifecycle.FAILED,
+                TerminalShellIntegrationCommandLifecycle.FAILED,
+            ),
+            projection.commandLifecycleStates,
+        )
+        assertContentEquals(booleanArrayOf(false, false, true, true), projection.failedCommandRails)
+    }
+
+    @Test
     fun `prompt end without prompt start is ignored`() {
         val state = TerminalShellIntegrationState()
         val promptDividers = BooleanArray(2)
@@ -297,6 +325,40 @@ class TerminalShellIntegrationStateTest {
         assertFalse(state.hasPromptDividerAtLine(1))
         assertTrue(state.hasPromptDividerAtLine(2))
         assertTrue(state.hasPromptDividerAtLine(3))
+    }
+
+    @Test
+    fun `bounded command timeline evicts old record ids from viewport projection`() {
+        val state = TerminalShellIntegrationState(capacity = 2)
+
+        state.recordCommandStart(1, includeLine = true)
+        state.recordCommandFinished(2, exitCode = 1)
+        state.recordCommandStart(3, includeLine = true)
+        state.recordCommandFinished(4, exitCode = 0)
+        state.recordPromptStart(5)
+
+        val projection = state.project(longArrayOf(1, 2, 3, 4, 5))
+
+        assertContentEquals(
+            intArrayOf(
+                TerminalShellIntegrationCommandRecord.NONE,
+                TerminalShellIntegrationCommandRecord.NONE,
+                projection.commandRecordIds[2],
+                projection.commandRecordIds[2],
+                projection.commandRecordIds[4],
+            ),
+            projection.commandRecordIds,
+        )
+        assertContentEquals(
+            intArrayOf(
+                TerminalShellIntegrationCommandLifecycle.NONE,
+                TerminalShellIntegrationCommandLifecycle.NONE,
+                TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                TerminalShellIntegrationCommandLifecycle.PROMPT_ONLY,
+            ),
+            projection.commandLifecycleStates,
+        )
     }
 
     @Test
@@ -474,6 +536,29 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `exclusive command with no output still projects failed command boundary metadata`() {
+        val state = TerminalShellIntegrationState()
+
+        state.recordCommandStart(10, includeLine = false)
+        state.recordCommandFinished(10, exitCode = 1)
+
+        val projection = state.project(longArrayOf(10, 11))
+
+        assertContentEquals(booleanArrayOf(false, false), projection.failedCommandRails)
+        assertContentEquals(booleanArrayOf(true, false), projection.commandStarts)
+        assertContentEquals(booleanArrayOf(true, false), projection.commandEnds)
+        assertTrue(projection.commandRecordIds[0] != TerminalShellIntegrationCommandRecord.NONE)
+        assertEquals(TerminalShellIntegrationCommandRecord.NONE, projection.commandRecordIds[1])
+        assertContentEquals(
+            intArrayOf(
+                TerminalShellIntegrationCommandLifecycle.FAILED,
+                TerminalShellIntegrationCommandLifecycle.NONE,
+            ),
+            projection.commandLifecycleStates,
+        )
+    }
+
+    @Test
     fun `prompt divider is projected once when resize reflow exposes duplicate physical rows`() {
         val state = TerminalShellIntegrationState()
         val promptDividers = BooleanArray(3)
@@ -498,4 +583,106 @@ class TerminalShellIntegrationStateTest {
         assertContentEquals(booleanArrayOf(true, false, false), promptDividers)
         assertContentEquals(booleanArrayOf(false, false, false), failedCommandRails)
     }
+
+    @Test
+    fun `multiline prompt projects one prompt record over the whole prompt range`() {
+        val state = TerminalShellIntegrationState()
+
+        state.recordPromptStart(10)
+        state.recordPromptEnd(12)
+
+        val projection = state.project(longArrayOf(10, 11, 12, 13))
+
+        assertContentEquals(booleanArrayOf(true, false, false, false), projection.promptDividers)
+        assertContentEquals(
+            intArrayOf(
+                projection.commandRecordIds[0],
+                projection.commandRecordIds[0],
+                projection.commandRecordIds[0],
+                TerminalShellIntegrationCommandRecord.NONE,
+            ),
+            projection.commandRecordIds,
+        )
+        assertContentEquals(
+            intArrayOf(
+                TerminalShellIntegrationCommandLifecycle.PROMPT_ONLY,
+                TerminalShellIntegrationCommandLifecycle.PROMPT_ONLY,
+                TerminalShellIntegrationCommandLifecycle.PROMPT_ONLY,
+                TerminalShellIntegrationCommandLifecycle.NONE,
+            ),
+            projection.commandLifecycleStates,
+        )
+    }
+
+    @Test
+    fun `clear removes projected command ids lifecycles and decoration flags`() {
+        val state = TerminalShellIntegrationState()
+
+        state.recordPromptStart(1)
+        state.recordCommandStart(2, includeLine = true)
+        state.recordCommandFinished(3, exitCode = 1)
+        state.clear()
+
+        val projection = state.project(longArrayOf(1, 2, 3))
+
+        assertContentEquals(booleanArrayOf(false, false, false), projection.promptDividers)
+        assertContentEquals(booleanArrayOf(false, false, false), projection.failedCommandRails)
+        assertContentEquals(booleanArrayOf(false, false, false), projection.commandStarts)
+        assertContentEquals(booleanArrayOf(false, false, false), projection.commandEnds)
+        assertContentEquals(
+            intArrayOf(
+                TerminalShellIntegrationCommandRecord.NONE,
+                TerminalShellIntegrationCommandRecord.NONE,
+                TerminalShellIntegrationCommandRecord.NONE,
+            ),
+            projection.commandRecordIds,
+        )
+        assertContentEquals(
+            intArrayOf(
+                TerminalShellIntegrationCommandLifecycle.NONE,
+                TerminalShellIntegrationCommandLifecycle.NONE,
+                TerminalShellIntegrationCommandLifecycle.NONE,
+            ),
+            projection.commandLifecycleStates,
+        )
+    }
+
+    private fun TerminalShellIntegrationState.project(lineIds: LongArray): Projection {
+        val rowCount = lineIds.size
+        val promptDividers = BooleanArray(rowCount)
+        val failedCommandRails = BooleanArray(rowCount)
+        val commandStarts = BooleanArray(rowCount)
+        val commandEnds = BooleanArray(rowCount)
+        val commandRecordIds = IntArray(rowCount)
+        val commandLifecycleStates = IntArray(rowCount)
+
+        copyViewport(
+            lineIds = lineIds,
+            rowCount = rowCount,
+            promptDividers = promptDividers,
+            failedCommandRails = failedCommandRails,
+            commandStarts = commandStarts,
+            commandEnds = commandEnds,
+            commandRecordIds = commandRecordIds,
+            commandLifecycleStates = commandLifecycleStates,
+        )
+
+        return Projection(
+            promptDividers = promptDividers,
+            failedCommandRails = failedCommandRails,
+            commandStarts = commandStarts,
+            commandEnds = commandEnds,
+            commandRecordIds = commandRecordIds,
+            commandLifecycleStates = commandLifecycleStates,
+        )
+    }
+
+    private class Projection(
+        val promptDividers: BooleanArray,
+        val failedCommandRails: BooleanArray,
+        val commandStarts: BooleanArray,
+        val commandEnds: BooleanArray,
+        val commandRecordIds: IntArray,
+        val commandLifecycleStates: IntArray,
+    )
 }

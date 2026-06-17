@@ -300,6 +300,58 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `OSC 133 zero exit code records succeeded lifecycle without failed rail`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector, columns = 20, rows = 4)
+
+        connector.feedFromHost("\u001B]133;C\u0007ok\u001B]133;D;0\u0007".ascii())
+
+        val decorations = session.shellDecorations()
+        assertAll(
+            { assertFalse(decorations.failedCommandRails[0]) },
+            { assertTrue(decorations.commandRecordIds[0] != TerminalShellIntegrationCommandRecord.NONE) },
+            { assertEquals(TerminalShellIntegrationCommandLifecycle.SUCCEEDED, decorations.commandLifecycleStates[0]) },
+        )
+        session.close()
+    }
+
+    @Test
+    fun `OSC 133 duplicate command start abandons first command and finishes newest command`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector, columns = 20, rows = 4)
+
+        connector.feedFromHost("\u001B]133;C\u0007partial\r\n\u001B]133;C\u0007new\r\n\u001B]133;D;1\u0007".ascii())
+
+        val decorations = session.shellDecorations()
+        assertAll(
+            { assertFalse(decorations.failedCommandRails[0]) },
+            { assertTrue(decorations.failedCommandRails[1]) },
+            { assertTrue(decorations.commandRecordIds[0] != TerminalShellIntegrationCommandRecord.NONE) },
+            { assertTrue(decorations.commandRecordIds[1] != TerminalShellIntegrationCommandRecord.NONE) },
+            { assertNotEquals(decorations.commandRecordIds[0], decorations.commandRecordIds[1]) },
+            { assertEquals(TerminalShellIntegrationCommandLifecycle.ABANDONED, decorations.commandLifecycleStates[0]) },
+            { assertEquals(TerminalShellIntegrationCommandLifecycle.FAILED, decorations.commandLifecycleStates[1]) },
+        )
+        session.close()
+    }
+
+    @Test
+    fun `OSC 133 finish without command start is ignored by command timeline`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector, columns = 20, rows = 4)
+
+        connector.feedFromHost("orphan\u001B]133;D;1\u0007".ascii())
+
+        val decorations = session.shellDecorations()
+        assertAll(
+            { assertFalse(decorations.failedCommandRails[0]) },
+            { assertEquals(TerminalShellIntegrationCommandRecord.NONE, decorations.commandRecordIds[0]) },
+            { assertEquals(TerminalShellIntegrationCommandLifecycle.NONE, decorations.commandLifecycleStates[0]) },
+        )
+        session.close()
+    }
+
+    @Test
     fun `resize preserves shared shell integration timeline`() {
         val connector = MockConnector()
         val session = createStartedSession(connector, columns = 10, rows = 4)
@@ -900,6 +952,10 @@ class TerminalSessionTest {
     private fun TerminalSession.shellDecorations(): ShellDecorationSnapshot {
         var promptDividers = BooleanArray(0)
         var failedCommandRails = BooleanArray(0)
+        var commandStarts = BooleanArray(0)
+        var commandEnds = BooleanArray(0)
+        var commandRecordIds = IntArray(0)
+        var commandLifecycleStates = IntArray(0)
         readRenderFrame { frame ->
             val lineIds = LongArray(frame.rows)
             var row = 0
@@ -909,10 +965,10 @@ class TerminalSessionTest {
             }
             promptDividers = BooleanArray(frame.rows)
             failedCommandRails = BooleanArray(frame.rows)
-            val commandStarts = BooleanArray(frame.rows)
-            val commandEnds = BooleanArray(frame.rows)
-            val commandRecordIds = IntArray(frame.rows)
-            val commandLifecycleStates = IntArray(frame.rows)
+            commandStarts = BooleanArray(frame.rows)
+            commandEnds = BooleanArray(frame.rows)
+            commandRecordIds = IntArray(frame.rows)
+            commandLifecycleStates = IntArray(frame.rows)
             shellIntegrationState.copyViewport(
                 lineIds = lineIds,
                 rowCount = frame.rows,
@@ -924,12 +980,23 @@ class TerminalSessionTest {
                 commandLifecycleStates = commandLifecycleStates,
             )
         }
-        return ShellDecorationSnapshot(promptDividers, failedCommandRails)
+        return ShellDecorationSnapshot(
+            promptDividers = promptDividers,
+            failedCommandRails = failedCommandRails,
+            commandStarts = commandStarts,
+            commandEnds = commandEnds,
+            commandRecordIds = commandRecordIds,
+            commandLifecycleStates = commandLifecycleStates,
+        )
     }
 
     private data class ShellDecorationSnapshot(
         val promptDividers: BooleanArray,
         val failedCommandRails: BooleanArray,
+        val commandStarts: BooleanArray,
+        val commandEnds: BooleanArray,
+        val commandRecordIds: IntArray,
+        val commandLifecycleStates: IntArray,
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -939,6 +1006,10 @@ class TerminalSessionTest {
 
             if (!promptDividers.contentEquals(other.promptDividers)) return false
             if (!failedCommandRails.contentEquals(other.failedCommandRails)) return false
+            if (!commandStarts.contentEquals(other.commandStarts)) return false
+            if (!commandEnds.contentEquals(other.commandEnds)) return false
+            if (!commandRecordIds.contentEquals(other.commandRecordIds)) return false
+            if (!commandLifecycleStates.contentEquals(other.commandLifecycleStates)) return false
 
             return true
         }
@@ -946,6 +1017,10 @@ class TerminalSessionTest {
         override fun hashCode(): Int {
             var result = promptDividers.contentHashCode()
             result = 31 * result + failedCommandRails.contentHashCode()
+            result = 31 * result + commandStarts.contentHashCode()
+            result = 31 * result + commandEnds.contentHashCode()
+            result = 31 * result + commandRecordIds.contentHashCode()
+            result = 31 * result + commandLifecycleStates.contentHashCode()
             return result
         }
     }
