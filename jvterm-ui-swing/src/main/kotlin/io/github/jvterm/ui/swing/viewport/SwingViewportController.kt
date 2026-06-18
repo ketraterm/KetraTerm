@@ -88,7 +88,26 @@ internal class SwingViewportController(
         return maxOf(1, (componentHeight - padding.top - padding.bottom) / metrics.cellHeight)
     }
 
-    fun requestedRows(visibleRows: Int): Int = scrollModel.requestedRows(visibleRows)
+    fun visibleRenderRows(
+        settings: SwingSettings,
+        metrics: SwingMetrics,
+        componentHeight: Int,
+    ): Int {
+        val padding = settings.padding
+        val availableHeight = componentHeight - padding.top - padding.bottom
+        if (availableHeight <= 0) return 1
+        return ceilDiv(availableHeight, metrics.cellHeight)
+    }
+
+    fun viewportPixelHeight(
+        settings: SwingSettings,
+        componentHeight: Int,
+    ): Int {
+        val padding = settings.padding
+        return maxOf(0, componentHeight - padding.top - padding.bottom)
+    }
+
+    fun requestedRows(renderRows: Int): Int = scrollModel.requestedRows(renderRows)
 
     fun scrollBy(
         delta: Double,
@@ -117,11 +136,39 @@ internal class SwingViewportController(
 
     fun contentYOffset(
         cacheRows: Int,
-        requestedRows: Int,
-        cellHeight: Int,
+        cacheScrollbackOffset: Int,
+        terminalRows: Int,
+        viewportPixelHeight: Int,
+        visualHeightForTerminalRows: Int,
+        leadingVisualStride: Int,
     ): Double {
-        if (cacheRows < requestedRows) return 0.0
-        return scrollModel.contentYOffset(cellHeight)
+        require(cacheRows >= 0) { "cacheRows must be >= 0, was $cacheRows" }
+        require(cacheScrollbackOffset >= 0) {
+            "cacheScrollbackOffset must be >= 0, was $cacheScrollbackOffset"
+        }
+        require(terminalRows > 0) { "terminalRows must be > 0, was $terminalRows" }
+        require(viewportPixelHeight >= 0) {
+            "viewportPixelHeight must be >= 0, was $viewportPixelHeight"
+        }
+        require(visualHeightForTerminalRows >= 0) {
+            "visualHeightForTerminalRows must be >= 0, was $visualHeightForTerminalRows"
+        }
+
+        val smoothYOffset =
+            if (
+                cacheRows > 1 &&
+                scrollModel.needsOverscan &&
+                cacheScrollbackOffset == scrollModel.requestedOffset
+            ) {
+                scrollModel.contentYOffset(leadingVisualStride)
+            } else {
+                0.0
+            }
+        val liveBottomRows = terminalRows + cacheScrollbackOffset
+        if (cacheRows < liveBottomRows || visualHeightForTerminalRows <= viewportPixelHeight) return smoothYOffset
+
+        val bottomAnchorYOffset = (viewportPixelHeight - visualHeightForTerminalRows).toDouble()
+        return minOf(smoothYOffset, bottomAnchorYOffset)
     }
 
     fun viewportStateSnapshot(): TerminalViewportState =
@@ -136,9 +183,10 @@ internal class SwingViewportController(
     fun publishViewportState(
         historySize: Int,
         visibleRows: Int,
+        renderRows: Int,
         notifyListener: Boolean = true,
     ) {
-        val requestedRows = scrollModel.requestedRows(visibleRows)
+        val requestedRows = scrollModel.requestedRows(renderRows)
         val scrollbackOffset = scrollModel.preciseScrollbackOffset
         val renderOffset = scrollModel.requestedOffset
 
@@ -180,5 +228,13 @@ internal class SwingViewportController(
         private fun doubleToRawLongBits(value: Double): Long = java.lang.Double.doubleToRawLongBits(value)
 
         private fun longBitsToDouble(value: Long): Double = java.lang.Double.longBitsToDouble(value)
+
+        private fun ceilDiv(
+            value: Int,
+            divisor: Int,
+        ): Int {
+            require(divisor > 0) { "divisor must be > 0, was $divisor" }
+            return (value - 1) / divisor + 1
+        }
     }
 }

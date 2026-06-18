@@ -875,7 +875,12 @@ class SwingTerminal
             historySize: Int,
             notifyListener: Boolean = true,
         ) {
-            viewportController.publishViewportState(historySize, visibleGridRows(), notifyListener)
+            viewportController.publishViewportState(
+                historySize = historySize,
+                visibleRows = visibleGridRows(),
+                renderRows = visibleRenderRows(),
+                notifyListener = notifyListener,
+            )
         }
 
         fun preferredGridSize(
@@ -918,7 +923,9 @@ class SwingTerminal
 
         private fun visibleGridRows(): Int = viewportController.visibleGridRows(settings, metrics, height)
 
-        private fun requestedRenderRows(): Int = viewportController.requestedRows(visibleGridRows())
+        private fun visibleRenderRows(): Int = viewportController.visibleRenderRows(settings, metrics, height)
+
+        private fun requestedRenderRows(): Int = viewportController.requestedRows(visibleRenderRows())
 
         private fun refreshRenderCacheFromSession(session: TerminalSession) {
             renderCache.updateFrom(
@@ -932,8 +939,23 @@ class SwingTerminal
             shellIntegrationDecorations.updateFrom(session.shellIntegrationState, renderCache) or
                 shellIntegrationRowLayout.update(settings, metrics, shellIntegrationDecorations, renderCache.rows)
 
-        private fun contentYOffset(cache: TerminalRenderCache): Double =
-            viewportController.contentYOffset(cache.rows, requestedRenderRows(), metrics.cellHeight)
+        private fun contentYOffset(cache: TerminalRenderCache): Double {
+            val terminalRows = visibleGridRows()
+            val layout = shellIntegrationRowLayout.takeIf { cache === renderCache && it.rowCount == cache.rows }
+            val terminalRowsInCache = minOf(cache.rows, terminalRows)
+            val visualHeightForTerminalRows =
+                layout?.visualHeightForRows(terminalRowsInCache)
+                    ?: terminalRowsInCache * metrics.cellHeight
+            val leadingVisualStride = layout?.leadingVisualStride() ?: metrics.cellHeight
+            return viewportController.contentYOffset(
+                cacheRows = cache.rows,
+                cacheScrollbackOffset = cache.scrollbackOffset,
+                terminalRows = terminalRows,
+                viewportPixelHeight = viewportController.viewportPixelHeight(settings, height),
+                visualHeightForTerminalRows = visualHeightForTerminalRows,
+                leadingVisualStride = leadingVisualStride,
+            )
+        }
 
         private fun buildMetrics(settings: SwingSettings): SwingMetrics {
             val metricsSource: FontMetrics = getFontMetrics(settings.font)

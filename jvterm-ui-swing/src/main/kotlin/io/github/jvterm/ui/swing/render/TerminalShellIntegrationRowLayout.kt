@@ -125,6 +125,26 @@ internal class TerminalShellIntegrationRowLayout {
     fun rowBottom(row: Int): Int = rowTop(row) + cellHeight
 
     /**
+     * Returns the visual height occupied by the first [rows] terminal rows.
+     */
+    fun visualHeightForRows(rows: Int): Int {
+        val safeRows = rows.coerceIn(0, rowCount)
+        if (safeRows == 0) return 0
+        return rowBottom(safeRows - 1)
+    }
+
+    /**
+     * Returns the visual distance from row 0 to row 1.
+     *
+     * Smooth scrolling uses this value when the render cache contains one
+     * leading overscan row. A divider before row 1 is part of that transition.
+     */
+    fun leadingVisualStride(): Int {
+        if (rowCount < 2) return cellHeight
+        return rowTop(1) - rowTop(0)
+    }
+
+    /**
      * Returns the graphics translation needed before painting [row] with
      * painters that still use terminal-native `row * cellHeight` coordinates.
      */

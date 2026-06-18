@@ -55,6 +55,8 @@ class TerminalShellIntegrationRowLayoutTest {
         assertEquals(0, layout.rowTop(0))
         assertEquals(METRICS.cellHeight + settings.shellIntegrationPromptDividerGap, layout.rowTop(1))
         assertEquals(METRICS.cellHeight * 2 + settings.shellIntegrationPromptDividerGap, layout.rowTop(2))
+        assertEquals(METRICS.cellHeight * 2 + settings.shellIntegrationPromptDividerGap, layout.visualHeightForRows(2))
+        assertEquals(METRICS.cellHeight + settings.shellIntegrationPromptDividerGap, layout.leadingVisualStride())
     }
 
     @Test

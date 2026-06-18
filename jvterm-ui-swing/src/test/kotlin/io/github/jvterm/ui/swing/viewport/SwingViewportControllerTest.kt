@@ -59,6 +59,28 @@ class SwingViewportControllerTest {
         }
 
         @Test
+        fun `visible render rows cover partial pixel rows without changing grid rows`() {
+            val controller = SwingViewportController { _, _, _, _, _ -> }
+
+            assertEquals(
+                6,
+                controller.visibleGridRows(
+                    settings = settings,
+                    metrics = metrics,
+                    componentHeight = 130,
+                ),
+            )
+            assertEquals(
+                7,
+                controller.visibleRenderRows(
+                    settings = settings,
+                    metrics = metrics,
+                    componentHeight = 131,
+                ),
+            )
+        }
+
+        @Test
         fun `visible grid size clamps tiny components to one cell`() {
             val controller = SwingViewportController { _, _, _, _, _ -> }
 
@@ -83,10 +105,10 @@ class SwingViewportControllerTest {
             val controller = SwingViewportController(listener)
 
             assertTrue(controller.scrollTo(offsetLines = 12.5, historySize = 100))
-            controller.publishViewportState(historySize = 100, visibleRows = 24)
+            controller.publishViewportState(historySize = 100, visibleRows = 24, renderRows = 25)
 
             val snapshot = controller.viewportStateSnapshot()
-            assertEquals(TerminalViewportState(100, 12.5, 13, 24, 25), snapshot)
+            assertEquals(TerminalViewportState(100, 12.5, 13, 24, 26), snapshot)
             assertEquals(snapshot, listener.lastState)
         }
 
@@ -96,9 +118,14 @@ class SwingViewportControllerTest {
             val controller = SwingViewportController(listener)
 
             controller.scrollTo(offsetLines = 3.0, historySize = 10)
-            controller.publishViewportState(historySize = 10, visibleRows = 5, notifyListener = false)
+            controller.publishViewportState(
+                historySize = 10,
+                visibleRows = 5,
+                renderRows = 6,
+                notifyListener = false,
+            )
 
-            assertEquals(TerminalViewportState(10, 3.0, 3, 5, 5), controller.viewportStateSnapshot())
+            assertEquals(TerminalViewportState(10, 3.0, 3, 5, 6), controller.viewportStateSnapshot())
             assertEquals(0, listener.callCount)
         }
     }
@@ -123,13 +150,58 @@ class SwingViewportControllerTest {
         }
 
         @Test
-        fun `contentYOffset is disabled until render cache covers requested rows`() {
+        fun `contentYOffset uses divider aware leading stride for smooth scroll`() {
             val controller = SwingViewportController { _, _, _, _, _ -> }
 
-            controller.scrollTo(offsetLines = 2.5, historySize = 10)
+            controller.scrollTo(offsetLines = 2.25, historySize = 10)
 
-            assertEquals(0.0, controller.contentYOffset(cacheRows = 5, requestedRows = 6, cellHeight = 20))
-            assertEquals(-10.0, controller.contentYOffset(cacheRows = 6, requestedRows = 6, cellHeight = 20))
+            assertEquals(
+                -19.5,
+                controller.contentYOffset(
+                    cacheRows = 8,
+                    cacheScrollbackOffset = 3,
+                    terminalRows = 6,
+                    viewportPixelHeight = 120,
+                    visualHeightForTerminalRows = 120,
+                    leadingVisualStride = 26,
+                ),
+            )
+        }
+
+        @Test
+        fun `contentYOffset does not bottom anchor partial render overscan by itself`() {
+            val controller = SwingViewportController { _, _, _, _, _ -> }
+
+            controller.scrollTo(offsetLines = 1.0, historySize = 10)
+
+            assertEquals(
+                0.0,
+                controller.contentYOffset(
+                    cacheRows = 7,
+                    cacheScrollbackOffset = 1,
+                    terminalRows = 6,
+                    viewportPixelHeight = 134,
+                    visualHeightForTerminalRows = 120,
+                    leadingVisualStride = 20,
+                ),
+            )
+        }
+
+        @Test
+        fun `contentYOffset bottom anchors live viewport when dividers overflow terminal rows`() {
+            val controller = SwingViewportController { _, _, _, _, _ -> }
+
+            assertEquals(
+                -12.0,
+                controller.contentYOffset(
+                    cacheRows = 6,
+                    cacheScrollbackOffset = 0,
+                    terminalRows = 6,
+                    viewportPixelHeight = 120,
+                    visualHeightForTerminalRows = 132,
+                    leadingVisualStride = 20,
+                ),
+            )
         }
 
         @Test
@@ -149,7 +221,12 @@ class SwingViewportControllerTest {
 
             controller.scrollTo(offsetLines = 4.5, historySize = 10)
             controller.reset()
-            controller.publishViewportState(historySize = 10, visibleRows = 4, notifyListener = false)
+            controller.publishViewportState(
+                historySize = 10,
+                visibleRows = 4,
+                renderRows = 4,
+                notifyListener = false,
+            )
 
             assertEquals(TerminalViewportState(10, 0.0, 0, 4, 4), controller.viewportStateSnapshot())
         }
@@ -181,7 +258,7 @@ class SwingViewportControllerTest {
     }
 
     private fun SwingViewportController.viewportOffsetForAssertion(): Double {
-        publishViewportState(historySize = 100, visibleRows = 1, notifyListener = false)
+        publishViewportState(historySize = 100, visibleRows = 1, renderRows = 1, notifyListener = false)
         return viewportStateSnapshot().scrollbackOffset
     }
 }

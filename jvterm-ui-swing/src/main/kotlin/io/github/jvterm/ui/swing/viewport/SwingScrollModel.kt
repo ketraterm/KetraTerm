@@ -126,17 +126,20 @@ internal class SwingScrollModel {
      * Returns the vertical content translation for the current fractional
      * scroll position.
      */
-    fun contentYOffset(cellHeight: Int): Double {
+    fun contentYOffset(leadingVisualStride: Int): Double {
+        require(leadingVisualStride > 0) {
+            "leadingVisualStride must be > 0, was $leadingVisualStride"
+        }
         if (!needsOverscan) return 0.0
-        return -(1.0 - fraction) * cellHeight
+        return -(1.0 - fraction) * leadingVisualStride
     }
 
     /**
      * Returns the render-cache row count needed for the current viewport.
      */
-    fun requestedRows(visibleRows: Int): Int {
-        require(visibleRows > 0) { "visibleRows must be > 0, was $visibleRows" }
-        return if (needsOverscan) visibleRows + 1 else visibleRows
+    fun requestedRows(renderRows: Int): Int {
+        require(renderRows > 0) { "renderRows must be > 0, was $renderRows" }
+        return if (needsOverscan) renderRows + 1 else renderRows
     }
 
     private fun committed(

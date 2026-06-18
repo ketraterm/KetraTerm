@@ -84,7 +84,7 @@ class SwingScrollModelTest {
 
         model.scrollBy(0.25, historySize = 10)
 
-        assertEquals(4, model.requestedRows(visibleRows = 3))
-        assertEquals(-12.0, model.contentYOffset(cellHeight = 16))
+        assertEquals(4, model.requestedRows(renderRows = 3))
+        assertEquals(-12.0, model.contentYOffset(leadingVisualStride = 16))
     }
 }
