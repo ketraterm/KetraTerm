@@ -67,9 +67,6 @@ class SwingTerminal
             get() = terminalFocused
         private var lastResizedColumns: Int = NO_RESIZE_DIMENSION
         private var lastResizedRows: Int = NO_RESIZE_DIMENSION
-        private var searchQuery: String = ""
-        private var searchHighlights: TerminalSearchHighlights? = null
-        private var searchIgnoreCase: Boolean = true
         private val renderPending = AtomicBoolean(false)
         private val visibleGridSizeSnapshot = AtomicLong(packVisibleGridSize(1, 1))
         private val viewportHistorySizeSnapshot = AtomicInteger(0)
@@ -91,8 +88,6 @@ class SwingTerminal
         private val renderCache = TerminalRenderCache(settings.columns, settings.rows)
         private val searchCache = TerminalRenderCache(settings.columns, settings.rows)
         private val keyMapper = SwingKeyMapper()
-        private val searchModel = TerminalSearchModel()
-        private val searchViewportHighlights = TerminalSearchViewportHighlights()
         private val shellIntegrationDecorations = TerminalShellIntegrationViewportDecorations()
 
         private val selectionController =
@@ -182,28 +177,26 @@ class SwingTerminal
                     override fun repaint() = this@SwingTerminal.repaint()
                 },
             )
-        private val searchOverlay =
-            TerminalSearchOverlay(
-                object : SearchOverlayListener {
-                    override fun onQueryChanged(query: String) {
-                        applySearchQueryOnEdt(query)
-                    }
+        private val searchController =
+            TerminalSearchController(
+                object : TerminalSearchHost {
+                    override val session: TerminalSession? get() = this@SwingTerminal.session
+                    override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
+                    override val searchCache: TerminalRenderCache get() = this@SwingTerminal.searchCache
 
-                    override fun onFindNext() {
-                        findNextOnEdt()
-                    }
+                    override fun visibleGridRows(): Int = this@SwingTerminal.visibleGridRows()
 
-                    override fun onFindPrevious() {
-                        findPreviousOnEdt()
-                    }
+                    override fun scrollViewportTo(
+                        offsetLines: Double,
+                        historySize: Int,
+                        boundSession: TerminalSession,
+                    ): Boolean = this@SwingTerminal.scrollViewportToOnEdt(offsetLines, historySize, boundSession)
 
-                    override fun onCloseSearch() {
-                        closeSearchOnEdt()
-                    }
+                    override fun revalidate() = this@SwingTerminal.revalidate()
 
-                    override fun onCaseSensitivityChanged(ignoreCase: Boolean) {
-                        searchIgnoreCase = ignoreCase
-                    }
+                    override fun repaint() = this@SwingTerminal.repaint()
+
+                    override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
                 },
             )
         private val repaintSink =
@@ -350,8 +343,8 @@ class SwingTerminal
             addMouseMotionListener(selectionMouseMotionListener)
             addMouseWheelListener(viewportWheelListener)
             addComponentListener(resizeListener)
-            add(searchOverlay)
-            searchOverlay.isVisible = false
+            add(searchController.overlay)
+            searchController.overlay.isVisible = false
             preferredSize = preferredGridSize(settings.columns, settings.rows)
             cursorTimer.isRepeats = true
             configureCursorTimerOnEdt()
@@ -591,6 +584,7 @@ class SwingTerminal
 
         override fun doLayout() {
             super.doLayout()
+            val searchOverlay = searchController.overlay
             val preferred = searchOverlay.preferredSize
             val availableWidth = width - settings.padding.left - settings.padding.right
             val overlayWidth = minOf(availableWidth, preferred.width).coerceAtLeast(0)
@@ -624,7 +618,7 @@ class SwingTerminal
                     textBlinkVisible = cursorBlinkVisible,
                     contentYOffset = contentYOffset(renderCache),
                     selection = selectionController.getViewportSelection(renderCache),
-                    searchHighlights = searchViewportHighlights,
+                    searchHighlights = searchController.viewportHighlights,
                     shellIntegrationDecorations = shellIntegrationDecorations,
                     hoveredHyperlinkId = hyperlinkController.hoveredHyperlinkId,
                     hyperlinkActivationHover = hyperlinkController.hyperlinkActivationHover,
@@ -642,7 +636,7 @@ class SwingTerminal
             session.addDirtyListener(dirtyListener)
             resetScrollbackState()
             selectionController.clearSelection()
-            clearSearch()
+            searchController.reset(renderCache.rows)
             shellIntegrationDecorations.reset()
             selectionController.stopSelectionDrag()
             lastResizedColumns = NO_RESIZE_DIMENSION
@@ -662,7 +656,7 @@ class SwingTerminal
             session = null
             resetScrollbackState()
             selectionController.clearSelection()
-            clearSearch()
+            searchController.reset(renderCache.rows)
             shellIntegrationDecorations.reset()
             selectionController.stopSelectionDrag()
             lastResizedColumns = NO_RESIZE_DIMENSION
@@ -688,7 +682,7 @@ class SwingTerminal
                 applySettingsToSession(it, settings)
             }
             selectionController.clearSelection()
-            updateSearchViewportHighlights()
+            searchController.updateViewportHighlights()
             hyperlinkController.clearHyperlinkHover()
             resizeSessionToVisibleGridOnEdt()
             session?.let {
@@ -725,8 +719,7 @@ class SwingTerminal
         fun search(query: String) {
             runOnEdt(
                 Runnable {
-                    searchOverlay.setQueryText(query)
-                    applySearchQueryOnEdt(query)
+                    searchController.search(query)
                 },
             )
         }
@@ -736,13 +729,7 @@ class SwingTerminal
          *
          * @return current terminal search state.
          */
-        fun currentSearchState(): TerminalSearchState =
-            TerminalSearchState(
-                visible = searchOverlay.isVisible,
-                query = searchQuery,
-                resultCount = searchHighlights?.resultCount ?: 0,
-                activeResultIndex = searchHighlights?.activeResultIndex ?: NO_ACTIVE_SEARCH_RESULT,
-            )
+        fun currentSearchState(): TerminalSearchState = searchController.state()
 
         private fun applySettingsToSession(
             session: TerminalSession,
@@ -838,7 +825,7 @@ class SwingTerminal
             if (event.keyCode != KeyEvent.VK_F) return false
             if (!event.isShiftDown) return false
             if (!event.isControlDown && !event.isMetaDown) return false
-            openSearchOnEdt()
+            searchController.open()
             event.consume()
             return true
         }
@@ -865,14 +852,6 @@ class SwingTerminal
             if (text.isEmpty()) return false
             session?.encodePaste(TerminalPasteEvent(text))
             return true
-        }
-
-        private fun clearSearch() {
-            searchQuery = ""
-            searchHighlights = null
-            searchViewportHighlights.reset(renderCache.rows)
-            searchOverlay.setQueryText("")
-            searchOverlay.updateResultCounter(0, NO_ACTIVE_SEARCH_RESULT)
         }
 
         private fun cellAt(
@@ -904,7 +883,7 @@ class SwingTerminal
                 refreshRenderCacheFromSession(boundSession)
                 refreshShellIntegrationDecorations(boundSession)
             }
-            updateSearchViewportHighlights()
+            searchController.updateViewportHighlights()
             publishViewportState(renderCache.historySize)
             repaint()
             return true
@@ -920,7 +899,7 @@ class SwingTerminal
                 refreshRenderCacheFromSession(boundSession)
                 refreshShellIntegrationDecorations(boundSession)
             }
-            updateSearchViewportHighlights()
+            searchController.updateViewportHighlights()
             publishViewportState(renderCache.historySize)
             repaint()
             return true
@@ -948,7 +927,7 @@ class SwingTerminal
                 refreshRenderCacheFromSession(boundSession)
             }
             val shellIntegrationDecorationsChanged = refreshShellIntegrationDecorations(boundSession)
-            refreshSearchForFrameOnEdt()
+            searchController.refreshForFrame()
             publishViewportState(renderCache.historySize)
             val yOffset = contentYOffset(renderCache)
             repaintPlanner.requestFrameRepaint(
@@ -1026,114 +1005,6 @@ class SwingTerminal
 
         private fun resetScrollbackState() {
             scrollModel.reset()
-        }
-
-        private fun openSearchOnEdt() {
-            searchOverlay.isVisible = true
-            searchOverlay.setQueryText(searchQuery)
-            revalidate()
-            searchOverlay.focusQuery()
-            if (searchQuery.isNotEmpty()) {
-                refreshSearchForFrameOnEdt()
-            }
-            repaint()
-        }
-
-        private fun closeSearchOnEdt() {
-            searchOverlay.isVisible = false
-            searchHighlights = null
-            searchViewportHighlights.reset(renderCache.rows)
-            revalidate()
-            requestFocusInWindow()
-            repaint()
-        }
-
-        private fun applySearchQueryOnEdt(query: String) {
-            searchQuery = query
-            if (query.isEmpty()) {
-                searchHighlights = null
-                searchViewportHighlights.reset(renderCache.rows)
-                searchOverlay.updateResultCounter(0, NO_ACTIVE_SEARCH_RESULT)
-                repaint()
-                return
-            }
-
-            val boundSession = session ?: return
-            refreshSearchCache(boundSession)
-            searchHighlights = searchModel.search(searchCache, query, ignoreCase = searchIgnoreCase)
-            searchOverlay.updateResultCounter(
-                resultCount = searchHighlights?.resultCount ?: 0,
-                activeResultIndex = searchHighlights?.activeResultIndex ?: NO_ACTIVE_SEARCH_RESULT,
-            )
-            scrollToActiveSearchResult()
-            updateSearchViewportHighlights()
-            repaint()
-        }
-
-        private fun refreshSearchForFrameOnEdt() {
-            if (searchQuery.isEmpty()) {
-                updateSearchViewportHighlights()
-                return
-            }
-            val boundSession = session ?: return
-            val oldActive = searchHighlights?.activeResultIndex ?: NO_ACTIVE_SEARCH_RESULT
-            refreshSearchCache(boundSession)
-            val nextHighlights = searchModel.search(searchCache, searchQuery, ignoreCase = searchIgnoreCase)
-            if (oldActive in 0 until nextHighlights.resultCount) {
-                nextHighlights.activate(oldActive)
-            }
-            searchHighlights = nextHighlights
-            searchOverlay.updateResultCounter(nextHighlights.resultCount, nextHighlights.activeResultIndex)
-            updateSearchViewportHighlights()
-        }
-
-        private fun refreshSearchCache(boundSession: TerminalSession) {
-            val historySize = renderCache.historySize
-            searchCache.updateFrom(
-                reader = boundSession,
-                scrollbackOffset = historySize,
-                viewportRows = (historySize + visibleGridRows()).coerceAtLeast(1),
-            )
-        }
-
-        private fun findNextOnEdt(): Boolean = activateRelativeSearchResult(1)
-
-        private fun findPreviousOnEdt(): Boolean = activateRelativeSearchResult(-1)
-
-        private fun activateRelativeSearchResult(delta: Int): Boolean {
-            val highlights = searchHighlights ?: return false
-            if (highlights.resultCount == 0) return false
-            val current =
-                if (highlights.activeResultIndex in 0 until highlights.resultCount) {
-                    highlights.activeResultIndex
-                } else {
-                    0
-                }
-            val next = (current + delta + highlights.resultCount) % highlights.resultCount
-            highlights.activate(next)
-            searchOverlay.updateResultCounter(highlights.resultCount, highlights.activeResultIndex)
-            scrollToActiveSearchResult()
-            updateSearchViewportHighlights()
-            repaint()
-            return true
-        }
-
-        private fun scrollToActiveSearchResult() {
-            val highlights = searchHighlights ?: return
-            val activeRow = highlights.activeStartAbsoluteRow()
-            if (activeRow == NO_ACTIVE_SEARCH_ROW) return
-            val centerRow = visibleGridRows() / 2
-            val desiredOffset = renderCache.discardedCount + renderCache.historySize + centerRow - activeRow
-            scrollViewportToOnEdt(desiredOffset.toDouble())
-        }
-
-        private fun updateSearchViewportHighlights() {
-            val highlights = searchHighlights
-            if (highlights == null) {
-                searchViewportHighlights.reset(renderCache.rows)
-                return
-            }
-            highlights.buildViewportHighlights(renderCache, searchViewportHighlights)
         }
 
         private fun publishViewportState(
@@ -1254,8 +1125,6 @@ class SwingTerminal
 
         private companion object {
             private const val NO_RESIZE_DIMENSION = -1
-            private const val NO_ACTIVE_SEARCH_RESULT = -1
-            private const val NO_ACTIVE_SEARCH_ROW = Long.MIN_VALUE
             private const val MIN_TIMER_DELAY_MILLIS = 1
 
             private fun cursorTimerDelay(settings: SwingSettings): Int = maxOf(MIN_TIMER_DELAY_MILLIS, settings.cursorBlinkMillis)
