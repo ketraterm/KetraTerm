@@ -15,25 +15,25 @@
  */
 package io.github.jvterm.ui.swing.api
 
-import io.github.jvterm.input.event.*
-import io.github.jvterm.protocol.MouseTrackingMode
+import io.github.jvterm.input.event.TerminalPasteEvent
 import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.session.TerminalSession
 import io.github.jvterm.session.TerminalShellIntegrationCommandRecord
-import io.github.jvterm.ui.swing.input.SwingKeyMapper
+import io.github.jvterm.ui.swing.input.SwingTerminalInputController
+import io.github.jvterm.ui.swing.input.SwingTerminalInputHost
+import io.github.jvterm.ui.swing.input.SwingTerminalMouseController
+import io.github.jvterm.ui.swing.input.SwingTerminalMouseHost
 import io.github.jvterm.ui.swing.render.GridPainter
+import io.github.jvterm.ui.swing.render.SwingRenderFrameController
+import io.github.jvterm.ui.swing.render.SwingRenderFrameHost
 import io.github.jvterm.ui.swing.render.TerminalShellIntegrationViewportDecorations
 import io.github.jvterm.ui.swing.search.*
 import io.github.jvterm.ui.swing.settings.SwingMetrics
 import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.ui.swing.settings.SwingSettingsProvider
-import io.github.jvterm.ui.swing.settings.TerminalClipboardAction
-import io.github.jvterm.ui.swing.viewport.SwingRepaintPlanner
 import io.github.jvterm.ui.swing.viewport.SwingViewportController
-import io.github.jvterm.ui.swing.viewport.TerminalRepaintSink
 import java.awt.*
 import java.awt.event.*
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import javax.swing.Timer
@@ -65,21 +65,13 @@ class SwingTerminal
             get() = terminalFocused
         private var lastResizedColumns: Int = NO_RESIZE_DIMENSION
         private var lastResizedRows: Int = NO_RESIZE_DIMENSION
-        private val renderPending = AtomicBoolean(false)
-        private val publishedFrameRunnable =
-            Runnable {
-                renderPending.set(false)
-                handlePublishedFrame()
-            }
         private val unbindRunnable = Runnable { unbindOnEdt() }
         private val reloadSettingsRunnable = Runnable { reloadSettingsOnEdt() }
 
         private val painter = GridPainter()
-        private val repaintPlanner = SwingRepaintPlanner()
         private val viewportController = SwingViewportController(hostServices.viewportListener)
         private val renderCache = TerminalRenderCache(settings.columns, settings.rows)
         private val searchCache = TerminalRenderCache(settings.columns, settings.rows)
-        private val keyMapper = SwingKeyMapper()
         private val shellIntegrationDecorations = TerminalShellIntegrationViewportDecorations()
 
         private val selectionController =
@@ -191,112 +183,149 @@ class SwingTerminal
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
                 },
             )
-        private val repaintSink =
-            object : TerminalRepaintSink {
-                override fun requestFullRepaint() {
-                    repaint()
-                }
+        private val inputController =
+            SwingTerminalInputController(
+                object : SwingTerminalInputHost {
+                    override val session: TerminalSession? get() = this@SwingTerminal.session
+                    override val settings: SwingSettings get() = this@SwingTerminal.settings
 
-                override fun requestRegionRepaint(
-                    x: Int,
-                    y: Int,
-                    width: Int,
-                    height: Int,
-                ) {
-                    repaint(x, y, width, height)
-                }
-            }
-        private val dirtyListener = { schedulePublishedFrame() }
+                    override fun updateHyperlinkActivationHover(active: Boolean) {
+                        hyperlinkController.updateHyperlinkActivationHover(active)
+                    }
+
+                    override fun resetCursorBlink(forceRepaint: Boolean) {
+                        this@SwingTerminal.resetCursorBlinkOnEdt(forceRepaint)
+                    }
+
+                    override fun setTerminalFocused(focused: Boolean) {
+                        this@SwingTerminal.terminalFocused = focused
+                    }
+
+                    override fun repaintCursorState() {
+                        renderFrameController.repaintCursorState()
+                    }
+
+                    override fun openSearch() {
+                        searchController.open()
+                    }
+
+                    override fun copySelectionToClipboard(): Boolean = this@SwingTerminal.copySelectionToClipboard()
+
+                    override fun pasteClipboardText(): Boolean = this@SwingTerminal.pasteClipboardText()
+                },
+            )
+        private val mouseController =
+            SwingTerminalMouseController(
+                object : SwingTerminalMouseHost {
+                    override val session: TerminalSession? get() = this@SwingTerminal.session
+                    override val settings: SwingSettings get() = this@SwingTerminal.settings
+                    override val metrics: SwingMetrics get() = this@SwingTerminal.metrics
+                    override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
+
+                    override fun cellAt(
+                        x: Int,
+                        y: Int,
+                        cache: TerminalRenderCache,
+                    ): Long = this@SwingTerminal.cellAt(x, y, cache)
+
+                    override fun contentYOffset(cache: TerminalRenderCache): Double = this@SwingTerminal.contentYOffset(cache)
+
+                    override fun visibleGridRows(): Int = this@SwingTerminal.visibleGridRows()
+
+                    override fun scrollViewportBy(
+                        delta: Double,
+                        historySize: Int,
+                    ): Boolean = this@SwingTerminal.scrollViewportByOnEdt(delta, historySize)
+
+                    override fun pasteClipboardText(): Boolean = this@SwingTerminal.pasteClipboardText()
+
+                    override fun handleHyperlinkMousePressed(event: MouseEvent): Boolean = hyperlinkController.handleMousePressed(event)
+
+                    override fun handleHyperlinkMouseMoved(event: MouseEvent) {
+                        hyperlinkController.handleMouseMoved(event)
+                    }
+
+                    override fun handleHyperlinkMouseExited() {
+                        hyperlinkController.handleMouseExited()
+                    }
+
+                    override fun clearHyperlinkHover() {
+                        hyperlinkController.clearHyperlinkHover()
+                    }
+
+                    override fun handleSelectionMousePressed(event: MouseEvent) {
+                        selectionController.handleSelectionMousePressed(event)
+                    }
+
+                    override fun handleSelectionMouseReleased(event: MouseEvent) {
+                        selectionController.handleSelectionMouseReleased(event)
+                    }
+
+                    override fun handleSelectionMouseDragged(event: MouseEvent) {
+                        selectionController.handleSelectionMouseDragged(event)
+                    }
+                },
+            )
+        private val renderFrameController =
+            SwingRenderFrameController(
+                object : SwingRenderFrameHost {
+                    override val session: TerminalSession? get() = this@SwingTerminal.session
+                    override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
+                    override val settings: SwingSettings get() = this@SwingTerminal.settings
+                    override val metrics: SwingMetrics get() = this@SwingTerminal.metrics
+                    override val componentWidth: Int get() = this@SwingTerminal.width
+                    override val componentHeight: Int get() = this@SwingTerminal.height
+                    override val cursorPresentationEnabled: Boolean get() = this@SwingTerminal.cursorPresentationEnabled
+
+                    override fun dispatch(action: Runnable) {
+                        hostServices.uiDispatcher.dispatch(action)
+                    }
+
+                    override fun resetCursorBlinkForFrame() {
+                        this@SwingTerminal.resetCursorBlinkOnEdt(forceRepaint = false)
+                    }
+
+                    override fun refreshRenderCacheFromSession(session: TerminalSession) {
+                        this@SwingTerminal.refreshRenderCacheFromSession(session)
+                    }
+
+                    override fun clampViewport(historySize: Int): Boolean = viewportController.clamp(historySize)
+
+                    override fun requestedViewportOffset(): Int = viewportController.requestedOffset
+
+                    override fun refreshShellIntegrationDecorations(session: TerminalSession): Boolean =
+                        this@SwingTerminal.refreshShellIntegrationDecorations(session)
+
+                    override fun refreshSearchForFrame() {
+                        this@SwingTerminal.searchController.refreshForFrame()
+                    }
+
+                    override fun publishViewportState(historySize: Int) {
+                        this@SwingTerminal.publishViewportState(historySize)
+                    }
+
+                    override fun contentYOffset(cache: TerminalRenderCache): Double = this@SwingTerminal.contentYOffset(cache)
+
+                    override fun repaint() {
+                        this@SwingTerminal.repaint()
+                    }
+
+                    override fun repaintRegion(
+                        x: Int,
+                        y: Int,
+                        width: Int,
+                        height: Int,
+                    ) {
+                        this@SwingTerminal.repaint(x, y, width, height)
+                    }
+                },
+            )
+        private val dirtyListener = { renderFrameController.schedulePublishedFrame() }
 
         internal val cursorTimer =
             Timer(cursorTimerDelay(settings)) {
                 cursorBlinkVisible = !cursorBlinkVisible
-                repaintBlinkState()
-            }
-
-        private val inputKeyListener =
-            object : KeyAdapter() {
-                override fun keyPressed(event: KeyEvent) {
-                    hyperlinkController.updateHyperlinkActivationHover(event.isControlDown)
-                    resetCursorBlinkOnEdt(forceRepaint = true)
-                    if (handleSearchShortcut(event)) return
-                    if (handleClipboardShortcut(event)) return
-
-                    val keyEvent = keyMapper.keyPressed(event) ?: return
-                    session?.encodeKey(keyEvent)
-                    event.consume()
-                }
-
-                override fun keyReleased(event: KeyEvent) {
-                    hyperlinkController.updateHyperlinkActivationHover(event.isControlDown)
-                }
-
-                override fun keyTyped(event: KeyEvent) {
-                    resetCursorBlinkOnEdt(forceRepaint = true)
-                    val keyEvent = keyMapper.keyTyped(event) ?: return
-                    session?.encodeKey(keyEvent)
-                    event.consume()
-                }
-            }
-
-        private val terminalFocusListener =
-            object : FocusAdapter() {
-                override fun focusGained(event: FocusEvent) {
-                    terminalFocused = true
-                    resetCursorBlinkOnEdt(forceRepaint = false)
-                    repaintCursorState()
-                }
-
-                override fun focusLost(event: FocusEvent) {
-                    terminalFocused = false
-                    repaintCursorState()
-                }
-            }
-
-        private val viewportWheelListener =
-            MouseWheelListener { event ->
-                handleMouseWheel(event)
-            }
-
-        private val selectionMouseListener =
-            object : MouseAdapter() {
-                override fun mousePressed(event: MouseEvent) {
-                    if (handleMouseTracking(event, TerminalMouseEventType.PRESS)) return
-                    if (hyperlinkController.handleMousePressed(event)) return
-                    if (SwingUtilities.isMiddleMouseButton(event)) {
-                        if (settings.pasteOnMiddleClick) {
-                            pasteClipboardText()
-                            event.consume()
-                            return
-                        }
-                    }
-                    selectionController.handleSelectionMousePressed(event)
-                }
-
-                override fun mouseReleased(event: MouseEvent) {
-                    if (handleMouseTracking(event, TerminalMouseEventType.RELEASE)) return
-                    selectionController.handleSelectionMouseReleased(event)
-                }
-
-                override fun mouseExited(event: MouseEvent) {
-                    hyperlinkController.handleMouseExited()
-                }
-            }
-
-        private val selectionMouseMotionListener =
-            object : MouseMotionAdapter() {
-                override fun mouseDragged(event: MouseEvent) {
-                    if (handleMouseTracking(event, TerminalMouseEventType.MOTION)) return
-                    selectionController.handleSelectionMouseDragged(event)
-                }
-
-                override fun mouseMoved(event: MouseEvent) {
-                    if (handleMouseTracking(event, TerminalMouseEventType.MOTION)) {
-                        hyperlinkController.clearHyperlinkHover()
-                        return
-                    }
-                    hyperlinkController.handleMouseMoved(event)
-                }
+                renderFrameController.repaintBlinkState()
             }
 
         private val resizeListener =
@@ -329,11 +358,11 @@ class SwingTerminal
             isOpaque = true
             isFocusable = true
             focusTraversalKeysEnabled = false
-            addFocusListener(terminalFocusListener)
-            addKeyListener(inputKeyListener)
-            addMouseListener(selectionMouseListener)
-            addMouseMotionListener(selectionMouseMotionListener)
-            addMouseWheelListener(viewportWheelListener)
+            addFocusListener(inputController.focusListener)
+            addKeyListener(inputController.keyListener)
+            addMouseListener(mouseController.mouseListener)
+            addMouseMotionListener(mouseController.mouseMotionListener)
+            addMouseWheelListener(mouseController.wheelListener)
             addComponentListener(resizeListener)
             add(searchController.overlay)
             searchController.overlay.isVisible = false
@@ -622,8 +651,7 @@ class SwingTerminal
             selectionController.stopSelectionDrag()
             lastResizedColumns = NO_RESIZE_DIMENSION
             lastResizedRows = NO_RESIZE_DIMENSION
-            repaintPlanner.reset()
-            renderPending.set(false)
+            renderFrameController.reset()
             hyperlinkController.clearHyperlinkHover()
             resizeSessionToVisibleGridOnEdt()
             refreshRenderCacheFromSession(session)
@@ -642,8 +670,7 @@ class SwingTerminal
             selectionController.stopSelectionDrag()
             lastResizedColumns = NO_RESIZE_DIMENSION
             lastResizedRows = NO_RESIZE_DIMENSION
-            repaintPlanner.reset()
-            renderPending.set(false)
+            renderFrameController.reset()
             hyperlinkController.clearHyperlinkHover()
             publishViewportState(0)
             repaint()
@@ -721,96 +748,6 @@ class SwingTerminal
             session.setCursorShape(settings.cursorShape)
         }
 
-        private fun handleMouseWheel(event: MouseWheelEvent) {
-            if (handleMouseTracking(event, TerminalMouseEventType.WHEEL)) return
-            val historySize = renderCache.historySize
-            if (historySize == 0) return
-
-            val delta = wheelScrollLines(event)
-            if (delta == 0.0) return
-
-            scrollViewportByOnEdt(delta, historySize)
-            event.consume()
-        }
-
-        private fun isMouseTrackingIntercepted(event: MouseEvent): Boolean {
-            if (event.isShiftDown) return false
-            val trackingMode = session?.terminal?.getModeSnapshot()?.mouseTrackingMode ?: MouseTrackingMode.OFF
-            return trackingMode != MouseTrackingMode.OFF
-        }
-
-        private fun handleMouseTracking(
-            event: MouseEvent,
-            type: TerminalMouseEventType,
-        ): Boolean {
-            val boundSession = session ?: return false
-            if (!isMouseTrackingIntercepted(event)) return false
-
-            val cell = cellAt(event, renderCache)
-            val column = unpackCellColumn(cell)
-            val row = unpackCellRow(cell)
-
-            val button =
-                if (event is MouseWheelEvent) {
-                    if (event.wheelRotation < 0) TerminalMouseButton.WHEEL_UP else TerminalMouseButton.WHEEL_DOWN
-                } else {
-                    when {
-                        SwingUtilities.isLeftMouseButton(event) -> TerminalMouseButton.LEFT
-                        SwingUtilities.isMiddleMouseButton(event) -> TerminalMouseButton.MIDDLE
-                        SwingUtilities.isRightMouseButton(event) -> TerminalMouseButton.RIGHT
-                        else -> TerminalMouseButton.NONE
-                    }
-                }
-
-            var mods = TerminalModifiers.NONE
-            if (event.isShiftDown) mods = mods or TerminalModifiers.SHIFT
-            if (event.isAltDown) mods = mods or TerminalModifiers.ALT
-            if (event.isControlDown) mods = mods or TerminalModifiers.CTRL
-            if (event.isMetaDown) mods = mods or TerminalModifiers.META
-
-            val padding = settings.padding
-            val gridWidth = renderCache.columns * metrics.cellWidth
-            val gridHeight = renderCache.rows * metrics.cellHeight
-            val pixelX = (event.x - padding.left).coerceIn(0, gridWidth - 1)
-            val pixelY = (event.y - padding.top - contentYOffset(renderCache)).toInt().coerceIn(0, gridHeight - 1)
-
-            val mouseEvent =
-                TerminalMouseEvent(
-                    column = column,
-                    row = row,
-                    button = button,
-                    type = type,
-                    modifiers = mods,
-                    pixelX = pixelX,
-                    pixelY = pixelY,
-                )
-            boundSession.encodeMouse(mouseEvent)
-            event.consume()
-            return true
-        }
-
-        private fun handleClipboardShortcut(event: KeyEvent): Boolean {
-            val handled =
-                when (settings.clipboardShortcuts.actionFor(event.keyCode, event.modifiersEx)) {
-                    TerminalClipboardAction.COPY -> copySelectionToClipboard()
-                    TerminalClipboardAction.PASTE -> pasteClipboardText()
-                    TerminalClipboardAction.NONE -> false
-                }
-
-            if (!handled) return false
-            event.consume()
-            return true
-        }
-
-        private fun handleSearchShortcut(event: KeyEvent): Boolean {
-            if (event.keyCode != KeyEvent.VK_F) return false
-            if (!event.isShiftDown) return false
-            if (!event.isControlDown && !event.isMetaDown) return false
-            searchController.open()
-            event.consume()
-            return true
-        }
-
         /**
          * Copies the current terminal text selection to the host clipboard.
          *
@@ -834,11 +771,6 @@ class SwingTerminal
             session?.encodePaste(TerminalPasteEvent(text))
             return true
         }
-
-        private fun cellAt(
-            event: MouseEvent,
-            cache: TerminalRenderCache,
-        ): Long = cellAt(event.x, event.y, cache)
 
         private fun cellAt(
             x: Int,
@@ -886,82 +818,6 @@ class SwingTerminal
             return true
         }
 
-        /**
-         * Coalesces high-frequency render requests from the background IO thread.
-         * * The [TerminalSession] may fire `onDirty` thousands of times per second
-         * during heavy output. To prevent flooding the Swing EventQueue and causing
-         * UI lockups, this method uses an atomic flag to ensure only one EDT layout
-         * pass is ever queued at a time. The flag is cleared immediately before the
-         * EDT executes the frame evaluation.
-         */
-        private fun schedulePublishedFrame() {
-            if (!renderPending.compareAndSet(false, true)) return
-
-            hostServices.uiDispatcher.dispatch(publishedFrameRunnable)
-        }
-
-        private fun handlePublishedFrame() {
-            val boundSession = session ?: return
-            resetCursorBlinkOnEdt(forceRepaint = false)
-            refreshRenderCacheFromSession(boundSession)
-            if (viewportController.clamp(renderCache.historySize) || renderCache.scrollbackOffset != viewportController.requestedOffset) {
-                refreshRenderCacheFromSession(boundSession)
-            }
-            val shellIntegrationDecorationsChanged = refreshShellIntegrationDecorations(boundSession)
-            searchController.refreshForFrame()
-            publishViewportState(renderCache.historySize)
-            val yOffset = contentYOffset(renderCache)
-            repaintPlanner.requestFrameRepaint(
-                cache = renderCache,
-                metrics = metrics,
-                componentWidth = width,
-                componentHeight = height,
-                contentYOffset = yOffset,
-                padding = settings.padding,
-                repaintSink = repaintSink,
-                forceFullRepaint = shellIntegrationDecorationsChanged,
-            )
-        }
-
-        private fun repaintBlinkState() {
-            if (session == null) return
-            val yOffset = contentYOffset(renderCache)
-            if (terminalFocused) {
-                repaintPlanner.requestCursorBlinkRepaint(
-                    cache = renderCache,
-                    metrics = metrics,
-                    componentWidth = width,
-                    componentHeight = height,
-                    contentYOffset = yOffset,
-                    padding = settings.padding,
-                    repaintSink = repaintSink,
-                )
-            }
-            repaintPlanner.requestBlinkingTextRepaint(
-                cache = renderCache,
-                metrics = metrics,
-                componentWidth = width,
-                componentHeight = height,
-                contentYOffset = yOffset,
-                padding = settings.padding,
-                repaintSink = repaintSink,
-            )
-        }
-
-        private fun repaintCursorState() {
-            if (session == null) return
-            val yOffset = contentYOffset(renderCache)
-            repaintPlanner.requestCursorRepaint(
-                cache = renderCache,
-                metrics = metrics,
-                componentWidth = width,
-                componentHeight = height,
-                contentYOffset = yOffset,
-                padding = settings.padding,
-                repaintSink = repaintSink,
-            )
-        }
-
         private fun resetCursorBlinkOnEdt(forceRepaint: Boolean) {
             val wasVisible = cursorBlinkVisible
             cursorBlinkVisible = true
@@ -969,7 +825,7 @@ class SwingTerminal
                 cursorTimer.restart()
             }
             if (forceRepaint && !wasVisible) {
-                repaintBlinkState()
+                renderFrameController.repaintBlinkState()
             }
         }
 
@@ -1033,13 +889,6 @@ class SwingTerminal
             viewportController.anchorAfterResize(newOffset, newHistorySize, oldFraction)
         }
 
-        private fun wheelScrollLines(event: MouseWheelEvent): Double =
-            when (event.scrollType) {
-                MouseWheelEvent.WHEEL_UNIT_SCROLL -> -event.preciseWheelRotation * event.scrollAmount
-                MouseWheelEvent.WHEEL_BLOCK_SCROLL -> -event.preciseWheelRotation * visibleGridRows()
-                else -> -event.preciseWheelRotation
-            }
-
         private fun visibleGridRows(): Int = viewportController.visibleGridRows(settings, metrics, height)
 
         private fun requestedRenderRows(): Int = viewportController.requestedRows(visibleGridRows())
@@ -1081,9 +930,5 @@ class SwingTerminal
                 column: Int,
                 row: Int,
             ): Long = (column.toLong() shl 32) or (row.toLong() and 0xffff_ffffL)
-
-            private fun unpackCellColumn(packed: Long): Int = (packed ushr 32).toInt()
-
-            private fun unpackCellRow(packed: Long): Int = packed.toInt()
         }
     }
