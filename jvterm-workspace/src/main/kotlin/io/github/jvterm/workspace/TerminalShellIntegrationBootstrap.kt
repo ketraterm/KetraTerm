@@ -15,6 +15,9 @@
  */
 package io.github.jvterm.workspace
 
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.ArrayList
 import java.util.Base64
 import java.util.Locale
@@ -22,21 +25,30 @@ import java.util.Locale
 /**
  * Applies host-neutral shell integration launch hooks to terminal profiles.
  *
- * The bootstrapper modifies only shell process arguments. It does not parse
- * terminal output, mutate core state, or own PTY lifecycle.
+ * The bootstrapper modifies only launch profiles. It does not parse terminal
+ * output, mutate core state, or own PTY lifecycle.
  */
 internal object TerminalShellIntegrationBootstrap {
     /**
      * Returns [profile] with shell integration startup hooks applied when
      * supported by the shell family and [enabled] is true.
+     *
+     * @param scriptDirectory persistent directory used for generated shell
+     *   startup wrappers required by shells without an init-command argument.
      */
     fun apply(
         profile: TerminalProfile,
         enabled: Boolean,
+        scriptDirectory: Path = defaultScriptDirectory(),
     ): TerminalProfile {
         if (!enabled) return profile
         return when (profile.kind) {
             TerminalProfileKind.POWERSHELL -> withPowerShellIntegration(profile)
+            TerminalProfileKind.BASH,
+            TerminalProfileKind.GIT_BASH,
+            -> withBashIntegration(profile)
+            TerminalProfileKind.ZSH -> withZshIntegration(profile, scriptDirectory)
+            TerminalProfileKind.FISH -> withFishIntegration(profile)
             else -> profile
         }
     }
@@ -56,6 +68,54 @@ internal object TerminalShellIntegrationBootstrap {
         }
         next += "-EncodedCommand"
         next += encodedScript
+        return profile.copy(command = next)
+    }
+
+    private fun withBashIntegration(profile: TerminalProfile): TerminalProfile {
+        val command = profile.command
+        if (hasExplicitBashEntryPoint(command)) return profile
+
+        val promptCommand = profile.environment["PROMPT_COMMAND"]
+        val environment =
+            profile.environment +
+                mapOf(
+                    "PROMPT_COMMAND" to joinedShellCommands(BASH_PROMPT_COMMAND, promptCommand),
+                )
+        return profile.copy(environment = environment)
+    }
+
+    private fun withZshIntegration(
+        profile: TerminalProfile,
+        scriptDirectory: Path,
+    ): TerminalProfile {
+        val command = profile.command
+        if (hasExplicitZshEntryPoint(command)) return profile
+
+        val zshDirectory = scriptDirectory.resolve("zsh")
+        try {
+            writeZshBootstrapFiles(zshDirectory)
+        } catch (_: IOException) {
+            return profile
+        }
+
+        val originalZdotdir = profile.environment["ZDOTDIR"].orEmpty()
+        val environment =
+            profile.environment +
+                mapOf(
+                    "JVTERM_ORIGINAL_ZDOTDIR" to originalZdotdir,
+                    "ZDOTDIR" to zshDirectory.toString(),
+                )
+        return profile.copy(environment = environment)
+    }
+
+    private fun withFishIntegration(profile: TerminalProfile): TerminalProfile {
+        val command = profile.command
+        if (hasExplicitFishEntryPoint(command)) return profile
+
+        val next = ArrayList<String>(command.size + 2)
+        next += command
+        next += "--init-command"
+        next += FISH_INIT_COMMAND
         return profile.copy(command = next)
     }
 
@@ -102,6 +162,100 @@ internal object TerminalShellIntegrationBootstrap {
         return if (separator < 0) normalized else normalized.substring(0, separator)
     }
 
+    private fun hasExplicitBashEntryPoint(command: List<String>): Boolean {
+        var index = 1
+        while (index < command.size) {
+            val argument = command[index]
+            if (argument == "-c" || argument == "--command" || isShortOptionCluster(argument, 'c')) return true
+            if (!argument.startsWith("-")) return true
+            index++
+        }
+        return false
+    }
+
+    private fun hasExplicitZshEntryPoint(command: List<String>): Boolean {
+        var index = 1
+        while (index < command.size) {
+            val argument = command[index]
+            if (argument == "-c" || argument == "-s" || isShortOptionCluster(argument, 'c') || isShortOptionCluster(argument, 's')) {
+                return true
+            }
+            if (argument == "-f" || argument == "--no-rcs" || isShortOptionCluster(argument, 'f')) return true
+            if (!argument.startsWith("-")) return true
+            index++
+        }
+        return false
+    }
+
+    private fun hasExplicitFishEntryPoint(command: List<String>): Boolean {
+        var index = 1
+        while (index < command.size) {
+            val argument = command[index]
+            if (argument == "-c" || argument.startsWith("--command") || isShortOptionCluster(argument, 'c')) return true
+            if (!argument.startsWith("-")) return true
+            index += if (argument == "-C" || argument == "--init-command") 2 else 1
+        }
+        return false
+    }
+
+    private fun isShortOptionCluster(
+        argument: String,
+        option: Char,
+    ): Boolean =
+        argument.length > 2 &&
+            argument[0] == '-' &&
+            argument[1] != '-' &&
+            argument.indexOf(option, startIndex = 1) >= 0
+
+    private fun joinedShellCommands(
+        first: String,
+        second: String?,
+    ): String =
+        if (second.isNullOrBlank()) {
+            first
+        } else {
+            "$first; $second"
+        }
+
+    private fun writeZshBootstrapFiles(directory: Path) {
+        Files.createDirectories(directory)
+        writeIfChanged(directory.resolve(".zshenv"), zshSourceOriginalStartupFile(".zshenv"))
+        writeIfChanged(directory.resolve(".zprofile"), zshSourceOriginalStartupFile(".zprofile"))
+        writeIfChanged(
+            directory.resolve(".zshrc"),
+            joinedShellCommands(
+                zshSourceOriginalStartupFile(".zshrc"),
+                ZSH_INTEGRATION_SCRIPT,
+            ),
+        )
+        writeIfChanged(directory.resolve(".zlogin"), zshSourceOriginalStartupFile(".zlogin"))
+        writeIfChanged(directory.resolve(".zlogout"), zshSourceOriginalStartupFile(".zlogout"))
+    }
+
+    private fun zshSourceOriginalStartupFile(fileName: String): String =
+        """
+        __jvterm_original_zdotdir=${'$'}{JVTERM_ORIGINAL_ZDOTDIR:-${'$'}HOME}
+        if [[ -n "${'$'}__jvterm_original_zdotdir" && "${'$'}__jvterm_original_zdotdir" != "${'$'}ZDOTDIR" && -r "${'$'}__jvterm_original_zdotdir/$fileName" ]]; then
+            source "${'$'}__jvterm_original_zdotdir/$fileName"
+        fi
+        unset __jvterm_original_zdotdir
+        """.trimIndent()
+
+    private fun writeIfChanged(
+        path: Path,
+        content: String,
+    ) {
+        if (Files.exists(path) && Files.readString(path) == content) return
+        Files.writeString(path, content)
+    }
+
+    private fun defaultScriptDirectory(): Path =
+        Path.of(
+            System.getProperty("java.io.tmpdir"),
+            "jvterm-shell-integration",
+            "v1",
+        )
+
     private val explicitEntryPointArguments =
         setOf(
             "-command",
@@ -111,6 +265,111 @@ internal object TerminalShellIntegrationBootstrap {
             "-file",
             "-f",
         )
+
+    private val BASH_PROMPT_COMMAND =
+        """
+        if [[ -z ${'$'}{__JVTERM_BASH_SHELL_INTEGRATION_INSTALLED:-} ]]; then
+            __JVTERM_BASH_SHELL_INTEGRATION_INSTALLED=1
+            __jvterm_command_started=0
+            __jvterm_in_prompt=0
+            __jvterm_osc133() { printf '\033]133;%s\a' "${'$'}1"; }
+            __jvterm_install_prompt_end() {
+                case "${'$'}PS1" in
+                    *${'$'}'\033]133;B\a'*) ;;
+                    *) PS1="${'$'}PS1"${'$'}'\[\033]133;B\a\]' ;;
+                esac
+            }
+            __jvterm_prompt_command() {
+                local __jvterm_status=${'$'}?
+                __jvterm_in_prompt=1
+                if [[ ${'$'}{__jvterm_command_started:-0} == 1 ]]; then
+                    __jvterm_osc133 "D;${'$'}__jvterm_status"
+                    __jvterm_command_started=0
+                fi
+                __jvterm_install_prompt_end
+                __jvterm_osc133 A
+                __jvterm_in_prompt=0
+                return ${'$'}__jvterm_status
+            }
+            __jvterm_preexec() {
+                if [[ ${'$'}{__jvterm_in_prompt:-0} == 1 || ${'$'}{__jvterm_command_started:-0} == 1 ]]; then
+                    return
+                fi
+                case "${'$'}BASH_COMMAND" in
+                    __jvterm_*|*__jvterm_prompt_command*) return ;;
+                esac
+                __jvterm_command_started=1
+                __jvterm_osc133 C
+            }
+            trap '__jvterm_preexec' DEBUG
+        fi
+        __jvterm_prompt_command
+        """.trimIndent()
+
+    internal val FISH_INIT_COMMAND =
+        """
+        if not set -q __JVTERM_FISH_SHELL_INTEGRATION_INSTALLED
+            set -g __JVTERM_FISH_SHELL_INTEGRATION_INSTALLED 1
+            set -g __jvterm_fish_command_started 0
+            function __jvterm_osc133 --argument-names marker
+                printf '\e]133;%s\a' "${'$'}marker"
+            end
+            function __jvterm_fish_prompt --on-event fish_prompt
+                set -l code ${'$'}status
+                if test "${'$'}__jvterm_fish_command_started" = 1
+                    __jvterm_osc133 "D;${'$'}code"
+                    set -g __jvterm_fish_command_started 0
+                end
+                __jvterm_osc133 A
+            end
+            function __jvterm_fish_preexec --on-event fish_preexec
+                set -g __jvterm_fish_command_started 1
+                __jvterm_osc133 C
+            end
+            function __jvterm_fish_postexec --on-event fish_postexec
+                set -l code ${'$'}status
+                if test "${'$'}__jvterm_fish_command_started" = 1
+                    __jvterm_osc133 "D;${'$'}code"
+                    set -g __jvterm_fish_command_started 0
+                end
+            end
+            set -l __jvterm_prompt_end (printf '\e]133;B\a')
+            if not string match -q "*${'$'}__jvterm_prompt_end*" -- "${'$'}SHELL_PROMPT_SUFFIX"
+                set -gx SHELL_PROMPT_SUFFIX "${'$'}SHELL_PROMPT_SUFFIX${'$'}__jvterm_prompt_end"
+            end
+        end
+        """.trimIndent()
+
+    internal val ZSH_INTEGRATION_SCRIPT =
+        """
+        if [[ -z ${'$'}{__JVTERM_ZSH_SHELL_INTEGRATION_INSTALLED:-} ]]; then
+            typeset -g __JVTERM_ZSH_SHELL_INTEGRATION_INSTALLED=1
+            typeset -g __jvterm_zsh_command_started=0
+            function __jvterm_osc133() {
+                printf '\033]133;%s\a' "${'$'}1"
+            }
+            function __jvterm_zsh_preexec() {
+                __jvterm_zsh_command_started=1
+                __jvterm_osc133 C
+            }
+            function __jvterm_zsh_precmd() {
+                local code=${'$'}?
+                if [[ ${'$'}__jvterm_zsh_command_started == 1 ]]; then
+                    __jvterm_osc133 "D;${'$'}code"
+                    __jvterm_zsh_command_started=0
+                fi
+                __jvterm_osc133 A
+                return ${'$'}code
+            }
+            autoload -Uz add-zsh-hook
+            add-zsh-hook preexec __jvterm_zsh_preexec
+            add-zsh-hook precmd __jvterm_zsh_precmd
+            case "${'$'}PROMPT" in
+                *${'$'}'\033]133;B\a'*) ;;
+                *) PROMPT="${'$'}PROMPT"${'$'}'%{\033]133;B\a%}' ;;
+            esac
+        fi
+        """.trimIndent()
 
     private val POWERSHELL_SCRIPT =
         """

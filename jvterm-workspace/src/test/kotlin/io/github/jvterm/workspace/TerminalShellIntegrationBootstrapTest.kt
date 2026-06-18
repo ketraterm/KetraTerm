@@ -15,7 +15,11 @@
  */
 package io.github.jvterm.workspace
 
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Path
 import java.util.Base64
+import kotlin.io.path.exists
+import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -126,18 +130,140 @@ class TerminalShellIntegrationBootstrapTest {
     }
 
     @Test
-    fun `non PowerShell profiles are not rewritten`() {
+    fun `Bash profile receives prompt command OSC 133 bootstrap environment`() {
         val profile =
             TerminalProfile(
                 id = "bash",
                 displayName = "Bash",
                 command = listOf("/bin/bash", "-l"),
+                environment = mapOf("PROMPT_COMMAND" to "history -a"),
+            )
+
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+
+        assertEquals(profile.command, integrated.command)
+        val promptCommand = integrated.environment.getValue("PROMPT_COMMAND")
+        assertTrue(promptCommand.contains("__jvterm_prompt_command"))
+        assertTrue(promptCommand.contains("]133;"))
+        assertTrue(promptCommand.endsWith("history -a"))
+    }
+
+    @Test
+    fun `Git Bash profile receives Bash-compatible OSC 133 bootstrap environment`() {
+        val profile =
+            TerminalProfile(
+                id = "git-bash",
+                displayName = "Git Bash",
+                command = listOf("C:\\Program Files\\Git\\bin\\bash.exe", "--login", "-i"),
+            )
+
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+
+        assertEquals(profile.command, integrated.command)
+        assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("__jvterm_preexec"))
+    }
+
+    @Test
+    fun `explicit Bash command profile is not rewritten`() {
+        val profile =
+            TerminalProfile(
+                id = "bash",
+                displayName = "Bash",
+                command = listOf("/bin/bash", "-lc", "echo already-custom"),
             )
 
         val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
 
         assertSame(profile, integrated)
-        assertFalse(integrated.command.any { it.contains("133") })
+    }
+
+    @Test
+    fun `zsh profile receives generated ZDOTDIR bootstrap files`(
+        @TempDir tempDir: Path,
+    ) {
+        val originalZdotdir = tempDir.resolve("original")
+        val profile =
+            TerminalProfile(
+                id = "zsh",
+                displayName = "Zsh",
+                command = listOf("/bin/zsh", "-l"),
+                environment = mapOf("ZDOTDIR" to originalZdotdir.toString()),
+            )
+
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+        val zshDirectory = tempDir.resolve("zsh")
+
+        assertEquals(profile.command, integrated.command)
+        assertEquals(originalZdotdir.toString(), integrated.environment.getValue("JVTERM_ORIGINAL_ZDOTDIR"))
+        assertEquals(zshDirectory.toString(), integrated.environment.getValue("ZDOTDIR"))
+        assertTrue(zshDirectory.resolve(".zshenv").exists())
+        assertTrue(zshDirectory.resolve(".zprofile").exists())
+        assertTrue(zshDirectory.resolve(".zshrc").readText().contains("__jvterm_zsh_preexec"))
+        assertTrue(zshDirectory.resolve(".zshrc").readText().contains("]133;"))
+        assertTrue(zshDirectory.resolve(".zlogin").exists())
+        assertTrue(zshDirectory.resolve(".zlogout").exists())
+    }
+
+    @Test
+    fun `explicit zsh command profile is not rewritten`(
+        @TempDir tempDir: Path,
+    ) {
+        val profile =
+            TerminalProfile(
+                id = "zsh",
+                displayName = "Zsh",
+                command = listOf("/bin/zsh", "-c", "echo already-custom"),
+            )
+
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+
+        assertSame(profile, integrated)
+        assertFalse(tempDir.resolve("zsh").exists())
+    }
+
+    @Test
+    fun `fish profile receives init-command OSC 133 bootstrap`() {
+        val profile =
+            TerminalProfile(
+                id = "fish",
+                displayName = "Fish",
+                command = listOf("/usr/bin/fish", "-l"),
+            )
+
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+
+        assertEquals(listOf("/usr/bin/fish", "-l", "--init-command"), integrated.command.dropLast(1))
+        assertTrue(integrated.command.last().contains("__jvterm_fish_preexec"))
+        assertTrue(integrated.command.last().contains("]133;"))
+    }
+
+    @Test
+    fun `explicit fish command profile is not rewritten`() {
+        val profile =
+            TerminalProfile(
+                id = "fish",
+                displayName = "Fish",
+                command = listOf("/usr/bin/fish", "-c", "echo already-custom"),
+            )
+
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+
+        assertSame(profile, integrated)
+    }
+
+    @Test
+    fun `default profiles remain unchanged`() {
+        val profile =
+            TerminalProfile(
+                id = "custom",
+                displayName = "Custom",
+                command = listOf("custom-shell"),
+                kind = TerminalProfileKind.DEFAULT,
+            )
+
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+
+        assertSame(profile, integrated)
     }
 
     private fun decodePowerShellScript(encoded: String): String = String(Base64.getDecoder().decode(encoded), Charsets.UTF_16LE)
