@@ -18,8 +18,11 @@ package io.github.jvterm.workspace
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.io.TempDir
 import java.io.IOException
+import java.net.URI
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Base64
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,7 +30,38 @@ import kotlin.test.assertTrue
 
 class TerminalShellIntegrationBootstrapIntegrationTest {
     @Test
-    fun `generated Bash bootstrap emits prompt command and lifecycle markers when Bash is installed`() {
+    fun `generated PowerShell bootstrap emits encoded current directory before prompt when PowerShell is installed`(
+        @TempDir tempDir: Path,
+    ) {
+        val powerShell = installedExecutable("pwsh", "pwsh.exe", "powershell.exe")
+        assumeTrue(powerShell != null, "PowerShell is not installed")
+
+        val profile =
+            TerminalProfile(
+                id = "powershell",
+                displayName = "PowerShell",
+                command = listOf(powerShell!!),
+            )
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val bootstrap = String(Base64.getDecoder().decode(integrated.command.last()), Charsets.UTF_16LE)
+        val invocation = Base64.getEncoder().encodeToString("$bootstrap\nprompt | Out-Host".toByteArray(Charsets.UTF_16LE))
+        val workingDirectory = Files.createDirectory(tempDir.resolve("space % directory"))
+        val result =
+            runProcess(
+                listOf(powerShell, "-NoProfile", "-EncodedCommand", invocation),
+                workingDirectory = workingDirectory,
+            )
+
+        assertEquals(0, result.exitCode)
+        assertMarkerOrder(result.stdout, "A")
+        assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 1)
+        assertTrue(result.stdout.contains("space%20%25%20directory"), visibleEscapes(result.stdout))
+    }
+
+    @Test
+    fun `generated Bash bootstrap emits encoded current directory and lifecycle markers when Bash is installed`(
+        @TempDir tempDir: Path,
+    ) {
         val bash = installedExecutable("bash", "bash.exe")
         assumeTrue(bash != null, "bash is not installed")
 
@@ -38,6 +72,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 command = listOf(bash!!),
             )
         val bootstrap = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).environment.getValue("PROMPT_COMMAND")
+        val workingDirectory = Files.createDirectory(tempDir.resolve("space % directory"))
         val result =
             runProcess(
                 listOf(
@@ -46,10 +81,13 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                     "--norc",
                 ),
                 standardInput = "$bootstrap; __jvterm_preexec; false; __jvterm_prompt_command\n",
+                workingDirectory = workingDirectory,
             )
 
         assertEquals(1, result.exitCode)
         assertMarkerOrder(result.stdout, "A", "C", "D;1", "A")
+        assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 2)
+        assertTrue(result.stdout.contains("space%20%25%20directory"), visibleEscapes(result.stdout))
     }
 
     @Test
@@ -80,6 +118,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
 
         assertEquals(1, result.exitCode)
         assertMarkerOrder(result.stdout, "A", "C", "D;0", "A", "C", "D;1", "A")
+        assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 3)
     }
 
     @Test
@@ -114,6 +153,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
 
         assertEquals(1, result.exitCode)
         assertMarkerOrder(result.stdout, "A", "C", "D;1", "A")
+        assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 2)
     }
 
     @Test
@@ -140,6 +180,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
 
         assertEquals(0, result.exitCode)
         assertMarkerOrder(result.stdout, "A", "C", "D;1", "A")
+        assertCurrentDirectoryBeforePrompts(result.stdout, expectedPromptCount = 2)
     }
 
     private fun assertMarkerOrder(
@@ -155,14 +196,37 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
         }
     }
 
+    private fun assertCurrentDirectoryBeforePrompts(
+        output: String,
+        expectedPromptCount: Int,
+    ) {
+        val osc7Prefix = "\u001B]7;"
+        val promptStart = "\u001B]133;A\u0007"
+        var searchFrom = 0
+        repeat(expectedPromptCount) {
+            val promptIndex = output.indexOf(promptStart, startIndex = searchFrom)
+            assertTrue(promptIndex >= 0, "missing OSC 133 prompt marker in ${visibleEscapes(output)}")
+            val osc7Index = output.lastIndexOf(osc7Prefix, startIndex = promptIndex)
+            assertTrue(osc7Index >= searchFrom, "missing OSC 7 before prompt in ${visibleEscapes(output)}")
+            val uriEnd = output.indexOf('\u0007', startIndex = osc7Index + osc7Prefix.length)
+            assertTrue(uriEnd in (osc7Index + osc7Prefix.length)..<promptIndex)
+            val uri = URI(output.substring(osc7Index + osc7Prefix.length, uriEnd))
+            assertEquals("file", uri.scheme)
+            assertTrue(!uri.rawPath.isNullOrEmpty(), "OSC 7 URI must contain a path: $uri")
+            searchFrom = promptIndex + promptStart.length
+        }
+    }
+
     private fun runProcess(
         command: List<String>,
         environment: Map<String, String> = emptyMap(),
         standardInput: String? = null,
+        workingDirectory: Path? = null,
     ): ProcessResult {
         val process =
             ProcessBuilder(command)
                 .redirectErrorStream(true)
+                .also { if (workingDirectory != null) it.directory(workingDirectory.toFile()) }
                 .also { it.environment().putAll(environment) }
                 .start()
         if (standardInput != null) {

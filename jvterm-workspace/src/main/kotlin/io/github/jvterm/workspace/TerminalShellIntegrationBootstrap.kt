@@ -273,6 +273,23 @@ internal object TerminalShellIntegrationBootstrap {
             __jvterm_command_started=0
             __jvterm_in_prompt=0
             __jvterm_osc133() { printf '\033]133;%s\a' "${'$'}1"; }
+            __jvterm_hostname=${'$'}{HOSTNAME:-${'$'}(hostname 2>/dev/null)}
+            [[ -n "${'$'}__jvterm_hostname" ]] || __jvterm_hostname=localhost
+            __jvterm_encode_uri_path() {
+                local LC_ALL=C __jvterm_value=${'$'}1 __jvterm_encoded= __jvterm_char __jvterm_hex __jvterm_index
+                for (( __jvterm_index=0; __jvterm_index<${'$'}{${'#'}__jvterm_value}; __jvterm_index++ )); do
+                    __jvterm_char=${'$'}{__jvterm_value:__jvterm_index:1}
+                    case "${'$'}__jvterm_char" in
+                        [a-zA-Z0-9/._~-]) __jvterm_encoded+=${'$'}__jvterm_char ;;
+                        *) printf -v __jvterm_hex '%%%02X' "'${'$'}__jvterm_char"; __jvterm_encoded+=${'$'}__jvterm_hex ;;
+                    esac
+                done
+                REPLY=${'$'}__jvterm_encoded
+            }
+            __jvterm_osc7() {
+                __jvterm_encode_uri_path "${'$'}PWD"
+                printf '\033]7;file://%s%s\a' "${'$'}__jvterm_hostname" "${'$'}REPLY"
+            }
             __jvterm_install_prompt_end() {
                 case "${'$'}PS1" in
                     *${'$'}'\033]133;B\a'*) ;;
@@ -287,6 +304,7 @@ internal object TerminalShellIntegrationBootstrap {
                     __jvterm_command_started=0
                 fi
                 __jvterm_install_prompt_end
+                __jvterm_osc7
                 __jvterm_osc133 A
                 __jvterm_in_prompt=0
                 return ${'$'}__jvterm_status
@@ -314,12 +332,21 @@ internal object TerminalShellIntegrationBootstrap {
             function __jvterm_osc133 --argument-names marker
                 printf '\e]133;%s\a' "${'$'}marker"
             end
+            set -g __jvterm_fish_hostname (hostname 2>/dev/null)
+            if test -z "${'$'}__jvterm_fish_hostname"
+                set -g __jvterm_fish_hostname localhost
+            end
+            function __jvterm_osc7
+                set -l encoded_path (string escape --style=url -- "${'$'}PWD" | string replace -a '%2F' '/' | string replace -a '%2f' '/')
+                printf '\e]7;file://%s%s\a' "${'$'}__jvterm_fish_hostname" "${'$'}encoded_path"
+            end
             function __jvterm_fish_prompt --on-event fish_prompt
                 set -l code ${'$'}status
                 if test "${'$'}__jvterm_fish_command_started" = 1
                     __jvterm_osc133 "D;${'$'}code"
                     set -g __jvterm_fish_command_started 0
                 end
+                __jvterm_osc7
                 __jvterm_osc133 A
             end
             function __jvterm_fish_preexec --on-event fish_preexec
@@ -348,6 +375,24 @@ internal object TerminalShellIntegrationBootstrap {
             function __jvterm_osc133() {
                 printf '\033]133;%s\a' "${'$'}1"
             }
+            typeset -g __jvterm_zsh_hostname=${'$'}{HOST:-${'$'}(hostname 2>/dev/null)}
+            [[ -n "${'$'}__jvterm_zsh_hostname" ]] || __jvterm_zsh_hostname=localhost
+            function __jvterm_zsh_encode_uri_path() {
+                local LC_ALL=C value=${'$'}1 encoded='' char hex
+                local -i index
+                for (( index=1; index<=${'$'}{${'#'}value}; index++ )); do
+                    char=${'$'}{value[index]}
+                    case "${'$'}char" in
+                        [a-zA-Z0-9/._~-]) encoded+=${'$'}char ;;
+                        *) printf -v hex '%%%02X' "'${'$'}char"; encoded+=${'$'}hex ;;
+                    esac
+                done
+                REPLY=${'$'}encoded
+            }
+            function __jvterm_zsh_osc7() {
+                __jvterm_zsh_encode_uri_path "${'$'}PWD"
+                printf '\033]7;file://%s%s\a' "${'$'}__jvterm_zsh_hostname" "${'$'}REPLY"
+            }
             function __jvterm_zsh_preexec() {
                 __jvterm_zsh_command_started=1
                 __jvterm_osc133 C
@@ -358,6 +403,7 @@ internal object TerminalShellIntegrationBootstrap {
                     __jvterm_osc133 "D;${'$'}code"
                     __jvterm_zsh_command_started=0
                 fi
+                __jvterm_zsh_osc7
                 __jvterm_osc133 A
                 return ${'$'}code
             }
@@ -380,6 +426,18 @@ internal object TerminalShellIntegrationBootstrap {
             function global:__JvTermOsc133([string] ${'$'}Marker) {
                 [Console]::Write(([string][char]27) + ']133;' + ${'$'}Marker + ([string][char]7))
             }
+            function global:__JvTermOsc7 {
+                try {
+                    ${'$'}location = Get-Location
+                    if (${'$'}location.Provider.Name -ne 'FileSystem') {
+                        return
+                    }
+                    ${'$'}builder = [System.UriBuilder]::new('file', [Environment]::MachineName)
+                    ${'$'}builder.Path = ${'$'}location.Path
+                    [Console]::Write(([string][char]27) + ']7;' + ${'$'}builder.Uri.AbsoluteUri + ([string][char]7))
+                } catch {
+                }
+            }
             ${'$'}global:__JvTermOriginalPrompt = (Get-Item Function:\prompt).ScriptBlock
             function global:prompt {
                 ${'$'}success = ${'$'}?
@@ -395,6 +453,7 @@ internal object TerminalShellIntegrationBootstrap {
                     global:__JvTermOsc133 ('D;' + ${'$'}exitCode)
                     ${'$'}global:__JvTermCommandStarted = ${'$'}false
                 }
+                global:__JvTermOsc7
                 global:__JvTermOsc133 'A'
                 try {
                     ${'$'}promptText = & ${'$'}global:__JvTermOriginalPrompt

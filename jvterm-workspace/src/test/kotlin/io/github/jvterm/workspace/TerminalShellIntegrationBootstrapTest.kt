@@ -47,6 +47,9 @@ class TerminalShellIntegrationBootstrapTest {
         assertTrue(script.contains("function global:prompt"))
         assertTrue(script.contains("function global:PSConsoleHostReadLine"))
         assertTrue(script.contains("]133;"))
+        assertTrue(script.contains("]7;"))
+        assertTrue(script.contains("[System.UriBuilder]::new('file', [Environment]::MachineName)"))
+        assertTrue(script.contains("Provider.Name -ne 'FileSystem'"))
         assertTrue(script.contains("'D;' + ${'$'}exitCode"))
         assertFalse(script.contains('"'))
     }
@@ -145,6 +148,8 @@ class TerminalShellIntegrationBootstrapTest {
         val promptCommand = integrated.environment.getValue("PROMPT_COMMAND")
         assertTrue(promptCommand.contains("__jvterm_prompt_command"))
         assertTrue(promptCommand.contains("]133;"))
+        assertTrue(promptCommand.contains("__jvterm_osc7"))
+        assertTrue(promptCommand.contains("'%%%02X'"))
         assertTrue(promptCommand.endsWith("history -a"))
     }
 
@@ -200,6 +205,8 @@ class TerminalShellIntegrationBootstrapTest {
         assertTrue(zshDirectory.resolve(".zprofile").exists())
         assertTrue(zshDirectory.resolve(".zshrc").readText().contains("__jvterm_zsh_preexec"))
         assertTrue(zshDirectory.resolve(".zshrc").readText().contains("]133;"))
+        assertTrue(zshDirectory.resolve(".zshrc").readText().contains("__jvterm_zsh_osc7"))
+        assertTrue(zshDirectory.resolve(".zshrc").readText().contains("'%%%02X'"))
         assertTrue(zshDirectory.resolve(".zlogin").exists())
         assertTrue(zshDirectory.resolve(".zlogout").exists())
     }
@@ -235,6 +242,8 @@ class TerminalShellIntegrationBootstrapTest {
         assertEquals(listOf("/usr/bin/fish", "-l", "--init-command"), integrated.command.dropLast(1))
         assertTrue(integrated.command.last().contains("__jvterm_fish_preexec"))
         assertTrue(integrated.command.last().contains("]133;"))
+        assertTrue(integrated.command.last().contains("__jvterm_osc7"))
+        assertTrue(integrated.command.last().contains("string escape --style=url"))
     }
 
     @Test
