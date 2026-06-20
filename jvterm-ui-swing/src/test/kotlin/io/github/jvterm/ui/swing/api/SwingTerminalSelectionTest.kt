@@ -97,10 +97,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 8, y = -10)) }
-        }
-
-        assertTrue(awaitRequestedOffset(renderReader, 1), "selection drag did not request a scrolled render")
-        SwingUtilities.invokeAndWait {
+            assertEquals(1, renderReader.lastRequestedOffset)
             component.mouseListeners.forEach { it.mouseReleased(mouseReleased(component, x = 8, y = -10)) }
         }
         assertEquals(1, renderReader.lastRequestedOffset)
@@ -678,18 +675,6 @@ class SwingTerminalSelectionTest {
             false,
             MouseEvent.BUTTON1,
         )
-
-    private fun awaitRequestedOffset(
-        renderReader: ScrollbackFrameReader,
-        offset: Int,
-    ): Boolean {
-        val deadline = System.nanoTime() + 1_000_000_000L
-        while (System.nanoTime() < deadline) {
-            if (renderReader.lastRequestedOffset == offset) return true
-            Thread.sleep(10)
-        }
-        return false
-    }
 
     private fun copyKey(
         component: SwingTerminal,

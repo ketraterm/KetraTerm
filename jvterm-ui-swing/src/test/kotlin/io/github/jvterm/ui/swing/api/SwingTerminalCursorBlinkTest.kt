@@ -33,6 +33,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.awt.event.FocusEvent
 import java.awt.event.KeyEvent
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import javax.swing.JFrame
 import javax.swing.SwingUtilities
 
@@ -145,16 +147,15 @@ class SwingTerminalCursorBlinkTest {
                 assertFalse(component.cursorBlinkVisible)
             }
 
-            // 4. Trigger a session dirty update to simulate a frame update
-            session.requestRender(scrollbackOffset = 0)
-            val deadline = System.nanoTime() + 1_000_000_000L
-            while (System.nanoTime() < deadline) {
-                if (session.publisher.current() != null) break
-                Thread.sleep(10)
-            }
-
-            SwingUtilities.invokeAndWait {
-                session.onDirty?.invoke()
+            // Trigger a session dirty update to simulate a frame update.
+            val renderPublished = CountDownLatch(1)
+            val publicationListener = { renderPublished.countDown() }
+            session.addDirtyListener(publicationListener)
+            try {
+                session.requestRender(scrollbackOffset = 0)
+                assertTrue(renderPublished.await(1, TimeUnit.SECONDS), "render was not published")
+            } finally {
+                session.removeDirtyListener(publicationListener)
             }
             SwingUtilities.invokeAndWait {
                 // Drain dirty runnable

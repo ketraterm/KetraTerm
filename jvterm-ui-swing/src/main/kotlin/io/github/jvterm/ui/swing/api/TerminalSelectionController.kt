@@ -159,7 +159,7 @@ internal class TerminalSelectionController(
         lastSelectionDragY = event.y
 
         updateSelectionCaret(event.x, event.y)
-        updateSelectionAutoscroll()
+        updateSelectionAutoscroll(scrollImmediately = true)
         host.repaint()
         event.consume()
     }
@@ -251,9 +251,12 @@ internal class TerminalSelectionController(
         selectionCaretColumn = caretColumn
     }
 
-    private fun updateSelectionAutoscroll() {
+    private fun updateSelectionAutoscroll(scrollImmediately: Boolean = false) {
         if (selectingWithMouse && selectionAutoscrollDelta(lastSelectionDragY) != 0.0) {
-            if (!selectionAutoscrollTimer.isRunning) selectionAutoscrollTimer.start()
+            if (!selectionAutoscrollTimer.isRunning) {
+                if (scrollImmediately) handleSelectionAutoscrollTick()
+                selectionAutoscrollTimer.start()
+            }
         } else {
             selectionAutoscrollTimer.stop()
         }
