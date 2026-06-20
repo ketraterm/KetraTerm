@@ -45,6 +45,13 @@ interface HostEventSink {
     fun windowTitleChanged(title: String)
 
     /**
+     * Called after a valid OSC 7 current-working-directory URI is accepted.
+     *
+     * @param uri absolute `file://` URI exactly as emitted by the shell.
+     */
+    fun currentWorkingDirectoryChanged(uri: String) = Unit
+
+    /**
      * Called when the shell requests a window resize.
      *
      * @param rows target row count.

@@ -516,6 +516,33 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `OSC 7 current working directory dispatches on BEL and survives chunk boundaries`() {
+            val bel = TerminalParserFixture()
+            val chunked = TerminalParserFixture()
+
+            bel.acceptAscii("\u001B]7;file:///home/user/My%20Project\u0007")
+            for (byte in "\u001B]7;file://host/share/project\u001B\\".encodeToByteArray()) {
+                chunked.parser.accept(byteArrayOf(byte))
+            }
+
+            assertAll(
+                {
+                    assertEquals(
+                        listOf("setCurrentWorkingDirectoryUri:file:///home/user/My%20Project"),
+                        bel.sink.events,
+                    )
+                },
+                { assertEquals(AnsiState.GROUND, chunked.state.fsmState) },
+                {
+                    assertEquals(
+                        listOf("setCurrentWorkingDirectoryUri:file://host/share/project"),
+                        chunked.sink.events,
+                    )
+                },
+            )
+        }
+
+        @Test
         fun `OSC 9 and OSC 777 desktop notifications through the full parser`() {
             val osc9 = TerminalParserFixture()
             val osc777 = TerminalParserFixture()

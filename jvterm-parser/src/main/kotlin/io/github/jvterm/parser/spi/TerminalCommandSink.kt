@@ -757,6 +757,16 @@ interface TerminalCommandSink {
     fun setIconAndWindowTitle(title: String)
 
     /**
+     * Reports the shell's current working directory as an OSC 7 file URI.
+     *
+     * The parser only recognizes and decodes the protocol payload. Host layers
+     * own URI validation, retention limits, and application-facing policy.
+     *
+     * @param uri raw current-working-directory URI from terminal output.
+     */
+    fun setCurrentWorkingDirectoryUri(uri: String)
+
+    /**
      * Starts an OSC 8 hyperlink context.
      *
      * @param uri Target URI.

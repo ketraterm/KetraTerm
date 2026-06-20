@@ -157,6 +157,14 @@ class TerminalSession(
     fun hyperlinkUri(hyperlinkId: Int): String? = hyperlinkResolver.uriForHyperlinkId(hyperlinkId)
 
     /**
+     * Returns the latest valid OSC 7 current-working-directory URI.
+     *
+     * @return absolute `file://` URI reported by the shell, or `null` before
+     *   the shell reports one.
+     */
+    fun currentWorkingDirectoryUri(): String? = shellIntegrationState.currentWorkingDirectoryUri()
+
+    /**
      * Starts the connector after resizing core and transport to [columns] x
      * [rows].
      *
@@ -651,6 +659,11 @@ private class ShellIntegrationRecordingHostEventSink(
         delegate.windowTitleChanged(title)
     }
 
+    override fun currentWorkingDirectoryChanged(uri: String) {
+        state.recordCurrentWorkingDirectory(uri)
+        delegate.currentWorkingDirectoryChanged(uri)
+    }
+
     override fun resizeWindow(
         rows: Int,
         columns: Int,
@@ -731,7 +744,12 @@ private class ShellIntegrationRecordingHostEventSink(
             }
             ShellIntegrationMarker.COMMAND_START -> {
                 if (cursorLineId != NO_LINE_ID) {
-                    state.recordCommandStart(cursorLineId, includeLine = cursorColumn == 0, commandText = commandText)
+                    state.recordCommandStart(
+                        lineId = cursorLineId,
+                        includeLine = cursorColumn == 0,
+                        commandText = commandText,
+                        workingDirectoryUri = state.currentWorkingDirectoryUri(),
+                    )
                 }
                 promptStartedForCommandText = false
             }

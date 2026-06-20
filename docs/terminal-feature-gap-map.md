@@ -73,7 +73,6 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ### OSC Protocols
 - `TODO(policy)`: OSC 52 clipboard support. This needs an explicit permission and security policy before implementation.
-- `TODO(parser)`: OSC 7 current directory.
 - `TODO(parser)`: OSC 1337/iTerm2 extensions, if desired.
 - `TODO(parser)`: OSC query responses. Requires terminal-to-host output.
 - `TODO(parser)`: payload encoding policy for non-UTF-8 or invalid UTF-8 OSC data.
@@ -95,7 +94,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ### Reset and Mode Semantics
 - `TODO(core/host)`: richer event API for hyperlink metadata, palette changes, terminal notifications, and any future host-observable state that should not be read from render frames.
-- `TODO(session/host/ui)`: shell integration persistent command history, multiline command text extraction, prompt click actions, full command output copy/export, current-directory metadata, rich command metadata, and WSL-specific shell bootstrap handling, on top of the existing OSC 133 marker event backbone, PowerShell/Bash/Git Bash/zsh/fish bootstraps, bounded single-line command text metadata, command timeline, primitive command lookup/navigation, Swing previous/next command navigation, command hit-testing/output selection, zero-layout prompt dots, and failed-output rails.
+- `TODO(session/host/ui)`: shell integration persistent command history, multiline command text extraction, prompt click actions, full command output copy/export, additional rich command metadata, and WSL-specific shell bootstrap handling, on top of the existing OSC 7 current-directory metadata, OSC 133 marker event backbone, PowerShell/Bash/Git Bash/zsh/fish bootstraps, bounded single-line command text metadata, command timeline, primitive command lookup/navigation, Swing previous/next command navigation, command hit-testing/output selection, zero-layout prompt dots, and failed-output rails.
 
 ### Grid Operations
 - `TODO(core)`: rectangular area operations if parser support is added (copy, erase, fill, selective erase).

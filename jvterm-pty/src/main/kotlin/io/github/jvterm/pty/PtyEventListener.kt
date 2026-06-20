@@ -57,6 +57,17 @@ interface PtyEventListener {
     )
 
     /**
+     * Called after a valid OSC 7 current-working-directory URI is accepted.
+     *
+     * @param session session that received the event.
+     * @param uri absolute `file://` URI reported by the shell.
+     */
+    fun currentWorkingDirectoryChanged(
+        session: TerminalSession,
+        uri: String,
+    ) = Unit
+
+    /**
      * Called when another listener callback throws.
      *
      * This callback is also failure-isolated; exceptions thrown from it are

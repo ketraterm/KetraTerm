@@ -93,6 +93,31 @@ class OscDispatcherTest {
     }
 
     @Nested
+    @DisplayName("current working directory")
+    inner class CurrentWorkingDirectory {
+        @Test
+        fun `OSC 7 dispatches the complete URI payload`() {
+            assertEquals(
+                listOf("setCurrentWorkingDirectoryUri:file://workstation/home/user/a;b%20c"),
+                dispatch("7;file://workstation/home/user/a;b%20c").events,
+            )
+        }
+
+        @Test
+        fun `OSC 7 dispatches empty payload for host policy to reject`() {
+            assertEquals(
+                listOf("setCurrentWorkingDirectoryUri:"),
+                dispatch("7;").events,
+            )
+        }
+
+        @Test
+        fun `overflowed OSC 7 is ignored`() {
+            assertTrue(dispatch("7;file:///home/user", overflowed = true).events.isEmpty())
+        }
+    }
+
+    @Nested
     @DisplayName("colors")
     inner class Colors {
         @Test

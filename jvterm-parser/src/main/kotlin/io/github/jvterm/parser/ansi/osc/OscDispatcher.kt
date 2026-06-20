@@ -62,6 +62,7 @@ internal object OscDispatcher {
                     i += 2
                 }
             }
+            7 -> sink.setCurrentWorkingDirectoryUri(decodePayload(payload, commandEnd + 1, length))
             8 -> dispatchHyperlink(sink, payload, length, commandEnd + 1)
             9 -> {
                 val payloadStr = decodePayload(payload, commandEnd + 1, length)

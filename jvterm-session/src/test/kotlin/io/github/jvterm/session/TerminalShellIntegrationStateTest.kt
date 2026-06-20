@@ -19,6 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TerminalShellIntegrationStateTest {
@@ -288,6 +289,45 @@ class TerminalShellIntegrationStateTest {
         records.copyFrom(state)
 
         assertEquals("git status", state.commandText(records.recordIds[0]))
+    }
+
+    @Test
+    fun `current working directory is snapshotted by command records`() {
+        val state = TerminalShellIntegrationState()
+        val records = RecordColumns(capacity = 2)
+
+        state.recordCurrentWorkingDirectory("file:///first")
+        state.recordCommandStart(1, includeLine = true, workingDirectoryUri = state.currentWorkingDirectoryUri())
+        state.recordCommandFinished(1, exitCode = 0)
+        state.recordCurrentWorkingDirectory("file:///second")
+        state.recordCommandStart(2, includeLine = true, workingDirectoryUri = state.currentWorkingDirectoryUri())
+        records.copyFrom(state)
+
+        assertEquals("file:///second", state.currentWorkingDirectoryUri())
+        assertEquals("file:///first", state.commandWorkingDirectoryUri(records.recordIds[0]))
+        assertEquals("file:///second", state.commandWorkingDirectoryUri(records.recordIds[1]))
+    }
+
+    @Test
+    fun `command working directory is removed on eviction while live directory survives clear`() {
+        val state = TerminalShellIntegrationState(capacity = 1)
+        val records = RecordColumns(capacity = 1)
+        state.recordCurrentWorkingDirectory("file:///workspace")
+        state.recordCommandStart(1, includeLine = true, workingDirectoryUri = state.currentWorkingDirectoryUri())
+        records.copyFrom(state)
+        val evictedRecordId = records.recordIds[0]
+
+        state.recordCommandStart(2, includeLine = true, workingDirectoryUri = state.currentWorkingDirectoryUri())
+        records.copyFrom(state)
+        val retainedRecordId = records.recordIds[0]
+
+        assertNull(state.commandWorkingDirectoryUri(evictedRecordId))
+        assertEquals("file:///workspace", state.commandWorkingDirectoryUri(retainedRecordId))
+
+        state.clear()
+
+        assertNull(state.commandWorkingDirectoryUri(retainedRecordId))
+        assertEquals("file:///workspace", state.currentWorkingDirectoryUri())
     }
 
     @Test

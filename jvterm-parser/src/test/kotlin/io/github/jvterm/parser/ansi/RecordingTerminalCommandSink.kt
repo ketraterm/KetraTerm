@@ -419,6 +419,10 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "setWindowTitle:$title"
     }
 
+    override fun setCurrentWorkingDirectoryUri(uri: String) {
+        events += "setCurrentWorkingDirectoryUri:$uri"
+    }
+
     override fun setIconTitle(title: String) {
         events += "setIconTitle:$title"
     }

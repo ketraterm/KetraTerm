@@ -30,6 +30,8 @@ package io.github.jvterm.host
  * hyperlink.
  * @property maxNotificationTitleLength maximum accepted character length for desktop notification titles.
  * @property maxNotificationBodyLength maximum accepted character length for desktop notification bodies.
+ * @property maxCurrentWorkingDirectoryUriLength maximum accepted OSC 7 file
+ * URI length in UTF-16 code units. Longer or malformed URIs are ignored.
  */
 data class HostPolicy(
     val maxHyperlinkEntries: Int = 4096,
@@ -37,6 +39,7 @@ data class HostPolicy(
     val maxHyperlinkIdLength: Int = 256,
     val maxNotificationTitleLength: Int = 256,
     val maxNotificationBodyLength: Int = 1024,
+    val maxCurrentWorkingDirectoryUriLength: Int = 4096,
 ) {
     init {
         require(maxHyperlinkEntries > 0) {
@@ -53,6 +56,9 @@ data class HostPolicy(
         }
         require(maxNotificationBodyLength >= 0) {
             "maxNotificationBodyLength must be non-negative, got $maxNotificationBodyLength"
+        }
+        require(maxCurrentWorkingDirectoryUriLength >= 0) {
+            "maxCurrentWorkingDirectoryUriLength must be non-negative, got $maxCurrentWorkingDirectoryUriLength"
         }
     }
 }

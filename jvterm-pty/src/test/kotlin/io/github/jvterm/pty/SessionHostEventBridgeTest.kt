@@ -46,6 +46,7 @@ class SessionHostEventBridgeTest {
         assertThrows(IllegalStateException::class.java) { bridge.bell() }
         assertThrows(IllegalStateException::class.java) { bridge.iconTitleChanged("icon") }
         assertThrows(IllegalStateException::class.java) { bridge.windowTitleChanged("window") }
+        assertThrows(IllegalStateException::class.java) { bridge.currentWorkingDirectoryChanged("file:///workspace") }
         assertThrows(IllegalStateException::class.java) {
             bridge.shellIntegrationMarker(ShellIntegrationEvent(ShellIntegrationMarker.PROMPT_START))
         }
@@ -61,6 +62,7 @@ class SessionHostEventBridgeTest {
         bridge.bell()
         bridge.iconTitleChanged("icon")
         bridge.windowTitleChanged("window")
+        bridge.currentWorkingDirectoryChanged("file:///workspace")
         bridge.resizeWindow(24, 80)
         bridge.moveWindow(100, 200)
         bridge.minimizeWindow()
@@ -77,6 +79,7 @@ class SessionHostEventBridgeTest {
                 "bell",
                 "icon:icon",
                 "window:window",
+                "currentWorkingDirectory:file:///workspace",
                 "resizeWindow:24:80",
                 "moveWindow:100:200",
                 "minimizeWindow",
@@ -156,6 +159,13 @@ class SessionHostEventBridgeTest {
             title: String,
         ) {
             events += "window:$title"
+        }
+
+        override fun currentWorkingDirectoryChanged(
+            session: TerminalSession,
+            uri: String,
+        ) {
+            events += "currentWorkingDirectory:$uri"
         }
 
         override fun resizeWindow(

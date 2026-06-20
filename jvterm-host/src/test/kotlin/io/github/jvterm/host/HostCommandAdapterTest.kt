@@ -1234,6 +1234,48 @@ class HostCommandAdapterTest {
     @DisplayName("shell integration")
     inner class ShellIntegration {
         @Test
+        fun `OSC 7 retains and forwards valid file URIs`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B]7;file:///home/user/My%20Project\u001B\\")
+            f.acceptAscii("\u001B]7;file://build-host/workspace\u0007")
+
+            assertAll(
+                {
+                    assertEquals(
+                        listOf("file:///home/user/My%20Project", "file://build-host/workspace"),
+                        f.events.currentWorkingDirectories,
+                    )
+                },
+                { assertEquals("file://build-host/workspace", f.sink.currentWorkingDirectoryUri()) },
+                { assertEquals("", f.terminal.getLineAsString(0)) },
+            )
+        }
+
+        @Test
+        fun `OSC 7 rejects malformed unsafe and oversized URIs without replacing metadata`() {
+            val f = Fixture(hostPolicy = HostPolicy(maxCurrentWorkingDirectoryUriLength = 32))
+            f.acceptAscii("\u001B]7;file:///safe\u001B\\")
+
+            listOf(
+                "",
+                "/not-a-uri",
+                "https://example.com/path",
+                "file:/missing-authority-form",
+                "file://user@host/path",
+                "file:///path?query",
+                "file:///path#fragment",
+                "file:///bad%escape",
+                "file:///this/path/is/too/long/for/policy",
+            ).forEach { uri -> f.acceptAscii("\u001B]7;$uri\u001B\\") }
+
+            assertAll(
+                { assertEquals(listOf("file:///safe"), f.events.currentWorkingDirectories) },
+                { assertEquals("file:///safe", f.sink.currentWorkingDirectoryUri()) },
+            )
+        }
+
+        @Test
         fun `OSC 133 shell integration markers are forwarded without grid mutation`() {
             val f = Fixture()
 
@@ -1323,6 +1365,7 @@ class HostCommandAdapterTest {
         var lowers = 0
         val maximisedStates = mutableListOf<Boolean>()
         val shellIntegrationEvents = mutableListOf<ShellIntegrationEvent>()
+        val currentWorkingDirectories = mutableListOf<String>()
 
         override fun bell() {
             bells++
@@ -1334,6 +1377,10 @@ class HostCommandAdapterTest {
 
         override fun windowTitleChanged(title: String) {
             windowTitles += title
+        }
+
+        override fun currentWorkingDirectoryChanged(uri: String) {
+            currentWorkingDirectories += uri
         }
 
         override fun resizeWindow(

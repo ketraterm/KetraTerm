@@ -44,6 +44,10 @@ internal class SessionHostEventBridge(
         safeDispatch { session -> listener.windowTitleChanged(session, title) }
     }
 
+    override fun currentWorkingDirectoryChanged(uri: String) {
+        safeDispatch { session -> listener.currentWorkingDirectoryChanged(session, uri) }
+    }
+
     override fun resizeWindow(
         rows: Int,
         columns: Int,

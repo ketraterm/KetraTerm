@@ -138,12 +138,39 @@ class TerminalShellIntegrationState(
     private val lifecycles = IntArray(capacity)
     private val flags = IntArray(capacity)
     private val commandTexts = arrayOfNulls<String>(capacity)
+    private val commandWorkingDirectoryUris = arrayOfNulls<String>(capacity)
 
     private var count = 0
     private var activePromptIndex = NO_INDEX
     private var activeCommandIndex = NO_INDEX
     private var nextRecordId = 1
     private var lastObservedBottomRow = NO_OBSERVED_ROW
+    private var currentWorkingDirectory: String? = null
+
+    /**
+     * Records the latest host-validated OSC 7 current-working-directory URI.
+     *
+     * The value is session metadata and remains available when command history
+     * is cleared. Command starts snapshot it into their bounded record.
+     *
+     * @param uri accepted absolute `file://` URI.
+     */
+    fun recordCurrentWorkingDirectory(uri: String) {
+        require(uri.isNotEmpty()) { "uri must not be empty" }
+        synchronized(lock) {
+            currentWorkingDirectory = uri
+        }
+    }
+
+    /**
+     * Returns the latest accepted OSC 7 URI, or `null` before one is received.
+     *
+     * @return current working directory URI for the live shell session.
+     */
+    fun currentWorkingDirectoryUri(): String? =
+        synchronized(lock) {
+            currentWorkingDirectory
+        }
 
     /**
      * Records the start of a shell prompt.
@@ -186,11 +213,13 @@ class TerminalShellIntegrationState(
      * @param lineId stable render line identity where command output begins.
      * @param includeLine whether [lineId] itself belongs to command output.
      * @param commandText bounded command text captured between prompt end and command start, or `null` when unknown.
+     * @param workingDirectoryUri current-working-directory URI to snapshot for this command, or `null` when unknown.
      */
     fun recordCommandStart(
         lineId: Long,
         includeLine: Boolean,
         commandText: String? = null,
+        workingDirectoryUri: String? = null,
     ) {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
         synchronized(lock) {
@@ -203,6 +232,7 @@ class TerminalShellIntegrationState(
             exitCodes[index] = TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE
             lifecycles[index] = TerminalShellIntegrationCommandLifecycle.RUNNING
             commandTexts[index] = boundedCommandText(commandText)
+            commandWorkingDirectoryUris[index] = workingDirectoryUri
             flags[index] =
                 if (includeLine) flags[index] or FLAG_COMMAND_START_INCLUSIVE else flags[index] and FLAG_COMMAND_START_INCLUSIVE.inv()
             activeCommandIndex = index
@@ -314,6 +344,24 @@ class TerminalShellIntegrationState(
             var index = 0
             while (index < count) {
                 if (recordIds[index] == recordId) return commandTexts[index]
+                index++
+            }
+            return null
+        }
+    }
+
+    /**
+     * Returns the OSC 7 working-directory URI snapshotted when [recordId] began.
+     *
+     * @param recordId stable retained command record id.
+     * @return command working-directory URI, or `null` when unknown or evicted.
+     */
+    fun commandWorkingDirectoryUri(recordId: Int): String? {
+        if (recordId == TerminalShellIntegrationCommandRecord.NONE) return null
+        synchronized(lock) {
+            var index = 0
+            while (index < count) {
+                if (recordIds[index] == recordId) return commandWorkingDirectoryUris[index]
                 index++
             }
             return null
@@ -694,6 +742,7 @@ class TerminalShellIntegrationState(
         lifecycles[index] = TerminalShellIntegrationCommandLifecycle.NONE
         flags[index] = 0
         commandTexts[index] = null
+        commandWorkingDirectoryUris[index] = null
         return index
     }
 
@@ -713,8 +762,15 @@ class TerminalShellIntegrationState(
         lifecycles.copyInto(lifecycles, destinationOffset = 0, startIndex = 1, endIndex = count)
         flags.copyInto(flags, destinationOffset = 0, startIndex = 1, endIndex = count)
         commandTexts.copyInto(commandTexts, destinationOffset = 0, startIndex = 1, endIndex = count)
+        commandWorkingDirectoryUris.copyInto(
+            commandWorkingDirectoryUris,
+            destinationOffset = 0,
+            startIndex = 1,
+            endIndex = count,
+        )
         count--
         commandTexts[count] = null
+        commandWorkingDirectoryUris[count] = null
         activePromptIndex = shiftIndexAfterEviction(activePromptIndex)
         activeCommandIndex = shiftIndexAfterEviction(activeCommandIndex)
     }
@@ -957,6 +1013,7 @@ class TerminalShellIntegrationState(
         var index = 0
         while (index < count) {
             commandTexts[index] = null
+            commandWorkingDirectoryUris[index] = null
             index++
         }
         count = 0

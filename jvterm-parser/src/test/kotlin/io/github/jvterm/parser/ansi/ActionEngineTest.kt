@@ -553,6 +553,10 @@ class ActionEngineTest {
             sinkCalls += "setIconAndWindowTitle:$title"
         }
 
+        override fun setCurrentWorkingDirectoryUri(uri: String) {
+            sinkCalls += "setCurrentWorkingDirectoryUri:$uri"
+        }
+
         override fun startHyperlink(
             uri: String,
             id: String?,

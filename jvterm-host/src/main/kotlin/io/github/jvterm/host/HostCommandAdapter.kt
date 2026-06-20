@@ -27,6 +27,8 @@ import io.github.jvterm.protocol.NotificationLevel
 import io.github.jvterm.protocol.ShellIntegrationEvent
 import io.github.jvterm.protocol.keyboard.*
 import io.github.jvterm.render.api.TerminalRenderCursorShape
+import java.net.URI
+import java.net.URISyntaxException
 
 /**
  * Production bridge from parser semantic commands to the terminal core.
@@ -44,6 +46,9 @@ class HostCommandAdapter(
     private val hostEvents: HostEventSink = HostEventSink.NONE,
     private val hostPolicy: HostPolicy = HostPolicy(),
 ) : TerminalCommandSink {
+    @Volatile
+    private var currentWorkingDirectory: String? = null
+
     /**
      * The current window title reported by the shell or application.
      */
@@ -714,6 +719,12 @@ class HostCommandAdapter(
         updateWindowTitle(title)
     }
 
+    override fun setCurrentWorkingDirectoryUri(uri: String) {
+        if (!isCurrentWorkingDirectoryUriAllowed(uri)) return
+        currentWorkingDirectory = uri
+        hostEvents.currentWorkingDirectoryChanged(uri)
+    }
+
     override fun startHyperlink(
         uri: String,
         id: String?,
@@ -795,6 +806,13 @@ class HostCommandAdapter(
      * @return target URI, or `null`.
      */
     fun hyperlinkUri(hyperlinkId: Int): String? = hyperlinkKeysByNumericId[hyperlinkId]?.uri
+
+    /**
+     * Returns the latest valid OSC 7 current-working-directory URI.
+     *
+     * @return accepted absolute `file://` URI, or `null` before one is received.
+     */
+    fun currentWorkingDirectoryUri(): String? = currentWorkingDirectory
 
     private fun setMouseTrackingMode(
         enabled: Boolean,
@@ -888,4 +906,20 @@ class HostCommandAdapter(
         val id: String,
         val uri: String,
     )
+
+    private fun isCurrentWorkingDirectoryUriAllowed(value: String): Boolean {
+        if (value.isEmpty() || value.length > hostPolicy.maxCurrentWorkingDirectoryUriLength) return false
+        val uri =
+            try {
+                URI(value)
+            } catch (_: URISyntaxException) {
+                return false
+            }
+        return uri.scheme.equals("file", ignoreCase = true) &&
+            value.regionMatches(uri.scheme.length + 1, "//", 0, 2) &&
+            !uri.rawPath.isNullOrEmpty() &&
+            uri.rawUserInfo == null &&
+            uri.rawQuery == null &&
+            uri.rawFragment == null
+    }
 }

@@ -251,6 +251,31 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `OSC 7 updates session directory and OSC 133 snapshots it onto the command`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector, columns = 30, rows = 4)
+
+        connector.feedFromHost(
+            "\u001B]7;file:///workspace/My%20Project\u001B\\".ascii(),
+        )
+        connector.feedFromHost(
+            "\u001B]133;A\u0007PS> \u001B]133;B\u0007build\u001B]133;C\u0007".ascii(),
+        )
+
+        val recordId = session.shellDecorations().commandRecordIds[0]
+        assertAll(
+            { assertEquals("file:///workspace/My%20Project", session.currentWorkingDirectoryUri()) },
+            {
+                assertEquals(
+                    "file:///workspace/My%20Project",
+                    session.shellIntegrationState.commandWorkingDirectoryUri(recordId),
+                )
+            },
+        )
+        session.close()
+    }
+
+    @Test
     fun `OSC 133 command start captures same line command text after prompt end`() {
         val connector = MockConnector()
         val session = createStartedSession(connector, columns = 30, rows = 4)
