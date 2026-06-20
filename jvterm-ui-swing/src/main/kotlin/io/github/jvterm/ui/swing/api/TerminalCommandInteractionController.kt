@@ -27,6 +27,7 @@ internal class TerminalCommandInteractionController(
     private val host: TerminalCommandInteractionHost,
 ) {
     private val commandOutputRangeScratch = LongArray(TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS)
+    private val textExtractor = TerminalSelectionTextExtractor()
 
     fun scrollToCommand(previous: Boolean): Boolean {
         val boundSession = host.session ?: return false
@@ -101,6 +102,29 @@ internal class TerminalCommandInteractionController(
         host.scrollViewportTo(desiredOffset.toDouble(), historySize = host.searchCache.historySize, boundSession)
         host.repaint()
         return true
+    }
+
+    fun commandOutputText(recordId: Int): String? {
+        val boundSession = host.session ?: return null
+        if (recordId == TerminalShellIntegrationCommandRecord.NONE) return null
+        val shellState = boundSession.shellIntegrationState
+        if (!shellState.copyCommandOutputRange(recordId, commandOutputRangeScratch)) return null
+
+        refreshCommandNavigationCache(boundSession)
+        val startLineId = commandOutputRangeScratch[TerminalShellIntegrationCommandOutputRange.START_LINE_ID_INDEX]
+        val endLineId = commandOutputRangeScratch[TerminalShellIntegrationCommandOutputRange.END_LINE_ID_INDEX]
+        val includeStart = commandOutputRangeScratch[TerminalShellIntegrationCommandOutputRange.START_INCLUSIVE_INDEX] != 0L
+        val startAbsoluteRow = firstCommandOutputAbsoluteRow(host.searchCache, startLineId, endLineId, includeStart)
+        val endAbsoluteRow = lastLineAbsoluteRow(host.searchCache, startLineId, endLineId)
+        if (startAbsoluteRow == NO_COMMAND_ABSOLUTE_ROW || endAbsoluteRow < startAbsoluteRow) return null
+
+        val firstCacheAbsoluteRow =
+            host.searchCache.discardedCount + host.searchCache.historySize - host.searchCache.scrollbackOffset
+        val startRow = (startAbsoluteRow - firstCacheAbsoluteRow).toInt()
+        val endRow = (endAbsoluteRow - firstCacheAbsoluteRow).toInt()
+        if (startRow !in 0 until host.searchCache.rows || endRow !in startRow until host.searchCache.rows) return null
+        val selection = CellSelection(0, startRow, host.searchCache.columns, endRow)
+        return textExtractor.selectedText(host.searchCache, selection, joinSoftWrappedRows = true)
     }
 
     private fun currentCommandNavigationLineId(): Long? {

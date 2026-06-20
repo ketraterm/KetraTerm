@@ -64,6 +64,8 @@ private fun defaultFontFamily(): String {
  * @property lineHeight font metric line-height multiplier.
  * @property shellRequestResizeWindow whether shell application window/grid resize requests are honored.
  * @property desktopNotificationsEnabled whether desktop notifications are enabled.
+ * @property persistentCommandHistoryEnabled whether completed command metadata
+ * is retained by supporting product hosts across application restarts.
  */
 data class TerminalConfig(
     val theme: String = DEFAULT_THEME,
@@ -84,6 +86,7 @@ data class TerminalConfig(
     val shellRequestResizeWindow: Boolean = DEFAULT_SHELL_REQUEST_RESIZE_WINDOW,
     val shellRequestWindowManipulation: Boolean = DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION,
     val desktopNotificationsEnabled: Boolean = DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED,
+    val persistentCommandHistoryEnabled: Boolean = DEFAULT_PERSISTENT_COMMAND_HISTORY_ENABLED,
 ) {
     init {
         require(columns in COLUMNS_MIN..COLUMNS_MAX) {
@@ -138,6 +141,7 @@ data class TerminalConfig(
         const val DEFAULT_SHELL_REQUEST_RESIZE_WINDOW: Boolean = false
         const val DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION: Boolean = false
         const val DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED: Boolean = true
+        const val DEFAULT_PERSISTENT_COMMAND_HISTORY_ENABLED: Boolean = false
 
         val DEFAULT_FONT_FAMILY: String get() = defaultFontFamily()
         val DEFAULT_SHELL_PATH: String get() = defaultShellPath()

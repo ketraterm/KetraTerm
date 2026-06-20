@@ -46,6 +46,7 @@ internal class SettingsModel(
             lineHeight = settings.lineHeight.toDouble(),
             shellRequestResizeWindow = settings.shellRequestResizeWindow,
             shellRequestWindowManipulation = settings.shellRequestWindowManipulation,
+            persistentCommandHistoryEnabled = settings.persistentCommandHistoryEnabled,
         )
 
     fun hasChanges(uiState: SettingsState): Boolean = uiState != initialUiState
@@ -71,6 +72,7 @@ internal class SettingsModel(
         settings.lineHeight = uiState.lineHeight.toFloat()
         settings.shellRequestResizeWindow = uiState.shellRequestResizeWindow
         settings.shellRequestWindowManipulation = uiState.shellRequestWindowManipulation
+        settings.persistentCommandHistoryEnabled = uiState.persistentCommandHistoryEnabled
 
         settings.fontFamily = uiState.fontFamily
         settings.fontSize = uiState.fontSize
@@ -106,4 +108,5 @@ internal data class SettingsState(
     val lineHeight: Double,
     val shellRequestResizeWindow: Boolean,
     val shellRequestWindowManipulation: Boolean,
+    val persistentCommandHistoryEnabled: Boolean,
 )

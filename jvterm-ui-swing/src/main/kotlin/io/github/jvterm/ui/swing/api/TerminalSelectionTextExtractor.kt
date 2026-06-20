@@ -27,6 +27,7 @@ internal class TerminalSelectionTextExtractor {
     fun selectedText(
         cache: TerminalRenderCache,
         selection: CellSelection,
+        joinSoftWrappedRows: Boolean = false,
     ): String {
         if (selection.isEmpty) return ""
 
@@ -36,7 +37,9 @@ internal class TerminalSelectionTextExtractor {
         while (row <= lastRow) {
             val range = selection.packedColumnRange(row, cache.columns, cache)
             if (range != CellSelection.NO_RANGE) {
-                if (result.isNotEmpty()) result.append('\n')
+                if (result.isNotEmpty() && (!joinSoftWrappedRows || row == 0 || !cache.lineWrapped[row - 1])) {
+                    result.append('\n')
+                }
                 appendTrimmedRow(
                     destination = result,
                     cache = cache,

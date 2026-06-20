@@ -94,7 +94,6 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ### Reset and Mode Semantics
 - `TODO(core/host)`: richer event API for hyperlink metadata, palette changes, terminal notifications, and any future host-observable state that should not be read from render frames.
-- `TODO(session/host/ui)`: shell integration persistent command history, prompt click actions, full command output copy/export, additional rich command metadata, and WSL-specific shell bootstrap handling, on top of the existing OSC 7 current-directory metadata, OSC 133 marker event backbone, PowerShell/Bash/Git Bash/zsh/fish bootstraps, bounded single-line and multiline command text metadata, command timeline, primitive command lookup/navigation, Swing previous/next command navigation, command hit-testing/output selection, zero-layout prompt dots, and failed-output rails.
 
 ### Grid Operations
 - `TODO(core)`: rectangular area operations if parser support is added (copy, erase, fill, selective erase).

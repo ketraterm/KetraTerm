@@ -50,6 +50,8 @@ internal interface SwingTerminalMouseHost {
 
     fun pasteClipboardText(): Boolean
 
+    fun handlePromptMarkerMousePressed(event: MouseEvent): Boolean = false
+
     fun handleHyperlinkMousePressed(event: MouseEvent): Boolean
 
     fun handleHyperlinkMouseMoved(event: MouseEvent)

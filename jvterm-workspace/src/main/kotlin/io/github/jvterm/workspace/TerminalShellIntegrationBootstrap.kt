@@ -49,9 +49,68 @@ internal object TerminalShellIntegrationBootstrap {
             -> withBashIntegration(profile)
             TerminalProfileKind.ZSH -> withZshIntegration(profile, scriptDirectory)
             TerminalProfileKind.FISH -> withFishIntegration(profile)
+            TerminalProfileKind.WSL,
+            TerminalProfileKind.UBUNTU,
+            -> withExplicitWslShellIntegration(profile, scriptDirectory)
             else -> profile
         }
     }
+
+    private fun withExplicitWslShellIntegration(
+        profile: TerminalProfile,
+        scriptDirectory: Path,
+    ): TerminalProfile {
+        val shellIndex = explicitWslShellIndex(profile.command)
+        if (shellIndex < 0) return profile
+        val shellCommand = profile.command.subList(shellIndex, profile.command.size)
+        val shellName = executableName(shellCommand[0])
+        val shellProfile = profile.copy(command = shellCommand)
+        val integrated =
+            when (shellName) {
+                "bash", "bash.exe" -> withBashIntegration(shellProfile)
+                "zsh", "zsh.exe" -> withZshIntegration(shellProfile, scriptDirectory)
+                "fish", "fish.exe" -> withFishIntegration(shellProfile)
+                else -> return profile
+            }
+        if (integrated === shellProfile) return profile
+
+        var environment = integrated.environment
+        environment =
+            when (shellName) {
+                "bash", "bash.exe" -> environment.withWslEnvironmentExport("PROMPT_COMMAND/u")
+                "zsh", "zsh.exe" ->
+                    environment
+                        .withWslEnvironmentExport("JVTERM_ORIGINAL_ZDOTDIR/up")
+                        .withWslEnvironmentExport("ZDOTDIR/up")
+                else -> environment
+            }
+        return profile.copy(
+            command = profile.command.subList(0, shellIndex) + integrated.command,
+            environment = environment,
+        )
+    }
+
+    private fun explicitWslShellIndex(command: List<String>): Int {
+        var index = 1
+        while (index < command.size) {
+            val argument = command[index]
+            if (argument == "--" || argument == "-e" || argument == "--exec" || argument == "run") {
+                return (index + 1).takeIf { it < command.size } ?: -1
+            }
+            index++
+        }
+        return -1
+    }
+
+    private fun Map<String, String>.withWslEnvironmentExport(export: String): Map<String, String> {
+        val variableName = export.substringBefore('/')
+        val current = this["WSLENV"].orEmpty()
+        val entries = current.split(':').filter(String::isNotEmpty)
+        if (entries.any { it.substringBefore('/') == variableName }) return this
+        return this + ("WSLENV" to (entries + export).joinToString(":"))
+    }
+
+    private fun executableName(command: String): String = command.substringAfterLast('\\').substringAfterLast('/').lowercase(Locale.ROOT)
 
     private fun withPowerShellIntegration(profile: TerminalProfile): TerminalProfile {
         val command = profile.command

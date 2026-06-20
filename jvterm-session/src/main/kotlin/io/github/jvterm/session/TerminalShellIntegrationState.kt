@@ -101,6 +101,30 @@ object TerminalShellIntegrationCommandLifecycle {
 }
 
 /**
+ * Immutable metadata snapshot for one retained shell command.
+ *
+ * Snapshots are intended for event-driven host features such as history
+ * persistence. Rendering continues to consume the primitive projection APIs.
+ *
+ * @property recordId session-local command record identifier.
+ * @property lifecycle primitive [TerminalShellIntegrationCommandLifecycle] value.
+ * @property commandText captured command text, or `null` when unavailable.
+ * @property workingDirectoryUri OSC 7 directory captured at command start, or `null`.
+ * @property exitCode shell exit code, or `null` when unknown.
+ * @property startedAtEpochMillis wall-clock command-start time.
+ * @property finishedAtEpochMillis wall-clock completion time, or `null` while unfinished.
+ */
+data class TerminalShellIntegrationCommandMetadata(
+    val recordId: Int,
+    val lifecycle: Int,
+    val commandText: String?,
+    val workingDirectoryUri: String?,
+    val exitCode: Int?,
+    val startedAtEpochMillis: Long,
+    val finishedAtEpochMillis: Long?,
+)
+
+/**
  * Session-owned OSC 133 shell command timeline.
  *
  * This model intentionally lives outside terminal core. Core owns bytes already
@@ -118,10 +142,12 @@ object TerminalShellIntegrationCommandLifecycle {
  * @param capacity maximum retained command records before oldest-record eviction.
  * @param maxCommandTextLength maximum retained UTF-16 command-text length per
  *   record; longer extracted text is stored as unknown.
+ * @param epochMillis wall-clock source used for command metadata timestamps.
  */
 class TerminalShellIntegrationState(
     private val capacity: Int = DEFAULT_CAPACITY,
     private val maxCommandTextLength: Int = DEFAULT_SHELL_INTEGRATION_COMMAND_TEXT_LENGTH,
+    private val epochMillis: () -> Long = System::currentTimeMillis,
 ) {
     init {
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
@@ -137,6 +163,8 @@ class TerminalShellIntegrationState(
     private val recordIds = IntArray(capacity)
     private val lifecycles = IntArray(capacity)
     private val flags = IntArray(capacity)
+    private val commandStartedAtEpochMillis = LongArray(capacity) { UNKNOWN_TIMESTAMP }
+    private val commandFinishedAtEpochMillis = LongArray(capacity) { UNKNOWN_TIMESTAMP }
     private val commandTexts = arrayOfNulls<String>(capacity)
     private val commandWorkingDirectoryUris = arrayOfNulls<String>(capacity)
 
@@ -233,6 +261,8 @@ class TerminalShellIntegrationState(
             lifecycles[index] = TerminalShellIntegrationCommandLifecycle.RUNNING
             commandTexts[index] = boundedCommandText(commandText)
             commandWorkingDirectoryUris[index] = workingDirectoryUri
+            commandStartedAtEpochMillis[index] = epochMillis()
+            commandFinishedAtEpochMillis[index] = UNKNOWN_TIMESTAMP
             flags[index] =
                 if (includeLine) flags[index] or FLAG_COMMAND_START_INCLUSIVE else flags[index] and FLAG_COMMAND_START_INCLUSIVE.inv()
             activeCommandIndex = index
@@ -262,6 +292,7 @@ class TerminalShellIntegrationState(
             commandEndLineIds[index] = lineId
             exitCodes[index] = exitCode ?: TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE
             lifecycles[index] = lifecycleForExitCode(exitCode)
+            commandFinishedAtEpochMillis[index] = epochMillis()
         }
     }
 
@@ -367,6 +398,54 @@ class TerminalShellIntegrationState(
             return null
         }
     }
+
+    /**
+     * Returns an immutable metadata snapshot for [recordId].
+     *
+     * This allocates only when explicitly queried and is not used by viewport
+     * projection or painting.
+     *
+     * @param recordId retained command record id.
+     * @return command metadata, or `null` for an unknown, prompt-only, or evicted record.
+     */
+    fun commandMetadata(recordId: Int): TerminalShellIntegrationCommandMetadata? {
+        if (recordId == TerminalShellIntegrationCommandRecord.NONE) return null
+        synchronized(lock) {
+            val index = indexForRecordIdLocked(recordId)
+            if (index == NO_INDEX || !isCommandRecordLocked(index)) return null
+            val startedAt = commandStartedAtEpochMillis[index]
+            if (startedAt == UNKNOWN_TIMESTAMP) return null
+            val storedExitCode = exitCodes[index]
+            val finishedAt = commandFinishedAtEpochMillis[index]
+            return TerminalShellIntegrationCommandMetadata(
+                recordId = recordIds[index],
+                lifecycle = lifecycles[index],
+                commandText = commandTexts[index],
+                workingDirectoryUri = commandWorkingDirectoryUris[index],
+                exitCode =
+                    storedExitCode.takeUnless {
+                        it == TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE
+                    },
+                startedAtEpochMillis = startedAt,
+                finishedAtEpochMillis = finishedAt.takeUnless { it == UNKNOWN_TIMESTAMP },
+            )
+        }
+    }
+
+    /**
+     * Returns the newest retained command record id, skipping prompt-only records.
+     *
+     * @return newest command record id, or `0` when no command is retained.
+     */
+    fun latestCommandRecordId(): Int =
+        synchronized(lock) {
+            var index = count - 1
+            while (index >= 0) {
+                if (isCommandRecordLocked(index)) return@synchronized recordIds[index]
+                index--
+            }
+            TerminalShellIntegrationCommandRecord.NONE
+        }
 
     /**
      * Returns the preferred navigation anchor line for [recordId].
@@ -741,6 +820,8 @@ class TerminalShellIntegrationState(
         recordIds[index] = nextRecordIdLocked()
         lifecycles[index] = TerminalShellIntegrationCommandLifecycle.NONE
         flags[index] = 0
+        commandStartedAtEpochMillis[index] = UNKNOWN_TIMESTAMP
+        commandFinishedAtEpochMillis[index] = UNKNOWN_TIMESTAMP
         commandTexts[index] = null
         commandWorkingDirectoryUris[index] = null
         return index
@@ -761,6 +842,8 @@ class TerminalShellIntegrationState(
         recordIds.copyInto(recordIds, destinationOffset = 0, startIndex = 1, endIndex = count)
         lifecycles.copyInto(lifecycles, destinationOffset = 0, startIndex = 1, endIndex = count)
         flags.copyInto(flags, destinationOffset = 0, startIndex = 1, endIndex = count)
+        commandStartedAtEpochMillis.copyInto(commandStartedAtEpochMillis, destinationOffset = 0, startIndex = 1, endIndex = count)
+        commandFinishedAtEpochMillis.copyInto(commandFinishedAtEpochMillis, destinationOffset = 0, startIndex = 1, endIndex = count)
         commandTexts.copyInto(commandTexts, destinationOffset = 0, startIndex = 1, endIndex = count)
         commandWorkingDirectoryUris.copyInto(
             commandWorkingDirectoryUris,
@@ -785,6 +868,7 @@ class TerminalShellIntegrationState(
         val index = activeCommandIndex
         if (index != NO_INDEX && commandEndLineIds[index] == NO_LINE_ID) {
             lifecycles[index] = TerminalShellIntegrationCommandLifecycle.ABANDONED
+            commandFinishedAtEpochMillis[index] = epochMillis()
         }
         activeCommandIndex = NO_INDEX
     }
@@ -1026,6 +1110,7 @@ class TerminalShellIntegrationState(
         private const val NO_INDEX = -1
         private const val NO_LINE_ID = 0L
         private const val NO_OBSERVED_ROW = Long.MIN_VALUE
+        private const val UNKNOWN_TIMESTAMP = Long.MIN_VALUE
         private const val FLAG_COMMAND_START_INCLUSIVE = 1 shl 0
 
         private fun clearViewport(

@@ -20,6 +20,7 @@ import io.github.jvterm.ui.swing.settings.TerminalTheme
 import io.github.jvterm.workspace.config.TerminalConfig
 import io.github.jvterm.workspace.config.TerminalWorkspaceConfigManager
 import java.awt.Font
+import java.nio.file.Path
 import java.util.*
 
 /**
@@ -144,6 +145,15 @@ internal class JvTermSettings(
         set(value) {
             updateConfig(config.copy(desktopNotificationsEnabled = value))
         }
+
+    var persistentCommandHistoryEnabled: Boolean
+        get() = config.persistentCommandHistoryEnabled
+        set(value) {
+            updateConfig(config.copy(persistentCommandHistoryEnabled = value))
+        }
+
+    val commandHistoryPath: Path
+        get() = configManager.configPath.resolveSibling("command-history-v1.tsv")
 
     fun current(): SwingSettings {
         val resolvedFamily = SwingSettings.resolveFontFamily(config.fontFamily)

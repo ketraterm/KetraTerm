@@ -242,6 +242,9 @@ class SwingTerminal
 
                     override fun pasteClipboardText(): Boolean = this@SwingTerminal.pasteClipboardText()
 
+                    override fun handlePromptMarkerMousePressed(event: MouseEvent): Boolean =
+                        this@SwingTerminal.handlePromptMarkerMousePressed(event)
+
                     override fun handleHyperlinkMousePressed(event: MouseEvent): Boolean = hyperlinkController.handleMousePressed(event)
 
                     override fun handleHyperlinkMouseMoved(event: MouseEvent) {
@@ -352,6 +355,19 @@ class SwingTerminal
                 val iconified = (window.extendedState and Frame.ICONIFIED) != 0
                 session?.terminal?.setWindowMinimized(iconified)
             }
+        }
+
+        private fun handlePromptMarkerMousePressed(event: MouseEvent): Boolean {
+            if (!SwingUtilities.isLeftMouseButton(event)) return false
+            val gutterWidth = settings.shellIntegrationDecorationGutterWidth.coerceAtMost(settings.padding.left)
+            if (gutterWidth <= 0 || event.x !in (settings.padding.left - gutterWidth) until settings.padding.left) return false
+            val row = cellAt(event.x, event.y, renderCache).toInt()
+            if (!shellIntegrationDecorations.hasPromptStartAt(row)) return false
+            val recordId = shellIntegrationDecorations.commandRecordIdAt(row)
+            if (recordId == TerminalShellIntegrationCommandRecord.NONE) return false
+            if (!commandInteractionController.selectCommandOutput(recordId)) return false
+            event.consume()
+            return true
         }
 
         init {
@@ -586,6 +602,47 @@ class SwingTerminal
         fun selectCommandOutput(recordId: Int): Boolean {
             if (!SwingUtilities.isEventDispatchThread()) return false
             return commandInteractionController.selectCommandOutput(recordId)
+        }
+
+        /**
+         * Returns all currently retained output for [recordId].
+         *
+         * Soft-wrapped rows are joined while hard row boundaries become
+         * newlines. This explicit EDT-only query may allocate in proportion to
+         * the retained output and is never used while painting.
+         *
+         * @param recordId retained command record id.
+         * @return command output, or `null` when unavailable or called off the EDT.
+         */
+        fun commandOutputText(recordId: Int): String? {
+            if (!SwingUtilities.isEventDispatchThread()) return null
+            return commandInteractionController.commandOutputText(recordId)
+        }
+
+        /**
+         * Copies all retained output for [recordId] through the host clipboard service.
+         *
+         * @param recordId retained command record id.
+         * @return `true` when retained output was copied; `false` when unavailable or called off the EDT.
+         */
+        fun copyCommandOutputToClipboard(recordId: Int): Boolean {
+            if (!SwingUtilities.isEventDispatchThread()) return false
+            val text = commandInteractionController.commandOutputText(recordId) ?: return false
+            hostServices.clipboardHandler.copyText(text)
+            return true
+        }
+
+        /**
+         * Copies captured command text for [recordId] through the host clipboard service.
+         *
+         * @param recordId retained command record id.
+         * @return `true` when command text was copied; `false` when unavailable or called off the EDT.
+         */
+        fun copyCommandTextToClipboard(recordId: Int): Boolean {
+            if (!SwingUtilities.isEventDispatchThread()) return false
+            val text = session?.shellIntegrationState?.commandText(recordId) ?: return false
+            hostServices.clipboardHandler.copyText(text)
+            return true
         }
 
         override fun addNotify() {

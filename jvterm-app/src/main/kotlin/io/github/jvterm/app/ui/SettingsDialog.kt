@@ -180,6 +180,8 @@ internal class SettingsDialog(
     private val shellRequestResizeWindowCheckbox = JCheckBox("Allow window resize from shell", settings.shellRequestResizeWindow)
     private val shellRequestWindowManipulationCheckbox =
         JCheckBox("Allow window manipulation from shell", settings.shellRequestWindowManipulation)
+    private val persistentCommandHistoryCheckbox =
+        JCheckBox("Persist command history", settings.persistentCommandHistoryEnabled)
     private val cursorBlinkSpinner =
         createSpinner(settings.cursorBlinkMillis, TerminalConfig.CURSOR_BLINK_MIN, TerminalConfig.CURSOR_BLINK_MAX, 50, 70)
     private val cursorShapeCombo = createComboBox(arrayOf("block", "underline", "beam"), settings.cursorShape.lowercase(Locale.ROOT), 150)
@@ -240,6 +242,7 @@ internal class SettingsDialog(
         registerChangeListener(pasteOnMiddleClickCheckbox, updateApplyState)
         registerChangeListener(shellRequestResizeWindowCheckbox, updateApplyState)
         registerChangeListener(shellRequestWindowManipulationCheckbox, updateApplyState)
+        registerChangeListener(persistentCommandHistoryCheckbox, updateApplyState)
         registerChangeListener(cursorBlinkSpinner, updateApplyState)
         registerChangeListener(cursorShapeCombo, updateApplyState)
     }
@@ -418,6 +421,12 @@ internal class SettingsDialog(
             7,
             shellRequestWindowManipulationCheckbox,
             "Allow the shell to move, minimize, maximize, raise, or lower the terminal window.",
+        )
+        addCheckboxRow(
+            behaviorSection,
+            9,
+            persistentCommandHistoryCheckbox,
+            "Persist bounded command text, working directory, exit status, and timestamps. Terminal output is never stored.",
         )
         panel.add(behaviorSection)
 
@@ -606,6 +615,7 @@ internal class SettingsDialog(
         pasteOnMiddleClickCheckbox.isSelected = TerminalConfig.DEFAULT_PASTE_ON_MIDDLE_CLICK
         shellRequestResizeWindowCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_RESIZE_WINDOW
         shellRequestWindowManipulationCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
+        persistentCommandHistoryCheckbox.isSelected = TerminalConfig.DEFAULT_PERSISTENT_COMMAND_HISTORY_ENABLED
         cursorBlinkSpinner.value = TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS
         cursorShapeCombo.selectedItem = TerminalConfig.DEFAULT_CURSOR_SHAPE
     }
@@ -665,6 +675,7 @@ internal class SettingsDialog(
             lineHeight = lineHeightSpinner.value as? Double ?: TerminalConfig.DEFAULT_LINE_HEIGHT.toDouble(),
             shellRequestResizeWindow = shellRequestResizeWindowCheckbox.isSelected,
             shellRequestWindowManipulation = shellRequestWindowManipulationCheckbox.isSelected,
+            persistentCommandHistoryEnabled = persistentCommandHistoryCheckbox.isSelected,
         )
     }
 

@@ -113,6 +113,9 @@ class TerminalWorkspaceConfigManager(
                 behavior["shell_request_window_manipulation"]?.toBooleanStrictOrNull() ?: default.shellRequestWindowManipulation
             val desktopNotificationsEnabled =
                 behavior["desktop_notifications_enabled"]?.toBooleanStrictOrNull() ?: default.desktopNotificationsEnabled
+            val persistentCommandHistoryEnabled =
+                behavior["persistent_command_history_enabled"]?.toBooleanStrictOrNull()
+                    ?: default.persistentCommandHistoryEnabled
             val scrollbackLines =
                 parseIntSetting(
                     raw = window["scrollback_lines"],
@@ -144,6 +147,7 @@ class TerminalWorkspaceConfigManager(
                 shellRequestResizeWindow = shellRequestResizeWindow,
                 shellRequestWindowManipulation = shellRequestWindowManipulation,
                 desktopNotificationsEnabled = desktopNotificationsEnabled,
+                persistentCommandHistoryEnabled = persistentCommandHistoryEnabled,
             )
         } catch (e: Exception) {
             try {
@@ -231,6 +235,8 @@ class TerminalWorkspaceConfigManager(
         shell_request_window_manipulation = ${config.shellRequestWindowManipulation}
         # Whether to enable desktop notifications when the terminal receives OSC 9 or OSC 777 sequences
         desktop_notifications_enabled = ${config.desktopNotificationsEnabled}
+        # Persist bounded command metadata (never raw terminal output) across application restarts
+        persistent_command_history_enabled = ${config.persistentCommandHistoryEnabled}
         """.trimIndent()
 
     private fun parseIntSetting(

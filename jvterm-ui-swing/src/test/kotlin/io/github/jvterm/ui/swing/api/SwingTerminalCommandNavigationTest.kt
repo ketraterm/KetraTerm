@@ -32,6 +32,7 @@ import io.github.jvterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.awt.Insets
+import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
 
 class SwingTerminalCommandNavigationTest {
@@ -244,6 +245,54 @@ class SwingTerminalCommandNavigationTest {
         session.close()
     }
 
+    @Test
+    fun `command output text preserves hard breaks and joins soft wraps`() {
+        val reader = CommandFrameReader()
+        val session = commandSession(reader)
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
+        val secondCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(6))
+
+        SwingUtilities.invokeAndWait {
+            component.setSize(component.preferredGridSize(12, 2))
+            component.bind(session)
+            assertEquals("row6row7", component.commandOutputText(secondCommandId))
+        }
+
+        session.close()
+    }
+
+    @Test
+    fun `clicking prompt marker gutter selects its command output`() {
+        val reader = CommandFrameReader()
+        val session = commandSession(reader)
+        val padding = Insets(8, 12, 8, 8)
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = padding) })
+
+        SwingUtilities.invokeAndWait {
+            component.setSize(component.preferredGridSize(12, 2))
+            component.bind(session)
+            component.scrollToScrollbackOffset(1)
+            val click =
+                MouseEvent(
+                    component,
+                    MouseEvent.MOUSE_PRESSED,
+                    1L,
+                    0,
+                    padding.left - 2,
+                    padding.top + 2,
+                    1,
+                    false,
+                    MouseEvent.BUTTON1,
+                )
+            component.dispatchEvent(click)
+
+            assertEquals(true, click.isConsumed)
+            assertEquals(CellSelection(0, 0, 12, 1), component.currentSelection())
+        }
+
+        session.close()
+    }
+
     private fun commandSession(
         renderReader: TerminalRenderFrameReader,
         capacity: Int = 8,
@@ -324,7 +373,7 @@ class SwingTerminalCommandNavigationTest {
 
         override fun lineId(row: Int): Long = lineIdForAbsoluteRow(HISTORY_SIZE - scrollbackOffset + row)
 
-        override fun lineWrapped(row: Int): Boolean = false
+        override fun lineWrapped(row: Int): Boolean = HISTORY_SIZE - scrollbackOffset + row == 6
 
         override fun copyLine(
             row: Int,
@@ -342,10 +391,12 @@ class SwingTerminalCommandNavigationTest {
             clusterDataSink: TerminalRenderClusterDataSink?,
         ) {
             var column = 0
+            val text = "row${HISTORY_SIZE - scrollbackOffset + row}"
             while (column < columns) {
-                codeWords[codeOffset + column] = 0
+                codeWords[codeOffset + column] = if (column < text.length) text[column].code else 0
                 attrWords[attrOffset + column] = TerminalRenderAttrs.DEFAULT
-                flags[flagOffset + column] = TerminalRenderCellFlags.EMPTY
+                flags[flagOffset + column] =
+                    if (column < text.length) TerminalRenderCellFlags.CODEPOINT else TerminalRenderCellFlags.EMPTY
                 extraAttrWords?.set(extraAttrOffset + column, TerminalRenderExtraAttrs.DEFAULT)
                 hyperlinkIds?.set(hyperlinkOffset + column, 0)
                 column++

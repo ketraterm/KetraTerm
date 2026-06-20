@@ -42,6 +42,7 @@ internal class SwingTerminalMouseController(
         object : MouseAdapter() {
             override fun mousePressed(event: MouseEvent) {
                 if (handleMouseTracking(event, TerminalMouseEventType.PRESS)) return
+                if (host.handlePromptMarkerMousePressed(event)) return
                 if (host.handleHyperlinkMousePressed(event)) return
                 if (SwingUtilities.isMiddleMouseButton(event)) {
                     if (host.settings.pasteOnMiddleClick) {
