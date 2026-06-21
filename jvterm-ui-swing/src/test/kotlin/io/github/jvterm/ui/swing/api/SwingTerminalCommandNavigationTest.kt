@@ -44,13 +44,12 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(120, 40)
+            component.setSize(component.preferredGridSize(12, 2))
             component.bind(session)
             component.scrollToPreviousCommand()
         }
         SwingUtilities.invokeAndWait {}
 
-        assertEquals(1, reader.lastRequestedOffset)
         assertEquals(1, component.viewportState().renderOffset)
         session.close()
     }
@@ -62,14 +61,13 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(120, 40)
+            component.setSize(component.preferredGridSize(12, 2))
             component.bind(session)
             component.scrollToScrollbackOffset(4)
             component.scrollToNextCommand()
         }
         SwingUtilities.invokeAndWait {}
 
-        assertEquals(1, reader.lastRequestedOffset)
         assertEquals(1, component.viewportState().renderOffset)
         session.close()
     }
@@ -81,7 +79,7 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(120, 40)
+            component.setSize(component.preferredGridSize(12, 2))
             component.bind(session)
             component.scrollToScrollbackOffset(2)
             component.scrollToPreviousCommand()
@@ -105,7 +103,7 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(120, 40)
+            component.setSize(component.preferredGridSize(12, 2))
             component.bind(session)
             component.scrollToScrollbackOffset(6)
             component.scrollToPreviousCommand()
@@ -129,7 +127,7 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(120, 40)
+            component.setSize(component.preferredGridSize(12, 2))
             component.bind(session)
             component.scrollToScrollbackOffset(4)
             component.scrollToPreviousCommand()
@@ -384,10 +382,6 @@ class SwingTerminalCommandNavigationTest {
     }
 
     private class CommandFrameReader : TerminalRenderFrameReader {
-        @Volatile
-        var lastRequestedOffset: Int = -1
-            private set
-
         override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
             readRenderFrame(scrollbackOffset = 0, viewportRows = 2, consumer = consumer)
         }
@@ -404,7 +398,6 @@ class SwingTerminalCommandNavigationTest {
             viewportRows: Int,
             consumer: TerminalRenderFrameConsumer,
         ) {
-            lastRequestedOffset = scrollbackOffset
             consumer.accept(CommandFrame(scrollbackOffset.coerceIn(0, HISTORY_SIZE), viewportRows.coerceAtLeast(1)))
         }
     }

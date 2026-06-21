@@ -507,7 +507,7 @@ class GridPainterTest {
             )
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 3, rows = 1)
-        cache.updateFrom(TextRowsFrame(lines = arrayOf("abc"), palette = settings.palette))
+        cache.updateFrom(TextRowsFrame(lines = arrayOf("   "), palette = settings.palette))
         val state = TerminalShellIntegrationState()
         state.recordPromptStart(1)
         val decorations = TerminalShellIntegrationViewportDecorations()
@@ -529,7 +529,11 @@ class GridPainterTest {
         val centerY = metrics.cellHeight / 2
         assertEquals(GREEN, image.getRGB(6, centerY))
         assertTrue(image.getRGB(1, centerY) != BLACK)
-        assertEquals(BLACK, image.getRGB(13, centerY))
+        var y = 0
+        while (y < metrics.cellHeight) {
+            assertEquals(BLACK, image.getRGB(settings.padding.left, y))
+            y++
+        }
     }
 
     @Test
