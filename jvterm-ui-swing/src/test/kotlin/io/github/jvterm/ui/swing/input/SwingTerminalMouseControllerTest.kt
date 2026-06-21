@@ -15,6 +15,8 @@
  */
 package io.github.jvterm.ui.swing.input
 
+import io.github.jvterm.input.event.TerminalMouseEvent
+import io.github.jvterm.protocol.MouseTrackingMode
 import io.github.jvterm.render.api.TerminalRenderAttrs
 import io.github.jvterm.render.api.TerminalRenderBufferKind
 import io.github.jvterm.render.api.TerminalRenderCellFlags
@@ -27,7 +29,6 @@ import io.github.jvterm.render.api.TerminalRenderFrame
 import io.github.jvterm.render.api.TerminalRenderFrameConsumer
 import io.github.jvterm.render.api.TerminalRenderFrameReader
 import io.github.jvterm.render.cache.TerminalRenderCache
-import io.github.jvterm.session.TerminalSession
 import io.github.jvterm.ui.swing.settings.SwingMetrics
 import io.github.jvterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -111,7 +112,6 @@ class SwingTerminalMouseControllerTest {
             controller.wheelListener.mouseWheelMoved(event)
 
             assertEquals(1, host.scrollCount)
-            assertEquals(0, host.lastScrollHistorySize)
             assertTrue(event.isConsumed)
         }
 
@@ -137,8 +137,47 @@ class SwingTerminalMouseControllerTest {
             controller.wheelListener.mouseWheelMoved(event)
 
             assertEquals(1, host.scrollCount)
-            assertEquals(-3.0, host.lastScrollDelta)
-            assertEquals(7, host.lastScrollHistorySize)
+            assertEquals(-3, host.lastScrollDelta)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `partial trackpad rotation is consumed without fractional viewport movement`() {
+            val host = RecordingMouseHost()
+            val controller = SwingTerminalMouseController(host)
+            val event = mouseWheel(rotation = -0.1)
+
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertEquals(0, host.scrollCount)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `partial precision rotation is consumed without a false TUI wheel report`() {
+            val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL)
+            val controller = SwingTerminalMouseController(host)
+            val event = mouseWheel(rotation = 0.25)
+
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertEquals(0, host.mouseReports.size)
+            assertEquals(0, host.scrollCount)
+            assertEquals(1, host.finishWheelAnimationCount)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `integer wheel rotation emits one TUI report per click`() {
+            val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL)
+            val controller = SwingTerminalMouseController(host)
+            val event = mouseWheel(rotation = -3.0)
+
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertEquals(3, host.mouseReports.size)
+            assertTrue(host.mouseReports.all { it.button == io.github.jvterm.input.event.TerminalMouseButton.WHEEL_UP })
+            assertEquals(0, host.scrollCount)
             assertTrue(event.isConsumed)
         }
     }
@@ -147,7 +186,7 @@ class SwingTerminalMouseControllerTest {
     inner class HyperlinkHover {
         @Test
         fun `mouse moved routes to hyperlink hover when mouse tracking is off`() {
-            val host = RecordingMouseHost(session = null)
+            val host = RecordingMouseHost()
             val controller = SwingTerminalMouseController(host)
 
             controller.mouseMotionListener.mouseMoved(mouseMoved())
@@ -254,10 +293,10 @@ class SwingTerminalMouseControllerTest {
         )
 
     private class RecordingMouseHost(
-        override val session: TerminalSession? = null,
         override val settings: SwingSettings = SwingSettings(padding = Insets(0, 0, 0, 0)),
         private val hyperlinkPressHandled: Boolean = false,
         private val scrollResult: Boolean = true,
+        private val mouseTrackingMode: MouseTrackingMode = MouseTrackingMode.OFF,
     ) : SwingTerminalMouseHost {
         override val metrics =
             SwingMetrics(
@@ -280,8 +319,15 @@ class SwingTerminalMouseControllerTest {
         var selectionPressCount = 0
         var selectionReleaseCount = 0
         var selectionDragCount = 0
-        var lastScrollDelta = 0.0
-        var lastScrollHistorySize = 0
+        var lastScrollDelta = 0
+        var finishWheelAnimationCount = 0
+        val mouseReports = ArrayList<TerminalMouseEvent>()
+
+        override fun mouseTrackingMode(): MouseTrackingMode = mouseTrackingMode
+
+        override fun encodeMouse(event: TerminalMouseEvent) {
+            mouseReports += event
+        }
 
         override fun cellAt(
             x: Int,
@@ -296,14 +342,14 @@ class SwingTerminalMouseControllerTest {
 
         override fun visibleGridRows(): Int = 24
 
-        override fun scrollViewportBy(
-            delta: Double,
-            historySize: Int,
-        ): Boolean {
+        override fun scrollViewportByRows(delta: Int): Boolean {
             scrollCount++
             lastScrollDelta = delta
-            lastScrollHistorySize = historySize
             return scrollResult
+        }
+
+        override fun finishWheelScrollAnimation() {
+            finishWheelAnimationCount++
         }
 
         override fun pasteClipboardText(): Boolean {

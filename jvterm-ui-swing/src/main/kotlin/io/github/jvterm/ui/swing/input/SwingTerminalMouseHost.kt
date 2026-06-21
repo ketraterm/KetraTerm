@@ -15,8 +15,9 @@
  */
 package io.github.jvterm.ui.swing.input
 
+import io.github.jvterm.input.event.TerminalMouseEvent
+import io.github.jvterm.protocol.MouseTrackingMode
 import io.github.jvterm.render.cache.TerminalRenderCache
-import io.github.jvterm.session.TerminalSession
 import io.github.jvterm.ui.swing.settings.SwingMetrics
 import io.github.jvterm.ui.swing.settings.SwingSettings
 import java.awt.event.MouseEvent
@@ -25,10 +26,13 @@ import java.awt.event.MouseEvent
  * Narrow adapter for Swing mouse routing.
  */
 internal interface SwingTerminalMouseHost {
-    val session: TerminalSession?
     val settings: SwingSettings
     val metrics: SwingMetrics
     val renderCache: TerminalRenderCache
+
+    fun mouseTrackingMode(): MouseTrackingMode
+
+    fun encodeMouse(event: TerminalMouseEvent)
 
     fun cellAt(
         x: Int,
@@ -43,10 +47,9 @@ internal interface SwingTerminalMouseHost {
 
     fun visibleGridRows(): Int
 
-    fun scrollViewportBy(
-        delta: Double,
-        historySize: Int,
-    ): Boolean
+    fun scrollViewportByRows(delta: Int): Boolean
+
+    fun finishWheelScrollAnimation()
 
     fun pasteClipboardText(): Boolean
 

@@ -26,6 +26,7 @@ import java.awt.event.MouseMotionAdapter
 import java.awt.event.MouseWheelEvent
 import java.awt.event.MouseWheelListener
 import javax.swing.SwingUtilities
+import kotlin.math.min
 
 /**
  * Swing mouse routing for terminal mouse protocol, links, selection, and wheel scrolling.
@@ -85,33 +86,44 @@ internal class SwingTerminalMouseController(
         }
 
     private fun handleMouseWheel(event: MouseWheelEvent) {
-        if (handleMouseTracking(event, TerminalMouseEventType.WHEEL)) return
-        val historySize = host.renderCache.historySize
-
+        if (isMouseTrackingIntercepted(event)) {
+            host.finishWheelScrollAnimation()
+            handleMouseTracking(event, TerminalMouseEventType.WHEEL)
+            return
+        }
         val delta = wheelScrollLines(event)
-        if (delta == 0.0) return
+        if (delta == 0) {
+            // Java accumulates high-resolution wheel movement until
+            // wheelRotation reaches a whole click. Keep the event inside the
+            // terminal without translating the fixed grid fractionally.
+            event.consume()
+            return
+        }
 
-        if (host.scrollViewportBy(delta, historySize)) {
+        if (host.scrollViewportByRows(delta)) {
             event.consume()
         }
     }
 
     private fun isMouseTrackingIntercepted(event: MouseEvent): Boolean {
         if (event.isShiftDown) return false
-        val trackingMode =
-            host.session
-                ?.terminal
-                ?.getModeSnapshot()
-                ?.mouseTrackingMode ?: MouseTrackingMode.OFF
-        return trackingMode != MouseTrackingMode.OFF
+        return host.mouseTrackingMode() != MouseTrackingMode.OFF
     }
 
     private fun handleMouseTracking(
         event: MouseEvent,
         type: TerminalMouseEventType,
     ): Boolean {
-        val boundSession = host.session ?: return false
         if (!isMouseTrackingIntercepted(event)) return false
+
+        val wheelRotation = if (event is MouseWheelEvent) event.wheelRotation else 0
+        if (event is MouseWheelEvent && wheelRotation == 0) {
+            // High-resolution devices emit partial rotations whose integer
+            // click count is zero. They belong to the application, but do not
+            // represent a terminal wheel button report yet.
+            event.consume()
+            return true
+        }
 
         val cell = host.cellAt(event.x, event.y, host.renderCache)
         val column = unpackCellColumn(cell)
@@ -119,7 +131,7 @@ internal class SwingTerminalMouseController(
 
         val button =
             if (event is MouseWheelEvent) {
-                if (event.wheelRotation < 0) TerminalMouseButton.WHEEL_UP else TerminalMouseButton.WHEEL_DOWN
+                if (wheelRotation < 0) TerminalMouseButton.WHEEL_UP else TerminalMouseButton.WHEEL_DOWN
             } else {
                 when {
                     SwingUtilities.isLeftMouseButton(event) -> TerminalMouseButton.LEFT
@@ -151,19 +163,35 @@ internal class SwingTerminalMouseController(
                 pixelX = pixelX,
                 pixelY = pixelY,
             )
-        boundSession.encodeMouse(mouseEvent)
+        val reportCount =
+            if (event is MouseWheelEvent) {
+                min(kotlin.math.abs(wheelRotation.toLong()), MAX_WHEEL_REPORTS_PER_EVENT.toLong()).toInt()
+            } else {
+                1
+            }
+        var report = 0
+        while (report < reportCount) {
+            host.encodeMouse(mouseEvent)
+            report++
+        }
         event.consume()
         return true
     }
 
-    private fun wheelScrollLines(event: MouseWheelEvent): Double =
-        when (event.scrollType) {
-            MouseWheelEvent.WHEEL_UNIT_SCROLL -> -event.preciseWheelRotation * event.scrollAmount
-            MouseWheelEvent.WHEEL_BLOCK_SCROLL -> -event.preciseWheelRotation * host.visibleGridRows()
-            else -> -event.preciseWheelRotation
-        }
+    private fun wheelScrollLines(event: MouseWheelEvent): Int {
+        val clicks = -event.wheelRotation.toLong()
+        val units =
+            when (event.scrollType) {
+                MouseWheelEvent.WHEEL_UNIT_SCROLL -> event.scrollAmount
+                MouseWheelEvent.WHEEL_BLOCK_SCROLL -> host.visibleGridRows()
+                else -> 1
+            }
+        return (clicks * units).coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
+    }
 
     private companion object {
+        private const val MAX_WHEEL_REPORTS_PER_EVENT = 64
+
         private fun unpackCellColumn(packed: Long): Int = (packed ushr 32).toInt()
 
         private fun unpackCellRow(packed: Long): Int = packed.toInt()

@@ -15,7 +15,9 @@
  */
 package io.github.jvterm.ui.swing.api
 
+import io.github.jvterm.input.event.TerminalMouseEvent
 import io.github.jvterm.input.event.TerminalPasteEvent
+import io.github.jvterm.protocol.MouseTrackingMode
 import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.session.TerminalSession
 import io.github.jvterm.session.TerminalShellIntegrationCommandRecord
@@ -33,6 +35,8 @@ import io.github.jvterm.ui.swing.settings.SwingMetrics
 import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.ui.swing.settings.SwingSettingsProvider
 import io.github.jvterm.ui.swing.viewport.SwingViewportController
+import io.github.jvterm.ui.swing.viewport.WheelScrollAnimationHost
+import io.github.jvterm.ui.swing.viewport.WheelScrollAnimator
 import java.awt.*
 import java.awt.event.*
 import javax.swing.JComponent
@@ -75,6 +79,19 @@ class SwingTerminal
         private val searchCache = TerminalRenderCache(settings.columns, settings.rows)
         private val shellIntegrationDecorations = TerminalShellIntegrationViewportDecorations()
         private val visualGeometry = TerminalVisualViewportGeometry()
+        private val wheelScrollAnimator =
+            WheelScrollAnimator(
+                object : WheelScrollAnimationHost {
+                    override fun wheelScrollOffset(): Double = viewportController.preciseOffset
+
+                    override fun wheelScrollHistorySize(): Int = renderCache.historySize
+
+                    override fun applyWheelScrollOffset(
+                        offsetRows: Double,
+                        animationComplete: Boolean,
+                    ): Boolean = this@SwingTerminal.applyAnimatedWheelOffsetOnEdt(offsetRows, animationComplete)
+                },
+            )
         private var hoveredPromptMarkerRow: Int = NO_PROMPT_MARKER_ROW
 
         private val selectionController =
@@ -218,10 +235,20 @@ class SwingTerminal
         private val mouseController =
             SwingTerminalMouseController(
                 object : SwingTerminalMouseHost {
-                    override val session: TerminalSession? get() = this@SwingTerminal.session
                     override val settings: SwingSettings get() = this@SwingTerminal.settings
                     override val metrics: SwingMetrics get() = this@SwingTerminal.metrics
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
+
+                    override fun mouseTrackingMode(): MouseTrackingMode =
+                        this@SwingTerminal
+                            .session
+                            ?.terminal
+                            ?.getModeSnapshot()
+                            ?.mouseTrackingMode ?: MouseTrackingMode.OFF
+
+                    override fun encodeMouse(event: TerminalMouseEvent) {
+                        this@SwingTerminal.session?.encodeMouse(event)
+                    }
 
                     override fun cellAt(
                         x: Int,
@@ -236,10 +263,11 @@ class SwingTerminal
 
                     override fun visibleGridRows(): Int = this@SwingTerminal.visibleGridRows()
 
-                    override fun scrollViewportBy(
-                        delta: Double,
-                        historySize: Int,
-                    ): Boolean = this@SwingTerminal.scrollViewportByOnEdt(delta, historySize)
+                    override fun scrollViewportByRows(delta: Int): Boolean = wheelScrollAnimator.scrollByRows(delta)
+
+                    override fun finishWheelScrollAnimation() {
+                        wheelScrollAnimator.finish()
+                    }
 
                     override fun pasteClipboardText(): Boolean = this@SwingTerminal.pasteClipboardText()
 
@@ -694,6 +722,7 @@ class SwingTerminal
         override fun removeNotify() {
             terminalFocused = false
             cursorTimer.stop()
+            wheelScrollAnimator.finish()
             selectionController.stopSelectionDrag()
 
             ancestorWindow?.removeWindowStateListener(windowStateListener)
@@ -917,6 +946,7 @@ class SwingTerminal
             historySize: Int = renderCache.historySize,
             boundSession: TerminalSession? = session,
         ): Boolean {
+            wheelScrollAnimator.cancel()
             if (!viewportController.scrollBy(delta, historySize)) return false
             if (boundSession != null) {
                 refreshRenderCacheFromSession(boundSession)
@@ -932,6 +962,7 @@ class SwingTerminal
             offsetPixels: Double,
             boundSession: TerminalSession? = session,
         ): Boolean {
+            wheelScrollAnimator.cancel()
             if (!viewportController.scrollToVisualOffsetPixels(offsetPixels)) return false
             if (boundSession != null) {
                 refreshRenderCacheFromSession(boundSession)
@@ -948,6 +979,7 @@ class SwingTerminal
             historySize: Int = renderCache.historySize,
             boundSession: TerminalSession? = session,
         ): Boolean {
+            wheelScrollAnimator.cancel()
             if (!viewportController.scrollTo(offsetLines, historySize)) return false
             if (boundSession != null) {
                 refreshRenderCacheFromSession(boundSession)
@@ -957,6 +989,26 @@ class SwingTerminal
             publishViewportState(renderCache.historySize)
             repaint()
             return true
+        }
+
+        private fun applyAnimatedWheelOffsetOnEdt(
+            offsetRows: Double,
+            animationComplete: Boolean,
+        ): Boolean {
+            val changed = viewportController.scrollTo(offsetRows, renderCache.historySize)
+            if (changed) {
+                val boundSession = session
+                if (boundSession != null) {
+                    refreshRenderCacheFromSession(boundSession)
+                    refreshShellIntegrationDecorations(boundSession)
+                }
+                searchController.updateViewportHighlights()
+                repaint()
+            }
+            if (changed || animationComplete) {
+                publishViewportState(renderCache.historySize, notifyListener = animationComplete)
+            }
+            return changed
         }
 
         private fun resetCursorBlinkOnEdt(forceRepaint: Boolean) {
@@ -982,6 +1034,7 @@ class SwingTerminal
         }
 
         private fun resetScrollbackState() {
+            wheelScrollAnimator.cancel()
             viewportController.reset()
         }
 
@@ -1011,6 +1064,7 @@ class SwingTerminal
         }
 
         private fun resizeSessionToVisibleGridOnEdt() {
+            wheelScrollAnimator.finish()
             val visibleGridSize = viewportController.visibleGridSizeOnEdt(settings, metrics, width, height)
             publishViewportState(renderCache.historySize)
             val boundSession = session ?: return
