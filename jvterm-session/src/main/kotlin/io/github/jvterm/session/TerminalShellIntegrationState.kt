@@ -232,6 +232,16 @@ class TerminalShellIntegrationState(
         }
     }
 
+    /** Replaces the active prompt's visual start anchor with a proven rendered prompt line. */
+    internal fun reanchorActivePromptStart(lineId: Long) {
+        require(lineId > 0L) { "lineId must be positive, was $lineId" }
+        synchronized(lock) {
+            val index = activePromptIndex
+            if (index == NO_INDEX) return
+            promptStartLineIds[index] = lineId
+        }
+    }
+
     /**
      * Records command execution start.
      *

@@ -251,6 +251,56 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `OSC 133 prompt marker skips leading blank layout row in multiline Bash prompt`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector, columns = 30, rows = 4)
+
+        connector.feedFromHost(
+            "\u001B]133;A\u0007\r\ngagik@host MINGW64 ~\r\n$ \u001B]133;B\u0007".ascii(),
+        )
+
+        val decorations = session.shellDecorations()
+        assertAll(
+            { assertFalse(decorations.promptStarts[0]) },
+            { assertTrue(decorations.promptStarts[1]) },
+            { assertFalse(decorations.promptStarts[2]) },
+        )
+        session.close()
+    }
+
+    @Test
+    fun `OSC 133 prompt marker remains on first row when prompt content begins there`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector, columns = 30, rows = 4)
+
+        connector.feedFromHost(
+            "\u001B]133;A\u0007gagik@host\r\n$ \u001B]133;B\u0007".ascii(),
+        )
+
+        val decorations = session.shellDecorations()
+        assertAll(
+            { assertTrue(decorations.promptStarts[0]) },
+            { assertFalse(decorations.promptStarts[1]) },
+        )
+        session.close()
+    }
+
+    @Test
+    fun `OSC 133 empty prompt span preserves original marker anchor`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector, columns = 30, rows = 4)
+
+        connector.feedFromHost("\u001B]133;A\u0007\r\n\u001B]133;B\u0007".ascii())
+
+        val decorations = session.shellDecorations()
+        assertAll(
+            { assertTrue(decorations.promptStarts[0]) },
+            { assertFalse(decorations.promptStarts[1]) },
+        )
+        session.close()
+    }
+
+    @Test
     fun `OSC 7 updates session directory and OSC 133 snapshots it onto the command`() {
         val connector = MockConnector()
         val session = createStartedSession(connector, columns = 30, rows = 4)
