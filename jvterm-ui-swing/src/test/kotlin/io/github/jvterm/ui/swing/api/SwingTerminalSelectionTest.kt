@@ -97,11 +97,25 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 8, y = -10)) }
-            assertEquals(1, renderReader.lastRequestedOffset)
+        }
+        awaitRequestedOffset(renderReader, expectedOffset = 1)
+        SwingUtilities.invokeAndWait {
             component.mouseListeners.forEach { it.mouseReleased(mouseReleased(component, x = 8, y = -10)) }
         }
         assertEquals(1, renderReader.lastRequestedOffset)
         session.close()
+    }
+
+    private fun awaitRequestedOffset(
+        renderReader: ScrollbackFrameReader,
+        expectedOffset: Int,
+    ) {
+        repeat(200) {
+            SwingUtilities.invokeAndWait {}
+            if (renderReader.lastRequestedOffset == expectedOffset) return
+            Thread.sleep(5)
+        }
+        assertEquals(expectedOffset, renderReader.lastRequestedOffset)
     }
 
     @Test

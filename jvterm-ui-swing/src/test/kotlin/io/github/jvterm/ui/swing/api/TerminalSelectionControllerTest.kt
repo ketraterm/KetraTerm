@@ -64,10 +64,7 @@ class TerminalSelectionControllerTest {
             return (col.toLong() shl 32) or (row.toLong() and 0xffff_ffffL)
         }
 
-        override fun scrollViewportBy(
-            delta: Double,
-            historySize: Int,
-        ): Boolean {
+        override fun scrollViewportBy(delta: Double): Boolean {
             scrollDelta = delta
             return true
         }

@@ -126,6 +126,7 @@ class SwingViewportControllerTest {
                     visualScrollRangePixels = 2000,
                     viewportHeightPixels = 480,
                     contentHeightPixels = 500,
+                    cellHeightPixels = 20,
                 ),
                 snapshot,
             )
@@ -159,6 +160,7 @@ class SwingViewportControllerTest {
                     visualScrollRangePixels = 200,
                     viewportHeightPixels = 100,
                     contentHeightPixels = 120,
+                    cellHeightPixels = 20,
                 ),
                 controller.viewportStateSnapshot(),
             )
@@ -186,7 +188,7 @@ class SwingViewportControllerTest {
         }
 
         @Test
-        fun `contentOriginY uses terminal cell height for smooth scroll`() {
+        fun `contentOriginY applies fractional smooth scroll translation`() {
             val controller = SwingViewportController { _, _, _, _, _ -> }
 
             controller.scrollTo(offsetLines = 2.25, historySize = 10)
@@ -222,21 +224,6 @@ class SwingViewportControllerTest {
             assertThrows(IllegalArgumentException::class.java) {
                 controller.updateVisualMetrics(historySize = 0, cellHeight = 20, visualOverflowPixels = 12)
             }
-        }
-
-        @Test
-        fun `visual pixel scroll maps directly to fixed row scrollback`() {
-            val controller = SwingViewportController { _, _, _, _, _ -> }
-
-            controller.updateVisualMetrics(historySize = 10, cellHeight = 20, visualOverflowPixels = 0)
-
-            assertTrue(controller.scrollToVisualOffsetPixels(10.0))
-            assertEquals(1, controller.requestedOffset)
-            assertEquals(-10.0, controller.contentOriginY(cacheScrollbackOffset = 1, cellHeight = 20))
-
-            assertTrue(controller.scrollToVisualOffsetPixels(20.0))
-            assertEquals(1, controller.requestedOffset)
-            assertEquals(0.0, controller.contentOriginY(cacheScrollbackOffset = 1, cellHeight = 20))
         }
 
         @Test
@@ -277,6 +264,7 @@ class SwingViewportControllerTest {
                     visualScrollRangePixels = 200,
                     viewportHeightPixels = 80,
                     contentHeightPixels = 80,
+                    cellHeightPixels = 20,
                 ),
                 controller.viewportStateSnapshot(),
             )

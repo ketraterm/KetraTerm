@@ -17,6 +17,7 @@ package io.github.jvterm.app.ui
 
 import io.github.jvterm.app.config.JvTermSettings
 import io.github.jvterm.ui.swing.api.SwingHostServices
+import io.github.jvterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.jvterm.ui.swing.api.SwingTerminal
 import io.github.jvterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
@@ -55,7 +56,7 @@ internal class TerminalPane private constructor(
             onContextMenu: (TerminalPane, Int, Int) -> Unit,
         ): TerminalPane {
             val scrollbar = JScrollBar(Adjustable.VERTICAL)
-            val scrollbarAdapter = TerminalScrollbarAdapter(scrollbar)
+            val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
             val terminal =
                 SwingTerminal(
                     settingsProvider = { settings.current() },

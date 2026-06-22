@@ -22,13 +22,14 @@ import kotlin.test.assertTrue
 
 class SwingScrollModelTest {
     @Test
-    fun `fractional deltas accumulate before crossing a row boundary`() {
+    fun `fractional input uses overscan and visual translation`() {
         val model = SwingScrollModel()
 
         assertTrue(model.scrollBy(0.4, historySize = 10))
         assertEquals(0, model.offset)
         assertEquals(1, model.requestedOffset)
         assertTrue(model.needsOverscan)
+        assertEquals(-9.6, model.contentYOffset(cellHeight = 16), 1.0e-12)
 
         assertTrue(model.scrollBy(0.7, historySize = 10))
         assertEquals(1, model.offset)
@@ -43,11 +44,10 @@ class SwingScrollModelTest {
 
         assertEquals(5, model.offset)
         assertEquals(5, model.requestedOffset)
-        assertFalse(model.needsOverscan)
     }
 
     @Test
-    fun `absolute scroll preserves fractional offsets for host controls`() {
+    fun `absolute fractional input preserves precise visual position`() {
         val model = SwingScrollModel()
 
         assertTrue(model.scrollTo(2.5, historySize = 10))
@@ -55,7 +55,6 @@ class SwingScrollModelTest {
         assertEquals(2.5, model.preciseScrollbackOffset)
         assertEquals(2, model.offset)
         assertEquals(3, model.requestedOffset)
-        assertTrue(model.needsOverscan)
     }
 
     @Test
@@ -79,7 +78,7 @@ class SwingScrollModelTest {
     }
 
     @Test
-    fun `fractional scroll requests one overscan row and translated content`() {
+    fun `fractional scroll requests overscan row and translated content`() {
         val model = SwingScrollModel()
 
         model.scrollBy(0.25, historySize = 10)

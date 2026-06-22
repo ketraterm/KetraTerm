@@ -18,11 +18,13 @@ package io.github.jvterm.ui.swing.viewport
 import kotlin.math.floor
 
 /**
- * EDT-confined scrollback viewport model for Swing wheel input.
+ * EDT-confined smooth scrollback viewport model.
  *
- * The terminal render reader is line-addressed. The model keeps one precise
- * row offset for smooth wheel input and derives the whole-row render request
- * from it. Renderer decorations do not contribute scrollable height.
+ * The model owns the precise visual position shared by wheel, trackpad,
+ * selection autoscroll, and scrollbar input. The line-addressed render reader
+ * receives a whole-row anchor plus one overscan row; fractional motion is a
+ * renderer translation only. Renderer decorations do not contribute
+ * scrollable height.
  */
 internal class SwingScrollModel {
     private var cellHeight: Int = 1
@@ -63,11 +65,13 @@ internal class SwingScrollModel {
      * Maximum visual pixel offset from the live bottom.
      */
     val visualScrollRangePixels: Int
-        get() = historySize * cellHeight
+        get() = (historySize.toLong() * cellHeight).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
-    /**
-     * Whether the current viewport needs one row of overscan.
-     */
+    /** Current fixed terminal row height used by visual controls. */
+    val cellHeightPixels: Int
+        get() = cellHeight
+
+    /** Whether the current viewport needs one row of smooth-scroll overscan. */
     val needsOverscan: Boolean
         get() = fraction > 0.0 && renderOffset > committedOffset
 
@@ -129,16 +133,6 @@ internal class SwingScrollModel {
     }
 
     /**
-     * Moves to an absolute visual pixel offset from the live bottom.
-     *
-     * @return true when the visual offset changed.
-     */
-    fun scrollToVisualOffset(offsetPixels: Double): Boolean {
-        require(!offsetPixels.isNaN()) { "offsetPixels must not be NaN" }
-        return scrollToPreciseOffset((offsetPixels / cellHeight).coerceIn(0.0, historySize.toDouble()))
-    }
-
-    /**
      * Applies a fractional line delta.
      *
      * @return true when the precise offset changed.
@@ -154,10 +148,7 @@ internal class SwingScrollModel {
         return scrollToPreciseOffset(preciseOffset + deltaLines)
     }
 
-    /**
-     * Returns the vertical content translation for the current fractional
-     * scroll position.
-     */
+    /** Returns the fractional vertical content translation for rendering. */
     fun contentYOffset(cellHeight: Int): Double {
         require(cellHeight > 0) {
             "cellHeight must be > 0, was $cellHeight"
@@ -166,9 +157,7 @@ internal class SwingScrollModel {
         return -(1.0 - fraction) * cellHeight
     }
 
-    /**
-     * Returns the render-cache row count needed for the current viewport.
-     */
+    /** Returns the render-cache row count needed for the current viewport. */
     fun requestedRows(renderRows: Int): Int {
         require(renderRows > 0) { "renderRows must be > 0, was $renderRows" }
         return if (needsOverscan) renderRows + 1 else renderRows
@@ -184,8 +173,7 @@ internal class SwingScrollModel {
         historySize: Int,
     ): Int {
         val committed = committed(offset, historySize)
-        val offsetFraction = fractionalPart(offset)
-        if (offsetFraction == 0.0) return committed
+        if (fractionalPart(offset) == 0.0) return committed
         return (committed + 1).coerceIn(0, historySize)
     }
 

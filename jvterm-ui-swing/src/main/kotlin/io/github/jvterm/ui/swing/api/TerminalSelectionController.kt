@@ -35,10 +35,7 @@ internal interface TerminalSelectionHost {
         y: Int,
     ): Long
 
-    fun scrollViewportBy(
-        delta: Double,
-        historySize: Int,
-    ): Boolean
+    fun scrollViewportBy(delta: Double): Boolean
 
     fun repaint()
 
@@ -292,7 +289,7 @@ internal class TerminalSelectionController(
             return
         }
 
-        val changed = host.scrollViewportBy(delta, cache.historySize)
+        val changed = host.scrollViewportBy(delta)
         if (changed) {
             updateSelectionCaret(lastSelectionDragX, lastSelectionDragY)
         }

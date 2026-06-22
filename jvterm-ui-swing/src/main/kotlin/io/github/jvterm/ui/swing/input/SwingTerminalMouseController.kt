@@ -87,15 +87,12 @@ internal class SwingTerminalMouseController(
 
     private fun handleMouseWheel(event: MouseWheelEvent) {
         if (isMouseTrackingIntercepted(event)) {
-            host.finishWheelScrollAnimation()
+            host.finishSmoothScrollAnimation()
             handleMouseTracking(event, TerminalMouseEventType.WHEEL)
             return
         }
         val delta = wheelScrollLines(event)
-        if (delta == 0) {
-            // Java accumulates high-resolution wheel movement until
-            // wheelRotation reaches a whole click. Keep the event inside the
-            // terminal without translating the fixed grid fractionally.
+        if (delta == 0.0) {
             event.consume()
             return
         }
@@ -178,15 +175,15 @@ internal class SwingTerminalMouseController(
         return true
     }
 
-    private fun wheelScrollLines(event: MouseWheelEvent): Int {
-        val clicks = -event.wheelRotation.toLong()
+    private fun wheelScrollLines(event: MouseWheelEvent): Double {
+        val clicks = -event.preciseWheelRotation
         val units =
             when (event.scrollType) {
                 MouseWheelEvent.WHEEL_UNIT_SCROLL -> event.scrollAmount
                 MouseWheelEvent.WHEEL_BLOCK_SCROLL -> host.visibleGridRows()
                 else -> 1
             }
-        return (clicks * units).coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
+        return (clicks * units).coerceIn(Int.MIN_VALUE.toDouble(), Int.MAX_VALUE.toDouble())
     }
 
     private companion object {

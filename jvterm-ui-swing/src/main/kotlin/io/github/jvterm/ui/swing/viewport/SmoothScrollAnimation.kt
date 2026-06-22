@@ -17,52 +17,61 @@ package io.github.jvterm.ui.swing.viewport
 
 import kotlin.math.roundToInt
 
-/** Allocation-free primitive state for one row-targeted wheel animation. */
-internal class WheelScrollAnimation {
+/** Allocation-free primitive state for one terminal viewport animation. */
+internal class SmoothScrollAnimation {
     var isActive: Boolean = false
         private set
 
     var targetOffset: Double = 0.0
         private set
 
-    private var startOffset: Double = 0.0
-    private var startNanos: Long = 0L
+    private var startOffset = 0.0
+    private var startNanos = 0L
 
     /**
-     * Retargets the animation by a whole-row delta.
+     * Retargets the animation by [deltaRows].
      *
-     * Active animations accumulate from their integer destination. New
-     * animations start from the nearest grid row, so wheel input never creates
-     * a fractional destination.
-     *
-     * @return true when the event has an attainable destination or an existing
-     * animation is still moving toward the same clamped boundary.
+     * Relative input accumulates from the active destination. A new gesture
+     * starts from the nearest row so whole-row devices always finish aligned.
      */
-    fun retarget(
+    fun retargetBy(
         currentOffset: Double,
-        deltaRows: Int,
+        deltaRows: Double,
         historySize: Int,
         nowNanos: Long,
     ): Boolean {
         require(currentOffset.isFinite()) { "currentOffset must be finite, was $currentOffset" }
+        require(deltaRows.isFinite()) { "deltaRows must be finite, was $deltaRows" }
         require(historySize >= 0) { "historySize must be >= 0, was $historySize" }
-        if (deltaRows == 0) return false
+        if (deltaRows == 0.0) return false
 
         val baseTarget = if (isActive) targetOffset else currentOffset.roundToInt().toDouble()
-        val nextTarget =
-            (baseTarget + deltaRows.toLong())
-                .coerceIn(0.0, historySize.toDouble())
-        if (nextTarget == targetOffset && isActive) return true
+        return retargetTo(currentOffset, baseTarget + deltaRows, historySize, nowNanos)
+    }
+
+    /** Retargets the animation to an absolute row offset. */
+    fun retargetTo(
+        currentOffset: Double,
+        targetOffset: Double,
+        historySize: Int,
+        nowNanos: Long,
+    ): Boolean {
+        require(currentOffset.isFinite()) { "currentOffset must be finite, was $currentOffset" }
+        require(targetOffset.isFinite()) { "targetOffset must be finite, was $targetOffset" }
+        require(historySize >= 0) { "historySize must be >= 0, was $historySize" }
+
+        val nextTarget = targetOffset.coerceIn(0.0, historySize.toDouble())
+        if (nextTarget == this.targetOffset && isActive) return true
         if (nextTarget == currentOffset) return false
 
         startOffset = currentOffset
-        targetOffset = nextTarget
+        this.targetOffset = nextTarget
         startNanos = nowNanos
         isActive = true
         return true
     }
 
-    /** Returns the eased position at [nowNanos], completing exactly on the target row. */
+    /** Returns the eased position, completing exactly on [targetOffset]. */
     fun positionAt(nowNanos: Long): Double {
         if (!isActive) return targetOffset
         val elapsed = (nowNanos - startNanos).coerceAtLeast(0L)

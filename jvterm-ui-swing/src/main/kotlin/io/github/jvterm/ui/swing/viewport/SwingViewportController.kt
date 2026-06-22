@@ -44,6 +44,7 @@ internal class SwingViewportController(
     private val viewportVisualRangePixelsSnapshot = AtomicInteger(0)
     private val viewportHeightPixelsSnapshot = AtomicInteger(0)
     private val viewportContentHeightPixelsSnapshot = AtomicInteger(0)
+    private val viewportCellHeightPixelsSnapshot = AtomicInteger(1)
 
     val requestedOffset: Int
         get() = scrollModel.requestedOffset
@@ -131,8 +132,6 @@ internal class SwingViewportController(
         visualOverflowPixels: Int,
     ): Boolean = scrollModel.updateVisualMetrics(historySize, cellHeight, visualOverflowPixels)
 
-    fun scrollToVisualOffsetPixels(offsetPixels: Double): Boolean = scrollModel.scrollToVisualOffset(offsetPixels)
-
     fun resizeRequestedOffset(): Int = scrollModel.requestedOffset
 
     fun resizeFraction(): Double = scrollModel.preciseScrollbackOffset - scrollModel.offset
@@ -142,8 +141,7 @@ internal class SwingViewportController(
         newHistorySize: Int,
         oldFraction: Double,
     ) {
-        val newPrecise = (newOffset + oldFraction).coerceIn(0.0, newHistorySize.toDouble())
-        scrollModel.scrollTo(newPrecise, newHistorySize)
+        scrollModel.scrollTo((newOffset + oldFraction).coerceIn(0.0, newHistorySize.toDouble()), newHistorySize)
     }
 
     fun contentOriginY(
@@ -169,6 +167,7 @@ internal class SwingViewportController(
             visualScrollRangePixels = viewportVisualRangePixelsSnapshot.get(),
             viewportHeightPixels = viewportHeightPixelsSnapshot.get(),
             contentHeightPixels = viewportContentHeightPixelsSnapshot.get(),
+            cellHeightPixels = viewportCellHeightPixelsSnapshot.get(),
         )
 
     fun publishViewportState(
@@ -194,6 +193,7 @@ internal class SwingViewportController(
         viewportVisualRangePixelsSnapshot.set(visualScrollRangePixels)
         viewportHeightPixelsSnapshot.set(viewportHeightPixels)
         viewportContentHeightPixelsSnapshot.set(contentHeightPixels)
+        viewportCellHeightPixelsSnapshot.set(scrollModel.cellHeightPixels)
         if (!notifyListener) return
 
         listener.viewportStateChanged(
@@ -207,6 +207,7 @@ internal class SwingViewportController(
                 visualScrollRangePixels = visualScrollRangePixels,
                 viewportHeightPixels = viewportHeightPixels,
                 contentHeightPixels = contentHeightPixels,
+                cellHeightPixels = scrollModel.cellHeightPixels,
             ),
         )
     }

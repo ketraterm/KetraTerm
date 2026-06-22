@@ -24,21 +24,20 @@ package io.github.jvterm.ui.swing.api
  * value in their adapter without changing terminal rendering policy.
  *
  * @property historySize number of rows available above the live viewport.
- * @property scrollbackOffset precise logical offset in rows from the live
- * viewport. Fractional values are produced by precision wheel devices.
+ * @property scrollbackOffset precise logical offset from the live viewport.
+ * Fractional values represent smooth visual motion between terminal rows.
  * @property renderOffset whole-row offset requested from the render cache.
- * This may differ from [scrollbackOffset] when smooth scrolling needs an
- * overscan row.
+ * This is the integer overscan anchor for [scrollbackOffset].
  * @property visibleRows number of terminal rows that fit in the component.
  * @property requestedRows number of rows requested from the render cache,
- * including overscan when needed.
- * @property visualScrollOffsetPixels precise row-native pixel offset from the
- * live bottom.
+ * including smooth-scroll overscan when required.
+ * @property visualScrollOffsetPixels precise pixel offset from the live bottom.
  * @property visualScrollRangePixels maximum row-native pixel offset from the
  * live bottom.
  * @property viewportHeightPixels visual viewport height in pixels.
  * @property contentHeightPixels visual content height for the current render
  * cache in pixels.
+ * @property cellHeightPixels fixed terminal row height in pixels.
  */
 data class TerminalViewportState(
     val historySize: Int,
@@ -50,6 +49,7 @@ data class TerminalViewportState(
     val visualScrollRangePixels: Int = historySize,
     val viewportHeightPixels: Int = visibleRows,
     val contentHeightPixels: Int = requestedRows,
+    val cellHeightPixels: Int = 1,
 ) {
     init {
         require(historySize >= 0) { "historySize must be >= 0, was $historySize" }
@@ -65,6 +65,7 @@ data class TerminalViewportState(
         }
         require(viewportHeightPixels >= 0) { "viewportHeightPixels must be >= 0, was $viewportHeightPixels" }
         require(contentHeightPixels >= 0) { "contentHeightPixels must be >= 0, was $contentHeightPixels" }
+        require(cellHeightPixels > 0) { "cellHeightPixels must be > 0, was $cellHeightPixels" }
     }
 
     /**

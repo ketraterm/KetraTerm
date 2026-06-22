@@ -150,7 +150,7 @@ class SwingTerminalScrollbackTest {
     }
 
     @Test
-    fun `precise trackpad fractions wait for an accumulated whole wheel click`() {
+    fun `precise trackpad fractions use shared smooth scroll animation`() {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
         val session =
             TerminalSession(
@@ -189,10 +189,11 @@ class SwingTerminalScrollbackTest {
             component.dispatchEvent(event)
         }
 
+        awaitViewportOffset(component, expectedOffset = 0.75)
         val state = component.viewportState()
-        assertEquals(0.0, state.scrollbackOffset)
-        assertEquals(0, state.renderOffset)
-        assertEquals(0.0, state.visualScrollOffsetPixels)
+        assertEquals(0.75, state.scrollbackOffset)
+        assertEquals(1, state.renderOffset)
+        assertTrue(state.visualScrollOffsetPixels > 0.0)
         assertTrue(event.isConsumed)
         session.close()
     }
@@ -231,7 +232,7 @@ class SwingTerminalScrollbackTest {
     }
 
     @Test
-    fun `host fractional scroll command publishes overscan viewport state`() {
+    fun `host fractional scroll command uses smooth viewport overscan`() {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
         val listener = RecordingViewportListener()
         val session =
@@ -258,7 +259,7 @@ class SwingTerminalScrollbackTest {
         }
         component.scrollViewportBy(0.25)
 
-        drainEdt()
+        awaitViewportOffset(component, 0.25)
         val state = component.viewportState()
         assertEquals(0.25, state.scrollbackOffset)
         assertEquals(1, state.renderOffset)
@@ -356,7 +357,7 @@ class SwingTerminalScrollbackTest {
             )
         }
 
-        component.scrollToVisualOffsetPixels(8.0)
+        component.scrollToScrollbackOffset(1)
         drainEdt()
 
         val scrolledState = component.viewportState()

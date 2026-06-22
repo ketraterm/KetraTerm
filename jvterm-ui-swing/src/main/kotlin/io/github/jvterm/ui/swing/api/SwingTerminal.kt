@@ -34,9 +34,9 @@ import io.github.jvterm.ui.swing.search.*
 import io.github.jvterm.ui.swing.settings.SwingMetrics
 import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.ui.swing.settings.SwingSettingsProvider
+import io.github.jvterm.ui.swing.viewport.SmoothScrollAnimationHost
+import io.github.jvterm.ui.swing.viewport.SmoothScrollAnimator
 import io.github.jvterm.ui.swing.viewport.SwingViewportController
-import io.github.jvterm.ui.swing.viewport.WheelScrollAnimationHost
-import io.github.jvterm.ui.swing.viewport.WheelScrollAnimator
 import java.awt.*
 import java.awt.event.*
 import javax.swing.JComponent
@@ -60,7 +60,8 @@ class SwingTerminal
         private val settingsProvider: SwingSettingsProvider =
             SwingSettingsProvider { SwingSettings() },
         private val hostServices: SwingHostServices = SwingHostServices(),
-    ) : JComponent() {
+    ) : JComponent(),
+        SwingSmoothScroller {
         private var session: TerminalSession? = null
         private var settings: SwingSettings = settingsProvider.currentSettings()
         private var metrics: SwingMetrics = buildMetrics(settings)
@@ -79,17 +80,17 @@ class SwingTerminal
         private val searchCache = TerminalRenderCache(settings.columns, settings.rows)
         private val shellIntegrationDecorations = TerminalShellIntegrationViewportDecorations()
         private val visualGeometry = TerminalVisualViewportGeometry()
-        private val wheelScrollAnimator =
-            WheelScrollAnimator(
-                object : WheelScrollAnimationHost {
-                    override fun wheelScrollOffset(): Double = viewportController.preciseOffset
+        private val smoothScrollAnimator =
+            SmoothScrollAnimator(
+                object : SmoothScrollAnimationHost {
+                    override fun smoothScrollOffset(): Double = viewportController.preciseOffset
 
-                    override fun wheelScrollHistorySize(): Int = renderCache.historySize
+                    override fun smoothScrollHistorySize(): Int = renderCache.historySize
 
-                    override fun applyWheelScrollOffset(
+                    override fun applySmoothScrollOffset(
                         offsetRows: Double,
                         animationComplete: Boolean,
-                    ): Boolean = this@SwingTerminal.applyAnimatedWheelOffsetOnEdt(offsetRows, animationComplete)
+                    ): Boolean = this@SwingTerminal.applyAnimatedScrollOffsetOnEdt(offsetRows, animationComplete)
                 },
             )
         private var hoveredPromptMarkerRow: Int = NO_PROMPT_MARKER_ROW
@@ -109,10 +110,7 @@ class SwingTerminal
                         y: Int,
                     ): Long = this@SwingTerminal.cellAt(x, y, this@SwingTerminal.renderCache)
 
-                    override fun scrollViewportBy(
-                        delta: Double,
-                        historySize: Int,
-                    ): Boolean = this@SwingTerminal.scrollViewportByOnEdt(delta, historySize)
+                    override fun scrollViewportBy(delta: Double): Boolean = smoothScrollAnimator.scrollBy(delta)
 
                     override fun repaint() = this@SwingTerminal.repaint()
 
@@ -263,10 +261,10 @@ class SwingTerminal
 
                     override fun visibleGridRows(): Int = this@SwingTerminal.visibleGridRows()
 
-                    override fun scrollViewportByRows(delta: Int): Boolean = wheelScrollAnimator.scrollByRows(delta)
+                    override fun scrollViewportByRows(delta: Double): Boolean = smoothScrollAnimator.scrollBy(delta)
 
-                    override fun finishWheelScrollAnimation() {
-                        wheelScrollAnimator.finish()
+                    override fun finishSmoothScrollAnimation() {
+                        smoothScrollAnimator.finish()
                     }
 
                     override fun pasteClipboardText(): Boolean = this@SwingTerminal.pasteClipboardText()
@@ -549,8 +547,9 @@ class SwingTerminal
          * Applies a signed scrollback delta in terminal rows.
          *
          * Positive values move farther back into scrollback; negative values move
-         * toward the live viewport. Fractional values are preserved for smooth
-         * wheel and trackpad composition.
+         * toward the live viewport. Fractional values use the shared smooth-scroll
+         * animation and renderer overscan path; render-cache addressing remains
+         * anchored to whole terminal rows.
          *
          * @param deltaLines signed row delta.
          */
@@ -558,24 +557,16 @@ class SwingTerminal
             require(!deltaLines.isNaN()) { "deltaLines must not be NaN" }
             runOnEdt(
                 Runnable {
-                    scrollViewportByOnEdt(deltaLines)
+                    smoothScrollAnimator.scrollBy(deltaLines)
                 },
             )
         }
 
-        /**
-         * Scrolls to an absolute visual-pixel offset from the live viewport.
-         *
-         * The offset is row-native scrollback expressed in pixels using the
-         * current fixed cell height. `0.0` is the live bottom.
-         *
-         * @param offsetPixels requested visual pixel offset from live output.
-         */
-        fun scrollToVisualOffsetPixels(offsetPixels: Double) {
-            require(!offsetPixels.isNaN()) { "offsetPixels must not be NaN" }
+        override fun smoothScrollToScrollbackOffset(scrollbackOffset: Int) {
+            require(scrollbackOffset >= 0) { "scrollbackOffset must be >= 0, was $scrollbackOffset" }
             runOnEdt(
                 Runnable {
-                    scrollViewportToVisualPixelsOnEdt(offsetPixels)
+                    smoothScrollAnimator.scrollTo(scrollbackOffset.toDouble())
                 },
             )
         }
@@ -722,7 +713,7 @@ class SwingTerminal
         override fun removeNotify() {
             terminalFocused = false
             cursorTimer.stop()
-            wheelScrollAnimator.finish()
+            smoothScrollAnimator.finish()
             selectionController.stopSelectionDrag()
 
             ancestorWindow?.removeWindowStateListener(windowStateListener)
@@ -941,45 +932,12 @@ class SwingTerminal
             return localY.coerceIn(0, maxOf(0, cache.rows * metrics.cellHeight - 1))
         }
 
-        private fun scrollViewportByOnEdt(
-            delta: Double,
-            historySize: Int = renderCache.historySize,
-            boundSession: TerminalSession? = session,
-        ): Boolean {
-            wheelScrollAnimator.cancel()
-            if (!viewportController.scrollBy(delta, historySize)) return false
-            if (boundSession != null) {
-                refreshRenderCacheFromSession(boundSession)
-                refreshShellIntegrationDecorations(boundSession)
-            }
-            searchController.updateViewportHighlights()
-            publishViewportState(renderCache.historySize)
-            repaint()
-            return true
-        }
-
-        private fun scrollViewportToVisualPixelsOnEdt(
-            offsetPixels: Double,
-            boundSession: TerminalSession? = session,
-        ): Boolean {
-            wheelScrollAnimator.cancel()
-            if (!viewportController.scrollToVisualOffsetPixels(offsetPixels)) return false
-            if (boundSession != null) {
-                refreshRenderCacheFromSession(boundSession)
-                refreshShellIntegrationDecorations(boundSession)
-            }
-            searchController.updateViewportHighlights()
-            publishViewportState(renderCache.historySize)
-            repaint()
-            return true
-        }
-
         private fun scrollViewportToOnEdt(
             offsetLines: Double,
             historySize: Int = renderCache.historySize,
             boundSession: TerminalSession? = session,
         ): Boolean {
-            wheelScrollAnimator.cancel()
+            smoothScrollAnimator.cancel()
             if (!viewportController.scrollTo(offsetLines, historySize)) return false
             if (boundSession != null) {
                 refreshRenderCacheFromSession(boundSession)
@@ -991,7 +949,7 @@ class SwingTerminal
             return true
         }
 
-        private fun applyAnimatedWheelOffsetOnEdt(
+        private fun applyAnimatedScrollOffsetOnEdt(
             offsetRows: Double,
             animationComplete: Boolean,
         ): Boolean {
@@ -1034,7 +992,7 @@ class SwingTerminal
         }
 
         private fun resetScrollbackState() {
-            wheelScrollAnimator.cancel()
+            smoothScrollAnimator.cancel()
             viewportController.reset()
         }
 
@@ -1064,7 +1022,7 @@ class SwingTerminal
         }
 
         private fun resizeSessionToVisibleGridOnEdt() {
-            wheelScrollAnimator.finish()
+            smoothScrollAnimator.finish()
             val visibleGridSize = viewportController.visibleGridSizeOnEdt(settings, metrics, width, height)
             publishViewportState(renderCache.historySize)
             val boundSession = session ?: return
@@ -1077,17 +1035,12 @@ class SwingTerminal
             lastResizedColumns = columns
             lastResizedRows = rows
 
-            // Capture the integer scrollback offset and fractional sub-row position before
-            // reflow changes history size and line wrapping. The resizer uses the integer
-            // offset to locate the top visible logical line; we restore the fractional part
-            // afterwards so smooth-scroll state survives the resize.
+            // Preserve both the render anchor and fractional visual position across reflow.
             val oldOffset = viewportController.resizeRequestedOffset()
             val oldFraction = viewportController.resizeFraction()
 
             val (newOffset, newHistorySize) = boundSession.resize(columns, rows, oldOffset)
 
-            // Re-anchor the scroll model to the reflowed position, preserving the
-            // fractional sub-row that was in-flight before the resize.
             viewportController.anchorAfterResize(newOffset, newHistorySize, oldFraction)
         }
 
