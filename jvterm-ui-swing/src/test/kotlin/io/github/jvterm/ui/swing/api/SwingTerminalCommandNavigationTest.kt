@@ -44,7 +44,7 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
             component.scrollToPreviousCommand()
         }
@@ -61,7 +61,7 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
             component.scrollToScrollbackOffset(4)
             component.scrollToNextCommand()
@@ -79,7 +79,7 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
             component.scrollToScrollbackOffset(2)
             component.scrollToPreviousCommand()
@@ -103,7 +103,7 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
             component.scrollToScrollbackOffset(6)
             component.scrollToPreviousCommand()
@@ -127,7 +127,7 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
             component.scrollToScrollbackOffset(4)
             component.scrollToPreviousCommand()
@@ -152,7 +152,7 @@ class SwingTerminalCommandNavigationTest {
         val secondCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(6))
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
 
             assertEquals(secondCommandId, component.commandRecordAt(0, 0))
@@ -178,7 +178,7 @@ class SwingTerminalCommandNavigationTest {
         val firstCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(1))
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
 
             assertEquals(true, component.selectCommandOutput(firstCommandId))
@@ -197,7 +197,7 @@ class SwingTerminalCommandNavigationTest {
         val secondCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(6))
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
 
             assertEquals(true, component.selectCommandOutput(secondCommandId))
@@ -215,7 +215,7 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
             component.scrollToScrollbackOffset(2)
 
@@ -234,7 +234,7 @@ class SwingTerminalCommandNavigationTest {
         val evictedCommandId = 1
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
 
             assertEquals(false, component.selectCommandOutput(evictedCommandId))
@@ -252,7 +252,7 @@ class SwingTerminalCommandNavigationTest {
         val secondCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(6))
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
             assertEquals("row6row7", component.commandOutputText(secondCommandId))
         }
@@ -268,7 +268,7 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = padding) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
             component.scrollToScrollbackOffset(1)
             val click =
@@ -300,7 +300,7 @@ class SwingTerminalCommandNavigationTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = padding) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 2))
+            component.size = component.preferredGridSize(12, 2)
             component.bind(session)
             component.scrollToScrollbackOffset(1)
 
