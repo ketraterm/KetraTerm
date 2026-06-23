@@ -16,6 +16,7 @@
 package io.github.jvterm.ui.swing.render
 
 import io.github.jvterm.render.api.TerminalColorPalette
+import io.github.jvterm.render.api.TerminalRenderBufferKind
 import io.github.jvterm.render.cache.TerminalRenderCache
 import io.github.jvterm.ui.swing.api.CellSelection
 import io.github.jvterm.ui.swing.render.cache.AwtColorCache
@@ -23,6 +24,7 @@ import io.github.jvterm.ui.swing.render.painter.*
 import io.github.jvterm.ui.swing.search.TerminalSearchViewportHighlights
 import io.github.jvterm.ui.swing.settings.SwingMetrics
 import io.github.jvterm.ui.swing.settings.SwingSettings
+import io.github.jvterm.ui.swing.settings.SwingTerminalChrome
 import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.Rectangle
@@ -97,12 +99,21 @@ internal class GridPainter {
         val clip = g.getClipBounds(clipScratch)
         backgroundPainter.clear(g, palette, width, height)
 
-        val padding = settings.padding
+        val paddingLeft = SwingTerminalChrome.left(settings, cache.activeBuffer)
+        val paddingTop = SwingTerminalChrome.top(settings)
+        val paddingBottom = SwingTerminalChrome.bottom(settings)
+        val promptGutterWidth = SwingTerminalChrome.promptDecorationGutterWidth(settings, cache.activeBuffer)
         val geometry = visualGeometry?.takeIf { it.rowCount == cache.rows }
+        val shellDecorations =
+            if (cache.activeBuffer == TerminalRenderBufferKind.ALTERNATE || promptGutterWidth <= 0) {
+                null
+            } else {
+                shellIntegrationDecorations
+            }
         val contentOriginY = geometry?.contentOriginY ?: 0.0
-        val firstRow = firstPaintRow(clip, metrics, contentOriginY, padding.top, geometry)
-        val rows = lastPaintRowExclusive(clip, cache, metrics, height, contentOriginY, padding.top, padding.bottom, geometry)
-        g.translate(padding.left.toDouble(), padding.top.toDouble() + contentOriginY)
+        val firstRow = firstPaintRow(clip, metrics, contentOriginY, paddingTop, geometry)
+        val rows = lastPaintRowExclusive(clip, cache, metrics, height, contentOriginY, paddingTop, paddingBottom, geometry)
+        g.translate(paddingLeft.toDouble(), paddingTop.toDouble() + contentOriginY)
         try {
             var row = firstRow
             while (row < rows) {
@@ -111,7 +122,8 @@ internal class GridPainter {
                     g = g,
                     settings = settings,
                     metrics = metrics,
-                    decorations = shellIntegrationDecorations,
+                    decorations = shellDecorations,
+                    gutterWidth = promptGutterWidth,
                     row = row,
                     hovered = row == hoveredPromptMarkerRow,
                 )
@@ -150,7 +162,7 @@ internal class GridPainter {
                 cursorVisible = cursorVisible,
             )
         } finally {
-            g.translate(-padding.left.toDouble(), -(padding.top.toDouble() + contentOriginY))
+            g.translate(-paddingLeft.toDouble(), -(paddingTop.toDouble() + contentOriginY))
         }
     }
 

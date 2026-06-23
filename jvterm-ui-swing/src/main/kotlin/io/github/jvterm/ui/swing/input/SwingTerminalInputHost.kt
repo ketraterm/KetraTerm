@@ -25,6 +25,10 @@ internal interface SwingTerminalInputHost {
     val session: TerminalSession?
     val settings: SwingSettings
 
+    fun visibleGridRows(): Int
+
+    fun scrollViewportByRows(deltaRows: Int)
+
     fun updateHyperlinkActivationHover(active: Boolean)
 
     fun resetCursorBlink(forceRepaint: Boolean)

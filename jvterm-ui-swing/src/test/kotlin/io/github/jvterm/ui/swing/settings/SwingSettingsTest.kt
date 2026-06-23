@@ -15,6 +15,7 @@
  */
 package io.github.jvterm.ui.swing.settings
 
+import io.github.jvterm.render.api.TerminalRenderBufferKind
 import io.github.jvterm.ui.swing.api.SwingTerminal
 import java.awt.Canvas
 import java.awt.Font
@@ -136,8 +137,10 @@ class SwingSettingsTest {
         assertEquals(true, settings.shellIntegrationFailedCommandRailsVisible)
         assertEquals(0xFFE74856.toInt(), settings.shellIntegrationFailedCommandRailColor)
         assertEquals(3, settings.shellIntegrationFailedCommandRailWidth)
-        assertEquals(Insets(12, 20, 12, 12), settings.padding)
+        assertEquals(Insets(0, 20, 8, 12), settings.padding)
         assertEquals(4, settings.padding.left - settings.shellIntegrationDecorationGutterWidth)
+        assertEquals(0, settings.padding.top)
+        assertEquals(8, settings.padding.bottom)
     }
 
     @Test
@@ -157,6 +160,28 @@ class SwingSettingsTest {
     fun settingsAcceptCustomPadding() {
         val settings = SwingSettings(padding = Insets(4, 8, 4, 8))
         assertEquals(Insets(4, 8, 4, 8), settings.padding)
+    }
+
+    @Test
+    fun alternateScreenChromeUsesSymmetricSideInsetsFromBottomSpacer() {
+        val settings = SwingSettings()
+
+        assertEquals(20, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(12, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(8, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(8, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(32, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(16, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(8, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(16, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(0, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.ALTERNATE))
+    }
+
+    @Test
+    fun settingsRejectNegativePaddingEdges() {
+        assertFailsWith<IllegalArgumentException> {
+            SwingSettings(padding = Insets(0, -1, 0, 0))
+        }
     }
 
     @Test
@@ -279,5 +304,18 @@ class SwingSettingsTest {
 
         assertEquals(10, visibleColumns)
         assertEquals(4, visibleRows)
+    }
+
+    @Test
+    fun preferredGridSizeIncludesBothHorizontalPaddingEdges() {
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings(columns = 10, rows = 4, padding = Insets(3, 5, 7, 11))
+            })
+        val cellWidth = (component.preferredGridSize(2, 1).width - component.preferredGridSize(1, 1).width)
+        val cellHeight = (component.preferredGridSize(1, 2).height - component.preferredGridSize(1, 1).height)
+
+        assertEquals(10 * cellWidth + 5 + 11, component.preferredGridSize(10, 4).width)
+        assertEquals(4 * cellHeight + 3 + 7, component.preferredGridSize(10, 4).height)
     }
 }

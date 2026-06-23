@@ -15,10 +15,12 @@
  */
 package io.github.jvterm.ui.swing.viewport
 
+import io.github.jvterm.render.api.TerminalRenderBufferKind
 import io.github.jvterm.ui.swing.api.TerminalViewportListener
 import io.github.jvterm.ui.swing.api.TerminalViewportState
 import io.github.jvterm.ui.swing.settings.SwingMetrics
 import io.github.jvterm.ui.swing.settings.SwingSettings
+import io.github.jvterm.ui.swing.settings.SwingTerminalChrome
 import java.awt.Dimension
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -44,6 +46,7 @@ internal class SwingViewportController(
     private val viewportVisualRangePixelsSnapshot = AtomicInteger(0)
     private val viewportHeightPixelsSnapshot = AtomicInteger(0)
     private val viewportContentHeightPixelsSnapshot = AtomicInteger(0)
+    private val viewportCellHeightPixelsSnapshot = AtomicInteger(1)
 
     val requestedOffset: Int
         get() = scrollModel.requestedOffset
@@ -65,8 +68,9 @@ internal class SwingViewportController(
         metrics: SwingMetrics,
         componentWidth: Int,
         componentHeight: Int,
+        activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
     ): Dimension {
-        val packed = updateVisibleGridSize(settings, metrics, componentWidth, componentHeight)
+        val packed = updateVisibleGridSize(settings, metrics, componentWidth, componentHeight, activeBuffer)
         return Dimension(unpackVisibleColumns(packed), unpackVisibleRows(packed))
     }
 
@@ -75,9 +79,10 @@ internal class SwingViewportController(
         metrics: SwingMetrics,
         componentWidth: Int,
         componentHeight: Int,
+        activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
     ): Long {
-        val columns = visibleGridColumns(settings, metrics, componentWidth)
-        val rows = visibleGridRows(settings, metrics, componentHeight)
+        val columns = visibleGridColumns(settings, metrics, componentWidth, activeBuffer)
+        val rows = visibleGridRows(settings, metrics, componentHeight, activeBuffer)
         val packed = packVisibleGridSize(columns, rows)
         visibleGridSizeSnapshot.set(packed)
         return packed
@@ -87,18 +92,20 @@ internal class SwingViewportController(
         settings: SwingSettings,
         metrics: SwingMetrics,
         componentHeight: Int,
-    ): Int {
-        val padding = settings.padding
-        return maxOf(1, (componentHeight - padding.top - padding.bottom) / metrics.cellHeight)
-    }
+        activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
+    ): Int =
+        maxOf(
+            1,
+            (componentHeight - SwingTerminalChrome.verticalInset(settings, activeBuffer)) / metrics.cellHeight,
+        )
 
     fun visibleRenderRows(
         settings: SwingSettings,
         metrics: SwingMetrics,
         componentHeight: Int,
+        activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
     ): Int {
-        val padding = settings.padding
-        val availableHeight = componentHeight - padding.top - padding.bottom
+        val availableHeight = componentHeight - SwingTerminalChrome.verticalInset(settings, activeBuffer)
         if (availableHeight <= 0) return 1
         return ceilDiv(availableHeight, metrics.cellHeight)
     }
@@ -106,17 +113,10 @@ internal class SwingViewportController(
     fun viewportPixelHeight(
         settings: SwingSettings,
         componentHeight: Int,
-    ): Int {
-        val padding = settings.padding
-        return maxOf(0, componentHeight - padding.top - padding.bottom)
-    }
+        activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
+    ): Int = maxOf(0, componentHeight - SwingTerminalChrome.verticalInset(settings, activeBuffer))
 
     fun requestedRows(renderRows: Int): Int = scrollModel.requestedRows(renderRows)
-
-    fun scrollBy(
-        delta: Double,
-        historySize: Int,
-    ): Boolean = scrollModel.scrollBy(delta, historySize)
 
     fun scrollTo(
         offsetLines: Double,
@@ -131,19 +131,13 @@ internal class SwingViewportController(
         visualOverflowPixels: Int,
     ): Boolean = scrollModel.updateVisualMetrics(historySize, cellHeight, visualOverflowPixels)
 
-    fun scrollToVisualOffsetPixels(offsetPixels: Double): Boolean = scrollModel.scrollToVisualOffset(offsetPixels)
-
     fun resizeRequestedOffset(): Int = scrollModel.requestedOffset
-
-    fun resizeFraction(): Double = scrollModel.preciseScrollbackOffset - scrollModel.offset
 
     fun anchorAfterResize(
         newOffset: Int,
         newHistorySize: Int,
-        oldFraction: Double,
     ) {
-        val newPrecise = (newOffset + oldFraction).coerceIn(0.0, newHistorySize.toDouble())
-        scrollModel.scrollTo(newPrecise, newHistorySize)
+        scrollModel.scrollTo(newOffset.toDouble(), newHistorySize)
     }
 
     fun contentOriginY(
@@ -169,6 +163,7 @@ internal class SwingViewportController(
             visualScrollRangePixels = viewportVisualRangePixelsSnapshot.get(),
             viewportHeightPixels = viewportHeightPixelsSnapshot.get(),
             contentHeightPixels = viewportContentHeightPixelsSnapshot.get(),
+            cellHeightPixels = viewportCellHeightPixelsSnapshot.get(),
         )
 
     fun publishViewportState(
@@ -178,6 +173,7 @@ internal class SwingViewportController(
         viewportHeightPixels: Int,
         contentHeightPixels: Int,
         notifyListener: Boolean = true,
+        notifyPrimitiveListener: Boolean = false,
     ) {
         val requestedRows = scrollModel.requestedRows(renderRows)
         val scrollbackOffset = scrollModel.preciseScrollbackOffset
@@ -194,7 +190,19 @@ internal class SwingViewportController(
         viewportVisualRangePixelsSnapshot.set(visualScrollRangePixels)
         viewportHeightPixelsSnapshot.set(viewportHeightPixels)
         viewportContentHeightPixelsSnapshot.set(contentHeightPixels)
-        if (!notifyListener) return
+        viewportCellHeightPixelsSnapshot.set(scrollModel.cellHeightPixels)
+        if (!notifyListener) {
+            if (notifyPrimitiveListener) {
+                listener.viewportChanged(
+                    historySize = historySize,
+                    scrollbackOffset = scrollbackOffset,
+                    renderOffset = renderOffset,
+                    visibleRows = visibleRows,
+                    requestedRows = requestedRows,
+                )
+            }
+            return
+        }
 
         listener.viewportStateChanged(
             TerminalViewportState(
@@ -207,6 +215,7 @@ internal class SwingViewportController(
                 visualScrollRangePixels = visualScrollRangePixels,
                 viewportHeightPixels = viewportHeightPixels,
                 contentHeightPixels = contentHeightPixels,
+                cellHeightPixels = scrollModel.cellHeightPixels,
             ),
         )
     }
@@ -216,10 +225,12 @@ internal class SwingViewportController(
             settings: SwingSettings,
             metrics: SwingMetrics,
             componentWidth: Int,
-        ): Int {
-            val padding = settings.padding
-            return maxOf(1, (componentWidth - padding.left) / metrics.cellWidth)
-        }
+            activeBuffer: TerminalRenderBufferKind,
+        ): Int =
+            maxOf(
+                1,
+                (componentWidth - SwingTerminalChrome.horizontalInset(settings, activeBuffer)) / metrics.cellWidth,
+            )
 
         private fun packVisibleGridSize(
             columns: Int,

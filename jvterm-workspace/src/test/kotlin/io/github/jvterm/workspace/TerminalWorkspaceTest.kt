@@ -141,6 +141,54 @@ class TerminalWorkspaceTest {
     }
 
     @Test
+    fun `launch executable window title is ignored so directory fallback remains visible`() {
+        val tab =
+            TerminalWorkspaceTab(
+                id = "t1",
+                profile =
+                    TerminalProfile(
+                        id = "windows-powershell",
+                        displayName = "Windows PowerShell",
+                        command = listOf("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-NoLogo"),
+                    ),
+                title = "Windows PowerShell",
+                session = testSession(),
+                onColorChanged = { _, _ -> },
+                onTitleChanged = { _, _ -> },
+                onCurrentWorkingDirectoryChanged = { _, _ -> },
+            )
+
+        tab.updateCurrentWorkingDirectoryUri("file:///C:/Users/gagik")
+        tab.updateDynamicTitle("C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")
+
+        assertEquals("gagik", tab.title)
+    }
+
+    @Test
+    fun `application window title still overrides directory fallback`() {
+        val tab =
+            TerminalWorkspaceTab(
+                id = "t1",
+                profile =
+                    TerminalProfile(
+                        id = "windows-powershell",
+                        displayName = "Windows PowerShell",
+                        command = listOf("powershell.exe", "-NoLogo"),
+                    ),
+                title = "Windows PowerShell",
+                session = testSession(),
+                onColorChanged = { _, _ -> },
+                onTitleChanged = { _, _ -> },
+                onCurrentWorkingDirectoryChanged = { _, _ -> },
+            )
+
+        tab.updateCurrentWorkingDirectoryUri("file:///C:/Users/gagik")
+        tab.updateDynamicTitle("nvim")
+
+        assertEquals("nvim", tab.title)
+    }
+
+    @Test
     fun `directory title fallback strips encoded control and format characters`() {
         val tab =
             TerminalWorkspaceTab(

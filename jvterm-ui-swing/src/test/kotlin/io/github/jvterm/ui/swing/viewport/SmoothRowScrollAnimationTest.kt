@@ -20,12 +20,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class WheelScrollAnimationTest {
+class SmoothRowScrollAnimationTest {
     @Test
     fun `whole-row destination is eased and finishes exactly on grid`() {
-        val animation = WheelScrollAnimation()
+        val animation = SmoothRowScrollAnimation()
 
-        assertTrue(animation.retarget(currentOffset = 0.0, deltaRows = 3, historySize = 10, nowNanos = 0L))
+        assertTrue(animation.retargetBy(currentOffset = 0.0, deltaRows = 3, historySize = 10, nowNanos = 0L))
 
         val halfway = animation.positionAt(50_000_000L)
         assertTrue(halfway > 0.0 && halfway < 3.0)
@@ -35,13 +35,13 @@ class WheelScrollAnimationTest {
     }
 
     @Test
-    fun `repeated clicks accumulate from in-flight destination without jumping`() {
-        val animation = WheelScrollAnimation()
-        animation.retarget(currentOffset = 0.0, deltaRows = 3, historySize = 10, nowNanos = 0L)
+    fun `repeated input accumulates from integer destination without visual jump`() {
+        val animation = SmoothRowScrollAnimation()
+        animation.retargetBy(currentOffset = 0.0, deltaRows = 3, historySize = 10, nowNanos = 0L)
         val inFlightOffset = animation.positionAt(50_000_000L)
 
         assertTrue(
-            animation.retarget(
+            animation.retargetBy(
                 currentOffset = inFlightOffset,
                 deltaRows = 3,
                 historySize = 10,
@@ -49,17 +49,26 @@ class WheelScrollAnimationTest {
             ),
         )
 
-        assertEquals(6.0, animation.targetOffset)
+        assertEquals(6, animation.targetRow)
         assertEquals(inFlightOffset, animation.positionAt(50_000_000L))
         assertEquals(6.0, animation.positionAt(150_000_000L))
     }
 
     @Test
     fun `destination clamps to history boundary`() {
-        val animation = WheelScrollAnimation()
+        val animation = SmoothRowScrollAnimation()
 
-        assertTrue(animation.retarget(currentOffset = 4.0, deltaRows = 20, historySize = 5, nowNanos = 0L))
+        assertTrue(animation.retargetBy(currentOffset = 4.0, deltaRows = 20, historySize = 5, nowNanos = 0L))
         assertEquals(5.0, animation.positionAt(100_000_000L))
-        assertFalse(animation.retarget(currentOffset = 5.0, deltaRows = 1, historySize = 5, nowNanos = 200_000_000L))
+        assertFalse(animation.retargetBy(currentOffset = 5.0, deltaRows = 1, historySize = 5, nowNanos = 200_000_000L))
+    }
+
+    @Test
+    fun `absolute integer retarget starts from current visual position`() {
+        val animation = SmoothRowScrollAnimation()
+
+        assertTrue(animation.retargetTo(currentOffset = 2.25, targetRow = 8, historySize = 10, nowNanos = 0L))
+        assertEquals(2.25, animation.positionAt(0L))
+        assertEquals(8.0, animation.positionAt(100_000_000L))
     }
 }

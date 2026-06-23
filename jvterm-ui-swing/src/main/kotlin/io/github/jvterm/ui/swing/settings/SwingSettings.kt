@@ -63,7 +63,13 @@ import java.util.*
  * @property shellIntegrationFailedCommandRailsVisible whether failed-command output draws a vertical gutter rail.
  * @property shellIntegrationFailedCommandRailColor packed ARGB color for failed-command rails.
  * @property shellIntegrationFailedCommandRailWidth failed-command rail width in pixels.
- * @property padding internal margins around the terminal grid in pixels.
+ * @property padding optional host-owned visual inset around the terminal grid
+ * in pixels. The default keeps vertical padding at zero so smooth scrolling
+ * uses the full component height. The default retains horizontal breathing
+ * room, the shell-integration decoration gutter, and a small bottom visual
+ * spacer; alternate-screen rendering replaces the inactive prompt gutter with
+ * symmetric side insets and resizes the terminal grid to the newly available
+ * columns.
  * @property pasteOnMiddleClick whether middle mouse button click triggers a clipboard paste.
  * @property cursorShape default cursor shape configured for the session.
  * @property scrollbackLines maximum scrollback lines retained by the terminal.
@@ -97,7 +103,7 @@ data class SwingSettings
         val shellIntegrationFailedCommandRailsVisible: Boolean = true,
         val shellIntegrationFailedCommandRailColor: Int = DEFAULT_SHELL_INTEGRATION_FAILED_COMMAND_RAIL_COLOR,
         val shellIntegrationFailedCommandRailWidth: Int = 3,
-        val padding: Insets = Insets(12, 20, 12, 12),
+        val padding: Insets = Insets(0, 20, 8, 12),
         val pasteOnMiddleClick: Boolean = true,
         val cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK,
         val scrollbackLines: Int = 1000,
@@ -125,6 +131,9 @@ data class SwingSettings
             }
             require(shellIntegrationFailedCommandRailWidth > 0) {
                 "shellIntegrationFailedCommandRailWidth must be > 0, was $shellIntegrationFailedCommandRailWidth"
+            }
+            require(padding.top >= 0 && padding.left >= 0 && padding.bottom >= 0 && padding.right >= 0) {
+                "padding must be non-negative, was $padding"
             }
         }
 

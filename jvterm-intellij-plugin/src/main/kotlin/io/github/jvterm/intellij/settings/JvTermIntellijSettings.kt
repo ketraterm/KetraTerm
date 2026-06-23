@@ -23,7 +23,6 @@ import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
 import com.intellij.util.ui.JBFont
-import com.intellij.util.ui.JBUI
 import io.github.jvterm.render.api.TerminalRenderCursorShape
 import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.ui.swing.settings.TerminalTheme
@@ -282,7 +281,6 @@ internal object JvTermIntellijSettingsMapper {
             cursorShape = parseCursorShape(normalized.cursorShape),
             scrollbackLines = normalized.scrollbackLines,
             lineHeight = normalized.lineHeight,
-            padding = JBUI.insets(8),
             shellRequestResizeWindow = false,
             shellRequestWindowManipulation = false,
         )

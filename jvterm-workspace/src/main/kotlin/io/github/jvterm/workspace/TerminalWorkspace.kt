@@ -25,6 +25,7 @@ import io.github.jvterm.session.TerminalSession
 import java.net.URI
 import java.net.URISyntaxException
 import java.nio.file.Path
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -361,8 +362,9 @@ class TerminalWorkspaceTab internal constructor(
 
     internal fun updateDynamicTitle(nextTitle: String?) {
         val previousTitle = title
-        applicationTitleActive = nextTitle != null
-        dynamicTitle = nextTitle ?: profile.displayName
+        val acceptedTitle = nextTitle?.trim()?.takeIf(String::isNotEmpty)?.takeUnless(::isLaunchExecutableTitle)
+        applicationTitleActive = acceptedTitle != null
+        dynamicTitle = acceptedTitle ?: profile.displayName
         notifyTitleChanged(previousTitle)
     }
 
@@ -416,6 +418,19 @@ class TerminalWorkspaceTab internal constructor(
                 .trim()
         return sanitized.ifEmpty { null }
     }
+
+    private fun isLaunchExecutableTitle(candidate: String): Boolean {
+        val launchExecutable = profile.command.firstOrNull() ?: return false
+        return executableTitleKey(candidate) == executableTitleKey(launchExecutable)
+    }
+
+    private fun executableTitleKey(value: String): String =
+        value
+            .trim()
+            .trim('"')
+            .replace('\\', '/')
+            .substringAfterLast('/')
+            .lowercase(Locale.ROOT)
 
     private companion object {
         private const val MAX_DIRECTORY_TITLE_LENGTH = 256

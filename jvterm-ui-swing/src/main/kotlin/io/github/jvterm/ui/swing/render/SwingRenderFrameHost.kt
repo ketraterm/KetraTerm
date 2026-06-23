@@ -39,6 +39,15 @@ internal interface SwingRenderFrameHost {
 
     fun refreshRenderCacheFromSession(session: TerminalSession)
 
+    /**
+     * Resizes the bound terminal grid when the latest rendered frame changes
+     * active-buffer chrome enough to alter visible rows or columns.
+     *
+     * @return true when the terminal grid was resized and the render cache must
+     * be refreshed from the session again.
+     */
+    fun syncTerminalGridToActiveChrome(): Boolean
+
     fun clampViewport(historySize: Int): Boolean
 
     fun requestedViewportOffset(): Int

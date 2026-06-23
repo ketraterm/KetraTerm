@@ -182,7 +182,11 @@ internal class TerminalSearchController(
         if (activeRow == NO_ACTIVE_ROW) return
         val centerRow = host.visibleGridRows() / 2
         val desiredOffset = host.renderCache.discardedCount + host.renderCache.historySize + centerRow - activeRow
-        host.scrollViewportTo(desiredOffset.toDouble(), host.renderCache.historySize, host.session ?: return)
+        host.scrollViewportTo(
+            desiredOffset.coerceIn(0L, host.renderCache.historySize.toLong()).toInt(),
+            host.renderCache.historySize,
+            host.session ?: return,
+        )
     }
 
     private fun refreshSearchCache(boundSession: TerminalSession) {
@@ -211,7 +215,7 @@ internal interface TerminalSearchHost {
     fun visibleGridRows(): Int
 
     fun scrollViewportTo(
-        offsetLines: Double,
+        offsetRows: Int,
         historySize: Int,
         boundSession: TerminalSession,
     ): Boolean

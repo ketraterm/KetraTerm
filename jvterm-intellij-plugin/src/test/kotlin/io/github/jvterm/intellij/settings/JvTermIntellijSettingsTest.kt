@@ -22,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
+import java.awt.Insets
 
 /**
  * Tests IntelliJ settings persistence mapping without opening an IDE window.
@@ -42,6 +43,17 @@ class JvTermIntellijSettingsTest {
             )
 
         assertEquals(JvTermIntellijSettings.DEFAULT_FONT_SIZE, settings.font.size)
+    }
+
+    @Test
+    fun `default terminal grid keeps top edge open with horizontal gutter and bottom spacer`() {
+        val settings =
+            JvTermIntellijSettingsMapper.toSwingSettings(
+                JvTermIntellijSettings.State(themeId = "nord"),
+            )
+
+        assertEquals(Insets(0, 20, 8, 12), settings.padding)
+        assertEquals(4, settings.padding.left - settings.shellIntegrationDecorationGutterWidth)
     }
 
     @Test

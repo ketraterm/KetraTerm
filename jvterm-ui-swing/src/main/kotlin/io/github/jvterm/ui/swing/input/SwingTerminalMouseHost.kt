@@ -47,9 +47,9 @@ internal interface SwingTerminalMouseHost {
 
     fun visibleGridRows(): Int
 
-    fun scrollViewportByRows(delta: Int): Boolean
+    fun scrollViewportByPreciseRows(deltaRows: Double): Boolean
 
-    fun finishWheelScrollAnimation()
+    fun finishViewportScroll()
 
     fun pasteClipboardText(): Boolean
 

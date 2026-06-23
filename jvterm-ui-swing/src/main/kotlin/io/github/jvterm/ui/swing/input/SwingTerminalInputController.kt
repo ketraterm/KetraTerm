@@ -34,6 +34,7 @@ internal class SwingTerminalInputController(
             override fun keyPressed(event: KeyEvent) {
                 host.updateHyperlinkActivationHover(event.isControlDown)
                 host.resetCursorBlink(forceRepaint = true)
+                if (handleViewportScrollShortcut(event)) return
                 if (handleSearchShortcut(event)) return
                 if (handleClipboardShortcut(event)) return
 
@@ -77,6 +78,20 @@ internal class SwingTerminalInputController(
             }
 
         if (!handled) return false
+        event.consume()
+        return true
+    }
+
+    private fun handleViewportScrollShortcut(event: KeyEvent): Boolean {
+        if (!event.isShiftDown || event.isControlDown || event.isAltDown || event.isMetaDown) return false
+        val rows = host.visibleGridRows().coerceAtLeast(1)
+        val deltaRows =
+            when (event.keyCode) {
+                KeyEvent.VK_PAGE_UP -> rows
+                KeyEvent.VK_PAGE_DOWN -> -rows
+                else -> return false
+            }
+        host.scrollViewportByRows(deltaRows)
         event.consume()
         return true
     }

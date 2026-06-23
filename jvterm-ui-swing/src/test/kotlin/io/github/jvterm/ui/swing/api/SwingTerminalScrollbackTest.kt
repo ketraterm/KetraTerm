@@ -150,7 +150,7 @@ class SwingTerminalScrollbackTest {
     }
 
     @Test
-    fun `precise trackpad fractions wait for an accumulated whole wheel click`() {
+    fun `precise trackpad fractions accumulate into an integer row destination`() {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
         val session =
             TerminalSession(
@@ -168,31 +168,24 @@ class SwingTerminalScrollbackTest {
             component.setSize(30, 100)
             component.bind(session)
         }
-        val event =
-            MouseWheelEvent(
-                component,
-                MouseWheelEvent.MOUSE_WHEEL,
-                System.currentTimeMillis(),
-                0,
-                5,
-                5,
-                0,
-                0,
-                0,
-                false,
-                MouseWheelEvent.WHEEL_UNIT_SCROLL,
-                3,
-                0,
-                -0.25,
-            )
+        lateinit var event: MouseWheelEvent
         SwingUtilities.invokeAndWait {
+            repeat(3) {
+                event = preciseWheelEvent(component, preciseRotation = -0.1)
+                component.dispatchEvent(event)
+            }
+            assertEquals(0.0, component.viewportState().scrollbackOffset)
+        }
+
+        SwingUtilities.invokeAndWait {
+            event = preciseWheelEvent(component, preciseRotation = -0.1)
             component.dispatchEvent(event)
         }
 
+        awaitViewportOffset(component, expectedOffset = 1.0)
         val state = component.viewportState()
-        assertEquals(0.0, state.scrollbackOffset)
-        assertEquals(0, state.renderOffset)
-        assertEquals(0.0, state.visualScrollOffsetPixels)
+        assertEquals(1.0, state.scrollbackOffset)
+        assertEquals(1, state.renderOffset)
         assertTrue(event.isConsumed)
         session.close()
     }
@@ -231,14 +224,15 @@ class SwingTerminalScrollbackTest {
     }
 
     @Test
-    fun `host fractional scroll command publishes overscan viewport state`() {
+    fun `host fractional scroll commands accumulate and finish on a row`() {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
         val listener = RecordingViewportListener()
+        val renderReader = ScrollbackFrameReader()
         val session =
             TerminalSession(
                 terminal = terminal,
                 publisher = TerminalRenderPublisher(3, 1),
-                renderReader = ScrollbackFrameReader(),
+                renderReader = renderReader,
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
@@ -256,15 +250,87 @@ class SwingTerminalScrollbackTest {
             component.setSize(30, 100)
             component.bind(session)
         }
+        repeat(3) {
+            component.scrollViewportBy(0.25)
+        }
+        drainEdt()
+        assertEquals(0.0, component.viewportState().scrollbackOffset)
+
         component.scrollViewportBy(0.25)
 
-        drainEdt()
+        awaitViewportOffset(component, 1.0)
         val state = component.viewportState()
-        assertEquals(0.25, state.scrollbackOffset)
+        assertEquals(1.0, state.scrollbackOffset)
         assertEquals(1, state.renderOffset)
-        assertTrue(state.requestedRows > state.visibleRows)
-        assertEquals(0.25, listener.lastScrollbackOffset.get())
+        assertEquals(1.0, listener.lastScrollbackOffset.get())
         assertEquals(1, listener.lastRenderOffset.get())
+        assertTrue(renderReader.requestedOffsets.contains(1))
+        session.close()
+    }
+
+    @Test
+    fun `fractional-height viewport requests both partial-row and animation overscan`() {
+        val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
+        val renderReader = ScrollbackFrameReader()
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                publisher = TerminalRenderPublisher(3, 1),
+                renderReader = renderReader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+            )
+        val component = scrollTestTerminal()
+
+        SwingUtilities.invokeAndWait {
+            val tenRows = component.preferredGridSize(columns = 3, rows = 10)
+            val elevenRows = component.preferredGridSize(columns = 3, rows = 11)
+            val cellHeight = elevenRows.height - tenRows.height
+            component.setSize(tenRows.width, tenRows.height + cellHeight - 1)
+            component.bind(session)
+
+            assertEquals(10, component.visibleGridSize().height)
+            assertEquals(10, terminal.height)
+            assertEquals(11, component.viewportState().requestedRows)
+        }
+
+        component.scrollViewportBy(1.0)
+        awaitViewportOffset(component, expectedOffset = 1.0)
+
+        assertTrue(
+            renderReader.requestedRows.contains(12),
+            "reader never received 11 visible render rows plus one animation overscan row",
+        )
+        assertEquals(11, component.viewportState().requestedRows)
+        session.close()
+    }
+
+    @Test
+    fun `scrollbar drag applies exact rows immediately and release is aligned`() {
+        val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                publisher = TerminalRenderPublisher(3, 1),
+                renderReader = ScrollbackFrameReader(),
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+            )
+        val component = scrollTestTerminal()
+
+        SwingUtilities.invokeAndWait {
+            component.setSize(30, 100)
+            component.bind(session)
+            component.scrollFromScrollbar(scrollbackOffset = 3, valueIsAdjusting = true)
+            assertEquals(3.0, component.viewportState().scrollbackOffset)
+        }
+
+        component.scrollFromScrollbar(scrollbackOffset = 3, valueIsAdjusting = false)
+        awaitViewportOffset(component, expectedOffset = 3.0)
         session.close()
     }
 
@@ -356,7 +422,7 @@ class SwingTerminalScrollbackTest {
             )
         }
 
-        component.scrollToVisualOffsetPixels(8.0)
+        component.scrollToScrollbackOffset(1)
         drainEdt()
 
         val scrolledState = component.viewportState()
@@ -412,6 +478,56 @@ class SwingTerminalScrollbackTest {
         assertEquals(3, connector.lastRows.get())
         assertEquals(3, component.visibleGridSize().height)
         session.close()
+    }
+
+    @Test
+    fun `alternate screen chrome resizes terminal grid to symmetric side padding`() {
+        val connector = RecordingConnector()
+        val reader = ActiveBufferFrameReader()
+        val terminal = TerminalBuffers.create(width = 3, height = 3, maxHistory = 0)
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                publisher = TerminalRenderPublisher(3, 3),
+                renderReader = reader,
+                responseReader = terminal,
+                connector = connector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+            )
+        val settings =
+            SwingSettings(
+                padding = Insets(0, 40, 8, 8),
+                shellIntegrationDecorationGutterWidth = 32,
+            )
+        val component = SwingTerminal(settingsProvider = SwingSettingsProvider { settings })
+
+        try {
+            SwingUtilities.invokeAndWait {
+                component.setSize(component.preferredGridSize(10, 3))
+                component.bind(session)
+            }
+            drainEdt()
+
+            val primaryColumns = terminal.width
+            assertEquals(10, primaryColumns)
+
+            reader.activeBuffer = TerminalRenderBufferKind.ALTERNATE
+            session.onDirty?.invoke()
+            drainEdt()
+
+            lateinit var alternateVisibleSize: java.awt.Dimension
+            SwingUtilities.invokeAndWait {
+                alternateVisibleSize = component.visibleGridSize()
+            }
+
+            assertTrue(alternateVisibleSize.width > primaryColumns)
+            assertEquals(alternateVisibleSize.width, terminal.width)
+            assertEquals(alternateVisibleSize.width, connector.lastColumns.get())
+            assertEquals(8, settings.padding.bottom)
+        } finally {
+            session.close()
+        }
     }
 
     private class CountingRepaintManager(
@@ -487,6 +603,27 @@ class SwingTerminalScrollbackTest {
         assertEquals(expectedOffset, component.viewportState().scrollbackOffset)
     }
 
+    private fun preciseWheelEvent(
+        component: SwingTerminal,
+        preciseRotation: Double,
+    ): MouseWheelEvent =
+        MouseWheelEvent(
+            component,
+            MouseWheelEvent.MOUSE_WHEEL,
+            System.currentTimeMillis(),
+            0,
+            5,
+            5,
+            0,
+            0,
+            0,
+            false,
+            MouseWheelEvent.WHEEL_UNIT_SCROLL,
+            3,
+            0,
+            preciseRotation,
+        )
+
     private fun scrollTestTerminal(
         hostServices: SwingHostServices = SwingHostServices(),
         settings: SwingSettings = SwingSettings(padding = Insets(0, 0, 0, 0)),
@@ -523,6 +660,7 @@ class SwingTerminalScrollbackTest {
         var lastRequestedRows: Int = -1
             private set
         val requestedOffsets = CopyOnWriteArrayList<Int>()
+        val requestedRows = CopyOnWriteArrayList<Int>()
 
         override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
             readRenderFrame(scrollbackOffset = 0, consumer = consumer)
@@ -535,6 +673,7 @@ class SwingTerminalScrollbackTest {
             lastRequestedOffset = scrollbackOffset
             requestedOffsets += scrollbackOffset
             lastRequestedRows = 0
+            requestedRows += 0
             consumer.accept(ScrollbackFrame(scrollbackOffset.coerceIn(0, 5), rows = 1))
         }
 
@@ -546,6 +685,7 @@ class SwingTerminalScrollbackTest {
             lastRequestedOffset = scrollbackOffset
             requestedOffsets += scrollbackOffset
             lastRequestedRows = viewportRows
+            requestedRows += viewportRows
             consumer.accept(ScrollbackFrame(scrollbackOffset.coerceIn(0, 5), rows = viewportRows.coerceAtLeast(1)))
         }
     }
@@ -672,6 +812,80 @@ class SwingTerminalScrollbackTest {
                 codeWords[codeOffset + column] = line[column].code
                 attrWords[attrOffset + column] = TerminalRenderAttrs.DEFAULT
                 flags[flagOffset + column] = TerminalRenderCellFlags.CODEPOINT
+                extraAttrWords?.set(extraAttrOffset + column, TerminalRenderExtraAttrs.DEFAULT)
+                hyperlinkIds?.set(hyperlinkOffset + column, 0)
+                column++
+            }
+        }
+    }
+
+    private class ActiveBufferFrameReader : TerminalRenderFrameReader {
+        @Volatile
+        var activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
+
+        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+            consumer.accept(ActiveBufferFrame(activeBuffer))
+        }
+
+        override fun readRenderFrame(
+            scrollbackOffset: Int,
+            consumer: TerminalRenderFrameConsumer,
+        ) {
+            consumer.accept(ActiveBufferFrame(activeBuffer))
+        }
+
+        override fun readRenderFrame(
+            scrollbackOffset: Int,
+            viewportRows: Int,
+            consumer: TerminalRenderFrameConsumer,
+        ) {
+            consumer.accept(ActiveBufferFrame(activeBuffer))
+        }
+    }
+
+    private class ActiveBufferFrame(
+        override val activeBuffer: TerminalRenderBufferKind,
+    ) : TerminalRenderFrame {
+        override val columns: Int = 3
+        override val rows: Int = 3
+        override val historySize: Int = 0
+        override val scrollbackOffset: Int = 0
+        override val frameGeneration: Long = 1
+        override val structureGeneration: Long = 1
+        override val cursor: TerminalRenderCursor =
+            TerminalRenderCursor(
+                column = 0,
+                row = 0,
+                visible = false,
+                blinking = false,
+                shape = TerminalRenderCursorShape.BLOCK,
+                generation = 1,
+            )
+
+        override fun lineGeneration(row: Int): Long = 1
+
+        override fun lineWrapped(row: Int): Boolean = false
+
+        override fun copyLine(
+            row: Int,
+            codeWords: IntArray,
+            codeOffset: Int,
+            attrWords: LongArray,
+            attrOffset: Int,
+            flags: IntArray,
+            flagOffset: Int,
+            extraAttrWords: LongArray?,
+            extraAttrOffset: Int,
+            hyperlinkIds: IntArray?,
+            hyperlinkOffset: Int,
+            clusterSink: TerminalRenderClusterSink?,
+            clusterDataSink: TerminalRenderClusterDataSink?,
+        ) {
+            var column = 0
+            while (column < columns) {
+                codeWords[codeOffset + column] = 0
+                attrWords[attrOffset + column] = TerminalRenderAttrs.DEFAULT
+                flags[flagOffset + column] = TerminalRenderCellFlags.EMPTY
                 extraAttrWords?.set(extraAttrOffset + column, TerminalRenderExtraAttrs.DEFAULT)
                 hyperlinkIds?.set(hyperlinkOffset + column, 0)
                 column++

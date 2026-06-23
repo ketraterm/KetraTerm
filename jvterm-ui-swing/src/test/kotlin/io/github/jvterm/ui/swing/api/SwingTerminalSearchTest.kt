@@ -64,7 +64,7 @@ class SwingTerminalSearchTest {
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
-            component.setSize(component.preferredGridSize(12, 1))
+            component.size = component.preferredGridSize(12, 1)
             component.bind(session)
             component.search("needle")
 

@@ -47,7 +47,7 @@ internal interface TerminalCommandInteractionHost {
     )
 
     fun scrollViewportTo(
-        offsetLines: Double,
+        offsetRows: Int,
         historySize: Int,
         boundSession: TerminalSession,
     ): Boolean

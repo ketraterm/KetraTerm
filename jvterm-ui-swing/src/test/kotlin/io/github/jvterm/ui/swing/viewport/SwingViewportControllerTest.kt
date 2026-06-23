@@ -15,6 +15,7 @@
  */
 package io.github.jvterm.ui.swing.viewport
 
+import io.github.jvterm.render.api.TerminalRenderBufferKind
 import io.github.jvterm.ui.swing.api.TerminalViewportState
 import io.github.jvterm.ui.swing.settings.SwingMetrics
 import io.github.jvterm.ui.swing.settings.SwingSettings
@@ -42,7 +43,7 @@ class SwingViewportControllerTest {
     @Nested
     inner class GridSizing {
         @Test
-        fun `visible grid size uses left horizontal padding and vertical padding`() {
+        fun `visible grid size uses full horizontal and vertical padding`() {
             val controller = SwingViewportController { _, _, _, _, _ -> }
 
             val size =
@@ -53,9 +54,36 @@ class SwingViewportControllerTest {
                     componentHeight = 130,
                 )
 
-            assertEquals(21, size.width)
+            assertEquals(20, size.width)
             assertEquals(6, size.height)
             assertEquals(size, controller.visibleGridSizeSnapshot())
+        }
+
+        @Test
+        fun `alternate screen visible grid uses symmetric chrome instead of primary prompt gutter`() {
+            val controller = SwingViewportController { _, _, _, _, _ -> }
+            val settings = SwingSettings(padding = Insets(0, 20, 8, 12))
+
+            val primary =
+                controller.visibleGridSizeOnEdt(
+                    settings = settings,
+                    metrics = metrics,
+                    componentWidth = 212,
+                    componentHeight = 128,
+                    activeBuffer = TerminalRenderBufferKind.PRIMARY,
+                )
+            val alternate =
+                controller.visibleGridSizeOnEdt(
+                    settings = settings,
+                    metrics = metrics,
+                    componentWidth = 212,
+                    componentHeight = 128,
+                    activeBuffer = TerminalRenderBufferKind.ALTERNATE,
+                )
+
+            assertEquals(18, primary.width)
+            assertEquals(19, alternate.width)
+            assertEquals(primary.height, alternate.height)
         }
 
         @Test
@@ -78,6 +106,20 @@ class SwingViewportControllerTest {
                     componentHeight = 131,
                 ),
             )
+        }
+
+        @Test
+        fun `partial viewport plus fractional animation requests two rows beyond the grid`() {
+            val controller = SwingViewportController { _, _, _, _, _ -> }
+            val componentHeight = settings.padding.top + settings.padding.bottom + metrics.cellHeight * 11 - 1
+
+            assertEquals(10, controller.visibleGridRows(settings, metrics, componentHeight))
+            val renderRows = controller.visibleRenderRows(settings, metrics, componentHeight)
+            assertEquals(11, renderRows)
+
+            controller.scrollTo(offsetLines = 4.25, historySize = 10)
+
+            assertEquals(12, controller.requestedRows(renderRows))
         }
 
         @Test
@@ -126,6 +168,7 @@ class SwingViewportControllerTest {
                     visualScrollRangePixels = 2000,
                     viewportHeightPixels = 480,
                     contentHeightPixels = 500,
+                    cellHeightPixels = 20,
                 ),
                 snapshot,
             )
@@ -159,34 +202,55 @@ class SwingViewportControllerTest {
                     visualScrollRangePixels = 200,
                     viewportHeightPixels = 100,
                     contentHeightPixels = 120,
+                    cellHeightPixels = 20,
                 ),
                 controller.viewportStateSnapshot(),
             )
             assertEquals(0, listener.callCount)
+        }
+
+        @Test
+        fun `publishViewportState can notify primitive listener without full snapshot`() {
+            val listener = RecordingViewportListener()
+            val controller = SwingViewportController(listener)
+            controller.updateVisualMetrics(historySize = 10, cellHeight = 20, visualOverflowPixels = 0)
+            controller.scrollTo(offsetLines = 2.5, historySize = 10)
+
+            controller.publishViewportState(
+                historySize = 10,
+                visibleRows = 5,
+                renderRows = 5,
+                viewportHeightPixels = 100,
+                contentHeightPixels = 120,
+                notifyListener = false,
+                notifyPrimitiveListener = true,
+            )
+
+            assertEquals(1, listener.callCount)
+            assertEquals(2.5, listener.lastState?.scrollbackOffset)
+            assertEquals(3, listener.lastState?.renderOffset)
         }
     }
 
     @Nested
     inner class ScrollState {
         @Test
-        fun `resize anchoring preserves fractional scroll offset`() {
+        fun `resize anchoring preserves whole-row scroll offset`() {
             val controller = SwingViewportController { _, _, _, _, _ -> }
 
-            controller.scrollTo(offsetLines = 7.75, historySize = 100)
+            controller.scrollTo(offsetLines = 8.0, historySize = 100)
             val requestedOffset = controller.resizeRequestedOffset()
-            val fraction = controller.resizeFraction()
             controller.anchorAfterResize(
                 newOffset = requestedOffset + 10,
                 newHistorySize = 100,
-                oldFraction = fraction,
             )
 
-            assertEquals(19, controller.requestedOffset)
-            assertEquals(18.75, controller.viewportOffsetForAssertion())
+            assertEquals(18, controller.requestedOffset)
+            assertEquals(18.0, controller.viewportOffsetForAssertion())
         }
 
         @Test
-        fun `contentOriginY uses terminal cell height for smooth scroll`() {
+        fun `contentOriginY applies fractional smooth scroll translation`() {
             val controller = SwingViewportController { _, _, _, _, _ -> }
 
             controller.scrollTo(offsetLines = 2.25, historySize = 10)
@@ -222,21 +286,6 @@ class SwingViewportControllerTest {
             assertThrows(IllegalArgumentException::class.java) {
                 controller.updateVisualMetrics(historySize = 0, cellHeight = 20, visualOverflowPixels = 12)
             }
-        }
-
-        @Test
-        fun `visual pixel scroll maps directly to fixed row scrollback`() {
-            val controller = SwingViewportController { _, _, _, _, _ -> }
-
-            controller.updateVisualMetrics(historySize = 10, cellHeight = 20, visualOverflowPixels = 0)
-
-            assertTrue(controller.scrollToVisualOffsetPixels(10.0))
-            assertEquals(1, controller.requestedOffset)
-            assertEquals(-10.0, controller.contentOriginY(cacheScrollbackOffset = 1, cellHeight = 20))
-
-            assertTrue(controller.scrollToVisualOffsetPixels(20.0))
-            assertEquals(1, controller.requestedOffset)
-            assertEquals(0.0, controller.contentOriginY(cacheScrollbackOffset = 1, cellHeight = 20))
         }
 
         @Test
@@ -277,6 +326,7 @@ class SwingViewportControllerTest {
                     visualScrollRangePixels = 200,
                     viewportHeightPixels = 80,
                     contentHeightPixels = 80,
+                    cellHeightPixels = 20,
                 ),
                 controller.viewportStateSnapshot(),
             )

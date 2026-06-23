@@ -25,6 +25,8 @@ class TerminalRenderCacheTest {
         assertAll(
             { assertThrows(IllegalArgumentException::class.java) { TerminalRenderCache(0, 1) } },
             { assertThrows(IllegalArgumentException::class.java) { TerminalRenderCache(1, 0) } },
+            { assertThrows(IllegalArgumentException::class.java) { TerminalRenderCache(1, 1, rowCapacityReserve = -1) } },
+            { assertThrows(IllegalArgumentException::class.java) { TerminalRenderCache(1, Int.MAX_VALUE, rowCapacityReserve = 1) } },
         )
     }
 
@@ -200,7 +202,7 @@ class TerminalRenderCacheTest {
         cache.updateFrom(frame.reader)
 
         assertAll(
-            { assertTrue(cache.resizedOnLastUpdate) },
+            { assertTrue(cache.shapeChangedOnLastUpdate) },
             { assertEquals(2, cache.columns) },
             { assertEquals(1, cache.rows) },
             { assertEquals("ab", cache.rowText(0)) },
@@ -319,7 +321,37 @@ class TerminalRenderCacheTest {
             { assertEquals(1, frame.lastRequestedOffset) },
             { assertEquals(2, frame.lastRequestedRows) },
             { assertEquals(2, cache.rows) },
-            { assertTrue(cache.resizedOnLastUpdate) },
+            { assertTrue(cache.shapeChangedOnLastUpdate) },
+        )
+    }
+
+    @Test
+    fun `reserved rows reuse primitive planes while overscan shape toggles`() {
+        val frame = OffsetFrame()
+        val cache = TerminalRenderCache(columns = 3, rows = 1, rowCapacityReserve = 1)
+        val initialCodeWords = cache.codeWords
+        val initialAttrWords = cache.attrWords
+        val initialFlags = cache.flags
+        val initialLineGenerations = cache.lineGenerations
+
+        cache.updateFrom(frame.reader, scrollbackOffset = 1, viewportRows = 2)
+
+        assertAll(
+            { assertEquals(2, cache.rows) },
+            { assertTrue(cache.shapeChangedOnLastUpdate) },
+            { assertSame(initialCodeWords, cache.codeWords) },
+            { assertSame(initialAttrWords, cache.attrWords) },
+            { assertSame(initialFlags, cache.flags) },
+            { assertSame(initialLineGenerations, cache.lineGenerations) },
+        )
+
+        cache.updateFrom(frame.reader, scrollbackOffset = 0)
+
+        assertAll(
+            { assertEquals(1, cache.rows) },
+            { assertTrue(cache.shapeChangedOnLastUpdate) },
+            { assertSame(initialCodeWords, cache.codeWords) },
+            { assertSame(initialLineGenerations, cache.lineGenerations) },
         )
     }
 

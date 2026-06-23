@@ -26,13 +26,30 @@ import io.github.jvterm.render.api.*
  * timer logic. Swing, Compose, and other renderers can build their local layout
  * and paint caches from this primitive data.
  *
+ * Cell and row planes may have spare capacity when [rowCapacityReserve] is
+ * non-zero. Only the prefix addressed by [columns] and [rows] is part of the
+ * current frame. The reserve lets renderers change a viewport's logical row
+ * count, for example while smooth-scroll overscan is active, without replacing
+ * the primitive arrays in the frame-update hot path.
+ *
  * @param columns initial cache width in cells.
  * @param rows initial cache height in rows.
+ * @param rowCapacityReserve spare rows retained whenever primitive storage is
+ * allocated; must be non-negative.
  */
 class TerminalRenderCache(
     columns: Int,
     rows: Int,
+    private val rowCapacityReserve: Int,
 ) : TerminalRenderFrameConsumer {
+    /**
+     * Creates a cache whose primitive planes exactly fit its initial shape.
+     *
+     * @param columns initial cache width in cells.
+     * @param rows initial cache height in rows.
+     */
+    constructor(columns: Int, rows: Int) : this(columns, rows, rowCapacityReserve = 0)
+
     /**
      * Cached visible width in cells.
      */
@@ -224,9 +241,13 @@ class TerminalRenderCache(
         }
 
     /**
-     * Whether the most recent [updateFrom] call resized the primitive storage.
+     * Whether the most recent [updateFrom] call changed the logical frame shape.
+     *
+     * Reserved row capacity can satisfy a row-only shape change without
+     * replacing primitive storage. Consumers should still treat this as a
+     * structural repaint signal because [columns] or [rows] changed.
      */
-    var resizedOnLastUpdate: Boolean = false
+    var shapeChangedOnLastUpdate: Boolean = false
         private set
 
     /**
@@ -240,6 +261,7 @@ class TerminalRenderCache(
     private var nextClusterCodepointCount: Int = 0
     private var clusterSinkRow: Int = NO_CLUSTER_SINK_ROW
     private var clusterSinkRefs: LongArray = LongArray(0)
+    private var storageRows: Int = 0
     private var hasCursor: Boolean = false
     private var nextCursorColumn: Int = 0
     private var nextCursorRow: Int = 0
@@ -287,6 +309,9 @@ class TerminalRenderCache(
     init {
         require(columns > 0) { "columns must be > 0, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
+        require(rowCapacityReserve >= 0) {
+            "rowCapacityReserve must be >= 0, was $rowCapacityReserve"
+        }
         resizeStorage(columns, rows)
     }
 
@@ -354,11 +379,15 @@ class TerminalRenderCache(
      * @param frame the short-lived render frame snapshot to copy from.
      */
     override fun accept(frame: TerminalRenderFrame) {
-        resizedOnLastUpdate = false
+        shapeChangedOnLastUpdate = false
 
         if (columns != frame.columns || rows != frame.rows) {
-            resizeStorage(frame.columns, frame.rows)
-            resizedOnLastUpdate = true
+            if (columns != frame.columns || frame.rows > storageRows) {
+                resizeStorage(frame.columns, frame.rows)
+            } else {
+                rows = frame.rows
+            }
+            shapeChangedOnLastUpdate = true
             structureGeneration = UNINITIALIZED_GENERATION
         }
 
@@ -440,13 +469,19 @@ class TerminalRenderCache(
         require(newColumns > 0) { "columns must be > 0, was $newColumns" }
         require(newRows > 0) { "rows must be > 0, was $newRows" }
 
+        require(newRows <= Int.MAX_VALUE - rowCapacityReserve) {
+            "row capacity overflows Int: rows=$newRows, reserve=$rowCapacityReserve"
+        }
+        val newStorageRows = newRows + rowCapacityReserve
+        require(newColumns <= Int.MAX_VALUE / newStorageRows) {
+            "cell capacity overflows Int: columns=$newColumns, rows=$newRows, reserve=$rowCapacityReserve"
+        }
+
         columns = newColumns
         rows = newRows
+        storageRows = newStorageRows
 
-        require(newColumns <= Int.MAX_VALUE / newRows) {
-            "cell count overflows Int: columns=$newColumns, rows=$newRows"
-        }
-        val cellCount = newColumns * newRows
+        val cellCount = newColumns * newStorageRows
         codeWords = IntArray(cellCount)
         attrWords = LongArray(cellCount)
         flags = IntArray(cellCount)
@@ -457,10 +492,10 @@ class TerminalRenderCache(
         clusterCodepointCount = 0
         nextClusterCodepointCount = 0
 
-        lineGenerations = LongArray(newRows) { UNINITIALIZED_GENERATION }
-        lineIds = LongArray(newRows)
-        lineWrapped = BooleanArray(newRows)
-        lineHasBlinkingText = BooleanArray(newRows)
+        lineGenerations = LongArray(newStorageRows) { UNINITIALIZED_GENERATION }
+        lineIds = LongArray(newStorageRows)
+        lineWrapped = BooleanArray(newStorageRows)
+        lineHasBlinkingText = BooleanArray(newStorageRows)
         hasBlinkingText = false
 
         hasCursor = false

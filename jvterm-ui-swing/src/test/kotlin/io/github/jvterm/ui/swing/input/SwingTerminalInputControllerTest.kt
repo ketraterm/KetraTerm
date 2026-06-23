@@ -150,6 +150,34 @@ class SwingTerminalInputControllerTest {
     }
 
     @Nested
+    inner class ViewportShortcuts {
+        @Test
+        fun `shift page keys use whole-page row destinations`() {
+            val host = RecordingInputHost()
+            val controller = SwingTerminalInputController(host)
+            val pageUp = keyPressed(KeyEvent.VK_PAGE_UP, InputEvent.SHIFT_DOWN_MASK)
+            val pageDown = keyPressed(KeyEvent.VK_PAGE_DOWN, InputEvent.SHIFT_DOWN_MASK)
+
+            controller.keyListener.keyPressed(pageUp)
+            controller.keyListener.keyPressed(pageDown)
+
+            assertEquals(listOf(24, -24), host.viewportScrollDeltas)
+            assertTrue(pageUp.isConsumed)
+            assertTrue(pageDown.isConsumed)
+        }
+
+        @Test
+        fun `unmodified page key remains terminal input`() {
+            val host = RecordingInputHost()
+            val controller = SwingTerminalInputController(host)
+
+            controller.keyListener.keyPressed(keyPressed(KeyEvent.VK_PAGE_UP, 0))
+
+            assertTrue(host.viewportScrollDeltas.isEmpty())
+        }
+    }
+
+    @Nested
     inner class HyperlinkHover {
         @Test
         fun `key press and release publish control activation state`() {
@@ -197,11 +225,18 @@ class SwingTerminalInputControllerTest {
         override val session: TerminalSession? = null
         val hyperlinkHoverUpdates = ArrayList<Boolean>()
         val cursorBlinkResets = ArrayList<Boolean>()
+        val viewportScrollDeltas = ArrayList<Int>()
         var focused = false
         var cursorRepaints = 0
         var openSearchCount = 0
         var copyCount = 0
         var pasteCount = 0
+
+        override fun visibleGridRows(): Int = 24
+
+        override fun scrollViewportByRows(deltaRows: Int) {
+            viewportScrollDeltas += deltaRows
+        }
 
         override fun updateHyperlinkActivationHover(active: Boolean) {
             hyperlinkHoverUpdates += active

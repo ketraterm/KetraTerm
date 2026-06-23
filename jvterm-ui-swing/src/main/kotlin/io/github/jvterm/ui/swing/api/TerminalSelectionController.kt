@@ -35,10 +35,7 @@ internal interface TerminalSelectionHost {
         y: Int,
     ): Long
 
-    fun scrollViewportBy(
-        delta: Double,
-        historySize: Int,
-    ): Boolean
+    fun scrollViewportByRows(deltaRows: Int): Boolean
 
     fun repaint()
 
@@ -252,7 +249,7 @@ internal class TerminalSelectionController(
     }
 
     private fun updateSelectionAutoscroll(scrollImmediately: Boolean = false) {
-        if (selectingWithMouse && selectionAutoscrollDelta(lastSelectionDragY) != 0.0) {
+        if (selectingWithMouse && selectionAutoscrollDelta(lastSelectionDragY) != 0) {
             if (!selectionAutoscrollTimer.isRunning) {
                 if (scrollImmediately) handleSelectionAutoscrollTick()
                 selectionAutoscrollTimer.start()
@@ -262,20 +259,20 @@ internal class TerminalSelectionController(
         }
     }
 
-    private fun selectionAutoscrollDelta(y: Int): Double {
+    private fun selectionAutoscrollDelta(y: Int): Int {
         val padding = host.settings.padding
         return when {
             y < padding.top -> {
                 val distance = padding.top - y
-                kotlin.math.floor(1.0 + (distance / 20.0))
+                1 + distance / 20
             }
 
             y >= host.componentHeight - padding.bottom -> {
                 val distance = y - (host.componentHeight - padding.bottom)
-                -kotlin.math.floor(1.0 + (distance / 20.0))
+                -(1 + distance / 20)
             }
 
-            else -> 0.0
+            else -> 0
         }
     }
 
@@ -287,12 +284,12 @@ internal class TerminalSelectionController(
 
         val cache = host.renderCache
         val delta = selectionAutoscrollDelta(lastSelectionDragY)
-        if (delta == 0.0) {
+        if (delta == 0) {
             selectionAutoscrollTimer.stop()
             return
         }
 
-        val changed = host.scrollViewportBy(delta, cache.historySize)
+        val changed = host.scrollViewportByRows(delta)
         if (changed) {
             updateSelectionCaret(lastSelectionDragX, lastSelectionDragY)
         }

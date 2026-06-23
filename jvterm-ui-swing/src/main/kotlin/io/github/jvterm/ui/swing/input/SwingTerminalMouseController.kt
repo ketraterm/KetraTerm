@@ -20,6 +20,7 @@ import io.github.jvterm.input.event.TerminalMouseButton
 import io.github.jvterm.input.event.TerminalMouseEvent
 import io.github.jvterm.input.event.TerminalMouseEventType
 import io.github.jvterm.protocol.MouseTrackingMode
+import io.github.jvterm.ui.swing.settings.SwingTerminalChrome
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
@@ -87,20 +88,17 @@ internal class SwingTerminalMouseController(
 
     private fun handleMouseWheel(event: MouseWheelEvent) {
         if (isMouseTrackingIntercepted(event)) {
-            host.finishWheelScrollAnimation()
+            host.finishViewportScroll()
             handleMouseTracking(event, TerminalMouseEventType.WHEEL)
             return
         }
         val delta = wheelScrollLines(event)
-        if (delta == 0) {
-            // Java accumulates high-resolution wheel movement until
-            // wheelRotation reaches a whole click. Keep the event inside the
-            // terminal without translating the fixed grid fractionally.
+        if (delta == 0.0) {
             event.consume()
             return
         }
 
-        if (host.scrollViewportByRows(delta)) {
+        if (host.scrollViewportByPreciseRows(delta)) {
             event.consume()
         }
     }
@@ -147,10 +145,10 @@ internal class SwingTerminalMouseController(
         if (event.isControlDown) mods = mods or TerminalModifiers.CTRL
         if (event.isMetaDown) mods = mods or TerminalModifiers.META
 
-        val padding = host.settings.padding
+        val paddingLeft = SwingTerminalChrome.left(host.settings, host.renderCache.activeBuffer)
         val gridWidth = host.renderCache.columns * host.metrics.cellWidth
         val gridHeight = host.renderCache.rows * host.metrics.cellHeight
-        val pixelX = (event.x - padding.left).coerceIn(0, gridWidth - 1)
+        val pixelX = (event.x - paddingLeft).coerceIn(0, gridWidth - 1)
         val pixelY = host.terminalPixelYAt(event.y, host.renderCache).coerceIn(0, gridHeight - 1)
 
         val mouseEvent =
@@ -178,15 +176,15 @@ internal class SwingTerminalMouseController(
         return true
     }
 
-    private fun wheelScrollLines(event: MouseWheelEvent): Int {
-        val clicks = -event.wheelRotation.toLong()
+    private fun wheelScrollLines(event: MouseWheelEvent): Double {
+        val clicks = -event.preciseWheelRotation
         val units =
             when (event.scrollType) {
                 MouseWheelEvent.WHEEL_UNIT_SCROLL -> event.scrollAmount
                 MouseWheelEvent.WHEEL_BLOCK_SCROLL -> host.visibleGridRows()
                 else -> 1
             }
-        return (clicks * units).coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
+        return (clicks * units).coerceIn(Int.MIN_VALUE.toDouble(), Int.MAX_VALUE.toDouble())
     }
 
     private companion object {

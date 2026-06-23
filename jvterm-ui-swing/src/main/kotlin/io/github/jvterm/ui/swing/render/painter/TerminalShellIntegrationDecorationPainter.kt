@@ -37,12 +37,11 @@ internal class TerminalShellIntegrationDecorationPainter(
         settings: SwingSettings,
         metrics: SwingMetrics,
         decorations: TerminalShellIntegrationViewportDecorations?,
+        gutterWidth: Int,
         row: Int,
         hovered: Boolean,
     ) {
         if (decorations == null) return
-
-        val gutterWidth = settings.shellIntegrationDecorationGutterWidth.coerceAtMost(settings.padding.left)
         if (gutterWidth <= 0) return
 
         val y = row * metrics.cellHeight

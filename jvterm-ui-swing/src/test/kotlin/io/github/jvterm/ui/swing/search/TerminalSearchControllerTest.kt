@@ -88,12 +88,12 @@ class TerminalSearchControllerTest {
         override fun visibleGridRows(): Int = 1
 
         override fun scrollViewportTo(
-            offsetLines: Double,
+            offsetRows: Int,
             historySize: Int,
             boundSession: TerminalSession,
         ): Boolean {
             scrollRequestCount++
-            renderCache.updateFrom(boundSession, scrollbackOffset = offsetLines.toInt(), viewportRows = visibleGridRows())
+            renderCache.updateFrom(boundSession, scrollbackOffset = offsetRows, viewportRows = visibleGridRows())
             return true
         }
 

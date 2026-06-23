@@ -137,19 +137,20 @@ class SwingTerminalMouseControllerTest {
             controller.wheelListener.mouseWheelMoved(event)
 
             assertEquals(1, host.scrollCount)
-            assertEquals(-3, host.lastScrollDelta)
+            assertEquals(-3.0, host.lastScrollDelta)
             assertTrue(event.isConsumed)
         }
 
         @Test
-        fun `partial trackpad rotation is consumed without fractional viewport movement`() {
+        fun `partial trackpad rotation enters shared smooth scroll path`() {
             val host = RecordingMouseHost()
             val controller = SwingTerminalMouseController(host)
             val event = mouseWheel(rotation = -0.1)
 
             controller.wheelListener.mouseWheelMoved(event)
 
-            assertEquals(0, host.scrollCount)
+            assertEquals(1, host.scrollCount)
+            assertEquals(0.3, host.lastScrollDelta, 1.0e-12)
             assertTrue(event.isConsumed)
         }
 
@@ -319,7 +320,7 @@ class SwingTerminalMouseControllerTest {
         var selectionPressCount = 0
         var selectionReleaseCount = 0
         var selectionDragCount = 0
-        var lastScrollDelta = 0
+        var lastScrollDelta = 0.0
         var finishWheelAnimationCount = 0
         val mouseReports = ArrayList<TerminalMouseEvent>()
 
@@ -342,13 +343,13 @@ class SwingTerminalMouseControllerTest {
 
         override fun visibleGridRows(): Int = 24
 
-        override fun scrollViewportByRows(delta: Int): Boolean {
+        override fun scrollViewportByPreciseRows(deltaRows: Double): Boolean {
             scrollCount++
-            lastScrollDelta = delta
+            lastScrollDelta = deltaRows
             return scrollResult
         }
 
-        override fun finishWheelScrollAnimation() {
+        override fun finishViewportScroll() {
             finishWheelAnimationCount++
         }
 

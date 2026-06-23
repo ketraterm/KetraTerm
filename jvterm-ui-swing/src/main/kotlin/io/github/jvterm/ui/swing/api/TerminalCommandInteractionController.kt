@@ -61,7 +61,11 @@ internal class TerminalCommandInteractionController(
         if (targetAbsoluteRow == NO_COMMAND_ABSOLUTE_ROW) return false
 
         val desiredOffset = host.searchCache.discardedCount + host.searchCache.historySize - targetAbsoluteRow
-        return host.scrollViewportTo(desiredOffset.toDouble(), historySize = host.searchCache.historySize, boundSession)
+        return host.scrollViewportTo(
+            desiredOffset.coerceIn(0L, host.searchCache.historySize.toLong()).toInt(),
+            historySize = host.searchCache.historySize,
+            boundSession,
+        )
     }
 
     fun commandRecordAt(
@@ -99,7 +103,11 @@ internal class TerminalCommandInteractionController(
 
         host.selectAbsoluteRows(startAbsoluteRow, endAbsoluteRow, host.searchCache.columns)
         val desiredOffset = host.searchCache.discardedCount + host.searchCache.historySize - startAbsoluteRow
-        host.scrollViewportTo(desiredOffset.toDouble(), historySize = host.searchCache.historySize, boundSession)
+        host.scrollViewportTo(
+            desiredOffset.coerceIn(0L, host.searchCache.historySize.toLong()).toInt(),
+            historySize = host.searchCache.historySize,
+            boundSession,
+        )
         host.repaint()
         return true
     }

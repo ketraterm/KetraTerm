@@ -16,11 +16,14 @@
 package io.github.jvterm.intellij.ui
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.ui.components.JBScrollBar
 import io.github.jvterm.intellij.settings.JvTermIntellijSettings
 import io.github.jvterm.ui.swing.api.SwingHostServices
+import io.github.jvterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.jvterm.ui.swing.api.SwingTerminal
 import io.github.jvterm.ui.swing.api.TerminalUiDispatcher
 import io.github.jvterm.workspace.TerminalWorkspaceTab
+import java.awt.Adjustable
 import java.awt.BorderLayout
 import javax.swing.JPanel
 
@@ -65,27 +68,44 @@ internal class JvTermTerminalPane private constructor(
          * @return bound terminal pane.
          */
         fun create(tab: TerminalWorkspaceTab): JvTermTerminalPane {
+            val scrollbar = JBScrollBar(Adjustable.VERTICAL)
+            val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
+
             val terminal =
                 SwingTerminal(
                     settingsProvider = { JvTermIntellijSettings.current() },
                     hostServices =
                         SwingHostServices(
+                            viewportListener = scrollbarAdapter,
                             uiDispatcher = TerminalUiDispatcher { runnable ->
                                 ApplicationManager.getApplication().invokeLater(runnable)
                             },
                         ),
                 )
+            scrollbarAdapter.attach(terminal)
             terminal.bind(tab.session)
+
+            configureScrollbar(scrollbar)
 
             val component =
                 JPanel(BorderLayout()).apply {
                     border = null
                     background = terminal.background
+                    terminal.border = null
                     add(terminal, BorderLayout.CENTER)
+                    add(scrollbar, BorderLayout.EAST)
             }
 
             tab.session.notifyRenderDirty()
             return JvTermTerminalPane(terminal, component)
+        }
+
+        private fun configureScrollbar(scrollbar: JBScrollBar) {
+            scrollbar.unitIncrement = 1
+            scrollbar.blockIncrement = 8
+            scrollbar.isVisible = false
+            scrollbar.isFocusable = false
+            scrollbar.isOpaque = false
         }
     }
 }

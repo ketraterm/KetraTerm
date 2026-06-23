@@ -15,8 +15,10 @@
  */
 package io.github.jvterm.ui.swing.render
 
+import io.github.jvterm.ui.swing.settings.SwingTerminalChrome
 import io.github.jvterm.ui.swing.viewport.SwingRepaintPlanner
 import io.github.jvterm.ui.swing.viewport.TerminalRepaintSink
+import java.awt.Insets
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -26,6 +28,7 @@ internal class SwingRenderFrameController(
     private val host: SwingRenderFrameHost,
 ) {
     private val repaintPlanner = SwingRepaintPlanner()
+    private val repaintPaddingScratch = Insets(0, 0, 0, 0)
     private val renderPending = AtomicBoolean(false)
     private val repaintSink =
         object : TerminalRepaintSink {
@@ -65,6 +68,9 @@ internal class SwingRenderFrameController(
         val boundSession = host.session ?: return
         host.resetCursorBlinkForFrame()
         host.refreshRenderCacheFromSession(boundSession)
+        if (host.syncTerminalGridToActiveChrome()) {
+            host.refreshRenderCacheFromSession(boundSession)
+        }
         if (host.clampViewport(host.renderCache.historySize) || host.renderCache.scrollbackOffset != host.requestedViewportOffset()) {
             host.refreshRenderCacheFromSession(boundSession)
         }
@@ -80,7 +86,7 @@ internal class SwingRenderFrameController(
             metrics = host.metrics,
             componentWidth = host.componentWidth,
             componentHeight = host.componentHeight,
-            padding = host.settings.padding,
+            padding = repaintPadding(),
             repaintSink = repaintSink,
             forceFullRepaint = shellIntegrationDecorationsChanged,
             visualGeometry = host.visualGeometry,
@@ -95,7 +101,7 @@ internal class SwingRenderFrameController(
                 metrics = host.metrics,
                 componentWidth = host.componentWidth,
                 componentHeight = host.componentHeight,
-                padding = host.settings.padding,
+                padding = repaintPadding(),
                 repaintSink = repaintSink,
                 visualGeometry = host.visualGeometry,
             )
@@ -105,7 +111,7 @@ internal class SwingRenderFrameController(
             metrics = host.metrics,
             componentWidth = host.componentWidth,
             componentHeight = host.componentHeight,
-            padding = host.settings.padding,
+            padding = repaintPadding(),
             repaintSink = repaintSink,
             visualGeometry = host.visualGeometry,
         )
@@ -118,9 +124,19 @@ internal class SwingRenderFrameController(
             metrics = host.metrics,
             componentWidth = host.componentWidth,
             componentHeight = host.componentHeight,
-            padding = host.settings.padding,
+            padding = repaintPadding(),
             repaintSink = repaintSink,
             visualGeometry = host.visualGeometry,
         )
+    }
+
+    private fun repaintPadding(): Insets {
+        val settings = host.settings
+        val activeBuffer = host.renderCache.activeBuffer
+        repaintPaddingScratch.top = SwingTerminalChrome.top(settings)
+        repaintPaddingScratch.left = SwingTerminalChrome.left(settings, activeBuffer)
+        repaintPaddingScratch.bottom = SwingTerminalChrome.bottom(settings)
+        repaintPaddingScratch.right = SwingTerminalChrome.right(settings, activeBuffer)
+        return repaintPaddingScratch
     }
 }

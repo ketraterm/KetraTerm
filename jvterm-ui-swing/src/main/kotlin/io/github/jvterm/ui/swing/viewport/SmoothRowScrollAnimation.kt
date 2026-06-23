@@ -17,28 +17,19 @@ package io.github.jvterm.ui.swing.viewport
 
 import kotlin.math.roundToInt
 
-/** Allocation-free primitive state for one row-targeted wheel animation. */
-internal class WheelScrollAnimation {
-    var isActive: Boolean = false
+/** Allocation-free interpolation state whose destination is always a row. */
+internal class SmoothRowScrollAnimation {
+    var isActive = false
         private set
 
-    var targetOffset: Double = 0.0
+    var targetRow = 0
         private set
 
-    private var startOffset: Double = 0.0
-    private var startNanos: Long = 0L
+    private var startOffset = 0.0
+    private var startNanos = 0L
 
-    /**
-     * Retargets the animation by a whole-row delta.
-     *
-     * Active animations accumulate from their integer destination. New
-     * animations start from the nearest grid row, so wheel input never creates
-     * a fractional destination.
-     *
-     * @return true when the event has an attainable destination or an existing
-     * animation is still moving toward the same clamped boundary.
-     */
-    fun retarget(
+    /** Retargets from [currentOffset] by a signed whole-row delta. */
+    fun retargetBy(
         currentOffset: Double,
         deltaRows: Int,
         historySize: Int,
@@ -48,36 +39,48 @@ internal class WheelScrollAnimation {
         require(historySize >= 0) { "historySize must be >= 0, was $historySize" }
         if (deltaRows == 0) return false
 
-        val baseTarget = if (isActive) targetOffset else currentOffset.roundToInt().toDouble()
-        val nextTarget =
-            (baseTarget + deltaRows.toLong())
-                .coerceIn(0.0, historySize.toDouble())
-        if (nextTarget == targetOffset && isActive) return true
-        if (nextTarget == currentOffset) return false
+        val baseRow = if (isActive) targetRow else currentOffset.roundToInt().coerceIn(0, historySize)
+        val nextRow = (baseRow.toLong() + deltaRows).coerceIn(0L, historySize.toLong()).toInt()
+        return retargetTo(currentOffset, nextRow, historySize, nowNanos)
+    }
+
+    /** Retargets from [currentOffset] to the clamped integer [targetRow]. */
+    fun retargetTo(
+        currentOffset: Double,
+        targetRow: Int,
+        historySize: Int,
+        nowNanos: Long,
+    ): Boolean {
+        require(currentOffset.isFinite()) { "currentOffset must be finite, was $currentOffset" }
+        require(historySize >= 0) { "historySize must be >= 0, was $historySize" }
+
+        val nextRow = targetRow.coerceIn(0, historySize)
+        if (isActive && nextRow == this.targetRow) return true
+        if (nextRow.toDouble() == currentOffset) return false
 
         startOffset = currentOffset
-        targetOffset = nextTarget
+        this.targetRow = nextRow
         startNanos = nowNanos
         isActive = true
         return true
     }
 
-    /** Returns the eased position at [nowNanos], completing exactly on the target row. */
+    /** Returns the eased visual offset, ending exactly on [targetRow]. */
     fun positionAt(nowNanos: Long): Double {
-        if (!isActive) return targetOffset
+        if (!isActive) return targetRow.toDouble()
         val elapsed = (nowNanos - startNanos).coerceAtLeast(0L)
         if (elapsed >= DURATION_NANOS) {
             isActive = false
-            return targetOffset
+            return targetRow.toDouble()
         }
 
         val progress = elapsed.toDouble() / DURATION_NANOS
         val remaining = 1.0 - progress
         val easedProgress = 1.0 - remaining * remaining * remaining
-        return startOffset + (targetOffset - startOffset) * easedProgress
+        return startOffset + (targetRow - startOffset) * easedProgress
     }
 
-    /** Cancels interpolation without changing the viewport position. */
+    /** Cancels interpolation without changing the visual offset. */
     fun cancel() {
         isActive = false
     }

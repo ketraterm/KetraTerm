@@ -48,7 +48,7 @@ class TerminalSelectionControllerTest {
         var cellAtCallCount = 0
         var cellAtX = -1
         var cellAtY = -1
-        var scrollDelta = 0.0
+        var scrollDeltaRows = 0
         var repaints = 0
         var focusRequests = 0
 
@@ -64,11 +64,8 @@ class TerminalSelectionControllerTest {
             return (col.toLong() shl 32) or (row.toLong() and 0xffff_ffffL)
         }
 
-        override fun scrollViewportBy(
-            delta: Double,
-            historySize: Int,
-        ): Boolean {
-            scrollDelta = delta
+        override fun scrollViewportByRows(deltaRows: Int): Boolean {
+            scrollDeltaRows = deltaRows
             return true
         }
 

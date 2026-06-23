@@ -390,7 +390,7 @@ internal class SwingRepaintPlanner {
             lastLineWrapped[row] != cache.lineWrapped[row]
 
     private fun requiresFullRepaint(cache: TerminalRenderCache): Boolean =
-        cache.resizedOnLastUpdate ||
+        cache.shapeChangedOnLastUpdate ||
             lastColumns != cache.columns ||
             lastRows != cache.rows ||
             lastLineGenerations.size != cache.rows ||
