@@ -103,7 +103,7 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 ## 7. Embedding & Swing UI
 
 - **PTY Process Integration**: Spawns default platform shells using Pty4J with Windows ConPTY support and prompt resizing.
-- **SSH Transport Integration**: Provides an SSH transport module backed by Apache MINA SSHD for remote PTY shell channels, strict host-key verification by default, runtime-only authentication credentials, synchronous transport byte delivery through the shared `TerminalConnector` contract, SSH PTY resize propagation, host metadata event forwarding, TOML-backed SSH endpoint profiles without stored secrets, and workspace tab creation for SSH profiles without changing parser, core, input, or rendering layers.
+- **SSH Transport Integration**: Provides an SSH transport module backed by Apache MINA SSHD for remote PTY shell channels, strict host-key verification by default, runtime-only authentication credentials, synchronous transport byte delivery through the shared `TerminalConnector` contract, SSH PTY resize propagation, host metadata event forwarding, TOML-backed SSH endpoint profiles without stored secrets, workspace tab creation for SSH profiles, and standalone app profile-menu opening with an ephemeral password prompt plus strict known-hosts verification.
 - **High-Performance Painting**: Decoupled, multi-threaded rendering using triple-buffering to achieve 60+ FPS paint cycles with zero tearing under heavy stdout throughput.
 - **Font Fallbacks**: Scan and fall back to native system fonts for color emojis and complex visual shapes.
 - **Windows Emoji Rasterizer**: Segoe UI Emoji COLR/CPAL color glyph painting.

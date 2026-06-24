@@ -196,6 +196,43 @@ internal class TabManager(
                 return false
             }
 
+        attachWorkspaceTab(workspaceTab, profile.kind)
+        return true
+    }
+
+    fun openSshTab(
+        profile: TerminalSshProfile,
+        request: SshOpenRequest,
+    ): Boolean {
+        val workspaceTab =
+            try {
+                workspace.openSshTab(
+                    profile = profile,
+                    options =
+                        settings.current().let { snapshot ->
+                            TerminalWorkspaceSshOpenOptions(
+                                columns = snapshot.columns,
+                                rows = snapshot.rows,
+                                treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
+                                maxHistory = snapshot.scrollbackLines,
+                                authentication = request.authentication,
+                                hostKeyPolicy = request.hostKeyPolicy,
+                            )
+                        },
+                )
+            } catch (exception: Exception) {
+                showSshStartError(profile, exception)
+                return false
+            }
+
+        attachWorkspaceTab(workspaceTab, TerminalProfileKind.SSH)
+        return true
+    }
+
+    private fun attachWorkspaceTab(
+        workspaceTab: TerminalWorkspaceTab,
+        profileKind: TerminalProfileKind,
+    ) {
         val pane =
             TerminalPane.create(workspaceTab, settings) { p, x, y ->
                 showPaneContextMenu(p, p.terminal, x, y)
@@ -215,11 +252,10 @@ internal class TabManager(
         tabContainers[tabId] = container
 
         tabContentPanel.add(container, tabId)
-        tabBar.addTab(TabEntry(id = tabId, title = workspaceTab.title, profileKind = profile.kind))
+        tabBar.addTab(TabEntry(id = tabId, title = workspaceTab.title, profileKind = profileKind))
         showPane(tabId)
         updateFrameTitle()
         pane.requestFocus()
-        return true
     }
 
     /** Closes the tab identified by [id]. No-op if the id is unknown. */
@@ -603,6 +639,18 @@ internal class TabManager(
             frame,
             exception.message ?: exception.javaClass.name,
             "Unable to start ${profile.displayName}",
+            JOptionPane.ERROR_MESSAGE,
+        )
+    }
+
+    private fun showSshStartError(
+        profile: TerminalSshProfile,
+        exception: Exception,
+    ) {
+        JOptionPane.showMessageDialog(
+            frame,
+            exception.message ?: exception.javaClass.name,
+            "Unable to connect to ${profile.displayName}",
             JOptionPane.ERROR_MESSAGE,
         )
     }

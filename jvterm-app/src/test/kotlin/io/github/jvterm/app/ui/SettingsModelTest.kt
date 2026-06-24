@@ -17,6 +17,8 @@ package io.github.jvterm.app.ui
 
 import io.github.jvterm.app.config.JvTermSettings
 import io.github.jvterm.workspace.TerminalProfileRegistry
+import io.github.jvterm.workspace.TerminalSshProfile
+import io.github.jvterm.workspace.config.TerminalConfig
 import io.github.jvterm.workspace.config.TerminalWorkspaceConfigManager
 import java.nio.file.Files
 import kotlin.test.*
@@ -96,5 +98,22 @@ class SettingsModelTest {
 
         // Snapshot should be updated, so it shouldn't show changes against modified state anymore
         assertFalse(model.hasChanges(modifiedState))
+    }
+
+    @Test
+    fun testSettingsExposeConfiguredSshProfiles() {
+        val profile =
+            TerminalSshProfile(
+                id = "prod",
+                displayName = "Production",
+                host = "prod.example.com",
+                username = "deploy",
+            )
+        val manager = TerminalWorkspaceConfigManager(tempFile)
+        manager.save(TerminalConfig(sshProfiles = listOf(profile)))
+
+        val loadedSettings = JvTermSettings(manager)
+
+        assertEquals(listOf(profile), loadedSettings.sshProfiles)
     }
 }

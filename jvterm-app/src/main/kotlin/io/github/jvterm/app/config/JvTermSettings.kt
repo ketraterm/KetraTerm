@@ -17,6 +17,7 @@ package io.github.jvterm.app.config
 
 import io.github.jvterm.ui.swing.settings.SwingSettings
 import io.github.jvterm.ui.swing.settings.TerminalTheme
+import io.github.jvterm.workspace.TerminalSshProfile
 import io.github.jvterm.workspace.config.TerminalConfig
 import io.github.jvterm.workspace.config.TerminalWorkspaceConfigManager
 import java.awt.Font
@@ -160,6 +161,9 @@ internal class JvTermSettings(
 
     val commandHistoryPath: Path
         get() = configManager.configPath.resolveSibling("command-history-v1.tsv")
+
+    val sshProfiles: List<TerminalSshProfile>
+        get() = config.sshProfiles
 
     fun current(): SwingSettings {
         val resolvedFamily = SwingSettings.resolveFontFamily(config.fontFamily)

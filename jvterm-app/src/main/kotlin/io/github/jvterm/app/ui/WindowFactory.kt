@@ -18,6 +18,7 @@ package io.github.jvterm.app.ui
 import com.formdev.flatlaf.extras.FlatSVGIcon
 import io.github.jvterm.app.config.JvTermSettings
 import io.github.jvterm.workspace.TerminalProfileRegistry
+import io.github.jvterm.workspace.TerminalSshProfile
 import java.awt.CardLayout
 import java.awt.Dimension
 import java.awt.event.WindowAdapter
@@ -67,6 +68,7 @@ internal class WindowFactory(
         lateinit var tabBar: TabBar
 
         val availableProfiles = profileRegistry.availableProfiles()
+        val availableSshProfiles = settings.sshProfiles
 
         // Builds a fresh configured profile from the current settings each time
         // a new default tab or split is opened. This means shell changes in the
@@ -86,7 +88,18 @@ internal class WindowFactory(
                 onTabSelected = { id -> tabManager.onTabSelected(id) },
                 onTabClose = { id -> tabManager.closeTab(id) },
                 onNewTab = { tabManager.openTab(defaultProfileProvider()) },
-                onMenuClick = { x, y -> showDropdownMenu(frame, tabBar, x, y, availableProfiles, tabManager, defaultProfileProvider) },
+                onMenuClick = { x, y ->
+                    showDropdownMenu(
+                        frame = frame,
+                        invoker = tabBar,
+                        x = x,
+                        y = y,
+                        profiles = availableProfiles,
+                        sshProfiles = availableSshProfiles,
+                        tabManager = tabManager,
+                        defaultProfileProvider = defaultProfileProvider,
+                    )
+                },
                 onTabColorChanged = { id, color -> tabManager.onTabColorChanged(id, color) },
                 onTabRenameRequested = { id, newName -> tabManager.onTabRenameRequested(id, newName) },
             )
@@ -131,6 +144,7 @@ internal class WindowFactory(
         x: Int,
         y: Int,
         profiles: List<io.github.jvterm.workspace.TerminalProfile>,
+        sshProfiles: List<TerminalSshProfile>,
         tabManager: TabManager,
         defaultProfileProvider: () -> io.github.jvterm.workspace.TerminalProfile,
     ) {
@@ -162,6 +176,23 @@ internal class WindowFactory(
                     }
                 }
             popup.add(item)
+        }
+
+        if (sshProfiles.isNotEmpty()) {
+            popup.addSeparator()
+            sshProfiles.forEach { profile ->
+                val item =
+                    JMenuItem(profile.displayName, profileIcons.icon(io.github.jvterm.workspace.TerminalProfileKind.SSH)).apply {
+                        background = Chrome.popupBackground
+                        foreground = Chrome.textPrimary
+                        toolTipText = "${profile.username}@${profile.host}:${profile.port}"
+                        addActionListener {
+                            val request = SshAuthenticationDialog(frame, profile).showDialog() ?: return@addActionListener
+                            tabManager.openSshTab(profile, request)
+                        }
+                    }
+                popup.add(item)
+            }
         }
 
         popup.addSeparator()
