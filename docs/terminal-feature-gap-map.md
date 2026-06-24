@@ -128,7 +128,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(parser/core/input)`: xterm highlight mouse tracking (`?1001`) if full xterm mouse parity is required.
 
 ### Deferred Kitty Keyboard Protocol Scope
-- `CSI ? u` query response and terminal capability identity policy.
+- `DONE(protocol/core/pty)`: terminal capability identity contract centralizes `$TERM`, `COLORTERM`, DA/DA2, XTGETTCAP terminal-name/color claims, and the implemented Kitty keyboard flag mask.
+- `TODO(parser/core/policy)`: `CSI ? u` Kitty keyboard capability query response remains disabled until a response shape and fingerprinting policy are implemented.
 - separate left/right modifier reporting if host event vocabulary grows it.
 - key repeat/release reporting.
 - alternate-key fields and associated text fields.
@@ -156,4 +157,4 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(parser/policy)`: protocol-family-specific raw OSC/DCS parser payload ceilings beyond the parser's generic bound, especially before large graphics or clipboard protocols are enabled.
 - `DONE(host/policy)`: title/icon updates are host-gated through `HostPolicy.titlePolicy` and bounded by `maxTitleLength`.
 - `DONE(input/policy)`: paste sanitization and bracketed paste behavior are explicit in `TerminalInputPolicy`; remaining product work is host/profile default selection.
-- `TODO(policy)`: terminal capability identity policies.
+- `DONE(policy)`: terminal capability identity policy is explicit in `TerminalCapabilityIdentity` and consumed by PTY launch defaults plus core terminal-to-host query responses.

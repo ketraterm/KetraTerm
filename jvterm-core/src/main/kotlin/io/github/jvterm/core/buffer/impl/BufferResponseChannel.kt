@@ -21,6 +21,7 @@ import io.github.jvterm.core.model.CellColor
 import io.github.jvterm.core.model.CellColorKind
 import io.github.jvterm.core.model.UnderlineStyle
 import io.github.jvterm.core.state.TerminalState
+import io.github.jvterm.protocol.TerminalCapabilityIdentity
 
 internal class BufferResponseChannel(
     private val state: TerminalState,
@@ -56,15 +57,13 @@ internal class BufferResponseChannel(
 
         when (kind) {
             TerminalResponseChannel.DEVICE_ATTRIBUTES_PRIMARY -> {
-                // Conservative VT100-with-advanced-video identity. Avoid overclaiming xterm.
                 enqueuePrimaryDeviceAttributes()
             }
             TerminalResponseChannel.DEVICE_ATTRIBUTES_SECONDARY -> {
-                // Generic versionless secondary DA. Avoid leaking product/version identity.
                 enqueueSecondaryDeviceAttributes()
             }
             TerminalResponseChannel.DEVICE_ATTRIBUTES_TERTIARY -> {
-                // DA3 can expose a stable terminal unit id. Keep it silent until policy exists.
+                // DA3 can expose a stable terminal unit id. Keep it silent by identity policy.
             }
         }
     }
@@ -120,20 +119,20 @@ internal class BufferResponseChannel(
     private fun enqueuePrimaryDeviceAttributes() {
         enqueueCsiPrefix()
         state.hostResponses.enqueueByte('?'.code)
-        state.hostResponses.enqueueByte('1'.code)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.PRIMARY_DA_TERMINAL_CLASS)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueueByte('2'.code)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.PRIMARY_DA_ADVANCED_VIDEO)
         state.hostResponses.enqueueByte('c'.code)
     }
 
     private fun enqueueSecondaryDeviceAttributes() {
         enqueueCsiPrefix()
         state.hostResponses.enqueueByte('>'.code)
-        state.hostResponses.enqueueByte('0'.code)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.SECONDARY_DA_TERMINAL_ID)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueueByte('0'.code)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.SECONDARY_DA_VERSION)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueueByte('0'.code)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.SECONDARY_DA_OPTIONS)
         state.hostResponses.enqueueByte('c'.code)
     }
 
@@ -341,9 +340,14 @@ internal class BufferResponseChannel(
      */
     private fun resolveCapability(name: String): String? =
         when (name) {
-            "Co", "colors" -> "256"
-            "TN", "name" -> "xterm-256color"
-            "RGB", "Tc" -> "" // Boolean capability: present without value.
+            "Co", "colors" -> TerminalCapabilityIdentity.TERMINFO_COLOR_COUNT
+            "TN", "name" -> TerminalCapabilityIdentity.TERM_NAME
+            "RGB", "Tc" ->
+                if (TerminalCapabilityIdentity.TERMINFO_TRUECOLOR_SUPPORTED) {
+                    ""
+                } else {
+                    null
+                }
             else -> null
         }
 

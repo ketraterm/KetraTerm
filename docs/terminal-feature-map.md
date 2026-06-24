@@ -61,13 +61,14 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   - **Operational Policies**: Explicitly filters ConEmu conflicting subcommands (skips digits `0-4`, `9` after `OSC 9;`). Protects the system tray by reusing a single `TrayIcon` instance on the EDT with a self-cleaning **10-second** inactivity cleanup timer. Clamps parameters to a maximum title length of 256 characters and body of 1024 characters.
 - **Capability Queries (DCS)**:
   - **DECRQSS**: Queries active SGR attributes (`m`), top/bottom scroll regions (`r`), left/right margins (`s`), and cursor shape configurations (`q`).
-  - **XTGETTCAP / XTSETTCAP**: Queries color capabilities (`Co`/`colors` returning `256`), terminal name (`TN`/`name` returning `xterm-256color`), and TrueColor support (`RGB`/`Tc` returning boolean success). Responses are strictly checked against a security allowlist.
+  - **XTGETTCAP / XTSETTCAP**: Queries color capabilities (`Co`/`colors` returning `256`), terminal name (`TN`/`name` returning `xterm-256color`), and TrueColor support (`RGB`/`Tc` returning boolean success). Responses are strictly checked against a security allowlist and sourced from the shared terminal capability identity contract.
 
 ---
 
 ## 4. Query-Response Channels
 
 - **Host Security Policy**: Host-affecting terminal controls are gated at the `jvterm-host` adapter boundary before they mutate host metadata, call host event sinks, alter palette state, or enqueue terminal-to-host response bytes. `HostPolicy` provides explicit allow/deny controls for title updates, OSC 8 hyperlinks, OSC 7 current-working-directory reports, desktop notifications, window manipulation requests, OSC palette controls, terminal response channels, and future clipboard protocols. Implemented controls default to allowed for compatibility, while future clipboard/OSC 52 behavior is deny-by-default until a permission model exists. Host-owned payloads are bounded per feature, including titles, hyperlink URIs/IDs and registry size, notification title/body text, and OSC 7 directory URI length.
+- **Terminal Capability Identity**: A shared `TerminalCapabilityIdentity` contract owns all advertised identity constants used by launch environments and terminal query responses. JVTerm currently advertises `$TERM=xterm-256color`, `COLORTERM=truecolor`, primary DA `CSI ? 1 ; 2 c`, secondary DA `CSI > 0 ; 0 ; 0 c`, XTGETTCAP `TN`/`name=xterm-256color`, `Co`/`colors=256`, boolean `RGB`/`Tc`, and the implemented Kitty keyboard progressive flag mask. DA3 remains silent to avoid stable unit-id fingerprinting, and `CSI ? u` Kitty keyboard capability query responses remain disabled until a response policy is implemented.
 - **Operating Status**: Responds operating status `CSI 0 n` on `DSR 5`.
 - **Cursor Position Reports**: Responds active coordinate position on `CPR` / `DSR 6`.
 - **Device Attributes**: VT100-compatible primary attribute response (`DA`) and generic secondary attribute response (`DA2`).

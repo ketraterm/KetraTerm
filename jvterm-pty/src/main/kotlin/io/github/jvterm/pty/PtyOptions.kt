@@ -17,14 +17,16 @@ package io.github.jvterm.pty
 
 import io.github.jvterm.input.policy.EnterNewLineModePolicy
 import io.github.jvterm.input.policy.TerminalInputPolicy
+import io.github.jvterm.protocol.TerminalCapabilityIdentity
 import java.nio.file.Path
 
 /**
  * Configuration for starting a local PTY-backed terminal session.
  *
  * @param command command and arguments passed to the PTY child process.
- * @param environment environment variables for the child process. `TERM`
- * defaults to `xterm-256color` when the caller does not provide it.
+ * @param environment environment variables for the child process. `TERM` and
+ * `COLORTERM` default to the shared terminal capability identity when the
+ * caller does not provide them.
  * @param workingDirectory initial process working directory, or `null` to let
  * PTY4J use its platform default.
  * @param columns initial terminal width in cells.
@@ -93,8 +95,8 @@ data class PtyOptions
             @JvmStatic
             fun defaultEnvironment(): Map<String, String> {
                 val env = LinkedHashMap(System.getenv())
-                env.putIfAbsent("TERM", "xterm-256color")
-                env.putIfAbsent("COLORTERM", "truecolor")
+                env.putIfAbsent("TERM", TerminalCapabilityIdentity.TERM_NAME)
+                env.putIfAbsent("COLORTERM", TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR)
                 return env
             }
 

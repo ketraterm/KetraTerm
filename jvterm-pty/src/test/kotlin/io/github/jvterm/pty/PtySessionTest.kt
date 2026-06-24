@@ -17,6 +17,7 @@ package io.github.jvterm.pty
 
 import io.github.jvterm.input.event.TerminalKey
 import io.github.jvterm.input.event.TerminalKeyEvent
+import io.github.jvterm.protocol.TerminalCapabilityIdentity
 import io.github.jvterm.session.TerminalSession
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -29,6 +30,21 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class PtySessionTest {
+    @Test
+    fun `default environment advertises the shared terminal capability identity`() {
+        val environment = PtyOptions.defaultEnvironment()
+        val systemEnvironment = System.getenv()
+
+        assertEquals(
+            systemEnvironment["TERM"] ?: TerminalCapabilityIdentity.TERM_NAME,
+            environment.getValue("TERM"),
+        )
+        assertEquals(
+            systemEnvironment["COLORTERM"] ?: TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR,
+            environment.getValue("COLORTERM"),
+        )
+    }
+
     @Test
     fun `pty stdout is parsed into terminal core through shared session`() {
         val process = FakePtyProcess(inputBytes = "hello\u001B[5n".ascii())

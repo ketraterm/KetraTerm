@@ -18,6 +18,7 @@ package io.github.jvterm.core.buffer
 import io.github.jvterm.core.TerminalBuffers
 import io.github.jvterm.core.api.TerminalBuffer
 import io.github.jvterm.core.api.TerminalResponseChannel
+import io.github.jvterm.protocol.TerminalCapabilityIdentity
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -94,6 +95,23 @@ class TerminalResponseChannelTest {
         buffer.requestDeviceAttributes(TerminalResponseChannel.DEVICE_ATTRIBUTES_TERTIARY, parameter = 0)
 
         assertEquals("\u001B[?1;2c\u001B[>0;0;0c", drain(buffer))
+    }
+
+    @Test
+    fun `DA response bytes match the shared capability identity contract`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+
+        buffer.requestDeviceAttributes(TerminalResponseChannel.DEVICE_ATTRIBUTES_PRIMARY, parameter = 0)
+        buffer.requestDeviceAttributes(TerminalResponseChannel.DEVICE_ATTRIBUTES_SECONDARY, parameter = 0)
+
+        assertEquals(
+            "\u001B[?${TerminalCapabilityIdentity.PRIMARY_DA_TERMINAL_CLASS};" +
+                "${TerminalCapabilityIdentity.PRIMARY_DA_ADVANCED_VIDEO}c" +
+                "\u001B[>${TerminalCapabilityIdentity.SECONDARY_DA_TERMINAL_ID};" +
+                "${TerminalCapabilityIdentity.SECONDARY_DA_VERSION};" +
+                "${TerminalCapabilityIdentity.SECONDARY_DA_OPTIONS}c",
+            drain(buffer),
+        )
     }
 
     @Test
@@ -235,6 +253,21 @@ class TerminalResponseChannelTest {
         // Querying unsupported
         buffer.queryTerminfo("invalid")
         assertEquals("\u001BP0+r\u001B\\", drain(buffer))
+    }
+
+    @Test
+    fun `queryTerminfo aliases resolve to the shared capability identity contract`() {
+        val buffer = TerminalBuffers.create(width = 80, height = 24)
+
+        // colors; name; Tc
+        buffer.queryTerminfo("636f6c6f7273;6e616d65;5463")
+
+        assertEquals(
+            "\u001BP1+r636f6c6f7273=323536;6e616d65=787465726d2d323536636f6c6f72;5463\u001B\\",
+            drain(buffer),
+        )
+        assertEquals("256", TerminalCapabilityIdentity.TERMINFO_COLOR_COUNT)
+        assertEquals("xterm-256color", TerminalCapabilityIdentity.TERM_NAME)
     }
 
     private fun drain(buffer: TerminalBuffer): String {

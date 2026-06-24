@@ -27,6 +27,7 @@ dependencies {
     implementation(project(":jvterm-core"))
     implementation(project(":jvterm-host"))
     implementation(project(":jvterm-input"))
+    implementation(project(":jvterm-protocol"))
     api(project(":jvterm-session"))
     implementation(project(":jvterm-transport-api"))
     implementation("org.jetbrains.pty4j:pty4j:0.13.12")

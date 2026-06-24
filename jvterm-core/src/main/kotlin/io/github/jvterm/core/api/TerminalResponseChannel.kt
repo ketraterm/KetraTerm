@@ -47,6 +47,9 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
     /**
      * Enqueues a device attributes (DA) report response.
      *
+     * Response identity values are governed by the shared terminal capability
+     * identity contract in `jvterm-protocol`; DA3 remains silent by policy.
+     *
      * @param kind The device attributes query type (primary, secondary, or tertiary).
      * @param parameter The request parameter/subtype (usually 0).
      */
@@ -103,6 +106,9 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
 
     /**
      * Enqueues the response for a DCS XTGETTCAP request.
+     *
+     * Only allowlisted capability names from the shared terminal capability
+     * identity contract produce success responses.
      *
      * @param rawPayload the raw payload containing semicolon-separated hex capability names.
      */
