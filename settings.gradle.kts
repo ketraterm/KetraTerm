@@ -11,6 +11,7 @@ include(
     ":jvterm-input",
     ":jvterm-host",
     ":jvterm-pty",
+    ":jvterm-ssh",
     ":jvterm-transport-api",
     ":jvterm-session",
     ":jvterm-testkit",

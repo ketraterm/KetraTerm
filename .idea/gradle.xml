@@ -20,6 +20,7 @@
             <option value="$PROJECT_DIR$/jvterm-render-api" />
             <option value="$PROJECT_DIR$/jvterm-render-cache" />
             <option value="$PROJECT_DIR$/jvterm-session" />
+            <option value="$PROJECT_DIR$/jvterm-ssh" />
             <option value="$PROJECT_DIR$/jvterm-testkit" />
             <option value="$PROJECT_DIR$/jvterm-transport-api" />
             <option value="$PROJECT_DIR$/jvterm-ui-swing" />
@@ -45,6 +46,7 @@
                   <project path="$PROJECT_DIR$/jvterm-render-api" />
                   <project path="$PROJECT_DIR$/jvterm-render-cache" />
                   <project path="$PROJECT_DIR$/jvterm-session" />
+                  <project path="$PROJECT_DIR$/jvterm-ssh" />
                   <project path="$PROJECT_DIR$/jvterm-testkit" />
                   <project path="$PROJECT_DIR$/jvterm-transport-api" />
                   <project path="$PROJECT_DIR$/jvterm-ui-swing" />
@@ -71,6 +73,7 @@
             <option value="$PROJECT_DIR$/jvterm-render-api" />
             <option value="$PROJECT_DIR$/jvterm-render-cache" />
             <option value="$PROJECT_DIR$/jvterm-session" />
+            <option value="$PROJECT_DIR$/jvterm-ssh" />
             <option value="$PROJECT_DIR$/jvterm-testkit" />
             <option value="$PROJECT_DIR$/jvterm-transport-api" />
             <option value="$PROJECT_DIR$/jvterm-ui-swing" />

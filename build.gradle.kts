@@ -22,6 +22,7 @@ dependencies {
     dokka(project(":jvterm-ui-swing"))
     dokka(project(":jvterm-testkit"))
     dokka(project(":jvterm-pty"))
+    dokka(project(":jvterm-ssh"))
     dokka(project(":jvterm-workspace"))
 }
 
