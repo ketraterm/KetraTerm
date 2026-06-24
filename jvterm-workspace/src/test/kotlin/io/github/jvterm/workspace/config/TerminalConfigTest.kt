@@ -15,6 +15,7 @@
  */
 package io.github.jvterm.workspace.config
 
+import io.github.jvterm.workspace.TerminalSshProfile
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.*
@@ -203,6 +204,118 @@ class TerminalConfigTest {
 
         Files.deleteIfExists(configFile)
         Files.deleteIfExists(tempDir)
+    }
+
+    @Test
+    fun `test TerminalWorkspaceConfigManager loads ssh profiles without secrets`() {
+        val tempDir = Files.createTempDirectory("jvterm-config-test-ssh")
+        val configFile = tempDir.resolve("config.toml")
+        val manager = TerminalWorkspaceConfigManager(configFile)
+
+        Files.writeString(
+            configFile,
+            """
+            [shell]
+            path = "powershell.exe"
+
+            [ssh.profile.prod]
+            display_name = "Production"
+            host = "prod.example.com"
+            username = "deploy"
+            port = 2222
+            terminal_type = "xterm-256color"
+            known_hosts = "C:\Users\me\.ssh\known_hosts"
+
+            [ssh.profile.incomplete]
+            display_name = "Missing User"
+            host = "missing-user.example.com"
+
+            [ssh.profile.dev]
+            host = "dev.example.com"
+            username = "me"
+            port = 999999
+            """.trimIndent(),
+        )
+
+        val loaded = manager.load()
+
+        assertEquals(2, loaded.sshProfiles.size)
+        assertEquals(
+            TerminalSshProfile(
+                id = "prod",
+                displayName = "Production",
+                host = "prod.example.com",
+                username = "deploy",
+                port = 2222,
+                terminalType = "xterm-256color",
+                knownHostsPath = Path.of("C:\\Users\\me\\.ssh\\known_hosts"),
+            ),
+            loaded.sshProfiles[0],
+        )
+        assertEquals(
+            TerminalSshProfile(
+                id = "dev",
+                displayName = "me@dev.example.com",
+                host = "dev.example.com",
+                username = "me",
+                port = 65535,
+            ),
+            loaded.sshProfiles[1],
+        )
+
+        Files.deleteIfExists(configFile)
+        Files.deleteIfExists(tempDir)
+    }
+
+    @Test
+    fun `test TerminalWorkspaceConfigManager saves and loads ssh profiles`() {
+        val tempDir = Files.createTempDirectory("jvterm-config-test-ssh-save")
+        val configFile = tempDir.resolve("config.toml")
+        val manager = TerminalWorkspaceConfigManager(configFile)
+        val profile =
+            TerminalSshProfile(
+                id = "staging",
+                displayName = "Staging",
+                host = "staging.example.com",
+                username = "deploy",
+                knownHostsPath = Path.of("C:\\Users\\me\\.ssh\\known_hosts"),
+            )
+        val config = TerminalConfig(sshProfiles = listOf(profile))
+
+        manager.save(config)
+        val raw = Files.readString(configFile)
+        val loaded = manager.load()
+
+        assertEquals(listOf(profile), loaded.sshProfiles)
+        assertContains(raw, "[ssh.profile.staging]")
+        assertContains(raw, "known_hosts = \"C:\\Users\\me\\.ssh\\known_hosts\"")
+        assertFalse(raw.contains("password", ignoreCase = true))
+        assertFalse(raw.contains("passphrase", ignoreCase = true))
+
+        Files.deleteIfExists(configFile)
+        Files.deleteIfExists(tempDir)
+    }
+
+    @Test
+    fun `test TerminalConfig rejects duplicate ssh profile ids`() {
+        val first =
+            TerminalSshProfile(
+                id = "prod",
+                displayName = "Prod A",
+                host = "a.example.com",
+                username = "deploy",
+            )
+        val second =
+            TerminalSshProfile(
+                id = "prod",
+                displayName = "Prod B",
+                host = "b.example.com",
+                username = "deploy",
+            )
+
+        assertFailsWith<IllegalArgumentException> {
+            TerminalConfig(sshProfiles = listOf(first, second))
+        }
     }
 
     @Test

@@ -15,6 +15,7 @@
  */
 package io.github.jvterm.workspace.config
 
+import io.github.jvterm.workspace.TerminalSshProfile
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -150,6 +151,7 @@ class TerminalWorkspaceConfigManager(
                 shellRequestWindowManipulation = shellRequestWindowManipulation,
                 desktopNotificationsEnabled = desktopNotificationsEnabled,
                 persistentCommandHistoryEnabled = persistentCommandHistoryEnabled,
+                sshProfiles = parseSshProfiles(parsed),
             )
         } catch (e: Exception) {
             try {
@@ -187,61 +189,146 @@ class TerminalWorkspaceConfigManager(
     }
 
     private fun generateToml(config: TerminalConfig): String =
-        """
-        # JvTerm Terminal Emulator Configuration File
-        # Power users can edit this file directly to customize behavior.
-        # Changes will take effect on next application launch.
+        buildString {
+            append(
+                """
+                # JvTerm Terminal Emulator Configuration File
+                # Power users can edit this file directly to customize behavior.
+                # Changes will take effect on next application launch.
 
-        [shell]
-        # Command or path to the shell executable to run
-        path = "${config.shellPath}"
-        # Initial working directory when opening a new tab
-        start_directory = "${config.startDirectory}"
+                [shell]
+                # Command or path to the shell executable to run
+                path = "${config.shellPath}"
+                # Initial working directory when opening a new tab
+                start_directory = "${config.startDirectory}"
 
-        [window]
-        # Preferred default terminal size in columns and rows
-        columns = ${config.columns}
-        rows = ${config.rows}
-        # Maximum number of lines to retain in the scrollback buffer
-        scrollback_lines = ${config.scrollbackLines}
+                [window]
+                # Preferred default terminal size in columns and rows
+                columns = ${config.columns}
+                rows = ${config.rows}
+                # Maximum number of lines to retain in the scrollback buffer
+                scrollback_lines = ${config.scrollbackLines}
 
-        [font]
-        # Primary monospace font family
-        family = "${config.fontFamily}"
-        # Font size in points
-        size = ${config.fontSize}
-        # Line height multiplier
-        line_height = ${config.lineHeight}
-        # Whether the complex-text renderer may use installed system fonts as fallback
-        use_system_fallback_fonts = ${config.useSystemFallbackFonts}
+                [font]
+                # Primary monospace font family
+                family = "${config.fontFamily}"
+                # Font size in points
+                size = ${config.fontSize}
+                # Line height multiplier
+                line_height = ${config.lineHeight}
+                # Whether the complex-text renderer may use installed system fonts as fallback
+                use_system_fallback_fonts = ${config.useSystemFallbackFonts}
 
-        [theme]
-        # Resolved terminal color palette theme.
-        # Supported themes: campbell, one-dark, nord, tokyo-night, everforest
-        name = "${config.theme}"
+                [theme]
+                # Resolved terminal color palette theme.
+                # Supported themes: campbell, one-dark, nord, tokyo-night, everforest
+                name = "${config.theme}"
 
-        [behavior]
-        # Whether East Asian Ambiguous characters should occupy two terminal cells in width policy
-        treat_ambiguous_as_wide = ${config.treatAmbiguousAsWide}
-        # Cursor blink period in milliseconds
-        cursor_blink_millis = ${config.cursorBlinkMillis}
-        # Style of the text cursor (block, underline, beam)
-        cursor_shape = "${config.cursorShape}"
-        # Play a system beep when the terminal receives a BEL character
-        audible_bell = ${config.audibleBell}
-        # Show a visual edge pulse when the terminal receives a BEL character
-        visual_bell = ${config.visualBell}
-        # Automatically paste clipboard contents when the middle mouse button is clicked
-        paste_on_middle_click = ${config.pasteOnMiddleClick}
-        # Whether terminal window should resize when the shell requests a grid resize
-        shell_request_resize_window = ${config.shellRequestResizeWindow}
-        # Whether terminal window manipulation (move, minimize, maximize, raise, lower) is allowed from the shell
-        shell_request_window_manipulation = ${config.shellRequestWindowManipulation}
-        # Whether to enable desktop notifications when the terminal receives OSC 9 or OSC 777 sequences
-        desktop_notifications_enabled = ${config.desktopNotificationsEnabled}
-        # Persist bounded command metadata (never raw terminal output) across application restarts
-        persistent_command_history_enabled = ${config.persistentCommandHistoryEnabled}
-        """.trimIndent()
+                [behavior]
+                # Whether East Asian Ambiguous characters should occupy two terminal cells in width policy
+                treat_ambiguous_as_wide = ${config.treatAmbiguousAsWide}
+                # Cursor blink period in milliseconds
+                cursor_blink_millis = ${config.cursorBlinkMillis}
+                # Style of the text cursor (block, underline, beam)
+                cursor_shape = "${config.cursorShape}"
+                # Play a system beep when the terminal receives a BEL character
+                audible_bell = ${config.audibleBell}
+                # Show a visual edge pulse when the terminal receives a BEL character
+                visual_bell = ${config.visualBell}
+                # Automatically paste clipboard contents when the middle mouse button is clicked
+                paste_on_middle_click = ${config.pasteOnMiddleClick}
+                # Whether terminal window should resize when the shell requests a grid resize
+                shell_request_resize_window = ${config.shellRequestResizeWindow}
+                # Whether terminal window manipulation (move, minimize, maximize, raise, lower) is allowed from the shell
+                shell_request_window_manipulation = ${config.shellRequestWindowManipulation}
+                # Whether to enable desktop notifications when the terminal receives OSC 9 or OSC 777 sequences
+                desktop_notifications_enabled = ${config.desktopNotificationsEnabled}
+                # Persist bounded command metadata (never raw terminal output) across application restarts
+                persistent_command_history_enabled = ${config.persistentCommandHistoryEnabled}
+                """.trimIndent(),
+            )
+            appendSshProfiles(config.sshProfiles)
+        }
+
+    private fun StringBuilder.appendSshProfiles(profiles: List<TerminalSshProfile>) {
+        if (profiles.isEmpty()) return
+
+        appendLine()
+        appendLine()
+        appendLine("# SSH terminal profiles. Secrets are never stored here.")
+        for (profile in profiles) {
+            appendLine("[ssh.profile.${profile.id}]")
+            appendLine("display_name = \"${tomlString(profile.displayName)}\"")
+            appendLine("host = \"${tomlString(profile.host)}\"")
+            appendLine("username = \"${tomlString(profile.username)}\"")
+            appendLine("port = ${profile.port}")
+            appendLine("terminal_type = \"${tomlString(profile.terminalType)}\"")
+            profile.knownHostsPath?.let { appendLine("known_hosts = \"${tomlString(it.toString())}\"") }
+            appendLine()
+        }
+    }
+
+    private fun parseSshProfiles(parsed: Map<String, Map<String, String>>): List<TerminalSshProfile> {
+        val profiles = ArrayList<TerminalSshProfile>()
+        for ((section, values) in parsed) {
+            if (!section.startsWith(SSH_PROFILE_SECTION_PREFIX)) continue
+            val id = section.removePrefix(SSH_PROFILE_SECTION_PREFIX).trim()
+            val profile = parseSshProfile(id, values) ?: continue
+            profiles += profile
+        }
+        return profiles
+    }
+
+    private fun parseSshProfile(
+        id: String,
+        values: Map<String, String>,
+    ): TerminalSshProfile? {
+        if (id.isBlank()) return null
+        val host = values["host"]?.trim().orEmpty()
+        val username = values["username"]?.trim().orEmpty()
+        if (host.isBlank() || username.isBlank()) return null
+
+        val displayName = values["display_name"]?.takeIf { it.isNotBlank() } ?: "$username@$host"
+        val port =
+            parseIntSetting(
+                raw = values["port"],
+                defaultValue = TerminalSshProfile.DEFAULT_PORT,
+                min = 1,
+                max = 65535,
+            )
+        val terminalType =
+            values["terminal_type"]
+                ?.takeIf { it.isNotBlank() }
+                ?: TerminalSshProfile.DEFAULT_TERMINAL_TYPE
+        val knownHostsPath = values["known_hosts"]?.takeIf { it.isNotBlank() }?.let(Path::of)
+
+        return try {
+            TerminalSshProfile(
+                id = id,
+                displayName = displayName,
+                host = host,
+                username = username,
+                port = port,
+                terminalType = terminalType,
+                knownHostsPath = knownHostsPath,
+            )
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
+
+    private fun tomlString(value: String): String =
+        buildString(value.length) {
+            for (char in value) {
+                when (char) {
+                    '"' -> append("\\\"")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    else -> append(char)
+                }
+            }
+        }
 
     private fun parseIntSetting(
         raw: String?,
@@ -282,6 +369,8 @@ class TerminalWorkspaceConfigManager(
     }
 
     companion object {
+        private const val SSH_PROFILE_SECTION_PREFIX: String = "ssh.profile."
+
         /**
          * Resolves the default configuration path on disk for this operating system.
          *

@@ -38,6 +38,15 @@ shell_request_window_manipulation = false # permits shell scripts to move, minim
 [shell]
 path = ""                         # Shell path override (empty maps to default shell)
 start_directory = ""              # Shell startup directory
+
+# Optional SSH terminal profile. Secrets are intentionally not supported here.
+[ssh.profile.prod]
+display_name = "Production"
+host = "prod.example.com"
+username = "deploy"
+port = 22
+terminal_type = "xterm-256color"
+known_hosts = "C:\Users\me\.ssh\known_hosts"
 ```
 
 ---
@@ -61,3 +70,26 @@ The config manager resolves the location of the `config.toml` file dynamically a
 
 * **Automatic Creation**: If no config file is found at the resolved path upon loading, the manager creates a default configuration file populated with default properties and comments, saving it to disk for user editing.
 * **Soft Failures**: If the TOML file contains invalid syntax or unreadable properties, the config manager logs the warning and falls back gracefully to default values for those specific keys instead of crashing.
+
+---
+
+## 4. SSH Profile Sections
+
+SSH profiles use sections named `[ssh.profile.<id>]`, where `<id>` is a stable
+identifier used by product UI and workspace code. Each section may contain:
+
+```toml
+[ssh.profile.staging]
+display_name = "Staging"
+host = "staging.example.com"
+username = "deploy"
+port = 22
+terminal_type = "xterm-256color"
+known_hosts = "C:\Users\me\.ssh\known_hosts"
+```
+
+Only endpoint and trust-source metadata belongs in this file. Passwords,
+private-key passphrases, keyboard-interactive answers, and raw private keys must
+be collected by the product host at connection time or delegated to an SSH agent.
+Incomplete SSH profiles are ignored during load instead of preventing local
+terminal settings from loading.

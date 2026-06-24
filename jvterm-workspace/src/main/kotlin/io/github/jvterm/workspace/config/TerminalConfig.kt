@@ -15,6 +15,7 @@
  */
 package io.github.jvterm.workspace.config
 
+import io.github.jvterm.workspace.TerminalSshProfile
 import java.util.*
 
 private fun defaultShellPath(): String {
@@ -67,6 +68,8 @@ private fun defaultFontFamily(): String {
  * @property desktopNotificationsEnabled whether desktop notifications are enabled.
  * @property persistentCommandHistoryEnabled whether completed command metadata
  * is retained by supporting product hosts across application restarts.
+ * @property sshProfiles configured SSH terminal profiles. Profiles contain no
+ * password, passphrase, or private-key material.
  */
 data class TerminalConfig(
     val theme: String = DEFAULT_THEME,
@@ -89,6 +92,7 @@ data class TerminalConfig(
     val shellRequestWindowManipulation: Boolean = DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION,
     val desktopNotificationsEnabled: Boolean = DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED,
     val persistentCommandHistoryEnabled: Boolean = DEFAULT_PERSISTENT_COMMAND_HISTORY_ENABLED,
+    val sshProfiles: List<TerminalSshProfile> = emptyList(),
 ) {
     init {
         require(columns in COLUMNS_MIN..COLUMNS_MAX) {
@@ -112,6 +116,9 @@ data class TerminalConfig(
         }
         require(lineHeight in LINE_HEIGHT_MIN..LINE_HEIGHT_MAX) {
             "lineHeight must be in ${LINE_HEIGHT_MIN}..${LINE_HEIGHT_MAX}, was $lineHeight"
+        }
+        require(sshProfiles.map { it.id }.toSet().size == sshProfiles.size) {
+            "ssh profile ids must be unique"
         }
     }
 
