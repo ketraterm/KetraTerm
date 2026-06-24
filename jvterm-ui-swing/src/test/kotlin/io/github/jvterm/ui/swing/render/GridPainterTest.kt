@@ -587,6 +587,73 @@ class GridPainterTest {
     }
 
     @Test
+    fun `fractional scroll clips translated overscan before bottom padding`() {
+        val image = BufferedImage(120, 48, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val settings =
+            SwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = WHITE,
+                        defaultBackground = BLACK,
+                    ),
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+                padding = Insets(0, 0, 8, 0),
+            )
+        val metrics =
+            SwingMetrics(
+                cellWidth = 10,
+                cellHeight = 20,
+                baseline = 15,
+                underlineY = 16,
+                strikethroughY = 10,
+                overlineY = 0,
+                cursorStrokeWidth = 1,
+            )
+        val cache = TerminalRenderCache(columns = 3, rows = 3)
+        cache.updateFrom(
+            TextRowsFrame(
+                lines = arrayOf("   ", "   ", "   "),
+                palette = settings.palette,
+                rowAttrs =
+                    longArrayOf(
+                        TerminalRenderAttrs.DEFAULT,
+                        TerminalRenderAttrs.DEFAULT,
+                        TerminalRenderAttrs.pack(
+                            backgroundKind = TerminalRenderColorKind.RGB,
+                            backgroundValue = 0x00_FF_00,
+                        ),
+                    ),
+            ),
+        )
+        val geometry =
+            visualGeometry(
+                metrics = metrics,
+                rows = cache.rows,
+                viewportPixelHeight = image.height - settings.padding.bottom,
+                contentOriginY = -10.0,
+            )
+
+        GridPainter().paint(
+            g = g,
+            cache = cache,
+            settings = settings,
+            metrics = metrics,
+            width = image.width,
+            height = image.height,
+            cursorBlinkVisible = true,
+            visualGeometry = geometry,
+        )
+        g.dispose()
+
+        val bottomPaddingStart = image.height - settings.padding.bottom
+        assertEquals(GREEN, image.getRGB(1, bottomPaddingStart - 1))
+        assertEquals(BLACK, image.getRGB(1, bottomPaddingStart))
+        assertEquals(BLACK, image.getRGB(1, image.height - 1))
+    }
+
+    @Test
     fun `shell integration failed command paints red prompt dot and original output rail`() {
         val image = BufferedImage(120, 80, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
@@ -944,6 +1011,7 @@ class GridPainterTest {
         override val discardedCount: Long = 0L,
         private val lineIds: LongArray = LongArray(lines.size) { row -> row + 1L },
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
+        private val rowAttrs: LongArray = LongArray(lines.size) { TerminalRenderAttrs.DEFAULT },
     ) : TerminalRenderFrameReader,
         TerminalRenderFrame {
         override val columns: Int = lines.maxOf { it.length }
@@ -996,7 +1064,7 @@ class GridPainterTest {
                     codeWords[offset] = 0
                     flags[flagOffset + column] = TerminalRenderCellFlags.EMPTY
                 }
-                attrWords[attrOffset + column] = TerminalRenderAttrs.DEFAULT
+                attrWords[attrOffset + column] = rowAttrs[row]
                 extraAttrWords?.set(extraAttrOffset + column, TerminalRenderExtraAttrs.DEFAULT)
                 hyperlinkIds?.set(hyperlinkOffset + column, 0)
                 column++

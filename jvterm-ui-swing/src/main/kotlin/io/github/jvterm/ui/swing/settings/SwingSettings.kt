@@ -71,12 +71,11 @@ import java.util.*
  * @property shellIntegrationFailedCommandRailColor packed ARGB color for failed-command rails.
  * @property shellIntegrationFailedCommandRailWidth failed-command rail width in pixels.
  * @property padding optional host-owned visual inset around the terminal grid
- * in pixels. The default keeps vertical padding at zero so smooth scrolling
- * uses the full component height. The default retains horizontal breathing
- * room, the shell-integration decoration gutter, and a small bottom visual
- * spacer; alternate-screen rendering replaces the inactive prompt gutter with
- * symmetric side insets and resizes the terminal grid to the newly available
- * columns.
+ * in pixels. The default keeps top padding at zero so smooth scrolling can
+ * enter through the top edge, while retaining horizontal breathing room, the
+ * shell-integration decoration gutter, and a small bottom visual spacer.
+ * Alternate-screen rendering replaces the inactive prompt gutter with symmetric
+ * side insets and resizes the terminal grid to the newly available columns.
  * @property pasteOnMiddleClick whether middle mouse button click triggers a clipboard paste.
  * @property cursorShape default cursor shape configured for the session.
  * @property scrollbackLines maximum scrollback lines retained by the terminal.
