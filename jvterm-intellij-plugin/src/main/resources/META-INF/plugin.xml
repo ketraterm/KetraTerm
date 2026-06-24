@@ -28,7 +28,7 @@
                     anchor="bottom"
                     canCloseContents="true"
                     factoryClass="io.github.jvterm.intellij.ui.JvTermToolWindowFactory"
-                    icon="AllIcons.Toolwindows.ToolWindowTerminal"/>
+                    icon="/icons/jvterm-toolwindow.svg"/>
     </extensions>
 
 </idea-plugin>
