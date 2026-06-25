@@ -254,6 +254,7 @@ internal class NoOpCommandSink : TerminalCommandSink {
     override fun setIconTitle(title: String) {}
 
     override fun setIconAndWindowTitle(title: String) {}
+
     override fun setCurrentWorkingDirectoryUri(uri: String) {}
 
     override fun startHyperlink(

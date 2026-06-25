@@ -16,6 +16,7 @@
 package io.github.ketraterm.core.state
 
 import io.github.ketraterm.core.model.*
+import io.github.ketraterm.render.api.TerminalRenderCursorShape
 
 /**
  * The global hardware context of the terminal.
@@ -42,7 +43,8 @@ internal class TerminalState(
     val dimensions = GridDimensions(initialWidth, initialHeight)
     val hostResponses = HostResponseQueue()
     var themePalette =
-        _root_ide_package_.io.github.ketraterm.render.api.TerminalColorPalette()
+        _root_ide_package_.io.github.ketraterm.render.api
+            .TerminalColorPalette()
     var palette = themePalette
     var windowPixelWidth: Int = 0
     var windowPixelHeight: Int = 0
@@ -62,9 +64,9 @@ internal class TerminalState(
             }
         }
 
-    var defaultCursorShape: io.github.ketraterm.render.api.TerminalRenderCursorShape = io.github.ketraterm.render.api.TerminalRenderCursorShape.BLOCK
+    var defaultCursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
 
-    var cursorShape: io.github.ketraterm.render.api.TerminalRenderCursorShape = io.github.ketraterm.render.api.TerminalRenderCursorShape.BLOCK
+    var cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
         set(value) {
             if (field != value) {
                 field = value

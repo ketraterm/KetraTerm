@@ -260,12 +260,16 @@ internal class TerminalModes : TerminalInputState {
 
         private fun decodeMouseTracking(bits: Long): io.github.ketraterm.protocol.MouseTrackingMode {
             val ordinal = TerminalInputState.mouseTrackingMode(bits)
-            return io.github.ketraterm.protocol.MouseTrackingMode.entries.getOrElse(ordinal) { io.github.ketraterm.protocol.MouseTrackingMode.OFF }
+            return io.github.ketraterm.protocol.MouseTrackingMode.entries.getOrElse(
+                ordinal,
+            ) { io.github.ketraterm.protocol.MouseTrackingMode.OFF }
         }
 
         private fun decodeMouseEncoding(bits: Long): io.github.ketraterm.protocol.MouseEncodingMode {
             val ordinal = TerminalInputState.mouseEncodingMode(bits)
-            return io.github.ketraterm.protocol.MouseEncodingMode.entries.getOrElse(ordinal) { io.github.ketraterm.protocol.MouseEncodingMode.DEFAULT }
+            return io.github.ketraterm.protocol.MouseEncodingMode.entries.getOrElse(
+                ordinal,
+            ) { io.github.ketraterm.protocol.MouseEncodingMode.DEFAULT }
         }
     }
 }

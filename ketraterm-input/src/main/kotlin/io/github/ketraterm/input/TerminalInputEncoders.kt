@@ -35,7 +35,10 @@ object TerminalInputEncoders {
     fun create(
         inputState: TerminalInputState,
         output: TerminalHostOutput,
-        policy: io.github.ketraterm.input.policy.TerminalInputPolicy = _root_ide_package_.io.github.ketraterm.input.policy.TerminalInputPolicy(),
+        policy: io.github.ketraterm.input.policy.TerminalInputPolicy =
+            _root_ide_package_.io.github.ketraterm.input.policy
+                .TerminalInputPolicy(),
     ): io.github.ketraterm.input.api.TerminalInputEncoder =
-        _root_ide_package_.io.github.ketraterm.input.impl.DefaultTerminalInputEncoder(inputState, output, policy)
+        _root_ide_package_.io.github.ketraterm.input.impl
+            .DefaultTerminalInputEncoder(inputState, output, policy)
 }

@@ -912,6 +912,9 @@ private data class PasteSanitizationOption(
 private val PASTE_SANITIZATION_OPTIONS =
     listOf(
         PasteSanitizationOption("Raw paste", io.github.ketraterm.input.policy.PasteSanitizationPolicy.RAW),
-        PasteSanitizationOption("Strip control characters", io.github.ketraterm.input.policy.PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF),
+        PasteSanitizationOption(
+            "Strip control characters",
+            io.github.ketraterm.input.policy.PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+        ),
         PasteSanitizationOption("Normalize line endings", io.github.ketraterm.input.policy.PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS),
     )

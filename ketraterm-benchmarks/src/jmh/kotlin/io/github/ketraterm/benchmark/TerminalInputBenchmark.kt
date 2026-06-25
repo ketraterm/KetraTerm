@@ -93,8 +93,11 @@ open class TerminalInputBenchmark {
         // Pre-built events
         asciiKeyEvent = TerminalKeyEvent.codepoint('a'.code)
         specialKeyEvent = TerminalKeyEvent.key(TerminalKey.UP)
-        modifiedSpecialKeyEvent = TerminalKeyEvent.key(
-            TerminalKey.F5, TerminalModifiers.CTRL or TerminalModifiers.SHIFT)
+        modifiedSpecialKeyEvent =
+            TerminalKeyEvent.key(
+                TerminalKey.F5,
+                TerminalModifiers.CTRL or TerminalModifiers.SHIFT,
+            )
         mouseEvent =
             TerminalMouseEvent(
                 column = 40,

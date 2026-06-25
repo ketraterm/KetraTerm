@@ -211,9 +211,11 @@ open class TerminalBufferClusterBenchmark : io.github.ketraterm.render.api.Termi
     private lateinit var attrWords: LongArray
     private lateinit var flags: IntArray
     private val clusterSink =
-        _root_ide_package_.io.github.ketraterm.render.api.TerminalRenderClusterSink { _, _ -> }
+        _root_ide_package_.io.github.ketraterm.render.api
+            .TerminalRenderClusterSink { _, _ -> }
     private val clusterDataSink =
-        _root_ide_package_.io.github.ketraterm.render.api.TerminalRenderClusterDataSink { _, _, _, _ -> }
+        _root_ide_package_.io.github.ketraterm.render.api
+            .TerminalRenderClusterDataSink { _, _, _, _ -> }
 
     private var runWithDataSink = false
 

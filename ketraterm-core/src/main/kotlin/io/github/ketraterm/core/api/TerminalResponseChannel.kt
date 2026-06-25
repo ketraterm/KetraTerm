@@ -18,7 +18,6 @@ package io.github.ketraterm.core.api
 import io.github.ketraterm.core.api.TerminalResponseChannel.Companion.WINDOW_REPORT_GRID_CELLS
 import io.github.ketraterm.core.api.TerminalResponseChannel.Companion.WINDOW_REPORT_PIXELS
 
-
 /**
  * Terminal-to-host response channel.
  *
