@@ -10,19 +10,19 @@ repositories {
 }
 
 dependencies {
-    dokka(project(":jvterm-protocol"))
-    dokka(project(":jvterm-parser"))
-    dokka(project(":jvterm-core"))
-    dokka(project(":jvterm-host"))
-    dokka(project(":jvterm-input"))
-    dokka(project(":jvterm-render-api"))
-    dokka(project(":jvterm-render-cache"))
-    dokka(project(":jvterm-transport-api"))
-    dokka(project(":jvterm-session"))
-    dokka(project(":jvterm-ui-swing"))
-    dokka(project(":jvterm-testkit"))
-    dokka(project(":jvterm-pty"))
-    dokka(project(":jvterm-workspace"))
+    dokka(project(":ketraterm-protocol"))
+    dokka(project(":ketraterm-parser"))
+    dokka(project(":ketraterm-core"))
+    dokka(project(":ketraterm-host"))
+    dokka(project(":ketraterm-input"))
+    dokka(project(":ketraterm-render-api"))
+    dokka(project(":ketraterm-render-cache"))
+    dokka(project(":ketraterm-transport-api"))
+    dokka(project(":ketraterm-session"))
+    dokka(project(":ketraterm-ui-swing"))
+    dokka(project(":ketraterm-testkit"))
+    dokka(project(":ketraterm-pty"))
+    dokka(project(":ketraterm-workspace"))
 }
 
 val versionFile = rootProject.file("VERSION")
@@ -49,7 +49,7 @@ subprojects {
     }
 
     plugins.withId("org.jetbrains.kotlin.jvm") {
-        if (name != "jvterm-benchmarks" && name != "jvterm-app") {
+        if (name != "ketraterm-benchmarks" && name != "ketraterm-app") {
             plugins.apply("com.vanniktech.maven.publish")
 
             extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
@@ -58,8 +58,8 @@ subprojects {
 
                 pom {
                     name.set(project.name)
-                    description.set("JvTerm terminal emulator library - subproject ${project.name}")
-                    url.set("https://github.com/jvterm/JvTerm")
+                    description.set("ketraterm terminal emulator library - subproject ${project.name}")
+                    url.set("https://github.com/ketraterm/ketraterm")
                     licenses {
                         license {
                             name.set("The Apache License, Version 2.0")
@@ -73,9 +73,9 @@ subprojects {
                         }
                     }
                     scm {
-                        connection.set("scm:git:git://github.com/jvterm/JvTerm.git")
-                        developerConnection.set("scm:git:ssh://github.com/jvterm/JvTerm.git")
-                        url.set("https://github.com/jvterm/JvTerm")
+                        connection.set("scm:git:git://github.com/ketraterm/ketraterm.git")
+                        developerConnection.set("scm:git:ssh://github.com/ketraterm/ketraterm.git")
+                        url.set("https://github.com/ketraterm/ketraterm")
                     }
                 }
             }

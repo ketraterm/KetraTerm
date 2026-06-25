@@ -1,6 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.extensions.intellijPlatform
 
-rootProject.name = "jvterm-intellij-plugin"
+rootProject.name = "ketraterm-intellij-plugin"
 
 includeBuild("..")
 

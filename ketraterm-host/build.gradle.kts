@@ -15,7 +15,6 @@
  */
 
 plugins {
-    application
     kotlin("jvm")
 }
 
@@ -24,28 +23,14 @@ repositories {
 }
 
 dependencies {
-    implementation("com.formdev:flatlaf:3.7.1")
-    implementation("com.formdev:flatlaf-extras:3.7.1")
-    implementation(project(":jvterm-ui-swing"))
-    implementation(project(":jvterm-workspace"))
-
-    runtimeOnly("org.slf4j:slf4j-nop:2.0.18")
+    implementation(project(":ketraterm-protocol"))
+    implementation(project(":ketraterm-core"))
+    implementation(project(":ketraterm-parser"))
 
     testImplementation(kotlin("test"))
-}
-
-application {
-    mainClass.set("io.github.ketraterm.app.JvTermAppKt")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
 }
 
 tasks.test {
     useJUnitPlatform()
-}
-
-tasks.processResources {
-    val appVersion = project.version.toString()
-    inputs.property("version", appVersion)
-    filesMatching("**/version.properties") {
-        expand(mapOf("version" to appVersion))
-    }
 }

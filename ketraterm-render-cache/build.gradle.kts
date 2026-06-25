@@ -15,7 +15,6 @@
  */
 
 plugins {
-    id("java-library")
     kotlin("jvm")
 }
 
@@ -24,11 +23,8 @@ repositories {
 }
 
 dependencies {
-    api(project(":jvterm-session"))
-    implementation(project(":jvterm-input"))
-    implementation(project(":jvterm-render-api"))
-    implementation(project(":jvterm-render-cache"))
 
+    api(project(":ketraterm-render-api"))
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
 }

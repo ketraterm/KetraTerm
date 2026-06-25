@@ -9,21 +9,21 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/jvterm-app" />
-            <option value="$PROJECT_DIR$/jvterm-benchmarks" />
-            <option value="$PROJECT_DIR$/jvterm-core" />
-            <option value="$PROJECT_DIR$/jvterm-host" />
-            <option value="$PROJECT_DIR$/jvterm-input" />
-            <option value="$PROJECT_DIR$/jvterm-parser" />
-            <option value="$PROJECT_DIR$/jvterm-protocol" />
-            <option value="$PROJECT_DIR$/jvterm-pty" />
-            <option value="$PROJECT_DIR$/jvterm-render-api" />
-            <option value="$PROJECT_DIR$/jvterm-render-cache" />
-            <option value="$PROJECT_DIR$/jvterm-session" />
-            <option value="$PROJECT_DIR$/jvterm-testkit" />
-            <option value="$PROJECT_DIR$/jvterm-transport-api" />
-            <option value="$PROJECT_DIR$/jvterm-ui-swing" />
-            <option value="$PROJECT_DIR$/jvterm-workspace" />
+            <option value="$PROJECT_DIR$/ketraterm-app" />
+            <option value="$PROJECT_DIR$/ketraterm-benchmarks" />
+            <option value="$PROJECT_DIR$/ketraterm-core" />
+            <option value="$PROJECT_DIR$/ketraterm-host" />
+            <option value="$PROJECT_DIR$/ketraterm-input" />
+            <option value="$PROJECT_DIR$/ketraterm-parser" />
+            <option value="$PROJECT_DIR$/ketraterm-protocol" />
+            <option value="$PROJECT_DIR$/ketraterm-pty" />
+            <option value="$PROJECT_DIR$/ketraterm-render-api" />
+            <option value="$PROJECT_DIR$/ketraterm-render-cache" />
+            <option value="$PROJECT_DIR$/ketraterm-session" />
+            <option value="$PROJECT_DIR$/ketraterm-testkit" />
+            <option value="$PROJECT_DIR$/ketraterm-transport-api" />
+            <option value="$PROJECT_DIR$/ketraterm-ui-swing" />
+            <option value="$PROJECT_DIR$/ketraterm-workspace" />
           </set>
         </option>
       </GradleProjectSettings>
@@ -31,50 +31,50 @@
         <compositeConfiguration>
           <compositeBuild compositeDefinitionSource="SCRIPT">
             <builds>
-              <build path="$PROJECT_DIR$" name="JvTerm">
+              <build path="$PROJECT_DIR$" name="KetraTerm">
                 <projects>
                   <project path="$PROJECT_DIR$" />
-                  <project path="$PROJECT_DIR$/jvterm-app" />
-                  <project path="$PROJECT_DIR$/jvterm-benchmarks" />
-                  <project path="$PROJECT_DIR$/jvterm-core" />
-                  <project path="$PROJECT_DIR$/jvterm-host" />
-                  <project path="$PROJECT_DIR$/jvterm-input" />
-                  <project path="$PROJECT_DIR$/jvterm-parser" />
-                  <project path="$PROJECT_DIR$/jvterm-protocol" />
-                  <project path="$PROJECT_DIR$/jvterm-pty" />
-                  <project path="$PROJECT_DIR$/jvterm-render-api" />
-                  <project path="$PROJECT_DIR$/jvterm-render-cache" />
-                  <project path="$PROJECT_DIR$/jvterm-session" />
-                  <project path="$PROJECT_DIR$/jvterm-testkit" />
-                  <project path="$PROJECT_DIR$/jvterm-transport-api" />
-                  <project path="$PROJECT_DIR$/jvterm-ui-swing" />
-                  <project path="$PROJECT_DIR$/jvterm-workspace" />
+                  <project path="$PROJECT_DIR$/ketraterm-app" />
+                  <project path="$PROJECT_DIR$/ketraterm-benchmarks" />
+                  <project path="$PROJECT_DIR$/ketraterm-core" />
+                  <project path="$PROJECT_DIR$/ketraterm-host" />
+                  <project path="$PROJECT_DIR$/ketraterm-input" />
+                  <project path="$PROJECT_DIR$/ketraterm-parser" />
+                  <project path="$PROJECT_DIR$/ketraterm-protocol" />
+                  <project path="$PROJECT_DIR$/ketraterm-pty" />
+                  <project path="$PROJECT_DIR$/ketraterm-render-api" />
+                  <project path="$PROJECT_DIR$/ketraterm-render-cache" />
+                  <project path="$PROJECT_DIR$/ketraterm-session" />
+                  <project path="$PROJECT_DIR$/ketraterm-testkit" />
+                  <project path="$PROJECT_DIR$/ketraterm-transport-api" />
+                  <project path="$PROJECT_DIR$/ketraterm-ui-swing" />
+                  <project path="$PROJECT_DIR$/ketraterm-workspace" />
                 </projects>
               </build>
             </builds>
           </compositeBuild>
         </compositeConfiguration>
-        <option name="externalProjectPath" value="$PROJECT_DIR$/jvterm-intellij-plugin" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$/ketraterm-intellij-plugin" />
         <option name="gradleJvm" value="jbr-21" />
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/jvterm-app" />
-            <option value="$PROJECT_DIR$/jvterm-benchmarks" />
-            <option value="$PROJECT_DIR$/jvterm-core" />
-            <option value="$PROJECT_DIR$/jvterm-host" />
-            <option value="$PROJECT_DIR$/jvterm-input" />
-            <option value="$PROJECT_DIR$/jvterm-intellij-plugin" />
-            <option value="$PROJECT_DIR$/jvterm-parser" />
-            <option value="$PROJECT_DIR$/jvterm-protocol" />
-            <option value="$PROJECT_DIR$/jvterm-pty" />
-            <option value="$PROJECT_DIR$/jvterm-render-api" />
-            <option value="$PROJECT_DIR$/jvterm-render-cache" />
-            <option value="$PROJECT_DIR$/jvterm-session" />
-            <option value="$PROJECT_DIR$/jvterm-testkit" />
-            <option value="$PROJECT_DIR$/jvterm-transport-api" />
-            <option value="$PROJECT_DIR$/jvterm-ui-swing" />
-            <option value="$PROJECT_DIR$/jvterm-workspace" />
+            <option value="$PROJECT_DIR$/ketraterm-intellij-plugin" />
+            <option value="$PROJECT_DIR$/ketraterm-app" />
+            <option value="$PROJECT_DIR$/ketraterm-benchmarks" />
+            <option value="$PROJECT_DIR$/ketraterm-core" />
+            <option value="$PROJECT_DIR$/ketraterm-host" />
+            <option value="$PROJECT_DIR$/ketraterm-input" />
+            <option value="$PROJECT_DIR$/ketraterm-parser" />
+            <option value="$PROJECT_DIR$/ketraterm-protocol" />
+            <option value="$PROJECT_DIR$/ketraterm-pty" />
+            <option value="$PROJECT_DIR$/ketraterm-render-api" />
+            <option value="$PROJECT_DIR$/ketraterm-render-cache" />
+            <option value="$PROJECT_DIR$/ketraterm-session" />
+            <option value="$PROJECT_DIR$/ketraterm-testkit" />
+            <option value="$PROJECT_DIR$/ketraterm-transport-api" />
+            <option value="$PROJECT_DIR$/ketraterm-ui-swing" />
+            <option value="$PROJECT_DIR$/ketraterm-workspace" />
           </set>
         </option>
       </GradleProjectSettings>

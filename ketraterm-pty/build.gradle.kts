@@ -15,15 +15,25 @@
  */
 
 plugins {
+    id("java-library")
     kotlin("jvm")
 }
 
+repositories {
+    mavenCentral()
+}
+
 dependencies {
-    api(project(":jvterm-session"))
-    implementation(project(":jvterm-pty"))
-    implementation(project(":jvterm-render-api"))
+    implementation(project(":ketraterm-core"))
+    implementation(project(":ketraterm-host"))
+    implementation(project(":ketraterm-input"))
+    implementation(project(":ketraterm-protocol"))
+    api(project(":ketraterm-session"))
+    implementation(project(":ketraterm-transport-api"))
+    implementation("org.jetbrains.pty4j:pty4j:0.13.12")
 
     testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
 }
 
 tasks.test {

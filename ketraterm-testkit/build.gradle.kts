@@ -24,7 +24,7 @@ repositories {
 
 dependencies {
 
-    implementation(project(":jvterm-transport-api"))
+    implementation(project(":ketraterm-transport-api"))
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
 }

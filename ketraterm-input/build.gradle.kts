@@ -24,15 +24,8 @@ repositories {
 }
 
 dependencies {
-    api(project(":jvterm-core"))
-    api(project(":jvterm-parser"))
-    api(project(":jvterm-host"))
-    api(project(":jvterm-input"))
-    api(project(":jvterm-render-api"))
-    api(project(":jvterm-render-cache"))
-    api(project(":jvterm-transport-api"))
-    implementation(project(":jvterm-protocol"))
-    testImplementation(project(":jvterm-testkit"))
+    api(project(":ketraterm-protocol"))
+    api(project(":ketraterm-core"))
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")

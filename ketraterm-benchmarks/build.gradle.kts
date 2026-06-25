@@ -24,15 +24,15 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":jvterm-core"))
-    implementation(project(":jvterm-host"))
-    implementation(project(":jvterm-parser"))
-    implementation(project(":jvterm-render-api"))
-    implementation(project(":jvterm-render-cache"))
-    implementation(project(":jvterm-protocol"))
-    implementation(project(":jvterm-session"))
-    implementation(project(":jvterm-input"))
-    implementation(project(":jvterm-ui-swing"))
+    implementation(project(":ketraterm-core"))
+    implementation(project(":ketraterm-host"))
+    implementation(project(":ketraterm-parser"))
+    implementation(project(":ketraterm-render-api"))
+    implementation(project(":ketraterm-render-cache"))
+    implementation(project(":ketraterm-protocol"))
+    implementation(project(":ketraterm-session"))
+    implementation(project(":ketraterm-input"))
+    implementation(project(":ketraterm-ui-swing"))
 
     implementation("org.openjdk.jmh:jmh-core:1.37")
     annotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:1.37")

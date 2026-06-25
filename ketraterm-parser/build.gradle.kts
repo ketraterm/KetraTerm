@@ -24,7 +24,7 @@ repositories {
 
 dependencies {
 
-    api(project(":jvterm-render-api"))
+    implementation(project(":ketraterm-protocol"))
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
 }
