@@ -36,9 +36,9 @@ object TerminalInputEncoders {
         inputState: TerminalInputState,
         output: TerminalHostOutput,
         policy: io.github.ketraterm.input.policy.TerminalInputPolicy =
-            _root_ide_package_.io.github.ketraterm.input.policy
+            io.github.ketraterm.input.policy
                 .TerminalInputPolicy(),
     ): io.github.ketraterm.input.api.TerminalInputEncoder =
-        _root_ide_package_.io.github.ketraterm.input.impl
+        io.github.ketraterm.input.impl
             .DefaultTerminalInputEncoder(inputState, output, policy)
 }

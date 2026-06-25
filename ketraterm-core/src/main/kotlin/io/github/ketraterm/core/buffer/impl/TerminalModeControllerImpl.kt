@@ -18,6 +18,8 @@ package io.github.ketraterm.core.buffer.impl
 import io.github.ketraterm.core.api.TerminalModeController
 import io.github.ketraterm.core.engine.CursorEngine
 import io.github.ketraterm.core.state.TerminalState
+import io.github.ketraterm.render.api.TerminalColorPalette
+import io.github.ketraterm.render.api.TerminalRenderCursorShape
 
 internal class TerminalModeControllerImpl(
     private val state: TerminalState,
@@ -130,13 +132,13 @@ internal class TerminalModeControllerImpl(
         }
     }
 
-    override fun setCursorShape(shape: io.github.ketraterm.render.api.TerminalRenderCursorShape) {
+    override fun setCursorShape(shape: TerminalRenderCursorShape) {
         mutateMode {
             state.cursorShape = shape
         }
     }
 
-    override fun setDefaultCursorShape(shape: io.github.ketraterm.render.api.TerminalRenderCursorShape) {
+    override fun setDefaultCursorShape(shape: TerminalRenderCursorShape) {
         mutateMode {
             state.defaultCursorShape = shape
         }
@@ -191,7 +193,7 @@ internal class TerminalModeControllerImpl(
         state.markStructureChanged()
     }
 
-    override fun setThemePalette(palette: io.github.ketraterm.render.api.TerminalColorPalette) {
+    override fun setThemePalette(palette: TerminalColorPalette) {
         mutateMode {
             state.themePalette = palette
             state.palette = palette

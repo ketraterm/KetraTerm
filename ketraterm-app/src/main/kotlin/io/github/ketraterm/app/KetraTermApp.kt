@@ -33,14 +33,14 @@ private object KetraTermApp {
         KetraTermLookAndFeel.install()
 
         val settings =
-            _root_ide_package_.io.github.ketraterm.app.config
+            io.github.ketraterm.app.config
                 .KetraTermSettings()
         io.github.ketraterm.app.ui.Chrome
             .applyPalette(settings.current().palette)
         val profileRegistry =
             TerminalProfileRegistry()
         val windowFactory =
-            _root_ide_package_.io.github.ketraterm.app.ui
+            io.github.ketraterm.app.ui
                 .WindowFactory(settings, profileRegistry)
         val window = windowFactory.createWindow()
         val frame = window.frame

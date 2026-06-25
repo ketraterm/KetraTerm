@@ -43,7 +43,7 @@ internal class TerminalState(
     val dimensions = GridDimensions(initialWidth, initialHeight)
     val hostResponses = HostResponseQueue()
     var themePalette =
-        _root_ide_package_.io.github.ketraterm.render.api
+        io.github.ketraterm.render.api
             .TerminalColorPalette()
     var palette = themePalette
     var windowPixelWidth: Int = 0

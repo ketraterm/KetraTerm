@@ -121,7 +121,7 @@ internal class CoreTerminalRenderFrame(
         get() {
             checkValid()
             val row = state.cursor.row + resolvedScrollbackOffset
-            return _root_ide_package_.io.github.ketraterm.render.api.TerminalRenderCursor(
+            return io.github.ketraterm.render.api.TerminalRenderCursor(
                 column = state.cursor.col,
                 row = row,
                 visible = state.modes.isCursorVisible && row in 0 until resolvedRows,
