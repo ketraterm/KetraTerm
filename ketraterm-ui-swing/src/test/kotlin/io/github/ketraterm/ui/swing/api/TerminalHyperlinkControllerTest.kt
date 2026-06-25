@@ -158,6 +158,10 @@ class TerminalHyperlinkControllerTest {
         controller.handleMouseMoved(event)
 
         assertEquals(5, controller.hoveredHyperlinkId)
+        assertEquals(1, controller.hoveredHyperlinkStartRow)
+        assertEquals(1, controller.hoveredHyperlinkStartColumn)
+        assertEquals(1, controller.hoveredHyperlinkEndRow)
+        assertEquals(2, controller.hoveredHyperlinkEndColumn)
         assertEquals(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR), host.cursor)
     }
 
@@ -190,6 +194,76 @@ class TerminalHyperlinkControllerTest {
         controller.handleMouseExited()
         assertEquals(0, controller.hoveredHyperlinkId)
         assertEquals(Cursor.getDefaultCursor(), host.cursor)
+    }
+
+    @Test
+    fun `hover over repeated same id tracks only the contiguous span under the pointer`() {
+        val cache =
+            TerminalRenderCache(6, 2).apply {
+                hyperlinkIds[rowOffset(1) + 1] = 5
+                hyperlinkIds[rowOffset(1) + 2] = 5
+                hyperlinkIds[rowOffset(1) + 4] = 5
+            }
+        val terminal = TerminalBuffers.create(width = 6, height = 2, maxHistory = 5)
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                publisher = TerminalRenderPublisher(6, 2),
+                renderReader = FakeFrameReader(),
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+                hyperlinkResolver = { id -> if (id == 5) "https://example.com" else null },
+            )
+        val host = FakeHyperlinkHost(cache, session, SwingHostServices())
+        val controller = TerminalHyperlinkController(host)
+
+        val button = JButton()
+        val event = MouseEvent(button, MouseEvent.MOUSE_MOVED, System.currentTimeMillis(), 0, 15, 25, 0, false)
+        controller.handleMouseMoved(event)
+
+        assertEquals(5, controller.hoveredHyperlinkId)
+        assertEquals(1, controller.hoveredHyperlinkStartRow)
+        assertEquals(1, controller.hoveredHyperlinkStartColumn)
+        assertEquals(1, controller.hoveredHyperlinkEndRow)
+        assertEquals(3, controller.hoveredHyperlinkEndColumn)
+    }
+
+    @Test
+    fun `hover over soft-wrapped link tracks the full wrapped contiguous span`() {
+        val cache =
+            TerminalRenderCache(3, 2).apply {
+                hyperlinkIds[rowOffset(0) + 1] = 5
+                hyperlinkIds[rowOffset(0) + 2] = 5
+                hyperlinkIds[rowOffset(1)] = 5
+                hyperlinkIds[rowOffset(1) + 1] = 5
+                lineWrapped[0] = true
+            }
+        val terminal = TerminalBuffers.create(width = 3, height = 2, maxHistory = 5)
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                publisher = TerminalRenderPublisher(3, 2),
+                renderReader = FakeFrameReader(),
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+                hyperlinkResolver = { id -> if (id == 5) "https://example.com" else null },
+            )
+        val host = FakeHyperlinkHost(cache, session, SwingHostServices())
+        val controller = TerminalHyperlinkController(host)
+
+        val button = JButton()
+        val event = MouseEvent(button, MouseEvent.MOUSE_MOVED, System.currentTimeMillis(), 0, 5, 25, 0, false)
+        controller.handleMouseMoved(event)
+
+        assertEquals(5, controller.hoveredHyperlinkId)
+        assertEquals(0, controller.hoveredHyperlinkStartRow)
+        assertEquals(1, controller.hoveredHyperlinkStartColumn)
+        assertEquals(1, controller.hoveredHyperlinkEndRow)
+        assertEquals(2, controller.hoveredHyperlinkEndColumn)
     }
 
     @Test

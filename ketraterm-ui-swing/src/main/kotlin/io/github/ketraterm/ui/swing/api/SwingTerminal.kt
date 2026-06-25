@@ -828,6 +828,10 @@ class SwingTerminal
                     shellIntegrationDecorations = shellIntegrationDecorations,
                     hoveredPromptMarkerRow = hoveredPromptMarkerRow,
                     hoveredHyperlinkId = hyperlinkController.hoveredHyperlinkId,
+                    hoveredHyperlinkStartRow = hyperlinkController.hoveredHyperlinkStartRow,
+                    hoveredHyperlinkStartColumn = hyperlinkController.hoveredHyperlinkStartColumn,
+                    hoveredHyperlinkEndRow = hyperlinkController.hoveredHyperlinkEndRow,
+                    hoveredHyperlinkEndColumn = hyperlinkController.hoveredHyperlinkEndColumn,
                     hyperlinkActivationHover = hyperlinkController.hyperlinkActivationHover,
                 )
                 visualBellController.paint(g, width, height)

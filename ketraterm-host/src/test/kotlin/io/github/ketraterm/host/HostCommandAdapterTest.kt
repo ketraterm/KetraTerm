@@ -1067,6 +1067,23 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `OSC hyperlink without explicit id receives a fresh numeric id for each open`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 2, height = 1))
+
+            f.sink.startHyperlink(uri = "https://example.com/a", id = null)
+            f.sink.writeCodepoint('A'.code)
+            f.sink.startHyperlink(uri = "https://example.com/a", id = null)
+            f.sink.writeCodepoint('B'.code)
+
+            assertAll(
+                { assertEquals(1, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                { assertEquals(2, f.terminal.getAttrAt(1, 0)?.hyperlinkId) },
+                { assertEquals("https://example.com/a", f.sink.hyperlinkUri(1)) },
+                { assertEquals("https://example.com/a", f.sink.hyperlinkUri(2)) },
+            )
+        }
+
+        @Test
         fun `OSC hyperlink reuses numeric id for same uri and id`() {
             val f = Fixture(terminal = TerminalBuffers.create(width = 2, height = 1))
 
@@ -1187,12 +1204,14 @@ class HostCommandAdapterTest {
             assertAll(
                 { assertEquals(1, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
                 { assertEquals(2, f.terminal.getAttrAt(1, 0)?.hyperlinkId) },
-                { assertEquals(1, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
-                { assertEquals(3, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
-                { assertEquals(4, f.terminal.getAttrAt(4, 0)?.hyperlinkId) },
+                { assertEquals(3, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
+                { assertEquals(4, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
+                { assertEquals(5, f.terminal.getAttrAt(4, 0)?.hyperlinkId) },
                 { assertNull(f.sink.hyperlinkUri(1)) },
-                { assertEquals("https://example.com/c", f.sink.hyperlinkUri(3)) },
-                { assertEquals("https://example.com/b", f.sink.hyperlinkUri(4)) },
+                { assertNull(f.sink.hyperlinkUri(2)) },
+                { assertNull(f.sink.hyperlinkUri(3)) },
+                { assertEquals("https://example.com/c", f.sink.hyperlinkUri(4)) },
+                { assertEquals("https://example.com/b", f.sink.hyperlinkUri(5)) },
             )
         }
 
@@ -1219,7 +1238,7 @@ class HostCommandAdapterTest {
             assertAll(
                 { assertEquals(16, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
                 { assertEquals(17, f.terminal.getAttrAt(1, 0)?.hyperlinkId) },
-                { assertEquals(16, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
+                { assertEquals(18, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
                 { assertEquals(0, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
             )
         }

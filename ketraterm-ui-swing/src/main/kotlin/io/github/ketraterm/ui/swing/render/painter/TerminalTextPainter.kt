@@ -81,6 +81,10 @@ internal class TerminalTextPainter(
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean = true,
         hoveredHyperlinkId: Int = NO_HYPERLINK_ID,
+        hoveredHyperlinkStartRow: Int = DEFAULT_HOVER_START_ROW,
+        hoveredHyperlinkStartColumn: Int = 0,
+        hoveredHyperlinkEndRow: Int = DEFAULT_HOVER_END_ROW,
+        hoveredHyperlinkEndColumn: Int = DEFAULT_HOVER_END_COLUMN,
         hyperlinkActivationHover: Boolean = false,
         hyperlinkActivationForeground: Int = DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND,
     ) {
@@ -94,6 +98,10 @@ internal class TerminalTextPainter(
                 fontRenderContext = fontRenderContext,
                 textBlinkVisible = textBlinkVisible,
                 hoveredHyperlinkId = hoveredHyperlinkId,
+                hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
+                hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
+                hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
+                hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
                 hyperlinkActivationHover = hyperlinkActivationHover,
                 hyperlinkActivationForeground = hyperlinkActivationForeground,
             )
@@ -135,6 +143,10 @@ internal class TerminalTextPainter(
                             fontRenderContext = fontRenderContext,
                             textBlinkVisible = textBlinkVisible,
                             hoveredHyperlinkId = hoveredHyperlinkId,
+                            hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
+                            hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
+                            hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
+                            hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
                             hyperlinkActivationHover = hyperlinkActivationHover,
                             hyperlinkActivationForeground = hyperlinkActivationForeground,
                         )
@@ -151,6 +163,10 @@ internal class TerminalTextPainter(
                             fontRenderContext = fontRenderContext,
                             textBlinkVisible = textBlinkVisible,
                             hoveredHyperlinkId = hoveredHyperlinkId,
+                            hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
+                            hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
+                            hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
+                            hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
                             hyperlinkActivationHover = hyperlinkActivationHover,
                             hyperlinkActivationForeground = hyperlinkActivationForeground,
                         )
@@ -167,6 +183,10 @@ internal class TerminalTextPainter(
                             fontRenderContext = fontRenderContext,
                             textBlinkVisible = textBlinkVisible,
                             hoveredHyperlinkId = hoveredHyperlinkId,
+                            hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
+                            hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
+                            hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
+                            hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
                             hyperlinkActivationHover = hyperlinkActivationHover,
                             hyperlinkActivationForeground = hyperlinkActivationForeground,
                         )
@@ -282,6 +302,10 @@ internal class TerminalTextPainter(
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean,
         hoveredHyperlinkId: Int,
+        hoveredHyperlinkStartRow: Int,
+        hoveredHyperlinkStartColumn: Int,
+        hoveredHyperlinkEndRow: Int,
+        hoveredHyperlinkEndColumn: Int,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
     ): Int {
@@ -295,7 +319,17 @@ internal class TerminalTextPainter(
         val attr = attrWords[startIndex]
         val extraAttr = extraAttrWords[startIndex]
         val hyperlinkId = hyperlinkIds[startIndex]
-        val hovered = isHoveredHyperlink(hyperlinkId, hoveredHyperlinkId)
+        val hovered =
+            isHoveredHyperlink(
+                hyperlinkId,
+                row,
+                startColumn,
+                hoveredHyperlinkId,
+                hoveredHyperlinkStartRow,
+                hoveredHyperlinkStartColumn,
+                hoveredHyperlinkEndRow,
+                hoveredHyperlinkEndColumn,
+            )
         val foreground =
             effectiveForeground(
                 palette = palette,
@@ -317,7 +351,17 @@ internal class TerminalTextPainter(
             val currentExtraAttr = extraAttrWords[index]
             val currentHyperlinkId = hyperlinkIds[index]
             val currentBlinkHidden = isBlinkHidden(currentAttr, textBlinkVisible)
-            val currentHovered = isHoveredHyperlink(currentHyperlinkId, hoveredHyperlinkId)
+            val currentHovered =
+                isHoveredHyperlink(
+                    currentHyperlinkId,
+                    row,
+                    column,
+                    hoveredHyperlinkId,
+                    hoveredHyperlinkStartRow,
+                    hoveredHyperlinkStartColumn,
+                    hoveredHyperlinkEndRow,
+                    hoveredHyperlinkEndColumn,
+                )
             val currentForeground =
                 effectiveForeground(
                     palette = palette,
@@ -369,6 +413,10 @@ internal class TerminalTextPainter(
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean,
         hoveredHyperlinkId: Int,
+        hoveredHyperlinkStartRow: Int,
+        hoveredHyperlinkStartColumn: Int,
+        hoveredHyperlinkEndRow: Int,
+        hoveredHyperlinkEndColumn: Int,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
     ): Int {
@@ -385,7 +433,17 @@ internal class TerminalTextPainter(
 
         val extraAttr = extraAttrWords[index]
         val hyperlinkId = hyperlinkIds[index]
-        val hovered = isHoveredHyperlink(hyperlinkId, hoveredHyperlinkId)
+        val hovered =
+            isHoveredHyperlink(
+                hyperlinkId,
+                row,
+                column,
+                hoveredHyperlinkId,
+                hoveredHyperlinkStartRow,
+                hoveredHyperlinkStartColumn,
+                hoveredHyperlinkEndRow,
+                hoveredHyperlinkEndColumn,
+            )
         val foreground =
             effectiveForeground(
                 palette = palette,
@@ -483,8 +541,20 @@ internal class TerminalTextPainter(
 
     private fun isHoveredHyperlink(
         hyperlinkId: Int,
+        row: Int,
+        column: Int,
         hoveredHyperlinkId: Int,
-    ): Boolean = hyperlinkId != NO_HYPERLINK_ID && hyperlinkId == hoveredHyperlinkId
+        hoveredHyperlinkStartRow: Int,
+        hoveredHyperlinkStartColumn: Int,
+        hoveredHyperlinkEndRow: Int,
+        hoveredHyperlinkEndColumn: Int,
+    ): Boolean =
+        hyperlinkId != NO_HYPERLINK_ID &&
+            hyperlinkId == hoveredHyperlinkId &&
+            row >= hoveredHyperlinkStartRow &&
+            row <= hoveredHyperlinkEndRow &&
+            (row > hoveredHyperlinkStartRow || column >= hoveredHyperlinkStartColumn) &&
+            (row < hoveredHyperlinkEndRow || column < hoveredHyperlinkEndColumn)
 
     private fun effectiveForeground(
         palette: TerminalColorPalette,
@@ -645,6 +715,9 @@ internal class TerminalTextPainter(
         private const val STRIKETHROUGH_KEY = 1L shl 8
         private const val EXTRA_ATTR_KEY_SHIFT = 9
         private const val NO_HYPERLINK_ID = 0
+        private const val DEFAULT_HOVER_START_ROW = 0
+        private const val DEFAULT_HOVER_END_ROW = Int.MAX_VALUE
+        private const val DEFAULT_HOVER_END_COLUMN = Int.MAX_VALUE
         private const val DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND = 0xFF4DA3FF.toInt()
     }
 }

@@ -327,6 +327,104 @@ class TerminalTextPainterTest {
             assertEquals(activationBlue, fixture.image.getRGB(0, fixture.metrics.underlineY))
             assertEquals(TEST_RED, fixture.image.getRGB(fixture.metrics.cellWidth, fixture.metrics.underlineY))
         }
+
+        @Test
+        fun `ctrl hovered hyperlink span does not bleed into another same-id span`() {
+            val activationBlue = 0xFF4DA3FF.toInt()
+            val fixture = fixture()
+            val cache =
+                renderCache(
+                    TestRenderFrame(
+                        arrayOf(
+                            arrayOf(
+                                TestCell(
+                                    codeWord = ' '.code,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    hyperlinkId = 7,
+                                ),
+                                TestCell(),
+                                TestCell(
+                                    codeWord = ' '.code,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    hyperlinkId = 7,
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+
+            fixture.paintRow(
+                cache = cache,
+                hoveredHyperlinkId = 7,
+                hoveredHyperlinkStartRow = 0,
+                hoveredHyperlinkStartColumn = 0,
+                hoveredHyperlinkEndRow = 0,
+                hoveredHyperlinkEndColumn = 1,
+                hyperlinkActivationHover = true,
+                hyperlinkActivationForeground = activationBlue,
+            )
+
+            assertEquals(activationBlue, fixture.image.getRGB(0, fixture.metrics.underlineY))
+            assertEquals(TEST_RED, fixture.image.getRGB(fixture.metrics.cellWidth * 2, fixture.metrics.underlineY))
+        }
+
+        @Test
+        fun `ctrl hovered hyperlink span paints across soft-wrapped rows`() {
+            val activationBlue = 0xFF4DA3FF.toInt()
+            val fixture = fixture()
+            val cache =
+                renderCache(
+                    TestRenderFrame(
+                        arrayOf(
+                            arrayOf(
+                                TestCell(),
+                                TestCell(
+                                    codeWord = ' '.code,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    hyperlinkId = 7,
+                                ),
+                            ),
+                            arrayOf(
+                                TestCell(
+                                    codeWord = ' '.code,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    hyperlinkId = 7,
+                                ),
+                                TestCell(),
+                            ),
+                        ),
+                    ),
+                )
+
+            fixture.paintRow(
+                cache = cache,
+                row = 0,
+                hoveredHyperlinkId = 7,
+                hoveredHyperlinkStartRow = 0,
+                hoveredHyperlinkStartColumn = 1,
+                hoveredHyperlinkEndRow = 1,
+                hoveredHyperlinkEndColumn = 1,
+                hyperlinkActivationHover = true,
+                hyperlinkActivationForeground = activationBlue,
+            )
+            fixture.paintRow(
+                cache = cache,
+                row = 1,
+                hoveredHyperlinkId = 7,
+                hoveredHyperlinkStartRow = 0,
+                hoveredHyperlinkStartColumn = 1,
+                hoveredHyperlinkEndRow = 1,
+                hoveredHyperlinkEndColumn = 1,
+                hyperlinkActivationHover = true,
+                hyperlinkActivationForeground = activationBlue,
+            )
+
+            assertEquals(activationBlue, fixture.image.getRGB(fixture.metrics.cellWidth, fixture.metrics.underlineY))
+            assertEquals(
+                activationBlue,
+                fixture.image.getRGB(0, fixture.metrics.cellHeight + fixture.metrics.underlineY),
+            )
+        }
     }
 
     @Nested
@@ -830,6 +928,10 @@ class TerminalTextPainterTest {
             row: Int = 0,
             textBlinkVisible: Boolean = true,
             hoveredHyperlinkId: Int = 0,
+            hoveredHyperlinkStartRow: Int = 0,
+            hoveredHyperlinkStartColumn: Int = 0,
+            hoveredHyperlinkEndRow: Int = Int.MAX_VALUE,
+            hoveredHyperlinkEndColumn: Int = Int.MAX_VALUE,
             hyperlinkActivationHover: Boolean = false,
             hyperlinkActivationForeground: Int = 0xFF4DA3FF.toInt(),
         ) {
@@ -844,6 +946,10 @@ class TerminalTextPainterTest {
                 fontRenderContext = g.fontRenderContext,
                 textBlinkVisible = textBlinkVisible,
                 hoveredHyperlinkId = hoveredHyperlinkId,
+                hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
+                hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
+                hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
+                hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
                 hyperlinkActivationHover = hyperlinkActivationHover,
                 hyperlinkActivationForeground = hyperlinkActivationForeground,
             )

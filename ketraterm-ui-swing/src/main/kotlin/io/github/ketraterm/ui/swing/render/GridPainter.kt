@@ -82,6 +82,10 @@ internal class GridPainter {
         shellIntegrationDecorations: TerminalShellIntegrationViewportDecorations? = null,
         hoveredPromptMarkerRow: Int = -1,
         hoveredHyperlinkId: Int = 0,
+        hoveredHyperlinkStartRow: Int = 0,
+        hoveredHyperlinkStartColumn: Int = 0,
+        hoveredHyperlinkEndRow: Int = Int.MAX_VALUE,
+        hoveredHyperlinkEndColumn: Int = Int.MAX_VALUE,
         hyperlinkActivationHover: Boolean = false,
     ) {
         val palette = cache.palette
@@ -150,6 +154,10 @@ internal class GridPainter {
                     fontRenderContext = fontRenderContext,
                     textBlinkVisible = textBlinkVisible,
                     hoveredHyperlinkId = hoveredHyperlinkId,
+                    hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
+                    hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
+                    hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
+                    hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
                     hyperlinkActivationHover = hyperlinkActivationHover,
                     hyperlinkActivationForeground = settings.hyperlinkActivationForeground,
                 )
