@@ -17,6 +17,7 @@ package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.app.history.CommandHistoryStore
+import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.workspace.*
 import java.awt.*
 import java.awt.event.InputEvent
@@ -684,6 +685,16 @@ internal class TabManager(
             }
         }
 
+        override fun terminalClipboardWrite(
+            tab: TerminalWorkspaceTab,
+            event: TerminalClipboardWriteEvent,
+        ) {
+            if (!targetsHostClipboard(event.selection)) return
+            SwingUtilities.invokeLater {
+                panes.firstOrNull { it.tab == tab }?.terminal?.copyTextToClipboard(event.text)
+            }
+        }
+
         override fun resizeWindow(
             tab: TerminalWorkspaceTab,
             rows: Int,
@@ -783,6 +794,8 @@ internal class TabManager(
 
     private companion object {
         private const val INITIAL_TAB_CAPACITY = 4
+
+        private fun targetsHostClipboard(selection: String): Boolean = selection.isEmpty() || selection.indexOf('c') >= 0
     }
 }
 

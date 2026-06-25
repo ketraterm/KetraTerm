@@ -1623,7 +1623,7 @@ class HostCommandAdapterTest {
         }
 
         @Test
-        fun `OSC 52 allowed policy audits allowance but adapter performs no clipboard IO`() {
+        fun `OSC 52 allowed policy audits allowance and emits decoded clipboard write`() {
             val f =
                 Fixture(
                     hostPolicy =
@@ -1643,6 +1643,16 @@ class HostCommandAdapterTest {
                 f.events.clipboardAudits
                     .single()
                     .decision,
+            )
+            assertEquals(
+                listOf(
+                    TerminalClipboardWriteEvent(
+                        selection = "c",
+                        text = "Hello",
+                        audit = f.events.clipboardAudits.single(),
+                    ),
+                ),
+                f.events.clipboardWrites,
             )
         }
 
@@ -1693,6 +1703,16 @@ class HostCommandAdapterTest {
                     .single()
                     .decision,
             )
+            assertEquals(
+                listOf(
+                    TerminalClipboardWriteEvent(
+                        selection = "c",
+                        text = "Hello",
+                        audit = f.events.clipboardAudits.single(),
+                    ),
+                ),
+                f.events.clipboardWrites,
+            )
         }
 
         @Test
@@ -1723,6 +1743,7 @@ class HostCommandAdapterTest {
                     .single()
                     .decodedBytes,
             )
+            assertTrue(f.events.clipboardWrites.isEmpty())
         }
 
         @Test
@@ -1759,6 +1780,95 @@ class HostCommandAdapterTest {
                 f.events.clipboardAudits
                     .single()
                     .maxDecodedBytes,
+            )
+            assertTrue(f.events.clipboardWrites.isEmpty())
+        }
+
+        @Test
+        fun `OSC 52 prompt and read query policies do not emit decoded clipboard writes`() {
+            val prompt =
+                Fixture(
+                    hostPolicy =
+                        HostPolicy(
+                            clipboardPolicy =
+                                TerminalClipboardPolicy(
+                                    origin = TerminalClipboardOrigin.LOCAL,
+                                    localWritePermission = TerminalClipboardPermission.PROMPT,
+                                ),
+                        ),
+                )
+            val read =
+                Fixture(
+                    hostPolicy =
+                        HostPolicy(
+                            clipboardPolicy =
+                                TerminalClipboardPolicy(
+                                    origin = TerminalClipboardOrigin.LOCAL,
+                                    readPermission = TerminalClipboardPermission.ALLOW,
+                                ),
+                        ),
+                )
+
+            prompt.acceptAscii("\u001B]52;c;SGVsbG8=\u0007")
+            read.acceptAscii("\u001B]52;c;?\u0007")
+
+            assertAll(
+                {
+                    assertEquals(
+                        TerminalClipboardDecision.PROMPT_REQUIRED,
+                        prompt.events.clipboardAudits
+                            .single()
+                            .decision,
+                    )
+                },
+                { assertTrue(prompt.events.clipboardWrites.isEmpty()) },
+                {
+                    assertEquals(
+                        TerminalClipboardOperation.READ_QUERY,
+                        read.events.clipboardAudits
+                            .single()
+                            .operation,
+                    )
+                },
+                {
+                    assertEquals(
+                        TerminalClipboardDecision.ALLOWED_BY_POLICY,
+                        read.events.clipboardAudits
+                            .single()
+                            .decision,
+                    )
+                },
+                { assertTrue(read.events.clipboardWrites.isEmpty()) },
+            )
+        }
+
+        @Test
+        fun `OSC 52 empty allowed write emits clipboard clear text`() {
+            val f =
+                Fixture(
+                    hostPolicy =
+                        HostPolicy(
+                            clipboardPolicy =
+                                TerminalClipboardPolicy(
+                                    origin = TerminalClipboardOrigin.LOCAL,
+                                    localWritePermission = TerminalClipboardPermission.ALLOW,
+                                ),
+                        ),
+                )
+
+            f.acceptAscii("\u001B]52;c;\u0007")
+
+            assertEquals(
+                "",
+                f.events.clipboardWrites
+                    .single()
+                    .text,
+            )
+            assertEquals(
+                0,
+                f.events.clipboardAudits
+                    .single()
+                    .decodedBytes,
             )
         }
     }
@@ -1880,6 +1990,7 @@ class HostCommandAdapterTest {
 
         val notifications = mutableListOf<Triple<String, String, NotificationLevel>>()
         val clipboardAudits = mutableListOf<TerminalClipboardAuditEvent>()
+        val clipboardWrites = mutableListOf<TerminalClipboardWriteEvent>()
 
         override fun showNotification(
             title: String,
@@ -1891,6 +2002,10 @@ class HostCommandAdapterTest {
 
         override fun terminalClipboardRequest(event: TerminalClipboardAuditEvent) {
             clipboardAudits += event
+        }
+
+        override fun terminalClipboardWrite(event: TerminalClipboardWriteEvent) {
+            clipboardWrites += event
         }
     }
 }

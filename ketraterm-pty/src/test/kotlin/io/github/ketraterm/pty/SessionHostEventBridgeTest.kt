@@ -16,6 +16,11 @@
 package io.github.ketraterm.pty
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.host.TerminalClipboardAuditEvent
+import io.github.ketraterm.host.TerminalClipboardDecision
+import io.github.ketraterm.host.TerminalClipboardOperation
+import io.github.ketraterm.host.TerminalClipboardOrigin
+import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
@@ -73,6 +78,7 @@ class SessionHostEventBridgeTest {
         bridge.setMaximized(false)
         bridge.shellIntegrationMarker(ShellIntegrationEvent(ShellIntegrationMarker.COMMAND_FINISHED, exitCode = 3))
         bridge.showNotification("title", "body", NotificationLevel.INFO)
+        bridge.terminalClipboardWrite(testClipboardWriteEvent("copied"))
 
         assertEquals(
             listOf(
@@ -90,6 +96,7 @@ class SessionHostEventBridgeTest {
                 "setMaximized:false",
                 "shellIntegrationMarker:COMMAND_FINISHED:3",
                 "showNotification:title:body:INFO",
+                "terminalClipboardWrite:c:copied",
             ),
             listener.events,
         )
@@ -139,6 +146,22 @@ class SessionHostEventBridgeTest {
         val terminal = TerminalBuffers.create(width = 5, height = 2)
         return TerminalSession.create(terminal = terminal, connector = NoopConnector)
     }
+
+    private fun testClipboardWriteEvent(text: String): TerminalClipboardWriteEvent =
+        TerminalClipboardWriteEvent(
+            selection = "c",
+            text = text,
+            audit =
+                TerminalClipboardAuditEvent(
+                    operation = TerminalClipboardOperation.WRITE,
+                    selection = "c",
+                    origin = TerminalClipboardOrigin.LOCAL,
+                    encodedLength = 8,
+                    decodedBytes = text.encodeToByteArray().size,
+                    maxDecodedBytes = 1024,
+                    decision = TerminalClipboardDecision.ALLOWED_BY_POLICY,
+                ),
+        )
 
     private class RecordingListener : PtyEventListener {
         val events = mutableListOf<String>()
@@ -221,6 +244,13 @@ class SessionHostEventBridgeTest {
             level: NotificationLevel,
         ) {
             events += "showNotification:$title:$body:${level.name}"
+        }
+
+        override fun terminalClipboardWrite(
+            session: TerminalSession,
+            event: TerminalClipboardWriteEvent,
+        ) {
+            events += "terminalClipboardWrite:${event.selection}:${event.text}"
         }
 
         override fun listenerFailed(

@@ -19,8 +19,10 @@ package io.github.ketraterm.host
  * Permission policy for terminal-originated clipboard protocols such as OSC 52.
  *
  * This policy describes what would be permitted by an embedding host. The host
- * adapter never writes to the clipboard directly; it audits the request and
- * leaves prompting, allowlists, and actual clipboard access to product hosts.
+ * adapter never writes to a platform clipboard directly; it audits every
+ * request and emits decoded write payloads only when the configured policy
+ * permits the operation. Prompting, allowlists, read responses, and platform
+ * clipboard access remain product-host responsibilities.
  *
  * @property origin trust boundary of the terminal session that produced the
  * request.
@@ -99,8 +101,7 @@ enum class TerminalClipboardPermission {
     ALLOWLIST,
 
     /**
-     * The policy permits the operation, but the adapter still does not perform
-     * clipboard I/O directly.
+     * The policy permits the operation.
      */
     ALLOW,
 }
@@ -138,7 +139,7 @@ enum class TerminalClipboardDecision {
     /** Product host must prompt before deciding. */
     PROMPT_REQUIRED,
 
-    /** Policy permits the request; no clipboard I/O has been performed. */
+    /** Policy permits the request. */
     ALLOWED_BY_POLICY,
 }
 
@@ -165,4 +166,22 @@ data class TerminalClipboardAuditEvent(
     val decodedBytes: Int,
     val maxDecodedBytes: Int,
     val decision: TerminalClipboardDecision,
+)
+
+/**
+ * Host-facing decoded OSC 52 clipboard write request.
+ *
+ * This event is emitted only after the request has been parsed, size-checked,
+ * decoded as UTF-8 text, and allowed by [TerminalClipboardPolicy]. It is kept
+ * separate from [TerminalClipboardAuditEvent] so content-free audit streams do
+ * not accidentally retain clipboard payloads.
+ *
+ * @property selection OSC 52 selection designator exactly as parsed.
+ * @property text decoded clipboard text to write.
+ * @property audit content-free audit metadata for the same request.
+ */
+data class TerminalClipboardWriteEvent(
+    val selection: String,
+    val text: String,
+    val audit: TerminalClipboardAuditEvent,
 )

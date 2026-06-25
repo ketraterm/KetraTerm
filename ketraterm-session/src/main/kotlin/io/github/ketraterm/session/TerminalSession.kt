@@ -20,6 +20,8 @@ import io.github.ketraterm.core.api.TerminalHostResponseReader
 import io.github.ketraterm.host.HostCommandAdapter
 import io.github.ketraterm.host.HostEventSink
 import io.github.ketraterm.host.HostPolicy
+import io.github.ketraterm.host.TerminalClipboardAuditEvent
+import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.input.TerminalInputEncoders
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalFocusEvent
@@ -922,5 +924,13 @@ private class ShellIntegrationRecordingHostEventSink(
         level: NotificationLevel,
     ) {
         delegate.showNotification(title, body, level)
+    }
+
+    override fun terminalClipboardRequest(event: TerminalClipboardAuditEvent) {
+        delegate.terminalClipboardRequest(event)
+    }
+
+    override fun terminalClipboardWrite(event: TerminalClipboardWriteEvent) {
+        delegate.terminalClipboardWrite(event)
     }
 }

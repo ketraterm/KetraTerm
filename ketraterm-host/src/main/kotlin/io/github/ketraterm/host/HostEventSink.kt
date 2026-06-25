@@ -124,13 +124,27 @@ interface HostEventSink {
      * Called after an OSC 52 terminal clipboard request is evaluated by host
      * policy.
      *
-     * The audit event never contains clipboard payload contents. Hosts that
-     * choose to prompt or allow future clipboard writes must keep the actual
-     * clipboard I/O outside the parser, core, and reusable rendering layers.
+     * The audit event never contains clipboard payload contents. Allowed write
+     * payloads are delivered separately through [terminalClipboardWrite] so
+     * logs, telemetry, and generic event queues can remain content-free.
      *
      * @param event clipboard request audit record.
      */
     fun terminalClipboardRequest(event: TerminalClipboardAuditEvent) = Unit
+
+    /**
+     * Called when an OSC 52 clipboard write request has been allowed by host
+     * policy and decoded to text.
+     *
+     * The adapter never writes to a platform clipboard directly. Product hosts
+     * that support OSC 52 writes should perform clipboard I/O from this callback
+     * using their own platform or embedding clipboard service. This callback is
+     * not invoked for denied requests, prompt-required requests, malformed
+     * payloads, oversized payloads, or read/query requests.
+     *
+     * @param event decoded clipboard write request.
+     */
+    fun terminalClipboardWrite(event: TerminalClipboardWriteEvent) = Unit
 
     companion object {
         /**

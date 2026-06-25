@@ -24,6 +24,7 @@ import io.github.ketraterm.protocol.keyboard.*
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import java.net.URI
 import java.net.URISyntaxException
+import java.util.Base64
 
 /**
  * Production bridge from parser semantic commands to the terminal core.
@@ -770,7 +771,22 @@ class HostCommandAdapter(
         selection: String,
         encodedData: String,
     ) {
-        hostEvents.terminalClipboardRequest(evaluateClipboardRequest(selection, encodedData))
+        val audit = evaluateClipboardRequest(selection, encodedData)
+        hostEvents.terminalClipboardRequest(audit)
+        if (audit.operation != TerminalClipboardOperation.WRITE ||
+            audit.decision != TerminalClipboardDecision.ALLOWED_BY_POLICY
+        ) {
+            return
+        }
+
+        val decodedText = decodeClipboardText(encodedData) ?: return
+        hostEvents.terminalClipboardWrite(
+            TerminalClipboardWriteEvent(
+                selection = selection,
+                text = decodedText,
+                audit = audit,
+            ),
+        )
     }
 
     override fun setPaletteColor(
@@ -1097,6 +1113,13 @@ class HostCommandAdapter(
                 else -> 0
             }
     }
+
+    private fun decodeClipboardText(value: String): String? =
+        try {
+            Base64.getDecoder().decode(value).decodeToString()
+        } catch (_: IllegalArgumentException) {
+            null
+        }
 }
 
 private val HostControlPolicy.isAllowed: Boolean
