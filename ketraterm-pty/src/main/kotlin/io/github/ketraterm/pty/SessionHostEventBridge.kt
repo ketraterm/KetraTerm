@@ -16,6 +16,8 @@
 package io.github.ketraterm.pty
 
 import io.github.ketraterm.host.HostEventSink
+import io.github.ketraterm.host.TerminalClipboardPromptEvent
+import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.session.TerminalSession
@@ -92,6 +94,14 @@ internal class SessionHostEventBridge(
         level: NotificationLevel,
     ) {
         safeDispatch { session -> listener.showNotification(session, title, body, level) }
+    }
+
+    override fun terminalClipboardWrite(event: TerminalClipboardWriteEvent) {
+        safeDispatch { session -> listener.terminalClipboardWrite(session, event) }
+    }
+
+    override fun terminalClipboardPrompt(event: TerminalClipboardPromptEvent) {
+        safeDispatch { session -> listener.terminalClipboardPrompt(session, event) }
     }
 
     private inline fun safeDispatch(block: (TerminalSession) -> Unit) {

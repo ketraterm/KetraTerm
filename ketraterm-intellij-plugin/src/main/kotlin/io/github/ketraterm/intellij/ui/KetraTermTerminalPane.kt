@@ -79,6 +79,7 @@ internal class KetraTermTerminalPane private constructor(
                     hostServices =
                         SwingHostServices(
                             viewportListener = scrollbarAdapter,
+                            clipboardHandler = IntellijTerminalClipboardHandler,
                             uiDispatcher = TerminalUiDispatcher { runnable ->
                                 ApplicationManager.getApplication().invokeLater(runnable)
                             },

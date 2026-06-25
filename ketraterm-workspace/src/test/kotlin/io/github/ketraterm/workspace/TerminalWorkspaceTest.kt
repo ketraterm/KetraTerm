@@ -16,6 +16,12 @@
 package io.github.ketraterm.workspace
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.host.TerminalClipboardAuditEvent
+import io.github.ketraterm.host.TerminalClipboardDecision
+import io.github.ketraterm.host.TerminalClipboardOperation
+import io.github.ketraterm.host.TerminalClipboardOrigin
+import io.github.ketraterm.host.TerminalClipboardPromptEvent
+import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
@@ -279,6 +285,118 @@ class TerminalWorkspaceTest {
 
         assertEquals(listOf(tab.id to event), markerEvents)
     }
+
+    @Test
+    fun `allowed clipboard write is forwarded with owning tab`() {
+        var capturedEventListener: PtyEventListener? = null
+        val session = testSession()
+        val clipboardEvents = mutableListOf<Pair<String, TerminalClipboardWriteEvent>>()
+        val workspace =
+            TerminalWorkspace(
+                listener =
+                    object : TerminalWorkspaceListener {
+                        override fun terminalClipboardWrite(
+                            tab: TerminalWorkspaceTab,
+                            event: TerminalClipboardWriteEvent,
+                        ) {
+                            clipboardEvents += tab.id to event
+                        }
+                    },
+                sessionFactory =
+                    TerminalWorkspaceSessionFactory { _, _, eventListener ->
+                        capturedEventListener = eventListener
+                        session
+                    },
+            )
+        val tab =
+            workspace.openTab(
+                profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
+                options =
+                    TerminalWorkspaceOpenOptions(
+                        columns = 80,
+                        rows = 24,
+                        treatAmbiguousAsWide = false,
+                        maxHistory = 100,
+                    ),
+            )
+        val event = testClipboardWriteEvent("copied")
+
+        capturedEventListener!!.terminalClipboardWrite(session, event)
+
+        assertEquals(listOf(tab.id to event), clipboardEvents)
+    }
+
+    @Test
+    fun `clipboard prompt is forwarded with owning tab`() {
+        var capturedEventListener: PtyEventListener? = null
+        val session = testSession()
+        val clipboardEvents = mutableListOf<Pair<String, TerminalClipboardPromptEvent>>()
+        val workspace =
+            TerminalWorkspace(
+                listener =
+                    object : TerminalWorkspaceListener {
+                        override fun terminalClipboardPrompt(
+                            tab: TerminalWorkspaceTab,
+                            event: TerminalClipboardPromptEvent,
+                        ) {
+                            clipboardEvents += tab.id to event
+                        }
+                    },
+                sessionFactory =
+                    TerminalWorkspaceSessionFactory { _, _, eventListener ->
+                        capturedEventListener = eventListener
+                        session
+                    },
+            )
+        val tab =
+            workspace.openTab(
+                profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
+                options =
+                    TerminalWorkspaceOpenOptions(
+                        columns = 80,
+                        rows = 24,
+                        treatAmbiguousAsWide = false,
+                        maxHistory = 100,
+                    ),
+            )
+        val event = testClipboardPromptEvent("prompted")
+
+        capturedEventListener!!.terminalClipboardPrompt(session, event)
+
+        assertEquals(listOf(tab.id to event), clipboardEvents)
+    }
+
+    private fun testClipboardWriteEvent(text: String): TerminalClipboardWriteEvent =
+        TerminalClipboardWriteEvent(
+            selection = "c",
+            text = text,
+            audit =
+                TerminalClipboardAuditEvent(
+                    operation = TerminalClipboardOperation.WRITE,
+                    selection = "c",
+                    origin = TerminalClipboardOrigin.LOCAL,
+                    encodedLength = 8,
+                    decodedBytes = text.encodeToByteArray().size,
+                    maxDecodedBytes = 1024,
+                    decision = TerminalClipboardDecision.ALLOWED_BY_POLICY,
+                ),
+        )
+
+    private fun testClipboardPromptEvent(text: String): TerminalClipboardPromptEvent =
+        TerminalClipboardPromptEvent(
+            selection = "c",
+            text = text,
+            audit =
+                TerminalClipboardAuditEvent(
+                    operation = TerminalClipboardOperation.WRITE,
+                    selection = "c",
+                    origin = TerminalClipboardOrigin.LOCAL,
+                    encodedLength = 8,
+                    decodedBytes = text.encodeToByteArray().size,
+                    maxDecodedBytes = 1024,
+                    decision = TerminalClipboardDecision.PROMPT_REQUIRED,
+                ),
+        )
 
     private fun testSession(): TerminalSession {
         val terminal = TerminalBuffers.create(width = 80, height = 24, maxHistory = 100)

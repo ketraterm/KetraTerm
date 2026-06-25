@@ -17,6 +17,8 @@ package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.app.history.CommandHistoryStore
+import io.github.ketraterm.host.TerminalClipboardPromptEvent
+import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.workspace.*
 import java.awt.*
 import java.awt.event.InputEvent
@@ -684,6 +686,37 @@ internal class TabManager(
             }
         }
 
+        override fun terminalClipboardWrite(
+            tab: TerminalWorkspaceTab,
+            event: TerminalClipboardWriteEvent,
+        ) {
+            if (!targetsHostClipboard(event.selection)) return
+            SwingUtilities.invokeLater {
+                panes.firstOrNull { it.tab == tab }?.terminal?.copyTextToClipboard(event.text)
+            }
+        }
+
+        override fun terminalClipboardPrompt(
+            tab: TerminalWorkspaceTab,
+            event: TerminalClipboardPromptEvent,
+        ) {
+            if (!targetsHostClipboard(event.selection)) return
+            SwingUtilities.invokeLater {
+                val pane = panes.firstOrNull { it.tab == tab } ?: return@invokeLater
+                val answer =
+                    JOptionPane.showConfirmDialog(
+                        frame,
+                        clipboardPromptComponent(tab.profile.displayName, event),
+                        Osc52ClipboardPromptText.title(),
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE,
+                    )
+                if (answer == JOptionPane.YES_OPTION) {
+                    pane.terminal.copyTextToClipboard(event.text)
+                }
+            }
+        }
+
         override fun resizeWindow(
             tab: TerminalWorkspaceTab,
             rows: Int,
@@ -783,6 +816,19 @@ internal class TabManager(
 
     private companion object {
         private const val INITIAL_TAB_CAPACITY = 4
+
+        private fun targetsHostClipboard(selection: String): Boolean = selection.isEmpty() || selection.indexOf('c') >= 0
+
+        private fun clipboardPromptComponent(
+            profileName: String,
+            event: TerminalClipboardPromptEvent,
+        ): JComponent =
+            JPanel(BorderLayout(0, 6)).apply {
+                isOpaque = false
+                border = BorderFactory.createEmptyBorder(2, 0, 0, 0)
+                add(JLabel(Osc52ClipboardPromptText.htmlQuestion(profileName, event)), BorderLayout.NORTH)
+                add(JLabel(Osc52ClipboardPromptText.htmlDetail(event)), BorderLayout.CENTER)
+            }
     }
 }
 

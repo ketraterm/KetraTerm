@@ -197,11 +197,23 @@ internal class SettingsDialog(
 
     // Form Controls - Security
     private val clipboardLocalWriteCombo =
-        createComboBox(arrayOf("allow", "prompt", "allowlist", "deny"), settings.clipboardLocalWrite.name.lowercase(Locale.ROOT), 150)
+        createComboBox(
+            CLIPBOARD_PERMISSION_OPTIONS,
+            visibleClipboardPermission(settings.clipboardLocalWrite.name.lowercase(Locale.ROOT), "prompt"),
+            150,
+        )
     private val clipboardRemoteWriteCombo =
-        createComboBox(arrayOf("allow", "prompt", "allowlist", "deny"), settings.clipboardRemoteWrite.name.lowercase(Locale.ROOT), 150)
+        createComboBox(
+            CLIPBOARD_PERMISSION_OPTIONS,
+            visibleClipboardPermission(settings.clipboardRemoteWrite.name.lowercase(Locale.ROOT), "deny"),
+            150,
+        )
     private val clipboardReadCombo =
-        createComboBox(arrayOf("allow", "prompt", "allowlist", "deny"), settings.clipboardRead.name.lowercase(Locale.ROOT), 150)
+        createComboBox(
+            CLIPBOARD_PERMISSION_OPTIONS,
+            visibleClipboardPermission(settings.clipboardRead.name.lowercase(Locale.ROOT), "deny"),
+            150,
+        )
     private val clipboardMaxDecodedBytesSpinner = createSpinner(settings.clipboardMaxDecodedBytes, 0, Int.MAX_VALUE, 1024, 150)
     private val titleLocalPermissionCheckbox =
         JCheckBox("Allow local sessions to rename window/tab", settings.titleLocalPermission == TerminalTitlePermission.ALLOW)
@@ -908,6 +920,26 @@ private data class PasteSanitizationOption(
 ) {
     override fun toString(): String = label
 }
+
+// TODO(policy): Re-enable "allowlist" after product-host allowlist management
+// can persist entries and set TerminalClipboardPolicy.allowlisted for sessions.
+private val CLIPBOARD_PERMISSION_OPTIONS =
+    arrayOf(
+        "allow",
+        "prompt",
+        // "allowlist",
+        "deny",
+    )
+
+private fun visibleClipboardPermission(
+    value: String,
+    fallback: String,
+): String =
+    if (CLIPBOARD_PERMISSION_OPTIONS.any { it == value }) {
+        value
+    } else {
+        fallback
+    }
 
 private val PASTE_SANITIZATION_OPTIONS =
     listOf(

@@ -35,7 +35,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("io.github.ketraterm.app.ketratermAppKt")
+    mainClass.set("io.github.ketraterm.app.KetraTermAppKt")
 }
 
 tasks.test {

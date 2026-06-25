@@ -59,12 +59,12 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/ketraterm-intellij-plugin" />
             <option value="$PROJECT_DIR$/ketraterm-app" />
             <option value="$PROJECT_DIR$/ketraterm-benchmarks" />
             <option value="$PROJECT_DIR$/ketraterm-core" />
             <option value="$PROJECT_DIR$/ketraterm-host" />
             <option value="$PROJECT_DIR$/ketraterm-input" />
+            <option value="$PROJECT_DIR$/ketraterm-intellij-plugin" />
             <option value="$PROJECT_DIR$/ketraterm-parser" />
             <option value="$PROJECT_DIR$/ketraterm-protocol" />
             <option value="$PROJECT_DIR$/ketraterm-pty" />

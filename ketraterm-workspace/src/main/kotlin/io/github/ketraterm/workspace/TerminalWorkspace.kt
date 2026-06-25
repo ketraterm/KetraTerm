@@ -16,6 +16,8 @@
 package io.github.ketraterm.workspace
 
 import io.github.ketraterm.host.HostPolicy
+import io.github.ketraterm.host.TerminalClipboardPromptEvent
+import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.input.policy.PasteSanitizationPolicy
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
@@ -231,6 +233,20 @@ class TerminalWorkspace internal constructor(
                 level: NotificationLevel,
             ) {
                 tabBySession(session)?.let { listener.showNotification(it, title, body, level) }
+            }
+
+            override fun terminalClipboardWrite(
+                session: TerminalSession,
+                event: TerminalClipboardWriteEvent,
+            ) {
+                tabBySession(session)?.let { listener.terminalClipboardWrite(it, event) }
+            }
+
+            override fun terminalClipboardPrompt(
+                session: TerminalSession,
+                event: TerminalClipboardPromptEvent,
+            ) {
+                tabBySession(session)?.let { listener.terminalClipboardPrompt(it, event) }
             }
 
             override fun listenerFailed(
@@ -617,6 +633,36 @@ interface TerminalWorkspaceListener {
         title: String,
         body: String,
         level: NotificationLevel,
+    ) = Unit
+
+    /**
+     * Called when a tab receives an OSC 52 clipboard write request that was
+     * allowed by host policy and decoded to text.
+     *
+     * UI products own platform clipboard access. Implementations should avoid
+     * logging or retaining [event.text].
+     *
+     * @param tab tab that received the request.
+     * @param event decoded clipboard write request.
+     */
+    fun terminalClipboardWrite(
+        tab: TerminalWorkspaceTab,
+        event: TerminalClipboardWriteEvent,
+    ) = Unit
+
+    /**
+     * Called when a tab receives an OSC 52 clipboard write request that requires
+     * product-host user approval.
+     *
+     * UI products own prompting and platform clipboard access. Implementations
+     * should avoid logging or retaining [event.text].
+     *
+     * @param tab tab that received the request.
+     * @param event decoded clipboard prompt request.
+     */
+    fun terminalClipboardPrompt(
+        tab: TerminalWorkspaceTab,
+        event: TerminalClipboardPromptEvent,
     ) = Unit
 
     companion object {

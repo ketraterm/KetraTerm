@@ -20,8 +20,12 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.ui.content.Content
+import io.github.ketraterm.host.TerminalClipboardOrigin
+import io.github.ketraterm.host.TerminalClipboardPromptEvent
+import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.ui.KetraTermTerminalPane
 import io.github.ketraterm.intellij.ui.KetraTermTerminalStartupView
@@ -145,7 +149,7 @@ class KetraTermProjectTerminalService(
                     ptyRuntime.openWorkspaceTab(
                         workspace = workspace,
                         profile = profile,
-                        options = openOptions(settings),
+                        options = openOptions(settings, profile),
                     )
                 }
             },
@@ -273,12 +277,17 @@ class KetraTermProjectTerminalService(
         }
     }
 
-    private fun openOptions(settings: SwingSettings): TerminalWorkspaceOpenOptions =
+    private fun openOptions(
+        settings: SwingSettings,
+        profile: TerminalProfile,
+    ): TerminalWorkspaceOpenOptions =
         TerminalWorkspaceOpenOptions(
             columns = settings.columns,
             rows = settings.rows,
             treatAmbiguousAsWide = settings.treatAmbiguousAsWide,
             maxHistory = settings.scrollbackLines,
+            pasteSanitizationPolicy = settings.pasteSanitizationPolicy,
+            hostPolicy = KetraTermIntellijSettings.getInstance().createHostPolicy(profile.command),
         )
 
     private inner class TerminalTabDisposable(
@@ -324,6 +333,36 @@ class KetraTermProjectTerminalService(
             }
         }
 
+        override fun terminalClipboardWrite(
+            tab: TerminalWorkspaceTab,
+            event: TerminalClipboardWriteEvent,
+        ) {
+            if (!IntellijOsc52ClipboardSelections.targetsIdeClipboard(event.selection)) return
+            invokeLaterIfAlive {
+                panesByTabId[tab.id]?.terminal?.copyTextToClipboard(event.text)
+            }
+        }
+
+        override fun terminalClipboardPrompt(
+            tab: TerminalWorkspaceTab,
+            event: TerminalClipboardPromptEvent,
+        ) {
+            if (!IntellijOsc52ClipboardSelections.targetsIdeClipboard(event.selection)) return
+            invokeLaterIfAlive {
+                val pane = panesByTabId[tab.id] ?: return@invokeLaterIfAlive
+                val answer =
+                    Messages.showYesNoDialog(
+                        project,
+                        IntellijOsc52ClipboardPromptText.message(tab.profile.displayName, event),
+                        IntellijOsc52ClipboardPromptText.title(),
+                        Messages.getWarningIcon(),
+                    )
+                if (answer == Messages.YES) {
+                    pane.terminal.copyTextToClipboard(event.text)
+                }
+            }
+        }
+
         override fun tabClosed(tabId: String) {
             invokeLaterIfAlive {
                 contentsByTabId.remove(tabId)
@@ -364,4 +403,42 @@ class KetraTermProjectTerminalService(
             val error: Throwable,
         ) : TerminalStartupResult
     }
+}
+
+internal object IntellijOsc52ClipboardSelections {
+    fun targetsIdeClipboard(selection: String): Boolean = selection.isEmpty() || selection.indexOf('c') >= 0
+}
+
+internal object IntellijOsc52ClipboardPromptText {
+    fun title(): String = "Clipboard Access"
+
+    fun message(
+        profileName: String,
+        event: TerminalClipboardPromptEvent,
+    ): String = question(profileName, event) + "\n\n" + detail(event)
+
+    private fun question(
+        profileName: String,
+        event: TerminalClipboardPromptEvent,
+    ): String {
+        val applicationName = profileName.trim().ifBlank { "this terminal" }
+        if (event.text.isEmpty()) {
+            return "Allow $applicationName to clear the IDE clipboard?"
+        }
+        val count = event.text.codePointCount(0, event.text.length)
+        return "Allow $applicationName to write ${count.formatCount("character")} to the IDE clipboard?"
+    }
+
+    private fun detail(event: TerminalClipboardPromptEvent): String =
+        when (event.audit.origin) {
+            TerminalClipboardOrigin.LOCAL -> "Local terminal session"
+            TerminalClipboardOrigin.REMOTE -> "Remote terminal session"
+        }
+
+    private fun Int.formatCount(unit: String): String =
+        if (this == 1) {
+            "1 $unit"
+        } else {
+            "$this ${unit}s"
+        }
 }

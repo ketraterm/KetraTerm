@@ -251,9 +251,9 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
         visualBellCheckBox.isSelected = normalized.visualBell
         pasteOnMiddleClickCheckBox.isSelected = normalized.pasteOnMiddleClick
         pasteSanitizationCombo.selectedItem = pasteSanitizationOptions().firstOrNull { it.id == normalized.pasteSanitization }
-        clipboardLocalWriteCombo.selectedItem = permissionOptions().firstOrNull { it.id == normalized.clipboardLocalWrite }
-        clipboardRemoteWriteCombo.selectedItem = permissionOptions().firstOrNull { it.id == normalized.clipboardRemoteWrite }
-        clipboardReadCombo.selectedItem = permissionOptions().firstOrNull { it.id == normalized.clipboardRead }
+        clipboardLocalWriteCombo.selectedItem = visiblePermissionOption(normalized.clipboardLocalWrite, "prompt")
+        clipboardRemoteWriteCombo.selectedItem = visiblePermissionOption(normalized.clipboardRemoteWrite, "deny")
+        clipboardReadCombo.selectedItem = visiblePermissionOption(normalized.clipboardRead, "deny")
         clipboardMaxDecodedBytesSpinner.value = normalized.clipboardMaxDecodedBytes
         titleLocalPermissionCheckBox.isSelected = normalized.titleLocalPermission == "allow"
         titleRemotePermissionCheckBox.isSelected = normalized.titleRemotePermission == "allow"
@@ -439,9 +439,16 @@ private fun permissionOptions(): Array<PermissionOption> =
     arrayOf(
         PermissionOption("allow", KetraTermBundle.message("settings.ketraterm.permission.allow")),
         PermissionOption("prompt", KetraTermBundle.message("settings.ketraterm.permission.prompt")),
-        PermissionOption("allowlist", KetraTermBundle.message("settings.ketraterm.permission.allowlist")),
+        // TODO(policy): Re-enable after product-host allowlist management can
+        // persist entries and set TerminalClipboardPolicy.allowlisted.
+        // PermissionOption("allowlist", KetraTermBundle.message("settings.ketraterm.permission.allowlist")),
         PermissionOption("deny", KetraTermBundle.message("settings.ketraterm.permission.deny")),
     )
+
+private fun visiblePermissionOption(
+    id: String,
+    fallback: String,
+): PermissionOption = permissionOptions().firstOrNull { it.id == id } ?: permissionOptions().first { it.id == fallback }
 
 
 

@@ -964,6 +964,21 @@ class SwingTerminal
         }
 
         /**
+         * Writes host-approved text to the configured clipboard service.
+         *
+         * This is intended for host-owned workflows where policy has already
+         * allowed a non-selection clipboard write, such as OSC 52 handling.
+         *
+         * @param text text to place on the host clipboard.
+         * @return `true` when a session is bound and the clipboard handler was invoked.
+         */
+        fun copyTextToClipboard(text: String): Boolean {
+            if (session == null) return false
+            hostServices.clipboardHandler.copyText(text)
+            return true
+        }
+
+        /**
          * Pastes text from the host clipboard into the active terminal session.
          *
          * @return `true` if clipboard text was read and sent to the session, `false` otherwise.
