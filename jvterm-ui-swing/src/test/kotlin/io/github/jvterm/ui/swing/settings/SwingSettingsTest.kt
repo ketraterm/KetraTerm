@@ -126,7 +126,7 @@ class SwingSettingsTest {
         assertEquals(RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB, settings.textAntialiasing)
         assertEquals(RenderingHints.VALUE_FRACTIONALMETRICS_OFF, settings.fractionalMetrics)
         assertTrue(settings.fallbackFonts.isNotEmpty())
-        assertEquals(false, settings.useSystemFallbackFonts)
+        assertEquals(true, settings.useSystemFallbackFonts)
         assertEquals(false, settings.treatAmbiguousAsWide)
         assertEquals(0xFF4DA3FF.toInt(), settings.hyperlinkActivationForeground)
         assertEquals(true, settings.visualBellEnabled)

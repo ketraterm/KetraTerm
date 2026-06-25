@@ -121,7 +121,7 @@ class TerminalConfigTest {
         assertEquals(16, config.fontSize)
         assertFalse(config.treatAmbiguousAsWide)
         assertEquals(600, config.cursorBlinkMillis)
-        assertFalse(config.useSystemFallbackFonts)
+        assertTrue(config.useSystemFallbackFonts)
         assertEquals("block", config.cursorShape)
         assertTrue(config.visualBell)
         assertEquals(PasteSanitizationPolicy.RAW, config.pasteSanitizationPolicy)

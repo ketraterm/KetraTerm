@@ -91,7 +91,7 @@ data class SwingSettings
     constructor(
         val font: Font = defaultTerminalFont(),
         val fallbackFonts: List<Font> = defaultFallbackFonts(),
-        val useSystemFallbackFonts: Boolean = false,
+        val useSystemFallbackFonts: Boolean = true,
         val palette: TerminalColorPalette = defaultPalette(),
         val columns: Int = 80,
         val rows: Int = 24,

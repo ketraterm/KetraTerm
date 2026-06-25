@@ -156,7 +156,7 @@ data class TerminalConfig(
         const val DEFAULT_COLUMNS: Int = 100
         const val DEFAULT_ROWS: Int = 30
         const val DEFAULT_CURSOR_BLINK_MILLIS: Int = 600
-        const val DEFAULT_USE_SYSTEM_FALLBACK_FONTS: Boolean = false
+        const val DEFAULT_USE_SYSTEM_FALLBACK_FONTS: Boolean = true
         const val DEFAULT_CURSOR_SHAPE: String = "block"
         const val DEFAULT_AUDIBLE_BELL: Boolean = true
         const val DEFAULT_VISUAL_BELL: Boolean = true
