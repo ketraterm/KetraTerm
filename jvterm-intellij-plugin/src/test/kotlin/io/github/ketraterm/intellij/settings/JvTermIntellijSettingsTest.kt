@@ -1,0 +1,246 @@
+/*
+ * Copyright 2026 Gagik Sargsyan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.github.ketraterm.intellij.settings
+
+import io.github.ketraterm.host.TerminalClipboardOrigin
+import io.github.ketraterm.host.TerminalClipboardPermission
+import io.github.ketraterm.host.TerminalTitleOrigin
+import io.github.ketraterm.host.TerminalTitlePermission
+import io.github.ketraterm.render.api.TerminalRenderCursorShape
+import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.workspace.config.TerminalConfig
+import org.junit.Assert.*
+import org.junit.Test
+import java.awt.Insets
+
+/**
+ * Tests IntelliJ settings persistence mapping without opening an IDE window.
+ */
+class JvTermIntellijSettingsTest {
+    @Test
+    fun `default theme id follows IntelliJ`() {
+        val state = JvTermIntellijSettings.State()
+
+        assertEquals(JvTermIntellijSettings.DEFAULT_THEME_ID, state.themeId)
+    }
+
+    @Test
+    fun `default font size matches IntelliJ terminal default`() {
+        val settings =
+            JvTermIntellijSettingsMapper.toSwingSettings(
+                JvTermIntellijSettings.State(themeId = "nord"),
+            )
+
+        assertEquals(JvTermIntellijSettings.DEFAULT_FONT_SIZE, settings.font.size)
+    }
+
+    @Test
+    fun `default terminal grid keeps top edge open with horizontal gutter and bottom spacer`() {
+        val settings =
+            JvTermIntellijSettingsMapper.toSwingSettings(
+                JvTermIntellijSettings.State(themeId = "nord"),
+            )
+
+        assertEquals(Insets(0, 20, 8, 8), settings.padding)
+        assertEquals(4, settings.padding.left - settings.shellIntegrationDecorationGutterWidth)
+    }
+
+    @Test
+    fun `visual bell defaults on and maps to swing settings`() {
+        val enabled =
+            JvTermIntellijSettingsMapper.toSwingSettings(
+                JvTermIntellijSettings.State(themeId = "nord"),
+            )
+        val disabled =
+            JvTermIntellijSettingsMapper.toSwingSettings(
+                JvTermIntellijSettings.State(themeId = "nord", visualBell = false),
+            )
+
+        assertEquals(true, enabled.visualBellEnabled)
+        assertFalse(disabled.visualBellEnabled)
+    }
+
+    @Test
+    fun `normalizes unknown theme ids to IntelliJ native theme`() {
+        assertEquals(
+            JvTermIntellijSettings.DEFAULT_THEME_ID,
+            JvTermIntellijSettings.normalizeThemeId("missing-theme"),
+        )
+    }
+
+    @Test
+    fun `maps built in theme ids to built in palettes`() {
+        val settings =
+            JvTermIntellijSettingsMapper.toSwingSettings(
+                JvTermIntellijSettings.State(themeId = "one-dark"),
+            )
+        val expected = TerminalTheme.ONE_DARK.createPalette()
+
+        assertEquals(expected.defaultForeground, settings.palette.defaultForeground)
+        assertEquals(expected.defaultBackground, settings.palette.defaultBackground)
+        assertEquals(expected.indexedColor(1), settings.palette.indexedColor(1))
+    }
+
+    @Test
+    fun `clamps hostile persisted dimensions before creating Swing settings`() {
+        val settings =
+            JvTermIntellijSettingsMapper.toSwingSettings(
+                JvTermIntellijSettings.State(
+                    themeId = "nord",
+                    columns = Int.MAX_VALUE,
+                    rows = Int.MIN_VALUE,
+                    fontSize = Int.MAX_VALUE,
+                    cursorBlinkMillis = -1,
+                    scrollbackLines = Int.MAX_VALUE,
+                    lineHeight = Float.NaN,
+                ),
+            )
+
+        assertEquals(TerminalConfig.COLUMNS_MAX, settings.columns)
+        assertEquals(TerminalConfig.ROWS_MIN, settings.rows)
+        assertEquals(TerminalConfig.FONT_SIZE_MAX, settings.font.size)
+        assertEquals(TerminalConfig.CURSOR_BLINK_MIN, settings.cursorBlinkMillis)
+        assertEquals(TerminalConfig.SCROLLBACK_MAX, settings.scrollbackLines)
+        assertEquals(TerminalConfig.DEFAULT_LINE_HEIGHT, settings.lineHeight)
+        assertFalse(settings.shellRequestResizeWindow)
+        assertFalse(settings.shellRequestWindowManipulation)
+    }
+
+    @Test
+    fun `normalizer canonicalizes persisted ui state`() {
+        val state =
+            JvTermIntellijSettingsNormalizer.normalize(
+                JvTermIntellijSettings.State(
+                    themeId = "TOKYO-NIGHT",
+                    fontFamily = "  ",
+                    fallbackFontFamily = "  ",
+                    fontSize = 1,
+                    columns = 1,
+                    rows = Int.MAX_VALUE,
+                    cursorBlinkMillis = Int.MAX_VALUE,
+                    cursorShape = "bar",
+                    scrollbackLines = -1,
+                    lineHeight = Float.POSITIVE_INFINITY,
+                    shellPath = "  ",
+                    environmentVariables = " ONE =first \nmissing\nTWO=second\nONE=last",
+                    defaultTabName = "  ",
+                ),
+            )
+
+        assertEquals("tokyo-night", state.themeId)
+        assertEquals(JvTermIntellijSettings.DEFAULT_FONT_FAMILY, state.fontFamily)
+        assertEquals(JvTermIntellijSettings.DEFAULT_FONT_FAMILY, state.fallbackFontFamily)
+        assertEquals(TerminalConfig.FONT_SIZE_MIN, state.fontSize)
+        assertEquals(TerminalConfig.COLUMNS_MIN, state.columns)
+        assertEquals(TerminalConfig.ROWS_MAX, state.rows)
+        assertEquals(TerminalConfig.CURSOR_BLINK_MAX, state.cursorBlinkMillis)
+        assertEquals("beam", state.cursorShape)
+        assertEquals(TerminalConfig.SCROLLBACK_MIN, state.scrollbackLines)
+        assertEquals(TerminalConfig.DEFAULT_LINE_HEIGHT, state.lineHeight)
+        assertEquals(TerminalConfig.DEFAULT_SHELL_PATH, state.shellPath)
+        assertEquals("ONE=last\nTWO=second", state.environmentVariables)
+        assertEquals("Local", state.defaultTabName)
+    }
+
+    @Test
+    fun `normalizer uses field specific security defaults for invalid persisted values`() {
+        val state =
+            JvTermIntellijSettingsNormalizer.normalize(
+                JvTermIntellijSettings.State(
+                    clipboardLocalWrite = "invalid",
+                    clipboardRemoteWrite = "invalid",
+                    clipboardRead = "invalid",
+                    titleLocalPermission = "invalid",
+                    titleRemotePermission = "invalid",
+                ),
+            )
+
+        assertEquals(TerminalClipboardPermission.PROMPT.name.lowercase(), state.clipboardLocalWrite)
+        assertEquals(TerminalClipboardPermission.DENY.name.lowercase(), state.clipboardRemoteWrite)
+        assertEquals(TerminalClipboardPermission.DENY.name.lowercase(), state.clipboardRead)
+        assertEquals(TerminalTitlePermission.ALLOW.name.lowercase(), state.titleLocalPermission)
+        assertEquals(TerminalTitlePermission.DENY.name.lowercase(), state.titleRemotePermission)
+    }
+
+    @Test
+    fun `host policy maps ssh executable names to remote origin only`() {
+        val settings = JvTermIntellijSettings()
+
+        val localPolicy = settings.createHostPolicy(listOf("powershell.exe"))
+        val remotePolicy = settings.createHostPolicy(listOf("ssh", "example.com"))
+        val remoteWindowsPathPolicy = settings.createHostPolicy(listOf("""C:\Windows\System32\OpenSSH\ssh.exe"""))
+        val nonSshPrefixPolicy = settings.createHostPolicy(listOf("sshuttle"))
+
+        assertEquals(TerminalClipboardOrigin.LOCAL, localPolicy.clipboardPolicy.origin)
+        assertEquals(TerminalTitleOrigin.LOCAL, localPolicy.titlePolicy.origin)
+        assertEquals(TerminalClipboardOrigin.REMOTE, remotePolicy.clipboardPolicy.origin)
+        assertEquals(TerminalTitleOrigin.REMOTE, remotePolicy.titlePolicy.origin)
+        assertEquals(TerminalClipboardOrigin.REMOTE, remoteWindowsPathPolicy.clipboardPolicy.origin)
+        assertEquals(TerminalTitleOrigin.REMOTE, remoteWindowsPathPolicy.titlePolicy.origin)
+        assertEquals(TerminalClipboardOrigin.LOCAL, nonSshPrefixPolicy.clipboardPolicy.origin)
+        assertEquals(TerminalTitleOrigin.LOCAL, nonSshPrefixPolicy.titlePolicy.origin)
+    }
+
+    @Test
+    fun `parses environment variables without accepting malformed entries`() {
+        val environment =
+            JvTermIntellijSettingsNormalizer.parseEnvironmentVariables(
+                " JVM_OPTS =-Xmx1g\nNO_EQUALS\n=missing\nEMPTY=\nPATH=C:\\Tools=StillValue",
+            )
+
+        assertEquals(
+            mapOf(
+                "JVM_OPTS" to "-Xmx1g",
+                "EMPTY" to "",
+                "PATH" to "C:\\Tools=StillValue",
+            ),
+            environment,
+        )
+    }
+
+    @Test
+    fun `maps cursor shape ids`() {
+        val settings =
+            JvTermIntellijSettingsMapper.toSwingSettings(
+                JvTermIntellijSettings.State(themeId = "nord", cursorShape = "beam"),
+            )
+
+        assertEquals(TerminalRenderCursorShape.BAR, settings.cursorShape)
+    }
+
+    @Test
+    fun `native palette uses editor foreground background selection and cursor colors`() {
+        val palette =
+            JvTermIntellijThemePalette.fromSource(
+                JvTermIntellijThemePalette.ColorSource(
+                    foreground = 0xFF202124.toInt(),
+                    background = 0xFFFAFAFA.toInt(),
+                    selectionForeground = 0xFFFFFFFF.toInt(),
+                    selectionBackground = 0xFF3366CC.toInt(),
+                    cursor = 0xFF112233.toInt(),
+                ),
+            )
+
+        assertEquals(0xFF202124.toInt(), palette.defaultForeground)
+        assertEquals(0xFFFAFAFA.toInt(), palette.defaultBackground)
+        assertEquals(0xFFFFFFFF.toInt(), palette.selectionForeground)
+        assertEquals(0xFF3366CC.toInt(), palette.selectionBackground)
+        assertEquals(0xFF112233.toInt(), palette.cursorBackground)
+        assertEquals(0xFFFAFAFA.toInt(), palette.indexedColor(0))
+        assertEquals(0xFF202124.toInt(), palette.indexedColor(7))
+        assertNotEquals(palette.cursorBackground, palette.cursorForeground)
+    }
+}

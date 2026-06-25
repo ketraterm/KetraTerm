@@ -1,0 +1,46 @@
+<!--
+  - Copyright 2026 Gagik Sargsyan
+  -
+  - Licensed under the Apache License, Version 2.0 (the "License");
+  - you may not use this file except in compliance with the License.
+  - You may obtain a copy of the License at
+  -
+  -     https://www.apache.org/licenses/LICENSE-2.0
+  -
+  - Unless required by applicable law or agreed to in writing, software
+  - distributed under the License is distributed on an "AS IS" BASIS,
+  - WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  - See the License for the specific language governing permissions and
+  - limitations under the License.
+  -->
+
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="12" viewBox="0 0 14 12">
+    <rect x="0.6" y="0.6" width="12.8" height="10.8" rx="1.5"
+          fill="#0C0C0C" stroke="#7A7A7A" stroke-width="1.2"/>
+
+    <!-- C -->
+    <path d="M5.2 4.3
+           C4.7 3.8 3.6 3.8 3.1 4.5
+           C2.6 5.2 2.6 6.8 3.1 7.5
+           C3.6 8.2 4.7 8.2 5.2 7.7"
+          fill="none"
+          stroke="#CCCCCC"
+          stroke-width="1"
+          stroke-linecap="round"/>
+
+    <!-- : -->
+    <path d="M6.4 5.1H6.45M6.4 6.9H6.45"
+          stroke="#CCCCCC"
+          stroke-width="1.2"
+          stroke-linecap="round"/>
+
+    <!-- \ -->
+    <path d="M7.4 4.5L8.5 7.5"
+          stroke="#CCCCCC"
+          stroke-width="1"
+          stroke-linecap="round"/>
+
+    <!-- cursor -->
+    <rect x="9.4" y="7.1" width="2.1" height="0.9" rx="0.15"
+          fill="#CCCCCC"/>
+</svg>

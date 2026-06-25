@@ -1,0 +1,77 @@
+<!--
+  - Copyright 2026 Gagik Sargsyan
+  -
+  - Licensed under the Apache License, Version 2.0 (the "License");
+  - you may not use this file except in compliance with the License.
+  - You may obtain a copy of the License at
+  -
+  -     https://www.apache.org/licenses/LICENSE-2.0
+  -
+  - Unless required by applicable law or agreed to in writing, software
+  - distributed under the License is distributed on an "AS IS" BASIS,
+  - WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  - See the License for the specific language governing permissions and
+  - limitations under the License.
+  -->
+
+<svg xmlns="http://www.w3.org/2000/svg" id="Ebene_2" data-name="Ebene 2" viewBox="0 0 193 256">
+    <defs>
+        <style>
+            .cls-1 {
+            fill: url(#Unbenannter_Verlauf_20);
+            }
+
+            .cls-2 {
+            fill: #fff;
+            }
+
+            .cls-3 {
+            fill: url(#Unbenannter_Verlauf_25);
+            filter: url(#drop-shadow-1);
+            }
+
+            .cls-4 {
+            fill: url(#Unbenannter_Verlauf_13);
+            }
+
+            .cls-5 {
+            fill: url(#Unbenannter_Verlauf_37);
+            }
+        </style>
+        <linearGradient id="Unbenannter_Verlauf_13">
+            <stop offset="0" stop-color="#0078d3"/>
+            <stop offset="1" stop-color="#0c5aa5"/>
+        </linearGradient>
+        <radialGradient id="Unbenannter_Verlauf_25">
+            <stop offset="0" stop-color="#c86508"/>
+            <stop offset="1" stop-color="#bf6009"/>
+        </radialGradient>
+        <filter id="drop-shadow-1" x="40.5" y="102" width="112" height="113" filterUnits="userSpaceOnUse">
+            <feOffset dx="0" dy="7"/>
+            <feGaussianBlur result="blur" stdDeviation="8"/>
+            <feFlood flood-color="#000" flood-opacity=".4"/>
+            <feComposite in2="blur" operator="in"/>
+        </filter>
+        <radialGradient id="Unbenannter_Verlauf_20">
+            <stop offset="0" stop-color="#ef8506"/>
+            <stop offset="1" stop-color="#ed7e03"/>
+        </radialGradient>
+        <radialGradient id="Unbenannter_Verlauf_37">
+            <stop offset=".0784" stop-color="#ffc700"/>
+            <stop offset="1" stop-color="#ffc700"/>
+        </radialGradient>
+    </defs>
+    <g id="Ebene_1-2">
+        <path class="cls-4" d="M96.49981,0h.00019C149.7598,0,193,43.2402,193,96.5v149.5c0,5.51915-4.48085,10-10,10H10C4.48085,256,0,251.51915,0,246V96.49981C0,43.24011,43.24011,0,96.49981,0Z"/>
+        <circle class="cls-2" cx="56.5" cy="87.11" r="32"/>
+        <circle class="cls-2" cx="136.5" cy="87.11" r="32"/>
+        <path class="cls-2" d="M88.5,87.11H24.5v80.77687c0,35.23677,28.56505,63.80182,63.80182,63.80182h.19818V87.11Z"/>
+        <path class="cls-2" d="M104.5,87.11h64v80.77687c0,35.23677-28.56505,63.80182-63.80182,63.80182h-.19818V87.11Z"/>
+        <rect class="cls-2" x="75.96226" y="178.00943" width="40.75472" height="48.45283"/>
+        <circle cx="56.5" cy="96.10999" r="16.3019" transform="translate(-47.41926 136.48533) rotate(-80.78253)"/>
+        <circle cx="136.5" cy="96.11" r="16.30189"/>
+        <circle class="cls-3" cx="96.5" cy="151.91" r="32"/>
+        <path class="cls-1" d="M64.5,149.48114c0-14.94339,13.16492-29.21021,32-29.37115,19.08282-.16306,32,16.88058,32,29.37115,0,0-11.54718,7.62885-32,7.62885s-32-7.62885-32-7.62885Z"/>
+        <path class="cls-5" d="M24.5,160.25473c0,19.28659-2.59474,71.85527,71.95556,71.85527s72.04444-50.83755,72.04444-72.35057c0,0-14.9004,53.93208-72.04444,53.93208s-71.95556-53.43678-71.95556-53.43678Z"/>
+    </g>
+</svg>

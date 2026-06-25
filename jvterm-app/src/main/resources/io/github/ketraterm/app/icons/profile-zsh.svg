@@ -1,0 +1,17 @@
+<!--
+  - Copyright 2026 Gagik Sargsyan
+  -
+  - Licensed under the Apache License, Version 2.0 (the "License");
+  - you may not use this file except in compliance with the License.
+  - You may obtain a copy of the License at
+  -
+  -     https://www.apache.org/licenses/LICENSE-2.0
+  -
+  - Unless required by applicable law or agreed to in writing, software
+  - distributed under the License is distributed on an "AS IS" BASIS,
+  - WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  - See the License for the specific language governing permissions and
+  - limitations under the License.
+  -->
+
+<svg fill="none" height="816" viewBox="0 0 816 816" width="816" xmlns="http://www.w3.org/2000/svg"><g stroke="#f15a24" stroke-linecap="round" stroke-linejoin="round"><path d="m403 230-298.5 355.5" stroke-width="32.1465"/><circle cx="180.216" cy="309.716" r="61.6142" stroke-width="50.2041"/><circle cx="326.265" cy="505.97" r="61.6142" stroke-width="50.2041"/><path d="m739.645 576.61h-213.159" stroke-width="32.1465"/></g></svg>

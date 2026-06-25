@@ -1,0 +1,31 @@
+<!--
+  - Copyright 2026 Gagik Sargsyan
+  -
+  - Licensed under the Apache License, Version 2.0 (the "License");
+  - you may not use this file except in compliance with the License.
+  - You may obtain a copy of the License at
+  -
+  -     https://www.apache.org/licenses/LICENSE-2.0
+  -
+  - Unless required by applicable law or agreed to in writing, software
+  - distributed under the License is distributed on an "AS IS" BASIS,
+  - WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  - See the License for the specific language governing permissions and
+  - limitations under the License.
+  -->
+
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g clip-path="url(#clip0_6_19)">
+        <rect width="512" height="512" fill="white"/>
+        <rect width="512" height="512" fill="#111827"/>
+        <path d="M335.679 122.573C335.679 129.116 338.017 132.854 342.692 132.854H396.456L396.924 260.438C396.924 264.644 392.248 272.122 388.508 275.86L294.07 367.926L228.15 304.368C225.813 302.031 222.073 301.564 218.332 304.368L197.294 322.127C194.957 323.996 194.957 328.67 197.294 331.474L274.434 407.183C289.395 420.736 301.083 419.801 314.173 407.183L425.91 296.423C432.455 289.413 439 272.589 439 257.634L438.533 102.945C438.533 96.8694 437.597 95.4673 431.52 95.4673L342.692 95C336.614 95 335.679 100.141 335.679 107.618V122.573Z" fill="#0EB53D"/>
+        <path d="M221.605 275.393L91.6357 363.72C85.0904 367.459 72 363.72 72 354.373V322.127L167.373 257.634L72 193.609V159.493C72 151.081 85.0904 148.277 91.6357 152.015L221.605 240.81C229.085 245.951 229.553 268.85 221.605 275.393Z" fill="#0EB53D"/>
+        <path d="M335.679 122.573C335.679 129.116 338.017 132.854 342.692 132.854H396.456L396.924 260.438C396.924 264.644 392.248 272.122 388.508 275.86L294.07 367.926L228.15 304.368C225.813 302.031 222.073 301.564 218.332 304.368L197.294 322.127C194.957 323.996 194.957 328.67 197.294 331.474L274.434 407.183C289.395 420.736 301.083 419.801 314.173 407.183L425.91 296.423C432.455 289.413 439 272.589 439 257.634L438.533 102.945C438.533 96.8694 437.597 95.4673 431.52 95.4673L342.692 95C336.614 95 335.679 100.141 335.679 107.618V122.573Z" stroke="black"/>
+        <path d="M221.605 275.393L91.6357 363.72C85.0904 367.459 72 363.72 72 354.373V322.127L167.373 257.634L72 193.609V159.493C72 151.081 85.0904 148.277 91.6357 152.015L221.605 240.81C229.085 245.951 229.553 268.85 221.605 275.393Z" stroke="black"/>
+    </g>
+    <defs>
+        <clipPath id="clip0_6_19">
+            <rect width="512" height="512" fill="white"/>
+        </clipPath>
+    </defs>
+</svg>
