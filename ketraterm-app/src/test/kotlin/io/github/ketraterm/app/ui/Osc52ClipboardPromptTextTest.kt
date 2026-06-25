@@ -13,48 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.intellij.services
+package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.host.TerminalClipboardAuditEvent
 import io.github.ketraterm.host.TerminalClipboardDecision
 import io.github.ketraterm.host.TerminalClipboardOperation
 import io.github.ketraterm.host.TerminalClipboardOrigin
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertContains
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
-class IntellijOsc52ClipboardSelectionsTest {
+class Osc52ClipboardPromptTextTest {
     @Test
-    fun `empty and c selections target the IDE clipboard`() {
-        assertTrue(IntellijOsc52ClipboardSelections.targetsIdeClipboard(""))
-        assertTrue(IntellijOsc52ClipboardSelections.targetsIdeClipboard("c"))
-        assertTrue(IntellijOsc52ClipboardSelections.targetsIdeClipboard("cp"))
-    }
+    fun `plain prompt names profile and text length without protocol details`() {
+        val message = Osc52ClipboardPromptText.plainMessage("PowerShell", promptEvent("OSC 52 works"))
 
-    @Test
-    fun `primary and secondary only selections do not target the IDE clipboard`() {
-        assertFalse(IntellijOsc52ClipboardSelections.targetsIdeClipboard("p"))
-        assertFalse(IntellijOsc52ClipboardSelections.targetsIdeClipboard("s"))
-        assertFalse(IntellijOsc52ClipboardSelections.targetsIdeClipboard("ps"))
-    }
-
-    @Test
-    fun `prompt text names profile and hides protocol details`() {
-        val message = IntellijOsc52ClipboardPromptText.message("PowerShell", promptEvent("OSC 52 works"))
-
-        assertTrue(message.contains("Allow PowerShell to write 12 characters to the IDE clipboard?"))
-        assertTrue(message.contains("Local terminal session"))
+        assertContains(message, "Allow PowerShell to write 12 characters to the clipboard?")
+        assertContains(message, "Local terminal session")
         assertFalse(message.contains("OSC 52"))
         assertFalse(message.contains("Selection:"))
         assertFalse(message.contains("bytes"))
     }
 
     @Test
-    fun `empty prompt text is shown as clipboard clear`() {
-        val message = IntellijOsc52ClipboardPromptText.message("PowerShell", promptEvent(""))
+    fun `empty prompt is shown as clipboard clear`() {
+        val message = Osc52ClipboardPromptText.plainMessage("PowerShell", promptEvent(""))
 
-        assertTrue(message.contains("Allow PowerShell to clear the IDE clipboard?"))
+        assertEquals("Clipboard Access", Osc52ClipboardPromptText.title())
+        assertContains(message, "Allow PowerShell to clear the clipboard?")
     }
 
     private fun promptEvent(text: String): TerminalClipboardPromptEvent =
@@ -67,7 +55,7 @@ class IntellijOsc52ClipboardSelectionsTest {
                     selection = "c",
                     origin = TerminalClipboardOrigin.LOCAL,
                     encodedLength = 0,
-                    decodedBytes = text.toByteArray().size,
+                    decodedBytes = text.encodeToByteArray().size,
                     maxDecodedBytes = 1024,
                     decision = TerminalClipboardDecision.PROMPT_REQUIRED,
                 ),

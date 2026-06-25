@@ -706,8 +706,8 @@ internal class TabManager(
                 val answer =
                     JOptionPane.showConfirmDialog(
                         frame,
-                        clipboardPromptMessage(event),
-                        "Allow OSC 52 Clipboard Write?",
+                        clipboardPromptComponent(tab.profile.displayName, event),
+                        Osc52ClipboardPromptText.title(),
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.WARNING_MESSAGE,
                     )
@@ -819,11 +819,16 @@ internal class TabManager(
 
         private fun targetsHostClipboard(selection: String): Boolean = selection.isEmpty() || selection.indexOf('c') >= 0
 
-        private fun clipboardPromptMessage(event: TerminalClipboardPromptEvent): String =
-            "A terminal process requests permission to write ${event.audit.decodedBytes} bytes to the clipboard.\n" +
-                "Origin: ${event.audit.origin.name.lowercase()}\n" +
-                "Selection: ${event.selection.ifEmpty { "clipboard" }}\n\n" +
-                "Allow this clipboard write?"
+        private fun clipboardPromptComponent(
+            profileName: String,
+            event: TerminalClipboardPromptEvent,
+        ): JComponent =
+            JPanel(BorderLayout(0, 6)).apply {
+                isOpaque = false
+                border = BorderFactory.createEmptyBorder(2, 0, 0, 0)
+                add(JLabel(Osc52ClipboardPromptText.htmlQuestion(profileName, event)), BorderLayout.NORTH)
+                add(JLabel(Osc52ClipboardPromptText.htmlDetail(event)), BorderLayout.CENTER)
+            }
     }
 }
 
