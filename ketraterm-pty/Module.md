@@ -51,7 +51,7 @@ flowchart TD
 ## Sub-Documentation
 
 For deep-dive details on daemon threading and ConPTY integration:
-* [pty4j-process-lifecycle.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-pty/docs/pty4j-process-lifecycle.md) - PTY reader and watcher loops, exit-code capture, and Windows sizing adjustments.
+* [pty4j-process-lifecycle.md](docs/pty4j-process-lifecycle.md) - PTY reader and watcher loops, exit-code capture, and Windows sizing adjustments.
 
 ---
 

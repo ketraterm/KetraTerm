@@ -22,13 +22,13 @@ The module encapsulates the synchronization policies necessary to support concur
 ## Architectural Role & Runtime Context
 
 ```text
-UI Adapter  ───►  Terminal Event Loop Actor  ───►  TerminalInputEncoder  ───►  TerminalHostOutput  ───►  PTY stdin
-                                                                                      ▲
-Parser/Core Replies  ────────────────────────────────────────────────────────────────┘
+UI Adapter  --->  Terminal Event Loop Actor  --->  TerminalInputEncoder  --->  TerminalHostOutput  --->  PTY stdin
+                                                                                      ^
+Parser/Core Replies  ----------------------------------------------------------------+
 ```
 
 The session integrates all independent components into a single lifecycle loop:
-1. **PTY Inbound**: Raw bytes arriving from [TerminalConnector](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-transport-api/src/main/kotlin/io/github/ketraterm/transport/TerminalConnector.kt) are parsed and applied to the core [TerminalBuffer](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/api/TerminalBuffer.kt).
+1. **PTY Inbound**: Raw bytes arriving from [TerminalConnector](../ketraterm-transport-api/src/main/kotlin/io/github/ketraterm/transport/TerminalConnector.kt) are parsed and applied to the core [TerminalBuffer](../ketraterm-core/src/main/kotlin/io/github/ketraterm/core/api/TerminalBuffer.kt).
 2. **UI Outbound**: Key strokes and paste events are serialized, encoded, and written back to the connector stdin.
 3. **Cache Synchronization**: Render cache updates are scheduled on background workers and published to the triple-buffered cache.
 
@@ -37,8 +37,8 @@ The session integrates all independent components into a single lifecycle loop:
 ## Sub-Documentation
 
 For detailed specifications on session locks and thread architectures:
-* [session-concurrency-locks.md](file:///c:/Users/gagik/IdeaProjects/terminal-session/docs/session-concurrency-locks.md) - Core concurrency locks (`inboundLock`, `mutationLock`, `outboundWriteLock`) and lock order routing.
-* [asynchronous-render-coalescing.md](file:///c:/Users/gagik/IdeaProjects/terminal-session/docs/asynchronous-render-coalescing.md) - Background render thread executors, dirty frame invalidation, and pre-allocated query-response buffers.
+* [session-concurrency-locks.md](docs/session-concurrency-locks.md) - Core concurrency locks (`inboundLock`, `mutationLock`, `outboundWriteLock`) and lock order routing.
+* [asynchronous-render-coalescing.md](docs/asynchronous-render-coalescing.md) - Background render thread executors, dirty frame invalidation, and pre-allocated query-response buffers.
 
 ---
 

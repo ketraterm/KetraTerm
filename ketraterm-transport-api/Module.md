@@ -41,15 +41,15 @@ classDiagram
 ```
 
 ### Key Components:
-* [TerminalConnector](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-transport-api/src/main/kotlin/io/github/ketraterm/transport/TerminalConnector.kt): Represents a transport-neutral, duplex communication channel to a terminal host.
-* [TerminalConnectorListener](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-transport-api/src/main/kotlin/io/github/ketraterm/transport/TerminalConnectorListener.kt): Callback event sink for incoming raw bytes and transport lifecycle updates.
+* [TerminalConnector](src/main/kotlin/io/github/ketraterm/transport/TerminalConnector.kt): Represents a transport-neutral, duplex communication channel to a terminal host.
+* [TerminalConnectorListener](src/main/kotlin/io/github/ketraterm/transport/TerminalConnectorListener.kt): Callback event sink for incoming raw bytes and transport lifecycle updates.
 
 ---
 
 ## Sub-Documentation
 
 For deep-dive technical details on threading invariants and lifecycle states:
-* [connector-lifecycle.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-transport-api/docs/connector-lifecycle.md) - Startup/shutdown transitions, concurrent writes, and synchronous consumption invariants.
+* [connector-lifecycle.md](docs/connector-lifecycle.md) - Startup/shutdown transitions, concurrent writes, and synchronous consumption invariants.
 
 ---
 

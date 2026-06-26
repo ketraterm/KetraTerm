@@ -6,7 +6,7 @@ The `ketraterm-ui-swing` module utilizes structured repaint planning and precise
 
 ## 1. Minimal Repaint Planning (`SwingRepaintPlanner`)
 
-Repainting the entire Swing component on every terminal update is highly inefficient. The [SwingRepaintPlanner](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/viewport/SwingRepaintPlanner.kt) maps changes in the `TerminalRenderCache` to schedule targeted repaint requests:
+Repainting the entire Swing component on every terminal update is highly inefficient. The [SwingRepaintPlanner](../src/main/kotlin/io/github/ketraterm/ui/swing/viewport/SwingRepaintPlanner.kt) maps changes in the `TerminalRenderCache` to schedule targeted repaint requests:
 
 * **Cursor-Only Repaints**: When only the cursor moves, the planner computes the pixel bounding box of both the old cursor cell and the new cursor cell. Only these two small rectangular areas are repainted, avoiding full-screen refreshes.
 * **Row-Level Repaints**: The planner scans the `lineGenerations` array. Rows whose generation number matches the previous frame are skipped. Only modified rows are invalidated and repainted.
@@ -27,5 +27,5 @@ Selection handles selection sweeps, word-level highlights, and block selections:
 
 ## 3. Clipboards & Key Mapping Services
 
-* **Clipboard Handlers**: Integrates with standard OS clipboards using [SwingHostServices](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingHostServices.kt), sanitizing carriage returns during copy/paste based on policy options.
+* **Clipboard Handlers**: Integrates with standard OS clipboards using [SwingHostServices](../src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingHostServices.kt), sanitizing carriage returns during copy/paste based on policy options.
 * **Focus Mapping**: Converts window focus gain/loss into `TerminalFocusEvent` events, routing them to the active session to trigger bracketed focus reports (`CSI I` and `CSI O`).

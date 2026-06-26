@@ -30,7 +30,7 @@ graph TD
 
 The module's public surface area contains a single, highly configurable test double:
 
-### [`MockConnector`](./src/main/kotlin/testkit/MockConnector.kt)
+### [`MockConnector`](src/main/kotlin/io/github/ketraterm/testkit/MockConnector.kt)
 
 #### Lifecycle Tracking Properties
 * `startCount: Int`: The number of times `start` was called. Tests can assert this is exactly `1` to verify the connector is not restarted incorrectly.

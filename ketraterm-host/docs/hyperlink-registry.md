@@ -25,7 +25,7 @@ The translation of string-based hyperlink keys (combining a unique ID and a dest
 ```
 
 1. **`hyperlinkIds` (`LinkedHashMap<HyperlinkKey, Int>`)**:
-   * Maps a [HyperlinkKey](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostCommandAdapter.kt) to its allocated numeric ID.
+   * Maps a [HyperlinkKey](../src/main/kotlin/io/github/ketraterm/host/HostCommandAdapter.kt) to its allocated numeric ID.
    * Configured in access-order mode to act as a Least Recently Used (LRU) cache.
 2. **`hyperlinkKeysByNumericId` (`HashMap<Int, HyperlinkKey>`)**:
    * Maps the numeric ID back to the hyperlink key. Used by renderers to resolve clicked cell IDs back to actual clickable URIs via `hyperlinkUri(numericId)`.
@@ -34,7 +34,7 @@ The translation of string-based hyperlink keys (combining a unique ID and a dest
 
 ## 3. Eviction & Safety Limits (`HostPolicy`)
 
-To protect terminal memory against unbounded memory growth (e.g. applications writing millions of unique URLs in scrollback logs), the registry is governed by safety constraints in [HostPolicy](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostPolicy.kt):
+To protect terminal memory against unbounded memory growth (e.g. applications writing millions of unique URLs in scrollback logs), the registry is governed by safety constraints in [HostPolicy](../src/main/kotlin/io/github/ketraterm/host/HostPolicy.kt):
 
 * **`maxHyperlinkEntries`**: The maximum number of active hyperlinks retained in the registry (default `256`).
 * **Eviction rule**: When the limit is reached, the oldest hyperlink is evicted from both collections. Cells carrying the evicted numeric ID will still display text but fail to resolve to active URIs, safely reclaiming memory.

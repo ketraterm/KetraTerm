@@ -56,8 +56,8 @@ graph TD
 ## Sub-Documentation
 
 For detailed specifications on Swing painting and text pipelines:
-* [swing-repaint-optimization.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-ui-swing/docs/swing-repaint-optimization.md) - Repaint planner bounds calculations, drag selection matrices, and smart path double-click detection.
-* [bifurcated-text-rendering.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-ui-swing/docs/bifurcated-text-rendering.md) - ASCII fast paths, shaped TextLayout caches, prioritized JBR color emoji fallback chains, and pixel-perfect primitive grid painters.
+* [swing-repaint-optimization.md](docs/swing-repaint-optimization.md) - Repaint planner bounds calculations, drag selection matrices, and smart path double-click detection.
+* [bifurcated-text-rendering.md](docs/bifurcated-text-rendering.md) - ASCII fast paths, shaped TextLayout caches, prioritized JBR color emoji fallback chains, and pixel-perfect primitive grid painters.
 
 ---
 
@@ -103,7 +103,7 @@ fun createTerminalView(session: TerminalSession): JComponent {
 
 ## How to Extend: Custom Host Services
 
-To integrate clipboard features, hyperlink clicking, or custom threading/dispatchers into the terminal view, construct a custom [SwingHostServices](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingHostServices.kt) instance and pass it to [SwingTerminal](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminal.kt):
+To integrate clipboard features, hyperlink clicking, or custom threading/dispatchers into the terminal view, construct a custom [SwingHostServices](src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingHostServices.kt) instance and pass it to [SwingTerminal](src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminal.kt):
 
 ```kotlin
 import io.github.ketraterm.ui.swing.api.SwingHostServices

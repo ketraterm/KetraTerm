@@ -62,7 +62,7 @@ classDiagram
 * **ANSI & ECMA-48 C0/C1 Byte Constants**: Raw numerical mappings for physical ASCII controls and 8-bit terminal state transitions.
 * **Standard ANSI & DEC Private Modes**: Integer constants for CSI SM/RM (Set/Reset Mode) and DECSET/DECRST parameters.
 * **State & Tracking Enums**: High-level semantic enums representing mouse tracking and encoding policies.
-* **Outbound Host Communication Interface**: A clean, unified, platform-neutral byte sink ([TerminalHostOutput](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-protocol/src/main/kotlin/io/github/ketraterm/protocol/host/TerminalHostOutput.kt)) that acts as the target for all encoded host communication (PTY stdin, SSH buffers, etc.).
+* **Outbound Host Communication Interface**: A clean, unified, platform-neutral byte sink ([TerminalHostOutput](src/main/kotlin/io/github/ketraterm/protocol/host/TerminalHostOutput.kt)) that acts as the target for all encoded host communication (PTY stdin, SSH buffers, etc.).
 
 ### What the Module Does NOT Own
 * **No Byte-Stream Parsing**: Does not parse escape sequences, decode UTF-8 streams, or analyze CSI/OSC/DCS structures.
@@ -74,8 +74,8 @@ classDiagram
 ## Sub-Documentation
 
 For deep-dive specifications on modes and input behaviors:
-* [protocol-modes.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-protocol/docs/protocol-modes.md) - Full specification of all supported ANSI and DEC private modes.
-* [input-protocols.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-protocol/docs/input-protocols.md) - Bit flags, event types, and key formats for xterm modifyOtherKeys and Kitty keyboard protocol.
+* [protocol-modes.md](docs/protocol-modes.md) - Full specification of all supported ANSI and DEC private modes.
+* [input-protocols.md](docs/input-protocols.md) - Bit flags, event types, and key formats for xterm modifyOtherKeys and Kitty keyboard protocol.
 
 ---
 
@@ -112,7 +112,7 @@ class CustomTerminalWidget {
 
 ## How to Extend: Custom Transport Sinks
 
-To output bytes from the emulator to a custom channel (such as a TCP Socket, SSH Session, or Mock Console), implement the [TerminalHostOutput](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-protocol/src/main/kotlin/io/github/ketraterm/protocol/host/TerminalHostOutput.kt) interface:
+To output bytes from the emulator to a custom channel (such as a TCP Socket, SSH Session, or Mock Console), implement the [TerminalHostOutput](src/main/kotlin/io/github/ketraterm/protocol/host/TerminalHostOutput.kt) interface:
 
 ```kotlin
 import io.github.ketraterm.protocol.host.TerminalHostOutput

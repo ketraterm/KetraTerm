@@ -1,6 +1,6 @@
 # Triple-Buffered Render Cache Concurrency
 
-The `ketraterm-render-cache` module uses a triple-buffering mechanism implemented in [TerminalRenderPublisher](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-cache/src/main/kotlin/io/github/ketraterm/render/cache/TerminalRenderPublisher.kt) to decouple the high-frequency terminal session rendering worker from UI repainting ticks.
+The `ketraterm-render-cache` module uses a triple-buffering mechanism implemented in [TerminalRenderPublisher](../src/main/kotlin/io/github/ketraterm/render/cache/TerminalRenderPublisher.kt) to decouple the high-frequency terminal session rendering worker from UI repainting ticks.
 
 ---
 
@@ -32,7 +32,7 @@ At any given time, the three cache buffers (`TerminalRenderCache`) are distribut
 ## 2. Lock-Free and Synchronized Intersections
 
 ### Lock-Free Front Queries
-For quick diagnostic checks (e.g. CLI utilities, testing), [current()](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-cache/src/main/kotlin/io/github/ketraterm/render/cache/TerminalRenderPublisher.kt#L116) returns the latest front buffer atomically without locks using an `AtomicReference`.
+For quick diagnostic checks (e.g. CLI utilities, testing), [current()](../src/main/kotlin/io/github/ketraterm/render/cache/TerminalRenderPublisher.kt#L116) returns the latest front buffer atomically without locks using an `AtomicReference`.
 
 ### Leased Read Block
 To prevent the front buffer from being recycled or rewritten while the UI thread is actively painting from it, the UI thread must acquire a read lease:

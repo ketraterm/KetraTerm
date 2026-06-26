@@ -38,8 +38,8 @@ graph TD
 ## Sub-Documentation
 
 For details on the hyperlink registry and mapping rules:
-* [hyperlink-registry.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-host/docs/hyperlink-registry.md) - OSC 8 URI mapping, numeric cell keys, and LRU eviction thresholds.
-* [command-adapter-mapping.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-host/docs/command-adapter-mapping.md) - Coordinate systems, screen buffer swapping logic, and soft/hard resets.
+* [hyperlink-registry.md](docs/hyperlink-registry.md) - OSC 8 URI mapping, numeric cell keys, and LRU eviction thresholds.
+* [command-adapter-mapping.md](docs/command-adapter-mapping.md) - Coordinate systems, screen buffer swapping logic, and soft/hard resets.
 
 ---
 
@@ -88,4 +88,4 @@ fun main() {
 
 ## How to Extend: Custom Event Sinks
 
-To react to non-grid events in a custom application UI (for example, to display window titles in an OS frame header), implement the [HostEventSink](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostEventSink.kt) interface and pass it to the `HostCommandAdapter` constructor during startup.
+To react to non-grid events in a custom application UI (for example, to display window titles in an OS frame header), implement the [HostEventSink](src/main/kotlin/io/github/ketraterm/host/HostEventSink.kt) interface and pass it to the `HostCommandAdapter` constructor during startup.

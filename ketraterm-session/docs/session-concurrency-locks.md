@@ -19,11 +19,11 @@ The `ketraterm-session` module acts as the synchronization pipeline coordinator 
 
 ### A. `inboundLock`
 * **Purpose**: Serializes execution of parser byte ingestion.
-* **Scope**: Guards the [onBytes](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-session/src/main/kotlin/io/github/ketraterm/session/TerminalSession.kt#L271) callback thread. It ensures that only one byte block from the transport is processed by the parser FSM at a time, preventing split-escape corruptions.
+* **Scope**: Guards the [onBytes](../src/main/kotlin/io/github/ketraterm/session/TerminalSession.kt#L271) callback thread. It ensures that only one byte block from the transport is processed by the parser FSM at a time, preventing split-escape corruptions.
 
 ### B. `mutationLock`
 * **Purpose**: Serializes all terminal grid, pen, and mode state mutations.
-* **Scope**: Guards the execution of [HostCommandAdapter](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostCommandAdapter.kt) commands, terminal resizes, theme palette changes, and cursor shape settings.
+* **Scope**: Guards the execution of [HostCommandAdapter](../../ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostCommandAdapter.kt) commands, terminal resizes, theme palette changes, and cursor shape settings.
 * **Deadlock Protection**: Implementations of `TerminalRenderFrameReader.readRenderFrame` acquire the `mutationLock` to provide a stable, thread-safe snapshot to the render consumer. Because of this, consumers **must not** block or call mutating APIs during a frame read callback.
 
 ### C. `outboundWriteLock`
@@ -41,4 +41,4 @@ When the parser handles an escape-sequence query (e.g. Device Status Report `DSR
 3. The adapter generates a response sequence and writes it to the connector.
 4. To prevent interleaving with concurrent UI input typing, the write acquires the **`outboundWriteLock`**.
 
-**Lock Ordering Rule**: `inboundLock` → `mutationLock` → `outboundWriteLock` must always be acquired in this order. Never attempt to acquire `mutationLock` if `outboundWriteLock` is already held.
+**Lock Ordering Rule**: `inboundLock` ? `mutationLock` ? `outboundWriteLock` must always be acquired in this order. Never attempt to acquire `mutationLock` if `outboundWriteLock` is already held.
