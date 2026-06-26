@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="KetraTerm: A gorgeous, modern, high-performance terminal emulator. Available as a premium standalone app and a highly reusable library for JVM and IntelliJ platforms.">
+    <meta name="keywords" content="KetraTerm, Terminal Emulator, Standalone App, IntelliJ Plugin, UI Component, TOML Configuration, TrueColor, Shell Integration, Desktop Notifications">
+    <meta name="author" content="Gagik Sargsyan">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ketraterm.github.io/ketraterm/">
+    <meta property="og:title" content="KetraTerm - Modern High-Performance Terminal">
+    <meta property="og:description" content="A gorgeous standalone terminal application and embeddable Swing component featuring high-fidelity rendering, true color, and shell integration.">
+    <meta property="og:image" content="https://ketraterm.github.io/ketraterm/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://ketraterm.github.io/ketraterm/">
+    <meta property="twitter:title" content="KetraTerm - Modern High-Performance Terminal">
+    <meta property="twitter:description" content="A gorgeous standalone terminal application and embeddable Swing component featuring high-fidelity rendering, true color, and shell integration.">
+    <meta property="twitter:image" content="https://ketraterm.github.io/ketraterm/og-image.png">
+
+    <meta name="google-site-verification" content="PLACEHOLDER_FOR_YOUR_GOOGLE_SEARCH_CONSOLE_VERIFICATION_KEY">
+
+    <title>KetraTerm | Modern High-Performance Terminal Application &amp; UI Component</title>
+    
+    <link rel="canonical" href="https://ketraterm.github.io/ketraterm/">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="container nav-wrapper">
+            <a href="#" class="logo" id="nav-logo">KetraTerm <span>Terminal</span></a>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="#about" class="nav-link" id="link-about">Overview</a></li>
+                    <li><a href="#features" class="nav-link" id="link-features">Features</a></li>
+                    <li><a href="#configuration" class="nav-link" id="link-config">Configuration</a></li>
+                    <li><a href="library.html" class="nav-link" id="link-library">Developer &amp; Library</a></li>
+                    <li><a href="docs/" class="btn btn-secondary" id="link-docs-btn">API Docs</a></li>
+                    <li><a href="https://github.com/ketraterm/ketraterm" class="btn btn-primary" id="link-github-btn">GitHub</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="badge">
+                <span class="pulse-dot"></span> Next-Gen Terminal Experience
+            </div>
+            <h1>A Modern Terminal Made for Daily Work</h1>
+            <p class="hero-subtitle">
+                A sleek, highly configurable terminal window built for contemporary shells. KetraTerm functions as both a standalone desktop application and a powerful component for embedding into JVM applications and IDEs.
+            </p>
+            <div class="hero-cta">
+                <a href="#features" class="btn btn-primary" id="hero-features-btn">Discover Features</a>
+                <a href="library.html" class="btn btn-secondary" id="hero-library-btn">Developer Guide</a>
+            </div>
+            
+            <!-- Terminal Mockup -->
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <div class="terminal-dots">
+                        <span class="terminal-dot dot-red"></span>
+                        <span class="terminal-dot dot-yellow"></span>
+                        <span class="terminal-dot dot-green"></span>
+                    </div>
+                    <span class="terminal-title">ketraterm-app --profile=default</span>
+                    <div style="width: 42px;"></div>
+                </div>
+                <div class="terminal-body">
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">ketraterm ~</span>
+                        <span>neofetch</span>
+                    </div>
+                    <div class="terminal-line" style="color: var(--accent-cyan); font-weight: 500;">
+                        <span>KetraTerm Terminal Desktop App 0.1.0</span>
+                    </div>
+                    <div class="terminal-line" style="color: var(--text-secondary);">
+                        <span>Shell: PowerShell Core / zsh</span>
+                    </div>
+                    <div class="terminal-line" style="color: var(--text-secondary);">
+                        <span>Theme: One Dark Pro (Configured via TOML)</span>
+                    </div>
+                    <div class="terminal-line" style="color: var(--accent-purple); font-weight: 500;">
+                        <span>Shell Integration: Enabled (OSC 133 command status rails active)</span>
+                    </div>
+                    <div class="terminal-line" style="color: var(--text-muted);">
+                        <span>Audible &amp; Edge-Pulse Visual Bells: Active</span>
+                    </div>
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">ketraterm ~</span>
+                        <span class="terminal-cursor"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Overview Section (Dual Roles) -->
+    <section id="about" class="section" style="border-top: 1px solid var(--border-color); background: var(--bg-secondary);">
+        <div class="container">
+            <h2 style="font-size: 36px; text-align: center; margin-bottom: 16px;">Two Ways to Run KetraTerm</h2>
+            <p style="color: var(--text-secondary); text-align: center; max-width: 600px; margin: 0 auto 50px auto;">
+                Whether you need a dedicated shell terminal for command execution or a tool window inside a custom IDE, KetraTerm has you covered.
+            </p>
+            
+            <div class="split-focus">
+                <div class="focus-box">
+                    <div class="badge" style="background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.2); color: var(--accent-purple); margin-bottom: 16px;">
+                        Standalone Desktop Application
+                    </div>
+                    <h3>Standalone Terminal</h3>
+                    <p>A fast, ready-to-run desktop terminal window. Includes session tab management, profile settings persistence, theme templates, and system PTY subprocess integration for Windows, Linux, and macOS.</p>
+                    <a href="https://github.com/ketraterm/ketraterm" class="btn btn-secondary">Get the Standalone App</a>
+                </div>
+                
+                <div class="focus-box">
+                    <div class="badge" style="margin-bottom: 16px;">
+                        Embeddable JVM Component
+                    </div>
+                    <h3>Developer Terminal Widget</h3>
+                    <p>A completely decoupled Swing/AWT component that developers can drop into IntelliJ IDEA plugins, desktop developer dashboards, or admin control consoles with minimal dependencies.</p>
+                    <a href="library.html" class="btn btn-primary">Integrator Guide &amp; Code</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Key Product Features -->
+    <section id="features" class="section">
+        <div class="container">
+            <h2 style="text-align: center; font-size: 36px; margin-bottom: 50px;">A High-Fidelity Terminal Interface</h2>
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-icon">🎨</div>
+                    <h3>Stunning SGR Graphic Styles</h3>
+                    <p>Experience 24-bit TrueColor RGB palettes. Features secondary underline decorations (single, double, curly, dotted, dashed) with custom color overrides.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🚀</div>
+                    <h3>Shell integration (OSC 133)</h3>
+                    <p>Visual command timeline rails identify prompt locations, highlight failed output rows with gutter dots, and report shell command exit codes directly.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🔗</div>
+                    <h3>Interactive Hyperlinks</h3>
+                    <p>OSC 8 hyperlink formatting detects URLs in stdout, rendering mouse-hover link lines and enabling direct Ctrl-click navigation.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🔔</div>
+                    <h3>Audible &amp; Visual Bells</h3>
+                    <p>Never miss a command completion signal. Features regular audible warning tones and a subtle, non-intrusive edge-pulse visual flash overlay.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📁</div>
+                    <h3>Auto Directory Sync</h3>
+                    <p>OSC 7 tracks prompt working directories to dynamically update tab titles and enable quick "Open Terminal Here" shell splits.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">😀</div>
+                    <h3>Native Emoji Rendering</h3>
+                    <p>Includes a built-in Segoe UI Emoji COLR/CPAL color glyph rasterizer on Windows, displaying emojis alongside system monospace fonts.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TOML Configuration Section -->
+    <section id="configuration" class="section" style="background: var(--bg-secondary); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+        <div class="container grid-2">
+            <div>
+                <h2 style="font-size: 40px; margin-bottom: 24px; letter-spacing: -0.5px;">Simple TOML Settings</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 16px;">
+                    Tailor your workspace to match your style. KetraTerm reads settings from a standard, human-readable <code>config.toml</code> file stored in OS-standard app data directories.
+                </p>
+                <p style="color: var(--text-secondary); margin-bottom: 32px; font-size: 16px;">
+                    Change your fonts, increase font-sizes, modify terminal column counts, configure cursor blinks, adjust underline line-height scaling, and select preconfigured themes like <em>One Dark</em>, <em>Dracula</em>, or <em>Nord</em>.
+                </p>
+                <div class="callout">
+                    <h4>Graceful Error Recovery</h4>
+                    <p>If your configuration contains syntax errors, KetraTerm automatically falls back to safe system defaults instead of crashing.</p>
+                </div>
+            </div>
+            
+            <div>
+                <pre><code><span class="comment"># KetraTerm User Configuration Profile</span>
+
+<span class="keyword">[window]</span>
+<span class="type">columns</span> = <span class="number">100</span>
+<span class="type">rows</span> = <span class="number">30</span>
+<span class="type">scrollback_lines</span> = <span class="number">5000</span>
+
+<span class="keyword">[font]</span>
+<span class="type">family</span> = <span class="string">"Cascadia Mono"</span>
+<span class="type">size</span> = <span class="number">14</span>
+<span class="type">line_height</span> = <span class="number">1.2</span>
+<span class="type">use_system_fallback_fonts</span> = <span class="number">true</span>
+
+<span class="keyword">[theme]</span>
+<span class="type">name</span> = <span class="string">"one-dark"</span>
+
+<span class="keyword">[behavior]</span>
+<span class="type">cursor_shape</span> = <span class="string">"block"</span>
+<span class="type">cursor_blink_millis</span> = <span class="number">500</span>
+<span class="type">audible_bell</span> = <span class="number">false</span>
+<span class="type">visual_bell</span> = <span class="number">true</span>
+<span class="type">paste_sanitization</span> = <span class="string">"normalize-line-endings"</span></code></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- Developer Gateway CTA -->
+    <section class="section" style="text-align: center;">
+        <div class="container" style="max-width: 700px;">
+            <h2 style="font-size: 36px; margin-bottom: 20px;">Are you building JVM Apps?</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 32px; font-size: 17px;">
+                Learn about KetraTerm's unidirectional pipeline, triple-buffered rendering engine, zero-allocation parallel memory arrays, and how to embed the Swing component with simple Gradle coordinates.
+            </p>
+            <a href="library.html" class="btn btn-primary" id="cta-library-btn">Open Developer &amp; Library Guide</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-wrapper">
+            <div>
+                <p>&copy; 2026 KetraTerm project. Released under the Apache 2.0 License.</p>
+            </div>
+            <ul class="footer-links">
+                <li><a href="sitemap.xml" class="footer-link" id="footer-sitemap">Sitemap</a></li>
+                <li><a href="robots.txt" class="footer-link" id="footer-robots">Robots.txt</a></li>
+                <li><a href="https://github.com/ketraterm/ketraterm" class="footer-link" id="footer-repo">GitHub Project</a></li>
+            </ul>
+        </div>
+    </footer>
+
+</body>
+</html>

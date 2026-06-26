@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="KetraTerm Developer Guide: Integrate the modern Swing terminal component into JVM and IntelliJ applications. Explore the unidirectional pipeline and concurrency controls.">
+    <meta name="keywords" content="Kotlin Terminal Library, JVM Terminal Widget, Swing Terminal Component, IntelliJ Terminal Integration, Terminal Pipeline, Java Terminal Emulator, Dokka API">
+    <meta name="author" content="Gagik Sargsyan">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ketraterm.github.io/ketraterm/library.html">
+    <meta property="og:title" content="KetraTerm Library &amp; Developer Integration Guide">
+    <meta property="og:description" content="Integrate the high-performance unidirectional terminal component into Kotlin/Java desktop apps.">
+    <meta property="og:image" content="https://ketraterm.github.io/ketraterm/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://ketraterm.github.io/ketraterm/library.html">
+    <meta property="twitter:title" content="KetraTerm Library &amp; Developer Integration Guide">
+    <meta property="twitter:description" content="Integrate the high-performance unidirectional terminal component into Kotlin/Java desktop apps.">
+    <meta property="twitter:image" content="https://ketraterm.github.io/ketraterm/og-image.png">
+
+    <title>KetraTerm Developer | Decoupled Terminal Component &amp; Architecture</title>
+    
+    <link rel="canonical" href="https://ketraterm.github.io/ketraterm/library.html">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="container nav-wrapper">
+            <a href="index.html" class="logo" id="nav-logo">KetraTerm <span>Library</span></a>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="index.html" class="nav-link" id="link-home">Home</a></li>
+                    <li><a href="#pipeline" class="nav-link" id="link-pipeline">Architecture</a></li>
+                    <li><a href="#concurrency" class="nav-link" id="link-concurrency">Concurrency</a></li>
+                    <li><a href="#integration" class="nav-link" id="link-integration">Integration</a></li>
+                    <li><a href="docs/" class="btn btn-primary" id="link-docs-btn">Dokka API Docs</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Header -->
+    <section class="hero" style="padding-top: 150px; padding-bottom: 60px;">
+        <div class="container">
+            <div class="badge">Integrators &amp; Developers</div>
+            <h1 style="font-size: 48px;">Developer &amp; Integration <span>Guide</span></h1>
+            <p class="hero-subtitle" style="margin-bottom: 20px;">
+                KetraTerm is engineered with a strict modular boundary, decoupling core terminal mechanics, byte parsing, input encoding, and UI presentation components.
+            </p>
+        </div>
+    </section>
+
+    <!-- Pipeline Architecture -->
+    <section id="pipeline" class="section" style="border-top: 1px solid var(--border-color); background: var(--bg-secondary);">
+        <div class="container grid-2">
+            <div>
+                <h2 style="font-size: 32px; margin-bottom: 18px;">Unidirectional Data Pipeline</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                    Unlike traditional terminal emulators where UI actions and PTY readers write asynchronously to the same grid memory, KetraTerm routes all actions along a strict, unidirectional loop.
+                </p>
+                <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                    This separation keeps GUI updates free from tearing even when the subprocess output is flooding the screen, sustaining steady 60+ FPS cycles.
+                </p>
+                <div class="callout">
+                    <h4>Flat In-Memory Cell Storage</h4>
+                    <p>To eliminate memory garbage collection overhead, grid lines in the core engine use flat, parallel primitive arrays (<code>codepoints: IntArray</code>, <code>attrs: LongArray</code>) instead of wrapping cells in Java objects.</p>
+                </div>
+            </div>
+            <div>
+                <pre style="font-size: 13px; line-height: 1.4;"><code><span class="comment">Inbound Path (Host to Screen State):</span>
+ PTY / SSH ──[Raw Bytes]──► Parser ──[Commands]──► Host ──[Mutations]──► Core Grid
+                                                                           │
+                                                                       [Snapshot]
+                                                                           ▼
+ UI Swing ◄──[Repaint]── UI Component ◄──[Lease]── Render Cache ◄── Render API
+
+<span class="comment">Outbound Path (User Typing to Host stdin):</span>
+ User Event ──[Key/Paste]──► Input ──[ANSI Bytes]──► Session ──► PTY / SSH</code></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- Concurrency & Locks -->
+    <section id="concurrency" class="section">
+        <div class="container">
+            <h2 style="font-size: 32px; text-align: center; margin-bottom: 16px;">Deterministic Concurrency Architecture</h2>
+            <p style="color: var(--text-secondary); text-align: center; max-width: 600px; margin: 0 auto 50px auto;">
+                KetraTerm coordinates background threads and the Swing Event Dispatch Thread (EDT) using three specialized locks inside the <code>TerminalSession</code> controller.
+            </p>
+            
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-icon">🔐</div>
+                    <h3><code>inboundLock</code></h3>
+                    <p>Guarantees that raw terminal output chunks arriving on PTY background threads are delivered to the ANSI state machine in sequential stream order.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🔐</div>
+                    <h3><code>mutationLock</code></h3>
+                    <p>Protects the grid engine. Prevents parser mutations from altering characters while the rendering thread snapshots frames, avoiding layout tearing.</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🔐</div>
+                    <h3><code>outboundWriteLock</code></h3>
+                    <p>Synchronizes terminal writes. Ensures that keyboard typing, clipboard pastes, and query responses (like CPR/DSR replies) are enqueued atomically.</p>
+                </div>
+            </div>
+            
+            <div class="callout" style="max-width: 800px; margin: 40px auto 0 auto; text-align: center;">
+                <h4>Monomorphized LRU Caching</h4>
+                <p style="text-align: left;">For hot rendering paths, KetraTerm avoids object-boxing by using custom primitive-keyed LRU caches, including <code>IntFontLru</code> for codepoints font lookup and <code>LongTextLayoutLru</code> for pre-shaped text layouts.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Integration Code Section -->
+    <section id="integration" class="section" style="background: var(--bg-secondary); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+        <div class="container grid-2">
+            <div>
+                <h2 style="font-size: 32px; margin-bottom: 18px;">How to Integrate in JVM Apps</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                    Integrate KetraTerm easily into your Gradle projects. The workspace module manages load-time user profiles, settings persistence, and tab selections.
+                </p>
+                <p style="color: var(--text-secondary); margin-bottom: 24px;">
+                    Implement <code>TerminalWorkspaceListener</code> to bind lifecycle operations (tab open, title changes, visual bell trigger) to your application panels.
+                </p>
+                
+                <h4 style="margin-bottom: 8px;">Gradle Dependency Configuration</h4>
+                <pre><code><span class="keyword">dependencies</span> {
+    <span class="comment">// Core terminal UI widget module</span>
+    <span class="type">implementation</span>(<span class="string">"io.github.ketraterm:ketraterm-ui-swing:0.1.0"</span>)
+    <span class="comment">// Workspace, TOML config, and lifecycle manager</span>
+    <span class="type">implementation</span>(<span class="string">"io.github.ketraterm:ketraterm-workspace:0.1.0"</span>)
+}</code></pre>
+            </div>
+            
+            <div>
+                <h4 style="margin-bottom: 8px;">Kotlin Bootstrap Implementation</h4>
+                <pre style="line-height: 1.45; font-size: 13px;"><code><span class="comment">// 1. Load TOML settings from OS directories</span>
+<span class="keyword">val</span> configManager = TerminalWorkspaceConfigManager.getDefault()
+<span class="keyword">val</span> config = configManager.load()
+
+<span class="comment">// 2. Create the workspace listener</span>
+<span class="keyword">val</span> listener = <span class="keyword">object</span> : <span class="type">TerminalWorkspaceListener</span> {
+    <span class="keyword">override fun</span> <span class="function">tabOpened</span>(tab: <span class="type">TerminalWorkspaceTab</span>) {
+        println(<span class="string">"Session launched: ${tab.id}"</span>)
+    }
+    <span class="keyword">override fun</span> <span class="function">tabClosed</span>(id: <span class="type">String</span>) {}
+    <span class="keyword">override fun</span> <span class="function">tabSelected</span>(id: <span class="type">String</span>) {}
+}
+
+<span class="comment">// 3. Initialize the workspace state controller</span>
+<span class="keyword">val</span> workspace = TerminalWorkspace(listener)
+
+<span class="comment">// 4. Define launch profile and trigger session</span>
+<span class="keyword">val</span> shellProfile = TerminalProfile(
+    name = <span class="string">"system-shell"</span>,
+    displayName = <span class="string">"Default Shell"</span>,
+    command = emptyList() <span class="comment">// Falls back to system default</span>
+)
+workspace.openTab(shellProfile)</code></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dokka Gateway -->
+    <section class="section" style="text-align: center;">
+        <div class="container" style="max-width: 700px;">
+            <h2 style="font-size: 36px; margin-bottom: 20px;">Dokka API Reference Documentation</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 32px; font-size: 17px;">
+                Access the complete class references, functions, types, and module interfaces generated from the source code.
+            </p>
+            <a href="docs/" class="btn btn-primary" id="dokka-docs-btn">Explore Dokka API Docs</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-wrapper">
+            <div>
+                <p>&copy; 2026 KetraTerm project. Released under the Apache 2.0 License.</p>
+            </div>
+            <ul class="footer-links">
+                <li><a href="sitemap.xml" class="footer-link" id="footer-sitemap">Sitemap</a></li>
+                <li><a href="robots.txt" class="footer-link" id="footer-robots">Robots.txt</a></li>
+                <li><a href="https://github.com/ketraterm/ketraterm" class="footer-link" id="footer-repo">GitHub Project</a></li>
+            </ul>
+        </div>
+    </footer>
+
+</body>
+</html>
