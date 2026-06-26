@@ -1,6 +1,6 @@
 # Transport Connector Lifecycle & Thread Invariants
 
-This document details the lifecycle phases, thread safety rules, and memory consumption rules required by the [TerminalConnector](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-transport-api/src/main/kotlin/io/github/ketraterm/transport/TerminalConnector.kt) contract.
+This document details the lifecycle phases, thread safety rules, and memory consumption rules required by the [TerminalConnector](../src/main/kotlin/io/github/ketraterm/transport/TerminalConnector.kt) contract.
 
 ---
 

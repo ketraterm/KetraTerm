@@ -35,16 +35,16 @@ graph TD
 ```
 
 ### Key Components
-* [TerminalWorkspace](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-workspace/src/main/kotlin/io/github/ketraterm/workspace/TerminalWorkspace.kt): The main lifecycle manager. Handles opening, selecting, closing, and applying settings updates to all open terminal tabs.
-* [TerminalProfile](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-workspace/src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt): Describes a launch configuration (command, display name, working directory, environment variables).
-* [TerminalWorkspaceConfigManager](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-workspace/src/main/kotlin/io/github/ketraterm/workspace/config/TerminalWorkspaceConfigManager.kt): Handles loading and saving TOML-based configurations from OS-specific directories, with automatic parsing backups and value clamping.
+* [TerminalWorkspace](src/main/kotlin/io/github/ketraterm/workspace/TerminalWorkspace.kt): The main lifecycle manager. Handles opening, selecting, closing, and applying settings updates to all open terminal tabs.
+* [TerminalProfile](src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt): Describes a launch configuration (command, display name, working directory, environment variables).
+* [TerminalWorkspaceConfigManager](src/main/kotlin/io/github/ketraterm/workspace/config/TerminalWorkspaceConfigManager.kt): Handles loading and saving TOML-based configurations from OS-specific directories, with automatic parsing backups and value clamping.
 
 ---
 
 ## Sub-Documentation
 
 For detailed specifications on the persistency configuration format and resolution:
-* [profile-config-toml.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-workspace/docs/profile-config-toml.md) - TOML config blocks syntax, configuration properties list, and directory resolution hierarchies per OS.
+* [profile-config-toml.md](docs/profile-config-toml.md) - TOML config blocks syntax, configuration properties list, and directory resolution hierarchies per OS.
 
 ---
 

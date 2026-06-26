@@ -16,31 +16,31 @@ These cached layouts allow asynchronous UI paint loop threads to perform font re
 To guarantee safety, memory locality, and absolute performance, `ketraterm-render-cache` operates under strict boundaries:
 
 ```text
-  ┌────────────────────────┐
-  │ State Provider Thread  │ (Background write & mutate)
-  └───────────┬────────────┘
-              │
-              ▼ [TerminalRenderFrameReader]
-  ┌────────────────────────┐
-  │  Render Worker Thread  │ (Copies raw frame into BACK buffer)
-  └───────────┬────────────┘
-              │
-              ▼ updateAndPublish()
-  ┌────────────────────────┐
-  │ TerminalRenderPublisher│ (Triple-buffered rotation & lock-free read leases)
-  └───────────┬────────────┘
-              │
-              ▼ readCurrent { front -> ... }
-  ┌────────────────────────┐
-  │    UI Paint Thread     │ (Paints from stable, snapshotted FRONT buffer)
-  └────────────────────────┘
+  +------------------------+
+  ¦ State Provider Thread  ¦ (Background write & mutate)
+  +------------------------+
+              ¦
+              ? [TerminalRenderFrameReader]
+  +------------------------+
+  ¦  Render Worker Thread  ¦ (Copies raw frame into BACK buffer)
+  +------------------------+
+              ¦
+              ? updateAndPublish()
+  +------------------------+
+  ¦ TerminalRenderPublisher¦ (Triple-buffered rotation & lock-free read leases)
+  +------------------------+
+              ¦
+              ? readCurrent { front -> ... }
+  +------------------------+
+  ¦    UI Paint Thread     ¦ (Paints from stable, snapshotted FRONT buffer)
+  +------------------------+
 ```
 
 ### What the Module Owns
-- **Primitive Array Retention**: Deep copying of active buffer, lines, cursor, and text generation metrics from [TerminalRenderFrameReader](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-api/src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderFrameReader.kt) into flat, reusable primitive arrays.
+- **Primitive Array Retention**: Deep copying of active buffer, lines, cursor, and text generation metrics from [TerminalRenderFrameReader](../ketraterm-render-api/src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderFrameReader.kt) into flat, reusable primitive arrays.
 - **Double-Buffered Row Synchronization**: Comparing generation numbers on a per-row basis to skip copying rows whose visual contents have not changed since the previous frame.
 - **Ping-Pong Grapheme Cluster Storage**: Double-buffering complex multi-codepoint grapheme clusters and preserving active references for unchanged rows with zero allocations.
-- **Triple-Buffered Thread Isolation**: Standardizing a thread-safe publication pipeline via a triple-buffered publisher ([TerminalRenderPublisher](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-cache/src/main/kotlin/io/github/ketraterm/render/cache/TerminalRenderPublisher.kt)) that separates the background render worker from the UI paint reader.
+- **Triple-Buffered Thread Isolation**: Standardizing a thread-safe publication pipeline via a triple-buffered publisher ([TerminalRenderPublisher](src/main/kotlin/io/github/ketraterm/render/cache/TerminalRenderPublisher.kt)) that separates the background render worker from the UI paint reader.
 
 ### What the Module Does NOT Own
 - **Terminal Output Parsing**: The render cache has no dependencies on protocols or ANSI/DEC byte parsers.
@@ -51,7 +51,7 @@ To guarantee safety, memory locality, and absolute performance, `ketraterm-rende
 ## Sub-Documentation
 
 For deep-dive technical details on triple-buffering logic and grapheme cluster copy optimizations:
-* [triple-buffering-concurrency.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-cache/docs/triple-buffering-concurrency.md) - Buffer rotation phases, reader lease counts, and packed cluster allocation safety.
+* [triple-buffering-concurrency.md](docs/triple-buffering-concurrency.md) - Buffer rotation phases, reader lease counts, and packed cluster allocation safety.
 
 ---
 

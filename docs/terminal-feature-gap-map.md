@@ -2,7 +2,7 @@
 
 This is the living backlog of gaps, TODOs, and policy constraints in the KetraTerm parser, core, host, input, and UI layers. 
 
-For a complete directory of supported features, see the [Terminal Feature Map](file:///c:/Users/gagik/IdeaProjects/KetraTerm/docs/terminal-feature-map.md).
+For a complete directory of supported features, see the [Terminal Feature Map](terminal-feature-map.md).
 
 The target is a modern, secure, xterm-compatible terminal pipeline for contemporary shells and TUIs. Obsolete or risky legacy protocols remain excluded unless they earn their place.
 
@@ -26,6 +26,7 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 
 ### Tier 2: Useful (Under consideration / partial gaps)
 - *No outstanding SAFE query-response, DECRQSS/XTGETTCAP, push/pop title stack, or host-adapter allow/deny policy-surface gaps (all implemented and verified).*
+- `FIXED(alpha-blocker)`: Kitty keyboard capability advertising now exposes only implemented progressive flags (`1` disambiguate escape codes and `8` report all keys as escape codes). Event types, alternate keys, and associated text remain protocol vocabulary only until the input event model can encode them.
 
 ### Tier 3: Optional (Graphics & advanced features)
 - Sixel or modern graphics protocols (e.g. Kitty graphics protocol).
@@ -108,7 +109,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(core)`: invalid/unassigned codepoint width policy.
 
 ### Query and Response Channel
-- `TODO(core)`: terminal-to-host response/event API for `XTGETTCAP`, OSC queries, and future query/response protocols.
+- `DONE(core/host/policy)`: terminal-to-host response channel exists for DA, DSR/CPR, safe window reports, palette queries, `DECRQSS`, and allowlisted `XTGETTCAP`; host policy can deny terminal responses before they enqueue bytes.
+- `TODO(core/parser/host/policy)`: OSC query responses and future query/response protocols need explicit response shape, allowlist, and host policy before implementation.
 - `TODO(core/host)`: event API for hyperlinks, palette updates, and terminal notifications if these move out of host or render-frame metadata.
 
 ---
@@ -134,6 +136,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ### Deferred Kitty Keyboard Protocol Scope
 - `DONE(protocol/core/pty)`: terminal capability identity contract centralizes `$TERM`, `COLORTERM`, DA/DA2, XTGETTCAP terminal-name/color claims, and the implemented Kitty keyboard flag mask.
+- `DONE(protocol/core/input)`: advertised Kitty keyboard progressive mask is restricted to implemented flags: disambiguate escape codes (`1`) and report-all-keys-as-escape-codes (`8`). Unsupported progressive bits are masked out of input-facing core mode state.
 - `TODO(parser/core/policy)`: `CSI ? u` Kitty keyboard capability query response remains disabled until a response shape and fingerprinting policy are implemented.
 - separate left/right modifier reporting if host event vocabulary grows it.
 - key repeat/release reporting.

@@ -12,7 +12,7 @@ Designed for embedding into IDEs, developer tools, and standalone desktop applic
 * **Native Pseudo-Terminal (PTY) Integration**: Seamless cross-platform native execution using JetBrains [Pty4J](https://github.com/traff/pty4j) with full Windows ConPTY support, built to handle modern shells (Zsh, Fish, PowerShell) and prompt size propagation.
 * **Modern TUI & vt100/xterm Compliance**: Passes most tests of the rigorous `vttest` suite, ensuring flawless rendering for heavy interactive TUI applications like Neovim, Tmux, Htop, Fzf, and lazygit.
 * **Richer Styling & 24-Bit TrueColor**: Bypasses the limits of standard 256-color palettes with full 24-bit TrueColor RGB mapping. Renders overline decorations and modern underline styles (Single, Double, Curly, Dotted, Dashed) with custom underline colors.
-* **Advanced Keyboard Shortcuts**: Full support for the **Kitty Keyboard Protocol** (capturing complex shortcut transitions like press, repeat, release, and alternate layout shortcuts that outdated terminal widgets drop) alongside xterm `modifyOtherKeys` and compact CSI-u.
+* **Advanced Keyboard Shortcuts**: Supports xterm `modifyOtherKeys`, compact CSI-u, and the implemented Kitty keyboard progressive flags for escape-code disambiguation and reporting text keys as CSI-u. Richer Kitty event types, alternate keys, and associated text fields remain intentionally deferred until the public input event model can carry them truthfully.
 * **Unbounded Mouse Tracking**: Supports legacy mouse tracking alongside modern Standard SGR Mouse (`1006`) and URXVT (`1015`) decimal-packed mouse coordinates, allowing clicks, drags, and scroll-wheel interactions to work on high-resolution displays larger than 223 columns.
 * **Tear-Free Triple-Buffered Rendering**: Decouples active parsing from the UI drawing loops using an asynchronous dirty-coalescing rendering worker and a triple-buffered publisher. Delivers a clean **60+ FPS** paint cycle with zero visual tearing or stuttering under massive log outputs.
 * **Security-Hardened Design**: Hardened against malicious escape sequence exploits. Utilizes a bounded, double-indexed LRU cache for OSC 8 hyperlinks, strict xterm title stack limits, and pre-allocated OSC/DCS payload buffers to block memory exhaustion.
@@ -20,6 +20,8 @@ Designed for embedding into IDEs, developer tools, and standalone desktop applic
 * **Zero-Allocation Memory Profile**: Core grid storage is built on flat parallel primitive arrays (no object-per-cell overhead) and a circular arena allocator (`ClusterStore`), ensuring near-zero garbage collector pressure and pauses during active shell throughput.
 * **Independent Buffer & Margin Physics**: Employs vertical and horizontal scroll margins (`DECSLRM`/`DECSTBM`) with instant switching between primary and alt buffers (`?1049`) carrying independent margins and cursor state save slots.
 * **Native Desktop Notifications**: Fully supports native desktop notifications triggered directly via iTerm2-style `OSC 9` and urxvt-style `OSC 777` sequences, featuring a KetraTerm-specific severity extension (`info`, `warning`, `error`, `none`), ConEmu subcommand conflict filtering, and self-cleaning tray icon management.
+* **Exceptional Utf-8 Support**: Supports UTF-8 input and output, including Unicode grapheme cluster segmentation, East Asian width policies, and full Unicode 15.0 coverage for emojis, symbols, and scripts.
+* **Modern Shell Integration**: Implements modern shell integration protocols (`OSC 133`, `OSC 7`) for accurate prompt detection, command lifecycle tracking, exit status reporting, and current working directory synchronization.
 
 > For a complete specification of all supported capabilities, see the [Terminal Feature Map](docs/terminal-feature-map.md). A detailed list of current backlog items and compatibility decisions is maintained in the [Terminal Feature Gap Map](docs/terminal-feature-gap-map.md)
 
@@ -78,7 +80,7 @@ fun spawnTerminalWindow() {
 
 ## Project Structure
 
-KetraTerm is composed of 12 highly decoupled Gradle modules:
+KetraTerm is composed of strict, decoupled Gradle modules:
 
 * **`:ketraterm-protocol`**: Zero-dependency ANSI/DEC constants and vocabulary enums.
 * **`:ketraterm-parser`**: Streaming UTF-8 decoder and table-driven escape sequence FSM.
@@ -91,7 +93,10 @@ KetraTerm is composed of 12 highly decoupled Gradle modules:
 * **`:ketraterm-session`**: Thread synchronization, lock controls, and event loop.
 * **`:ketraterm-pty`**: Local native process Pty4J launcher and stream pump.
 * **`:ketraterm-ui-swing`**: Reusable desktop `JComponent` painter and mouse interaction adapters.
+* **`:ketraterm-workspace`**: Headless tab/profile workspace layer used by product hosts.
+* **`:ketraterm-app`**: Standalone desktop application host.
 * **`:ketraterm-testkit`**: In-memory connector mocks and simulation tools.
+* **`:ketraterm-benchmarks`**: JMH benchmarks for parser, core, render, and session hot paths.
 
 > [TIP]
 > For a detailed walkthrough of the unidirectional pipeline flow, concurrency locks, in-memory cell storage, and caches, refer to our [Architecture Guide](ARCHITECTURE.md).
@@ -115,13 +120,13 @@ KetraTerm is composed of 12 highly decoupled Gradle modules:
   ./gradlew :ketraterm-core:test
   ./gradlew :ketraterm-ui-swing:test
   ```
-* **Launch Local PTY Swing Demo**:
+* **Launch Standalone Swing App**:
   ```bash
-  ./gradlew :ketraterm-ui-swing-demo:run
+  ./gradlew :ketraterm-app:run
   ```
 * **Launch with Custom Shell Command**:
   ```bash
-  ./gradlew :ketraterm-ui-swing-demo:run --args="powershell.exe"
+  ./gradlew :ketraterm-app:run --args="powershell.exe"
   ```
 
 ---

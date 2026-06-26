@@ -95,6 +95,7 @@ class HostCommandAdapter(
     private var conceal: Boolean = false
     private var activeHyperlinkNumericId: Int = 0
     private var nextHyperlinkNumericId: Int = 1
+    private var nextAnonymousHyperlinkInstance: Int = 1
     private val hyperlinkIds = LinkedHashMap<HyperlinkKey, Int>(256, 0.75f, true)
     private val hyperlinkKeysByNumericId = HashMap<Int, HyperlinkKey>(256)
 
@@ -163,6 +164,7 @@ class HostCommandAdapter(
         hyperlinkIds.clear()
         hyperlinkKeysByNumericId.clear()
         nextHyperlinkNumericId = 1
+        nextAnonymousHyperlinkInstance = 1
     }
 
     override fun decaln() {
@@ -995,8 +997,16 @@ class HostCommandAdapter(
         uri: String,
         id: String?,
     ): Int {
-        val key = HyperlinkKey(id.orEmpty(), uri)
-        hyperlinkIds[key]?.let { return it }
+        val key =
+            if (id == null) {
+                HyperlinkKey(id = "", uri = uri, anonymousInstance = nextAnonymousHyperlinkInstance)
+                    .also { nextAnonymousHyperlinkInstance = nextHyperlinkIdAfter(nextAnonymousHyperlinkInstance) }
+            } else {
+                HyperlinkKey(id = id, uri = uri, anonymousInstance = EXPLICIT_HYPERLINK_INSTANCE)
+            }
+        if (id != null) {
+            hyperlinkIds[key]?.let { return it }
+        }
 
         if (hyperlinkIds.size >= hostPolicy.maxHyperlinkEntries) {
             val eldest = hyperlinkIds.entries.iterator()
@@ -1055,6 +1065,7 @@ class HostCommandAdapter(
 
     private companion object {
         const val NO_HYPERLINK_ID: Int = 0
+        const val EXPLICIT_HYPERLINK_INSTANCE: Int = 0
         const val MAX_TITLE_STACK_DEPTH: Int = 16
         const val CLIPBOARD_QUERY_MARKER: String = "?"
     }
@@ -1062,6 +1073,7 @@ class HostCommandAdapter(
     private data class HyperlinkKey(
         val id: String,
         val uri: String,
+        val anonymousInstance: Int,
     )
 
     private fun isCurrentWorkingDirectoryUriAllowed(value: String): Boolean {

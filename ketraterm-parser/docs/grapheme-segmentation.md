@@ -6,7 +6,7 @@ The `ketraterm-parser` module handles UTF-8 byte stream decoding and Unicode gra
 
 ## 1. Streaming UTF-8 Decoder (`Utf8Decoder`)
 
-The [Utf8Decoder](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/utf8/Utf8Decoder.kt) accepts raw bytes one at a time and reconstructs Unicode codepoints without heap allocations.
+The [Utf8Decoder](../src/main/kotlin/io/github/ketraterm/parser/utf8/Utf8Decoder.kt) accepts raw bytes one at a time and reconstructs Unicode codepoints without heap allocations.
 
 ```
        Raw Byte Stream
@@ -29,7 +29,7 @@ The [Utf8Decoder](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-
 
 ## 2. Grapheme Segmentation (Unicode UAX #29)
 
-To support modern TUI layouts (which can include emojis, zero-width joiners, and combining accents), the parser uses the [GraphemeSegmenter](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeSegmenter.kt) to detect grapheme boundaries based on the **Unicode Standard Annex #29 (UAX #29)**.
+To support modern TUI layouts (which can include emojis, zero-width joiners, and combining accents), the parser uses the [GraphemeSegmenter](../src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeSegmenter.kt) to detect grapheme boundaries based on the **Unicode Standard Annex #29 (UAX #29)**.
 
 * **Generated Break Tables**: Binary classifications are mapped against a compressed static classification table `GeneratedGraphemeBreakTable` for $O(1)$ property checks.
 * **Complex Sequences**: Correctly handles Zero-Width Joiner (ZWJ) emoji sequences, combining mark characters, regional indicator (flag) pairs, and Hangul Jamo sequences.
@@ -40,7 +40,7 @@ To support modern TUI layouts (which can include emojis, zero-width joiners, and
 
 Under standard UAX #29 rules, a cluster boundary cannot be verified until the *next* codepoint arrives. In a terminal emulator, waiting for the next keypress to display the previous character introduces visible echo latency.
 
-To resolve this, the [GraphemeAssembler](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeAssembler.kt) provides a bifurcated emission model:
+To resolve this, the [GraphemeAssembler](../src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeAssembler.kt) provides a bifurcated emission model:
 
 1. **`flushForRender`**: When the current read block ends, the assembler emits the current pending grapheme immediately to the command sink to allow the terminal UI to draw it.
 2. **`appendToPreviousCluster`**: If subsequent bytes on a new read loop extend the recently flushed grapheme (e.g. a combining character), the assembler notifies the command sink to append this codepoint to the previous cell instead of creating a new cell.

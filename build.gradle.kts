@@ -49,7 +49,7 @@ subprojects {
     }
 
     plugins.withId("org.jetbrains.kotlin.jvm") {
-        if (name != "ketraterm-benchmarks" && name != "ketraterm-app") {
+        if (name != "ketraterm-benchmarks" && name != "ketraterm-app" && name != "ketraterm-testkit") {
             plugins.apply("com.vanniktech.maven.publish")
 
             extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {

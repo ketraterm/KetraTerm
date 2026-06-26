@@ -117,7 +117,7 @@ class TerminalModesTest {
         modes.formatOtherKeysMode = 1
         modes.kittyKeyboardFlags =
             KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
-            KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES
+            KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES
         modes.isSynchronizedOutput = true
         modes.isBellIsUrgent = true
         modes.isPopOnBell = true
@@ -138,7 +138,7 @@ class TerminalModesTest {
             {
                 assertEquals(
                     KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
-                        KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES,
+                        KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
                     snapshot.kittyKeyboardFlags,
                 )
             },

@@ -77,6 +77,10 @@ internal class TerminalShapedTextRunPainter(
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean,
         hoveredHyperlinkId: Int,
+        hoveredHyperlinkStartRow: Int,
+        hoveredHyperlinkStartColumn: Int,
+        hoveredHyperlinkEndRow: Int,
+        hoveredHyperlinkEndColumn: Int,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
     ) {
@@ -99,6 +103,10 @@ internal class TerminalShapedTextRunPainter(
                         runLimit = runLimit,
                         textBlinkVisible = textBlinkVisible,
                         hoveredHyperlinkId = hoveredHyperlinkId,
+                        hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
+                        hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
+                        hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
+                        hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
                         hyperlinkActivationHover = hyperlinkActivationHover,
                         hyperlinkActivationForeground = hyperlinkActivationForeground,
                     )
@@ -121,6 +129,10 @@ internal class TerminalShapedTextRunPainter(
                     fontRenderContext = fontRenderContext,
                     textBlinkVisible = textBlinkVisible,
                     hoveredHyperlinkId = hoveredHyperlinkId,
+                    hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
+                    hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
+                    hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
+                    hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
                     hyperlinkActivationHover = hyperlinkActivationHover,
                     hyperlinkActivationForeground = hyperlinkActivationForeground,
                 )
@@ -142,6 +154,10 @@ internal class TerminalShapedTextRunPainter(
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean,
         hoveredHyperlinkId: Int,
+        hoveredHyperlinkStartRow: Int,
+        hoveredHyperlinkStartColumn: Int,
+        hoveredHyperlinkEndRow: Int,
+        hoveredHyperlinkEndColumn: Int,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
     ): Int {
@@ -153,6 +169,10 @@ internal class TerminalShapedTextRunPainter(
                 startColumn = startColumn,
                 textBlinkVisible = textBlinkVisible,
                 hoveredHyperlinkId = hoveredHyperlinkId,
+                hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
+                hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
+                hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
+                hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
                 hyperlinkActivationHover = hyperlinkActivationHover,
                 hyperlinkActivationForeground = hyperlinkActivationForeground,
             )
@@ -169,6 +189,10 @@ internal class TerminalShapedTextRunPainter(
             fontRenderContext = fontRenderContext,
             textBlinkVisible = textBlinkVisible,
             hoveredHyperlinkId = hoveredHyperlinkId,
+            hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
+            hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
+            hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
+            hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
             hyperlinkActivationHover = hyperlinkActivationHover,
             hyperlinkActivationForeground = hyperlinkActivationForeground,
         )
@@ -229,6 +253,10 @@ internal class TerminalShapedTextRunPainter(
         runLimit: Int,
         textBlinkVisible: Boolean,
         hoveredHyperlinkId: Int,
+        hoveredHyperlinkStartRow: Int,
+        hoveredHyperlinkStartColumn: Int,
+        hoveredHyperlinkEndRow: Int,
+        hoveredHyperlinkEndColumn: Int,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
     ): Int {
@@ -237,7 +265,17 @@ internal class TerminalShapedTextRunPainter(
         val attr = cache.attrWords[startIndex]
         val extraAttr = cache.extraAttrWords[startIndex]
         val hyperlinkId = cache.hyperlinkIds[startIndex]
-        val hovered = isHoveredHyperlink(hyperlinkId, hoveredHyperlinkId)
+        val hovered =
+            isHoveredHyperlink(
+                hyperlinkId,
+                row,
+                startColumn,
+                hoveredHyperlinkId,
+                hoveredHyperlinkStartRow,
+                hoveredHyperlinkStartColumn,
+                hoveredHyperlinkEndRow,
+                hoveredHyperlinkEndColumn,
+            )
         val foreground =
             effectiveForeground(
                 palette = palette,
@@ -255,7 +293,17 @@ internal class TerminalShapedTextRunPainter(
             val currentAttr = cache.attrWords[index]
             val currentExtraAttr = cache.extraAttrWords[index]
             val currentHyperlinkId = cache.hyperlinkIds[index]
-            val currentHovered = isHoveredHyperlink(currentHyperlinkId, hoveredHyperlinkId)
+            val currentHovered =
+                isHoveredHyperlink(
+                    currentHyperlinkId,
+                    row,
+                    column,
+                    hoveredHyperlinkId,
+                    hoveredHyperlinkStartRow,
+                    hoveredHyperlinkStartColumn,
+                    hoveredHyperlinkEndRow,
+                    hoveredHyperlinkEndColumn,
+                )
             val currentForeground =
                 effectiveForeground(
                     palette = palette,
@@ -285,6 +333,10 @@ internal class TerminalShapedTextRunPainter(
         startColumn: Int,
         textBlinkVisible: Boolean,
         hoveredHyperlinkId: Int,
+        hoveredHyperlinkStartRow: Int,
+        hoveredHyperlinkStartColumn: Int,
+        hoveredHyperlinkEndRow: Int,
+        hoveredHyperlinkEndColumn: Int,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
     ): Int {
@@ -293,7 +345,17 @@ internal class TerminalShapedTextRunPainter(
         val attr = cache.attrWords[startIndex]
         val extraAttr = cache.extraAttrWords[startIndex]
         val hyperlinkId = cache.hyperlinkIds[startIndex]
-        val hovered = isHoveredHyperlink(hyperlinkId, hoveredHyperlinkId)
+        val hovered =
+            isHoveredHyperlink(
+                hyperlinkId,
+                row,
+                startColumn,
+                hoveredHyperlinkId,
+                hoveredHyperlinkStartRow,
+                hoveredHyperlinkStartColumn,
+                hoveredHyperlinkEndRow,
+                hoveredHyperlinkEndColumn,
+            )
         val foreground =
             effectiveForeground(
                 palette = palette,
@@ -312,7 +374,17 @@ internal class TerminalShapedTextRunPainter(
             val currentAttr = cache.attrWords[index]
             val currentExtraAttr = cache.extraAttrWords[index]
             val currentHyperlinkId = cache.hyperlinkIds[index]
-            val currentHovered = isHoveredHyperlink(currentHyperlinkId, hoveredHyperlinkId)
+            val currentHovered =
+                isHoveredHyperlink(
+                    currentHyperlinkId,
+                    row,
+                    column,
+                    hoveredHyperlinkId,
+                    hoveredHyperlinkStartRow,
+                    hoveredHyperlinkStartColumn,
+                    hoveredHyperlinkEndRow,
+                    hoveredHyperlinkEndColumn,
+                )
             val currentForeground =
                 effectiveForeground(
                     palette = palette,
@@ -363,6 +435,10 @@ internal class TerminalShapedTextRunPainter(
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean,
         hoveredHyperlinkId: Int,
+        hoveredHyperlinkStartRow: Int,
+        hoveredHyperlinkStartColumn: Int,
+        hoveredHyperlinkEndRow: Int,
+        hoveredHyperlinkEndColumn: Int,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
     ) {
@@ -373,7 +449,17 @@ internal class TerminalShapedTextRunPainter(
 
         val extraAttr = cache.extraAttrWords[index]
         val hyperlinkId = cache.hyperlinkIds[index]
-        val hovered = isHoveredHyperlink(hyperlinkId, hoveredHyperlinkId)
+        val hovered =
+            isHoveredHyperlink(
+                hyperlinkId,
+                row,
+                startColumn,
+                hoveredHyperlinkId,
+                hoveredHyperlinkStartRow,
+                hoveredHyperlinkStartColumn,
+                hoveredHyperlinkEndRow,
+                hoveredHyperlinkEndColumn,
+            )
         val foreground =
             effectiveForeground(
                 palette = palette,
@@ -561,8 +647,20 @@ internal class TerminalShapedTextRunPainter(
 
     private fun isHoveredHyperlink(
         hyperlinkId: Int,
+        row: Int,
+        column: Int,
         hoveredHyperlinkId: Int,
-    ): Boolean = hyperlinkId != NO_HYPERLINK_ID && hyperlinkId == hoveredHyperlinkId
+        hoveredHyperlinkStartRow: Int,
+        hoveredHyperlinkStartColumn: Int,
+        hoveredHyperlinkEndRow: Int,
+        hoveredHyperlinkEndColumn: Int,
+    ): Boolean =
+        hyperlinkId != NO_HYPERLINK_ID &&
+            hyperlinkId == hoveredHyperlinkId &&
+            row >= hoveredHyperlinkStartRow &&
+            row <= hoveredHyperlinkEndRow &&
+            (row > hoveredHyperlinkStartRow || column >= hoveredHyperlinkStartColumn) &&
+            (row < hoveredHyperlinkEndRow || column < hoveredHyperlinkEndColumn)
 
     private fun effectiveForeground(
         palette: TerminalColorPalette,

@@ -504,15 +504,13 @@ class HostCommandAdapterTest {
             f.acceptAscii("\u001B[=2;2u")
             assertEquals(
                 KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
-                    KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES or
                     KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
                 f.terminal.getModeSnapshot().kittyKeyboardFlags,
             )
 
             f.acceptAscii("\u001B[=1;3u")
             assertEquals(
-                KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES or
-                    KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
+                KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
                 f.terminal.getModeSnapshot().kittyKeyboardFlags,
             )
         }
@@ -544,23 +542,23 @@ class HostCommandAdapterTest {
         fun `Kitty keyboard push and pop sequences update core mode snapshot`() {
             val f = Fixture()
 
-            // 1. Set initial flags to 3: CSI = 3 u
-            f.acceptAscii("\u001B[=3u")
-            assertEquals(3, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            // 1. Set initial flags to 9: CSI = 9 u
+            f.acceptAscii("\u001B[=9u")
+            assertEquals(9, f.terminal.getModeSnapshot().kittyKeyboardFlags)
 
-            // 2. Push flags 12: CSI > 12 u
-            f.acceptAscii("\u001B[>12u")
-            assertEquals(12, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            // 2. Push flags 8: CSI > 8 u
+            f.acceptAscii("\u001B[>8u")
+            assertEquals(8, f.terminal.getModeSnapshot().kittyKeyboardFlags)
 
             // 3. Pop 1 count: CSI < 1 u
             f.acceptAscii("\u001B[<1u")
-            assertEquals(3, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals(9, f.terminal.getModeSnapshot().kittyKeyboardFlags)
 
-            // 4. Push 12, then pop using default count (omitted parameter) which defaults to 1: CSI < u
-            f.acceptAscii("\u001B[>12u")
-            assertEquals(12, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            // 4. Push 8, then pop using default count (omitted parameter) which defaults to 1: CSI < u
+            f.acceptAscii("\u001B[>8u")
+            assertEquals(8, f.terminal.getModeSnapshot().kittyKeyboardFlags)
             f.acceptAscii("\u001B[<u")
-            assertEquals(3, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals(9, f.terminal.getModeSnapshot().kittyKeyboardFlags)
         }
 
         @Test
@@ -1067,6 +1065,23 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `OSC hyperlink without explicit id receives a fresh numeric id for each open`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 2, height = 1))
+
+            f.sink.startHyperlink(uri = "https://example.com/a", id = null)
+            f.sink.writeCodepoint('A'.code)
+            f.sink.startHyperlink(uri = "https://example.com/a", id = null)
+            f.sink.writeCodepoint('B'.code)
+
+            assertAll(
+                { assertEquals(1, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                { assertEquals(2, f.terminal.getAttrAt(1, 0)?.hyperlinkId) },
+                { assertEquals("https://example.com/a", f.sink.hyperlinkUri(1)) },
+                { assertEquals("https://example.com/a", f.sink.hyperlinkUri(2)) },
+            )
+        }
+
+        @Test
         fun `OSC hyperlink reuses numeric id for same uri and id`() {
             val f = Fixture(terminal = TerminalBuffers.create(width = 2, height = 1))
 
@@ -1187,12 +1202,14 @@ class HostCommandAdapterTest {
             assertAll(
                 { assertEquals(1, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
                 { assertEquals(2, f.terminal.getAttrAt(1, 0)?.hyperlinkId) },
-                { assertEquals(1, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
-                { assertEquals(3, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
-                { assertEquals(4, f.terminal.getAttrAt(4, 0)?.hyperlinkId) },
+                { assertEquals(3, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
+                { assertEquals(4, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
+                { assertEquals(5, f.terminal.getAttrAt(4, 0)?.hyperlinkId) },
                 { assertNull(f.sink.hyperlinkUri(1)) },
-                { assertEquals("https://example.com/c", f.sink.hyperlinkUri(3)) },
-                { assertEquals("https://example.com/b", f.sink.hyperlinkUri(4)) },
+                { assertNull(f.sink.hyperlinkUri(2)) },
+                { assertNull(f.sink.hyperlinkUri(3)) },
+                { assertEquals("https://example.com/c", f.sink.hyperlinkUri(4)) },
+                { assertEquals("https://example.com/b", f.sink.hyperlinkUri(5)) },
             )
         }
 
@@ -1219,7 +1236,7 @@ class HostCommandAdapterTest {
             assertAll(
                 { assertEquals(16, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
                 { assertEquals(17, f.terminal.getAttrAt(1, 0)?.hyperlinkId) },
-                { assertEquals(16, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
+                { assertEquals(18, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
                 { assertEquals(0, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
             )
         }

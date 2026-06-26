@@ -329,14 +329,14 @@ class DefaultTerminalBufferTest {
         val state = stateOf(buffer)
 
         // 1. Setup primary buffer stack
-        buffer.setKittyKeyboardFlags(2)
-        buffer.pushKittyKeyboardFlags(4)
+        buffer.setKittyKeyboardFlags(1)
+        buffer.pushKittyKeyboardFlags(9)
         buffer.pushKittyKeyboardFlags(8)
 
         // 2. Setup alternate buffer stack
         buffer.enterAltBuffer()
         buffer.setKittyKeyboardFlags(1)
-        buffer.pushKittyKeyboardFlags(3)
+        buffer.pushKittyKeyboardFlags(8)
         buffer.pushKittyKeyboardFlags(9)
 
         // Verify state is active in alt buffer
@@ -358,13 +358,13 @@ class DefaultTerminalBufferTest {
         assertEquals(0, state.modes.kittyKeyboardFlags)
 
         // Now setup again to test softReset
-        buffer.setKittyKeyboardFlags(2)
-        buffer.pushKittyKeyboardFlags(4)
+        buffer.setKittyKeyboardFlags(1)
+        buffer.pushKittyKeyboardFlags(9)
         buffer.pushKittyKeyboardFlags(8)
 
         buffer.enterAltBuffer()
         buffer.setKittyKeyboardFlags(1)
-        buffer.pushKittyKeyboardFlags(3)
+        buffer.pushKittyKeyboardFlags(8)
         buffer.pushKittyKeyboardFlags(9)
 
         buffer.softReset()
@@ -387,11 +387,11 @@ class DefaultTerminalBufferTest {
         val state = stateOf(buffer)
 
         // 1. Push on primary screen
-        buffer.setKittyKeyboardFlags(3)
-        buffer.pushKittyKeyboardFlags(7)
+        buffer.setKittyKeyboardFlags(1)
+        buffer.pushKittyKeyboardFlags(9)
 
-        assertEquals(7, state.modes.kittyKeyboardFlags)
-        assertEquals(7, state.primaryBuffer.kittyKeyboardFlags)
+        assertEquals(9, state.modes.kittyKeyboardFlags)
+        assertEquals(9, state.primaryBuffer.kittyKeyboardFlags)
 
         // 2. Enter alt screen
         buffer.enterAltBuffer()
@@ -401,19 +401,19 @@ class DefaultTerminalBufferTest {
         assertEquals(0, state.altBuffer.kittyKeyboardFlags)
 
         // Push on alt screen
-        buffer.pushKittyKeyboardFlags(15)
-        assertEquals(15, state.modes.kittyKeyboardFlags)
-        assertEquals(15, state.altBuffer.kittyKeyboardFlags)
+        buffer.pushKittyKeyboardFlags(8)
+        assertEquals(8, state.modes.kittyKeyboardFlags)
+        assertEquals(8, state.altBuffer.kittyKeyboardFlags)
 
         // 3. Exit alt screen
         buffer.exitAltBuffer()
 
         // Primary stack is preserved and restored
-        assertEquals(7, state.modes.kittyKeyboardFlags)
-        assertEquals(7, state.primaryBuffer.kittyKeyboardFlags)
+        assertEquals(9, state.modes.kittyKeyboardFlags)
+        assertEquals(9, state.primaryBuffer.kittyKeyboardFlags)
 
         // Pop on primary
         buffer.popKittyKeyboardFlags(1)
-        assertEquals(3, state.modes.kittyKeyboardFlags)
+        assertEquals(1, state.modes.kittyKeyboardFlags)
     }
 }

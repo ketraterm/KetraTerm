@@ -30,7 +30,7 @@ Controls the structure used to format key sequences when `modifyOtherKeys` is ac
 
 ## 3. Kitty Keyboard Progressive Enhancement Flags
 
-The `KittyKeyboardProgressiveFlag` constants represent bit fields toggled using `CSI = flags ; mode u`. They enable applications to selectively receive richer keyboard events.
+The `KittyKeyboardProgressiveFlag` constants represent bit fields toggled using `CSI = flags ; mode u`. They enable applications to selectively receive richer keyboard events. `SUPPORTED_MASK` intentionally includes only flags implemented by the current input encoder; additional constants remain shared protocol vocabulary for future event-model work.
 
 | Constant Name | Value (Bit Shift) | Description |
 | :--- | :--- | :--- |
@@ -39,6 +39,8 @@ The `KittyKeyboardProgressiveFlag` constants represent bit fields toggled using 
 | `REPORT_ALTERNATE_KEYS` | `4` (1 << 2) | Includes alternate layout key values (e.g. shift/caps lock state) to aid keyboard shortcut matching. |
 | `REPORT_ALL_KEYS_AS_ESCAPE_CODES` | `8` (1 << 3) | Reports standard printable/text keys as CSI-u sequences instead of plain text characters. |
 | `REPORT_ASSOCIATED_TEXT` | `16` (1 << 4) | Emits the UTF-8 text associated with a key press alongside the escape sequence. |
+
+Current advertised support is `DISAMBIGUATE_ESCAPE_CODES | REPORT_ALL_KEYS_AS_ESCAPE_CODES`.
 
 ---
 

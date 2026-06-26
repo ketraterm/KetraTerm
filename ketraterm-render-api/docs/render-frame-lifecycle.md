@@ -6,7 +6,7 @@ The `ketraterm-render-api` defines a pull-based visual frame reading model desig
 
 ## 1. Frame Reader & Consumer Synchronization
 
-Render frame reading is orchestrated through the [TerminalRenderFrameReader](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-api/src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderFrameReader.kt) and [TerminalRenderFrameConsumer](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-api/src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderFrameConsumer.kt) contracts.
+Render frame reading is orchestrated through the [TerminalRenderFrameReader](../src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderFrameReader.kt) and [TerminalRenderFrameConsumer](../src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderFrameConsumer.kt) contracts.
 
 ```
        TerminalSession Thread                UI/Render Thread

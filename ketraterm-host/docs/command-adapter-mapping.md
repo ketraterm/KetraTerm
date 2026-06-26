@@ -1,6 +1,6 @@
 # Command Adapter Coordinate Mapping & Buffer Swaps
 
-The [HostCommandAdapter](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostCommandAdapter.kt) acts as the bridge that translates abstract, 1-based, string-containing parser commands into zero-based physical operations on the stateful terminal buffer core.
+The [HostCommandAdapter](../src/main/kotlin/io/github/ketraterm/host/HostCommandAdapter.kt) acts as the bridge that translates abstract, 1-based, string-containing parser commands into zero-based physical operations on the stateful terminal buffer core.
 
 ---
 

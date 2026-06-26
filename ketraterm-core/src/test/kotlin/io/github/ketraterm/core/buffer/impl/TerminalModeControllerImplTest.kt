@@ -125,7 +125,7 @@ class TerminalModeControllerImplTest {
         modeController.setFocusReportingEnabled(true)
         modeController.setModifyOtherKeysMode(2)
         modeController.setFormatOtherKeysMode(1)
-        modeController.setKittyKeyboardFlags(KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES)
+        modeController.setKittyKeyboardFlags(KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES)
         modeController.setReverseVideo(true)
         modeController.setCursorVisible(false)
         modeController.setCursorBlinking(true)
@@ -139,7 +139,7 @@ class TerminalModeControllerImplTest {
             { assertTrue(state.modes.isFocusReportingEnabled) },
             { assertEquals(2, state.modes.modifyOtherKeysMode) },
             { assertEquals(1, state.modes.formatOtherKeysMode) },
-            { assertEquals(KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES, state.modes.kittyKeyboardFlags) },
+            { assertEquals(KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES, state.modes.kittyKeyboardFlags) },
             { assertTrue(state.modes.isReverseVideo) },
             { assertFalse(state.modes.isCursorVisible) },
             { assertTrue(state.modes.isCursorBlinking) },
@@ -366,15 +366,15 @@ class TerminalModeControllerImplTest {
         assertEquals(0, state.modes.kittyKeyboardFlags)
         assertEquals(0, state.activeBuffer.kittyKeyboardFlags)
 
-        // Set flags directly
-        modeController.setKittyKeyboardFlags(3)
-        assertEquals(3, state.modes.kittyKeyboardFlags)
-        assertEquals(3, state.activeBuffer.kittyKeyboardFlags)
+        // Set flags directly.
+        modeController.setKittyKeyboardFlags(9)
+        assertEquals(9, state.modes.kittyKeyboardFlags)
+        assertEquals(9, state.activeBuffer.kittyKeyboardFlags)
 
-        // Push flags
-        modeController.pushKittyKeyboardFlags(12)
-        assertEquals(12, state.modes.kittyKeyboardFlags)
-        assertEquals(12, state.activeBuffer.kittyKeyboardFlags)
+        // Push flags.
+        modeController.pushKittyKeyboardFlags(8)
+        assertEquals(8, state.modes.kittyKeyboardFlags)
+        assertEquals(8, state.activeBuffer.kittyKeyboardFlags)
 
         // Switch to alternate buffer
         modeController.enterAltBuffer()
@@ -382,24 +382,24 @@ class TerminalModeControllerImplTest {
         assertEquals(0, state.activeBuffer.kittyKeyboardFlags)
 
         // Push inside alt screen
-        modeController.pushKittyKeyboardFlags(5)
-        assertEquals(5, state.modes.kittyKeyboardFlags)
-        assertEquals(5, state.activeBuffer.kittyKeyboardFlags)
+        modeController.pushKittyKeyboardFlags(1)
+        assertEquals(1, state.modes.kittyKeyboardFlags)
+        assertEquals(1, state.activeBuffer.kittyKeyboardFlags)
 
         // Exit alt buffer
         modeController.exitAltBuffer()
-        assertEquals(12, state.modes.kittyKeyboardFlags)
-        assertEquals(12, state.activeBuffer.kittyKeyboardFlags)
+        assertEquals(8, state.modes.kittyKeyboardFlags)
+        assertEquals(8, state.activeBuffer.kittyKeyboardFlags)
 
         // Pop on primary
         modeController.popKittyKeyboardFlags(1)
-        assertEquals(3, state.modes.kittyKeyboardFlags)
-        assertEquals(3, state.activeBuffer.kittyKeyboardFlags)
+        assertEquals(9, state.modes.kittyKeyboardFlags)
+        assertEquals(9, state.activeBuffer.kittyKeyboardFlags)
 
         // Pop to baseline
         modeController.popKittyKeyboardFlags(1)
-        assertEquals(3, state.modes.kittyKeyboardFlags)
-        assertEquals(3, state.activeBuffer.kittyKeyboardFlags)
+        assertEquals(9, state.modes.kittyKeyboardFlags)
+        assertEquals(9, state.activeBuffer.kittyKeyboardFlags)
     }
 
     @Test

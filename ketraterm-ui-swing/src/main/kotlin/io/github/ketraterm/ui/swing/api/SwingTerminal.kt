@@ -45,6 +45,8 @@ import java.awt.event.WindowStateListener
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import javax.swing.Timer
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * Reusable Swing terminal component.
@@ -186,7 +188,12 @@ class SwingTerminal
                         y: Int,
                     ): Long = this@SwingTerminal.cellAt(x, y, this@SwingTerminal.renderCache)
 
-                    override fun repaint() = this@SwingTerminal.repaint()
+                    override fun repaintHyperlinkSpan(
+                        startRow: Int,
+                        startColumn: Int,
+                        endRow: Int,
+                        endColumn: Int,
+                    ) = this@SwingTerminal.repaintHyperlinkSpan(startRow, startColumn, endRow, endColumn)
                 },
             )
         private val searchController =
@@ -828,6 +835,10 @@ class SwingTerminal
                     shellIntegrationDecorations = shellIntegrationDecorations,
                     hoveredPromptMarkerRow = hoveredPromptMarkerRow,
                     hoveredHyperlinkId = hyperlinkController.hoveredHyperlinkId,
+                    hoveredHyperlinkStartRow = hyperlinkController.hoveredHyperlinkStartRow,
+                    hoveredHyperlinkStartColumn = hyperlinkController.hoveredHyperlinkStartColumn,
+                    hoveredHyperlinkEndRow = hyperlinkController.hoveredHyperlinkEndRow,
+                    hoveredHyperlinkEndColumn = hyperlinkController.hoveredHyperlinkEndColumn,
                     hyperlinkActivationHover = hyperlinkController.hyperlinkActivationHover,
                 )
                 visualBellController.paint(g, width, height)
@@ -1005,6 +1016,42 @@ class SwingTerminal
                     ((y - paddingTop) / metrics.cellHeight).coerceIn(0, cache.rows - 1)
                 }
             return packCell(column, row)
+        }
+
+        private fun repaintHyperlinkSpan(
+            startRow: Int,
+            startColumn: Int,
+            endRow: Int,
+            endColumn: Int,
+        ) {
+            if (startRow < 0 || endRow < startRow || renderCache.rows <= 0 || renderCache.columns <= 0) return
+            val firstRow = startRow.coerceAtLeast(0)
+            val lastRow = endRow.coerceAtMost(renderCache.rows - 1)
+            if (firstRow > lastRow) return
+
+            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer)
+            val paddingTop = SwingTerminalChrome.top(settings)
+            val contentOriginY = if (visualGeometry.rowCount == renderCache.rows) visualGeometry.contentOriginY else 0.0
+            var row = firstRow
+            while (row <= lastRow) {
+                val rowStartColumn = if (row == startRow) startColumn else 0
+                val rowEndColumn = if (row == endRow) endColumn else renderCache.columns
+                val clampedStartColumn = rowStartColumn.coerceIn(0, renderCache.columns)
+                val clampedEndColumn = rowEndColumn.coerceIn(0, renderCache.columns)
+                if (clampedEndColumn > clampedStartColumn) {
+                    val x = paddingLeft + clampedStartColumn * metrics.cellWidth
+                    val yTop = paddingTop + contentOriginY + row * metrics.cellHeight
+                    val y = floor(yTop).toInt()
+                    val repaintHeight = ceil(yTop + metrics.cellHeight).toInt() - y
+                    repaint(
+                        x,
+                        y,
+                        (clampedEndColumn - clampedStartColumn) * metrics.cellWidth,
+                        repaintHeight,
+                    )
+                }
+                row++
+            }
         }
 
         private fun terminalPixelYAt(

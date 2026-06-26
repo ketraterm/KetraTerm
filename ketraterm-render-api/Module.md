@@ -46,8 +46,8 @@ classDiagram
 
 ### What the Module Owns
 - **Stable Primitives & Encodings**: Value objects and interfaces representing frames, cursors, buffer kinds, and cursor shapes.
-- **Bitwise Layout Specifications**: High-performance, 64-bit packed attribute formats ([TerminalRenderAttrs](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-api/src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderAttrs.kt) and [TerminalRenderExtraAttrs](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-api/src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderExtraAttrs.kt)) and cell-level flags ([TerminalRenderCellFlags](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-api/src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderCellFlags.kt)).
-- **Color Palettes**: An immutable palette model ([TerminalColorPalette](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-api/src/main/kotlin/io/github/ketraterm/render/api/TerminalColorPalette.kt)) that converts abstract ANSI/direct colors into packed ARGB integers for fast paint loops.
+- **Bitwise Layout Specifications**: High-performance, 64-bit packed attribute formats ([TerminalRenderAttrs](src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderAttrs.kt) and [TerminalRenderExtraAttrs](src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderExtraAttrs.kt)) and cell-level flags ([TerminalRenderCellFlags](src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderCellFlags.kt)).
+- **Color Palettes**: An immutable palette model ([TerminalColorPalette](src/main/kotlin/io/github/ketraterm/render/api/TerminalColorPalette.kt)) that converts abstract ANSI/direct colors into packed ARGB integers for fast paint loops.
 
 ### What the Module Does NOT Own
 - **Core Internal Storage**: It never exposes or holds references to mutable ring buffers, cell objects, cursor coordinates, or grid physics.
@@ -58,8 +58,8 @@ classDiagram
 ## Sub-Documentation
 
 For deep-dive technical details on attribute packing and thread synchronization:
-* [attribute-packing.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-api/docs/attribute-packing.md) - Exact bit mapping layouts for 64-bit attributes.
-* [render-frame-lifecycle.md](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-render-api/docs/render-frame-lifecycle.md) - Lifespans, monotonic generations, and synchronization boundaries.
+* [attribute-packing.md](docs/attribute-packing.md) - Exact bit mapping layouts for 64-bit attributes.
+* [render-frame-lifecycle.md](docs/render-frame-lifecycle.md) - Lifespans, monotonic generations, and synchronization boundaries.
 
 ---
 

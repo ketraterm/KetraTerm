@@ -6,7 +6,7 @@ To prevent UI repainting bottlenecks under high-frequency terminal byte floods (
 
 ## 1. The Render Worker Thread (`renderWorker`)
 
-The session spawns a dedicated, single-threaded ScheduledExecutorService named [renderWorker](file:///c:/Users/gagik/IdeaProjects/terminal-buffer/ketraterm-session/src/main/kotlin/io/github/ketraterm/session/TerminalSession.kt#L84):
+The session spawns a dedicated, single-threaded ScheduledExecutorService named [renderWorker](../src/main/kotlin/io/github/ketraterm/session/TerminalSession.kt#L84):
 
 * **Daemon Thread**: Spawns daemon threads (`terminal-render-worker-*`) to avoid preventing JVM shutdown when the session is closed.
 * **Isolation**: Decouples the UI painting ticks and PTY reader threads from the rendering cache updates.
