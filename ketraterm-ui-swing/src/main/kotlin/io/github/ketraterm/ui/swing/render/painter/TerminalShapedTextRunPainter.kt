@@ -783,9 +783,12 @@ internal class TerminalShapedTextRunPainter(
         private fun isComplexShapingCodePoint(codePoint: Int): Boolean =
             codePoint in 0x0900..0x0DFF ||
                 codePoint in 0x0E00..0x0EFF ||
-                codePoint in 0x1200..0x139F || // Ethiopic & Supplement
-                codePoint in 0x2D80..0x2DDF || // Ethiopic Extended
-                codePoint in 0xAB00..0xAB2F || // Ethiopic Extended-A
+                codePoint in 0x1200..0x139F ||
+                // Ethiopic & Supplement
+                codePoint in 0x2D80..0x2DDF ||
+                // Ethiopic Extended
+                codePoint in 0xAB00..0xAB2F ||
+                // Ethiopic Extended-A
                 codePoint in 0x1780..0x17FF ||
                 codePoint in 0x19E0..0x19FF ||
                 codePoint in 0x1A20..0x1AAF ||
