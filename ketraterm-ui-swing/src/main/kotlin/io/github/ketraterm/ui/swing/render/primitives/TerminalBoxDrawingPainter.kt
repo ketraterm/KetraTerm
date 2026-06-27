@@ -169,137 +169,88 @@ internal class TerminalBoxDrawingPainter {
         val u = up == DOUBLE
         val d = down == DOUBLE
 
-        // --- LEFT edges ---
         if (l) {
-            val endTop =
-                if (u) {
-                    x1 + ext
-                } else if (d) {
-                    x2 + ext
-                } else {
-                    cx
-                }
-            val endBot =
-                if (d) {
-                    x1 + ext
-                } else if (u) {
-                    x2 + ext
-                } else {
-                    cx
-                }
-            fillRectBounds(g, x, y1 - ext, endTop, y1 + ext)
-            fillRectBounds(g, x, y2 - ext, endBot, y2 + ext)
+            paintDoubleHorizontalFromLeft(
+                g = g,
+                x = x,
+                yTrackA = y1,
+                yTrackB = y2,
+                endA = selectTrackLimit(u, d, x1 + ext, x2 + ext, cx),
+                endB = selectTrackLimit(d, u, x1 + ext, x2 + ext, cx),
+                ext = ext,
+            )
         } else if (left != NONE) {
             val lt = thickness(left, w, h)
-            // Mixed junction topology: Stop at inner track for cross, wrap to outer track for corner.
-            val endL =
-                if (u && d) {
-                    x1 + ext
-                } else if (u || d) {
-                    x2 + ext
-                } else {
-                    cx
+            val end =
+                when {
+                    u && d -> x1 + ext
+                    u || d -> x2 + ext
+                    else -> cx
                 }
-            fillRectBounds(g, x, cy - lt / 2.0, endL, cy + lt / 2.0)
+            fillRectBounds(g, x, cy - lt / 2.0, end, cy + lt / 2.0)
         }
 
-        // --- RIGHT edges ---
         if (r) {
-            val startTop =
-                if (u) {
-                    x2 - ext
-                } else if (d) {
-                    x1 - ext
-                } else {
-                    cx
-                }
-            val startBot =
-                if (d) {
-                    x2 - ext
-                } else if (u) {
-                    x1 - ext
-                } else {
-                    cx
-                }
-            fillRectBounds(g, startTop, y1 - ext, x + w, y1 + ext)
-            fillRectBounds(g, startBot, y2 - ext, x + w, y2 + ext)
+            paintDoubleHorizontalToRight(
+                g = g,
+                xRight = x + w,
+                yTrackA = y1,
+                yTrackB = y2,
+                startA = selectTrackLimit(u, d, x2 - ext, x1 - ext, cx),
+                startB = selectTrackLimit(d, u, x2 - ext, x1 - ext, cx),
+                ext = ext,
+            )
         } else if (right != NONE) {
             val rt = thickness(right, w, h)
-            val startR =
-                if (u && d) {
-                    x2 - ext
-                } else if (u || d) {
-                    x1 - ext
-                } else {
-                    cx
+            val start =
+                when {
+                    u && d -> x2 - ext
+                    u || d -> x1 - ext
+                    else -> cx
                 }
-            fillRectBounds(g, startR, cy - rt / 2.0, x + w, cy + rt / 2.0)
+            fillRectBounds(g, start, cy - rt / 2.0, x + w, cy + rt / 2.0)
         }
 
-        // --- UP edges ---
         if (u) {
-            val endLeft =
-                if (l) {
-                    y1 + ext
-                } else if (r) {
-                    y2 + ext
-                } else {
-                    cy
-                }
-            val endRight =
-                if (r) {
-                    y1 + ext
-                } else if (l) {
-                    y2 + ext
-                } else {
-                    cy
-                }
-            fillRectBounds(g, x1 - ext, y, x1 + ext, endLeft)
-            fillRectBounds(g, x2 - ext, y, x2 + ext, endRight)
+            paintDoubleVerticalFromTop(
+                g = g,
+                y = y,
+                xTrackA = x1,
+                xTrackB = x2,
+                endA = selectTrackLimit(l, r, y1 + ext, y2 + ext, cy),
+                endB = selectTrackLimit(r, l, y1 + ext, y2 + ext, cy),
+                ext = ext,
+            )
         } else if (up != NONE) {
             val ut = thickness(up, w, h)
-            val endU =
-                if (l && r) {
-                    y1 + ext
-                } else if (l || r) {
-                    y2 + ext
-                } else {
-                    cy
+            val end =
+                when {
+                    l && r -> y1 + ext
+                    l || r -> y2 + ext
+                    else -> cy
                 }
-            fillRectBounds(g, cx - ut / 2.0, y, cx + ut / 2.0, endU)
+            fillRectBounds(g, cx - ut / 2.0, y, cx + ut / 2.0, end)
         }
 
-        // --- DOWN edges ---
         if (d) {
-            val startLeft =
-                if (l) {
-                    y2 - ext
-                } else if (r) {
-                    y1 - ext
-                } else {
-                    cy
-                }
-            val startRight =
-                if (r) {
-                    y2 - ext
-                } else if (l) {
-                    y2 - ext
-                } else {
-                    cy
-                }
-            fillRectBounds(g, x1 - ext, startLeft, x1 + ext, y + h)
-            fillRectBounds(g, x2 - ext, startRight, x2 + ext, y + h)
+            paintDoubleVerticalToBottom(
+                g = g,
+                yBottom = y + h,
+                xTrackA = x1,
+                xTrackB = x2,
+                startA = selectTrackLimit(l, r, y2 - ext, y1 - ext, cy),
+                startB = selectTrackLimit(r, l, y2 - ext, y1 - ext, cy),
+                ext = ext,
+            )
         } else if (down != NONE) {
             val dt = thickness(down, w, h)
-            val startD =
-                if (l && r) {
-                    y2 - ext
-                } else if (l || r) {
-                    y1 - ext
-                } else {
-                    cy
+            val start =
+                when {
+                    l && r -> y2 - ext
+                    l || r -> y1 - ext
+                    else -> cy
                 }
-            fillRectBounds(g, cx - dt / 2.0, startD, cx + dt / 2.0, y + h)
+            fillRectBounds(g, cx - dt / 2.0, start, cx + dt / 2.0, y + h)
         }
     }
 
@@ -502,6 +453,80 @@ internal class TerminalBoxDrawingPainter {
         w: Double,
         h: Double,
     ): Double = maxOf(2.0, minOf(w, h) / DOUBLE_OFFSET_RATIO)
+
+    /**
+     * Shared branchless-style selector for double-track junction topology.
+     *
+     * - [primaryConnected] chooses [primaryLimit]
+     * - else if [secondaryConnected] chooses [secondaryLimit]
+     * - otherwise falls back to [centerLimit]
+     *
+     * No allocation, no object wrappers, no Pair/Triple.
+     */
+    private fun selectTrackLimit(
+        primaryConnected: Boolean,
+        secondaryConnected: Boolean,
+        primaryLimit: Double,
+        secondaryLimit: Double,
+        centerLimit: Double,
+    ): Double =
+        when {
+            primaryConnected -> primaryLimit
+            secondaryConnected -> secondaryLimit
+            else -> centerLimit
+        }
+
+    private fun paintDoubleHorizontalFromLeft(
+        g: Graphics2D,
+        x: Double,
+        yTrackA: Double,
+        yTrackB: Double,
+        endA: Double,
+        endB: Double,
+        ext: Double,
+    ) {
+        fillRectBounds(g, x, yTrackA - ext, endA, yTrackA + ext)
+        fillRectBounds(g, x, yTrackB - ext, endB, yTrackB + ext)
+    }
+
+    private fun paintDoubleHorizontalToRight(
+        g: Graphics2D,
+        xRight: Double,
+        yTrackA: Double,
+        yTrackB: Double,
+        startA: Double,
+        startB: Double,
+        ext: Double,
+    ) {
+        fillRectBounds(g, startA, yTrackA - ext, xRight, yTrackA + ext)
+        fillRectBounds(g, startB, yTrackB - ext, xRight, yTrackB + ext)
+    }
+
+    private fun paintDoubleVerticalFromTop(
+        g: Graphics2D,
+        y: Double,
+        xTrackA: Double,
+        xTrackB: Double,
+        endA: Double,
+        endB: Double,
+        ext: Double,
+    ) {
+        fillRectBounds(g, xTrackA - ext, y, xTrackA + ext, endA)
+        fillRectBounds(g, xTrackB - ext, y, xTrackB + ext, endB)
+    }
+
+    private fun paintDoubleVerticalToBottom(
+        g: Graphics2D,
+        yBottom: Double,
+        xTrackA: Double,
+        xTrackB: Double,
+        startA: Double,
+        startB: Double,
+        ext: Double,
+    ) {
+        fillRectBounds(g, xTrackA - ext, startA, xTrackA + ext, yBottom)
+        fillRectBounds(g, xTrackB - ext, startB, xTrackB + ext, yBottom)
+    }
 
     private companion object {
         private const val KAPPA = 0.552284749831
