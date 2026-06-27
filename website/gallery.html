@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Explore KetraTerm visual features, layout splits, and conformance diagnostic checks in our screenshot gallery.">
+    <title>KetraTerm | Screenshot Gallery</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="bg-glow-top"></div>
+
+    <header id="site-header">
+        <div class="container nav-container">
+            <a href="index.html" class="logo" id="logo-link">KetraTerm <span>App</span></a>
+            <ul class="nav-links" id="nav-menu">
+                <li><a href="index.html" id="nav-home">Product Home</a></li>
+                <li><a href="index.html#features" id="nav-features">Features</a></li>
+                <li><a href="index.html#security" id="nav-security">Security</a></li>
+                <li><a href="gallery.html" class="active" id="nav-gallery">Gallery</a></li>
+                <li><a href="library.html" id="nav-library">Library Integrator Docs</a></li>
+                <li><a href="https://github.com/ketraterm/ketraterm" class="btn btn-secondary" style="padding: 6px 14px;" id="nav-github">GitHub</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Gallery Intro -->
+        <section class="gallery-intro" id="gallery-header">
+            <div class="badge-pill badge-pill-accent">Screenshots & Diagnostics</div>
+            <h1>Visual Gallery</h1>
+            <p class="text-dim" style="font-size: 16px; max-width: 600px; margin: 0 auto;">Visual outputs, configuration dialogs, and compliance checks running inside the KetraTerm client.</p>
+        </section>
+
+        <!-- Dynamic Grid Container -->
+        <section class="gallery-grid" id="gallery-grid">
+            <!-- Dynamic items will be injected here by client-side JS -->
+        </section>
+    </main>
+
+    <script>
+        // Array of screenshot files located in the website/screenshots/ folder.
+        // Update this list manually whenever you add or remove images.
+        const screenshots = [
+            '1.png',
+            '2.png',
+            '3.png',
+            '4.png',
+            '5.png',
+            '6.png',
+            '7.png',
+            '8.png',
+            '9.png',
+            '10.png',
+            '11.png',
+            '12.png'
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const grid = document.getElementById('gallery-grid');
+            if (grid) {
+                grid.innerHTML = '';
+                screenshots.forEach(filename => {
+                    const cleanName = filename
+                        .replace(/\.[^/.]+$/, '')
+                        .replace(/[-_]/g, ' ');
+
+                    const card = document.createElement('div');
+                    card.className = 'gallery-card';
+                    card.title = 'Click to view full size';
+                    card.onclick = () => window.open(`screenshots/${filename}`, '_blank');
+
+                    const img = document.createElement('img');
+                    img.src = `screenshots/${filename}`;
+                    img.alt = cleanName;
+                    img.loading = 'lazy';
+
+                    card.appendChild(img);
+                    grid.appendChild(card);
+                });
+            }
+        });
+    </script>
+
+    <footer id="site-footer">
+        <div class="container">
+            <p>&copy; 2026 KetraTerm project. Released under the Apache 2.0 License.</p>
+            <div style="margin-top: 16px; display: flex; justify-content: center; gap: 24px;">
+                <a href="sitemap.xml" id="footer-sitemap">Sitemap</a>
+                <a href="index.html" id="footer-home">App Home</a>
+                <a href="library.html" id="footer-library">Library Docs</a>
+                <a href="https://github.com/ketraterm/ketraterm" id="footer-github">GitHub</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

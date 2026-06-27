@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="KetraTerm Developer Guide: Embed the modular, zero-dependency Swing terminal widget or headless terminal engine into your JVM and IntelliJ plugins.">
+    <title>KetraTerm | Developer & Library Integration Docs</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="bg-glow-top"></div>
+
+    <header id="site-header">
+        <div class="container nav-container">
+            <a href="index.html" class="logo" id="logo-link">KetraTerm <span>Library</span></a>
+            <ul class="nav-links" id="nav-menu">
+                <li><a href="index.html" id="nav-home">Product Home</a></li>
+                <li><a href="#modular" id="nav-mod">Modular Design</a></li>
+                <li><a href="#architecture" id="nav-arch">Architecture</a></li>
+                <li><a href="#performance" id="nav-perf">Performance</a></li>
+                <li><a href="#integration" id="nav-integ">Integration</a></li>
+                <li><a href="gallery.html" id="nav-gallery">Gallery</a></li>
+                <li><a href="docs/" class="btn btn-secondary" style="padding: 6px 14px;" id="nav-dokka">Dokka API</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero container" id="hero-section" style="padding-bottom: 40px;">
+            <div class="badge-pill badge-pill-accent">Library & Plugin Integrators</div>
+            <h1>Embeddable Terminal Power</h1>
+            <p>KetraTerm is a fully decoupled, modular JVM terminal engine. Choose only what you need—from low-level ANSI parsers to high-performance Swing widgets and split-pane workspace managers.</p>
+        </section>
+
+        <!-- Modular Integration Options -->
+        <section id="modular" class="section container" style="border-top: 1px solid var(--border-color); padding-top: 60px;">
+            <div style="text-align: center; margin-bottom: 50px;">
+                <h2 style="font-size: 34px; margin-bottom: 12px;">Integrate Module-by-Module</h2>
+                <p class="text-dim" style="font-size: 15px; max-width: 600px; margin: 0 auto;">Select the level of abstraction that fits your architecture. Each layer remains strictly isolated.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <h3 class="feature-title">Parser Only</h3>
+                    <p class="feature-desc" style="margin-bottom: 12px;"><strong>ketraterm-parser</strong></p>
+                    <p class="feature-desc">A table-driven ANSI state machine and UTF-8 stream decoder. Resolves escapes, combining marks, and dispatches semantic commands. Consumes zero UI or grid models.</p>
+                </div>
+                <div class="card">
+                    <h3 class="feature-title">Headless State Engine</h3>
+                    <p class="feature-desc" style="margin-bottom: 12px;"><strong>ketraterm-core</strong></p>
+                    <p class="feature-desc">Owns circular scrollback histories, vertical/horizontal margin calculations, tab stops, and grid mutations. Ideal for SSH agents, test assertions, or headless automation.</p>
+                </div>
+                <div class="card">
+                    <h3 class="feature-title">Swing UI Widget</h3>
+                    <p class="feature-desc" style="margin-bottom: 12px;"><strong>ketraterm-ui-swing</strong></p>
+                    <p class="feature-desc">An optimized Swing terminal canvas component. Handles font measurement, color palettes, double-click smart selection, and AWT focus/repaint triggers. Ready for tool windows and splits.</p>
+                </div>
+                <div class="card">
+                    <h3 class="feature-title">Tab & Split Workspace</h3>
+                    <p class="feature-desc" style="margin-bottom: 12px;"><strong>ketraterm-workspace</strong></p>
+                    <p class="feature-desc">Manages multi-tab lifecycles, split panes, profile settings, and persistent command histories. Ideal for builders of comprehensive terminal desktop clients.</p>
+                </div>
+                <div class="card">
+                    <h3 class="feature-title">PTY Process Host</h3>
+                    <p class="feature-desc" style="margin-bottom: 12px;"><strong>ketraterm-pty</strong></p>
+                    <p class="feature-desc">Leverages Pty4J for cross-platform local process management. Handles background process threads, size adjustments, and default shell discovery.</p>
+                </div>
+                <div class="card">
+                    <h3 class="feature-title">Custom Graphics Pipeline</h3>
+                    <p class="feature-desc" style="margin-bottom: 12px;"><strong>ketraterm-render-cache</strong></p>
+                    <p class="feature-desc">Bypass Swing entirely. Consume raw render frames from our triple-buffered caches to draw terminal state on Compose Multiplatform, JavaFX, OpenGL, or native views.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Unidirectional Architecture Section -->
+        <section id="architecture" class="section container" style="border-top: 1px solid var(--border-color);">
+            <div class="grid-2">
+                <div>
+                    <h2 style="font-size: 34px; margin-bottom: 16px;">Strict Unidirectional Pipeline</h2>
+                    <p class="text-dim" style="font-size: 15px; margin-bottom: 20px;">Traditional terminal components often share mutable state, leading to race conditions or split-escape character corruption. KetraTerm serializes all bytes and mutations into a strict, unidirectional event-driven flow.</p>
+                    
+                    <h4 style="color: white; font-size: 16px; margin-bottom: 12px;">Three-Tier Concurrency Lock Guard</h4>
+                    <ul style="list-style: none; display: flex; flex-direction: column; gap: 14px; font-size: 14px;">
+                        <li>
+                            <strong style="color: #60a5fa;">inboundLock:</strong>
+                            <span class="text-dim">Serializes raw bytes entering the parser. Blocks concurrent PTY read buffers to protect the UTF-8 decoder state machine from corrupted escape splits.</span>
+                        </li>
+                        <li>
+                            <strong style="color: #a78bfa;">mutationLock:</strong>
+                            <span class="text-dim">Guards core state mutations and render-cache copies. Background parser updates are suspended while the UI thread takes snapshots of the screen rows, preventing visual tearing.</span>
+                        </li>
+                        <li>
+                            <strong style="color: #f472b6;">outboundWriteLock:</strong>
+                            <span class="text-dim">Synchronizes process stdin write calls. Guarantees keystrokes, pastes, and device query responses (CPR/DSR) are written atomically without interleaved bytes.</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="terminal-window" style="margin-top: 0;" id="pipeline-mockup">
+                    <div class="terminal-header">
+                        <div class="window-controls">
+                            <div class="control-dot close"></div>
+                            <div class="control-dot minimize"></div>
+                            <div class="control-dot maximize"></div>
+                        </div>
+                        <div class="terminal-title">Data Pipeline Flow</div>
+                    </div>
+                    <div class="terminal-body" style="font-size: 13px; line-height: 1.65;">
+                        <div class="dim-text">// Inbound Stream (PTY bytes to screen grid)</div>
+                        <div>PTY Process ➔ <span class="cyan-text">inboundLock</span> ➔ Parser ➔ Core Grid (under <span class="cyan-text">mutationLock</span>)</div>
+                        <br>
+                        <div class="dim-text">// Rendering Path (Core grid to UI repaint)</div>
+                        <div>Core Grid ➔ Render API ➔ Triple-Buffered Cache ➔ Swing component (EDT)</div>
+                        <br>
+                        <div class="dim-text">// Outbound Stream (User keys/pastes to process)</div>
+                        <div>Keyboard/Paste Event ➔ Input Encoder ➔ <span class="cyan-text">outboundWriteLock</span> ➔ PTY stdin</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Performance / GC Section -->
+        <section id="performance" class="section container" style="border-top: 1px solid var(--border-color);">
+            <div style="text-align: center; margin-bottom: 50px;">
+                <h2 style="font-size: 34px; margin-bottom: 12px;">Zero-Allocation Hot Loops</h2>
+                <p class="text-dim" style="font-size: 15px; max-width: 600px; margin: 0 auto;">High throughput logs shouldn't trigger JVM garbage collection spikes. Every execution loop is optimized for allocations safety.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <h3 class="feature-title">Flat Primitive Storage</h3>
+                    <p class="feature-desc">Rather than allocating an object per cell, KetraTerm rows use parallel primitive arrays: <code>IntArray</code> for Unicode codepoints, and <code>LongArray</code> for packed styling, SGR attributes, and hyperlink indices. This maximizes CPU cache-line locality.</p>
+                </div>
+                <div class="card">
+                    <h3 class="feature-title">Autoboxing Prevention</h3>
+                    <p class="feature-desc">Custom primitive-keyed LRU caches (like <code>IntFontLru</code> for codepoint fallback matches and <code>LongTextLayoutLru</code> for styled SGR text segments) bypass standard Java Map allocations during active log rendering ticks.</p>
+                </div>
+                <div class="card">
+                    <h3 class="feature-title">Triple-Buffered Rendering</h3>
+                    <p class="feature-desc">The render publisher manages Back, Front, and Spare frames in a lock-free, allocation-conscious layout. Enables steady 60+ FPS paint loops on AWT/Swing without allocating memory in the draw loop.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Integration Code Section -->
+        <section id="integration" class="section container" style="border-top: 1px solid var(--border-color);">
+            <div class="grid-2">
+                <div>
+                    <h2 style="font-size: 34px; margin-bottom: 16px;">Zero External Dependencies</h2>
+                    <p class="text-dim" style="font-size: 15px; margin-bottom: 20px;">The core terminal layers are built from the ground up on standard Kotlin Standard Library and JDK Swing classes. No bloated JSON libraries, no heavy dependencies. The local process transport uses <code>pty4j</code> as its single native executor.</p>
+                    
+                    <p class="text-dim" style="font-size: 15px; margin-bottom: 24px;">Declare coordinates in your Gradle build, instantiate a session configuration, and bind the widget on any background thread.</p>
+                    
+                    <a href="docs/" class="btn btn-primary" id="integrator-dokka-btn">Browse Dokka API Reference</a>
+                </div>
+                
+                <div>
+                    <!-- Gradle Config -->
+                    <div class="code-panel" style="margin-bottom: 16px;">
+                        <span class="code-cmt">// build.gradle.kts dependencies block</span><br>
+                        <span class="code-kw">dependencies</span> {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-call">implementation</span>(<span class="code-str">"io.github.ketraterm:ketraterm-ui-swing:0.1.0-alpha01"</span>)<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-call">implementation</span>(<span class="code-str">"io.github.ketraterm:ketraterm-pty:0.1.0-alpha01"</span>)<br>
+                        }
+                    </div>
+
+                    <!-- Bootstrap Code -->
+                    <div class="code-panel">
+                        <span class="code-cmt">// Bootstrapping the Swing Terminal component</span><br>
+                        <span class="code-kw">import</span> <span class="code-type">io.github.ketraterm.ui.swing.api.SwingTerminal</span><br>
+                        <span class="code-kw">import</span> <span class="code-type">io.github.ketraterm.pty.TerminalSessions</span><br>
+                        <span class="code-kw">import</span> <span class="code-type">io.github.ketraterm.pty.PtyOptions</span><br>
+                        <br>
+                        <span class="code-kw">fun</span> <span class="code-call">main</span>() {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-cmt">// 1. Configure local process options</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-kw">val</span> options = <span class="code-call">PtyOptions</span>(columns = <span class="code-num">100</span>, rows = <span class="code-num">30</span>)<br>
+                        <br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-cmt">// 2. Start a local PTY-backed session</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-kw">val</span> session = <span class="code-type">TerminalSessions</span>.<span class="code-call">localPty</span>(options)<br>
+                        <br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-cmt">// 3. Create the Swing terminal canvas component</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-kw">val</span> terminal = <span class="code-call">SwingTerminal</span>()<br>
+                        <br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-cmt">// 4. Bind the session (observations and inputs map automatically)</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;terminal.<span class="code-call">bind</span>(session)<br>
+                        <br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-cmt">// 5. Add to standard Swing panels</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;panel.<span class="code-call">add</span>(terminal, BorderLayout.CENTER)<br>
+                        }
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer id="site-footer">
+        <div class="container">
+            <p>&copy; 2026 KetraTerm project. Released under the Apache 2.0 License.</p>
+            <div style="margin-top: 16px; display: flex; justify-content: center; gap: 24px;">
+                <a href="sitemap.xml" id="footer-sitemap">Sitemap</a>
+                <a href="gallery.html" id="footer-gallery">Gallery</a>
+                <a href="index.html" id="footer-home">App Home</a>
+                <a href="https://github.com/ketraterm/ketraterm" id="footer-github">GitHub</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

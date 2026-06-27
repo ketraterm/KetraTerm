@@ -40,13 +40,19 @@ jobs:
       - name: Generate Dokka Docs
         run: ./gradlew dokkaGenerate
 
+      - name: Prepare Website & Docs Bundle
+        run: |
+          mkdir -p build/website/docs
+          cp -R website/* build/website/
+          cp -R build/dokka/html/* build/website/docs/
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'build/dokka/html'
+          path: 'build/website'
 
       - name: Deploy to GitHub Pages
         id: deployment
