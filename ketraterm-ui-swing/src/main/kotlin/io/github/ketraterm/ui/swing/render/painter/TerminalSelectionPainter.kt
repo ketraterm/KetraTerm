@@ -15,8 +15,10 @@
  */
 package io.github.ketraterm.ui.swing.render.painter
 
+import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.api.CellSelection
+import io.github.ketraterm.ui.swing.render.SwingColors
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
@@ -34,6 +36,7 @@ internal class TerminalSelectionPainter(
         row: Int,
         selection: CellSelection?,
         selectionBackground: Int,
+        palette: TerminalColorPalette,
     ) {
         if (selection == null) return
 
@@ -42,7 +45,33 @@ internal class TerminalSelectionPainter(
 
         val startColumn = CellSelection.rangeStart(range)
         val endColumn = CellSelection.rangeEnd(range)
-        g.color = colorCache.color(selectionBackground)
+
+        val baseSelBg =
+            if (selectionBackground == 0x66FFFFFF) {
+                val raw = palette.selectionBackground
+                val alpha = (raw ushr 24) and 0xFF
+                if (alpha == 0xFF) {
+                    (raw and 0x00FFFFFF) or 0x66000000
+                } else {
+                    raw
+                }
+            } else {
+                selectionBackground
+            }
+
+        var selColor = baseSelBg
+        val bg = palette.defaultBackground
+        val blended = SwingColors.blendOver(selColor, bg)
+        if (SwingColors.contrastRatio(blended, bg) < 1.15) {
+            selColor =
+                if (SwingColors.relativeLuminance(bg) < 0.5) {
+                    0x66FFFFFF
+                } else {
+                    0x33000000
+                }
+        }
+
+        g.color = colorCache.color(selColor)
         g.fillRect(
             startColumn * metrics.cellWidth,
             row * metrics.cellHeight,

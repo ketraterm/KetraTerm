@@ -376,12 +376,15 @@ internal object KetraTermIntellijSettingsMapper {
         val fontFamily = SwingSettings.resolveFontFamily(normalized.fontFamily)
         val fallbackFontFamily = SwingSettings.resolveFontFamily(normalized.fallbackFontFamily)
 
+        val palette = paletteForThemeId(normalized.themeId)
+
         return SwingSettings(
             font = JBFont.create(Font(fontFamily, Font.PLAIN, fontSize)),
             fallbackFonts = listOf(Font(fallbackFontFamily, Font.PLAIN, fontSize)),
             columns = normalized.columns,
             rows = normalized.rows,
-            palette = paletteForThemeId(normalized.themeId),
+            palette = palette,
+            selectionBackground = palette.selectionBackground,
             treatAmbiguousAsWide = normalized.treatAmbiguousAsWide,
             cursorBlinkMillis = normalized.cursorBlinkMillis,
             useSystemFallbackFonts = normalized.useSystemFallbackFonts,

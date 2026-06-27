@@ -135,6 +135,7 @@ internal class GridPainter {
                     gutterWidth = promptGutterWidth,
                     row = row,
                     hovered = row == hoveredPromptMarkerRow,
+                    palette = palette,
                 )
                 searchPainter.paint(
                     g = g,
@@ -144,7 +145,7 @@ internal class GridPainter {
                     matchBackground = settings.searchMatchBackground,
                     activeMatchBackground = settings.searchActiveMatchBackground,
                 )
-                selectionPainter.paint(g, cache, metrics, row, selection, settings.selectionBackground)
+                selectionPainter.paint(g, cache, metrics, row, selection, settings.selectionBackground, palette)
                 textPainter.paintRow(
                     g = g,
                     cache = cache,
