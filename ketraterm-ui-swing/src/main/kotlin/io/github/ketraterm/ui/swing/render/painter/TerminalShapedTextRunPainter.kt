@@ -24,6 +24,7 @@ import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.render.cache.FontCache
 import io.github.ketraterm.ui.swing.render.cache.TerminalComplexTextLayoutCache
 import io.github.ketraterm.ui.swing.render.hasDrawableText
+import io.github.ketraterm.ui.swing.render.isFastAsciiCell
 import io.github.ketraterm.ui.swing.render.terminalFontStyle
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
@@ -250,6 +251,19 @@ internal class TerminalShapedTextRunPainter(
         return bidi
     }
 
+    private fun cellCategory(
+        cache: TerminalRenderCache,
+        index: Int,
+    ): Int {
+        val flags = cache.flags[index]
+        val codeWord = cache.codeWords[index]
+        return when {
+            isFastAsciiCell(flags, codeWord) -> 0
+            isComplexShapingCell(cache, index) -> 1
+            else -> 2
+        }
+    }
+
     private fun bidiSegmentLimit(
         cache: TerminalRenderCache,
         palette: TerminalColorPalette,
@@ -267,6 +281,7 @@ internal class TerminalShapedTextRunPainter(
     ): Int {
         val rowOffset = cache.rowOffset(row)
         val startIndex = rowOffset + startColumn
+        val category = cellCategory(cache, startIndex)
         val attr = cache.attrWords[startIndex]
         val extraAttr = cache.extraAttrWords[startIndex]
         val hyperlinkId = cache.hyperlinkIds[startIndex]
@@ -295,6 +310,9 @@ internal class TerminalShapedTextRunPainter(
         var column = startColumn + 1
         while (column < runLimit) {
             val index = rowOffset + column
+            if (cellCategory(cache, index) != category) {
+                break
+            }
             val currentAttr = cache.attrWords[index]
             val currentExtraAttr = cache.extraAttrWords[index]
             val currentHyperlinkId = cache.hyperlinkIds[index]
@@ -765,6 +783,9 @@ internal class TerminalShapedTextRunPainter(
         private fun isComplexShapingCodePoint(codePoint: Int): Boolean =
             codePoint in 0x0900..0x0DFF ||
                 codePoint in 0x0E00..0x0EFF ||
+                codePoint in 0x1200..0x139F || // Ethiopic & Supplement
+                codePoint in 0x2D80..0x2DDF || // Ethiopic Extended
+                codePoint in 0xAB00..0xAB2F || // Ethiopic Extended-A
                 codePoint in 0x1780..0x17FF ||
                 codePoint in 0x19E0..0x19FF ||
                 codePoint in 0x1A20..0x1AAF ||
