@@ -810,6 +810,140 @@ class TerminalTextPainterTest {
                 "RTL run first logical cell should paint at the visual run end",
             )
         }
+
+        @Test
+        fun `scrolling does not bleed cached bidi layout across rows with same generation`() {
+            // Arrange
+            val fixture = fixture(foreground = TEST_WHITE, width = 120)
+            val underlineAttr = TerminalRenderAttrs.pack(underlineStyle = TerminalRenderUnderline.SINGLE)
+
+            // Frame 1: Row 0 has RTL string "\u05D0\u05D1\u05D2" (Red, Green, Blue underlines). Row 1 has LTR string "abc". Both have line generation 1.
+            val frame1 =
+                object : TestRenderFrame(
+                    cells =
+                        arrayOf(
+                            arrayOf(
+                                TestCell(
+                                    codeWord = 0x05D0,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    attr = underlineAttr,
+                                    extraAttr = underlineColor(TEST_RED),
+                                ),
+                                TestCell(
+                                    codeWord = 0x05D1,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    attr = underlineAttr,
+                                    extraAttr = underlineColor(TEST_GREEN),
+                                ),
+                                TestCell(
+                                    codeWord = 0x05D2,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    attr = underlineAttr,
+                                    extraAttr = underlineColor(TEST_BLUE),
+                                ),
+                            ),
+                            arrayOf(
+                                TestCell(
+                                    codeWord = 'a'.code,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    attr = underlineAttr,
+                                    extraAttr = underlineColor(TEST_RED),
+                                ),
+                                TestCell(
+                                    codeWord = 'b'.code,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    attr = underlineAttr,
+                                    extraAttr = underlineColor(TEST_GREEN),
+                                ),
+                                TestCell(
+                                    codeWord = 'c'.code,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    attr = underlineAttr,
+                                    extraAttr = underlineColor(TEST_BLUE),
+                                ),
+                            ),
+                        ),
+                ) {
+                    override fun lineId(row: Int): Long = if (row == 0) 10L else 20L
+
+                    override fun lineGeneration(row: Int): Long = 1L
+                }
+
+            // Update cache from Frame 1
+            val cache = TerminalRenderCache(columns = 3, rows = 2)
+            cache.updateFrom(frame1)
+
+            // Paint Row 0 (RTL). This caches bidi status for Row 0 (generation 1, lineId 10L).
+            fixture.paintRow(cache, row = 0)
+
+            // Now, simulate scrolling so that the LTR line "abc" is at Row 0.
+            // Row 0 of Frame 2 will return lineId = 20L (different) and generation = 1L (same).
+            val frame2 =
+                object : TestRenderFrame(
+                    cells =
+                        arrayOf(
+                            arrayOf(
+                                TestCell(
+                                    codeWord = 'a'.code,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    attr = underlineAttr,
+                                    extraAttr = underlineColor(TEST_RED),
+                                ),
+                                TestCell(
+                                    codeWord = 'b'.code,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    attr = underlineAttr,
+                                    extraAttr = underlineColor(TEST_GREEN),
+                                ),
+                                TestCell(
+                                    codeWord = 'c'.code,
+                                    flags = TerminalRenderCellFlags.CODEPOINT,
+                                    attr = underlineAttr,
+                                    extraAttr = underlineColor(TEST_BLUE),
+                                ),
+                            ),
+                            arrayOf(
+                                TestCell(),
+                                TestCell(),
+                                TestCell(),
+                            ),
+                        ),
+                ) {
+                    override fun lineId(row: Int): Long = if (row == 0) 20L else 30L
+
+                    override fun lineGeneration(row: Int): Long = 1L
+                }
+
+            // Update cache from Frame 2
+            cache.updateFrom(frame2)
+
+            // Clear image so we don't read old pixels
+            val g2 = fixture.image.createGraphics()
+            g2.composite = AlphaComposite.Clear
+            g2.fillRect(0, 0, fixture.image.width, fixture.image.height)
+            g2.dispose()
+
+            // Paint Row 0 of new cache (now LTR "abc").
+            fixture.paintRow(cache, row = 0)
+
+            // Assert that "abc" was painted in LTR visual order (Red, Green, Blue underlines).
+            // If the bug was present, it would be visually reversed to "cba" (Blue, Green, Red).
+            assertEquals(
+                TEST_RED,
+                fixture.image.getRGB(1, fixture.metrics.underlineY),
+                "First LTR cell underline should be red (visual order LTR)",
+            )
+            assertEquals(
+                TEST_GREEN,
+                fixture.image.getRGB(fixture.metrics.cellWidth + 1, fixture.metrics.underlineY),
+                "Middle LTR cell underline should be green",
+            )
+            assertEquals(
+                TEST_BLUE,
+                fixture.image.getRGB(fixture.metrics.cellWidth * 2 + 1, fixture.metrics.underlineY),
+                "Last LTR cell underline should be blue",
+            )
+        }
     }
 
     @Nested

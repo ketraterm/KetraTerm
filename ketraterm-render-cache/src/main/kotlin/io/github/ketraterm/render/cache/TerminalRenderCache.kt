@@ -404,12 +404,13 @@ class TerminalRenderCache(
         var nextHasBlinkingText = false
         while (row < frame.rows) {
             val lineGeneration = frame.lineGeneration(row)
-            lineIds[row] = frame.lineId(row)
+            val lineId = frame.lineId(row)
             val wrapped = frame.lineWrapped(row)
 
             if (
                 structureChanged ||
                 lineGenerations[row] != lineGeneration ||
+                lineIds[row] != lineId ||
                 lineWrapped[row] != wrapped
             ) {
                 clearClusterRow(row)
@@ -438,6 +439,7 @@ class TerminalRenderCache(
                 }
 
                 lineGenerations[row] = lineGeneration
+                lineIds[row] = lineId
                 lineWrapped[row] = wrapped
                 lineHasBlinkingText[row] = rowHasBlinkingText(offset)
             } else {

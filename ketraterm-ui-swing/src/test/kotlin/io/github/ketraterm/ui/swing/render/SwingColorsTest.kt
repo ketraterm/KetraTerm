@@ -19,11 +19,18 @@ import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class SwingColorsTest {
     @Test
     fun foregroundAppliesSwingFaintPolicy() {
-        val palette = TerminalColorPalette(defaultForeground = 0xFF224466.toInt())
+        // Use a white background so the faint color 0xFF112233 has high contrast and is not adjusted
+        val palette =
+            TerminalColorPalette(
+                defaultForeground = 0xFF224466.toInt(),
+                defaultBackground = 0xFFFFFFFF.toInt(),
+            )
         val attrs = TerminalRenderAttrs.pack(faint = true)
 
         assertEquals(0xFF112233.toInt(), SwingColors.foreground(palette, attrs))
@@ -39,5 +46,43 @@ class SwingColorsTest {
         val attrs = TerminalRenderAttrs.pack(faint = true, invisible = true)
 
         assertEquals(SwingColors.background(palette, attrs), SwingColors.foreground(palette, attrs))
+    }
+
+    @Test
+    fun foregroundEnforcesMinimumContrastOnDarkBackground() {
+        val attrs = TerminalRenderAttrs.pack()
+
+        // Red on black has contrast ~ 5.6 (no adjustment)
+        val paletteHighContrast =
+            TerminalColorPalette(
+                defaultForeground = 0xFFFF0000.toInt(), // Red
+                defaultBackground = 0xFF000000.toInt(), // Black
+            )
+        assertEquals(0xFFFF0000.toInt(), SwingColors.foreground(paletteHighContrast, attrs))
+
+        // Very dark red on black has low contrast, must be adjusted to be lighter
+        val paletteLowContrast =
+            TerminalColorPalette(
+                defaultForeground = 0xFF220000.toInt(), // Very dark red
+                defaultBackground = 0xFF000000.toInt(), // Black
+            )
+        val adjusted = SwingColors.foreground(paletteLowContrast, attrs)
+        assertNotEquals(0xFF220000.toInt(), adjusted)
+        assertTrue(SwingColors.contrastRatio(adjusted, 0xFF000000.toInt()) >= 3.0)
+    }
+
+    @Test
+    fun foregroundEnforcesMinimumContrastOnLightBackground() {
+        val attrs = TerminalRenderAttrs.pack()
+
+        // Yellow on white has contrast ~ 1.07, must be adjusted to be darker
+        val palette =
+            TerminalColorPalette(
+                defaultForeground = 0xFFFFFF00.toInt(), // Yellow
+                defaultBackground = 0xFFFFFFFF.toInt(), // White
+            )
+        val adjusted = SwingColors.foreground(palette, attrs)
+        assertNotEquals(0xFFFFFF00.toInt(), adjusted)
+        assertTrue(SwingColors.contrastRatio(adjusted, 0xFFFFFFFF.toInt()) >= 3.0)
     }
 }

@@ -24,6 +24,7 @@ import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.render.cache.FontCache
 import io.github.ketraterm.ui.swing.render.cache.TerminalComplexTextLayoutCache
 import io.github.ketraterm.ui.swing.render.hasDrawableText
+import io.github.ketraterm.ui.swing.render.isFastAsciiCell
 import io.github.ketraterm.ui.swing.render.terminalFontStyle
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
@@ -50,6 +51,7 @@ internal class TerminalShapedTextRunPainter(
     private var segmentCodepoints = IntArray(INITIAL_TEXT_RUN_CAPACITY)
     private var bidiRows = arrayOfNulls<Bidi>(0)
     private var rowGenerations = LongArray(0)
+    private var rowLineIds = LongArray(0)
     private var rowHasStrongRtl = BooleanArray(0)
     private var cachedColumns = 0
 
@@ -59,11 +61,13 @@ internal class TerminalShapedTextRunPainter(
     ): Boolean {
         ensureBidiRowCache(cache)
         val generation = cache.lineGenerations[row]
-        if (rowGenerations[row] == generation) return rowHasStrongRtl[row]
+        val lineId = cache.lineIds[row]
+        if (rowGenerations[row] == generation && rowLineIds[row] == lineId) return rowHasStrongRtl[row]
 
         val hasStrongRtl = rowContainsStrongRtl(cache, row)
         bidiRows[row] = null
         rowGenerations[row] = generation
+        rowLineIds[row] = lineId
         rowHasStrongRtl[row] = hasStrongRtl
         return hasStrongRtl
     }
@@ -226,8 +230,9 @@ internal class TerminalShapedTextRunPainter(
     ): Bidi {
         ensureBidiRowCache(cache)
         val generation = cache.lineGenerations[row]
+        val lineId = cache.lineIds[row]
         val cached = bidiRows[row]
-        if (cached != null && rowGenerations[row] == generation) return cached
+        if (cached != null && rowGenerations[row] == generation && rowLineIds[row] == lineId) return cached
 
         ensureRowCharCapacity(cache.columns)
         fillBidiRowChars(cache, row)
@@ -242,7 +247,21 @@ internal class TerminalShapedTextRunPainter(
             )
         bidiRows[row] = bidi
         rowGenerations[row] = generation
+        rowLineIds[row] = lineId
         return bidi
+    }
+
+    private fun cellCategory(
+        cache: TerminalRenderCache,
+        index: Int,
+    ): Int {
+        val flags = cache.flags[index]
+        val codeWord = cache.codeWords[index]
+        return when {
+            isFastAsciiCell(flags, codeWord) -> 0
+            isComplexShapingCell(cache, index) -> 1
+            else -> 2
+        }
     }
 
     private fun bidiSegmentLimit(
@@ -262,6 +281,7 @@ internal class TerminalShapedTextRunPainter(
     ): Int {
         val rowOffset = cache.rowOffset(row)
         val startIndex = rowOffset + startColumn
+        val category = cellCategory(cache, startIndex)
         val attr = cache.attrWords[startIndex]
         val extraAttr = cache.extraAttrWords[startIndex]
         val hyperlinkId = cache.hyperlinkIds[startIndex]
@@ -290,6 +310,9 @@ internal class TerminalShapedTextRunPainter(
         var column = startColumn + 1
         while (column < runLimit) {
             val index = rowOffset + column
+            if (cellCategory(cache, index) != category) {
+                break
+            }
             val currentAttr = cache.attrWords[index]
             val currentExtraAttr = cache.extraAttrWords[index]
             val currentHyperlinkId = cache.hyperlinkIds[index]
@@ -551,6 +574,7 @@ internal class TerminalShapedTextRunPainter(
 
         bidiRows = arrayOfNulls(cache.rows)
         rowGenerations = LongArray(cache.rows) { INVALID_GENERATION }
+        rowLineIds = LongArray(cache.rows)
         rowHasStrongRtl = BooleanArray(cache.rows)
         cachedColumns = cache.columns
     }
@@ -759,6 +783,12 @@ internal class TerminalShapedTextRunPainter(
         private fun isComplexShapingCodePoint(codePoint: Int): Boolean =
             codePoint in 0x0900..0x0DFF ||
                 codePoint in 0x0E00..0x0EFF ||
+                codePoint in 0x1200..0x139F ||
+                // Ethiopic & Supplement
+                codePoint in 0x2D80..0x2DDF ||
+                // Ethiopic Extended
+                codePoint in 0xAB00..0xAB2F ||
+                // Ethiopic Extended-A
                 codePoint in 0x1780..0x17FF ||
                 codePoint in 0x19E0..0x19FF ||
                 codePoint in 0x1A20..0x1AAF ||

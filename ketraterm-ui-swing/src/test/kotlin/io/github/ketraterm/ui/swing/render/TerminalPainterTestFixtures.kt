@@ -146,7 +146,7 @@ internal data class TestCell(
     val cluster: String? = null,
 )
 
-internal class TestRenderFrame(
+internal open class TestRenderFrame(
     private val cells: Array<Array<TestCell>>,
     private val cursorValue: TerminalRenderCursor =
         TerminalRenderCursor(
@@ -179,6 +179,8 @@ internal class TestRenderFrame(
     }
 
     override fun lineGeneration(row: Int): Long = 1
+
+    override fun lineId(row: Int): Long = row + 1L
 
     override fun lineWrapped(row: Int): Boolean = false
 

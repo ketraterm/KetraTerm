@@ -108,6 +108,11 @@ private fun findLineStartingWith(
     .map { state.ring[it] }
     .firstOrNull { it.getCodepoint(0) == codepoint }
 
+private data class ResizeRowSpec(
+    val text: String,
+    val wrapped: Boolean = false,
+)
+
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -795,7 +800,7 @@ class TerminalResizerTest {
     @DisplayName("Scrollback history")
     inner class ScrollbackTests {
         @Test
-        fun `widening preserves live viewport top instead of pulling history into freed rows`() {
+        fun `widening across hard boundary preserves live viewport top`() {
             val state = buildState(cols = 3, rows = 3, history = 5)
             state.ring.clear()
             state.ring.push().apply {
@@ -1083,6 +1088,504 @@ class TerminalResizerTest {
 
             val off3 = resizeStateReturningOffset(state, 12, 3, oldScrollbackOffset = off2)
             assertEquals("anchor", state.viewportTopLine(off3), "after widen again")
+        }
+    }
+
+    // =========================================================================
+    // Live-screen boundary anchoring
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Live-screen boundary anchoring")
+    inner class LiveScreenBoundaryAnchoringTests {
+        /**
+         * Replaces the state's ring with explicitly controlled history and live-screen rows.
+         *
+         * The final [height] rows form the live screen. Earlier rows form scrollback history.
+         */
+        private fun installRing(
+            state: TerminalState,
+            rows: List<ResizeRowSpec>,
+        ) {
+            state.ring.clear()
+
+            for (row in rows) {
+                state.ring.push().apply {
+                    clear(0, 0)
+
+                    row.text
+                        .take(state.dimensions.width)
+                        .forEachIndexed { col, char ->
+                            setCell(col, char.code, 0)
+                        }
+
+                    wrapped = row.wrapped
+                }
+            }
+        }
+
+        @Test
+        fun `widening across hard boundary preserves first live row and pads bottom`() {
+                /*
+                 * Ring at width 3:
+                 *
+                 * history:
+                 *   old
+                 *
+                 * live screen:
+                 *   aaa  wrapped
+                 *   bbb
+                 *   s
+                 *
+                 * The row before the live screen is not wrapped, so the live-screen
+                 * boundary is a real logical-line boundary.
+                 *
+                 * After widening, "aaa" and "bbb" merge, but "old" must remain in
+                 * history. The freed screen row becomes blank at the bottom.
+                 */
+            val state = buildState(cols = 3, rows = 3, history = 10)
+
+            installRing(
+                state,
+                listOf(
+                    ResizeRowSpec("old"),
+                    ResizeRowSpec("aaa", wrapped = true),
+                    ResizeRowSpec("bbb"),
+                    ResizeRowSpec("s"),
+                ),
+            )
+
+            state.cursor.row = 2
+            state.cursor.col = 1
+
+            val oldLiveTop = state.ring.size - state.dimensions.height
+
+            assertFalse(
+                state.ring[oldLiveTop - 1].wrapped,
+                "Test setup requires a hard logical-line boundary before the live screen",
+            )
+
+            resizeState(
+                state = state,
+                newWidth = 9,
+                newHeight = 3,
+            )
+
+            assertAll(
+                {
+                    assertEquals(
+                        listOf("aaabbb", "s", ""),
+                        state.screenLines(),
+                        "Hard-boundary widening must preserve the old live-screen top",
+                    )
+                },
+                {
+                    assertEquals(
+                        "old",
+                        state.ring[0].toTextTrimmed(),
+                        "History must not be pulled into the live screen across a hard boundary",
+                    )
+                },
+                {
+                    assertEquals(
+                        1,
+                        state.cursor.row,
+                        "Cursor must follow its reflowed content row",
+                    )
+                },
+                {
+                    assertEquals(
+                        1,
+                        state.cursor.col,
+                        "Cursor column must remain stable when its row does not wrap",
+                    )
+                },
+            )
+        }
+
+        @Test
+        fun `widening across wrapped boundary pulls logical-line prefix into live screen`() {
+                /*
+                 * Ring at width 3:
+                 *
+                 * history:
+                 *   AB
+                 *   CCC  wrapped
+                 *
+                 * live screen:
+                 *   DDD  wrapped
+                 *   EEE
+                 *   F
+                 *   G
+                 *
+                 * CCC, DDD, and EEE are one logical line. The old history/live-screen
+                 * boundary cuts through that logical line.
+                 *
+                 * At width 6, ConPTY-compatible anchoring requires:
+                 *
+                 *   CCCDDD  wrapped
+                 *   EEE
+                 *   F
+                 *   G
+                 *
+                 * The prefix "CCC" must move from history into the live screen.
+                 */
+            val state = buildState(cols = 3, rows = 4, history = 10)
+
+            installRing(
+                state,
+                listOf(
+                    ResizeRowSpec("AB"),
+                    ResizeRowSpec("CCC", wrapped = true),
+                    ResizeRowSpec("DDD", wrapped = true),
+                    ResizeRowSpec("EEE"),
+                    ResizeRowSpec("F"),
+                    ResizeRowSpec("G"),
+                ),
+            )
+
+            state.cursor.row = 3
+            state.cursor.col = 1
+
+            val oldLiveTop = state.ring.size - state.dimensions.height
+
+            assertTrue(
+                state.ring[oldLiveTop - 1].wrapped,
+                "Test setup requires the history row to continue into the first live row",
+            )
+
+            resizeState(
+                state = state,
+                newWidth = 6,
+                newHeight = 4,
+            )
+
+            val newLiveTop = state.ring.size - state.dimensions.height
+
+            assertAll(
+                {
+                    assertEquals(
+                        listOf("CCCDDD", "EEE", "F", "G"),
+                        state.screenLines(),
+                        "Wrapped-boundary widening must reveal the logical-line prefix",
+                    )
+                },
+                {
+                    assertTrue(
+                        state.ring[newLiveTop].wrapped,
+                        "The first reflowed chunk must continue into EEE",
+                    )
+                },
+                {
+                    assertFalse(
+                        state.ring[newLiveTop + 1].wrapped,
+                        "EEE must terminate the reconstructed logical line",
+                    )
+                },
+                {
+                    assertEquals(
+                        3,
+                        state.cursor.row,
+                        "Cursor must remain on G after the screen boundary moves upward",
+                    )
+                },
+                {
+                    assertEquals(
+                        1,
+                        state.cursor.col,
+                        "Cursor column on G must remain unchanged",
+                    )
+                },
+            )
+        }
+
+        @Test
+        fun `resize never splits logical line at history live-screen boundary`() {
+                /*
+                 * This test validates the ring structure directly, independently of
+                 * screen-line positioning.
+                 *
+                 * The old boundary lies between CCC and DDD, but the resizer must
+                 * reconstruct CCCDDDEEE as one logical line before re-wrapping.
+                 */
+            val state = buildState(cols = 3, rows = 4, history = 10)
+
+            installRing(
+                state,
+                listOf(
+                    ResizeRowSpec("AB"),
+                    ResizeRowSpec("CCC", wrapped = true),
+                    ResizeRowSpec("DDD", wrapped = true),
+                    ResizeRowSpec("EEE"),
+                    ResizeRowSpec("F"),
+                    ResizeRowSpec("G"),
+                ),
+            )
+
+            state.cursor.row = 3
+
+            resizeState(
+                state = state,
+                newWidth = 9,
+                newHeight = 4,
+            )
+
+            val logicalLine =
+                (0 until state.ring.size)
+                    .asSequence()
+                    .map { state.ring[it] }
+                    .firstOrNull { it.toTextTrimmed() == "CCCDDDEEE" }
+
+            assertNotNull(
+                logicalLine,
+                "The wrapped fragments must be reconstructed into one logical line",
+            )
+
+            assertFalse(
+                logicalLine!!.wrapped,
+                "The fully reconstructed line fits at width 9 and must not remain wrapped",
+            )
+        }
+
+        @Test
+        fun `shrink then widen reproduces ConPTY wrapped-boundary anchoring`() {
+                /*
+                 * Start with a normal four-row screen:
+                 *
+                 *   AB
+                 *   CCCDDDEEE
+                 *   F
+                 *   G
+                 *
+                 * Narrowing to width 3 moves CCC into history:
+                 *
+                 * history:
+                 *   AB
+                 *   CCC  wrapped
+                 *
+                 * live:
+                 *   DDD  wrapped
+                 *   EEE
+                 *   F
+                 *   G
+                 *
+                 * Widening to width 6 must pull CCC back into the screen.
+                 */
+            val state = buildState(cols = 9, rows = 4, history = 10)
+
+            state.writeLine(0, "AB")
+            state.writeLine(1, "CCCDDDEEE")
+            state.writeLine(2, "F")
+            state.writeLine(3, "G")
+
+            state.cursor.row = 3
+            state.cursor.col = 1
+
+            resizeState(
+                state = state,
+                newWidth = 3,
+                newHeight = 4,
+            )
+
+            val narrowLiveTop = state.ring.size - state.dimensions.height
+
+            assertAll(
+                {
+                    assertEquals(
+                        listOf("DDD", "EEE", "F", "G"),
+                        state.screenLines(),
+                        "Narrowing must bottom-anchor the live screen",
+                    )
+                },
+                {
+                    assertTrue(
+                        narrowLiveTop > 0,
+                        "The narrowed screen must have retained history",
+                    )
+                },
+                {
+                    assertEquals(
+                        "CCC",
+                        state.ring[narrowLiveTop - 1].toTextTrimmed(),
+                        "The logical-line prefix must move into history after narrowing",
+                    )
+                },
+                {
+                    assertTrue(
+                        state.ring[narrowLiveTop - 1].wrapped,
+                        "The history prefix must still wrap into the first live row",
+                    )
+                },
+            )
+
+            resizeState(
+                state = state,
+                newWidth = 6,
+                newHeight = 4,
+            )
+
+            assertAll(
+                {
+                    assertEquals(
+                        listOf("CCCDDD", "EEE", "F", "G"),
+                        state.screenLines(),
+                        "Widening must restore the logical-line prefix to the screen",
+                    )
+                },
+                {
+                    assertEquals(
+                        3,
+                        state.cursor.row,
+                        "Cursor must remain on the final G row",
+                    )
+                },
+                {
+                    assertEquals(
+                        1,
+                        state.cursor.col,
+                        "Cursor column must survive the round trip",
+                    )
+                },
+            )
+        }
+
+        @Test
+        fun `repeated narrow widen cycles keep wrapped boundary stable`() {
+            val state = buildState(cols = 9, rows = 4, history = 20)
+
+            state.writeLine(0, "AB")
+            state.writeLine(1, "CCCDDDEEE")
+            state.writeLine(2, "F")
+            state.writeLine(3, "G")
+
+            state.cursor.row = 3
+            state.cursor.col = 1
+
+            resizeState(
+                state = state,
+                newWidth = 3,
+                newHeight = 4,
+            )
+
+            repeat(3) { cycle ->
+                resizeState(
+                    state = state,
+                    newWidth = 6,
+                    newHeight = 4,
+                )
+
+                assertAll(
+                    "widen cycle $cycle",
+                    {
+                        assertEquals(
+                            listOf("CCCDDD", "EEE", "F", "G"),
+                            state.screenLines(),
+                        )
+                    },
+                    {
+                        assertEquals(
+                            3,
+                            state.cursor.row,
+                            "Cursor row drifted during widen cycle $cycle",
+                        )
+                    },
+                    {
+                        assertEquals(
+                            1,
+                            state.cursor.col,
+                            "Cursor column drifted during widen cycle $cycle",
+                        )
+                    },
+                )
+
+                resizeState(
+                    state = state,
+                    newWidth = 3,
+                    newHeight = 4,
+                )
+
+                assertAll(
+                    "narrow cycle $cycle",
+                    {
+                        assertEquals(
+                            listOf("DDD", "EEE", "F", "G"),
+                            state.screenLines(),
+                        )
+                    },
+                    {
+                        val liveTop = state.ring.size - state.dimensions.height
+
+                        assertTrue(
+                            liveTop > 0 &&
+                                state.ring[liveTop - 1].wrapped,
+                            "History must continue into the first live row after narrow cycle $cycle",
+                        )
+                    },
+                    {
+                        assertEquals(
+                            3,
+                            state.cursor.row,
+                            "Cursor row drifted during narrow cycle $cycle",
+                        )
+                    },
+                    {
+                        assertEquals(
+                            1,
+                            state.cursor.col,
+                            "Cursor column drifted during narrow cycle $cycle",
+                        )
+                    },
+                )
+            }
+        }
+
+        @Test
+        fun `wrapped boundary behavior is independent of user scrollback offset`() {
+                /*
+                 * Live-screen anchoring and user scrollback anchoring are separate.
+                 * With offset zero, the resizer must still pull the logical-line prefix
+                 * into the live screen when the boundary cuts through a wrapped line.
+                 */
+            val state = buildState(cols = 3, rows = 4, history = 10)
+
+            installRing(
+                state,
+                listOf(
+                    ResizeRowSpec("AB"),
+                    ResizeRowSpec("CCC", wrapped = true),
+                    ResizeRowSpec("DDD", wrapped = true),
+                    ResizeRowSpec("EEE"),
+                    ResizeRowSpec("F"),
+                    ResizeRowSpec("G"),
+                ),
+            )
+
+            state.cursor.row = 3
+
+            val newOffset =
+                resizeStateReturningOffset(
+                    state = state,
+                    newWidth = 6,
+                    newHeight = 4,
+                    oldScrollbackOffset = 0,
+                )
+
+            assertAll(
+                {
+                    assertEquals(
+                        0,
+                        newOffset,
+                        "A bottom-attached viewport must remain bottom-attached",
+                    )
+                },
+                {
+                    assertEquals(
+                        listOf("CCCDDD", "EEE", "F", "G"),
+                        state.screenLines(),
+                        "Live-screen re-anchoring must still follow wrapped-line semantics",
+                    )
+                },
+            )
         }
     }
 }

@@ -70,7 +70,7 @@ class TerminalRenderCacheTest {
     }
 
     @Test
-    fun `line ids are copied even when visual rows are not recopied`() {
+    fun `line id change triggers recopying of the row`() {
         val frame = MutableFrame(columns = 3, rows = 2)
         frame.setRow(0, "abc")
         frame.setRow(1, "def")
@@ -84,7 +84,7 @@ class TerminalRenderCacheTest {
             { assertEquals(1L, cache.lineIds[0]) },
             { assertEquals(99L, cache.lineIds[1]) },
             { assertEquals(1, frame.copyCounts[0]) },
-            { assertEquals(1, frame.copyCounts[1]) },
+            { assertEquals(2, frame.copyCounts[1]) },
         )
     }
 

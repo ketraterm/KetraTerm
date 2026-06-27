@@ -387,6 +387,42 @@ class GridPainterTest {
     }
 
     @Test
+    fun `selection adjusts low contrast background to be visible`() {
+        val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val settings =
+            SwingSettings(
+                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
+                palette =
+                    TerminalColorPalette(
+                        defaultForeground = BLACK,
+                        defaultBackground = WHITE,
+                    ),
+                selectionBackground = 0x66FFFFFF.toInt(),
+                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+                padding = Insets(0, 0, 0, 0),
+            )
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
+        val cache = TerminalRenderCache(columns = 2, rows = 1)
+        cache.updateFrom(TextFrame(text = "AB", cursorVisible = false, palette = settings.palette))
+
+        GridPainter().paint(
+            g = g,
+            cache = cache,
+            settings = settings,
+            metrics = metrics,
+            width = image.width,
+            height = image.height,
+            cursorBlinkVisible = true,
+            selection = CellSelection(0, 0, 1, 0),
+        )
+        g.dispose()
+
+        val rgb = image.getRGB(1, 1)
+        assertNotEquals(WHITE, rgb)
+    }
+
+    @Test
     fun `shell integration prompt marker paints compact gutter node on prompt row`() {
         val image = BufferedImage(120, 80, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
