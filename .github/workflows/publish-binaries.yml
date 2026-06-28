@@ -26,25 +26,17 @@ jobs:
         run: |
           ./gradlew :ketraterm-app:distZip --no-daemon
 
-      - name: Get Version
-        id: get_version
-        shell: bash
-        run: |
-          PROJECT_VERSION=$(cat VERSION)
-          echo "PROJECT_VERSION=$PROJECT_VERSION" >> $GITHUB_ENV
-          echo "project_version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
-
       - name: Rename and Prepare Archive
         shell: bash
         run: |
           mkdir -p dist
-          cp ketraterm-app/build/distributions/ketraterm-app-${{ steps.get_version.outputs.project_version }}.zip dist/KetraTerm-${{ steps.get_version.outputs.project_version }}-no-runtime.zip
+          cp ketraterm-app/build/distributions/ketraterm-app-*.zip dist/KetraTerm-no-runtime.zip
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: no-runtime-archive
-          path: dist/KetraTerm-${{ steps.get_version.outputs.project_version }}-no-runtime.zip
+          name: KetraTerm-no-runtime
+          path: dist/KetraTerm-no-runtime.zip
 
   build-native:
     strategy:
@@ -56,28 +48,32 @@ jobs:
             package_os: linux
             jbr_key: linux-x64
             icon_ext: png
-            artifact_suffix: tar.gz
+            installer_name: deb-rpm
+            portable_name: portable-linux
 
           - os: windows-latest
             platform: windows-x64
             package_os: windows
             jbr_key: windows-x64
             icon_ext: ico
-            artifact_suffix: zip
+            installer_name: setup-windows
+            portable_name: portable-windows
 
           - os: macos-15-intel
             platform: macos-x64
             package_os: macos
             jbr_key: macos-x64
             icon_ext: icns
-            artifact_suffix: zip
+            installer_name: dmg-macos-intel
+            portable_name: portable-macos-intel
 
           - os: macos-15
             platform: macos-aarch64
             package_os: macos
             jbr_key: macos-aarch64
             icon_ext: icns
-            artifact_suffix: zip
+            installer_name: dmg-macos-applesilicon
+            portable_name: portable-macos-applesilicon
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -97,15 +93,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y rpm fakeroot dpkg-dev
 
-      - name: Get Project Version
-        id: get_version
-        shell: bash
-        run: |
-          PROJECT_VERSION=$(cat VERSION)
-          echo "PROJECT_VERSION=$PROJECT_VERSION" >> $GITHUB_ENV
-          echo "project_version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Run Build and Prepare Input
+      - name: Prepare JPackage Input
         run: |
           ./gradlew :ketraterm-app:prepareJpackageInput --no-daemon
 
@@ -113,7 +101,6 @@ jobs:
         id: jbr_config
         shell: bash
         run: |
-          # Parse properties file
           get_property() {
             grep "^$1=" gradle/jbr-checksums.properties | cut -d= -f2- | tr -d '\r'
           }
@@ -166,7 +153,6 @@ jobs:
           fi
           echo "Resolved JBR_HOME: $JBR_HOME_PATH"
           
-          # Check java exists
           if [ "${{ runner.os }}" = "Windows" ]; then
             if [ ! -f "$JBR_HOME_PATH/bin/java.exe" ]; then
               echo "Error: java.exe not found in resolved JBR_HOME" >&2
@@ -179,7 +165,6 @@ jobs:
             fi
           fi
           
-          # Verify identity
           "$JBR_HOME_PATH/bin/java" -version
           
           echo "jbr_home=$JBR_HOME_PATH" >> $GITHUB_OUTPUT
@@ -196,11 +181,6 @@ jobs:
       - name: Build Application Image
         shell: bash
         run: |
-          ICON_ARGS=""
-          if [ -f "packaging/icons/ketraterm.${{ matrix.icon_ext }}" ]; then
-            ICON_ARGS="--icon packaging/icons/ketraterm.${{ matrix.icon_ext }}"
-          fi
-          
           MAC_ARGS=""
           if [ "${{ runner.os }}" = "macOS" ]; then
             MAC_ARGS="--mac-package-identifier io.github.ketraterm"
@@ -208,7 +188,7 @@ jobs:
 
           jpackage \
             @packaging/jpackage/common.args \
-            $ICON_ARGS \
+            --icon packaging/icons/ketraterm.${{ matrix.icon_ext }} \
             $MAC_ARGS \
             --type app-image \
             --input ketraterm-app/build/jpackage/input \
@@ -220,14 +200,17 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          # On macOS jpackage app-image destination contains KetraTerm.app directly
-          # On Windows/Linux, it contains KetraTerm/
           if [ "${{ runner.os }}" = "macOS" ]; then
-            ditto -c -k --keepParent packaging/app-image/KetraTerm.app dist/KetraTerm-${{ steps.get_version.outputs.project_version }}-${{ matrix.platform }}-portable.zip
+            if [ "${{ matrix.platform }}" = "macos-x64" ]; then
+              PORTABLE_NAME="KetraTerm-Portable-macOS-Intel.zip"
+            else
+              PORTABLE_NAME="KetraTerm-Portable-macOS-AppleSilicon.zip"
+            fi
+            ditto -c -k --keepParent packaging/app-image/KetraTerm.app dist/$PORTABLE_NAME
           elif [ "${{ runner.os }}" = "Windows" ]; then
-            powershell -Command "Compress-Archive -Path packaging/app-image/KetraTerm -DestinationPath dist/KetraTerm-${{ steps.get_version.outputs.project_version }}-${{ matrix.platform }}-portable.zip -Force"
+            powershell -Command "Compress-Archive -Path packaging/app-image/KetraTerm -DestinationPath dist/KetraTerm-Portable.zip -Force"
           else
-            tar -czf dist/KetraTerm-${{ steps.get_version.outputs.project_version }}-${{ matrix.platform }}-portable.tar.gz -C packaging/app-image KetraTerm
+            tar -czf dist/KetraTerm-Portable-Linux.tar.gz -C packaging/app-image KetraTerm
           fi
 
       - name: Build Native Installer(s)
@@ -266,26 +249,42 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          # Find generated installer files and rename them to canonical names
           if [ "${{ runner.os }}" = "Windows" ]; then
             EXE_FILE=$(find packaging/installer -maxdepth 1 -name "*.exe" | head -n 1)
-            cp "$EXE_FILE" dist/KetraTerm-${{ steps.get_version.outputs.project_version }}-${{ matrix.platform }}.exe
+            cp "$EXE_FILE" dist/KetraTerm-Setup.exe
           elif [ "${{ runner.os }}" = "macOS" ]; then
             DMG_FILE=$(find packaging/installer -maxdepth 1 -name "*.dmg" | head -n 1)
-            cp "$DMG_FILE" dist/KetraTerm-${{ steps.get_version.outputs.project_version }}-${{ matrix.platform }}.dmg
+            if [ "${{ matrix.platform }}" = "macos-x64" ]; then
+              cp "$DMG_FILE" dist/KetraTerm-macOS-Intel.dmg
+            else
+              cp "$DMG_FILE" dist/KetraTerm-macOS-AppleSilicon.dmg
+            fi
           else
             DEB_FILE=$(find packaging/installer -maxdepth 1 -name "*.deb" | head -n 1)
-            cp "$DEB_FILE" dist/KetraTerm-${{ steps.get_version.outputs.project_version }}-${{ matrix.platform }}.deb
+            cp "$DEB_FILE" dist/ketraterm_amd64.deb
             
             RPM_FILE=$(find packaging/installer -maxdepth 1 -name "*.rpm" | head -n 1)
-            cp "$RPM_FILE" dist/KetraTerm-${{ steps.get_version.outputs.project_version }}-${{ matrix.platform }}.rpm
+            cp "$RPM_FILE" dist/ketraterm-x86_64.rpm
           fi
 
-      - name: Upload Platform Artifacts
+      - name: Upload Installer Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: native-${{ matrix.platform }}
-          path: dist/*
+          name: ${{ matrix.installer_name }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.deb
+            dist/*.rpm
+
+      - name: Upload Portable Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.portable_name }}
+          path: |
+            dist/*-Portable.zip
+            dist/*-Portable-*.zip
+            dist/*-Portable-*.tar.gz
 
   publish-github-release:
     needs: [build-no-runtime, build-native]
@@ -296,34 +295,58 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Download No-Runtime Archive
+      - name: Download No-Runtime
         uses: actions/download-artifact@v4
         with:
-          name: no-runtime-archive
+          name: KetraTerm-no-runtime
           path: release-artifacts
 
-      - name: Download Native Windows
+      - name: Download Windows Installer
         uses: actions/download-artifact@v4
         with:
-          name: native-windows-x64
+          name: setup-windows
           path: release-artifacts
 
-      - name: Download Native Linux
+      - name: Download Windows Portable
         uses: actions/download-artifact@v4
         with:
-          name: native-linux-x64
+          name: portable-windows
           path: release-artifacts
 
-      - name: Download Native macOS Intel
+      - name: Download Linux Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: native-macos-x64
+          name: deb-rpm
           path: release-artifacts
 
-      - name: Download Native macOS Apple Silicon
+      - name: Download Linux Portable
         uses: actions/download-artifact@v4
         with:
-          name: native-macos-aarch64
+          name: portable-linux
+          path: release-artifacts
+
+      - name: Download macOS Intel DMG
+        uses: actions/download-artifact@v4
+        with:
+          name: dmg-macos-intel
+          path: release-artifacts
+
+      - name: Download macOS Intel Portable
+        uses: actions/download-artifact@v4
+        with:
+          name: portable-macos-intel
+          path: release-artifacts
+
+      - name: Download macOS Apple Silicon DMG
+        uses: actions/download-artifact@v4
+        with:
+          name: dmg-macos-applesilicon
+          path: release-artifacts
+
+      - name: Download macOS Apple Silicon Portable
+        uses: actions/download-artifact@v4
+        with:
+          name: portable-macos-applesilicon
           path: release-artifacts
 
       - name: Generate Checksums
