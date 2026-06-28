@@ -2,9 +2,8 @@ name: Deploy Dokka Docs to GitHub Pages
 
 on:
   push:
-    branches:
-      - master
-      - main
+    tags:
+      - "v*"
   workflow_dispatch:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
@@ -28,6 +27,15 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Determine Release Mode
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "RELEASE=true" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE=false" >> "$GITHUB_ENV"
+          fi
+
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
@@ -39,6 +47,13 @@ jobs:
 
       - name: Generate Dokka Docs
         run: ./gradlew dokkaGenerate
+
+      - name: Replace Version Placeholders
+        shell: bash
+        run: |
+          VERSION=$(cat VERSION | tr -d '\r\n')
+          echo "Injecting version: $VERSION"
+          sed -i "s/@VERSION@/$VERSION/g" website/*.html
 
       - name: Prepare Website & Docs Bundle
         run: |
