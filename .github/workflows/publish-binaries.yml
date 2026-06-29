@@ -2,8 +2,9 @@ name: Publish Binaries
 
 on:
   push:
-    branches:
-      - 'feat/release'
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
 env:
   RELEASE: "true"
