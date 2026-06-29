@@ -1,0 +1,12 @@
+--name
+KetraTerm
+--vendor
+KetraTerm
+--copyright
+"Copyright 2026 KetraTerm"
+--description
+"KetraTerm"
+--main-jar
+ketraterm-app.jar
+--main-class
+io.github.ketraterm.app.KetraTermAppKt
