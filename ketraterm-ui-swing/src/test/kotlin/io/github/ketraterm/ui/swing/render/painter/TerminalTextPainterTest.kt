@@ -430,6 +430,18 @@ class TerminalTextPainterTest {
     @Nested
     inner class ComplexTextRendering {
         @Test
+        fun `geometric square meter glyphs are painted as contiguous terminal primitives`() {
+            val fixture = fixture()
+            val cache = renderCache(TestRenderFrame.text("\u25A0\u25A0"))
+            val centerY = fixture.metrics.cellHeight / 2
+
+            fixture.paintRow(cache)
+
+            assertEquals(TEST_RED, fixture.image.getRGB(fixture.metrics.cellWidth - 1, centerY))
+            assertEquals(TEST_RED, fixture.image.getRGB(fixture.metrics.cellWidth, centerY))
+        }
+
+        @Test
         fun `paints non-ascii unicode code point using layout cache`() {
             // Arrange
             val fixture = fixture()

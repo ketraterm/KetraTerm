@@ -25,13 +25,15 @@ import java.awt.geom.AffineTransform
 internal class TerminalCellPrimitivePainter {
     private val boxDrawingPainter = TerminalBoxDrawingPainter()
     private val blockElementPainter = TerminalBlockElementPainter()
+    private val geometricShapePainter = TerminalGeometricShapePainter()
 
     /**
      * Returns true when [codePoint] is handled by this primitive painter.
      */
     fun canPaint(codePoint: Int): Boolean =
         TerminalBoxDrawingGlyphs.canPaint(codePoint) ||
-            TerminalBlockElementGlyphs.canPaint(codePoint)
+            TerminalBlockElementGlyphs.canPaint(codePoint) ||
+            TerminalGeometricShapeGlyphs.canPaint(codePoint)
 
     /**
      * Paints one supported cell-native glyph.
@@ -69,6 +71,11 @@ internal class TerminalCellPrimitivePainter {
 
                 TerminalBlockElementGlyphs.canPaint(codePoint) -> {
                     blockElementPainter.paint(g, codePoint, x1, y1, x2 - x1, y2 - y1)
+                }
+
+                TerminalGeometricShapeGlyphs.canPaint(codePoint) -> {
+                    val nominalCellWidth = maxOf(1, kotlin.math.round(metrics.cellWidth * scaleX).toInt())
+                    geometricShapePainter.paint(g, codePoint, x1, y1, x2 - x1, y2 - y1, nominalCellWidth)
                 }
             }
         } finally {
