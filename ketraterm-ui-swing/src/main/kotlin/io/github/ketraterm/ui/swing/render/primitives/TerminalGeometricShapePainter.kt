@@ -16,7 +16,6 @@
 package io.github.ketraterm.ui.swing.render.primitives
 
 import io.github.ketraterm.ui.swing.render.primitives.TerminalGeometricShapeGlyphs.BLACK_SQUARE
-import io.github.ketraterm.ui.swing.render.primitives.TerminalGeometricShapeGlyphs.WHITE_SQUARE
 import java.awt.Graphics2D
 
 /**
@@ -34,7 +33,6 @@ internal class TerminalGeometricShapePainter {
     ) {
         when (codePoint) {
             BLACK_SQUARE -> paintBlackSquare(g, x, y, width, height, nominalCellWidth)
-            WHITE_SQUARE -> paintWhiteSquare(g, x, y, width, height, nominalCellWidth)
         }
     }
 
@@ -48,31 +46,6 @@ internal class TerminalGeometricShapePainter {
     ) {
         val blockHeight = squareHeight(nominalCellWidth, height)
         g.fillRect(x, y + centeredOffset(height, blockHeight), width, blockHeight)
-    }
-
-    private fun paintWhiteSquare(
-        g: Graphics2D,
-        x: Int,
-        y: Int,
-        width: Int,
-        height: Int,
-        nominalCellWidth: Int,
-    ) {
-        val blockHeight = squareHeight(nominalCellWidth, height)
-        val top = y + centeredOffset(height, blockHeight)
-        val stroke = maxOf(1, minOf(width, blockHeight) / 8)
-        val right = x + width - stroke
-        val bottom = top + blockHeight - stroke
-
-        g.fillRect(x, top, width, stroke)
-        g.fillRect(x, bottom, width, stroke)
-        if (width > stroke && blockHeight > stroke) {
-            val verticalHeight = blockHeight - stroke * 2
-            if (verticalHeight > 0) {
-                g.fillRect(x, top + stroke, stroke, verticalHeight)
-                g.fillRect(right, top + stroke, stroke, verticalHeight)
-            }
-        }
     }
 
     private fun squareHeight(

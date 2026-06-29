@@ -20,7 +20,6 @@ package io.github.ketraterm.ui.swing.render.primitives
  */
 internal object TerminalGeometricShapeGlyphs {
     const val BLACK_SQUARE: Int = 0x25A0
-    const val WHITE_SQUARE: Int = 0x25A1
 
-    fun canPaint(codePoint: Int): Boolean = codePoint == BLACK_SQUARE || codePoint == WHITE_SQUARE
+    fun canPaint(codePoint: Int): Boolean = codePoint == BLACK_SQUARE
 }

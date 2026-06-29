@@ -16,7 +16,6 @@
 package io.github.ketraterm.ui.swing.render.primitives
 
 import io.github.ketraterm.ui.swing.render.primitives.TerminalGeometricShapeGlyphs.BLACK_SQUARE
-import io.github.ketraterm.ui.swing.render.primitives.TerminalGeometricShapeGlyphs.WHITE_SQUARE
 import org.junit.jupiter.api.Test
 import java.awt.Color
 import java.awt.Graphics2D
@@ -61,17 +60,8 @@ class TerminalGeometricShapePainterTest {
     }
 
     @Test
-    fun `white square paints an outline without filling the center`() {
-        val (image, g, painter) = fixture(width = 16, height = 16)
-
-        painter.paint(g, WHITE_SQUARE, 0, 0, image.width, image.height)
-        g.dispose()
-
-        assertTrue(isPainted(image, 0, 0))
-        assertTrue(isPainted(image, image.width - 1, 0))
-        assertTrue(isPainted(image, 0, image.height - 1))
-        assertTrue(isPainted(image, image.width - 1, image.height - 1))
-        assertEquals(0, image.getRGB(image.width / 2, image.height / 2))
+    fun `white square stays on the font-rendered path`() {
+        assertFalse(TerminalGeometricShapeGlyphs.canPaint(0x25A1))
     }
 
     private fun fixture(

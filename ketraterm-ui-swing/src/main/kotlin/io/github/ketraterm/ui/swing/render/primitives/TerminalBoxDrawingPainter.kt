@@ -44,40 +44,66 @@ internal class TerminalBoxDrawingPainter {
         y: Int,
         width: Int,
         height: Int,
+        nominalCellWidth: Int = width,
+        nominalCellHeight: Int = height,
     ) {
         val xD = x.toDouble()
         val yD = y.toDouble()
         val wD = width.toDouble()
         val hD = height.toDouble()
+        val metricWD = nominalCellWidth.toDouble()
+        val metricHD = nominalCellHeight.toDouble()
 
+        // Bounds use the exact rounded device cell; stroke style uses nominal
+        // device metrics so fractional HiDPI cells do not alternate thickness.
         // Mutually exclusive routing. Evaluated in order of complexity/probability.
         val roundedFallback = TerminalBoxDrawingGlyphs.roundedFallbackEdges(codePoint)
         if (roundedFallback != NONE) {
-            paintRoundedCorner(g, codePoint, xD, yD, wD, hD, roundedFallback)
+            paintRoundedCorner(g, codePoint, xD, yD, wD, hD, metricWD, metricHD, roundedFallback)
             return
         }
 
         val horizontalDashStyle = TerminalBoxDrawingGlyphs.horizontalDashStyle(codePoint)
         if (horizontalDashStyle != NONE) {
-            paintDashedHorizontal(g, xD, yD, wD, hD, horizontalDashStyle, TerminalBoxDrawingGlyphs.dashCount(codePoint))
+            paintDashedHorizontal(
+                g,
+                xD,
+                yD,
+                wD,
+                hD,
+                metricWD,
+                metricHD,
+                horizontalDashStyle,
+                TerminalBoxDrawingGlyphs.dashCount(codePoint),
+            )
             return
         }
 
         val verticalDashStyle = TerminalBoxDrawingGlyphs.verticalDashStyle(codePoint)
         if (verticalDashStyle != NONE) {
-            paintDashedVertical(g, xD, yD, wD, hD, verticalDashStyle, TerminalBoxDrawingGlyphs.dashCount(codePoint))
+            paintDashedVertical(
+                g,
+                xD,
+                yD,
+                wD,
+                hD,
+                metricWD,
+                metricHD,
+                verticalDashStyle,
+                TerminalBoxDrawingGlyphs.dashCount(codePoint),
+            )
             return
         }
 
         val diagonalMask = TerminalBoxDrawingGlyphs.diagonalMask(codePoint)
         if (diagonalMask != NONE) {
-            paintDiagonal(g, xD, yD, wD, hD, diagonalMask)
+            paintDiagonal(g, xD, yD, wD, hD, metricWD, metricHD, diagonalMask)
             return
         }
 
         val packedEdges = TerminalBoxDrawingGlyphs.edges(codePoint)
         if (packedEdges != NONE) {
-            paintPackedEdges(g, xD, yD, wD, hD, packedEdges)
+            paintPackedEdges(g, xD, yD, wD, hD, metricWD, metricHD, packedEdges)
         }
     }
 
@@ -87,6 +113,8 @@ internal class TerminalBoxDrawingPainter {
         y: Double,
         w: Double,
         h: Double,
+        metricW: Double,
+        metricH: Double,
         packed: Int,
     ) {
         val left = TerminalBoxDrawingGlyphs.edge(packed, LEFT_SHIFT)
@@ -98,9 +126,9 @@ internal class TerminalBoxDrawingPainter {
         val hasDoubleV = up == DOUBLE || down == DOUBLE
 
         if (hasDoubleH || hasDoubleV) {
-            paintDoubleEdges(g, x, y, w, h, left, right, up, down)
+            paintDoubleEdges(g, x, y, w, h, metricW, metricH, left, right, up, down)
         } else {
-            paintSingleEdges(g, x, y, w, h, left, right, up, down)
+            paintSingleEdges(g, x, y, w, h, metricW, metricH, left, right, up, down)
         }
     }
 
@@ -110,6 +138,8 @@ internal class TerminalBoxDrawingPainter {
         y: Double,
         w: Double,
         h: Double,
+        metricW: Double,
+        metricH: Double,
         left: Int,
         right: Int,
         up: Int,
@@ -118,10 +148,10 @@ internal class TerminalBoxDrawingPainter {
         val cx = x + w / 2.0
         val cy = y + h / 2.0
 
-        val tL = if (left != NONE) thickness(left, w, h) else 0.0
-        val tR = if (right != NONE) thickness(right, w, h) else 0.0
-        val tU = if (up != NONE) thickness(up, w, h) else 0.0
-        val tD = if (down != NONE) thickness(down, w, h) else 0.0
+        val tL = if (left != NONE) thickness(left, metricW, metricH) else 0.0
+        val tR = if (right != NONE) thickness(right, metricW, metricH) else 0.0
+        val tU = if (up != NONE) thickness(up, metricW, metricH) else 0.0
+        val tD = if (down != NONE) thickness(down, metricW, metricH) else 0.0
 
         // The maximum thickness of the perpendicular axis dictates how far
         // a line must cross the center to perfectly seal the outer corner gap.
@@ -148,6 +178,8 @@ internal class TerminalBoxDrawingPainter {
         y: Double,
         w: Double,
         h: Double,
+        metricW: Double,
+        metricH: Double,
         left: Int,
         right: Int,
         up: Int,
@@ -155,8 +187,8 @@ internal class TerminalBoxDrawingPainter {
     ) {
         val cx = x + w / 2.0
         val cy = y + h / 2.0
-        val off = doubleOffset(w, h)
-        val t = thin(w, h)
+        val off = doubleOffset(metricW, metricH)
+        val t = thin(metricW, metricH)
         val ext = t / 2.0
 
         val x1 = cx - off
@@ -180,7 +212,7 @@ internal class TerminalBoxDrawingPainter {
                 ext = ext,
             )
         } else if (left != NONE) {
-            val lt = thickness(left, w, h)
+            val lt = thickness(left, metricW, metricH)
             val end =
                 when {
                     u && d -> x1 + ext
@@ -201,7 +233,7 @@ internal class TerminalBoxDrawingPainter {
                 ext = ext,
             )
         } else if (right != NONE) {
-            val rt = thickness(right, w, h)
+            val rt = thickness(right, metricW, metricH)
             val start =
                 when {
                     u && d -> x2 - ext
@@ -222,7 +254,7 @@ internal class TerminalBoxDrawingPainter {
                 ext = ext,
             )
         } else if (up != NONE) {
-            val ut = thickness(up, w, h)
+            val ut = thickness(up, metricW, metricH)
             val end =
                 when {
                     l && r -> y1 + ext
@@ -243,7 +275,7 @@ internal class TerminalBoxDrawingPainter {
                 ext = ext,
             )
         } else if (down != NONE) {
-            val dt = thickness(down, w, h)
+            val dt = thickness(down, metricW, metricH)
             val start =
                 when {
                     l && r -> y2 - ext
@@ -260,10 +292,12 @@ internal class TerminalBoxDrawingPainter {
         y: Double,
         w: Double,
         h: Double,
+        metricW: Double,
+        metricH: Double,
         style: Int,
         dashCount: Int,
     ) {
-        val t = thickness(style, w, h)
+        val t = thickness(style, metricW, metricH)
         val cy = y + h / 2.0
 
         iterateDashes(dashCount, w) { startOffset, endOffset ->
@@ -277,10 +311,12 @@ internal class TerminalBoxDrawingPainter {
         y: Double,
         w: Double,
         h: Double,
+        metricW: Double,
+        metricH: Double,
         style: Int,
         dashCount: Int,
     ) {
-        val t = thickness(style, w, h)
+        val t = thickness(style, metricW, metricH)
         val cx = x + w / 2.0
 
         iterateDashes(dashCount, h) { startOffset, endOffset ->
@@ -335,11 +371,13 @@ internal class TerminalBoxDrawingPainter {
         y: Double,
         w: Double,
         h: Double,
+        metricW: Double,
+        metricH: Double,
         fallbackEdges: Int,
     ) {
-        val strokeThickness = quantizeStrokeWidth(thickness(LIGHT, w, h))
+        val strokeThickness = quantizeStrokeWidth(thickness(LIGHT, metricW, metricH))
         if (w <= strokeThickness || h <= strokeThickness) {
-            paintPackedEdges(g, x, y, w, h, fallbackEdges)
+            paintPackedEdges(g, x, y, w, h, metricW, metricH, fallbackEdges)
             return
         }
 
@@ -409,6 +447,8 @@ internal class TerminalBoxDrawingPainter {
         y: Double,
         w: Double,
         h: Double,
+        metricW: Double,
+        metricH: Double,
         mask: Int,
     ) {
         val path = pathLocal.get().apply { reset() }
@@ -422,7 +462,7 @@ internal class TerminalBoxDrawingPainter {
             path.lineTo(x + w, y + h)
         }
 
-        val strokeThickness = thickness(LIGHT, w, h)
+        val strokeThickness = thickness(LIGHT, metricW, metricH)
         withAntialiasing(g, strokeThickness.toFloat()) {
             g.draw(path)
         }
