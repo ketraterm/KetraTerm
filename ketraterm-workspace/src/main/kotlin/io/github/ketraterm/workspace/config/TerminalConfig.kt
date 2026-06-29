@@ -71,6 +71,8 @@ private fun defaultFontFamily(): String {
  * @property lineHeight font metric line-height multiplier.
  * @property shellRequestResizeWindow whether shell application window/grid resize requests are honored.
  * @property desktopNotificationsEnabled whether desktop notifications are enabled.
+ * @property shellSuggestionsEnabled whether host-provided shell suggestions may
+ * be shown in the terminal UI.
  * @property persistentCommandHistoryEnabled whether completed command metadata
  * is retained by supporting product hosts across application restarts.
  * @property clipboardLocalWrite OSC 52 write permission for local sessions.
@@ -101,6 +103,7 @@ data class TerminalConfig(
     val shellRequestResizeWindow: Boolean = DEFAULT_SHELL_REQUEST_RESIZE_WINDOW,
     val shellRequestWindowManipulation: Boolean = DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION,
     val desktopNotificationsEnabled: Boolean = DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED,
+    val shellSuggestionsEnabled: Boolean = DEFAULT_SHELL_SUGGESTIONS_ENABLED,
     val persistentCommandHistoryEnabled: Boolean = DEFAULT_PERSISTENT_COMMAND_HISTORY_ENABLED,
     val clipboardLocalWrite: TerminalClipboardPermission = DEFAULT_CLIPBOARD_LOCAL_WRITE,
     val clipboardRemoteWrite: TerminalClipboardPermission = DEFAULT_CLIPBOARD_REMOTE_WRITE,
@@ -167,6 +170,7 @@ data class TerminalConfig(
         const val DEFAULT_SHELL_REQUEST_RESIZE_WINDOW: Boolean = false
         const val DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION: Boolean = false
         const val DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED: Boolean = true
+        const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
         const val DEFAULT_PERSISTENT_COMMAND_HISTORY_ENABLED: Boolean = false
 
         val DEFAULT_CLIPBOARD_LOCAL_WRITE: TerminalClipboardPermission = TerminalClipboardPermission.PROMPT

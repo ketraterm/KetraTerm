@@ -128,6 +128,7 @@ class TerminalConfigTest {
         assertEquals(PasteSanitizationPolicy.RAW, config.pasteSanitizationPolicy)
         assertFalse(config.shellRequestResizeWindow)
         assertFalse(config.shellRequestWindowManipulation)
+        assertTrue(config.shellSuggestionsEnabled)
         assertEquals(TerminalClipboardPermission.PROMPT, config.clipboardLocalWrite)
         assertEquals(TerminalClipboardPermission.DENY, config.clipboardRemoteWrite)
         assertEquals(TerminalClipboardPermission.DENY, config.clipboardRead)
@@ -162,6 +163,7 @@ class TerminalConfigTest {
                 pasteSanitizationPolicy = PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS,
                 shellRequestResizeWindow = true,
                 shellRequestWindowManipulation = true,
+                shellSuggestionsEnabled = false,
                 desktopNotificationsEnabled = false,
                 clipboardLocalWrite = TerminalClipboardPermission.ALLOW,
                 clipboardRemoteWrite = TerminalClipboardPermission.ALLOWLIST,
@@ -174,6 +176,7 @@ class TerminalConfigTest {
         manager.save(customConfig)
         assertTrue(Files.exists(configFile))
         assertTrue(Files.readString(configFile).contains("""paste_sanitization = "normalize-line-endings""""))
+        assertTrue(Files.readString(configFile).contains("""shell_suggestions_enabled = false"""))
         assertTrue(Files.readString(configFile).contains("""clipboard_local_write = "allow""""))
         assertTrue(Files.readString(configFile).contains("""clipboard_max_decoded_bytes = 500"""))
 

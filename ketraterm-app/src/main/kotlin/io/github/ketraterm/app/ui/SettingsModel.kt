@@ -50,6 +50,7 @@ internal class SettingsModel(
             lineHeight = settings.lineHeight.toDouble(),
             shellRequestResizeWindow = settings.shellRequestResizeWindow,
             shellRequestWindowManipulation = settings.shellRequestWindowManipulation,
+            shellSuggestionsEnabled = settings.shellSuggestionsEnabled,
             persistentCommandHistoryEnabled = settings.persistentCommandHistoryEnabled,
             clipboardLocalWrite = settings.clipboardLocalWrite,
             clipboardRemoteWrite = settings.clipboardRemoteWrite,
@@ -84,6 +85,7 @@ internal class SettingsModel(
         settings.lineHeight = uiState.lineHeight.toFloat()
         settings.shellRequestResizeWindow = uiState.shellRequestResizeWindow
         settings.shellRequestWindowManipulation = uiState.shellRequestWindowManipulation
+        settings.shellSuggestionsEnabled = uiState.shellSuggestionsEnabled
         settings.persistentCommandHistoryEnabled = uiState.persistentCommandHistoryEnabled
 
         settings.fontFamily = uiState.fontFamily
@@ -128,6 +130,7 @@ internal data class SettingsState(
     val lineHeight: Double,
     val shellRequestResizeWindow: Boolean,
     val shellRequestWindowManipulation: Boolean,
+    val shellSuggestionsEnabled: Boolean,
     val persistentCommandHistoryEnabled: Boolean,
     val clipboardLocalWrite: TerminalClipboardPermission,
     val clipboardRemoteWrite: TerminalClipboardPermission,

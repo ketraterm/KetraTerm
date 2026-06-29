@@ -74,6 +74,21 @@ class KetraTermIntellijSettingsTest {
     }
 
     @Test
+    fun `shell suggestions setting maps to swing settings`() {
+        val enabled =
+            KetraTermIntellijSettingsMapper.toSwingSettings(
+                KetraTermIntellijSettings.State(themeId = "nord"),
+            )
+        val disabled =
+            KetraTermIntellijSettingsMapper.toSwingSettings(
+                KetraTermIntellijSettings.State(themeId = "nord", shellSuggestionsEnabled = false),
+            )
+
+        assertTrue(enabled.shellSuggestionsEnabled)
+        assertFalse(disabled.shellSuggestionsEnabled)
+    }
+
+    @Test
     fun `normalizes unknown theme ids to IntelliJ native theme`() {
         assertEquals(
             KetraTermIntellijSettings.DEFAULT_THEME_ID,

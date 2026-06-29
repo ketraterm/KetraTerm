@@ -85,6 +85,8 @@ import java.util.*
  * @property lineHeight vertical line height scaling factor.
  * @property shellRequestResizeWindow whether the terminal panel requests window resizing.
  * @property shellRequestWindowManipulation whether the terminal panel allows shell window manipulation.
+ * @property shellSuggestionsEnabled whether the reusable terminal component may
+ * show host-provided shell suggestion popups.
  */
 data class SwingSettings
     @JvmOverloads
@@ -124,6 +126,7 @@ data class SwingSettings
         val lineHeight: Float = 1.0f,
         val shellRequestResizeWindow: Boolean = false,
         val shellRequestWindowManipulation: Boolean = false,
+        val shellSuggestionsEnabled: Boolean = true,
     ) {
         init {
             require(columns > 0) { "columns must be > 0, was $columns" }

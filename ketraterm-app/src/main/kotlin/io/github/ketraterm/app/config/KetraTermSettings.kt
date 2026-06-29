@@ -165,6 +165,12 @@ internal class KetraTermSettings(
             updateConfig(config.copy(persistentCommandHistoryEnabled = value))
         }
 
+    var shellSuggestionsEnabled: Boolean
+        get() = config.shellSuggestionsEnabled
+        set(value) {
+            updateConfig(config.copy(shellSuggestionsEnabled = value))
+        }
+
     var clipboardLocalWrite: TerminalClipboardPermission
         get() = config.clipboardLocalWrite
         set(value) {
@@ -222,6 +228,7 @@ internal class KetraTermSettings(
             lineHeight = config.lineHeight,
             shellRequestResizeWindow = config.shellRequestResizeWindow,
             shellRequestWindowManipulation = config.shellRequestWindowManipulation,
+            shellSuggestionsEnabled = config.shellSuggestionsEnabled,
         )
     }
 
