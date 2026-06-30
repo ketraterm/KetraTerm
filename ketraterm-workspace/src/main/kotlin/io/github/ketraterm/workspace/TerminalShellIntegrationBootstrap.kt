@@ -15,9 +15,12 @@
  */
 package io.github.ketraterm.workspace
 
+import io.github.ketraterm.workspace.config.TerminalWorkspaceConfigManager
 import java.io.IOException
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermission
 import java.util.*
 
 /**
@@ -40,18 +43,52 @@ internal object TerminalShellIntegrationBootstrap {
         scriptDirectory: Path = defaultScriptDirectory(),
     ): TerminalProfile {
         if (!enabled) return profile
-        return when (profile.kind) {
-            TerminalProfileKind.POWERSHELL -> withPowerShellIntegration(profile)
-            TerminalProfileKind.BASH,
-            TerminalProfileKind.GIT_BASH,
-            -> withBashIntegration(profile)
-            TerminalProfileKind.ZSH -> withZshIntegration(profile, scriptDirectory)
-            TerminalProfileKind.FISH -> withFishIntegration(profile)
-            TerminalProfileKind.WSL,
-            TerminalProfileKind.UBUNTU,
-            -> withExplicitWslShellIntegration(profile, scriptDirectory)
-            else -> profile
+
+        val integrated =
+            when (profile.kind) {
+                TerminalProfileKind.POWERSHELL -> withPowerShellIntegration(profile)
+                TerminalProfileKind.BASH,
+                TerminalProfileKind.GIT_BASH,
+                -> withBashIntegration(profile)
+                TerminalProfileKind.ZSH -> withZshIntegration(profile, scriptDirectory)
+                TerminalProfileKind.FISH -> withFishIntegration(profile)
+                TerminalProfileKind.WSL,
+                TerminalProfileKind.UBUNTU,
+                -> withExplicitWslShellIntegration(profile, scriptDirectory)
+                else -> profile
+            }
+
+        if (integrated === profile) return profile
+
+        val configPath = TerminalWorkspaceConfigManager.getDefaultPath()
+        val historyPath = configPath.resolveSibling("command-history-v1.tsv")
+        val binDir = scriptDirectory.resolve("bin")
+        writeWrapperScripts(binDir)
+
+        val baseEnv = integrated.environment.toMutableMap()
+        baseEnv["KetraTerm_VERSION"] = getAppVersion()
+        baseEnv["KetraTerm_CONFIG_PATH"] = configPath.toAbsolutePath().toString()
+        baseEnv["KetraTerm_HISTORY_PATH"] = historyPath.toAbsolutePath().toString()
+        baseEnv["KetraTerm_OS"] = System.getProperty("os.name") + " (" + System.getProperty("os.arch") + ")"
+        baseEnv["KetraTerm_JVM"] = System.getProperty("java.version") + " (" + System.getProperty("java.vendor") + ")"
+
+        val systemPathKey = System.getenv().keys.firstOrNull { it.equals("PATH", ignoreCase = true) } ?: "PATH"
+        val pathKey = baseEnv.keys.firstOrNull { it.equals("PATH", ignoreCase = true) } ?: systemPathKey
+        val existingPath = baseEnv[pathKey] ?: System.getenv(pathKey) ?: ""
+        val separator = if (System.getProperty("os.name").lowercase(Locale.ROOT).contains("win")) ";" else ":"
+        val newPath =
+            if (existingPath.isNotEmpty()) {
+                "${binDir.toAbsolutePath()}$separator$existingPath"
+            } else {
+                binDir.toAbsolutePath().toString()
+            }
+        val keysToRemove = baseEnv.keys.filter { it.equals("PATH", ignoreCase = true) && it != pathKey }
+        for (k in keysToRemove) {
+            baseEnv.remove(k)
         }
+        baseEnv[pathKey] = newPath
+
+        return integrated.copy(environment = baseEnv)
     }
 
     private fun withExplicitWslShellIntegration(
@@ -535,5 +572,175 @@ internal object TerminalShellIntegrationBootstrap {
                 }
             }
         }
+        """.trimIndent()
+
+    private fun getAppVersion(): String =
+        try {
+            val properties = Properties()
+            val inputStream: InputStream? =
+                TerminalShellIntegrationBootstrap::class.java.classLoader
+                    .getResourceAsStream("io/github/ketraterm/app/version.properties")
+            if (inputStream != null) {
+                properties.load(inputStream)
+                properties.getProperty("version") ?: "0.1.0"
+            } else {
+                "0.1.0"
+            }
+        } catch (_: Exception) {
+            "0.1.0"
+        }
+
+    private fun writeWrapperScripts(directory: Path) {
+        try {
+            Files.createDirectories(directory)
+            val posixPath = directory.resolve("ketra")
+            writeIfChanged(posixPath, KETRA_POSIX_SCRIPT)
+            try {
+                val perms = Files.getPosixFilePermissions(posixPath)
+                val newPerms =
+                    perms + PosixFilePermission.OWNER_EXECUTE + PosixFilePermission.GROUP_EXECUTE + PosixFilePermission.OTHERS_EXECUTE
+                Files.setPosixFilePermissions(posixPath, newPerms)
+            } catch (_: UnsupportedOperationException) {
+                // Non-POSIX filesystem (e.g. Windows)
+            } catch (_: Exception) {
+                // Ignored
+            }
+
+            val batchPath = directory.resolve("ketra.bat")
+            writeIfChanged(batchPath, KETRA_BATCH_SCRIPT)
+        } catch (_: IOException) {
+            // Ignored
+        }
+    }
+
+    private val KETRA_POSIX_SCRIPT =
+        """
+        #!/bin/sh
+        case "${'$'}1" in
+            version)
+                echo "KetraTerm version ${'$'}{KetraTerm_VERSION:-unknown}"
+                ;;
+            config)
+                if [ -n "${'$'}KetraTerm_CONFIG_PATH" ]; then
+                    if [ -n "${'$'}EDITOR" ]; then
+                        "${'$'}EDITOR" "${'$'}KetraTerm_CONFIG_PATH"
+                    elif command -v nano >/dev/null 2>&1; then
+                        nano "${'$'}KetraTerm_CONFIG_PATH"
+                    elif command -v vim >/dev/null 2>&1; then
+                        vim "${'$'}KetraTerm_CONFIG_PATH"
+                    else
+                        cat "${'$'}KetraTerm_CONFIG_PATH"
+                    fi
+                else
+                    echo "KetraTerm_CONFIG_PATH is not set."
+                    exit 1
+                fi
+                ;;
+            history)
+                if [ -n "${'$'}KetraTerm_HISTORY_PATH" ]; then
+                    if [ -f "${'$'}KetraTerm_HISTORY_PATH" ]; then
+                        tail -n +2 "${'$'}KetraTerm_HISTORY_PATH" | cut -f6 | while read -r cmd; do
+                            if [ -n "${'$'}cmd" ]; then
+                                cleaned=\$(echo "${'$'}cmd" | tr -d '\r' | tr -- '-_' '+/')
+                                case \$((${'$'}{'#'}cleaned % 4)) in
+                                    2) cleaned="${'$'}{cleaned}==" ;;
+                                    3) cleaned="${'$'}{cleaned}=" ;;
+                                    *) ;;
+                                esac
+                                echo "${'$'}cleaned" | base64 -d 2>/dev/null || echo "${'$'}cleaned" | openssl base64 -d -A 2>/dev/null || echo "${'$'}cmd"
+                            fi
+                        done
+                    else
+                        echo "No history found at ${'$'}KetraTerm_HISTORY_PATH"
+                        exit 1
+                    fi
+                else
+                    echo "KetraTerm_HISTORY_PATH is not set."
+                    exit 1
+                fi
+                ;;
+            info)
+                echo "KetraTerm System Information:"
+                echo "  Version:       ${'$'}{KetraTerm_VERSION:-unknown}"
+                echo "  Config Path:   ${'$'}{KetraTerm_CONFIG_PATH:-unknown}"
+                echo "  History Path:  ${'$'}{KetraTerm_HISTORY_PATH:-unknown}"
+                echo "  OS:            ${'$'}{KetraTerm_OS:-unknown}"
+                echo "  JVM:           ${'$'}{KetraTerm_JVM:-unknown}"
+                echo ""
+                echo "Environment Variables:"
+                echo "  KetraTerm_VERSION       Active version of the terminal application"
+                echo "  KetraTerm_CONFIG_PATH   Path to workspace settings file (config.toml)"
+                echo "  KetraTerm_HISTORY_PATH  Path to persistent command history database file"
+                echo "  KetraTerm_OS            Current OS and architecture details"
+                echo "  KetraTerm_JVM           Java runtime version and vendor details"
+                echo ""
+                echo "Useful Commands:"
+                echo "  cat \"${'$'}{KetraTerm_CONFIG_PATH}\"       - Display the configuration file"
+                echo "  nano \"${'$'}{KetraTerm_CONFIG_PATH}\"      - Edit the configuration file in nano"
+                echo "  cat \"${'$'}{KetraTerm_HISTORY_PATH}\"      - Display the raw tab-separated command database"
+                ;;
+            *)
+                echo "Usage: ketra [version | config | history | info]"
+                exit 1
+                ;;
+        esac
+        """.trimIndent()
+
+    private val KETRA_BATCH_SCRIPT =
+        """
+        @echo off
+        if "%1"=="version" goto run_version
+        if "%1"=="config" goto run_config
+        if "%1"=="history" goto run_history
+        if "%1"=="info" goto run_info
+
+        echo Usage: ketra [version ^| config ^| history ^| info]
+        exit /b 1
+
+        :run_version
+        echo KetraTerm version %KetraTerm_VERSION%
+        goto end
+
+        :run_config
+        if "%KetraTerm_CONFIG_PATH%"=="" (
+            echo KetraTerm_CONFIG_PATH is not set.
+            exit /b 1
+        )
+        if not "%EDITOR%"=="" (
+            %EDITOR% "%KetraTerm_CONFIG_PATH%"
+        ) else (
+            notepad "%KetraTerm_CONFIG_PATH%"
+        )
+        goto end
+
+        :run_history
+        if "%KetraTerm_HISTORY_PATH%"=="" (
+            echo KetraTerm_HISTORY_PATH is not set.
+            exit /b 1
+        )
+        if not exist "%KetraTerm_HISTORY_PATH%" (
+            echo No history found at %KetraTerm_HISTORY_PATH%
+            exit /b 1
+        )
+        powershell -NoProfile -Command "Get-Content '%KetraTerm_HISTORY_PATH%' | Select-Object -Skip 1 | ForEach-Object { ${'$'}fields = ${'$'}_.Split([char]9); if (${'$'}fields.Length -ge 6) { ${'$'}b = ${'$'}fields[5].Replace('-', '+').Replace('_', '/'); switch (${'$'}b.Length %% 4) { 2 { ${'$'}b += '==' } 3 { ${'$'}b += '=' } }; [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(${'$'}b)) } }"
+        goto end
+
+        :run_info
+        echo KetraTerm System Information:
+        echo   Version:       %KetraTerm_VERSION%
+        echo   Config Path:   %KetraTerm_CONFIG_PATH%
+        echo   History Path:  %KetraTerm_HISTORY_PATH%
+        echo   OS:            %KetraTerm_OS%
+        echo   JVM:           %KetraTerm_JVM%
+        echo.
+        echo Environment Variables:
+        echo   KetraTerm_VERSION       Active version of the terminal application
+        echo   KetraTerm_CONFIG_PATH   Path to workspace settings file (config.toml)
+        echo   KetraTerm_HISTORY_PATH  Path to persistent command history database file
+        echo   KetraTerm_OS            Current OS and architecture details
+        echo   KetraTerm_JVM           Java runtime version and vendor details
+        goto end
+
+        :end
         """.trimIndent()
 }
