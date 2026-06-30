@@ -78,6 +78,7 @@ class TerminalSession(
     private val localCloseRequested = AtomicBoolean(false)
     private val remoteClosed = AtomicBoolean(false)
     private val parserClosed = AtomicBoolean(false)
+    private val closeNotified = AtomicBoolean(false)
     private val started = AtomicBoolean(false)
     private val renderScheduled = AtomicBoolean(false)
     private val pendingRenderRequest = AtomicLong(packRenderRequest(scrollbackOffset = 0, viewportRows = 0))
@@ -96,6 +97,7 @@ class TerminalSession(
         }
 
     private val dirtyListeners = CopyOnWriteArrayList<() -> Unit>()
+    private val closeListeners = CopyOnWriteArrayList<TerminalSessionCloseListener>()
 
     @Volatile
     private var legacyOnDirty: (() -> Unit)? = null
@@ -129,6 +131,37 @@ class TerminalSession(
     fun removeDirtyListener(listener: () -> Unit) {
         dirtyListeners.remove(listener)
     }
+
+    /**
+     * Registers a listener that is invoked exactly once when this session
+     * reaches a terminal lifecycle state.
+     *
+     * The callback runs on the thread that observes the close: connector
+     * watcher/reader thread for remote closure or the caller thread for local
+     * [close]. Implementations should return quickly and marshal to UI threads
+     * themselves when needed.
+     *
+     * @param listener listener to add.
+     */
+    fun addCloseListener(listener: TerminalSessionCloseListener) {
+        closeListeners.add(listener)
+    }
+
+    /**
+     * Unregisters a previously registered session close listener.
+     *
+     * @param listener listener to remove.
+     */
+    fun removeCloseListener(listener: TerminalSessionCloseListener) {
+        closeListeners.remove(listener)
+    }
+
+    /**
+     * Returns true after either local shutdown, remote closure, or transport
+     * failure has made the session unable to accept more input.
+     */
+    val isClosed: Boolean
+        get() = isSessionClosed()
 
     /**
      * Remote process exit code after [onClosed] receives one.
@@ -348,7 +381,7 @@ class TerminalSession(
         bytes.checkBounds(offset, length)
 
         synchronized(inboundLock) {
-            if (isClosed()) return
+            if (isSessionClosed()) return
 
             synchronized(mutationLock) {
                 parser.accept(bytes, offset, length)
@@ -394,7 +427,7 @@ class TerminalSession(
         scrollbackOffset: Int,
         viewportRows: Int,
     ) {
-        if (isClosed()) return
+        if (isSessionClosed()) return
         pendingRenderRequest.set(
             packRenderRequest(
                 scrollbackOffset = scrollbackOffset.coerceAtLeast(0),
@@ -446,7 +479,7 @@ class TerminalSession(
         var failedGeneration = NO_RENDER_GENERATION
         var reschedule = true
         try {
-            while (!isClosed()) {
+            while (!isSessionClosed()) {
                 val generation = pendingRenderGeneration.get()
                 if (generation == publishedGeneration) return
 
@@ -490,7 +523,7 @@ class TerminalSession(
             renderScheduled.set(false)
             val pendingGeneration = pendingRenderGeneration.get()
             if (reschedule &&
-                !isClosed() &&
+                !isSessionClosed() &&
                 pendingGeneration != publishedGeneration &&
                 pendingGeneration != failedGeneration
             ) {
@@ -551,6 +584,7 @@ class TerminalSession(
         if (!remoteClosed.compareAndSet(false, true)) return
         this.exitCode = exitCode
         cleanupParser()
+        notifyCloseListenersOnce(TerminalSessionCloseEvent(exitCode = exitCode, failure = null, locallyRequested = false))
     }
 
     /**
@@ -563,6 +597,7 @@ class TerminalSession(
         if (!remoteClosed.compareAndSet(false, true)) return
         failure = error
         cleanupParser()
+        notifyCloseListenersOnce(TerminalSessionCloseEvent(exitCode = null, failure = error, locallyRequested = false))
     }
 
     /**
@@ -574,11 +609,12 @@ class TerminalSession(
             connector.close()
         }
         cleanupParser()
+        notifyCloseListenersOnce(TerminalSessionCloseEvent(exitCode = exitCode, failure = failure, locallyRequested = true))
         renderWorker.awaitTermination(500, TimeUnit.MILLISECONDS)
     }
 
     private fun drainResponses() {
-        while (!isClosed()) {
+        while (!isSessionClosed()) {
             val count =
                 synchronized(mutationLock) {
                     responseReader.readResponseBytes(responseScratch, 0, responseScratch.size)
@@ -587,7 +623,7 @@ class TerminalSession(
             if (count <= 0) return
 
             synchronized(outboundWriteLock) {
-                if (!isClosed()) {
+                if (!isSessionClosed()) {
                     connector.write(responseScratch, 0, count)
                 }
             }
@@ -603,9 +639,20 @@ class TerminalSession(
         renderWorker.shutdown()
     }
 
-    private fun isClosed(): Boolean = localCloseRequested.get() || remoteClosed.get()
+    private fun notifyCloseListenersOnce(event: TerminalSessionCloseEvent) {
+        if (!closeNotified.compareAndSet(false, true)) return
+        for (listener in closeListeners) {
+            try {
+                listener.sessionClosed(this, event)
+            } catch (_: Exception) {
+                // Lifecycle listener failures must not interfere with cleanup.
+            }
+        }
+    }
 
-    private fun isAcceptingInput(): Boolean = started.get() && !isClosed()
+    private fun isSessionClosed(): Boolean = localCloseRequested.get() || remoteClosed.get()
+
+    private fun isAcceptingInput(): Boolean = started.get() && !isSessionClosed()
 
     companion object {
         private val SESSION_COUNTER =

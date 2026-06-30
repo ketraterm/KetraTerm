@@ -395,12 +395,22 @@ internal class TabManager(
         }
 
     fun closePane(pane: TerminalPane) {
-        val tabId = tabBar.selectedId() ?: return
+        closePane(pane, openReplacementWhenLastPane = false)
+    }
+
+    private fun closePane(
+        pane: TerminalPane,
+        openReplacementWhenLastPane: Boolean,
+    ) {
+        val tabId = visualTabIdForPane(pane) ?: return
         val root = tabRoots[tabId] ?: return
         val allPanes = root.allPanes()
 
         if (allPanes.size <= 1) {
             closeTab(tabId)
+            if (openReplacementWhenLastPane && tabRoots.isEmpty()) {
+                openTab(defaultProfileProvider())
+            }
             return
         }
 
@@ -434,6 +444,9 @@ internal class TabManager(
         val focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner
         return root.findActivePane(focusOwner) ?: root.allPanes().firstOrNull()
     }
+
+    private fun visualTabIdForPane(pane: TerminalPane): String? =
+        tabRoots.entries.firstOrNull { (_, root) -> root.allPanes().any { it === pane } }?.key
 
     fun showPaneContextMenu(
         pane: TerminalPane,
@@ -681,6 +694,17 @@ internal class TabManager(
         ) {
             SwingUtilities.invokeLater {
                 updateTabColor(tab.id, color)
+            }
+        }
+
+        override fun sessionClosed(
+            tab: TerminalWorkspaceTab,
+            exitCode: Int?,
+            failure: Throwable?,
+        ) {
+            SwingUtilities.invokeLater {
+                val pane = panes.firstOrNull { it.tab == tab } ?: return@invokeLater
+                closePane(pane, openReplacementWhenLastPane = true)
             }
         }
 

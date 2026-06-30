@@ -6,7 +6,27 @@ plugins {
     id("org.jetbrains.intellij.platform")
 }
 
-private val ketratermVersion = "0.1.0-alpha01-SNAPSHOT"
+val repositoryVersionProvider =
+    providers.fileContents(layout.projectDirectory.file("../VERSION")).asText.map { it.trim() }
+val isReleaseBuild =
+    providers.environmentVariable("RELEASE").map { it.equals("true", ignoreCase = true) }.orElse(false)
+val pluginVersionProvider =
+    repositoryVersionProvider.zip(isReleaseBuild) { repositoryVersion, isRelease ->
+        if (isRelease) repositoryVersion else "$repositoryVersion-SNAPSHOT"
+    }
+val intellijIdeaVersion = providers.gradleProperty("intellijIdeaVersion")
+val pluginSinceBuild = providers.gradleProperty("pluginSinceBuild")
+val pluginPublishChannel = providers.gradleProperty("pluginPublishChannel")
+val pluginDescription =
+    """
+    <p>KetraTerm is a fast, modern terminal for IntelliJ Platform IDEs, built for shells, command-line tools, and rich TUI applications that developers keep open all day.</p>
+    <p>It provides project-aware terminal tabs, quick shell-profile launch actions, IDE color-scheme integration, configurable typography and cursor behavior, scrollback, paste handling, visual bell support, and guarded clipboard/title controls.</p>
+    <p>KetraTerm focuses on contemporary terminal workflows: responsive rendering, Unicode-aware text, modern color and notification sequences, and security-conscious handling of terminal-initiated IDE actions.</p>
+    """.trimIndent()
+
+version = pluginVersionProvider.get()
+
+private val ketratermVersion = version.toString()
 
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
@@ -22,7 +42,7 @@ dependencies {
 
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {
-        intellijIdea("2025.3.5")
+        intellijIdea(intellijIdeaVersion)
         testFramework(TestFrameworkType.Platform)
 
         // Add plugin dependencies for compilation here, for example:
@@ -32,11 +52,23 @@ dependencies {
 
 intellijPlatform {
     pluginConfiguration {
+        id.set("io.github.ketraterm.terminal")
+        name.set("KetraTerm")
         version.set(project.version.toString())
+        description.set(pluginDescription)
 
         ideaVersion {
-            sinceBuild.set("253")
+            sinceBuild.set(pluginSinceBuild)
         }
+
+        vendor {
+            name.set("KetraTerm")
+            url.set("https://github.com/ketraterm/KetraTerm")
+        }
+    }
+
+    publishing {
+        channels.set(listOf(pluginPublishChannel.get()))
     }
 }
 

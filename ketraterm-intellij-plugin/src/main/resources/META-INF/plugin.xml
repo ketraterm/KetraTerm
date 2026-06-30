@@ -5,9 +5,7 @@
 
     <vendor url="https://github.com/ketraterm/KetraTerm">KetraTerm</vendor>
 
-    <description><![CDATA[
-        KetraTerm terminal emulator integration for IntelliJ Platform IDEs.
-        ]]></description>
+    <description>KetraTerm terminal emulator integration for IntelliJ Platform IDEs.</description>
 
     <depends>com.intellij.modules.platform</depends>
 

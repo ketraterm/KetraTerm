@@ -5,12 +5,14 @@
 This build is intentionally independent from the root KetraTerm Gradle build. The
 root build owns the terminal libraries, standalone app, tests, and benchmarks.
 This build owns IntelliJ Platform plugin packaging, sandbox runs, plugin
-verification, IDE services, and future Marketplace publishing.
+verification, IDE services, signing, and Marketplace publishing.
 
 ## Status
 
-The plugin is currently a scaffold. Runtime terminal integration should be
-added in small, verifiable slices after the build structure is clean.
+The plugin is the IntelliJ host for KetraTerm. It opens local terminal tabs in
+a bottom tool window, uses KetraTerm's reusable Swing terminal and
+workspace/session stack, and exposes IDE-native settings for startup, rendering,
+input, and security policy.
 
 Current intent:
 
@@ -18,8 +20,11 @@ Current intent:
 - reuse KetraTerm modules instead of copying terminal logic into the plugin.
 - keep the root `settings.gradle.kts` and root `build.gradle.kts` free of
   IntelliJ Platform configuration.
-- use a composite build for local development when the plugin begins depending
-  on KetraTerm modules.
+- use the repository `VERSION` file for the plugin and KetraTerm library
+  dependency version. Local development builds append `-SNAPSHOT`; release
+  builds use the exact repository version when `RELEASE=true`.
+- publish releases to the Marketplace default channel unless
+  `pluginPublishChannel` is overridden.
 
 ## Build
 
@@ -29,6 +34,7 @@ From this directory:
 ./gradlew test
 ./gradlew runIde
 ./gradlew verifyPlugin
+./gradlew buildPlugin
 ```
 
 From the repository root:
@@ -37,6 +43,21 @@ From the repository root:
 ./gradlew -p ketraterm-intellij-plugin test
 ./gradlew -p ketraterm-intellij-plugin runIde
 ./gradlew -p ketraterm-intellij-plugin verifyPlugin
+./gradlew -p ketraterm-intellij-plugin buildPlugin
+```
+
+Release build:
+
+```text
+RELEASE=true ./gradlew -p ketraterm-intellij-plugin buildPlugin verifyPlugin
+```
+
+Marketplace publishing uses the IntelliJ Platform Gradle Plugin defaults for
+`PUBLISH_TOKEN` and publishes to `pluginPublishChannel` from
+`gradle.properties`.
+
+```text
+RELEASE=true PUBLISH_TOKEN=... ./gradlew -p ketraterm-intellij-plugin publishPlugin
 ```
 
 ## Architecture
@@ -59,15 +80,15 @@ Platform dependencies to reusable modules.
 
 ## Local Source Wiring
 
-When plugin implementation begins, prefer published-style dependencies in this
-build and local substitution through a composite build:
+This build uses published-style KetraTerm coordinates and local substitution
+through a composite build:
 
 ```kotlin
 // ketraterm-intellij-plugin/settings.gradle.kts
 includeBuild("..")
 ```
 
-The plugin dependencies should then use normal coordinates rather than root
+Plugin dependencies should continue to use normal coordinates rather than root
 project references:
 
 ```kotlin

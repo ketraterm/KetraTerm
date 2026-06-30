@@ -28,6 +28,8 @@ or add IntelliJ dependencies to reusable KetraTerm modules.
 
 ## Current Scope
 
-This build currently contains plugin scaffolding and documentation. Runtime IDE
-features should be added in small slices with focused tests and clear
-ownership boundaries.
+This build contains the IntelliJ host integration: a bottom KetraTerm tool
+window, local terminal tab startup, shell profile launch actions, settings
+bridges, IDE notifications, clipboard policy prompts, icons, and focused
+host-adapter tests. New runtime IDE features should still be added in small
+slices with focused tests and clear ownership boundaries.
