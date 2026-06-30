@@ -35,8 +35,12 @@ import java.text.BreakIterator
  * path context, or a short description.
  * @property source compact source label, such as `history`, `path`, or `git`.
  * @property deleteCount number of characters/grapheme clusters to delete before
- * inserting the suggestion. `-1` triggers default prefix deletion based on
- * cursor offset.
+ * inserting the suggestion when no explicit replacement range is set. `-1`
+ * triggers default prefix deletion based on cursor offset.
+ * @property replacementStartOffset inclusive UTF-16 start offset in the request
+ * command text for range-aware replacement, or `-1` when unset.
+ * @property replacementEndOffset exclusive UTF-16 end offset in the request
+ * command text for range-aware replacement, or `-1` when unset.
  */
 data class SwingShellSuggestion
     @JvmOverloads
@@ -46,10 +50,20 @@ data class SwingShellSuggestion
         val detail: String = "",
         val source: String = "",
         val deleteCount: Int = -1,
+        val replacementStartOffset: Int = -1,
+        val replacementEndOffset: Int = -1,
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }
             require(displayText.isNotEmpty()) { "displayText must not be empty" }
+            require(deleteCount >= -1) { "deleteCount must be >= -1, was $deleteCount" }
+            require(
+                (replacementStartOffset == -1 && replacementEndOffset == -1) ||
+                    (replacementStartOffset >= 0 && replacementEndOffset >= replacementStartOffset),
+            ) {
+                "replacement range must be unset or satisfy 0 <= start <= end, was " +
+                    "$replacementStartOffset..$replacementEndOffset"
+            }
         }
     }
 
@@ -186,8 +200,9 @@ fun interface SwingShellSuggestionHandler {
         /**
          * Creates a standard command-line replacement suggestion handler.
          *
-         * The default handler is Unicode-aware: it computes the count of grapheme
-         * clusters to delete before pasting the accepted suggestion replacement.
+         * The default handler is Unicode-aware: it computes grapheme-cluster
+         * counts for generated Delete and Backspace events before pasting the
+         * accepted suggestion replacement.
          *
          * @param session active input encoder used to write backspaces and paste events.
          * @return standard replacement suggestion handler.
@@ -198,18 +213,57 @@ fun interface SwingShellSuggestionHandler {
                 val request = acceptance.request
                 val suggestion = acceptance.suggestion
 
-                val toDelete =
-                    if (suggestion.deleteCount >= 0) {
-                        suggestion.deleteCount
-                    } else {
-                        countGraphemeClusters(request.commandText.substring(0, request.cursorOffset))
+                if (suggestion.hasReplacementRange()) {
+                    if (!suggestion.hasValidReplacementRangeFor(request)) {
+                        return@SwingShellSuggestionHandler
+                    }
+                    val deleteAfterCursor =
+                        countGraphemeClusters(
+                            request.commandText.substring(request.cursorOffset, suggestion.replacementEndOffset),
+                        )
+                    repeat(deleteAfterCursor) {
+                        session.encodeKey(TerminalKeyEvent.key(TerminalKey.DELETE))
                     }
 
-                repeat(toDelete) {
-                    session.encodeKey(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
+                    val deleteBeforeCursor =
+                        countGraphemeClusters(
+                            request.commandText.substring(suggestion.replacementStartOffset, request.cursorOffset),
+                        )
+                    repeat(deleteBeforeCursor) {
+                        session.encodeKey(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
+                    }
+                } else {
+                    val toDelete =
+                        if (suggestion.deleteCount >= 0) {
+                            suggestion.deleteCount
+                        } else {
+                            countGraphemeClusters(request.commandText.substring(0, request.cursorOffset))
+                        }
+
+                    repeat(toDelete) {
+                        session.encodeKey(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
+                    }
                 }
                 session.encodePaste(TerminalPasteEvent(suggestion.replacementText))
             }
+
+        private fun SwingShellSuggestion.hasReplacementRange(): Boolean = replacementStartOffset >= 0 || replacementEndOffset >= 0
+
+        private fun SwingShellSuggestion.hasValidReplacementRangeFor(request: SwingShellSuggestionRequest): Boolean =
+            replacementStartOffset >= 0 &&
+                replacementStartOffset <= request.cursorOffset &&
+                request.cursorOffset <= replacementEndOffset &&
+                replacementEndOffset <= request.commandText.length &&
+                request.commandText.isUtf16Boundary(replacementStartOffset) &&
+                request.commandText.isUtf16Boundary(request.cursorOffset) &&
+                request.commandText.isUtf16Boundary(replacementEndOffset)
+
+        private fun String.isUtf16Boundary(offset: Int): Boolean {
+            if (offset !in 0..length) return false
+            val afterHighSurrogate = offset > 0 && Character.isHighSurrogate(this[offset - 1])
+            val beforeLowSurrogate = offset < length && Character.isLowSurrogate(this[offset])
+            return !afterHighSurrogate && !beforeLowSurrogate
+        }
 
         private fun countGraphemeClusters(text: String): Int {
             if (text.isEmpty()) return 0

@@ -24,23 +24,29 @@ import kotlin.test.assertEquals
 
 class CompletionSuggestionProviderTest {
     @Test
-    fun `adapts completion candidates to swing suggestions with delete count`() {
+    fun `adapts completion candidates to swing suggestions with replacement ranges`() {
         val provider = provider()
 
         val suggestions = provider.suggestions(request("git c"))
 
         assertEquals(listOf("commit", "checkout"), suggestions.map { it.replacementText })
-        assertEquals(listOf(1, 1), suggestions.map { it.deleteCount })
+        assertEquals(listOf(4, 4), suggestions.map { it.replacementStartOffset })
+        assertEquals(listOf(5, 5), suggestions.map { it.replacementEndOffset })
+        assertEquals(listOf(-1, -1), suggestions.map { it.deleteCount })
         assertEquals(listOf("spec", "spec"), suggestions.map { it.source })
     }
 
     @Test
-    fun `filters candidates that would need deleting after the cursor`() {
+    fun `preserves candidate ranges that replace text after the cursor`() {
         val provider = provider()
 
         val suggestions = provider.suggestions(request("git che", cursorOffset = 6))
 
-        assertEquals(emptyList(), suggestions)
+        val suggestion = suggestions.single()
+        assertEquals("checkout", suggestion.replacementText)
+        assertEquals(4, suggestion.replacementStartOffset)
+        assertEquals(7, suggestion.replacementEndOffset)
+        assertEquals(-1, suggestion.deleteCount)
     }
 
     @Test
@@ -51,7 +57,8 @@ class CompletionSuggestionProviderTest {
 
         assertEquals("--help", suggestion.replacementText)
         assertEquals("show help", suggestion.detail)
-        assertEquals(2, suggestion.deleteCount)
+        assertEquals(4, suggestion.replacementStartOffset)
+        assertEquals(6, suggestion.replacementEndOffset)
     }
 
     private fun provider(): CompletionSuggestionProvider =

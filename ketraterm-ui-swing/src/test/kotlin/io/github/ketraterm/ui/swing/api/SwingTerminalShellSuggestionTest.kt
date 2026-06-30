@@ -244,6 +244,50 @@ class SwingTerminalShellSuggestionTest {
         assertEquals("status", session.pastes[0].text)
     }
 
+    @Test
+    fun `default handler replaces explicit range around cursor`() {
+        val session = RecordingInputEncoder()
+        val handler = SwingShellSuggestionHandler.createDefault(session)
+
+        val request = SwingShellSuggestionRequest("git che", cursorOffset = 6, anchorColumn = 0, anchorRow = 0)
+        val suggestion =
+            SwingShellSuggestion(
+                replacementText = "checkout",
+                replacementStartOffset = 4,
+                replacementEndOffset = 7,
+            )
+        val acceptance = SwingShellSuggestionAcceptance(suggestion, 0, request)
+
+        handler.onSuggestionAccepted(acceptance)
+
+        assertEquals(
+            listOf(TerminalKey.DELETE, TerminalKey.BACKSPACE, TerminalKey.BACKSPACE),
+            session.keys.map { it.key },
+        )
+        assertEquals(1, session.pastes.size)
+        assertEquals("checkout", session.pastes[0].text)
+    }
+
+    @Test
+    fun `default handler ignores explicit range outside request text`() {
+        val session = RecordingInputEncoder()
+        val handler = SwingShellSuggestionHandler.createDefault(session)
+
+        val request = SwingShellSuggestionRequest("git che", cursorOffset = 6, anchorColumn = 0, anchorRow = 0)
+        val suggestion =
+            SwingShellSuggestion(
+                replacementText = "checkout",
+                replacementStartOffset = 4,
+                replacementEndOffset = 20,
+            )
+        val acceptance = SwingShellSuggestionAcceptance(suggestion, 0, request)
+
+        handler.onSuggestionAccepted(acceptance)
+
+        assertTrue(session.keys.isEmpty())
+        assertTrue(session.pastes.isEmpty())
+    }
+
     private class RecordingInputEncoder : TerminalInputEncoder {
         val keys = ArrayList<TerminalKeyEvent>()
         val pastes = ArrayList<TerminalPasteEvent>()

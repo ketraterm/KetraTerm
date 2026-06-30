@@ -26,10 +26,6 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
  * Standalone host adapter from the pure completion engine to the reusable Swing
  * shell suggestion popup contract.
  *
- * The current Swing acceptance path can delete text before the cursor and paste
- * a replacement. Candidates that require replacing text after the cursor are
- * therefore withheld until richer range replacement semantics are wired.
- *
  * @param engine pure completion engine used for suggestion computation.
  */
 internal class CompletionSuggestionProvider(
@@ -41,17 +37,16 @@ internal class CompletionSuggestionProvider(
                 commandLine = request.commandText,
                 cursorOffset = request.cursorOffset,
             )
-        return engine.complete(completionRequest).mapNotNull { it.toSwingSuggestion(request.cursorOffset) }
+        return engine.complete(completionRequest).map { it.toSwingSuggestion() }
     }
 
-    private fun TerminalCompletionCandidate.toSwingSuggestion(cursorOffset: Int): SwingShellSuggestion? {
-        if (replacementEndOffset != cursorOffset) return null
-        return SwingShellSuggestion(
+    private fun TerminalCompletionCandidate.toSwingSuggestion(): SwingShellSuggestion =
+        SwingShellSuggestion(
             replacementText = replacementText,
             displayText = displayText,
             detail = detail,
             source = source,
-            deleteCount = cursorOffset - replacementStartOffset,
+            replacementStartOffset = replacementStartOffset,
+            replacementEndOffset = replacementEndOffset,
         )
-    }
 }
