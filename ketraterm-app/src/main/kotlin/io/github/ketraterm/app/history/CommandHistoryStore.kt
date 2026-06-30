@@ -58,6 +58,7 @@ internal class CommandHistoryStore(
         metadata: TerminalShellIntegrationCommandMetadata,
     ) {
         val command = metadata.commandText ?: return
+        if (isSensitive(command)) return
         val finishedAt = metadata.finishedAtEpochMillis ?: return
         val entry =
             CommandHistoryEntry(
@@ -180,6 +181,18 @@ internal class CommandHistoryStore(
 
     private fun decodeText(value: String): String = String(commandHistoryDecoder.decode(value), StandardCharsets.UTF_8)
 
+    private fun isSensitive(command: String): Boolean {
+        if (command.startsWith(" ") || command.startsWith("\t")) {
+            return true
+        }
+        for (keyword in SENSITIVE_KEYWORDS) {
+            if (command.contains(keyword, ignoreCase = true)) {
+                return true
+            }
+        }
+        return false
+    }
+
     private companion object {
         private const val COMMAND_HISTORY_HEADER = "KetraTerm_COMMAND_HISTORY\t1"
         private const val COMMAND_HISTORY_FIELD_COUNT = 6
@@ -187,6 +200,29 @@ internal class CommandHistoryStore(
         private const val COMMAND_HISTORY_CLOSE_TIMEOUT_SECONDS = 5L
         private val commandHistoryEncoder = Base64.getUrlEncoder().withoutPadding()
         private val commandHistoryDecoder = Base64.getUrlDecoder()
+
+        private val SENSITIVE_KEYWORDS =
+            listOf(
+                "password",
+                "passwd",
+                "secret",
+                "token",
+                "bearer",
+                "authorization",
+                "credential",
+                "credentials",
+                "passphrase",
+                "passcode",
+                "jwt",
+                "key=",
+                "_key",
+                "key_",
+                "-key",
+                "--key",
+                "key ",
+                "auth ",
+                "auth=",
+            )
     }
 }
 

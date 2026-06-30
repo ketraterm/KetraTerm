@@ -50,35 +50,43 @@ tasks.processResources {
     }
 }
 
-val printNativeVersion by tasks.registering(JavaExec::class) {
-    dependsOn(tasks.named("compileKotlin"))
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("io.github.ketraterm.app.deployment.VersionNormalizationKt")
-    args(project.version.toString())
-}
-
-val writeNativeVersion by tasks.registering(JavaExec::class) {
-    dependsOn(tasks.named("compileKotlin"))
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("io.github.ketraterm.app.deployment.VersionNormalizationKt")
-    args(
-        project.version.toString(),
-        layout.buildDirectory
-            .file("native-version.txt")
-            .get()
-            .asFile.absolutePath,
-    )
-}
-
-val prepareJpackageInput by tasks.registering(Sync::class) {
-    dependsOn(tasks.named("jar"))
-    into(layout.buildDirectory.dir("jpackage/input"))
-
-    from(tasks.named("jar")) {
-        rename { "ketraterm-app.jar" }
+val printNativeVersion =
+    tasks.register<JavaExec>("printNativeVersion") {
+        dependsOn(tasks.named("compileKotlin"))
+        classpath = sourceSets["main"].runtimeClasspath
+        mainClass.set("io.github.ketraterm.app.deployment.VersionNormalizationKt")
+        args(project.version.toString())
     }
 
-    from(configurations.runtimeClasspath)
+val writeNativeVersion =
+    tasks.register<JavaExec>("writeNativeVersion") {
+        dependsOn(tasks.named("compileKotlin"))
+        classpath = sourceSets["main"].runtimeClasspath
+        mainClass.set("io.github.ketraterm.app.deployment.VersionNormalizationKt")
 
-    duplicatesStrategy = DuplicatesStrategy.FAIL
-}
+        val outputFile = layout.buildDirectory.file("native-version.txt")
+        outputs.file(outputFile)
+
+        args(
+            project.version.toString(),
+            outputFile.map { it.asFile.absolutePath },
+        )
+    }
+
+val prepareJpackageInput =
+    tasks.register<Sync>("prepareJpackageInput") {
+        dependsOn(tasks.named("jar"))
+        into(layout.buildDirectory.dir("jpackage/input"))
+
+        from(tasks.named("jar")) {
+            rename { "ketraterm-app.jar" }
+        }
+
+        from(
+            configurations.runtimeClasspath
+                .get()
+                .incoming.files,
+        )
+
+        duplicatesStrategy = DuplicatesStrategy.FAIL
+    }

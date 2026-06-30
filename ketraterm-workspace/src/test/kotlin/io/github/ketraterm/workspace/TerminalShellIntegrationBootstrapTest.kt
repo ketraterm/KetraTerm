@@ -333,6 +333,46 @@ class TerminalShellIntegrationBootstrapTest {
         assertSame(defaultShell, TerminalShellIntegrationBootstrap.apply(defaultShell, enabled = true))
     }
 
+    @Test
+    fun `injects config, history, version variables and writes wrapper scripts`(
+        @TempDir tempDir: Path,
+    ) {
+        val profile =
+            TerminalProfile(
+                id = "bash",
+                displayName = "Bash",
+                command = listOf("bash"),
+            )
+
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+
+        // Verify version, config, history variables in environment
+        assertNotNull(integrated.environment["KetraTerm_VERSION"])
+        assertNotNull(integrated.environment["KetraTerm_CONFIG_PATH"])
+        assertNotNull(integrated.environment["KetraTerm_HISTORY_PATH"])
+
+        // Verify PATH is prepended with the scripts bin directory
+        val pathKey = integrated.environment.keys.firstOrNull { it.equals("PATH", ignoreCase = true) }
+        assertNotNull(pathKey)
+        val pathVal = integrated.environment.getValue(pathKey)
+        val binDirStr = tempDir.resolve("bin").toAbsolutePath().toString()
+        assertTrue(pathVal.startsWith(binDirStr))
+
+        // Verify wrapper scripts are written to tempDir/bin
+        val posixScript = tempDir.resolve("bin/ketra")
+        val batchScript = tempDir.resolve("bin/ketra.bat")
+        assertTrue(posixScript.exists())
+        assertTrue(batchScript.exists())
+
+        // Verify script contents contain the correct keyword cases and paths
+        val posixContent = posixScript.readText()
+        val batchContent = batchScript.readText()
+        assertTrue(posixContent.contains("Usage: ketra"))
+        assertTrue(posixContent.contains("KetraTerm_CONFIG_PATH"))
+        assertTrue(batchContent.contains("Usage: ketra"))
+        assertTrue(batchContent.contains("KetraTerm_CONFIG_PATH"))
+    }
+
     private fun decodePowerShellScript(encoded: String): String = String(Base64.getDecoder().decode(encoded), Charsets.UTF_16LE)
 
     private fun integratedPowerShellScript(): String {
