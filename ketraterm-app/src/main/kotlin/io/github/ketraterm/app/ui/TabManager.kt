@@ -15,8 +15,11 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.completion.CompletionSuggestionProvider
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.app.history.CommandHistoryStore
+import io.github.ketraterm.completion.TerminalCommandSpecs
+import io.github.ketraterm.completion.TerminalCompletionEngines
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.workspace.*
@@ -50,6 +53,10 @@ internal class TabManager(
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
     private val tabRoots = HashMap<String, SplitNode>()
     private val tabContainers = HashMap<String, JPanel>()
+    private val completionSuggestionProvider =
+        CompletionSuggestionProvider(
+            engine = TerminalCompletionEngines.fromSpecs(TerminalCommandSpecs.defaults()),
+        )
     private var commandHistoryStore: CommandHistoryStore? = createCommandHistoryStoreIfEnabled()
 
     val selectedPane: TerminalPane?
@@ -201,6 +208,7 @@ internal class TabManager(
             TerminalPane.create(
                 tab = workspaceTab,
                 settings = settings,
+                suggestionProvider = completionSuggestionProvider,
             ) { p, x, y ->
                 showPaneContextMenu(p, p.terminal, x, y)
             }
@@ -346,6 +354,7 @@ internal class TabManager(
             TerminalPane.create(
                 tab = workspaceTab,
                 settings = settings,
+                suggestionProvider = completionSuggestionProvider,
             ) { p, x, y ->
                 showPaneContextMenu(p, p.terminal, x, y)
             }

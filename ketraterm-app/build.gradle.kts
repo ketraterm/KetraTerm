@@ -26,6 +26,7 @@ repositories {
 dependencies {
     implementation("com.formdev:flatlaf:3.7.1")
     implementation("com.formdev:flatlaf-extras:3.7.1")
+    implementation(project(":ketraterm-completion"))
     implementation(project(":ketraterm-ui-swing"))
     implementation(project(":ketraterm-workspace"))
 
