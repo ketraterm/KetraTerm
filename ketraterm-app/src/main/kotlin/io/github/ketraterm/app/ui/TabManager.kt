@@ -15,9 +15,12 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.completion.StandaloneCompletionFeedbackRecorder
 import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
 import io.github.ketraterm.app.config.KetraTermSettings
+import io.github.ketraterm.app.history.CommandCompletionStatsStore
 import io.github.ketraterm.app.history.CommandHistoryStore
+import io.github.ketraterm.completion.TerminalCompletionSources
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
@@ -52,8 +55,15 @@ internal class TabManager(
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
     private val tabRoots = HashMap<String, SplitNode>()
     private val tabContainers = HashMap<String, JPanel>()
-    private val completionRegistry = StandaloneCompletionRegistry()
+    private val commandCompletionStatsSource = TerminalCompletionSources.commandStats()
+    private val completionFeedbackRecorder =
+        StandaloneCompletionFeedbackRecorder(
+            statsSource = commandCompletionStatsSource,
+            persistSnapshot = { records -> commandCompletionStatsStore?.persist(records) },
+        )
+    private val completionRegistry = StandaloneCompletionRegistry(persistentStatsSource = commandCompletionStatsSource)
     private var commandHistoryStore: CommandHistoryStore? = createCommandHistoryStoreIfEnabled()
+    private var commandCompletionStatsStore: CommandCompletionStatsStore? = createCommandCompletionStatsStoreIfEnabled()
 
     val selectedPane: TerminalPane?
         get() = tabBar.selectedId()?.let { getActivePane(it) }
@@ -210,6 +220,11 @@ internal class TabManager(
                         profileId = workspaceTab.profile.id,
                         workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
                     ),
+                suggestionFeedbackHandler =
+                    completionFeedbackRecorder.createHandler(
+                        profileId = workspaceTab.profile.id,
+                        workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
+                    ),
             ) { p, x, y ->
                 showPaneContextMenu(p, p.terminal, x, y)
             }
@@ -265,6 +280,8 @@ internal class TabManager(
         workspace.close()
         commandHistoryStore?.close()
         commandHistoryStore = null
+        commandCompletionStatsStore?.close()
+        commandCompletionStatsStore = null
     }
 
     /** Propagates a settings reload to all live panes and the workspace. */
@@ -280,7 +297,7 @@ internal class TabManager(
             palette = snapshot.palette,
             treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
         )
-        reconcileCommandHistoryStore()
+        reconcileCommandPersistenceStores()
         tabBar.repaint()
     }
 
@@ -359,6 +376,11 @@ internal class TabManager(
                 suggestionProvider =
                     completionRegistry.createProvider(
                         sessionId = workspaceTab.id,
+                        profileId = workspaceTab.profile.id,
+                        workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
+                    ),
+                suggestionFeedbackHandler =
+                    completionFeedbackRecorder.createHandler(
                         profileId = workspaceTab.profile.id,
                         workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
                     ),
@@ -642,11 +664,22 @@ internal class TabManager(
             val state = tab.session.shellIntegrationState
             val metadata = state.commandMetadata(state.latestCommandRecordId()) ?: return
             commandHistoryStore?.record(tab.profile.id, metadata)
+            val command = metadata.commandText
+            if (command != null) {
+                commandCompletionStatsSource.recordCommandResult(
+                    commandLine = command,
+                    successful = metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                    profileId = tab.profile.id,
+                    workingDirectoryUri = metadata.workingDirectoryUri,
+                    usedAtEpochMillis = metadata.finishedAtEpochMillis ?: System.currentTimeMillis(),
+                )
+                commandCompletionStatsStore?.persist(commandCompletionStatsSource.snapshot())
+            }
             if (metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED) {
-                metadata.commandText?.let { command ->
+                command?.let {
                     completionRegistry.recordSuccessfulCommand(
                         sessionId = tab.id,
-                        commandLine = command,
+                        commandLine = it,
                         profileId = tab.profile.id,
                         workingDirectoryUri = metadata.workingDirectoryUri,
                     )
@@ -835,17 +868,34 @@ internal class TabManager(
         }
     }
 
-    private fun reconcileCommandHistoryStore() {
+    private fun reconcileCommandPersistenceStores() {
         if (settings.persistentCommandHistoryEnabled) {
             if (commandHistoryStore == null) commandHistoryStore = CommandHistoryStore(settings.commandHistoryPath)
+            if (commandCompletionStatsStore == null) {
+                commandCompletionStatsStore =
+                    CommandCompletionStatsStore(settings.commandCompletionStatsPath).also { store ->
+                        commandCompletionStatsSource.replaceAll(store.load() + commandCompletionStatsSource.snapshot())
+                    }
+            }
         } else {
             commandHistoryStore?.close()
             commandHistoryStore = null
+            commandCompletionStatsStore?.close()
+            commandCompletionStatsStore = null
         }
     }
 
     private fun createCommandHistoryStoreIfEnabled(): CommandHistoryStore? =
         if (settings.persistentCommandHistoryEnabled) CommandHistoryStore(settings.commandHistoryPath) else null
+
+    private fun createCommandCompletionStatsStoreIfEnabled(): CommandCompletionStatsStore? =
+        if (settings.persistentCommandHistoryEnabled) {
+            CommandCompletionStatsStore(settings.commandCompletionStatsPath).also { store ->
+                commandCompletionStatsSource.replaceAll(store.load())
+            }
+        } else {
+            null
+        }
 
     private companion object {
         private const val INITIAL_TAB_CAPACITY = 4

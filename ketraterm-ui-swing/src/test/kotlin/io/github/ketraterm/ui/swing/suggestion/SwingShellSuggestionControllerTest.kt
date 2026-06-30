@@ -98,21 +98,27 @@ class SwingShellSuggestionControllerTest {
         assertEquals(listOf(1), host.acceptedIndexes)
         assertEquals(listOf(items[1]), host.acceptedSuggestions)
         assertEquals(listOf(request), host.acceptedRequests)
+        assertEquals(listOf(SwingShellSuggestionFeedbackKind.ACCEPTED), host.feedbackKinds)
+        assertEquals(listOf(items[1]), host.feedbackSuggestions)
         assertEquals(1, host.focusRequests)
         assertTrue(enter.isConsumed)
     }
 
     @Test
-    fun `escape hides popup without accepting`() {
+    fun `escape hides popup records dismissal without accepting`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)
-        controller.show(request(), suggestions(2), selectedIndex = 0)
+        val items = suggestions(2)
+        controller.show(request(), items, selectedIndex = 0)
         val escape = keyPressed(KeyEvent.VK_ESCAPE)
 
         assertTrue(controller.handleKeyPressed(escape))
 
         assertFalse(controller.state().visible)
         assertTrue(host.acceptedSuggestions.isEmpty())
+        assertEquals(listOf(SwingShellSuggestionFeedbackKind.DISMISSED), host.feedbackKinds)
+        assertEquals(listOf(items[0]), host.feedbackSuggestions)
+        assertEquals(1, host.focusRequests)
         assertTrue(escape.isConsumed)
     }
 
@@ -167,6 +173,8 @@ class SwingShellSuggestionControllerTest {
         val acceptedSuggestions = ArrayList<SwingShellSuggestion>()
         val acceptedIndexes = ArrayList<Int>()
         val acceptedRequests = ArrayList<SwingShellSuggestionRequest>()
+        val feedbackKinds = ArrayList<SwingShellSuggestionFeedbackKind>()
+        val feedbackSuggestions = ArrayList<SwingShellSuggestion>()
         var focusRequests = 0
         var revalidations = 0
         var repaints = 0
@@ -176,6 +184,12 @@ class SwingShellSuggestionControllerTest {
                 acceptedSuggestions += acceptance.suggestion
                 acceptedIndexes += acceptance.index
                 acceptedRequests += acceptance.request
+            }
+
+        override val suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler =
+            SwingShellSuggestionFeedbackHandler { feedback ->
+                feedbackKinds += feedback.kind
+                feedbackSuggestions += feedback.suggestion
             }
 
         override fun revalidate() {

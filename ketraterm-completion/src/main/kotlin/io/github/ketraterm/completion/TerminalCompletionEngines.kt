@@ -90,6 +90,19 @@ object TerminalCompletionSources {
     @JvmStatic
     @JvmOverloads
     fun sessionMru(capacity: Int = 128): TerminalSessionMruCompletionSource = TerminalSessionMruCompletionSource(capacity)
+
+    /**
+     * Creates a bounded in-memory source for aggregated command statistics.
+     *
+     * Hosts should feed this source from compact stats indexes and live
+     * suggestion feedback. The source itself performs no persistence or I/O.
+     *
+     * @param capacity maximum distinct command/profile/directory rows retained.
+     * @return mutable command stats completion source.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun commandStats(capacity: Int = 2048): TerminalCommandStatsCompletionSource = TerminalCommandStatsCompletionSource(capacity)
 }
 
 /**

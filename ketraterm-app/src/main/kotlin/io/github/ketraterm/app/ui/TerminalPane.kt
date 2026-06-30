@@ -21,6 +21,7 @@ import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
@@ -69,6 +70,7 @@ internal class TerminalPane private constructor(
             tab: TerminalWorkspaceTab,
             settings: KetraTermSettings,
             suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
+            suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
             onContextMenu: (TerminalPane, Int, Int) -> Unit,
         ): TerminalPane {
             val scrollbar = JScrollBar(Adjustable.VERTICAL)
@@ -81,6 +83,7 @@ internal class TerminalPane private constructor(
                             viewportListener = scrollbarAdapter,
                             shellSuggestionProvider = suggestionProvider,
                             shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
+                            shellSuggestionFeedbackHandler = suggestionFeedbackHandler,
                         ),
                 )
             scrollbarAdapter.attach(terminal)

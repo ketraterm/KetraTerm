@@ -28,10 +28,13 @@ import io.github.ketraterm.completion.*
  * `ketraterm-completion` sources.
  *
  * @param specs static command specs shared by providers created from this registry.
+ * @param persistentStatsSource optional cross-session indexed stats source
+ * loaded and maintained by the standalone host.
  * @param sessionMruCapacity maximum distinct commands retained per terminal session.
  */
 internal class StandaloneCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    private val persistentStatsSource: TerminalCommandStatsCompletionSource? = null,
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
 ) {
     init {
@@ -64,13 +67,18 @@ internal class StandaloneCompletionRegistry(
         synchronized(lock) {
             sessionMruSources[sessionId] = mruSource
         }
+        val sources =
+            ArrayList<TerminalCompletionSourceEntry>(COMPOSED_SOURCE_CAPACITY).apply {
+                add(TerminalCompletionSourceEntry(mruSource, priority = SESSION_MRU_PRIORITY))
+                persistentStatsSource?.let { source ->
+                    add(TerminalCompletionSourceEntry(source, priority = PERSISTENT_STATS_PRIORITY))
+                }
+                add(TerminalCompletionSourceEntry(specSource, priority = SPEC_PRIORITY))
+            }
         return StandaloneCompletionSuggestionProvider(
             engine =
                 TerminalCompletionEngines.fromSources(
-                    listOf(
-                        TerminalCompletionSourceEntry(mruSource, priority = SESSION_MRU_PRIORITY),
-                        TerminalCompletionSourceEntry(specSource, priority = SPEC_PRIORITY),
-                    ),
+                    sources,
                 ),
             contextProvider = {
                 StandaloneCompletionSuggestionContext(
@@ -124,7 +132,9 @@ internal class StandaloneCompletionRegistry(
 
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
+        private const val COMPOSED_SOURCE_CAPACITY = 3
         private const val SESSION_MRU_PRIORITY = 100
+        private const val PERSISTENT_STATS_PRIORITY = 50
         private const val SPEC_PRIORITY = 0
     }
 }

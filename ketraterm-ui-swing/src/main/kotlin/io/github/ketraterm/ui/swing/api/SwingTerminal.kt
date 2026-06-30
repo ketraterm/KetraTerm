@@ -224,6 +224,7 @@ class SwingTerminal
                 object : SwingShellSuggestionHost {
                     override val settings: SwingSettings get() = this@SwingTerminal.settings
                     override val suggestionHandler: SwingShellSuggestionHandler get() = hostServices.shellSuggestionHandler
+                    override val suggestionFeedbackHandler get() = hostServices.shellSuggestionFeedbackHandler
 
                     override fun revalidate() = this@SwingTerminal.revalidate()
 

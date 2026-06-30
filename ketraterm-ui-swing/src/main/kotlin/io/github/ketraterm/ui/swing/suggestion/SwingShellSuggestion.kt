@@ -155,6 +155,36 @@ data class SwingShellSuggestionAcceptance(
 )
 
 /**
+ * Feedback kind emitted by the reusable suggestion popup.
+ */
+enum class SwingShellSuggestionFeedbackKind {
+    /**
+     * The user accepted the selected suggestion.
+     */
+    ACCEPTED,
+
+    /**
+     * The user explicitly dismissed the selected suggestion.
+     */
+    DISMISSED,
+}
+
+/**
+ * User feedback event for the selected shell suggestion.
+ *
+ * @property kind feedback category.
+ * @property suggestion suggestion that was accepted or explicitly dismissed.
+ * @property index index of [suggestion] in the displayed list.
+ * @property request command-line context that produced the suggestion.
+ */
+data class SwingShellSuggestionFeedback(
+    val kind: SwingShellSuggestionFeedbackKind,
+    val suggestion: SwingShellSuggestion,
+    val index: Int,
+    val request: SwingShellSuggestionRequest,
+)
+
+/**
  * Host provider for event-level shell suggestions.
  */
 fun interface SwingShellSuggestionProvider {
@@ -176,6 +206,26 @@ fun interface SwingShellSuggestionProvider {
          */
         @JvmField
         val NONE: SwingShellSuggestionProvider = SwingShellSuggestionProvider { emptyList() }
+    }
+}
+
+/**
+ * Host callback invoked for suggestion acceptance and explicit dismissal.
+ */
+fun interface SwingShellSuggestionFeedbackHandler {
+    /**
+     * Handles one user feedback event.
+     *
+     * @param feedback selected suggestion and feedback kind.
+     */
+    fun onSuggestionFeedback(feedback: SwingShellSuggestionFeedback)
+
+    companion object {
+        /**
+         * Feedback handler that ignores all popup feedback.
+         */
+        @JvmField
+        val NONE: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler { }
     }
 }
 

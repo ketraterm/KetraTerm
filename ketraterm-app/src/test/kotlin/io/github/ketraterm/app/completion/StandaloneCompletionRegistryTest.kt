@@ -16,6 +16,7 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.TerminalCommandSpec
+import io.github.ketraterm.completion.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -45,6 +46,57 @@ class StandaloneCompletionRegistryTest {
         assertEquals(0, suggestions[0].replacementStartOffset)
         assertEquals(5, suggestions[0].replacementEndOffset)
         assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
+    }
+
+    @Test
+    fun `persistent stats suggestions rank between session MRU and static specs`() {
+        val persistentStats = TerminalCommandStatsCompletionSource()
+        persistentStats.recordCommandResult(
+            commandLine = "git show --stat",
+            successful = true,
+            profileId = "bash",
+            workingDirectoryUri = "file:///repo",
+            usedAtEpochMillis = 1_000,
+        )
+        val registry = registry(persistentStatsSource = persistentStats)
+        val provider =
+            registry.createProvider(
+                sessionId = "session-1",
+                profileId = "bash",
+                workingDirectoryUriProvider = { "file:///repo" },
+            )
+        registry.recordSuccessfulCommand(
+            sessionId = "session-1",
+            commandLine = "git switch main",
+            profileId = "bash",
+            workingDirectoryUri = "file:///repo",
+        )
+
+        val suggestions = provider.suggestions(request("git s"))
+
+        assertEquals("git switch main", suggestions[0].replacementText)
+        assertEquals("mru", suggestions[0].source)
+        assertEquals("git show --stat", suggestions[1].replacementText)
+        assertEquals("stats", suggestions[1].source)
+        assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
+    }
+
+    @Test
+    fun `persistent stats source is shared across provider sessions`() {
+        val persistentStats = TerminalCommandStatsCompletionSource()
+        persistentStats.recordCommandResult(
+            commandLine = "npm test",
+            successful = true,
+            profileId = "bash",
+            workingDirectoryUri = "file:///repo",
+            usedAtEpochMillis = 1_000,
+        )
+        val registry = registry(specs = emptyList(), persistentStatsSource = persistentStats)
+        val first = registry.createProvider("session-1", profileId = "bash") { "file:///repo" }
+        val second = registry.createProvider("session-2", profileId = "bash") { "file:///repo" }
+
+        assertEquals(listOf("npm test"), first.suggestions(request("npm")).map { it.replacementText })
+        assertEquals(listOf("npm test"), second.suggestions(request("npm")).map { it.replacementText })
     }
 
     @Test
@@ -152,9 +204,13 @@ class StandaloneCompletionRegistryTest {
         assertTrue(provider.suggestions(request("git")).isEmpty())
     }
 
-    private fun registry(specs: List<TerminalCommandSpec> = specs()): StandaloneCompletionRegistry =
+    private fun registry(
+        specs: List<TerminalCommandSpec> = specs(),
+        persistentStatsSource: TerminalCommandStatsCompletionSource? = null,
+    ): StandaloneCompletionRegistry =
         StandaloneCompletionRegistry(
             specs = specs,
+            persistentStatsSource = persistentStatsSource,
             sessionMruCapacity = 4,
         )
 

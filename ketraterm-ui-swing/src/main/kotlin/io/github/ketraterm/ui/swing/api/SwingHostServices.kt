@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher.Companion.SWING
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import javax.swing.SwingUtilities
@@ -67,6 +68,8 @@ fun interface TerminalUiDispatcher {
  * command-line suggestion snapshots.
  * @property shellSuggestionHandler host callback invoked after the user accepts
  * a shell suggestion from the reusable popup.
+ * @property shellSuggestionFeedbackHandler host callback invoked when the user
+ * accepts or explicitly dismisses a shell suggestion.
  */
 data class SwingHostServices
     @JvmOverloads
@@ -77,4 +80,5 @@ data class SwingHostServices
         val viewportListener: TerminalViewportListener = TerminalViewportListener.NONE,
         val shellSuggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
         val shellSuggestionHandler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
+        val shellSuggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
     )

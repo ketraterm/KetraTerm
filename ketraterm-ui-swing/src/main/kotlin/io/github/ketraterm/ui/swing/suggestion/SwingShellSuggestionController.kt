@@ -87,7 +87,7 @@ internal class SwingShellSuggestionController(
                 KeyEvent.VK_PAGE_DOWN -> selectRelative(PAGE_STEP)
                 KeyEvent.VK_PAGE_UP -> selectRelative(-PAGE_STEP)
                 KeyEvent.VK_ENTER, KeyEvent.VK_TAB -> acceptSelected()
-                KeyEvent.VK_ESCAPE -> hide()
+                KeyEvent.VK_ESCAPE -> dismissSelected()
                 else -> false
             }
         if (handled) event.consume()
@@ -130,11 +130,37 @@ internal class SwingShellSuggestionController(
         val index = selectedIndex
         val acceptedRequest = request
         hide()
+        host.suggestionFeedbackHandler.onSuggestionFeedback(
+            SwingShellSuggestionFeedback(
+                kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
+                suggestion = suggestion,
+                index = index,
+                request = acceptedRequest,
+            ),
+        )
         host.suggestionHandler.onSuggestionAccepted(
             SwingShellSuggestionAcceptance(
                 suggestion = suggestion,
                 index = index,
                 request = acceptedRequest,
+            ),
+        )
+        host.requestFocusInWindow()
+        return true
+    }
+
+    private fun dismissSelected(): Boolean {
+        if (selectedIndex !in suggestions.indices) return hide()
+        val suggestion = suggestions[selectedIndex]
+        val index = selectedIndex
+        val dismissedRequest = request
+        hide()
+        host.suggestionFeedbackHandler.onSuggestionFeedback(
+            SwingShellSuggestionFeedback(
+                kind = SwingShellSuggestionFeedbackKind.DISMISSED,
+                suggestion = suggestion,
+                index = index,
+                request = dismissedRequest,
             ),
         )
         host.requestFocusInWindow()
@@ -160,6 +186,7 @@ internal class SwingShellSuggestionController(
 internal interface SwingShellSuggestionHost {
     val settings: SwingSettings
     val suggestionHandler: SwingShellSuggestionHandler
+    val suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler
 
     fun revalidate()
 
