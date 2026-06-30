@@ -334,7 +334,7 @@ class TerminalShellIntegrationBootstrapTest {
     }
 
     @Test
-    fun `injects config, history, version variables and writes wrapper scripts`(
+    fun `injects config and version variables and writes wrapper scripts`(
         @TempDir tempDir: Path,
     ) {
         val profile =
@@ -346,10 +346,10 @@ class TerminalShellIntegrationBootstrapTest {
 
         val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
 
-        // Verify version, config, history variables in environment
+        // Verify version and config variables in environment
         assertNotNull(integrated.environment["KetraTerm_VERSION"])
         assertNotNull(integrated.environment["KetraTerm_CONFIG_PATH"])
-        assertNotNull(integrated.environment["KetraTerm_HISTORY_PATH"])
+        assertNull(integrated.environment["KetraTerm_" + "HISTORY_PATH"])
 
         // Verify PATH is prepended with the scripts bin directory
         val pathKey = integrated.environment.keys.firstOrNull { it.equals("PATH", ignoreCase = true) }

@@ -34,7 +34,8 @@ import java.util.concurrent.TimeUnit
  * The store serializes aggregate ranking metadata, not raw repeated shell
  * history. Loading is synchronous during app startup so completion can warm its
  * in-memory index deterministically; writes run on one daemon worker so command
- * lifecycle events and Swing input never perform disk I/O.
+ * lifecycle events and Swing input never perform disk I/O. Loaded and persisted
+ * rows are filtered through [CommandPersistencePrivacyPolicy].
  *
  * @property path destination file for the versioned tab-separated stats index.
  */
@@ -94,11 +95,7 @@ internal class CommandCompletionStatsStore(
      * @param snapshot compact exact and shape stats produced by the shared completion index.
      */
     fun persist(snapshot: TerminalCommandCompletionStatsSnapshot) {
-        val stableSnapshot =
-            TerminalCommandCompletionStatsSnapshot(
-                commandStats = snapshot.commandStats.toList(),
-                shapeStats = snapshot.shapeStats.toList(),
-            )
+        val stableSnapshot = sanitizeSnapshot(snapshot)
         worker.execute {
             persistSnapshot(stableSnapshot)
         }
@@ -111,7 +108,7 @@ internal class CommandCompletionStatsStore(
             decodeCommandV1(lines[index])?.let(records::add)
             index++
         }
-        return TerminalCommandCompletionStatsSnapshot(commandStats = records, shapeStats = emptyList())
+        return sanitizeSnapshot(TerminalCommandCompletionStatsSnapshot(commandStats = records, shapeStats = emptyList()))
     }
 
     private fun loadVersionTwo(lines: List<String>): TerminalCommandCompletionStatsSnapshot {
@@ -126,7 +123,7 @@ internal class CommandCompletionStatsStore(
             }
             index++
         }
-        return TerminalCommandCompletionStatsSnapshot(commandStats = commandRecords, shapeStats = shapeRecords)
+        return sanitizeSnapshot(TerminalCommandCompletionStatsSnapshot(commandStats = commandRecords, shapeStats = shapeRecords))
     }
 
     /**
@@ -168,6 +165,12 @@ internal class CommandCompletionStatsStore(
             System.err.println("Failed to persist command completion stats to $path: ${exception.message}")
         }
     }
+
+    private fun sanitizeSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot): TerminalCommandCompletionStatsSnapshot =
+        TerminalCommandCompletionStatsSnapshot(
+            commandStats = snapshot.commandStats.filter(CommandPersistencePrivacyPolicy::allowsCommandStats),
+            shapeStats = snapshot.shapeStats.filter(CommandPersistencePrivacyPolicy::allowsShapeStats),
+        )
 
     private fun encodeCommandV2(record: TerminalCommandCompletionStats): String =
         listOf(

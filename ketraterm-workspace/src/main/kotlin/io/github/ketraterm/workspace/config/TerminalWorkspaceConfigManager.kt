@@ -296,7 +296,7 @@ class TerminalWorkspaceConfigManager(
         desktop_notifications_enabled = ${config.desktopNotificationsEnabled}
         # Whether host-provided shell suggestions may appear in the terminal UI
         shell_suggestions_enabled = ${config.shellSuggestionsEnabled}
-        # Persist bounded command metadata (never raw terminal output) across application restarts
+        # Persist compact suggestion-learning metadata (never raw terminal output) across application restarts
         persistent_command_history_enabled = ${config.persistentCommandHistoryEnabled}
 
         [security]

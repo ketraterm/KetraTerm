@@ -1,71 +1,76 @@
 # Persistent Terminal Storage Layout
 
-This document describes how KetraTerm stores configurations, back-ups, and command histories on the local filesystem, including directories resolved on different operating systems and the built-in security filters that prevent credentials from leaking to disk.
+This document describes how KetraTerm stores local configuration, backups, and
+command-completion learning data. Stored command data is intended for ranking
+local suggestions only; raw terminal stdout/stderr is never saved.
 
----
+## Directory Resolution Hierarchy
 
-## 1. Directory Resolution Hierarchy
+The workspace configuration path is resolved by
+`TerminalWorkspaceConfigManager` in this order:
 
-The path to the user configuration directory is resolved dynamically by the `ketraterm-workspace` configuration manager in the following order of precedence:
+1. System property override:
+   `-Dketraterm.config.path=/path/to/config.toml`.
+2. Environment variable override:
+   `KetraTerm_CONFIG_PATH=/path/to/config.toml`.
+3. OS-specific default directories:
+   Windows uses `%APPDATA%\KetraTerm\config.toml`, with a fallback to
+   `%USERPROFILE%\.config\ketraterm\config.toml`.
+   macOS uses `~/Library/Application Support/KetraTerm/config.toml`.
+   Linux/Unix uses `$XDG_CONFIG_HOME/ketraterm/config.toml`, with a fallback to
+   `~/.config/ketraterm/config.toml`.
 
-1. **System Property Override**:
-   * Uses `-Dketraterm.config.path=/path/to/config.toml` if defined.
-2. **Environment Variable Override**:
-   * Uses the environment variable `KetraTerm_CONFIG_PATH=/path/to/config.toml` if defined.
-3. **OS-Specific Default Directories**:
-   * **Windows**: `%APPDATA%\KetraTerm\config.toml` (falls back to `%USERPROFILE%\.config\ketraterm\config.toml`).
-   * **macOS**: `~/Library/Application Support/KetraTerm/config.toml`.
-   * **Linux/Unix**: `$XDG_CONFIG_HOME/ketraterm/config.toml` (falls back to `~/.config/ketraterm/config.toml`).
+Backup and completion-learning files are stored next to the resolved
+`config.toml`.
 
-The command history and backup files are stored in the same parent directory resolved for `config.toml`.
+## Files
 
----
+### `config.toml`
 
-## 2. File Specifications
+Stores load-time profiles, theme/font preferences, terminal sizing, behavior
+settings, and security policy settings. Missing or invalid values fall back to
+safe defaults. If no config exists, KetraTerm creates a default file with
+comments.
 
-KetraTerm persists three main files under the configuration directory:
+### `config.toml.broken`
 
-### A. `config.toml` (Workspace Configuration)
-Stores load-time user profiles, color themes, font preferences, terminal sizes, and behavior settings in TOML format.
-* **Fallback Behavior**: If a configuration key is missing or invalid, KetraTerm logs a warning and falls back to safe system defaults.
-* **Automatic Creation**: If no config file is found at the resolved path, a default file is created with extensive comments.
+If the config manager encounters a fatal parse error, it copies the malformed
+file to `config.toml.broken`, then writes clean defaults so the app can start.
 
-### B. `config.toml.broken` (Backup File)
-If the configuration manager encounters a fatal parsing error or malformed structure in `config.toml` upon load:
-1. It copies the malformed file to `config.toml.broken` (overwriting any previous backup) to prevent user data loss.
-2. It resets `config.toml` to clean defaults to allow the terminal emulator to start safely.
+### `command-completion-stats-v1.tsv`
 
-### C. `command-history-v1.tsv` (Command History Store)
-An opt-in, bounded history of completed command executions. Raw terminal stdout/stderr is **never** saved.
-* **Format**: Versioned, tab-separated values (TSV) format.
-  ```tsv
-  KetraTerm_COMMAND_HISTORY	1
-  <startedAt>	<finishedAt>	<exitCode>	<profileIdBase64>	<workingDirectoryBase64>	<commandBase64>
-  ```
-* **Text Encoding**: Text fields (`profileId`, `workingDirectoryUri`, `command`) are Base64URL-encoded (without padding) to preserve command newlines and tab characters without corrupting the TSV layout.
-* **IO Lifecycle**: Writes are offloaded to a background daemon thread (`ketraterm-command-history`) using atomic replacements (`ATOMIC_MOVE` falling back to standard replace) to ensure terminal thread performance is not impacted by disk I/O.
+An opt-in, compact suggestion-learning index. This is not raw shell history.
+The file stores aggregate exact-command counters and privacy-preserving command
+shape counters used by the completion engine:
 
----
+```tsv
+KetraTerm_COMMAND_COMPLETION_STATS	2
+C	<commandBase64>	<normalizedBase64>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
+S	<executableBase64>	<subcommandsBase64List>	<optionNamesBase64List>	<positionalArgumentCount>	<optionValueCount>	<shapeKeyBase64>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
+```
 
-## 3. Security and Secret Filtering
+Text fields are Base64URL-encoded without padding so tabs and Unicode text do
+not corrupt the TSV layout. Writes are offloaded to a single daemon worker and
+committed through atomic replacement when the filesystem supports it.
 
-To prevent API keys, private tokens, passwords, and sensitive environment variables from being persisted in plaintext (Base64 is encoding, not encryption), KetraTerm implements the following automatic filtering rules before any command is written to `command-history-v1.tsv`:
+## Security And Secret Filtering
 
-1. **Opt-in Only**:
-   * Persistent command history is disabled by default. It can be enabled by setting `persistent_command_history_enabled = true` under the `[behavior]` block in `config.toml`.
-2. **Ignorespace Convention**:
-   * Any command starting with a space (` `) or tab (`\t`) character is bypassed and **never** recorded. This aligns with standard shell `HISTCONTROL=ignorespace` behavior.
-3. **Credential Keyword Filter**:
-   * The command string is scanned case-insensitively. If it contains any of the following substrings, recording is skipped:
-     * `password` / `passwd`
-     * `secret`
-     * `token`
-     * `apikey` / `api_key`
-     * `private_key`
-     * `access_key`
-     * `secret_key`
-     * `bearer`
-     * `authorization`
-     * `credentials`
-     * `passcode`
-     * `passphrase`
+Persistent suggestion learning is disabled by default. It can be enabled with
+`persistent_command_history_enabled = true` under `[behavior]` in `config.toml`;
+the historical key name is retained for compatibility, but KetraTerm no longer
+stores a raw command-history file.
+
+Before any exact command or shape row is recorded or persisted, the standalone
+host applies `CommandPersistencePrivacyPolicy`:
+
+1. Commands starting with a space or tab are ignored, matching the common shell
+   `HISTCONTROL=ignorespace` convention.
+2. Blank and multi-line commands are ignored.
+3. Commands and shape vocabulary containing sensitive substrings are ignored,
+   including password/passwd, secret, token, apikey/api_key, private_key,
+   access_key, secret_key, bearer, authorization, credential/credentials,
+   passcode, passphrase, jwt, key markers, and auth markers.
+
+Shape rows intentionally avoid raw positional argument values. They store only
+the executable, bounded known subcommand vocabulary, option names, argument
+counts, and ranking counters.

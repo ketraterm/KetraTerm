@@ -73,8 +73,8 @@ private fun defaultFontFamily(): String {
  * @property desktopNotificationsEnabled whether desktop notifications are enabled.
  * @property shellSuggestionsEnabled whether host-provided shell suggestions may
  * be shown in the terminal UI.
- * @property persistentCommandHistoryEnabled whether completed command metadata
- * is retained by supporting product hosts across application restarts.
+ * @property persistentCommandHistoryEnabled whether supporting product hosts
+ * persist compact command-completion learning metadata across application restarts.
  * @property clipboardLocalWrite OSC 52 write permission for local sessions.
  * @property clipboardRemoteWrite OSC 52 write permission for remote sessions.
  * @property clipboardRead OSC 52 read/query permission.

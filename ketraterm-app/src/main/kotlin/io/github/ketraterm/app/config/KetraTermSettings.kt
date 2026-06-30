@@ -207,9 +207,6 @@ internal class KetraTermSettings(
             updateConfig(config.copy(titleRemotePermission = value))
         }
 
-    val commandHistoryPath: Path
-        get() = configManager.configPath.resolveSibling("command-history-v1.tsv")
-
     /** Path for the compact persisted command-completion stats index. */
     val commandCompletionStatsPath: Path
         get() = configManager.configPath.resolveSibling("command-completion-stats-v1.tsv")
