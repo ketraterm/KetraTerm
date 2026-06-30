@@ -287,6 +287,67 @@ class TerminalWorkspaceTest {
     }
 
     @Test
+    fun `remote session close is forwarded with owning tab and exit code`() {
+        val connector = RecordingConnector()
+        val session = testSession(connector)
+        session.start(columns = 80, rows = 24)
+        val closeEvents = mutableListOf<Triple<String, Int?, Throwable?>>()
+        val workspace =
+            TerminalWorkspace(
+                listener =
+                    object : TerminalWorkspaceListener {
+                        override fun sessionClosed(
+                            tab: TerminalWorkspaceTab,
+                            exitCode: Int?,
+                            failure: Throwable?,
+                        ) {
+                            closeEvents += Triple(tab.id, exitCode, failure)
+                        }
+                    },
+                sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+            )
+        val tab =
+            workspace.openTab(
+                profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
+                options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
+            )
+
+        connector.simulateClosed(1)
+
+        assertEquals(listOf(Triple<String, Int?, Throwable?>(tab.id, 1, null)), closeEvents)
+    }
+
+    @Test
+    fun `local workspace close is not forwarded as remote session close`() {
+        val session = testSession(RecordingConnector())
+        session.start(columns = 80, rows = 24)
+        val closeEvents = mutableListOf<String>()
+        val workspace =
+            TerminalWorkspace(
+                listener =
+                    object : TerminalWorkspaceListener {
+                        override fun sessionClosed(
+                            tab: TerminalWorkspaceTab,
+                            exitCode: Int?,
+                            failure: Throwable?,
+                        ) {
+                            closeEvents += tab.id
+                        }
+                    },
+                sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+            )
+        val tab =
+            workspace.openTab(
+                profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
+                options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
+            )
+
+        workspace.closeTab(tab.id)
+
+        assertEquals(emptyList<String>(), closeEvents)
+    }
+
+    @Test
     fun `allowed clipboard write is forwarded with owning tab`() {
         var capturedEventListener: PtyEventListener? = null
         val session = testSession()
@@ -398,14 +459,14 @@ class TerminalWorkspaceTest {
                 ),
         )
 
-    private fun testSession(): TerminalSession {
+    private fun testSession(connector: TerminalConnector = NoOpConnector): TerminalSession {
         val terminal = TerminalBuffers.create(width = 80, height = 24, maxHistory = 100)
         return TerminalSession(
             terminal = terminal,
             publisher = TerminalRenderPublisher(80, 24),
             renderReader = terminal as TerminalRenderFrameReader,
             responseReader = terminal,
-            connector = NoOpConnector,
+            connector = connector,
             parser = NoOpParser,
             inputEncoder = NoOpInputEncoder,
         )
@@ -426,6 +487,31 @@ class TerminalWorkspaceTest {
         ) = Unit
 
         override fun close() = Unit
+    }
+
+    private class RecordingConnector : TerminalConnector {
+        private var listener: TerminalConnectorListener? = null
+
+        override fun start(listener: TerminalConnectorListener) {
+            this.listener = listener
+        }
+
+        override fun write(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) = Unit
+
+        override fun resize(
+            columns: Int,
+            rows: Int,
+        ) = Unit
+
+        override fun close() = Unit
+
+        fun simulateClosed(exitCode: Int?) {
+            checkNotNull(listener).onClosed(exitCode)
+        }
     }
 
     private object NoOpParser : TerminalOutputParser {

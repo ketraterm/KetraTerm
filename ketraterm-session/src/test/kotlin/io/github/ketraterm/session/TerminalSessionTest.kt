@@ -82,11 +82,14 @@ class TerminalSessionTest {
     fun `remote close records exit code`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)
+        val closeEvents = mutableListOf<TerminalSessionCloseEvent>()
+        session.addCloseListener { _, event -> closeEvents += event }
 
         connector.simulateClosed(7)
 
         assertEquals(7, session.exitCode)
         assertEquals(0, connector.closeCount)
+        assertEquals(listOf(TerminalSessionCloseEvent(exitCode = 7, failure = null, locallyRequested = false)), closeEvents)
     }
 
     @Test
@@ -94,12 +97,15 @@ class TerminalSessionTest {
         val connector = MockConnector()
         val session = createStartedSession(connector)
         val failure = IllegalStateException("transport failed")
+        val closeEvents = mutableListOf<TerminalSessionCloseEvent>()
+        session.addCloseListener { _, event -> closeEvents += event }
 
         connector.simulateCrash(failure)
 
         assertEquals(failure, session.failure)
         assertNull(session.exitCode)
         assertEquals(0, connector.closeCount)
+        assertEquals(listOf(TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false)), closeEvents)
     }
 
     @Test
@@ -113,6 +119,19 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `local cleanup after remote close does not emit duplicate close event`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector)
+        val closeEvents = mutableListOf<TerminalSessionCloseEvent>()
+        session.addCloseListener { _, event -> closeEvents += event }
+
+        connector.simulateClosed(1)
+        session.close()
+
+        assertEquals(listOf(TerminalSessionCloseEvent(exitCode = 1, failure = null, locallyRequested = false)), closeEvents)
+    }
+
+    @Test
     fun `input key writes through connector`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)
@@ -121,6 +140,20 @@ class TerminalSessionTest {
 
         assertEquals("a", connector.writtenBytes.asciiText())
         session.close()
+    }
+
+    @Test
+    fun `local close emits local lifecycle event once`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector)
+        val closeEvents = mutableListOf<TerminalSessionCloseEvent>()
+        session.addCloseListener { _, event -> closeEvents += event }
+
+        session.close()
+        session.close()
+
+        assertTrue(session.isClosed)
+        assertEquals(listOf(TerminalSessionCloseEvent(exitCode = null, failure = null, locallyRequested = true)), closeEvents)
     }
 
     @Test

@@ -57,6 +57,7 @@ class KetraTermProjectTerminalService(
     private val nextPendingTabNumber = AtomicInteger(1)
     private val ptyRuntime = IntelliJPtyRuntime()
     private val settingsChangedListener = { reloadOpenTerminalSettings() }
+    private var lastToolWindow: ToolWindow? = null
     private var disposed = false
 
     init {
@@ -74,6 +75,7 @@ class KetraTermProjectTerminalService(
      * @param toolWindow target IntelliJ tool window.
      */
     fun ensureInitialTab(toolWindow: ToolWindow) {
+        lastToolWindow = toolWindow
         if (hasOpenTabs()) return
         openDefaultTab(toolWindow)
     }
@@ -87,6 +89,7 @@ class KetraTermProjectTerminalService(
     fun openDefaultTab(toolWindow: ToolWindow): Content {
         check(!disposed) { "KetraTerm project terminal service is disposed" }
 
+        lastToolWindow = toolWindow
         val settingsService = KetraTermIntellijSettings.getInstance()
         val settingsState = settingsService.state
         val profile = KetraTermDefaultProfileFactory.defaultProfile(project, settingsState)
@@ -107,6 +110,7 @@ class KetraTermProjectTerminalService(
     ): Content {
         check(!disposed) { "KetraTerm project terminal service is disposed" }
 
+        lastToolWindow = toolWindow
         val settingsState = KetraTermIntellijSettings.getInstance().state
         val configuredProfile =
             KetraTermDefaultProfileFactory.profileForSelectedShell(project, profile, settingsState)
@@ -178,10 +182,31 @@ class KetraTermProjectTerminalService(
     private fun closeTabFromContent(tabId: String) {
         if (disposed) return
 
-        panesByTabId.remove(tabId)?.close()
-        contentsByTabId.remove(tabId)
+        val pane = panesByTabId.remove(tabId)
+        val content = contentsByTabId.remove(tabId)
+        if (pane == null && content == null) return
+
+        pane?.close()
         synchronized(workspaceLock) {
             workspace.closeTab(tabId)
+        }
+    }
+
+    private fun closeTabAfterRemoteSessionExit(tab: TerminalWorkspaceTab) {
+        if (disposed) return
+
+        val pane = panesByTabId.remove(tab.id) ?: return
+        val content = contentsByTabId.remove(tab.id)
+
+        pane.close()
+        synchronized(workspaceLock) {
+            workspace.closeTab(tab.id)
+        }
+
+        content?.manager?.removeContent(content, true)
+
+        if (!hasOpenTabs()) {
+            lastToolWindow?.let(::openDefaultTab)
         }
     }
 
@@ -367,6 +392,16 @@ class KetraTermProjectTerminalService(
             invokeLaterIfAlive {
                 contentsByTabId.remove(tabId)
                 panesByTabId.remove(tabId)
+            }
+        }
+
+        override fun sessionClosed(
+            tab: TerminalWorkspaceTab,
+            exitCode: Int?,
+            failure: Throwable?,
+        ) {
+            invokeLaterIfAlive {
+                closeTabAfterRemoteSessionExit(tab)
             }
         }
     }

@@ -30,6 +30,7 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.nio.file.Path
 import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -96,9 +97,18 @@ class TerminalWorkspace internal constructor(
                 onCurrentWorkingDirectoryChanged = { t, uri -> listener.currentWorkingDirectoryChanged(t, uri) },
             )
         tabs += tab
+        val closeNotified = AtomicBoolean(false)
+        session.addCloseListener { closedSession, event ->
+            if (!event.locallyRequested && closeNotified.compareAndSet(false, true)) {
+                tabBySession(closedSession)?.let { listener.sessionClosed(it, event.exitCode, event.failure) }
+            }
+        }
         session.currentWorkingDirectoryUri()?.let(tab::updateCurrentWorkingDirectoryUri)
         selectTab(id)
         listener.tabOpened(tab)
+        if (session.isClosed && closeNotified.compareAndSet(false, true)) {
+            notifyAlreadyClosedSession(tab, session)
+        }
         return tab
     }
 
@@ -260,6 +270,13 @@ class TerminalWorkspace internal constructor(
     private fun tabById(id: String): TerminalWorkspaceTab? = tabs.firstOrNull { it.id == id }
 
     private fun tabBySession(session: TerminalSession): TerminalWorkspaceTab? = tabs.firstOrNull { it.session === session }
+
+    private fun notifyAlreadyClosedSession(
+        tab: TerminalWorkspaceTab,
+        session: TerminalSession,
+    ) {
+        listener.sessionClosed(tab, session.exitCode, session.failure)
+    }
 
     private companion object {
         private const val INITIAL_TAB_CAPACITY = 4
@@ -618,6 +635,25 @@ interface TerminalWorkspaceListener {
     fun listenerFailed(
         tab: TerminalWorkspaceTab,
         exception: Exception,
+    ) = Unit
+
+    /**
+     * Called when the tab's terminal session closes because the process exited
+     * or the transport failed.
+     *
+     * Local application-requested tab closes are reported through [tabClosed]
+     * instead. UI products should use this callback to remove, restart, or mark
+     * dead terminal panes according to product policy.
+     *
+     * @param tab tab whose session stopped.
+     * @param exitCode process exit code reported by the transport, or null when
+     * unknown.
+     * @param failure transport failure, or null for a normal process exit.
+     */
+    fun sessionClosed(
+        tab: TerminalWorkspaceTab,
+        exitCode: Int?,
+        failure: Throwable?,
     ) = Unit
 
     /**
