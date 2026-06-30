@@ -236,10 +236,23 @@ internal class MutationEngine(
         left: Int,
         right: Int,
     ) {
+        // Clear potential orphaned spacer on dest
+        if (right + 1 < width && dest.rawCodepoint(right + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+            dest.setCell(right + 1, TerminalConstants.EMPTY, blankAttr, blankExtendedAttr)
+        }
+
         for (col in left..right) {
-            val raw = src.rawCodepoint(col)
-            val attr = src.getPackedAttr(col)
-            val extendedAttr = src.getPackedExtendedAttr(col)
+            var raw = src.rawCodepoint(col)
+            var attr = src.getPackedAttr(col)
+            var extendedAttr = src.getPackedExtendedAttr(col)
+
+            if (col == left && raw == TerminalConstants.WIDE_CHAR_SPACER) {
+                // Do not copy the spacer without its leader
+                raw = TerminalConstants.EMPTY
+                attr = blankAttr
+                extendedAttr = blankExtendedAttr
+            }
+
             if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
                 val cpLen = src.store.length(raw)
                 if (clusterScratch.size < cpLen) {
@@ -632,6 +645,9 @@ internal class MutationEngine(
                 }
                 for (row in topRow until topRow + times) {
                     val line = getLine(row)
+                    if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+                        annihilateAt(row, rightMargin + 1)
+                    }
                     line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
                     line.wrapped = false
                     state.markLineChanged(line)
@@ -667,6 +683,9 @@ internal class MutationEngine(
                 }
                 for (row in bottomRow - times + 1..bottomRow) {
                     val line = getLine(row)
+                    if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+                        annihilateAt(row, rightMargin + 1)
+                    }
                     line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
                     line.wrapped = false
                     state.markLineChanged(line)
@@ -710,6 +729,12 @@ internal class MutationEngine(
                 annihilateAt(cRow, edgeCol)
             }
 
+            if (rightMargin + 1 < width &&
+                line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER
+            ) {
+                annihilateAt(cRow, rightMargin + 1)
+            }
+
             line.insertCellsInRange(cCol, safeCount, rightMargin, blankAttr, blankExtendedAttr)
             state.markLineChanged(line)
         }
@@ -738,6 +763,12 @@ internal class MutationEngine(
                 ) {
                     annihilateAt(cRow, rightEdge)
                 }
+            }
+
+            if (rightMargin + 1 < width &&
+                getLine(cRow).rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER
+            ) {
+                annihilateAt(cRow, rightMargin + 1)
             }
 
             val line = getLine(cRow)
@@ -789,6 +820,9 @@ internal class MutationEngine(
             val start = maxOf(cCol, leftMargin)
             if (start <= rightMargin) {
                 annihilateAt(cRow, start)
+                if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+                    annihilateAt(cRow, rightMargin + 1)
+                }
                 line.clearRange(start, rightMargin + 1, blankAttr, blankExtendedAttr)
                 state.markLineChanged(line)
             }

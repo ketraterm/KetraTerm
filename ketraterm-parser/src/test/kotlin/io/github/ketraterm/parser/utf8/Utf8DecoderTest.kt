@@ -430,4 +430,98 @@ class Utf8DecoderTest {
             assertEquals(listOf('?'.code), decodeAll(0xE2, 0x82, decoder = decoder, flushEndOfInput = true))
         }
     }
+
+    // ----- Structural boundary tests ---------------------------------------
+
+    @Nested
+    @DisplayName("structural boundary tests")
+    inner class StructuralBoundaryTests {
+        @Test
+        fun `2-byte sequence boundary cases`() {
+            // Valid lead + ASCII byte: expects replacement then reprocesses follow
+            val d1 = Utf8Decoder()
+            assertNoOutput(d1.accept(0xC2))
+            assertEmit(d1.accept('A'.code), replacement(), expectedReprocess = true)
+
+            // Valid lead + invalid continuation lead byte: expects replacement then reprocesses follow
+            val d2 = Utf8Decoder()
+            assertNoOutput(d2.accept(0xC2))
+            assertEmit(d2.accept(0xC3), replacement(), expectedReprocess = true)
+        }
+
+        @Test
+        fun `3-byte sequence boundary cases`() {
+            // Lead + ASCII at first continuation byte
+            val d1 = Utf8Decoder()
+            assertNoOutput(d1.accept(0xE1))
+            assertEmit(d1.accept('A'.code), replacement(), expectedReprocess = true)
+
+            // Lead + valid continuation + ASCII at second continuation byte
+            val d2 = Utf8Decoder()
+            assertNoOutput(d2.accept(0xE1))
+            assertNoOutput(d2.accept(0x80))
+            assertEmit(d2.accept('A'.code), replacement(), expectedReprocess = true)
+
+            // Lead + valid continuation + non-continuation lead byte at second continuation byte
+            val d3 = Utf8Decoder()
+            assertNoOutput(d3.accept(0xE1))
+            assertNoOutput(d3.accept(0x80))
+            assertEmit(d3.accept(0xC3), replacement(), expectedReprocess = true)
+        }
+
+        @Test
+        fun `4-byte sequence boundary cases`() {
+            // Lead + ASCII at first continuation byte
+            val d1 = Utf8Decoder()
+            assertNoOutput(d1.accept(0xF1))
+            assertEmit(d1.accept('A'.code), replacement(), expectedReprocess = true)
+
+            // Lead + valid continuation + ASCII at second continuation byte
+            val d2 = Utf8Decoder()
+            assertNoOutput(d2.accept(0xF1))
+            assertNoOutput(d2.accept(0x80))
+            assertEmit(d2.accept('A'.code), replacement(), expectedReprocess = true)
+
+            // Lead + valid continuation + valid continuation + ASCII at third continuation byte
+            val d3 = Utf8Decoder()
+            assertNoOutput(d3.accept(0xF1))
+            assertNoOutput(d3.accept(0x80))
+            assertNoOutput(d3.accept(0x80))
+            assertEmit(d3.accept('A'.code), replacement(), expectedReprocess = true)
+
+            // Lead + valid continuation + valid continuation + non-continuation lead byte at third continuation byte
+            val d4 = Utf8Decoder()
+            assertNoOutput(d4.accept(0xF1))
+            assertNoOutput(d4.accept(0x80))
+            assertNoOutput(d4.accept(0x80))
+            assertEmit(d4.accept(0xC3), replacement(), expectedReprocess = true)
+        }
+
+        @Test
+        fun `overlong and surrogate boundaries without reprocess`() {
+            // 3-byte overlong lead: 0xE0 followed by 0x80 (is in 0x80..0xBF, but not in 0xA0..0xBF)
+            // Expects replacement without reprocessing 0x80 because 0x80 is in 0x80..0xBF
+            val d1 = Utf8Decoder()
+            assertNoOutput(d1.accept(0xE0))
+            assertEmit(d1.accept(0x80), replacement(), expectedReprocess = false)
+
+            // Surrogate lead: 0xED followed by 0xA0 (is in 0x80..0xBF, but not in 0x80..0x9F)
+            // Expects replacement without reprocessing 0xA0
+            val d2 = Utf8Decoder()
+            assertNoOutput(d2.accept(0xED))
+            assertEmit(d2.accept(0xA0), replacement(), expectedReprocess = false)
+
+            // 4-byte overlong lead: 0xF0 followed by 0x80 (is in 0x80..0xBF, but not in 0x90..0xBF)
+            // Expects replacement without reprocessing 0x80
+            val d3 = Utf8Decoder()
+            assertNoOutput(d3.accept(0xF0))
+            assertEmit(d3.accept(0x80), replacement(), expectedReprocess = false)
+
+            // Out-of-unicode boundary: 0xF4 followed by 0x90 (is in 0x80..0xBF, but not in 0x80..0x8F)
+            // Expects replacement without reprocessing 0x90
+            val d4 = Utf8Decoder()
+            assertNoOutput(d4.accept(0xF4))
+            assertEmit(d4.accept(0x90), replacement(), expectedReprocess = false)
+        }
+    }
 }

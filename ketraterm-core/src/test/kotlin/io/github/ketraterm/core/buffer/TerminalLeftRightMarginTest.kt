@@ -17,9 +17,11 @@ package io.github.ketraterm.core.buffer
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.state.TerminalState
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import kotlin.random.Random
 
 class TerminalLeftRightMarginTest {
     private fun stateOf(api: TerminalBuffer): TerminalState {
@@ -573,5 +575,187 @@ class TerminalLeftRightMarginTest {
             { assertEquals('c'.code, buffer.getCodepointAt(4, 0)) },
             { assertEquals('R'.code, buffer.getCodepointAt(7, 0)) },
         )
+    }
+
+    @Test
+    fun `leftRightMargin_randomOperationsPropertyTest`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 6)
+        val state = stateOf(buffer)
+        val random = Random(42)
+        val logs = ArrayList<String>()
+
+        try {
+            repeat(1000) { step ->
+                // Randomly enable or disable modes
+                if (random.nextInt(20) == 0) {
+                    val modeVal = random.nextBoolean()
+                    buffer.setLeftRightMarginMode(modeVal)
+                    logs.add("Step $step: setLeftRightMarginMode($modeVal)")
+                }
+                if (random.nextInt(20) == 0) {
+                    val modeVal = random.nextBoolean()
+                    buffer.setOriginMode(modeVal)
+                    logs.add("Step $step: setOriginMode($modeVal)")
+                }
+
+                // Randomly update margins
+                if (random.nextInt(15) == 0 && state.modes.isLeftRightMarginMode) {
+                    val left = random.nextInt(4) // 0..3
+                    val right = 5 + random.nextInt(4) // 5..8
+                    buffer.setLeftRightMargins(left + 1, right + 1)
+                    logs.add("Step $step: setLeftRightMargins(${left + 1}, ${right + 1})")
+                }
+                if (random.nextInt(15) == 0) {
+                    val top = random.nextInt(2) // 0..1
+                    val bottom = 3 + random.nextInt(2) // 3..4
+                    buffer.setScrollRegion(top + 1, bottom + 1)
+                    logs.add("Step $step: setScrollRegion(${top + 1}, ${bottom + 1})")
+                }
+
+                // Perform a random edit or cursor operation
+                when (random.nextInt(18)) {
+                    0 -> {
+                        val cp = 'A'.code + random.nextInt(26)
+                        buffer.writeCodepoint(cp)
+                        logs.add("Step $step: writeCodepoint(${cp.toChar()})")
+                    }
+                    1 -> {
+                        val cp = 0x1F600 + random.nextInt(5)
+                        buffer.writeCluster(intArrayOf(cp), 1)
+                        logs.add("Step $step: writeCluster(WideChar: $cp)")
+                    }
+                    2 -> {
+                        buffer.newLine()
+                        logs.add("Step $step: newLine()")
+                    }
+                    3 -> {
+                        buffer.carriageReturn()
+                        logs.add("Step $step: carriageReturn()")
+                    }
+                    4 -> {
+                        buffer.reverseLineFeed()
+                        logs.add("Step $step: reverseLineFeed()")
+                    }
+                    5 -> {
+                        val cnt = 1 + random.nextInt(2)
+                        buffer.insertLines(cnt)
+                        logs.add("Step $step: insertLines($cnt)")
+                    }
+                    6 -> {
+                        val cnt = 1 + random.nextInt(2)
+                        buffer.deleteLines(cnt)
+                        logs.add("Step $step: deleteLines($cnt)")
+                    }
+                    7 -> {
+                        val cnt = 1 + random.nextInt(3)
+                        buffer.insertBlankCharacters(cnt)
+                        logs.add("Step $step: insertBlankCharacters($cnt)")
+                    }
+                    8 -> {
+                        val cnt = 1 + random.nextInt(3)
+                        buffer.deleteCharacters(cnt)
+                        logs.add("Step $step: deleteCharacters($cnt)")
+                    }
+                    9 -> {
+                        val cnt = 1 + random.nextInt(3)
+                        buffer.eraseCharacters(cnt)
+                        logs.add("Step $step: eraseCharacters($cnt)")
+                    }
+                    10 -> {
+                        buffer.eraseLineToEnd()
+                        logs.add("Step $step: eraseLineToEnd()")
+                    }
+                    11 -> {
+                        buffer.eraseLineToCursor()
+                        logs.add("Step $step: eraseLineToCursor()")
+                    }
+                    12 -> {
+                        buffer.eraseCurrentLine()
+                        logs.add("Step $step: eraseCurrentLine()")
+                    }
+                    13 -> {
+                        buffer.scrollUp()
+                        logs.add("Step $step: scrollUp()")
+                    }
+                    14 -> {
+                        buffer.scrollDown()
+                        logs.add("Step $step: scrollDown()")
+                    }
+                    15 -> {
+                        val col = random.nextInt(12) - 1 // include out of bounds
+                        val row = random.nextInt(8) - 1
+                        buffer.positionCursor(col, row)
+                        logs.add("Step $step: positionCursor($col, $row)")
+                    }
+                    16 -> {
+                        val isSave = random.nextBoolean()
+                        if (isSave) {
+                            buffer.saveCursor()
+                            logs.add("Step $step: saveCursor()")
+                        } else {
+                            buffer.restoreCursor()
+                            logs.add("Step $step: restoreCursor()")
+                        }
+                    }
+                    else -> {
+                        buffer.writeText("xyz")
+                        logs.add("Step $step: writeText(xyz)")
+                    }
+                }
+
+                // INVARIANTS:
+                val cursorCol = buffer.cursorCol
+                val cursorRow = buffer.cursorRow
+
+                // Cursor row must always be in [0, height - 1]
+                assertTrue(cursorRow in 0 until buffer.height, "Step $step: Cursor row $cursorRow must be in 0..${buffer.height - 1}")
+                // Cursor col must always be in [0, width - 1]
+                assertTrue(cursorCol in 0 until buffer.width, "Step $step: Cursor col $cursorCol must be in 0..${buffer.width - 1}")
+
+                // If left/right margins are active (which effectiveLeftMargin/effectiveRightMargin represent),
+                // the cursor column must be within those margins.
+                val left = state.effectiveLeftMargin
+                val right = state.effectiveRightMargin
+                assertTrue(
+                    cursorCol in left..right,
+                    "Step $step: Cursor col $cursorCol must be in effective horizontal margins $left..$right",
+                )
+
+                // 2. No orphan spacer characters in the grid
+                for (r in 0 until buffer.height) {
+                    for (c in 0 until buffer.width) {
+                        val cp = buffer.getCodepointAt(c, r)
+                        if (cp == TerminalConstants.WIDE_CHAR_SPACER) {
+                            assertTrue(c > 0, "Step $step: WIDE_CHAR_SPACER cannot be in column 0 at row $r")
+                            val leader = buffer.getCodepointAt(c - 1, r)
+                            assertTrue(
+                                leader != TerminalConstants.EMPTY && leader != TerminalConstants.WIDE_CHAR_SPACER,
+                                "Step $step: Spacer at row=$r col=$c must have a non-empty leader on its left (was $leader)",
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: Throwable) {
+            println("=== PROPERTY TEST FAILED ===")
+            println("Error: ${e.message}")
+            println("Steps leading to failure:")
+            logs.forEach { println("  $it") }
+            println("Grid content:")
+            for (r in 0 until buffer.height) {
+                val rowStr =
+                    (0 until buffer.width)
+                        .map { c ->
+                            val cp = buffer.getCodepointAt(c, r)
+                            when (cp) {
+                                TerminalConstants.EMPTY -> "."
+                                TerminalConstants.WIDE_CHAR_SPACER -> "S"
+                                else -> cp.toChar().toString()
+                            }
+                        }.joinToString("")
+                println("Row $r: $rowStr")
+            }
+            throw e
+        }
     }
 }
