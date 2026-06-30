@@ -67,9 +67,13 @@ val writeNativeVersion =
         val outputFile = layout.buildDirectory.file("native-version.txt")
         outputs.file(outputFile)
 
-        args(
-            project.version.toString(),
-            outputFile.map { it.asFile.absolutePath },
+        argumentProviders.add(
+            CommandLineArgumentProvider {
+                listOf(
+                    project.version.toString(),
+                    outputFile.get().asFile.absolutePath,
+                )
+            },
         )
     }
 
