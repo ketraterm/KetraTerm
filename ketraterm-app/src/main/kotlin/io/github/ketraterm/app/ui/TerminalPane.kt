@@ -15,7 +15,9 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.completion.StandaloneCompletionTriggerController
 import io.github.ketraterm.app.config.KetraTermSettings
+import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.ketraterm.ui.swing.api.SwingTerminal
@@ -38,6 +40,8 @@ internal class TerminalPane private constructor(
     val terminal: SwingTerminal,
     val component: JPanel,
     private val settings: KetraTermSettings,
+    private val completionTriggerController: StandaloneCompletionTriggerController,
+    private val completionDirtyListener: () -> Unit,
 ) {
     fun requestFocus() {
         terminal.requestFocusInWindow()
@@ -47,9 +51,16 @@ internal class TerminalPane private constructor(
         terminal.reloadSettings()
         component.background = terminal.background
         tab.session.setHostPolicy(settings.createHostPolicy(tab.profile.command))
+        if (settings.shellSuggestionsEnabled) {
+            completionTriggerController.scheduleRefresh()
+        } else {
+            completionTriggerController.cancelAndHide()
+        }
     }
 
     fun close() {
+        tab.session.removeDirtyListener(completionDirtyListener)
+        completionTriggerController.cancelAndHide()
         terminal.unbind()
     }
 
@@ -76,6 +87,15 @@ internal class TerminalPane private constructor(
             configureScrollbar(scrollbar)
 
             terminal.bind(tab.session)
+            val completionTriggerController =
+                StandaloneCompletionTriggerController(
+                    activeCommandLine = tab.session::activeShellCommandLine,
+                    requestSuggestions = { snapshot -> terminal.requestShellSuggestionsForSnapshot(snapshot) },
+                    hideSuggestions = terminal::hideShellSuggestions,
+                    suggestionsEnabled = { settings.shellSuggestionsEnabled },
+                )
+            val completionDirtyListener = completionTriggerController::scheduleRefresh
+            tab.session.addDirtyListener(completionDirtyListener)
 
             val pane =
                 TerminalPane(
@@ -83,6 +103,8 @@ internal class TerminalPane private constructor(
                     terminal = terminal,
                     component = terminalPanel(terminal, scrollbar),
                     settings = settings,
+                    completionTriggerController = completionTriggerController,
+                    completionDirtyListener = completionDirtyListener,
                 )
 
             terminal.addMouseListener(
@@ -100,9 +122,25 @@ internal class TerminalPane private constructor(
                     }
                 },
             )
+            terminal.addFocusListener(
+                object : java.awt.event.FocusAdapter() {
+                    override fun focusLost(e: java.awt.event.FocusEvent) {
+                        completionTriggerController.cancelAndHide()
+                    }
+                },
+            )
 
             tab.session.notifyRenderDirty()
             return pane
+        }
+
+        private fun SwingTerminal.requestShellSuggestionsForSnapshot(snapshot: TerminalShellCommandLineSnapshot) {
+            requestShellSuggestions(
+                commandText = snapshot.commandText,
+                cursorOffset = snapshot.cursorOffset,
+                anchorColumn = snapshot.cursorColumn,
+                anchorRow = snapshot.cursorRow,
+            )
         }
 
         private fun terminalPanel(
