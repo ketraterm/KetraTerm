@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.completion.TerminalCompletionFeedbackKind
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
@@ -36,7 +36,7 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
  */
 internal class StandaloneCompletionFeedbackRecorder(
     private val statsSource: TerminalCommandStatsCompletionSource,
-    private val persistSnapshot: (List<TerminalCommandCompletionStats>) -> Unit,
+    private val persistSnapshot: (TerminalCommandCompletionStatsSnapshot) -> Unit,
     private val clockEpochMillis: () -> Long = System::currentTimeMillis,
 ) {
     /**
@@ -85,7 +85,7 @@ internal class StandaloneCompletionFeedbackRecorder(
             workingDirectoryUri = workingDirectoryUri,
             feedbackAtEpochMillis = clockEpochMillis(),
         )
-        persistSnapshot(statsSource.snapshot())
+        persistSnapshot(statsSource.snapshotAll())
     }
 
     private companion object {

@@ -16,6 +16,7 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
@@ -29,7 +30,7 @@ class StandaloneCompletionFeedbackRecorderTest {
     @Test
     fun `accepted range suggestion records resulting command and persists snapshot`() {
         val source = TerminalCommandStatsCompletionSource()
-        val persisted = ArrayList<List<TerminalCommandCompletionStats>>()
+        val persisted = ArrayList<TerminalCommandCompletionStatsSnapshot>()
         val recorder =
             StandaloneCompletionFeedbackRecorder(
                 statsSource = source,
@@ -63,7 +64,15 @@ class StandaloneCompletionFeedbackRecorderTest {
             ),
             source.snapshot(),
         )
-        assertEquals(source.snapshot(), persisted.single())
+        assertEquals(source.snapshotAll(), persisted.single())
+        assertEquals(
+            "git",
+            persisted
+                .single()
+                .shapeStats
+                .single()
+                .shape.executable,
+        )
     }
 
     @Test
@@ -156,6 +165,7 @@ class StandaloneCompletionFeedbackRecorderTest {
         )
 
         assertEquals("file:///second", source.snapshot().single().workingDirectoryUri)
+        assertEquals("file:///second", source.shapeSnapshot().single().workingDirectoryUri)
     }
 
     private fun feedback(

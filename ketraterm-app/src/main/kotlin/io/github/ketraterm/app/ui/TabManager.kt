@@ -673,7 +673,7 @@ internal class TabManager(
                     workingDirectoryUri = metadata.workingDirectoryUri,
                     usedAtEpochMillis = metadata.finishedAtEpochMillis ?: System.currentTimeMillis(),
                 )
-                commandCompletionStatsStore?.persist(commandCompletionStatsSource.snapshot())
+                commandCompletionStatsStore?.persist(commandCompletionStatsSource.snapshotAll())
             }
             if (metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED) {
                 command?.let {
@@ -874,7 +874,9 @@ internal class TabManager(
             if (commandCompletionStatsStore == null) {
                 commandCompletionStatsStore =
                     CommandCompletionStatsStore(settings.commandCompletionStatsPath).also { store ->
-                        commandCompletionStatsSource.replaceAll(store.load() + commandCompletionStatsSource.snapshot())
+                        val loaded = store.loadSnapshot()
+                        commandCompletionStatsSource.replaceAll(loaded.commandStats + commandCompletionStatsSource.snapshot())
+                        commandCompletionStatsSource.replaceShapeStats(loaded.shapeStats + commandCompletionStatsSource.shapeSnapshot())
                     }
             }
         } else {
@@ -891,7 +893,9 @@ internal class TabManager(
     private fun createCommandCompletionStatsStoreIfEnabled(): CommandCompletionStatsStore? =
         if (settings.persistentCommandHistoryEnabled) {
             CommandCompletionStatsStore(settings.commandCompletionStatsPath).also { store ->
-                commandCompletionStatsSource.replaceAll(store.load())
+                val loaded = store.loadSnapshot()
+                commandCompletionStatsSource.replaceAll(loaded.commandStats)
+                commandCompletionStatsSource.replaceShapeStats(loaded.shapeStats)
             }
         } else {
             null

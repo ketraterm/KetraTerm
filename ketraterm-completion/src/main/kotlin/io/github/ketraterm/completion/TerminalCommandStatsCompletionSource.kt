@@ -113,6 +113,7 @@ class TerminalCommandStatsCompletionSource
 
         private val lock = Any()
         private val entries = ArrayList<TerminalCommandCompletionStats>(capacity)
+        private val shapeEntries = ArrayList<TerminalCommandShapeStats>(capacity)
 
         /**
          * Replaces the current index with [records].
@@ -143,6 +144,33 @@ class TerminalCommandStatsCompletionSource
         }
 
         /**
+         * Replaces the current command-shape index with [records].
+         *
+         * Duplicate shape/profile/directory rows are compacted by keeping the
+         * newest timestamp. At most [capacity] rows are retained.
+         *
+         * @param records compact shape-stat rows loaded by a host.
+         */
+        fun replaceShapeStats(records: List<TerminalCommandShapeStats>) {
+            val compacted = ArrayList<TerminalCommandShapeStats>(minOf(records.size, capacity))
+            for (record in records) {
+                val index = compacted.indexOfShapeKey(record)
+                if (index >= 0) {
+                    if (record.lastUsedEpochMillis >= compacted[index].lastUsedEpochMillis) {
+                        compacted[index] = record
+                    }
+                } else {
+                    compacted += record
+                }
+            }
+            compacted.sortWith(SHAPE_RECORD_ORDER)
+            synchronized(lock) {
+                shapeEntries.clear()
+                shapeEntries.addAll(compacted.take(capacity))
+            }
+        }
+
+        /**
          * Returns a stable snapshot for host persistence.
          *
          * @return retained rows sorted by ranking relevance.
@@ -150,6 +178,29 @@ class TerminalCommandStatsCompletionSource
         fun snapshot(): List<TerminalCommandCompletionStats> =
             synchronized(lock) {
                 entries.toList()
+            }
+
+        /**
+         * Returns a stable privacy-preserving command-shape snapshot.
+         *
+         * @return retained shape rows sorted by ranking relevance.
+         */
+        fun shapeSnapshot(): List<TerminalCommandShapeStats> =
+            synchronized(lock) {
+                shapeEntries.toList()
+            }
+
+        /**
+         * Returns exact command and structural shape stats in one snapshot.
+         *
+         * @return immutable stats snapshot for host persistence.
+         */
+        fun snapshotAll(): TerminalCommandCompletionStatsSnapshot =
+            synchronized(lock) {
+                TerminalCommandCompletionStatsSnapshot(
+                    commandStats = entries.toList(),
+                    shapeStats = shapeEntries.toList(),
+                )
             }
 
         /**
@@ -181,6 +232,14 @@ class TerminalCommandStatsCompletionSource
                     lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, usedAtEpochMillis),
                 )
             }
+            mutateShape(commandLine, profileId, workingDirectoryUri) { previous ->
+                previous.copy(
+                    useCount = saturatedIncrement(previous.useCount),
+                    successCount = if (successful) saturatedIncrement(previous.successCount) else previous.successCount,
+                    failureCount = if (successful) previous.failureCount else saturatedIncrement(previous.failureCount),
+                    lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, usedAtEpochMillis),
+                )
+            }
         }
 
         /**
@@ -203,6 +262,23 @@ class TerminalCommandStatsCompletionSource
             mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
                 previous.copy(
                     commandLine = canonical,
+                    acceptedCount =
+                        if (feedback == TerminalCompletionFeedbackKind.ACCEPTED) {
+                            saturatedIncrement(previous.acceptedCount)
+                        } else {
+                            previous.acceptedCount
+                        },
+                    dismissedCount =
+                        if (feedback == TerminalCompletionFeedbackKind.DISMISSED) {
+                            saturatedIncrement(previous.dismissedCount)
+                        } else {
+                            previous.dismissedCount
+                        },
+                    lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
+                )
+            }
+            mutateShape(commandLine, profileId, workingDirectoryUri) { previous ->
+                previous.copy(
                     acceptedCount =
                         if (feedback == TerminalCompletionFeedbackKind.ACCEPTED) {
                             saturatedIncrement(previous.acceptedCount)
@@ -265,6 +341,31 @@ class TerminalCommandStatsCompletionSource
             }
         }
 
+        private inline fun mutateShape(
+            commandLine: String,
+            profileId: String?,
+            workingDirectoryUri: String?,
+            update: (TerminalCommandShapeStats) -> TerminalCommandShapeStats,
+        ) {
+            val shape = TerminalCommandLineShape.fromCommandLine(commandLine) ?: return
+            synchronized(lock) {
+                val existingIndex = shapeEntries.indexOfShapeKey(shape.normalizedShapeKey, profileId, workingDirectoryUri)
+                if (existingIndex >= 0) {
+                    shapeEntries[existingIndex] = update(shapeEntries[existingIndex])
+                } else {
+                    if (shapeEntries.size == capacity) removeLeastRelevantShapeLocked()
+                    val initial =
+                        TerminalCommandShapeStats(
+                            shape = shape,
+                            profileId = profileId,
+                            workingDirectoryUri = workingDirectoryUri,
+                        )
+                    shapeEntries += update(initial)
+                }
+                shapeEntries.sortWith(SHAPE_RECORD_ORDER)
+            }
+        }
+
         private fun TerminalCommandCompletionStats.toCandidate(request: TerminalCompletionRequest): TerminalCompletionCandidate =
             TerminalCompletionCandidate(
                 replacementText = commandLine,
@@ -304,6 +405,17 @@ class TerminalCommandStatsCompletionSource
             entries.removeAt(removeIndex)
         }
 
+        private fun removeLeastRelevantShapeLocked() {
+            if (shapeEntries.isEmpty()) return
+            var removeIndex = 0
+            var index = 1
+            while (index < shapeEntries.size) {
+                if (SHAPE_RECORD_ORDER.compare(shapeEntries[index], shapeEntries[removeIndex]) > 0) removeIndex = index
+                index++
+            }
+            shapeEntries.removeAt(removeIndex)
+        }
+
         private fun ArrayList<TerminalCommandCompletionStats>.indexOfKey(record: TerminalCommandCompletionStats): Int =
             indexOfKey(record.normalizedCommandLine, record.profileId, record.workingDirectoryUri)
 
@@ -316,6 +428,28 @@ class TerminalCommandStatsCompletionSource
             while (index < size) {
                 val entry = this[index]
                 if (entry.normalizedCommandLine == normalizedCommandLine &&
+                    entry.profileId == profileId &&
+                    entry.workingDirectoryUri == workingDirectoryUri
+                ) {
+                    return index
+                }
+                index++
+            }
+            return -1
+        }
+
+        private fun ArrayList<TerminalCommandShapeStats>.indexOfShapeKey(record: TerminalCommandShapeStats): Int =
+            indexOfShapeKey(record.shape.normalizedShapeKey, record.profileId, record.workingDirectoryUri)
+
+        private fun List<TerminalCommandShapeStats>.indexOfShapeKey(
+            normalizedShapeKey: String,
+            profileId: String?,
+            workingDirectoryUri: String?,
+        ): Int {
+            var index = 0
+            while (index < size) {
+                val entry = this[index]
+                if (entry.shape.normalizedShapeKey == normalizedShapeKey &&
                     entry.profileId == profileId &&
                     entry.workingDirectoryUri == workingDirectoryUri
                 ) {
@@ -347,6 +481,13 @@ class TerminalCommandStatsCompletionSource
                     .thenByDescending { it.successCount }
                     .thenBy { it.dismissedCount }
                     .thenBy { it.commandLine }
+
+            private val SHAPE_RECORD_ORDER =
+                compareByDescending<TerminalCommandShapeStats> { it.lastUsedEpochMillis }
+                    .thenByDescending { it.acceptedCount }
+                    .thenByDescending { it.successCount }
+                    .thenBy { it.dismissedCount }
+                    .thenBy { it.shape.normalizedShapeKey }
 
             private val CANDIDATE_ORDER =
                 compareByDescending<TerminalCompletionCandidate> { it.score }
