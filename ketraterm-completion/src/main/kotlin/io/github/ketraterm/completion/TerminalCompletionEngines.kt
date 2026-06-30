@@ -26,7 +26,59 @@ object TerminalCompletionEngines {
      * @return completion engine that evaluates [specs] without shell I/O.
      */
     @JvmStatic
-    fun fromSpecs(specs: List<TerminalCommandSpec>): TerminalCompletionEngine = SpecCompletionEngine(specs)
+    fun fromSpecs(specs: List<TerminalCommandSpec>): TerminalCompletionEngine =
+        fromSources(
+            listOf(
+                TerminalCompletionSourceEntry(
+                    source = TerminalCompletionSources.fromSpecs(specs),
+                    priority = SPEC_SOURCE_PRIORITY,
+                ),
+            ),
+        )
+
+    /**
+     * Creates a deterministic merged engine from prioritized completion sources.
+     *
+     * Candidates are deduplicated by replacement range and replacement text,
+     * then ranked by source priority, candidate score, and stable text
+     * tie-breakers before [TerminalCompletionRequest.maxCandidates] is applied.
+     *
+     * @param sources prioritized source registrations.
+     * @return merged completion engine.
+     */
+    @JvmStatic
+    fun fromSources(sources: List<TerminalCompletionSourceEntry>): TerminalCompletionEngine =
+        if (sources.isEmpty()) {
+            TerminalCompletionEngine.NONE
+        } else {
+            MergedCompletionEngine(sources)
+        }
+
+    /**
+     * Creates a deterministic merged engine from equal-priority sources.
+     *
+     * @param sources completion sources queried in declaration order.
+     * @return merged completion engine.
+     */
+    @JvmStatic
+    fun fromSources(vararg sources: TerminalCompletionSource): TerminalCompletionEngine =
+        fromSources(sources.map { TerminalCompletionSourceEntry(it) })
+
+    private const val SPEC_SOURCE_PRIORITY = 0
+}
+
+/**
+ * Factories for dependency-free completion sources.
+ */
+object TerminalCompletionSources {
+    /**
+     * Creates a deterministic source backed by static command specs.
+     *
+     * @param specs top-level command specs.
+     * @return completion source that evaluates [specs] without shell I/O.
+     */
+    @JvmStatic
+    fun fromSpecs(specs: List<TerminalCommandSpec>): TerminalCompletionSource = SpecCompletionSource(specs)
 }
 
 /**

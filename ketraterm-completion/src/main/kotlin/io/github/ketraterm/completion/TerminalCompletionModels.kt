@@ -112,6 +112,46 @@ data class TerminalCompletionCandidate
     }
 
 /**
+ * Pure completion source contract for one bounded provider such as static
+ * command specs, session MRU, indexed history, path completion, or IDE context.
+ */
+fun interface TerminalCompletionSource {
+    /**
+     * Returns candidates produced by this source for [request].
+     *
+     * Implementations must be deterministic for a stable source snapshot and
+     * must not perform shell I/O, UI work, disk I/O, or network I/O. Expensive
+     * sources should maintain ready in-memory indexes outside this callback.
+     *
+     * @param request command-line completion context.
+     * @return ordered candidates from this source.
+     */
+    fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate>
+
+    companion object {
+        /**
+         * Source that returns no candidates.
+         */
+        @JvmField
+        val NONE: TerminalCompletionSource = TerminalCompletionSource { emptyList() }
+    }
+}
+
+/**
+ * Source registration consumed by merged completion engines.
+ *
+ * @property source completion source to query.
+ * @property priority source-level ranking priority. Larger values rank ahead of
+ * lower-priority sources before candidate score is considered.
+ */
+data class TerminalCompletionSourceEntry
+    @JvmOverloads
+    constructor(
+        val source: TerminalCompletionSource,
+        val priority: Int = 0,
+    )
+
+/**
  * Pure completion engine contract.
  */
 fun interface TerminalCompletionEngine {

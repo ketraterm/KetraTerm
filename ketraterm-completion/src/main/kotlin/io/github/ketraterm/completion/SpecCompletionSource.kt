@@ -15,9 +15,9 @@
  */
 package io.github.ketraterm.completion
 
-internal class SpecCompletionEngine(
+internal class SpecCompletionSource(
     specs: List<TerminalCommandSpec>,
-) : TerminalCompletionEngine {
+) : TerminalCompletionSource {
     private val specs = specs.toList()
 
     init {
