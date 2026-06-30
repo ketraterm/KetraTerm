@@ -1081,6 +1081,11 @@ class TerminalShellIntegrationState(
         val first = minOf(start, end)
         val last = maxOf(start, end)
         if (lineId < first || lineId > last) return false
+        var i = 0
+        while (i < count) {
+            if (promptStartLineIds[i] == lineId) return false
+            i++
+        }
         return hasFlag(index, FLAG_COMMAND_START_INCLUSIVE) || lineId != start
     }
 

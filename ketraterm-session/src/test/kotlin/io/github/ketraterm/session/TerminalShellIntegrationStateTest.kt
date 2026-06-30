@@ -136,6 +136,37 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `one-line failed command does not project failed command rail on next prompt row`() {
+        val state = TerminalShellIntegrationState()
+        val promptStarts = BooleanArray(2)
+        val failedCommandRails = BooleanArray(2)
+        val commandStarts = BooleanArray(2)
+        val commandEnds = BooleanArray(2)
+        val commandRecordIds = IntArray(2)
+        val commandLifecycleStates = IntArray(2)
+
+        state.recordPromptStart(10)
+        state.recordPromptEnd(10)
+        state.recordCommandStart(10, includeLine = false)
+        state.recordCommandFinished(11, exitCode = 1)
+        state.recordPromptStart(11)
+
+        state.copyViewport(
+            lineIds = longArrayOf(10, 11),
+            rowCount = 2,
+            promptStarts = promptStarts,
+            commandStarts = commandStarts,
+            commandEnds = commandEnds,
+            commandRecordIds = commandRecordIds,
+            commandLifecycleStates = commandLifecycleStates,
+            failedCommandRails = failedCommandRails,
+        )
+
+        assertContentEquals(booleanArrayOf(true, true), promptStarts)
+        assertContentEquals(booleanArrayOf(false, false), failedCommandRails)
+    }
+
+    @Test
     fun `zero null and missing command starts do not create failed command ranges`() {
         val state = TerminalShellIntegrationState()
 
