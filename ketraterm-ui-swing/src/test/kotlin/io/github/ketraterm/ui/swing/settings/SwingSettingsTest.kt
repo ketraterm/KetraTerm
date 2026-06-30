@@ -185,6 +185,7 @@ class SwingSettingsTest {
         assertEquals(8, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(16, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(0, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(true, settings.shellSuggestionsEnabled)
     }
 
     @Test

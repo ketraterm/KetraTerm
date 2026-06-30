@@ -97,6 +97,22 @@ class SwingTerminalInputControllerTest {
     }
 
     @Nested
+    inner class ShellSuggestionShortcuts {
+        @Test
+        fun `visible suggestion popup handles navigation before terminal input`() {
+            val host = RecordingInputHost(shellSuggestionKeyHandled = true)
+            val controller = SwingTerminalInputController(host)
+            val event = keyPressed(keyCode = KeyEvent.VK_DOWN, modifiers = 0)
+
+            controller.keyListener.keyPressed(event)
+
+            assertEquals(1, host.shellSuggestionKeyPressCount)
+            assertTrue(event.isConsumed)
+            assertTrue(host.viewportScrollDeltas.isEmpty())
+        }
+    }
+
+    @Nested
     inner class ClipboardShortcuts {
         @Test
         fun `configured copy shortcut is handled before terminal key encoding`() {
@@ -219,6 +235,7 @@ class SwingTerminalInputControllerTest {
         override val settings: SwingSettings = SwingSettings(),
         private val copyResult: Boolean = true,
         private val pasteResult: Boolean = true,
+        private val shellSuggestionKeyHandled: Boolean = false,
     ) : SwingTerminalInputHost {
         override val session: TerminalSession? = null
         val hyperlinkHoverUpdates = ArrayList<Boolean>()
@@ -229,6 +246,7 @@ class SwingTerminalInputControllerTest {
         var openSearchCount = 0
         var copyCount = 0
         var pasteCount = 0
+        var shellSuggestionKeyPressCount = 0
 
         override fun visibleGridRows(): Int = 24
 
@@ -254,6 +272,12 @@ class SwingTerminalInputControllerTest {
 
         override fun openSearch() {
             openSearchCount++
+        }
+
+        override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean {
+            shellSuggestionKeyPressCount++
+            if (shellSuggestionKeyHandled) event.consume()
+            return shellSuggestionKeyHandled
         }
 
         override fun copySelectionToClipboard(): Boolean {

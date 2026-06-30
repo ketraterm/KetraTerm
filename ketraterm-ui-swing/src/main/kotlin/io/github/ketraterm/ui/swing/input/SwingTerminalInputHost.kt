@@ -39,6 +39,8 @@ internal interface SwingTerminalInputHost {
 
     fun openSearch()
 
+    fun handleShellSuggestionKeyPressed(event: java.awt.event.KeyEvent): Boolean
+
     fun copySelectionToClipboard(): Boolean
 
     fun pasteClipboardText(): Boolean

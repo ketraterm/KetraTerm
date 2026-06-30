@@ -19,6 +19,7 @@ import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
@@ -55,6 +56,7 @@ internal class TerminalPane private constructor(
         fun create(
             tab: TerminalWorkspaceTab,
             settings: KetraTermSettings,
+            suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
             onContextMenu: (TerminalPane, Int, Int) -> Unit,
         ): TerminalPane {
             val scrollbar = JScrollBar(Adjustable.VERTICAL)
@@ -65,6 +67,7 @@ internal class TerminalPane private constructor(
                     hostServices =
                         SwingHostServices(
                             viewportListener = scrollbarAdapter,
+                            shellSuggestionProvider = suggestionProvider,
                         ),
                 )
             scrollbarAdapter.attach(terminal)

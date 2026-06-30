@@ -152,6 +152,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(host)`: richer font measurement policy for script/run-level shaping, fallback run metrics, and backend painter integrations beyond the current Java2D/Swing path.
 - `TODO(host)`: custom line spacing/height metrics in the renderer.
 - `TODO(host/ui)`: richer UI scrollback controls, selection behavior while scrolled, and auto-follow/offset-retention policy beyond the current fixed-grid Swing scrollbar and viewport mapping.
+- `TODO(host/ui)`: live shell suggestion triggers, command-line replacement semantics, path/current-directory providers, and IntelliJ-native popup styling remain host-owned follow-up work. The reusable Swing terminal popup surface, keyboard/mouse selection, acceptance callback, standalone history provider, and standalone/IntelliJ enablement settings exist.
 - `TODO(host)`: accessibility/export APIs.
 - `TODO(host)`: performance benchmarks for large scrollback, resize, and dense SGR streams.
 

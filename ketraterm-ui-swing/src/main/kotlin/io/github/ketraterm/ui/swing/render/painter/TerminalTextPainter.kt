@@ -448,17 +448,18 @@ internal class TerminalTextPainter(
                 hoveredHyperlinkEndRow,
                 hoveredHyperlinkEndColumn,
             )
+        val codeWord = codeWords[index]
         val foreground =
             effectiveForeground(
                 palette = palette,
                 attr = attr,
+                codePoint = codeWord,
                 hovered = hovered,
                 hyperlinkActivationHover = hyperlinkActivationHover,
                 hyperlinkActivationForeground = hyperlinkActivationForeground,
             )
         val fontStyle = terminalFontStyle(attr)
         val endColumn = minOf(cache.columns, column + cellSpan(flags))
-        val codeWord = codeWords[index]
         val isPrimitive = flags and TerminalRenderCellFlags.CLUSTER == 0 && cellPrimitives.canPaint(codeWord)
 
         if (isPrimitive) {
@@ -577,6 +578,7 @@ internal class TerminalTextPainter(
     private fun effectiveForeground(
         palette: TerminalColorPalette,
         attr: Long,
+        codePoint: Int = 0,
         hovered: Boolean,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
@@ -584,7 +586,7 @@ internal class TerminalTextPainter(
         if (hovered && hyperlinkActivationHover) {
             hyperlinkActivationForeground
         } else {
-            SwingColors.foreground(palette, attr)
+            SwingColors.foreground(palette, attr, codePoint)
         }
 
     private fun isBlinkHidden(

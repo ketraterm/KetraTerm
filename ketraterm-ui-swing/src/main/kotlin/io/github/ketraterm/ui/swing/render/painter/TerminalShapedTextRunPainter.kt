@@ -300,6 +300,7 @@ internal class TerminalShapedTextRunPainter(
             effectiveForeground(
                 palette = palette,
                 attr = attr,
+                codePoint = cache.codeWords[startIndex],
                 hovered = hovered,
                 hyperlinkActivationHover = hyperlinkActivationHover,
                 hyperlinkActivationForeground = hyperlinkActivationForeground,
@@ -331,6 +332,7 @@ internal class TerminalShapedTextRunPainter(
                 effectiveForeground(
                     palette = palette,
                     attr = currentAttr,
+                    codePoint = cache.codeWords[index],
                     hovered = currentHovered,
                     hyperlinkActivationHover = hyperlinkActivationHover,
                     hyperlinkActivationForeground = hyperlinkActivationForeground,
@@ -383,6 +385,7 @@ internal class TerminalShapedTextRunPainter(
             effectiveForeground(
                 palette = palette,
                 attr = attr,
+                codePoint = cache.codeWords[startIndex],
                 hovered = hovered,
                 hyperlinkActivationHover = hyperlinkActivationHover,
                 hyperlinkActivationForeground = hyperlinkActivationForeground,
@@ -412,6 +415,7 @@ internal class TerminalShapedTextRunPainter(
                 effectiveForeground(
                     palette = palette,
                     attr = currentAttr,
+                    codePoint = cache.codeWords[index],
                     hovered = currentHovered,
                     hyperlinkActivationHover = hyperlinkActivationHover,
                     hyperlinkActivationForeground = hyperlinkActivationForeground,
@@ -487,6 +491,7 @@ internal class TerminalShapedTextRunPainter(
             effectiveForeground(
                 palette = palette,
                 attr = attr,
+                codePoint = cache.codeWords[index],
                 hovered = hovered,
                 hyperlinkActivationHover = hyperlinkActivationHover,
                 hyperlinkActivationForeground = hyperlinkActivationForeground,
@@ -689,6 +694,7 @@ internal class TerminalShapedTextRunPainter(
     private fun effectiveForeground(
         palette: TerminalColorPalette,
         attr: Long,
+        codePoint: Int = 0,
         hovered: Boolean,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
@@ -696,7 +702,7 @@ internal class TerminalShapedTextRunPainter(
         if (hovered && hyperlinkActivationHover) {
             hyperlinkActivationForeground
         } else {
-            SwingColors.foreground(palette, attr)
+            SwingColors.foreground(palette, attr, codePoint)
         }
 
     private fun isBlinkHidden(

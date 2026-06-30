@@ -85,4 +85,36 @@ class SwingColorsTest {
         assertNotEquals(0xFFFFFF00.toInt(), adjusted)
         assertTrue(SwingColors.contrastRatio(adjusted, 0xFFFFFFFF.toInt()) >= 3.0)
     }
+
+    @Test
+    fun foregroundBypassesContrastEnforcementForGraphicGlyphs() {
+        val attrs = TerminalRenderAttrs.pack()
+
+        // Very dark red on black has low contrast, normally adjusted
+        val palette =
+            TerminalColorPalette(
+                defaultForeground = 0xFF220000.toInt(), // Very dark red
+                defaultBackground = 0xFF000000.toInt(), // Black
+            )
+
+        // Standard lookup / default codePoint should be adjusted
+        val adjustedNormal = SwingColors.foreground(palette, attrs, codePoint = 0)
+        assertNotEquals(0xFF220000.toInt(), adjustedNormal)
+
+        // Box drawing character (e.g. U+2500) must bypass adjustment and keep original color
+        val boxDrawingColor = SwingColors.foreground(palette, attrs, codePoint = 0x2500)
+        assertEquals(0xFF220000.toInt(), boxDrawingColor)
+
+        // Block element character (e.g. U+2588) must bypass adjustment and keep original color
+        val blockElementColor = SwingColors.foreground(palette, attrs, codePoint = 0x2588)
+        assertEquals(0xFF220000.toInt(), blockElementColor)
+
+        // Geometric shape character (e.g. U+25A0) must bypass adjustment and keep original color
+        val geometricShapeColor = SwingColors.foreground(palette, attrs, codePoint = 0x25A0)
+        assertEquals(0xFF220000.toInt(), geometricShapeColor)
+
+        // Braille pattern character (e.g. U+2812) must bypass adjustment and keep original color
+        val braillePatternColor = SwingColors.foreground(palette, attrs, codePoint = 0x2812)
+        assertEquals(0xFF220000.toInt(), braillePatternColor)
+    }
 }

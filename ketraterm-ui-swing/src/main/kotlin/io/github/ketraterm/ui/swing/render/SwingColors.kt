@@ -133,6 +133,7 @@ internal object SwingColors {
     fun foreground(
         palette: TerminalColorPalette,
         attrWord: Long,
+        codePoint: Int = 0,
     ): Int {
         if (TerminalRenderAttrs.isInvisible(attrWord)) {
             return background(palette, attrWord)
@@ -140,8 +141,19 @@ internal object SwingColors {
 
         val color = palette.foreground(attrWord)
         val fg = if (TerminalRenderAttrs.isFaint(attrWord)) dim(color) else color
+        if (isGraphicCodePoint(codePoint)) {
+            return fg
+        }
         val bg = background(palette, attrWord)
         return ensureContrast(fg, bg)
+    }
+
+    private fun isGraphicCodePoint(codePoint: Int): Boolean {
+        // Box Drawing: U+2500..U+257F
+        // Block Elements: U+2580..U+259F
+        // Geometric Shapes: U+25A0..U+25FF
+        // Braille Patterns: U+2800..U+28FF
+        return codePoint in 0x2500..0x25FF || codePoint in 0x2800..0x28FF
     }
 
     /**

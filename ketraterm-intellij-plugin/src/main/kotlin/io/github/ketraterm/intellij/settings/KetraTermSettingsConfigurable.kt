@@ -76,6 +76,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
     private val systemFallbackFontsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.systemFallbackFonts"))
     private val visualBellCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.visualBell"))
     private val pasteOnMiddleClickCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.pasteOnMiddleClick"))
+    private val shellSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
 
     private val pasteSanitizationCombo = ComboBox(pasteSanitizationOptions())
     private val clipboardLocalWriteCombo = ComboBox(permissionOptions())
@@ -183,6 +184,9 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
                     row {
                         cell(pasteOnMiddleClickCheckBox)
                     }
+                    row {
+                        cell(shellSuggestionsCheckBox)
+                    }
                 }
 
                 group(KetraTermBundle.message("settings.ketraterm.group.security")) {
@@ -250,6 +254,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
         systemFallbackFontsCheckBox.isSelected = normalized.useSystemFallbackFonts
         visualBellCheckBox.isSelected = normalized.visualBell
         pasteOnMiddleClickCheckBox.isSelected = normalized.pasteOnMiddleClick
+        shellSuggestionsCheckBox.isSelected = normalized.shellSuggestionsEnabled
         pasteSanitizationCombo.selectedItem = pasteSanitizationOptions().firstOrNull { it.id == normalized.pasteSanitization }
         clipboardLocalWriteCombo.selectedItem = visiblePermissionOption(normalized.clipboardLocalWrite, "prompt")
         clipboardRemoteWriteCombo.selectedItem = visiblePermissionOption(normalized.clipboardRemoteWrite, "deny")
@@ -273,6 +278,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
             cursorShape = selectedCursorShapeId(),
             visualBell = visualBellCheckBox.isSelected,
             pasteOnMiddleClick = pasteOnMiddleClickCheckBox.isSelected,
+            shellSuggestionsEnabled = shellSuggestionsCheckBox.isSelected,
             scrollbackLines = spinnerValue(scrollbackSpinner),
             lineHeight = spinnerDoubleValue(lineHeightSpinner).toFloat(),
             shellPath = selectedShellPath(),

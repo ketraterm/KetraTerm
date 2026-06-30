@@ -17,6 +17,7 @@ package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.app.history.CommandHistoryStore
+import io.github.ketraterm.app.history.CommandHistorySuggestionProvider
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.workspace.*
@@ -198,7 +199,11 @@ internal class TabManager(
             }
 
         val pane =
-            TerminalPane.create(workspaceTab, settings) { p, x, y ->
+            TerminalPane.create(
+                tab = workspaceTab,
+                settings = settings,
+                suggestionProvider = historySuggestionProvider(workspaceTab.profile.id),
+            ) { p, x, y ->
                 showPaneContextMenu(p, p.terminal, x, y)
             }
         panes += pane
@@ -340,7 +345,11 @@ internal class TabManager(
                 return
             }
         val newPane =
-            TerminalPane.create(workspaceTab, settings) { p, x, y ->
+            TerminalPane.create(
+                tab = workspaceTab,
+                settings = settings,
+                suggestionProvider = historySuggestionProvider(workspaceTab.profile.id),
+            ) { p, x, y ->
                 showPaneContextMenu(p, p.terminal, x, y)
             }
 
@@ -813,6 +822,12 @@ internal class TabManager(
 
     private fun createCommandHistoryStoreIfEnabled(): CommandHistoryStore? =
         if (settings.persistentCommandHistoryEnabled) CommandHistoryStore(settings.commandHistoryPath) else null
+
+    private fun historySuggestionProvider(profileId: String): CommandHistorySuggestionProvider =
+        CommandHistorySuggestionProvider(
+            profileId = profileId,
+            historySnapshot = { commandHistoryStore?.latestSnapshot() ?: emptyList() },
+        )
 
     private companion object {
         private const val INITIAL_TAB_CAPACITY = 4

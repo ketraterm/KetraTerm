@@ -35,12 +35,13 @@ import java.util.concurrent.TimeUnit
  */
 internal class CommandHistoryStore(
     private val path: Path,
-    private val capacity: Int = DEFAULT_CAPACITY,
+    private val capacity: Int = DEFAULT_COMMAND_HISTORY_CAPACITY,
 ) : AutoCloseable {
     init {
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
     }
 
+    private val lock = Any()
     private val entries = ArrayDeque<CommandHistoryEntry>(capacity)
     private val worker =
         Executors.newSingleThreadExecutor { task ->
@@ -68,9 +69,13 @@ internal class CommandHistoryStore(
                 finishedAtEpochMillis = finishedAt,
             )
         worker.execute {
-            while (entries.size >= capacity) entries.removeFirst()
-            entries.addLast(entry)
-            persist()
+            val snapshot =
+                synchronized(lock) {
+                    while (entries.size >= capacity) entries.removeFirst()
+                    entries.addLast(entry)
+                    entries.toList()
+                }
+            persist(snapshot)
         }
     }
 
@@ -81,12 +86,24 @@ internal class CommandHistoryStore(
 
     internal fun snapshot(): List<CommandHistoryEntry> {
         flush()
-        return entries.toList()
+        return latestSnapshot()
     }
+
+    /**
+     * Returns the latest in-memory history snapshot without waiting for queued
+     * persistence work.
+     *
+     * This is safe for EDT suggestion providers because it does not perform
+     * disk I/O or wait for the writer thread.
+     */
+    internal fun latestSnapshot(): List<CommandHistoryEntry> =
+        synchronized(lock) {
+            entries.toList()
+        }
 
     override fun close() {
         worker.shutdown()
-        if (!worker.awaitTermination(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        if (!worker.awaitTermination(COMMAND_HISTORY_CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
             worker.shutdownNow()
         }
     }
@@ -95,27 +112,29 @@ internal class CommandHistoryStore(
         if (!Files.isRegularFile(path)) return
         runCatching {
             val lines = Files.readAllLines(path, StandardCharsets.UTF_8)
-            if (lines.firstOrNull() != HEADER) return
+            if (lines.firstOrNull() != COMMAND_HISTORY_HEADER) return
             var index = 1
-            while (index < lines.size) {
-                decode(lines[index])?.let { entry ->
-                    while (entries.size >= capacity) entries.removeFirst()
-                    entries.addLast(entry)
+            synchronized(lock) {
+                while (index < lines.size) {
+                    decode(lines[index])?.let { entry ->
+                        while (entries.size >= capacity) entries.removeFirst()
+                        entries.addLast(entry)
+                    }
+                    index++
                 }
-                index++
             }
         }.onFailure { exception ->
             System.err.println("Failed to load command history from $path: ${exception.message}")
         }
     }
 
-    private fun persist() {
+    private fun persist(snapshot: List<CommandHistoryEntry>) {
         runCatching {
             path.parent?.let(Files::createDirectories)
             val temporary = path.resolveSibling("${path.fileName}.tmp")
             Files.newBufferedWriter(temporary, StandardCharsets.UTF_8).use { writer ->
-                writer.appendLine(HEADER)
-                for (entry in entries) writer.appendLine(encode(entry))
+                writer.appendLine(COMMAND_HISTORY_HEADER)
+                for (entry in snapshot) writer.appendLine(encode(entry))
             }
             try {
                 Files.move(
@@ -144,7 +163,7 @@ internal class CommandHistoryStore(
 
     private fun decode(line: String): CommandHistoryEntry? {
         val fields = line.split('\t')
-        if (fields.size != FIELD_COUNT) return null
+        if (fields.size != COMMAND_HISTORY_FIELD_COUNT) return null
         return runCatching {
             CommandHistoryEntry(
                 profileId = decodeText(fields[3]),
@@ -157,17 +176,17 @@ internal class CommandHistoryStore(
         }.getOrNull()
     }
 
-    private fun encodeText(value: String): String = encoder.encodeToString(value.toByteArray(StandardCharsets.UTF_8))
+    private fun encodeText(value: String): String = commandHistoryEncoder.encodeToString(value.toByteArray(StandardCharsets.UTF_8))
 
-    private fun decodeText(value: String): String = String(decoder.decode(value), StandardCharsets.UTF_8)
+    private fun decodeText(value: String): String = String(commandHistoryDecoder.decode(value), StandardCharsets.UTF_8)
 
     private companion object {
-        private const val HEADER = "KetraTerm_COMMAND_HISTORY\t1"
-        private const val FIELD_COUNT = 6
-        private const val DEFAULT_CAPACITY = 10_000
-        private const val CLOSE_TIMEOUT_SECONDS = 5L
-        private val encoder = Base64.getUrlEncoder().withoutPadding()
-        private val decoder = Base64.getUrlDecoder()
+        private const val COMMAND_HISTORY_HEADER = "KetraTerm_COMMAND_HISTORY\t1"
+        private const val COMMAND_HISTORY_FIELD_COUNT = 6
+        private const val DEFAULT_COMMAND_HISTORY_CAPACITY = 10_000
+        private const val COMMAND_HISTORY_CLOSE_TIMEOUT_SECONDS = 5L
+        private val commandHistoryEncoder = Base64.getUrlEncoder().withoutPadding()
+        private val commandHistoryDecoder = Base64.getUrlDecoder()
     }
 }
 

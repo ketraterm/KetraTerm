@@ -161,6 +161,8 @@ class KetraTermIntellijSettings :
      * @property startDirectory initial working directory; blank means project root.
      * @property environmentVariables newline-separated `NAME=VALUE` environment entries.
      * @property defaultTabName user-visible name for newly opened tabs.
+     * @property shellSuggestionsEnabled whether host-provided shell suggestions
+     * may appear in IDE-hosted terminals.
      */
     data class State(
         @JvmField val themeId: String = DEFAULT_THEME_ID,
@@ -181,6 +183,7 @@ class KetraTermIntellijSettings :
         @JvmField val startDirectory: String = "",
         @JvmField val environmentVariables: String = "",
         @JvmField val defaultTabName: String = "Local",
+        @JvmField val shellSuggestionsEnabled: Boolean = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED,
         @JvmField val pasteSanitization: String = "raw",
         @JvmField val clipboardLocalWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_LOCAL_WRITE.name.lowercase(Locale.ROOT),
         @JvmField val clipboardRemoteWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_REMOTE_WRITE.name.lowercase(Locale.ROOT),
@@ -396,6 +399,7 @@ internal object KetraTermIntellijSettingsMapper {
             lineHeight = normalized.lineHeight,
             shellRequestResizeWindow = false,
             shellRequestWindowManipulation = false,
+            shellSuggestionsEnabled = normalized.shellSuggestionsEnabled,
         )
     }
 

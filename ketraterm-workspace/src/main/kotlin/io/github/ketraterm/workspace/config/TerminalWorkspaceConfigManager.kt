@@ -124,6 +124,8 @@ class TerminalWorkspaceConfigManager(
                 behavior["shell_request_window_manipulation"]?.toBooleanStrictOrNull() ?: default.shellRequestWindowManipulation
             val desktopNotificationsEnabled =
                 behavior["desktop_notifications_enabled"]?.toBooleanStrictOrNull() ?: default.desktopNotificationsEnabled
+            val shellSuggestionsEnabled =
+                behavior["shell_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.shellSuggestionsEnabled
             val persistentCommandHistoryEnabled =
                 behavior["persistent_command_history_enabled"]?.toBooleanStrictOrNull()
                     ?: default.persistentCommandHistoryEnabled
@@ -193,6 +195,7 @@ class TerminalWorkspaceConfigManager(
                 shellRequestResizeWindow = shellRequestResizeWindow,
                 shellRequestWindowManipulation = shellRequestWindowManipulation,
                 desktopNotificationsEnabled = desktopNotificationsEnabled,
+                shellSuggestionsEnabled = shellSuggestionsEnabled,
                 persistentCommandHistoryEnabled = persistentCommandHistoryEnabled,
                 clipboardLocalWrite = clipboardLocalWrite,
                 clipboardRemoteWrite = clipboardRemoteWrite,
@@ -291,6 +294,8 @@ class TerminalWorkspaceConfigManager(
         shell_request_window_manipulation = ${config.shellRequestWindowManipulation}
         # Whether to enable desktop notifications when the terminal receives OSC 9 or OSC 777 sequences
         desktop_notifications_enabled = ${config.desktopNotificationsEnabled}
+        # Whether host-provided shell suggestions may appear in the terminal UI
+        shell_suggestions_enabled = ${config.shellSuggestionsEnabled}
         # Persist bounded command metadata (never raw terminal output) across application restarts
         persistent_command_history_enabled = ${config.persistentCommandHistoryEnabled}
 

@@ -34,6 +34,7 @@ import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.settings.SwingTerminalChrome
+import io.github.ketraterm.ui.swing.suggestion.*
 import io.github.ketraterm.ui.swing.viewport.SmoothRowScrollHost
 import io.github.ketraterm.ui.swing.viewport.SmoothRowScroller
 import io.github.ketraterm.ui.swing.viewport.SwingViewportController
@@ -218,6 +219,19 @@ class SwingTerminal
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
                 },
             )
+        private val shellSuggestionController =
+            SwingShellSuggestionController(
+                object : SwingShellSuggestionHost {
+                    override val settings: SwingSettings get() = this@SwingTerminal.settings
+                    override val suggestionHandler: SwingShellSuggestionHandler get() = hostServices.shellSuggestionHandler
+
+                    override fun revalidate() = this@SwingTerminal.revalidate()
+
+                    override fun repaint() = this@SwingTerminal.repaint()
+
+                    override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
+                },
+            )
         private val inputController =
             SwingTerminalInputController(
                 object : SwingTerminalInputHost {
@@ -249,6 +263,9 @@ class SwingTerminal
                     override fun openSearch() {
                         searchController.open()
                     }
+
+                    override fun handleShellSuggestionKeyPressed(event: java.awt.event.KeyEvent): Boolean =
+                        shellSuggestionController.handleKeyPressed(event)
 
                     override fun copySelectionToClipboard(): Boolean = this@SwingTerminal.copySelectionToClipboard()
 
@@ -478,6 +495,8 @@ class SwingTerminal
             addComponentListener(resizeListener)
             add(searchController.overlay)
             searchController.overlay.isVisible = false
+            add(shellSuggestionController.popup)
+            shellSuggestionController.popup.isVisible = false
             preferredSize = preferredGridSize(settings.columns, settings.rows)
             cursorTimer.isRepeats = true
             configureCursorTimerOnEdt()
@@ -793,6 +812,11 @@ class SwingTerminal
 
         override fun doLayout() {
             super.doLayout()
+            layoutSearchOverlay()
+            layoutShellSuggestionPopup()
+        }
+
+        private fun layoutSearchOverlay() {
             val searchOverlay = searchController.overlay
             val preferred = searchOverlay.preferredSize
             val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer)
@@ -806,6 +830,41 @@ class SwingTerminal
             }
             val x = maxOf(paddingLeft, width - paddingRight - overlayWidth)
             searchOverlay.setBounds(x, paddingTop, overlayWidth, preferred.height)
+        }
+
+        private fun layoutShellSuggestionPopup() {
+            val popup = shellSuggestionController.popup
+            val state = shellSuggestionController.state()
+            if (!state.visible) {
+                popup.setBounds(0, 0, 0, 0)
+                return
+            }
+
+            val preferred = popup.preferredSize
+            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer)
+            val paddingRight = SwingTerminalChrome.right(settings, renderCache.activeBuffer)
+            val paddingTop = SwingTerminalChrome.top(settings)
+            val availableWidth = width - paddingLeft - paddingRight
+            val popupWidth = minOf(availableWidth, preferred.width).coerceAtLeast(0)
+            val popupHeight = minOf(height - paddingTop - settings.padding.bottom, preferred.height).coerceAtLeast(0)
+            if (popupWidth == 0 || popupHeight == 0) {
+                popup.setBounds(0, 0, 0, 0)
+                return
+            }
+
+            val contentOriginY = if (visualGeometry.rowCount == renderCache.rows) visualGeometry.contentOriginY else 0.0
+            val anchorX = paddingLeft + state.anchorColumn * metrics.cellWidth
+            val belowY = paddingTop + contentOriginY + (state.anchorRow + 1) * metrics.cellHeight
+            val aboveY = paddingTop + contentOriginY + state.anchorRow * metrics.cellHeight - popupHeight
+            val bottomLimit = height - settings.padding.bottom
+            val popupY =
+                if (belowY + popupHeight <= bottomLimit || aboveY < paddingTop) {
+                    floor(belowY).toInt()
+                } else {
+                    floor(aboveY).toInt()
+                }
+            val popupX = anchorX.coerceIn(paddingLeft, maxOf(paddingLeft, width - paddingRight - popupWidth))
+            popup.setBounds(popupX, popupY.coerceAtLeast(paddingTop), popupWidth, popupHeight)
         }
 
         override fun paintComponent(graphics: Graphics) {
@@ -856,6 +915,7 @@ class SwingTerminal
             resetScrollbackState()
             selectionController.clearSelection()
             searchController.reset(renderCache.rows)
+            shellSuggestionController.hide()
             shellIntegrationDecorations.reset()
             visualGeometry.reset()
             selectionController.stopSelectionDrag()
@@ -877,6 +937,7 @@ class SwingTerminal
             resetScrollbackState()
             selectionController.clearSelection()
             searchController.reset(renderCache.rows)
+            shellSuggestionController.hide()
             shellIntegrationDecorations.reset()
             visualGeometry.reset()
             selectionController.stopSelectionDrag()
@@ -898,6 +959,7 @@ class SwingTerminal
             preferredSize = preferredGridSize(settings.columns, settings.rows)
             configureCursorTimerOnEdt()
             configureVisualBellOnEdt()
+            shellSuggestionController.reloadSettings()
             session?.let {
                 updateMinimizedStateFromAncestor()
                 applySettingsToSession(it, settings)
@@ -951,6 +1013,110 @@ class SwingTerminal
          * @return current terminal search state.
          */
         fun currentSearchState(): TerminalSearchState = searchController.state()
+
+        /**
+         * Shows host-provided shell suggestions near a terminal-grid cell.
+         *
+         * The reusable Swing terminal only presents the suggestions. Accepted
+         * suggestions are delivered to [SwingHostServices.shellSuggestionHandler]
+         * so the host/provider can apply command-line replacement semantics.
+         *
+         * If [SwingSettings.shellSuggestionsEnabled] is `false` or [suggestions]
+         * is empty, the current popup is hidden.
+         *
+         * @param suggestions suggestions to display.
+         * @param anchorColumn visible terminal-grid column used as the popup anchor.
+         * @param anchorRow visible terminal-grid row used as the popup anchor.
+         * @param selectedIndex initially selected suggestion index.
+         */
+        @JvmOverloads
+        fun showShellSuggestions(
+            suggestions: List<SwingShellSuggestion>,
+            anchorColumn: Int,
+            anchorRow: Int,
+            selectedIndex: Int = 0,
+        ) {
+            val request =
+                SwingShellSuggestionRequest(
+                    commandText = "",
+                    cursorOffset = 0,
+                    anchorColumn = anchorColumn.coerceAtLeast(0),
+                    anchorRow = anchorRow.coerceAtLeast(0),
+                )
+            val snapshot = suggestions.toList()
+            runOnEdt(
+                Runnable {
+                    shellSuggestionController.show(request, snapshot, selectedIndex)
+                    doLayout()
+                },
+            )
+        }
+
+        /**
+         * Requests shell suggestions from [SwingHostServices.shellSuggestionProvider]
+         * and shows the returned snapshot near a terminal-grid cell.
+         *
+         * Providers run on the Swing Event Dispatch Thread and should return a
+         * bounded, already-computed snapshot quickly. Empty provider results hide
+         * the current popup.
+         *
+         * @param commandText visible command-line text known to the host.
+         * @param cursorOffset UTF-16 cursor offset within [commandText].
+         * @param anchorColumn visible terminal-grid column used as the popup anchor.
+         * @param anchorRow visible terminal-grid row used as the popup anchor.
+         */
+        fun requestShellSuggestions(
+            commandText: String,
+            cursorOffset: Int,
+            anchorColumn: Int,
+            anchorRow: Int,
+        ) {
+            val request =
+                SwingShellSuggestionRequest(
+                    commandText = commandText,
+                    cursorOffset = cursorOffset,
+                    anchorColumn = anchorColumn,
+                    anchorRow = anchorRow,
+                )
+            runOnEdt(
+                Runnable {
+                    if (!settings.shellSuggestionsEnabled) {
+                        shellSuggestionController.hide()
+                        return@Runnable
+                    }
+                    val suggestions =
+                        runCatching {
+                            hostServices.shellSuggestionProvider.suggestions(request)
+                        }.getOrElse { exception ->
+                            System.err.println("Shell suggestion provider failed: ${exception.message}")
+                            emptyList()
+                        }
+                    shellSuggestionController.show(request, suggestions, selectedIndex = 0)
+                    doLayout()
+                },
+            )
+        }
+
+        /**
+         * Hides the shell suggestion popup.
+         *
+         * This method may be called from any thread; component state is updated
+         * asynchronously on the EDT.
+         */
+        fun hideShellSuggestions() {
+            runOnEdt(
+                Runnable {
+                    shellSuggestionController.hide()
+                },
+            )
+        }
+
+        /**
+         * Returns the current shell suggestion popup state.
+         *
+         * @return immutable shell suggestion state snapshot.
+         */
+        fun currentShellSuggestionState(): SwingShellSuggestionState = shellSuggestionController.state()
 
         private fun applySettingsToSession(
             session: TerminalSession,

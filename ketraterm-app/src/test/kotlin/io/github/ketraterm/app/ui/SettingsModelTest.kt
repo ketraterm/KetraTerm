@@ -53,6 +53,7 @@ class SettingsModelTest {
         assertEquals(settings.pasteSanitizationPolicy, state.pasteSanitizationPolicy)
         assertEquals(settings.shellRequestResizeWindow, state.shellRequestResizeWindow)
         assertEquals(settings.shellRequestWindowManipulation, state.shellRequestWindowManipulation)
+        assertEquals(settings.shellSuggestionsEnabled, state.shellSuggestionsEnabled)
         assertFalse(model.hasChanges(state))
     }
 
@@ -81,6 +82,7 @@ class SettingsModelTest {
                 pasteSanitizationPolicy = io.github.ketraterm.input.policy.PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
                 shellRequestResizeWindow = true,
                 shellRequestWindowManipulation = true,
+                shellSuggestionsEnabled = false,
                 clipboardLocalWrite = TerminalClipboardPermission.ALLOW,
                 clipboardRemoteWrite = TerminalClipboardPermission.ALLOWLIST,
                 clipboardRead = TerminalClipboardPermission.PROMPT,
@@ -103,6 +105,7 @@ class SettingsModelTest {
         assertEquals(io.github.ketraterm.input.policy.PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF, settings.pasteSanitizationPolicy)
         assertTrue(settings.shellRequestResizeWindow)
         assertTrue(settings.shellRequestWindowManipulation)
+        assertFalse(settings.shellSuggestionsEnabled)
         assertEquals(TerminalClipboardPermission.ALLOW, settings.clipboardLocalWrite)
         assertEquals(TerminalClipboardPermission.ALLOWLIST, settings.clipboardRemoteWrite)
         assertEquals(TerminalClipboardPermission.PROMPT, settings.clipboardRead)
