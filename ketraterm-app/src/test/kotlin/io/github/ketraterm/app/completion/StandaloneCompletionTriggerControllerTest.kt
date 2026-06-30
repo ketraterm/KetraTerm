@@ -59,6 +59,75 @@ class StandaloneCompletionTriggerControllerTest {
     }
 
     @Test
+    fun `refresh does not request suggestions twice for the same active command snapshot`() {
+        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+        val activeSnapshot = snapshot("git s")
+        val controller =
+            controller(
+                activeCommandLine = { activeSnapshot },
+                requestSuggestions = { requested += it },
+            )
+
+        controller.refreshNow()
+        controller.refreshNow()
+
+        assertEquals(listOf(activeSnapshot), requested)
+    }
+
+    @Test
+    fun `refresh requests suggestions again when active command snapshot changes`() {
+        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+        var activeSnapshot = snapshot("git s")
+        val controller =
+            controller(
+                activeCommandLine = { activeSnapshot },
+                requestSuggestions = { requested += it },
+            )
+
+        controller.refreshNow()
+        activeSnapshot = snapshot("git st")
+        controller.refreshNow()
+
+        assertEquals(listOf(snapshot("git s"), snapshot("git st")), requested)
+    }
+
+    @Test
+    fun `invalidate last request allows same active command snapshot to refresh again`() {
+        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+        val activeSnapshot = snapshot("git s")
+        val controller =
+            controller(
+                activeCommandLine = { activeSnapshot },
+                requestSuggestions = { requested += it },
+            )
+
+        controller.refreshNow()
+        controller.invalidateLastRequest()
+        controller.refreshNow()
+
+        assertEquals(listOf(activeSnapshot, activeSnapshot), requested)
+    }
+
+    @Test
+    fun `refresh requests suggestions again when ranking context changes`() {
+        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+        var rankingContext = "file:///project-a"
+        val activeSnapshot = snapshot("git s")
+        val controller =
+            controller(
+                activeCommandLine = { activeSnapshot },
+                requestSuggestions = { requested += it },
+                rankingContextKey = { rankingContext },
+            )
+
+        controller.refreshNow()
+        rankingContext = "file:///project-b"
+        controller.refreshNow()
+
+        assertEquals(listOf(activeSnapshot, activeSnapshot), requested)
+    }
+
+    @Test
     fun `refresh hides popup when command prefix is too short`() {
         val hidden = Counter()
         val requested = ArrayList<TerminalShellCommandLineSnapshot>()
@@ -121,6 +190,7 @@ class StandaloneCompletionTriggerControllerTest {
         activeCommandLine: () -> TerminalShellCommandLineSnapshot? = { snapshot("git s") },
         requestSuggestions: (TerminalShellCommandLineSnapshot) -> Unit = { },
         hideSuggestions: () -> Unit = { },
+        rankingContextKey: () -> String? = { null },
         suggestionsEnabled: () -> Boolean = { true },
         scheduler: StandaloneCompletionTriggerScheduler = FakeScheduler(),
     ): StandaloneCompletionTriggerController =
@@ -128,6 +198,7 @@ class StandaloneCompletionTriggerControllerTest {
             activeCommandLine = activeCommandLine,
             requestSuggestions = requestSuggestions,
             hideSuggestions = hideSuggestions,
+            rankingContextKey = rankingContextKey,
             suggestionsEnabled = suggestionsEnabled,
             scheduler = scheduler,
             debounceMillis = 50,

@@ -32,6 +32,8 @@ import javax.swing.Timer
  * @param requestSuggestions displays suggestions for a validated command
  * snapshot.
  * @param hideSuggestions hides the current standalone popup.
+ * @param rankingContextKey returns host-owned ranking context that can change
+ * suggestions for the same visible command text, such as current directory.
  * @param suggestionsEnabled returns whether shell suggestions are currently
  * enabled in standalone settings.
  * @param scheduler debounce scheduler used to coalesce render/input churn.
@@ -44,11 +46,14 @@ internal class StandaloneCompletionTriggerController(
     private val activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
     private val requestSuggestions: (TerminalShellCommandLineSnapshot) -> Unit,
     private val hideSuggestions: () -> Unit,
+    private val rankingContextKey: () -> String? = { null },
     private val suggestionsEnabled: () -> Boolean,
     private val scheduler: StandaloneCompletionTriggerScheduler = SwingStandaloneCompletionTriggerScheduler(),
     private val debounceMillis: Int = DEFAULT_DEBOUNCE_MILLIS,
     private val minimumNonWhitespaceCharacters: Int = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
 ) {
+    private var lastRequestedSnapshotKey: SnapshotKey? = null
+
     init {
         require(debounceMillis >= 0) { "debounceMillis must be >= 0, was $debounceMillis" }
         require(minimumNonWhitespaceCharacters >= 0) {
@@ -86,9 +91,13 @@ internal class StandaloneCompletionTriggerController(
         }
         val snapshot = activeCommandLine()
         if (snapshot == null || snapshot.nonWhitespaceCount() < minimumNonWhitespaceCharacters) {
+            lastRequestedSnapshotKey = null
             hideSuggestions()
             return
         }
+        val snapshotKey = snapshot.key()
+        if (snapshotKey == lastRequestedSnapshotKey) return
+        lastRequestedSnapshotKey = snapshotKey
         requestSuggestions(snapshot)
     }
 
@@ -97,7 +106,18 @@ internal class StandaloneCompletionTriggerController(
      */
     fun cancelAndHide() {
         scheduler.cancel()
+        lastRequestedSnapshotKey = null
         hideSuggestions()
+    }
+
+    /**
+     * Clears the last requested snapshot without hiding the current popup.
+     *
+     * Standalone hosts can call this after external ranking context changes
+     * while the same command text remains visible.
+     */
+    fun invalidateLastRequest() {
+        lastRequestedSnapshotKey = null
     }
 
     private fun TerminalShellCommandLineSnapshot.nonWhitespaceCount(): Int {
@@ -109,6 +129,23 @@ internal class StandaloneCompletionTriggerController(
         }
         return count
     }
+
+    private fun TerminalShellCommandLineSnapshot.key(): SnapshotKey =
+        SnapshotKey(
+            commandText = commandText,
+            cursorOffset = cursorOffset,
+            cursorColumn = cursorColumn,
+            cursorRow = cursorRow,
+            rankingContextKey = rankingContextKey(),
+        )
+
+    private data class SnapshotKey(
+        val commandText: String,
+        val cursorOffset: Int,
+        val cursorColumn: Int,
+        val cursorRow: Int,
+        val rankingContextKey: String?,
+    )
 
     private companion object {
         private const val DEFAULT_DEBOUNCE_MILLIS = 75

@@ -92,6 +92,7 @@ internal class TerminalPane private constructor(
                     activeCommandLine = tab.session::activeShellCommandLine,
                     requestSuggestions = { snapshot -> terminal.requestShellSuggestionsForSnapshot(snapshot) },
                     hideSuggestions = terminal::hideShellSuggestions,
+                    rankingContextKey = { tab.currentWorkingDirectoryUri },
                     suggestionsEnabled = { settings.shellSuggestionsEnabled },
                 )
             val completionDirtyListener = completionTriggerController::scheduleRefresh
