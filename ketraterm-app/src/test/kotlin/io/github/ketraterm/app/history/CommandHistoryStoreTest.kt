@@ -74,6 +74,36 @@ class CommandHistoryStoreTest {
         }
     }
 
+    @Test
+    fun `filters out sensitive commands and leading whitespace`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("history.tsv")
+        CommandHistoryStore(path).use { store ->
+            // Safe commands
+            store.record("bash", metadata("git status", 0))
+            store.record("bash", metadata("npm run build", 0))
+
+            // Ignored space/tab commands
+            store.record("bash", metadata(" export VAR=val", 0))
+            store.record("bash", metadata("\tsecret_command", 0))
+
+            // Sensitive keyword commands
+            store.record("bash", metadata("export SECRET_KEY=123", 0))
+            store.record("bash", metadata("docker login -u user -p password", 0))
+            store.record("bash", metadata("gh auth status", 0))
+            store.record("bash", metadata("curl -H 'Authorization: Bearer xyz' url", 0))
+            store.record("bash", metadata("private_key_generator --bits 2048", 0))
+
+            store.flush()
+        }
+
+        CommandHistoryStore(path).use { reloaded ->
+            val commands = reloaded.snapshot().map(CommandHistoryEntry::command)
+            assertEquals(listOf("git status", "npm run build"), commands)
+        }
+    }
+
     private fun metadata(
         command: String,
         exitCode: Int,
