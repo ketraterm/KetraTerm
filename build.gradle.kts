@@ -31,6 +31,7 @@ dependencies {
     dokka(project(":ketraterm-core"))
     dokka(project(":ketraterm-host"))
     dokka(project(":ketraterm-input"))
+    dokka(project(":ketraterm-completion"))
     dokka(project(":ketraterm-render-api"))
     dokka(project(":ketraterm-render-cache"))
     dokka(project(":ketraterm-transport-api"))

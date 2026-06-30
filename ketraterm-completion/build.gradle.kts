@@ -15,25 +15,18 @@
  */
 
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+    kotlin("jvm")
 }
 
-rootProject.name = "KetraTerm"
-include(
-    ":ketraterm-core",
-    ":ketraterm-render-api",
-    ":ketraterm-parser",
-    ":ketraterm-protocol",
-    ":ketraterm-input",
-    ":ketraterm-completion",
-    ":ketraterm-host",
-    ":ketraterm-pty",
-    ":ketraterm-transport-api",
-    ":ketraterm-session",
-    ":ketraterm-testkit",
-    ":ketraterm-workspace",
-    ":ketraterm-app",
-    ":ketraterm-ui-swing",
-    ":ketraterm-benchmarks",
-    ":ketraterm-render-cache",
-)
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
