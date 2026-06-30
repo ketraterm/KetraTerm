@@ -142,6 +142,34 @@ class StandaloneCompletionFeedbackRecorderTest {
     }
 
     @Test
+    fun `sensitive resulting command is ignored and not persisted`() {
+        val source = TerminalCommandStatsCompletionSource()
+        var persistCount = 0
+        val recorder =
+            StandaloneCompletionFeedbackRecorder(
+                statsSource = source,
+                persistSnapshot = { persistCount++ },
+            )
+
+        recorder.record(
+            feedback =
+                feedback(
+                    kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
+                    commandText = "docker login ",
+                    replacementText = "--password hunter2",
+                    replacementStartOffset = 13,
+                    replacementEndOffset = 13,
+                ),
+            profileId = "bash",
+            workingDirectoryUri = "file:///repo",
+        )
+
+        assertTrue(source.snapshot().isEmpty())
+        assertTrue(source.shapeSnapshot().isEmpty())
+        assertEquals(0, persistCount)
+    }
+
+    @Test
     fun `created handler reads latest working directory`() {
         val source = TerminalCommandStatsCompletionSource()
         val recorder =

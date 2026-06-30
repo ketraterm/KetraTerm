@@ -192,7 +192,7 @@ internal class SettingsDialog(
     private val shellSuggestionsCheckbox =
         JCheckBox("Show shell suggestions", settings.shellSuggestionsEnabled)
     private val persistentCommandHistoryCheckbox =
-        JCheckBox("Persist command history", settings.persistentCommandHistoryEnabled)
+        JCheckBox("Persist suggestion learning", settings.persistentCommandHistoryEnabled)
     private val cursorBlinkSpinner =
         createSpinner(settings.cursorBlinkMillis, TerminalConfig.CURSOR_BLINK_MIN, TerminalConfig.CURSOR_BLINK_MAX, 50, 70)
     private val cursorShapeCombo = createComboBox(arrayOf("block", "underline", "beam"), settings.cursorShape.lowercase(Locale.ROOT), 150)
@@ -415,13 +415,13 @@ internal class SettingsDialog(
         )
         panel.add(appSection)
 
-        panel.add(SectionHeader("Command History"))
+        panel.add(SectionHeader("Shell Suggestions"))
         val historySection = createSectionPanel()
         addCheckboxRow(
             historySection,
             0,
             persistentCommandHistoryCheckbox,
-            "Persist bounded command text, working directory, exit status, and timestamps. Terminal output is never stored.",
+            "Persist compact suggestion ranking metadata across app restarts. Terminal output is never stored.",
         )
         panel.add(historySection)
 

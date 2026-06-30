@@ -73,8 +73,8 @@ private fun defaultFontFamily(): String {
  * @property desktopNotificationsEnabled whether desktop notifications are enabled.
  * @property shellSuggestionsEnabled whether host-provided shell suggestions may
  * be shown in the terminal UI.
- * @property persistentCommandHistoryEnabled whether completed command metadata
- * is retained by supporting product hosts across application restarts.
+ * @property persistentCommandHistoryEnabled whether supporting product hosts
+ * persist compact command-completion learning metadata across application restarts.
  * @property clipboardLocalWrite OSC 52 write permission for local sessions.
  * @property clipboardRemoteWrite OSC 52 write permission for remote sessions.
  * @property clipboardRead OSC 52 read/query permission.
@@ -104,6 +104,8 @@ data class TerminalConfig(
     val shellRequestWindowManipulation: Boolean = DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION,
     val desktopNotificationsEnabled: Boolean = DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED,
     val shellSuggestionsEnabled: Boolean = DEFAULT_SHELL_SUGGESTIONS_ENABLED,
+    // TODO(config-migration): Rename this persisted setting to suggestion-learning terminology
+    // after adding backwards-compatible TOML read/write migration for existing users.
     val persistentCommandHistoryEnabled: Boolean = DEFAULT_PERSISTENT_COMMAND_HISTORY_ENABLED,
     val clipboardLocalWrite: TerminalClipboardPermission = DEFAULT_CLIPBOARD_LOCAL_WRITE,
     val clipboardRemoteWrite: TerminalClipboardPermission = DEFAULT_CLIPBOARD_REMOTE_WRITE,

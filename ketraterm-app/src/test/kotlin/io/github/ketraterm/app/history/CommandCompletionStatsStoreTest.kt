@@ -90,6 +90,55 @@ class CommandCompletionStatsStoreTest {
     }
 
     @Test
+    fun `filters sensitive exact command stats before persisting or loading`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("completion-stats.tsv")
+        val safe = stats(commandLine = "git status", normalizedCommandLine = "git status")
+        val privateByWhitespace = stats(commandLine = " export SECRET_TOKEN=123", normalizedCommandLine = "export secret_token=123")
+        val privateByKeyword =
+            stats(commandLine = "docker login --password hunter2", normalizedCommandLine = "docker login --password hunter2")
+
+        CommandCompletionStatsStore(path).use { store ->
+            store.persist(listOf(safe, privateByWhitespace, privateByKeyword))
+            store.flush()
+        }
+
+        CommandCompletionStatsStore(path).use { reloaded ->
+            assertEquals(listOf(safe), reloaded.load())
+        }
+        val persisted = Files.readString(path)
+        assertEquals(false, persisted.contains(encodeText(privateByWhitespace.commandLine)))
+        assertEquals(false, persisted.contains(encodeText(privateByKeyword.commandLine)))
+    }
+
+    @Test
+    fun `filters sensitive shape stats before persisting or loading`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("completion-stats.tsv")
+        val safe =
+            TerminalCommandShapeStats(
+                shape = TerminalCommandLineShape.fromCommandLine("git status")!!,
+                lastUsedEpochMillis = 10,
+            )
+        val sensitive =
+            TerminalCommandShapeStats(
+                shape = TerminalCommandLineShape.fromCommandLine("curl --authorization bearer")!!,
+                lastUsedEpochMillis = 20,
+            )
+
+        CommandCompletionStatsStore(path).use { store ->
+            store.persist(TerminalCommandCompletionStatsSnapshot(emptyList(), listOf(safe, sensitive)))
+            store.flush()
+        }
+
+        CommandCompletionStatsStore(path).use { reloaded ->
+            assertEquals(TerminalCommandCompletionStatsSnapshot(emptyList(), listOf(safe)), reloaded.loadSnapshot())
+        }
+    }
+
+    @Test
     fun `loads version one exact command files without shape stats`(
         @TempDir directory: Path,
     ) {

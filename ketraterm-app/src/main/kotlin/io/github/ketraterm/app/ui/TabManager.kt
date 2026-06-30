@@ -19,7 +19,7 @@ import io.github.ketraterm.app.completion.StandaloneCompletionFeedbackRecorder
 import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.app.history.CommandCompletionStatsStore
-import io.github.ketraterm.app.history.CommandHistoryStore
+import io.github.ketraterm.app.history.CommandPersistencePrivacyPolicy
 import io.github.ketraterm.completion.TerminalCompletionSources
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
@@ -62,7 +62,6 @@ internal class TabManager(
             persistSnapshot = { records -> commandCompletionStatsStore?.persist(records) },
         )
     private val completionRegistry = StandaloneCompletionRegistry(persistentStatsSource = commandCompletionStatsSource)
-    private var commandHistoryStore: CommandHistoryStore? = createCommandHistoryStoreIfEnabled()
     private var commandCompletionStatsStore: CommandCompletionStatsStore? = createCommandCompletionStatsStoreIfEnabled()
 
     val selectedPane: TerminalPane?
@@ -278,8 +277,6 @@ internal class TabManager(
             closeTab(tabId)
         }
         workspace.close()
-        commandHistoryStore?.close()
-        commandHistoryStore = null
         commandCompletionStatsStore?.close()
         commandCompletionStatsStore = null
     }
@@ -676,9 +673,8 @@ internal class TabManager(
             if (event.marker != io.github.ketraterm.protocol.ShellIntegrationMarker.COMMAND_FINISHED) return
             val state = tab.session.shellIntegrationState
             val metadata = state.commandMetadata(state.latestCommandRecordId()) ?: return
-            commandHistoryStore?.record(tab.profile.id, metadata)
             val command = metadata.commandText
-            if (command != null) {
+            if (command != null && CommandPersistencePrivacyPolicy.allowsCommand(command)) {
                 commandCompletionStatsSource.recordCommandResult(
                     commandLine = command,
                     successful = metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
@@ -894,7 +890,6 @@ internal class TabManager(
 
     private fun reconcileCommandPersistenceStores() {
         if (settings.persistentCommandHistoryEnabled) {
-            if (commandHistoryStore == null) commandHistoryStore = CommandHistoryStore(settings.commandHistoryPath)
             if (commandCompletionStatsStore == null) {
                 commandCompletionStatsStore =
                     CommandCompletionStatsStore(settings.commandCompletionStatsPath).also { store ->
@@ -904,15 +899,10 @@ internal class TabManager(
                     }
             }
         } else {
-            commandHistoryStore?.close()
-            commandHistoryStore = null
             commandCompletionStatsStore?.close()
             commandCompletionStatsStore = null
         }
     }
-
-    private fun createCommandHistoryStoreIfEnabled(): CommandHistoryStore? =
-        if (settings.persistentCommandHistoryEnabled) CommandHistoryStore(settings.commandHistoryPath) else null
 
     private fun createCommandCompletionStatsStoreIfEnabled(): CommandCompletionStatsStore? =
         if (settings.persistentCommandHistoryEnabled) {

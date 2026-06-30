@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.completion
 
+import io.github.ketraterm.app.history.CommandPersistencePrivacyPolicy
 import io.github.ketraterm.completion.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.completion.TerminalCompletionFeedbackKind
@@ -74,6 +75,7 @@ internal class StandaloneCompletionFeedbackRecorder(
         workingDirectoryUri: String?,
     ) {
         val commandLine = commandLineAfterSuggestion(feedback) ?: return
+        if (!CommandPersistencePrivacyPolicy.allowsCommand(commandLine)) return
         statsSource.recordSuggestionFeedback(
             commandLine = commandLine,
             feedback =
