@@ -15,10 +15,10 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.TerminalCommandLineShape
-import io.github.ketraterm.completion.TerminalCommandShapeStats
-import io.github.ketraterm.completion.TerminalCommandSpec
-import io.github.ketraterm.completion.TerminalCommandStatsCompletionSource
+import io.github.ketraterm.completion.model.TerminalCommandLineShape
+import io.github.ketraterm.completion.model.TerminalCommandShapeStats
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.source.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals

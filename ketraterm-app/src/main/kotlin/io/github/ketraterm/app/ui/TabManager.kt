@@ -20,8 +20,8 @@ import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.app.history.CommandCompletionStatsStore
 import io.github.ketraterm.app.history.CommandPersistencePrivacyPolicy
-import io.github.ketraterm.completion.TerminalCommandSpecs
-import io.github.ketraterm.completion.TerminalCompletionSources
+import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle

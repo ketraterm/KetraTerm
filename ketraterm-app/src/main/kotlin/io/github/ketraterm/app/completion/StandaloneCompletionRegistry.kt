@@ -15,7 +15,14 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.*
+import io.github.ketraterm.completion.api.TerminalCompletionEngines
+import io.github.ketraterm.completion.api.TerminalCompletionSource
+import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
+import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.source.TerminalCommandStatsCompletionSource
+import io.github.ketraterm.completion.source.TerminalSessionMruCompletionSource
 
 /**
  * Standalone completion wiring for one application window.

@@ -17,8 +17,8 @@ package io.github.ketraterm.app.history
 
 import io.github.ketraterm.app.history.CommandPersistencePrivacyDecisionLocation.*
 import io.github.ketraterm.app.history.CommandPersistencePrivacyPolicy.allowsCommand
-import io.github.ketraterm.completion.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.TerminalCommandShapeStats
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCommandShapeStats
 
 /**
  * Host-owned privacy gate for persisted command learning data.

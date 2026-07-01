@@ -15,8 +15,8 @@
  */
 package io.github.ketraterm.app.history
 
-import io.github.ketraterm.completion.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import java.nio.charset.StandardCharsets
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files

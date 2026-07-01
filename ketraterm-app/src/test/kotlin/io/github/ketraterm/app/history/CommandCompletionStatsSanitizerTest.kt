@@ -15,7 +15,8 @@
  */
 package io.github.ketraterm.app.history
 
-import io.github.ketraterm.completion.*
+import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
+import io.github.ketraterm.completion.model.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

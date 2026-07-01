@@ -15,9 +15,9 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.TerminalCompletionCandidate
-import io.github.ketraterm.completion.TerminalCompletionEngine
-import io.github.ketraterm.completion.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.TerminalCompletionCandidate
+import io.github.ketraterm.completion.api.TerminalCompletionEngine
+import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest

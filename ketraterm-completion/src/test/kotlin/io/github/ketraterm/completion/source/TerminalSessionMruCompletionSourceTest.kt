@@ -1,0 +1,154 @@
+/*
+ * Copyright 2026 Gagik Sargsyan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.github.ketraterm.completion.source
+
+import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
+import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.TerminalCompletionSources
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class TerminalSessionMruCompletionSourceTest {
+    @Test
+    fun `suggests matching recent commands as full-line replacements`() {
+        val source = TerminalSessionMruCompletionSource()
+        source.recordSuccessfulCommand("git status")
+        source.recordSuccessfulCommand("npm test")
+
+        val candidates = source.complete(request("git s"))
+
+        assertEquals(listOf("git status"), candidates.map { it.replacementText })
+        assertEquals(TerminalCompletionCandidateKind.HISTORY, candidates.single().kind)
+        assertEquals("mru", candidates.single().source)
+        assertEquals(0, candidates.single().replacementStartOffset)
+        assertEquals(5, candidates.single().replacementEndOffset)
+    }
+
+    @Test
+    fun `matches prefixes case-insensitively but keeps latest command casing`() {
+        val source = TerminalSessionMruCompletionSource()
+        source.recordSuccessfulCommand("Git Status")
+
+        val candidates = source.complete(request("git s"))
+
+        assertEquals(listOf("Git Status"), candidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `does not suggest the exact already typed command`() {
+        val source = TerminalSessionMruCompletionSource()
+        source.recordSuccessfulCommand("git status")
+
+        val candidates = source.complete(request("git status"))
+
+        assertTrue(candidates.isEmpty())
+    }
+
+    @Test
+    fun `duplicate commands are promoted instead of duplicated`() {
+        val source = TerminalSessionMruCompletionSource()
+        source.recordSuccessfulCommand("git status")
+        source.recordSuccessfulCommand("git switch main")
+        source.recordSuccessfulCommand("git status")
+
+        val candidates = source.complete(request("git s"))
+
+        assertEquals(listOf("git status", "git switch main"), candidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `capacity evicts least recent distinct command`() {
+        val source = TerminalSessionMruCompletionSource(capacity = 2)
+        source.recordSuccessfulCommand("git status")
+        source.recordSuccessfulCommand("git switch main")
+        source.recordSuccessfulCommand("git stash")
+
+        val candidates = source.complete(request("git s"))
+
+        assertEquals(listOf("git stash", "git switch main"), candidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `profile and working-directory matches boost ranking`() {
+        val source = TerminalSessionMruCompletionSource()
+        source.recordSuccessfulCommand(
+            commandLine = "git switch main",
+            profileId = "bash",
+            workingDirectoryUri = "file:///repo",
+        )
+        source.recordSuccessfulCommand(
+            commandLine = "git status",
+            profileId = "pwsh",
+            workingDirectoryUri = "file:///other",
+        )
+
+        val candidates =
+            source.complete(
+                request(
+                    commandLine = "git s",
+                    profileId = "bash",
+                    workingDirectoryUri = "file:///repo",
+                ),
+            )
+
+        assertEquals(listOf("git switch main", "git status"), candidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `ignores blank and multiline commands`() {
+        val source = TerminalSessionMruCompletionSource()
+        source.recordSuccessfulCommand("   ")
+        source.recordSuccessfulCommand("git status\ngit log")
+
+        val candidates = source.complete(request(""))
+
+        assertTrue(candidates.isEmpty())
+    }
+
+    @Test
+    fun `clear removes retained commands`() {
+        val source = TerminalSessionMruCompletionSource()
+        source.recordSuccessfulCommand("git status")
+
+        source.clear()
+
+        assertTrue(source.complete(request("git")).isEmpty())
+    }
+
+    @Test
+    fun `factory creates mutable session mru source`() {
+        val source = TerminalCompletionSources.sessionMru(capacity = 1)
+        source.recordSuccessfulCommand("git status")
+
+        val candidates = source.complete(request("git"))
+
+        assertEquals(listOf("git status"), candidates.map { it.replacementText })
+    }
+
+    private fun request(
+        commandLine: String,
+        profileId: String? = null,
+        workingDirectoryUri: String? = null,
+    ): TerminalCompletionRequest =
+        TerminalCompletionRequest(
+            commandLine = commandLine,
+            cursorOffset = commandLine.length,
+            profileId = profileId,
+            workingDirectoryUri = workingDirectoryUri,
+            maxCandidates = 8,
+        )
+}

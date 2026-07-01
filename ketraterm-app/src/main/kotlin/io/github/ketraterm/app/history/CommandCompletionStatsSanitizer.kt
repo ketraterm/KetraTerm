@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.app.history
 
-import io.github.ketraterm.completion.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 
 /**
  * Privacy sanitizer for persisted completion-learning snapshots.

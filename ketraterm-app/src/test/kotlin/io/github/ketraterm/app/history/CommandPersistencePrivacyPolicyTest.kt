@@ -15,9 +15,9 @@
  */
 package io.github.ketraterm.app.history
 
-import io.github.ketraterm.completion.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.TerminalCommandLineShape
-import io.github.ketraterm.completion.TerminalCommandShapeStats
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCommandLineShape
+import io.github.ketraterm.completion.model.TerminalCommandShapeStats
 import kotlin.test.*
 
 class CommandPersistencePrivacyPolicyTest {
