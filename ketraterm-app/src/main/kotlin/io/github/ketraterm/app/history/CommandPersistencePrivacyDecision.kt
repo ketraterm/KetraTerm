@@ -43,14 +43,46 @@ internal enum class CommandPersistencePrivacyDecisionKind {
 }
 
 /**
+ * Field or metadata surface that produced a privacy decision.
+ */
+internal enum class CommandPersistencePrivacyDecisionLocation {
+    /**
+     * Raw exact command text.
+     */
+    COMMAND_TEXT,
+
+    /**
+     * Public executable name in a structural command shape.
+     */
+    SHAPE_EXECUTABLE,
+
+    /**
+     * Public subcommand name in a structural command shape.
+     */
+    SHAPE_SUBCOMMAND,
+
+    /**
+     * Public option name in a structural command shape.
+     */
+    SHAPE_OPTION_NAME,
+
+    /**
+     * Normalized structural command-shape key.
+     */
+    SHAPE_KEY,
+}
+
+/**
  * Auditable privacy decision for command-learning persistence.
  *
  * @property kind reason category for the decision.
  * @property matchedText optional vocabulary fragment that caused rejection.
+ * @property location optional field or metadata surface that produced the decision.
  */
 internal data class CommandPersistencePrivacyDecision(
     val kind: CommandPersistencePrivacyDecisionKind,
     val matchedText: String? = null,
+    val location: CommandPersistencePrivacyDecisionLocation? = null,
 ) {
     /**
      * Whether the row may be persisted.
@@ -62,6 +94,9 @@ internal data class CommandPersistencePrivacyDecision(
             "matchedText must be present only for sensitive-keyword decisions"
         }
         require(matchedText == null || matchedText.isNotBlank()) { "matchedText must not be blank" }
+        require((kind != CommandPersistencePrivacyDecisionKind.ALLOWED) == (location != null)) {
+            "location must be present only for rejection decisions"
+        }
     }
 
     companion object {
@@ -75,21 +110,35 @@ internal data class CommandPersistencePrivacyDecision(
          * Blank or multiline rejection decision.
          */
         val BLANK_OR_MULTILINE: CommandPersistencePrivacyDecision =
-            CommandPersistencePrivacyDecision(CommandPersistencePrivacyDecisionKind.BLANK_OR_MULTILINE)
+            CommandPersistencePrivacyDecision(
+                kind = CommandPersistencePrivacyDecisionKind.BLANK_OR_MULTILINE,
+                location = CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT,
+            )
 
         /**
          * Ignorespace rejection decision.
          */
         val IGNORES_SPACE: CommandPersistencePrivacyDecision =
-            CommandPersistencePrivacyDecision(CommandPersistencePrivacyDecisionKind.IGNORES_SPACE)
+            CommandPersistencePrivacyDecision(
+                kind = CommandPersistencePrivacyDecisionKind.IGNORES_SPACE,
+                location = CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT,
+            )
 
         /**
          * Returns a sensitive-keyword rejection decision.
          *
          * @param keyword matched sensitive keyword.
+         * @param location field or metadata surface that matched [keyword].
          * @return rejection decision carrying [keyword].
          */
-        fun sensitiveKeyword(keyword: String): CommandPersistencePrivacyDecision =
-            CommandPersistencePrivacyDecision(CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD, keyword)
+        fun sensitiveKeyword(
+            keyword: String,
+            location: CommandPersistencePrivacyDecisionLocation = CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT,
+        ): CommandPersistencePrivacyDecision =
+            CommandPersistencePrivacyDecision(
+                kind = CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD,
+                matchedText = keyword,
+                location = location,
+            )
     }
 }

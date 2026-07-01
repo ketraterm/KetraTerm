@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.history
 
+import io.github.ketraterm.app.history.CommandPersistencePrivacyDecisionLocation.*
 import io.github.ketraterm.app.history.CommandPersistencePrivacyPolicy.allowsCommand
 import io.github.ketraterm.completion.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.TerminalCommandShapeStats
@@ -57,7 +58,7 @@ internal object CommandPersistencePrivacyPolicy {
         return if (keyword == null) {
             CommandPersistencePrivacyDecision.ALLOWED
         } else {
-            CommandPersistencePrivacyDecision.sensitiveKeyword(keyword)
+            CommandPersistencePrivacyDecision.sensitiveKeyword(keyword, COMMAND_TEXT)
         }
     }
 
@@ -99,20 +100,20 @@ internal object CommandPersistencePrivacyPolicy {
      */
     fun evaluateShapeStats(record: TerminalCommandShapeStats): CommandPersistencePrivacyDecision {
         findSensitiveKeyword(record.shape.executable)?.let {
-            return CommandPersistencePrivacyDecision.sensitiveKeyword(it)
+            return CommandPersistencePrivacyDecision.sensitiveKeyword(it, SHAPE_EXECUTABLE)
         }
         for (subcommand in record.shape.subcommands) {
             findSensitiveKeyword(subcommand)?.let {
-                return CommandPersistencePrivacyDecision.sensitiveKeyword(it)
+                return CommandPersistencePrivacyDecision.sensitiveKeyword(it, SHAPE_SUBCOMMAND)
             }
         }
         for (optionName in record.shape.optionNames) {
             findSensitiveKeyword(optionName)?.let {
-                return CommandPersistencePrivacyDecision.sensitiveKeyword(it)
+                return CommandPersistencePrivacyDecision.sensitiveKeyword(it, SHAPE_OPTION_NAME)
             }
         }
         findSensitiveKeyword(record.shape.normalizedShapeKey)?.let {
-            return CommandPersistencePrivacyDecision.sensitiveKeyword(it)
+            return CommandPersistencePrivacyDecision.sensitiveKeyword(it, SHAPE_KEY)
         }
         return CommandPersistencePrivacyDecision.ALLOWED
     }

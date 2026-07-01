@@ -32,21 +32,25 @@ class CommandPersistencePrivacyPolicyTest {
 
     @Test
     fun `rejects blank and multiline command text`() {
-        assertEquals(
-            CommandPersistencePrivacyDecision.BLANK_OR_MULTILINE,
-            CommandPersistencePrivacyPolicy.evaluateCommand("   "),
-        )
-        assertEquals(
-            CommandPersistencePrivacyDecision.BLANK_OR_MULTILINE,
-            CommandPersistencePrivacyPolicy.evaluateCommand("git status\ngit log"),
-        )
+        val blankDecision = CommandPersistencePrivacyPolicy.evaluateCommand("   ")
+        val multilineDecision = CommandPersistencePrivacyPolicy.evaluateCommand("git status\ngit log")
+
+        assertEquals(CommandPersistencePrivacyDecision.BLANK_OR_MULTILINE, blankDecision)
+        assertEquals(CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT, blankDecision.location)
+        assertEquals(CommandPersistencePrivacyDecision.BLANK_OR_MULTILINE, multilineDecision)
+        assertEquals(CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT, multilineDecision.location)
         assertFalse(CommandPersistencePrivacyPolicy.allowsCommand("git status\rgit log"))
     }
 
     @Test
     fun `rejects leading space and tab with ignorespace reason`() {
-        assertEquals(CommandPersistencePrivacyDecision.IGNORES_SPACE, CommandPersistencePrivacyPolicy.evaluateCommand(" git status"))
-        assertEquals(CommandPersistencePrivacyDecision.IGNORES_SPACE, CommandPersistencePrivacyPolicy.evaluateCommand("\tgit status"))
+        val leadingSpaceDecision = CommandPersistencePrivacyPolicy.evaluateCommand(" git status")
+        val leadingTabDecision = CommandPersistencePrivacyPolicy.evaluateCommand("\tgit status")
+
+        assertEquals(CommandPersistencePrivacyDecision.IGNORES_SPACE, leadingSpaceDecision)
+        assertEquals(CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT, leadingSpaceDecision.location)
+        assertEquals(CommandPersistencePrivacyDecision.IGNORES_SPACE, leadingTabDecision)
+        assertEquals(CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT, leadingTabDecision.location)
     }
 
     @Test
@@ -55,6 +59,7 @@ class CommandPersistencePrivacyPolicyTest {
 
         assertEquals(CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD, decision.kind)
         assertEquals("password", decision.matchedText)
+        assertEquals(CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT, decision.location)
         assertFalse(decision.isAllowed)
     }
 
@@ -62,6 +67,16 @@ class CommandPersistencePrivacyPolicyTest {
     fun `rejects blank sensitive decision matched text`() {
         assertFailsWith<IllegalArgumentException> {
             CommandPersistencePrivacyDecision.sensitiveKeyword(" ")
+        }
+    }
+
+    @Test
+    fun `rejects sensitive decision without location`() {
+        assertFailsWith<IllegalArgumentException> {
+            CommandPersistencePrivacyDecision(
+                kind = CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD,
+                matchedText = "token",
+            )
         }
     }
 
@@ -87,6 +102,7 @@ class CommandPersistencePrivacyPolicyTest {
 
         assertEquals(CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD, decision.kind)
         assertEquals("secret", decision.matchedText)
+        assertEquals(CommandPersistencePrivacyDecisionLocation.SHAPE_EXECUTABLE, decision.location)
     }
 
     @Test
@@ -95,6 +111,7 @@ class CommandPersistencePrivacyPolicyTest {
 
         assertEquals(CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD, decision.kind)
         assertEquals("secret", decision.matchedText)
+        assertEquals(CommandPersistencePrivacyDecisionLocation.SHAPE_SUBCOMMAND, decision.location)
     }
 
     @Test
@@ -103,6 +120,7 @@ class CommandPersistencePrivacyPolicyTest {
 
         assertEquals(CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD, decision.kind)
         assertEquals("authorization", decision.matchedText)
+        assertEquals(CommandPersistencePrivacyDecisionLocation.SHAPE_OPTION_NAME, decision.location)
         assertFalse(CommandPersistencePrivacyPolicy.allowsShapeStats(shapeStats("curl --authorization bearer")))
     }
 
@@ -122,6 +140,7 @@ class CommandPersistencePrivacyPolicyTest {
 
         assertEquals(CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD, decision.kind)
         assertEquals("secret", decision.matchedText)
+        assertEquals(CommandPersistencePrivacyDecisionLocation.SHAPE_KEY, decision.location)
     }
 
     private fun commandStats(commandLine: String): TerminalCommandCompletionStats =
