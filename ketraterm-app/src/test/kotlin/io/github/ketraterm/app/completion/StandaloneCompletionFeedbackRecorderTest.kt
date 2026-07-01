@@ -156,6 +156,73 @@ class StandaloneCompletionFeedbackRecorderTest {
     }
 
     @Test
+    fun `default delete feedback records same Unicode command accepted by Swing handler`() {
+        val source = TerminalCommandStatsCompletionSource()
+        val persisted = ArrayList<TerminalCommandCompletionStatsSnapshot>()
+        val recorder =
+            StandaloneCompletionFeedbackRecorder(
+                statsSource = source,
+                persistSnapshot = persisted::add,
+                clockEpochMillis = { 2_500L },
+            )
+
+        recorder.record(
+            feedback =
+                feedback(
+                    kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
+                    commandText = "echo \uD83D\uDE02",
+                    replacementText = "ok",
+                    replacementStartOffset = -1,
+                    replacementEndOffset = -1,
+                    deleteCount = 1,
+                    suggestionKind = TerminalCompletionCandidateKind.ARGUMENT,
+                ),
+            profileId = "bash",
+            workingDirectoryUri = "file:///repo",
+        )
+
+        assertEquals("echo ok", source.snapshot().single().commandLine)
+        assertEquals(
+            "echo ok",
+            persisted
+                .single()
+                .commandStats
+                .single()
+                .commandLine,
+        )
+    }
+
+    @Test
+    fun `default delete feedback with malformed cursor is ignored`() {
+        val source = TerminalCommandStatsCompletionSource()
+        var persistCount = 0
+        val recorder =
+            StandaloneCompletionFeedbackRecorder(
+                statsSource = source,
+                persistSnapshot = { persistCount++ },
+            )
+
+        recorder.record(
+            feedback =
+                feedback(
+                    kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
+                    commandText = "echo \uD83D\uDE02",
+                    replacementText = "ok",
+                    replacementStartOffset = -1,
+                    replacementEndOffset = -1,
+                    deleteCount = 1,
+                    cursorOffset = 6,
+                    suggestionKind = TerminalCompletionCandidateKind.ARGUMENT,
+                ),
+            profileId = "bash",
+            workingDirectoryUri = "file:///repo",
+        )
+
+        assertTrue(source.snapshot().isEmpty())
+        assertEquals(0, persistCount)
+    }
+
+    @Test
     fun `sensitive resulting command is ignored and not persisted`() {
         val source = TerminalCommandStatsCompletionSource()
         var persistCount = 0
@@ -216,6 +283,8 @@ class StandaloneCompletionFeedbackRecorderTest {
         replacementText: String,
         replacementStartOffset: Int,
         replacementEndOffset: Int,
+        deleteCount: Int = -1,
+        cursorOffset: Int = commandText.length,
         source: String = "spec",
         suggestionKind: TerminalCompletionCandidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
     ): SwingShellSuggestionFeedback =
@@ -226,6 +295,7 @@ class StandaloneCompletionFeedbackRecorderTest {
                     replacementText = replacementText,
                     source = source,
                     kind = suggestionKind.name,
+                    deleteCount = deleteCount,
                     replacementStartOffset = replacementStartOffset,
                     replacementEndOffset = replacementEndOffset,
                 ),
@@ -233,8 +303,8 @@ class StandaloneCompletionFeedbackRecorderTest {
             request =
                 SwingShellSuggestionRequest(
                     commandText = commandText,
-                    cursorOffset = commandText.length,
-                    anchorColumn = commandText.length,
+                    cursorOffset = cursorOffset,
+                    anchorColumn = cursorOffset,
                     anchorRow = 0,
                 ),
         )

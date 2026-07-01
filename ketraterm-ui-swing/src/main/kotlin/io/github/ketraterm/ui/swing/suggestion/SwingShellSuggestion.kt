@@ -89,6 +89,44 @@ data class SwingShellSuggestionReplacementRange(
 }
 
 /**
+ * Validated command-line replacement plan for one shell suggestion.
+ *
+ * The plan is derived from the suggestion, request cursor, explicit replacement
+ * range, and default-delete policy. Hosts can use [commandTextAfterReplacement]
+ * for learning/feedback while the default Swing acceptance handler uses the
+ * delete counts to emit terminal editing keys before pasting [replacementText].
+ *
+ * @property startOffset inclusive UTF-16 start offset replaced in the request
+ * command text.
+ * @property endOffset exclusive UTF-16 end offset replaced in the request
+ * command text.
+ * @property replacementText text pasted after the deletion keys are emitted.
+ * @property deleteBeforeCursorCount number of Backspace key events needed
+ * before paste.
+ * @property deleteAfterCursorCount number of Delete key events needed before
+ * any Backspace key events.
+ */
+data class SwingShellSuggestionReplacement(
+    val startOffset: Int,
+    val endOffset: Int,
+    val replacementText: String,
+    val deleteBeforeCursorCount: Int,
+    val deleteAfterCursorCount: Int,
+) {
+    init {
+        require(startOffset >= 0) { "startOffset must be >= 0, was $startOffset" }
+        require(endOffset >= startOffset) { "endOffset must be >= startOffset, was $endOffset < $startOffset" }
+        require(replacementText.isNotEmpty()) { "replacementText must not be empty" }
+        require(deleteBeforeCursorCount >= 0) {
+            "deleteBeforeCursorCount must be >= 0, was $deleteBeforeCursorCount"
+        }
+        require(deleteAfterCursorCount >= 0) {
+            "deleteAfterCursorCount must be >= 0, was $deleteAfterCursorCount"
+        }
+    }
+}
+
+/**
  * Returns whether this suggestion carries an explicit replacement range.
  *
  * @return `true` when either replacement endpoint is set.
@@ -118,6 +156,73 @@ fun SwingShellSuggestion.explicitReplacementRangeFor(request: SwingShellSuggesti
     return SwingShellSuggestionReplacementRange(
         startOffset = replacementStartOffset,
         endOffset = replacementEndOffset,
+    )
+}
+
+/**
+ * Returns the validated replacement plan for this suggestion and request.
+ *
+ * Explicit replacement ranges are validated against the command text and
+ * request cursor. Suggestions without an explicit range replace either the
+ * whole prefix before the cursor or [SwingShellSuggestion.deleteCount]
+ * grapheme clusters before the cursor. Malformed UTF-16 cursor/range offsets
+ * return `null` instead of producing partial surrogate pairs.
+ *
+ * @param request command-line request that produced this suggestion.
+ * @return validated replacement plan, or `null` when the request/range is invalid.
+ */
+fun SwingShellSuggestion.replacementFor(request: SwingShellSuggestionRequest): SwingShellSuggestionReplacement? {
+    if (!request.commandText.isUtf16Boundary(request.cursorOffset)) return null
+    val startOffset: Int
+    val endOffset: Int
+    val deleteBeforeCursorCount: Int
+    val deleteAfterCursorCount: Int
+    if (hasExplicitReplacementRange()) {
+        val range = explicitReplacementRangeFor(request) ?: return null
+        startOffset = range.startOffset
+        endOffset = range.endOffset
+        deleteBeforeCursorCount = countGraphemeClusters(request.commandText.substring(startOffset, request.cursorOffset))
+        deleteAfterCursorCount = countGraphemeClusters(request.commandText.substring(request.cursorOffset, endOffset))
+    } else {
+        endOffset = request.cursorOffset
+        val availableBeforeCursor = countGraphemeClusters(request.commandText.substring(0, request.cursorOffset))
+        deleteBeforeCursorCount =
+            if (deleteCount >= 0) {
+                minOf(deleteCount, availableBeforeCursor)
+            } else {
+                availableBeforeCursor
+            }
+        deleteAfterCursorCount = 0
+        startOffset =
+            request.commandText.startOffsetBeforeGraphemeClusters(
+                endOffset = request.cursorOffset,
+                graphemeClusterCount = deleteBeforeCursorCount,
+            ) ?: return null
+    }
+    return SwingShellSuggestionReplacement(
+        startOffset = startOffset,
+        endOffset = endOffset,
+        replacementText = replacementText,
+        deleteBeforeCursorCount = deleteBeforeCursorCount,
+        deleteAfterCursorCount = deleteAfterCursorCount,
+    )
+}
+
+/**
+ * Returns the command text that would result from accepting this suggestion.
+ *
+ * This is the host-learning companion to [replacementFor]: it uses the same
+ * UTF-16 and grapheme-cluster rules as the default acceptance handler.
+ *
+ * @param request command-line request that produced this suggestion.
+ * @return resulting command text, or `null` when the request/range is invalid.
+ */
+fun SwingShellSuggestion.commandTextAfterReplacement(request: SwingShellSuggestionRequest): String? {
+    val replacement = replacementFor(request) ?: return null
+    return request.commandText.replaceRange(
+        replacement.startOffset,
+        replacement.endOffset,
+        replacement.replacementText,
     )
 }
 
@@ -315,53 +420,45 @@ fun interface SwingShellSuggestionHandler {
         fun createDefault(session: TerminalInputEncoder): SwingShellSuggestionHandler =
             SwingShellSuggestionHandler { acceptance ->
                 val request = acceptance.request
-                val suggestion = acceptance.suggestion
+                val replacement = acceptance.suggestion.replacementFor(request) ?: return@SwingShellSuggestionHandler
 
-                if (suggestion.hasExplicitReplacementRange()) {
-                    val replacementRange =
-                        suggestion.explicitReplacementRangeFor(request)
-                            ?: return@SwingShellSuggestionHandler
-                    val deleteAfterCursor =
-                        countGraphemeClusters(
-                            request.commandText.substring(request.cursorOffset, replacementRange.endOffset),
-                        )
-                    repeat(deleteAfterCursor) {
-                        session.encodeKey(TerminalKeyEvent.key(TerminalKey.DELETE))
-                    }
-
-                    val deleteBeforeCursor =
-                        countGraphemeClusters(
-                            request.commandText.substring(replacementRange.startOffset, request.cursorOffset),
-                        )
-                    repeat(deleteBeforeCursor) {
-                        session.encodeKey(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
-                    }
-                } else {
-                    val toDelete =
-                        if (suggestion.deleteCount >= 0) {
-                            suggestion.deleteCount
-                        } else {
-                            countGraphemeClusters(request.commandText.substring(0, request.cursorOffset))
-                        }
-
-                    repeat(toDelete) {
-                        session.encodeKey(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
-                    }
+                repeat(replacement.deleteAfterCursorCount) {
+                    session.encodeKey(TerminalKeyEvent.key(TerminalKey.DELETE))
                 }
-                session.encodePaste(TerminalPasteEvent(suggestion.replacementText))
+                repeat(replacement.deleteBeforeCursorCount) {
+                    session.encodeKey(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
+                }
+                session.encodePaste(TerminalPasteEvent(replacement.replacementText))
             }
-
-        private fun countGraphemeClusters(text: String): Int {
-            if (text.isEmpty()) return 0
-            val iterator = BreakIterator.getCharacterInstance()
-            iterator.setText(text)
-            var count = 0
-            while (iterator.next() != BreakIterator.DONE) {
-                count++
-            }
-            return count
-        }
     }
+}
+
+private fun countGraphemeClusters(text: String): Int {
+    if (text.isEmpty()) return 0
+    val iterator = BreakIterator.getCharacterInstance()
+    iterator.setText(text)
+    var count = 0
+    while (iterator.next() != BreakIterator.DONE) {
+        count++
+    }
+    return count
+}
+
+private fun String.startOffsetBeforeGraphemeClusters(
+    endOffset: Int,
+    graphemeClusterCount: Int,
+): Int? {
+    if (!isUtf16Boundary(endOffset)) return null
+    if (graphemeClusterCount <= 0) return endOffset
+    val iterator = BreakIterator.getCharacterInstance()
+    iterator.setText(substring(0, endOffset))
+    var offset = endOffset
+    repeat(graphemeClusterCount) {
+        val previous = iterator.preceding(offset)
+        if (previous == BreakIterator.DONE) return 0
+        offset = previous
+    }
+    return offset
 }
 
 private fun String.isUtf16Boundary(offset: Int): Boolean {

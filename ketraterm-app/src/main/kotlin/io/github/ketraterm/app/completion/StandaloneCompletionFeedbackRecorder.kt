@@ -17,7 +17,10 @@ package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.app.history.CommandPersistencePrivacyPolicy
 import io.github.ketraterm.completion.*
-import io.github.ketraterm.ui.swing.suggestion.*
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
+import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
 
 /**
  * Standalone adapter from Swing popup feedback to shared completion statistics.
@@ -105,29 +108,10 @@ internal class StandaloneCompletionFeedbackRecorder(
             )
         }
 
-        private fun commandLineAfterSuggestion(feedback: SwingShellSuggestionFeedback): String? {
-            val request = feedback.request
-            val suggestion = feedback.suggestion
-            val start: Int
-            val end: Int
-            if (suggestion.hasExplicitReplacementRange()) {
-                val range = suggestion.explicitReplacementRangeFor(request) ?: return null
-                start = range.startOffset
-                end = range.endOffset
-            } else {
-                val deleteCount =
-                    if (suggestion.deleteCount >= 0) {
-                        suggestion.deleteCount
-                    } else {
-                        request.cursorOffset
-                    }
-                start = (request.cursorOffset - deleteCount).coerceAtLeast(0)
-                end = request.cursorOffset
-            }
-            return request.commandText
-                .replaceRange(start, end, suggestion.replacementText)
-                .trim()
-                .takeIf(String::isNotEmpty)
-        }
+        private fun commandLineAfterSuggestion(feedback: SwingShellSuggestionFeedback): String? =
+            feedback.suggestion
+                .commandTextAfterReplacement(feedback.request)
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
     }
 }
