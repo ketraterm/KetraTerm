@@ -15,10 +15,11 @@
  */
 package io.github.ketraterm.app.completion
 
+import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
+import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.model.TerminalCommandLineShape
 import io.github.ketraterm.completion.model.TerminalCommandShapeStats
 import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.source.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,7 +53,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `persistent stats suggestions rank between session MRU and static specs`() {
-        val persistentStats = TerminalCommandStatsCompletionSource()
+        val persistentStats = TerminalCompletionSources.commandStats()
         persistentStats.recordCommandResult(
             commandLine = "git show --stat",
             successful = true,
@@ -85,7 +86,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `persistent stats source is shared across provider sessions`() {
-        val persistentStats = TerminalCommandStatsCompletionSource()
+        val persistentStats = TerminalCompletionSources.commandStats()
         persistentStats.recordCommandResult(
             commandLine = "npm test",
             successful = true,
@@ -103,7 +104,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `shape stats boost matching static spec suggestions`() {
-        val persistentStats = TerminalCommandStatsCompletionSource()
+        val persistentStats = TerminalCompletionSources.commandStats()
         persistentStats.replaceShapeStats(
             listOf(
                 shapeStats(
@@ -130,7 +131,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `shape stats demote repeatedly dismissed static spec suggestions`() {
-        val persistentStats = TerminalCommandStatsCompletionSource()
+        val persistentStats = TerminalCompletionSources.commandStats()
         persistentStats.replaceShapeStats(
             listOf(
                 shapeStats(

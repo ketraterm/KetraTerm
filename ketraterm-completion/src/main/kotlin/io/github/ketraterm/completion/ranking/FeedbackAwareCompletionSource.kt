@@ -34,7 +34,7 @@ import io.github.ketraterm.completion.model.TerminalCompletionTokenPosition
  * @param feedbackStatsProvider supplier for the latest source-specific
  * feedback snapshot.
  */
-class FeedbackAwareCompletionSource(
+internal class FeedbackAwareCompletionSource(
     private val delegate: TerminalCompletionSource,
     private val feedbackStatsProvider: () -> List<TerminalCompletionFeedbackStats>,
 ) : TerminalCompletionSource {

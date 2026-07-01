@@ -18,7 +18,7 @@ package io.github.ketraterm.completion.model
 /**
  * Privacy-preserving category for one command-line argument token.
  */
-enum class TerminalCommandArgumentKind {
+internal enum class TerminalCommandArgumentKind {
     /**
      * Positional value after the recognized executable and subcommand path.
      */
@@ -45,7 +45,7 @@ enum class TerminalCommandArgumentKind {
  * @property optionName normalized option name for [TerminalCommandArgumentKind.OPTION_VALUE],
  * or `null` for positional argument kinds.
  */
-data class TerminalCommandArgumentShape
+internal data class TerminalCommandArgumentShape
     @JvmOverloads
     constructor(
         val kind: TerminalCommandArgumentKind,
@@ -70,7 +70,7 @@ data class TerminalCommandArgumentShape
  * @property arguments privacy-preserving argument classifications.
  * @property matchedSpec whether the executable matched a provided command spec.
  */
-data class TerminalCommandLineClassification(
+internal data class TerminalCommandLineClassification(
     val shape: TerminalCommandLineShape,
     val arguments: List<TerminalCommandArgumentShape>,
     val matchedSpec: Boolean,

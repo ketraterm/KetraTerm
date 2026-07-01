@@ -15,9 +15,9 @@
  */
 package io.github.ketraterm.completion.source
 
+import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalCompletionSource
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.ranking.ExactCommandStatsCandidateBuilder
@@ -36,12 +36,12 @@ import io.github.ketraterm.completion.stats.CompletionFeedbackStatsIndex
  * @param commandSpecs command specifications used to classify command-family
  * shapes for privacy-preserving structural learning.
  */
-class TerminalCommandStatsCompletionSource
+internal class CommandStatsCompletionSourceImpl
     @JvmOverloads
     constructor(
         capacity: Int = DEFAULT_CAPACITY,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    ) : TerminalCompletionSource {
+    ) : TerminalCommandStatsCompletionSource {
         init {
             require(capacity > 0) { "capacity must be > 0, was $capacity" }
         }
@@ -60,7 +60,7 @@ class TerminalCommandStatsCompletionSource
          *
          * @param records compact command-stat rows loaded by a host.
          */
-        fun replaceAll(records: List<TerminalCommandCompletionStats>) {
+        override fun replaceAll(records: List<TerminalCommandCompletionStats>) {
             synchronized(lock) {
                 commandStats.replaceAll(records)
             }
@@ -74,7 +74,7 @@ class TerminalCommandStatsCompletionSource
          *
          * @param records compact shape-stat rows loaded by a host.
          */
-        fun replaceShapeStats(records: List<TerminalCommandShapeStats>) {
+        override fun replaceShapeStats(records: List<TerminalCommandShapeStats>) {
             synchronized(lock) {
                 shapeStats.replaceAll(records)
             }
@@ -88,7 +88,7 @@ class TerminalCommandStatsCompletionSource
          *
          * @param records compact feedback rows loaded by a host.
          */
-        fun replaceFeedbackStats(records: List<TerminalCompletionFeedbackStats>) {
+        override fun replaceFeedbackStats(records: List<TerminalCompletionFeedbackStats>) {
             synchronized(lock) {
                 feedbackStats.replaceAll(records)
             }
@@ -99,7 +99,7 @@ class TerminalCommandStatsCompletionSource
          *
          * @return retained rows sorted by ranking relevance.
          */
-        fun snapshot(): List<TerminalCommandCompletionStats> =
+        override fun snapshot(): List<TerminalCommandCompletionStats> =
             synchronized(lock) {
                 commandStats.snapshot()
             }
@@ -109,7 +109,7 @@ class TerminalCommandStatsCompletionSource
          *
          * @return retained shape rows sorted by ranking relevance.
          */
-        fun shapeSnapshot(): List<TerminalCommandShapeStats> =
+        override fun shapeSnapshot(): List<TerminalCommandShapeStats> =
             synchronized(lock) {
                 shapeStats.snapshot()
             }
@@ -119,7 +119,7 @@ class TerminalCommandStatsCompletionSource
          *
          * @return retained feedback rows sorted by ranking relevance.
          */
-        fun feedbackSnapshot(): List<TerminalCompletionFeedbackStats> =
+        override fun feedbackSnapshot(): List<TerminalCompletionFeedbackStats> =
             synchronized(lock) {
                 feedbackStats.snapshot()
             }
@@ -129,7 +129,7 @@ class TerminalCommandStatsCompletionSource
          *
          * @return immutable stats snapshot for host persistence.
          */
-        fun snapshotAll(): TerminalCommandCompletionStatsSnapshot =
+        override fun snapshotAll(): TerminalCommandCompletionStatsSnapshot =
             synchronized(lock) {
                 TerminalCommandCompletionStatsSnapshot(
                     commandStats = commandStats.snapshot(),
@@ -150,7 +150,7 @@ class TerminalCommandStatsCompletionSource
          * @param workingDirectoryUri optional working-directory URI.
          * @param usedAtEpochMillis host timestamp for the execution event.
          */
-        fun recordCommandResult(
+        override fun recordCommandResult(
             commandLine: String,
             successful: Boolean,
             profileId: String?,
@@ -185,14 +185,13 @@ class TerminalCommandStatsCompletionSource
          * @param feedbackAtEpochMillis host timestamp for the feedback event.
          * @param context optional source-specific context for the displayed candidate.
          */
-        @JvmOverloads
-        fun recordSuggestionFeedback(
+        override fun recordSuggestionFeedback(
             commandLine: String,
             feedback: TerminalCompletionFeedbackKind,
             profileId: String?,
             workingDirectoryUri: String?,
             feedbackAtEpochMillis: Long,
-            context: TerminalCompletionFeedbackContext? = null,
+            context: TerminalCompletionFeedbackContext?,
         ) {
             synchronized(lock) {
                 commandStats.recordSuggestionFeedback(

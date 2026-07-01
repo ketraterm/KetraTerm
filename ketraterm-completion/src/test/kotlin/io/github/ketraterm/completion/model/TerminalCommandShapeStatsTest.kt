@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.completion.model
 
-import io.github.ketraterm.completion.source.TerminalCommandStatsCompletionSource
+import io.github.ketraterm.completion.api.TerminalCompletionSources
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -56,7 +56,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `source records command results into matching shape stats`() {
-        val source = TerminalCommandStatsCompletionSource()
+        val source = TerminalCompletionSources.commandStats()
 
         source.recordCommandResult(
             commandLine = "git log --stat main",
@@ -86,7 +86,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `source records spec aware nested command family shapes`() {
-        val source = TerminalCommandStatsCompletionSource()
+        val source = TerminalCompletionSources.commandStats()
 
         source.recordCommandResult(
             commandLine = "docker compose up",
@@ -104,7 +104,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `source records accepted and dismissed feedback into shape stats`() {
-        val source = TerminalCommandStatsCompletionSource()
+        val source = TerminalCompletionSources.commandStats()
 
         source.recordSuggestionFeedback(
             commandLine = "npm test -- --watch",
@@ -129,7 +129,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `replace shape stats deduplicates by shape profile and directory`() {
-        val source = TerminalCommandStatsCompletionSource()
+        val source = TerminalCompletionSources.commandStats()
         val shape = TerminalCommandLineShape.fromCommandLine("git status")!!
 
         source.replaceShapeStats(

@@ -21,8 +21,8 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
 import io.github.ketraterm.completion.ranking.FeedbackAwareCompletionSource
 import io.github.ketraterm.completion.ranking.ShapeAwareCompletionSource
-import io.github.ketraterm.completion.source.TerminalCommandStatsCompletionSource
-import io.github.ketraterm.completion.source.TerminalSessionMruCompletionSource
+import io.github.ketraterm.completion.source.CommandStatsCompletionSourceImpl
+import io.github.ketraterm.completion.source.SessionMruCompletionSourceImpl
 import io.github.ketraterm.completion.spec.SpecCompletionSource
 
 /**
@@ -47,7 +47,7 @@ object TerminalCompletionSources {
      */
     @JvmStatic
     @JvmOverloads
-    fun sessionMru(capacity: Int = 128): TerminalSessionMruCompletionSource = TerminalSessionMruCompletionSource(capacity)
+    fun sessionMru(capacity: Int = 128): TerminalSessionMruCompletionSource = SessionMruCompletionSourceImpl(capacity)
 
     /**
      * Creates a bounded in-memory source for aggregated command statistics.
@@ -66,7 +66,7 @@ object TerminalCompletionSources {
         capacity: Int = 2048,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     ): TerminalCommandStatsCompletionSource =
-        TerminalCommandStatsCompletionSource(
+        CommandStatsCompletionSourceImpl(
             capacity = capacity,
             commandSpecs = commandSpecs,
         )

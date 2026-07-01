@@ -17,11 +17,11 @@ package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
 import io.github.ketraterm.completion.model.TerminalCompletionTokenPosition
-import io.github.ketraterm.completion.source.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
@@ -33,7 +33,7 @@ import kotlin.test.assertTrue
 class StandaloneCompletionFeedbackRecorderTest {
     @Test
     fun `accepted range suggestion records resulting command and persists snapshot`() {
-        val source = TerminalCommandStatsCompletionSource()
+        val source = TerminalCompletionSources.commandStats()
         val persisted = ArrayList<TerminalCommandCompletionStatsSnapshot>()
         val recorder =
             StandaloneCompletionFeedbackRecorder(
@@ -97,7 +97,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `dismissed token suggestion records resulting command without making it suggestible`() {
-        val source = TerminalCommandStatsCompletionSource()
+        val source = TerminalCompletionSources.commandStats()
         val recorder =
             StandaloneCompletionFeedbackRecorder(
                 statsSource = source,
@@ -136,7 +136,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `invalid replacement range is ignored and not persisted`() {
-        val source = TerminalCommandStatsCompletionSource()
+        val source = TerminalCompletionSources.commandStats()
         var persistCount = 0
         val recorder =
             StandaloneCompletionFeedbackRecorder(
@@ -163,7 +163,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `default delete feedback records same Unicode command accepted by Swing handler`() {
-        val source = TerminalCommandStatsCompletionSource()
+        val source = TerminalCompletionSources.commandStats()
         val persisted = ArrayList<TerminalCommandCompletionStatsSnapshot>()
         val recorder =
             StandaloneCompletionFeedbackRecorder(
@@ -200,7 +200,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `default delete feedback with malformed cursor is ignored`() {
-        val source = TerminalCommandStatsCompletionSource()
+        val source = TerminalCompletionSources.commandStats()
         var persistCount = 0
         val recorder =
             StandaloneCompletionFeedbackRecorder(
@@ -230,7 +230,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `sensitive resulting command is ignored and not persisted`() {
-        val source = TerminalCommandStatsCompletionSource()
+        val source = TerminalCompletionSources.commandStats()
         var persistCount = 0
         val recorder =
             StandaloneCompletionFeedbackRecorder(
@@ -258,7 +258,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `created handler reads latest working directory`() {
-        val source = TerminalCommandStatsCompletionSource()
+        val source = TerminalCompletionSources.commandStats()
         val recorder =
             StandaloneCompletionFeedbackRecorder(
                 statsSource = source,

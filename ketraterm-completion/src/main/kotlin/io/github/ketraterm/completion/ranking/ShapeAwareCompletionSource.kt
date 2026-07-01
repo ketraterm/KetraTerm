@@ -42,7 +42,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
  * @param commandSpecs command specifications used to classify projected
  * candidates into the same command families used by stats recording.
  */
-class ShapeAwareCompletionSource(
+internal class ShapeAwareCompletionSource(
     private val delegate: TerminalCompletionSource,
     private val shapeStatsProvider: () -> List<TerminalCommandShapeStats>,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),

@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 class TerminalSessionMruCompletionSourceTest {
     @Test
     fun `suggests matching recent commands as full-line replacements`() {
-        val source = TerminalSessionMruCompletionSource()
+        val source = TerminalCompletionSources.sessionMru()
         source.recordSuccessfulCommand("git status")
         source.recordSuccessfulCommand("npm test")
 
@@ -40,7 +40,7 @@ class TerminalSessionMruCompletionSourceTest {
 
     @Test
     fun `matches prefixes case-insensitively but keeps latest command casing`() {
-        val source = TerminalSessionMruCompletionSource()
+        val source = TerminalCompletionSources.sessionMru()
         source.recordSuccessfulCommand("Git Status")
 
         val candidates = source.complete(request("git s"))
@@ -50,7 +50,7 @@ class TerminalSessionMruCompletionSourceTest {
 
     @Test
     fun `does not suggest the exact already typed command`() {
-        val source = TerminalSessionMruCompletionSource()
+        val source = TerminalCompletionSources.sessionMru()
         source.recordSuccessfulCommand("git status")
 
         val candidates = source.complete(request("git status"))
@@ -60,7 +60,7 @@ class TerminalSessionMruCompletionSourceTest {
 
     @Test
     fun `duplicate commands are promoted instead of duplicated`() {
-        val source = TerminalSessionMruCompletionSource()
+        val source = TerminalCompletionSources.sessionMru()
         source.recordSuccessfulCommand("git status")
         source.recordSuccessfulCommand("git switch main")
         source.recordSuccessfulCommand("git status")
@@ -72,7 +72,7 @@ class TerminalSessionMruCompletionSourceTest {
 
     @Test
     fun `capacity evicts least recent distinct command`() {
-        val source = TerminalSessionMruCompletionSource(capacity = 2)
+        val source = TerminalCompletionSources.sessionMru(capacity = 2)
         source.recordSuccessfulCommand("git status")
         source.recordSuccessfulCommand("git switch main")
         source.recordSuccessfulCommand("git stash")
@@ -84,7 +84,7 @@ class TerminalSessionMruCompletionSourceTest {
 
     @Test
     fun `profile and working-directory matches boost ranking`() {
-        val source = TerminalSessionMruCompletionSource()
+        val source = TerminalCompletionSources.sessionMru()
         source.recordSuccessfulCommand(
             commandLine = "git switch main",
             profileId = "bash",
@@ -110,7 +110,7 @@ class TerminalSessionMruCompletionSourceTest {
 
     @Test
     fun `ignores blank and multiline commands`() {
-        val source = TerminalSessionMruCompletionSource()
+        val source = TerminalCompletionSources.sessionMru()
         source.recordSuccessfulCommand("   ")
         source.recordSuccessfulCommand("git status\ngit log")
 
@@ -121,7 +121,7 @@ class TerminalSessionMruCompletionSourceTest {
 
     @Test
     fun `clear removes retained commands`() {
-        val source = TerminalSessionMruCompletionSource()
+        val source = TerminalCompletionSources.sessionMru()
         source.recordSuccessfulCommand("git status")
 
         source.clear()

@@ -26,7 +26,7 @@ import io.github.ketraterm.completion.spec.CommandSpecResolver
  * [TerminalCommandSpec] while treating unknown positional values as private
  * arguments. It performs no I/O and never stores raw argument values.
  */
-object TerminalCommandLineClassifier {
+internal object TerminalCommandLineClassifier {
     /**
      * Classifies [commandLine] using [specs].
      *

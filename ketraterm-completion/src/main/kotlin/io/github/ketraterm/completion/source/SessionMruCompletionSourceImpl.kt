@@ -18,7 +18,7 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalCompletionSource
+import io.github.ketraterm.completion.api.TerminalSessionMruCompletionSource
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncrement
@@ -38,11 +38,11 @@ import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
  *
  * @param capacity maximum number of distinct normalized commands retained.
  */
-class TerminalSessionMruCompletionSource
+internal class SessionMruCompletionSourceImpl
     @JvmOverloads
     constructor(
         private val capacity: Int = DEFAULT_CAPACITY,
-    ) : TerminalCompletionSource {
+    ) : TerminalSessionMruCompletionSource {
         init {
             require(capacity > 0) { "capacity must be > 0, was $capacity" }
         }
@@ -61,11 +61,10 @@ class TerminalSessionMruCompletionSource
          * @param profileId optional profile id associated with the command.
          * @param workingDirectoryUri optional working-directory URI at command start.
          */
-        @JvmOverloads
-        fun recordSuccessfulCommand(
+        override fun recordSuccessfulCommand(
             commandLine: String,
-            profileId: String? = null,
-            workingDirectoryUri: String? = null,
+            profileId: String?,
+            workingDirectoryUri: String?,
         ) {
             val command = commandLine.trim()
             if (!isRecordableTerminalCompletionCommand(command)) return
@@ -102,7 +101,7 @@ class TerminalSessionMruCompletionSource
         /**
          * Removes all retained session MRU commands.
          */
-        fun clear() {
+        override fun clear() {
             synchronized(lock) {
                 entries.clear()
             }
