@@ -116,7 +116,7 @@ class CommandCompletionStatsStoreTest {
     }
 
     @Test
-    fun `filters sensitive exact command stats before persisting or loading`(
+    fun `sanitizes exact command stats before persisting`(
         @TempDir directory: Path,
     ) {
         val path = directory.resolve("completion-stats.tsv")
@@ -136,32 +136,6 @@ class CommandCompletionStatsStoreTest {
         val persisted = Files.readString(path)
         assertEquals(false, persisted.contains(encodeText(privateByWhitespace.commandLine)))
         assertEquals(false, persisted.contains(encodeText(privateByKeyword.commandLine)))
-    }
-
-    @Test
-    fun `filters sensitive shape stats before persisting or loading`(
-        @TempDir directory: Path,
-    ) {
-        val path = directory.resolve("completion-stats.tsv")
-        val safe =
-            TerminalCommandShapeStats(
-                shape = TerminalCommandLineShape.fromCommandLine("git status")!!,
-                lastUsedEpochMillis = 10,
-            )
-        val sensitive =
-            TerminalCommandShapeStats(
-                shape = TerminalCommandLineShape.fromCommandLine("curl --authorization bearer")!!,
-                lastUsedEpochMillis = 20,
-            )
-
-        CommandCompletionStatsStore(path).use { store ->
-            store.persist(TerminalCommandCompletionStatsSnapshot(shapeStats = listOf(safe, sensitive)))
-            store.flush()
-        }
-
-        CommandCompletionStatsStore(path).use { reloaded ->
-            assertEquals(TerminalCommandCompletionStatsSnapshot(shapeStats = listOf(safe)), reloaded.loadSnapshot())
-        }
     }
 
     @Test

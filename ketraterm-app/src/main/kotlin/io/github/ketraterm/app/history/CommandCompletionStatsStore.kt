@@ -59,7 +59,7 @@ internal class CommandCompletionStatsStore(
         if (!Files.isRegularFile(path)) return TerminalCommandCompletionStatsSnapshot()
         return runCatching {
             val lines = Files.readAllLines(path, StandardCharsets.UTF_8)
-            sanitizeSnapshot(CommandCompletionStatsCodec.decode(lines))
+            CommandCompletionStatsSanitizer.sanitize(CommandCompletionStatsCodec.decode(lines))
         }.onFailure { exception ->
             System.err.println("Failed to load command completion stats from $path: ${exception.message}")
         }.getOrElse { TerminalCommandCompletionStatsSnapshot() }
@@ -80,7 +80,7 @@ internal class CommandCompletionStatsStore(
      * @param snapshot compact exact and shape stats produced by the shared completion index.
      */
     fun persist(snapshot: TerminalCommandCompletionStatsSnapshot) {
-        val stableSnapshot = sanitizeSnapshot(snapshot)
+        val stableSnapshot = CommandCompletionStatsSanitizer.sanitize(snapshot)
         writeQueue.enqueue(stableSnapshot)
     }
 
@@ -118,11 +118,4 @@ internal class CommandCompletionStatsStore(
             System.err.println("Failed to persist command completion stats to $path: ${exception.message}")
         }
     }
-
-    private fun sanitizeSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot): TerminalCommandCompletionStatsSnapshot =
-        TerminalCommandCompletionStatsSnapshot(
-            commandStats = snapshot.commandStats.filter(CommandPersistencePrivacyPolicy::allowsCommandStats),
-            shapeStats = snapshot.shapeStats.filter(CommandPersistencePrivacyPolicy::allowsShapeStats),
-            feedbackStats = snapshot.feedbackStats,
-        )
 }
