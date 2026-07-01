@@ -38,10 +38,27 @@ internal object CommandPersistencePrivacyPolicy {
      * @param command full command line captured from shell integration or popup feedback.
      * @return `true` when the command is safe enough for local persisted learning.
      */
-    fun allowsCommand(command: String): Boolean {
-        if (command.isBlank() || command.indexOf('\n') >= 0 || command.indexOf('\r') >= 0) return false
-        if (command.startsWith(" ") || command.startsWith("\t")) return false
-        return !containsSensitiveKeyword(command)
+    fun allowsCommand(command: String): Boolean = evaluateCommand(command).isAllowed
+
+    /**
+     * Evaluates whether [command] may be learned or written to disk.
+     *
+     * @param command full command line captured from shell integration or popup feedback.
+     * @return auditable privacy decision explaining allow/reject outcome.
+     */
+    fun evaluateCommand(command: String): CommandPersistencePrivacyDecision {
+        if (command.isBlank() || command.indexOf('\n') >= 0 || command.indexOf('\r') >= 0) {
+            return CommandPersistencePrivacyDecision.BLANK_OR_MULTILINE
+        }
+        if (command.startsWith(" ") || command.startsWith("\t")) {
+            return CommandPersistencePrivacyDecision.IGNORES_SPACE
+        }
+        val keyword = findSensitiveKeyword(command)
+        return if (keyword == null) {
+            CommandPersistencePrivacyDecision.ALLOWED
+        } else {
+            CommandPersistencePrivacyDecision.sensitiveKeyword(keyword)
+        }
     }
 
     /**
@@ -50,7 +67,16 @@ internal object CommandPersistencePrivacyPolicy {
      * @param record aggregate exact command stats row.
      * @return `true` when the exact command line passes [allowsCommand].
      */
-    fun allowsCommandStats(record: TerminalCommandCompletionStats): Boolean = allowsCommand(record.commandLine)
+    fun allowsCommandStats(record: TerminalCommandCompletionStats): Boolean = evaluateCommandStats(record).isAllowed
+
+    /**
+     * Evaluates whether an exact command stats row may be persisted.
+     *
+     * @param record aggregate exact command stats row.
+     * @return auditable privacy decision for [record].
+     */
+    fun evaluateCommandStats(record: TerminalCommandCompletionStats): CommandPersistencePrivacyDecision =
+        evaluateCommand(record.commandLine)
 
     /**
      * Returns whether a structural shape stats row may be persisted.
@@ -63,17 +89,39 @@ internal object CommandPersistencePrivacyPolicy {
      * @param record aggregate command-shape stats row.
      * @return `true` when the shape metadata is safe enough to persist.
      */
-    fun allowsShapeStats(record: TerminalCommandShapeStats): Boolean =
-        !containsSensitiveKeyword(record.shape.executable) &&
-            record.shape.subcommands.none(::containsSensitiveKeyword) &&
-            record.shape.optionNames.none(::containsSensitiveKeyword) &&
-            !containsSensitiveKeyword(record.shape.normalizedShapeKey)
+    fun allowsShapeStats(record: TerminalCommandShapeStats): Boolean = evaluateShapeStats(record).isAllowed
 
-    private fun containsSensitiveKeyword(text: String): Boolean {
-        for (keyword in SENSITIVE_KEYWORDS) {
-            if (text.contains(keyword, ignoreCase = true)) return true
+    /**
+     * Evaluates whether a structural shape stats row may be persisted.
+     *
+     * @param record aggregate command-shape stats row.
+     * @return auditable privacy decision for [record].
+     */
+    fun evaluateShapeStats(record: TerminalCommandShapeStats): CommandPersistencePrivacyDecision {
+        findSensitiveKeyword(record.shape.executable)?.let {
+            return CommandPersistencePrivacyDecision.sensitiveKeyword(it)
         }
-        return false
+        for (subcommand in record.shape.subcommands) {
+            findSensitiveKeyword(subcommand)?.let {
+                return CommandPersistencePrivacyDecision.sensitiveKeyword(it)
+            }
+        }
+        for (optionName in record.shape.optionNames) {
+            findSensitiveKeyword(optionName)?.let {
+                return CommandPersistencePrivacyDecision.sensitiveKeyword(it)
+            }
+        }
+        findSensitiveKeyword(record.shape.normalizedShapeKey)?.let {
+            return CommandPersistencePrivacyDecision.sensitiveKeyword(it)
+        }
+        return CommandPersistencePrivacyDecision.ALLOWED
+    }
+
+    private fun findSensitiveKeyword(text: String): String? {
+        for (keyword in SENSITIVE_KEYWORDS) {
+            if (text.contains(keyword, ignoreCase = true)) return keyword
+        }
+        return null
     }
 
     private val SENSITIVE_KEYWORDS =
