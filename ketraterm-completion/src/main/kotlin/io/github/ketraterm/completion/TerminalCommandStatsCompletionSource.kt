@@ -29,7 +29,7 @@ package io.github.ketraterm.completion
 class TerminalCommandStatsCompletionSource
     @JvmOverloads
     constructor(
-        private val capacity: Int = DEFAULT_CAPACITY,
+        capacity: Int = DEFAULT_CAPACITY,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     ) : TerminalCompletionSource {
         init {
@@ -37,10 +37,9 @@ class TerminalCommandStatsCompletionSource
         }
 
         private val lock = Any()
-        private val entries = ArrayList<TerminalCommandCompletionStats>(capacity)
-        private val shapeEntries = ArrayList<TerminalCommandShapeStats>(capacity)
-        private val feedbackEntries = ArrayList<TerminalCompletionFeedbackStats>(capacity)
-        private val commandSpecs = commandSpecs.toList()
+        private val commandStats = CommandCompletionStatsIndex(capacity)
+        private val shapeStats = CommandShapeStatsIndex(capacity, commandSpecs)
+        private val feedbackStats = CompletionFeedbackStatsIndex(capacity)
 
         /**
          * Replaces the current index with [records].
@@ -52,21 +51,8 @@ class TerminalCommandStatsCompletionSource
          * @param records compact command-stat rows loaded by a host.
          */
         fun replaceAll(records: List<TerminalCommandCompletionStats>) {
-            val compacted = ArrayList<TerminalCommandCompletionStats>(minOf(records.size, capacity))
-            for (record in records) {
-                val index = compacted.indexOfKey(record)
-                if (index >= 0) {
-                    if (record.lastUsedEpochMillis >= compacted[index].lastUsedEpochMillis) {
-                        compacted[index] = record
-                    }
-                } else {
-                    compacted += record
-                }
-            }
-            compacted.sortWith(TERMINAL_COMMAND_COMPLETION_STATS_ORDER)
             synchronized(lock) {
-                entries.clear()
-                entries.addAll(compacted.take(capacity))
+                commandStats.replaceAll(records)
             }
         }
 
@@ -79,21 +65,8 @@ class TerminalCommandStatsCompletionSource
          * @param records compact shape-stat rows loaded by a host.
          */
         fun replaceShapeStats(records: List<TerminalCommandShapeStats>) {
-            val compacted = ArrayList<TerminalCommandShapeStats>(minOf(records.size, capacity))
-            for (record in records) {
-                val index = compacted.indexOfShapeKey(record)
-                if (index >= 0) {
-                    if (record.lastUsedEpochMillis >= compacted[index].lastUsedEpochMillis) {
-                        compacted[index] = record
-                    }
-                } else {
-                    compacted += record
-                }
-            }
-            compacted.sortWith(TERMINAL_COMMAND_SHAPE_STATS_ORDER)
             synchronized(lock) {
-                shapeEntries.clear()
-                shapeEntries.addAll(compacted.take(capacity))
+                shapeStats.replaceAll(records)
             }
         }
 
@@ -106,21 +79,8 @@ class TerminalCommandStatsCompletionSource
          * @param records compact feedback rows loaded by a host.
          */
         fun replaceFeedbackStats(records: List<TerminalCompletionFeedbackStats>) {
-            val compacted = ArrayList<TerminalCompletionFeedbackStats>(minOf(records.size, capacity))
-            for (record in records) {
-                val index = compacted.indexOfFeedbackKey(record)
-                if (index >= 0) {
-                    if (record.lastUsedEpochMillis >= compacted[index].lastUsedEpochMillis) {
-                        compacted[index] = record
-                    }
-                } else {
-                    compacted += record
-                }
-            }
-            compacted.sortWith(TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER)
             synchronized(lock) {
-                feedbackEntries.clear()
-                feedbackEntries.addAll(compacted.take(capacity))
+                feedbackStats.replaceAll(records)
             }
         }
 
@@ -131,7 +91,7 @@ class TerminalCommandStatsCompletionSource
          */
         fun snapshot(): List<TerminalCommandCompletionStats> =
             synchronized(lock) {
-                entries.toList()
+                commandStats.snapshot()
             }
 
         /**
@@ -141,7 +101,7 @@ class TerminalCommandStatsCompletionSource
          */
         fun shapeSnapshot(): List<TerminalCommandShapeStats> =
             synchronized(lock) {
-                shapeEntries.toList()
+                shapeStats.snapshot()
             }
 
         /**
@@ -151,7 +111,7 @@ class TerminalCommandStatsCompletionSource
          */
         fun feedbackSnapshot(): List<TerminalCompletionFeedbackStats> =
             synchronized(lock) {
-                feedbackEntries.toList()
+                feedbackStats.snapshot()
             }
 
         /**
@@ -162,9 +122,9 @@ class TerminalCommandStatsCompletionSource
         fun snapshotAll(): TerminalCommandCompletionStatsSnapshot =
             synchronized(lock) {
                 TerminalCommandCompletionStatsSnapshot(
-                    commandStats = entries.toList(),
-                    shapeStats = shapeEntries.toList(),
-                    feedbackStats = feedbackEntries.toList(),
+                    commandStats = commandStats.snapshot(),
+                    shapeStats = shapeStats.snapshot(),
+                    feedbackStats = feedbackStats.snapshot(),
                 )
             }
 
@@ -187,42 +147,20 @@ class TerminalCommandStatsCompletionSource
             workingDirectoryUri: String?,
             usedAtEpochMillis: Long,
         ) {
-            if (!isRecordableTerminalCompletionCommand(commandLine) || usedAtEpochMillis < 0L) return
-            mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
-                previous.copy(
-                    commandLine = canonical,
-                    useCount = saturatedCompletionCounterIncrement(previous.useCount),
-                    successCount =
-                        if (successful) {
-                            saturatedCompletionCounterIncrement(previous.successCount)
-                        } else {
-                            previous.successCount
-                        },
-                    failureCount =
-                        if (successful) {
-                            previous.failureCount
-                        } else {
-                            saturatedCompletionCounterIncrement(previous.failureCount)
-                        },
-                    lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, usedAtEpochMillis),
+            synchronized(lock) {
+                commandStats.recordCommandResult(
+                    commandLine = commandLine,
+                    successful = successful,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    usedAtEpochMillis = usedAtEpochMillis,
                 )
-            }
-            mutateShape(commandLine, profileId, workingDirectoryUri) { previous ->
-                previous.copy(
-                    useCount = saturatedCompletionCounterIncrement(previous.useCount),
-                    successCount =
-                        if (successful) {
-                            saturatedCompletionCounterIncrement(previous.successCount)
-                        } else {
-                            previous.successCount
-                        },
-                    failureCount =
-                        if (successful) {
-                            previous.failureCount
-                        } else {
-                            saturatedCompletionCounterIncrement(previous.failureCount)
-                        },
-                    lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, usedAtEpochMillis),
+                shapeStats.recordCommandResult(
+                    commandLine = commandLine,
+                    successful = successful,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    usedAtEpochMillis = usedAtEpochMillis,
                 )
             }
         }
@@ -246,58 +184,28 @@ class TerminalCommandStatsCompletionSource
             feedbackAtEpochMillis: Long,
             context: TerminalCompletionFeedbackContext? = null,
         ) {
-            if (!isRecordableTerminalCompletionCommand(commandLine) || feedbackAtEpochMillis < 0L) return
-            mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
-                previous.copy(
-                    commandLine = canonical,
-                    acceptedCount =
-                        if (feedback == TerminalCompletionFeedbackKind.ACCEPTED) {
-                            saturatedCompletionCounterIncrement(previous.acceptedCount)
-                        } else {
-                            previous.acceptedCount
-                        },
-                    dismissedCount =
-                        if (feedback == TerminalCompletionFeedbackKind.DISMISSED) {
-                            saturatedCompletionCounterIncrement(previous.dismissedCount)
-                        } else {
-                            previous.dismissedCount
-                        },
-                    lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
+            synchronized(lock) {
+                commandStats.recordSuggestionFeedback(
+                    commandLine = commandLine,
+                    feedback = feedback,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    feedbackAtEpochMillis = feedbackAtEpochMillis,
                 )
-            }
-            mutateShape(commandLine, profileId, workingDirectoryUri) { previous ->
-                previous.copy(
-                    acceptedCount =
-                        if (feedback == TerminalCompletionFeedbackKind.ACCEPTED) {
-                            saturatedCompletionCounterIncrement(previous.acceptedCount)
-                        } else {
-                            previous.acceptedCount
-                        },
-                    dismissedCount =
-                        if (feedback == TerminalCompletionFeedbackKind.DISMISSED) {
-                            saturatedCompletionCounterIncrement(previous.dismissedCount)
-                        } else {
-                            previous.dismissedCount
-                        },
-                    lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
+                shapeStats.recordSuggestionFeedback(
+                    commandLine = commandLine,
+                    feedback = feedback,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    feedbackAtEpochMillis = feedbackAtEpochMillis,
                 )
-            }
-            if (context != null) {
-                mutateFeedback(context, profileId, workingDirectoryUri) { previous ->
-                    previous.copy(
-                        acceptedCount =
-                            if (feedback == TerminalCompletionFeedbackKind.ACCEPTED) {
-                                saturatedCompletionCounterIncrement(previous.acceptedCount)
-                            } else {
-                                previous.acceptedCount
-                            },
-                        dismissedCount =
-                            if (feedback == TerminalCompletionFeedbackKind.DISMISSED) {
-                                saturatedCompletionCounterIncrement(previous.dismissedCount)
-                            } else {
-                                previous.dismissedCount
-                            },
-                        lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
+                if (isRecordableTerminalCompletionCommand(commandLine) && context != null) {
+                    feedbackStats.recordSuggestionFeedback(
+                        context = context,
+                        feedback = feedback,
+                        profileId = profileId,
+                        workingDirectoryUri = workingDirectoryUri,
+                        feedbackAtEpochMillis = feedbackAtEpochMillis,
                     )
                 }
             }
@@ -319,88 +227,6 @@ class TerminalCommandStatsCompletionSource
             return candidates
                 .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
                 .take(request.maxCandidates)
-        }
-
-        private inline fun mutate(
-            commandLine: String,
-            profileId: String?,
-            workingDirectoryUri: String?,
-            update: (TerminalCommandCompletionStats, String) -> TerminalCommandCompletionStats,
-        ) {
-            val canonical = commandLine.trim()
-            val normalized = TerminalCommandCompletionStats.normalizeCommandLine(canonical)
-            synchronized(lock) {
-                val existingIndex = entries.indexOfKey(normalized, profileId, workingDirectoryUri)
-                if (existingIndex >= 0) {
-                    entries[existingIndex] = update(entries[existingIndex], canonical)
-                } else {
-                    if (entries.size == capacity) entries.removeLeastRelevantBy(TERMINAL_COMMAND_COMPLETION_STATS_ORDER)
-                    val initial =
-                        TerminalCommandCompletionStats(
-                            commandLine = canonical,
-                            normalizedCommandLine = normalized,
-                            profileId = profileId,
-                            workingDirectoryUri = workingDirectoryUri,
-                        )
-                    entries += update(initial, canonical)
-                }
-                entries.sortWith(TERMINAL_COMMAND_COMPLETION_STATS_ORDER)
-            }
-        }
-
-        private inline fun mutateShape(
-            commandLine: String,
-            profileId: String?,
-            workingDirectoryUri: String?,
-            update: (TerminalCommandShapeStats) -> TerminalCommandShapeStats,
-        ) {
-            val shape = shapeFor(commandLine) ?: return
-            synchronized(lock) {
-                val existingIndex = shapeEntries.indexOfShapeKey(shape.normalizedShapeKey, profileId, workingDirectoryUri)
-                if (existingIndex >= 0) {
-                    shapeEntries[existingIndex] = update(shapeEntries[existingIndex])
-                } else {
-                    if (shapeEntries.size == capacity) shapeEntries.removeLeastRelevantBy(TERMINAL_COMMAND_SHAPE_STATS_ORDER)
-                    val initial =
-                        TerminalCommandShapeStats(
-                            shape = shape,
-                            profileId = profileId,
-                            workingDirectoryUri = workingDirectoryUri,
-                        )
-                    shapeEntries += update(initial)
-                }
-                shapeEntries.sortWith(TERMINAL_COMMAND_SHAPE_STATS_ORDER)
-            }
-        }
-
-        private inline fun mutateFeedback(
-            context: TerminalCompletionFeedbackContext,
-            profileId: String?,
-            workingDirectoryUri: String?,
-            update: (TerminalCompletionFeedbackStats) -> TerminalCompletionFeedbackStats,
-        ) {
-            synchronized(lock) {
-                val existingIndex = feedbackEntries.indexOfFeedbackKey(context, profileId, workingDirectoryUri)
-                if (existingIndex >= 0) {
-                    feedbackEntries[existingIndex] = update(feedbackEntries[existingIndex])
-                } else {
-                    if (feedbackEntries.size == capacity) {
-                        feedbackEntries.removeLeastRelevantBy(TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER)
-                    }
-                    val initial =
-                        TerminalCompletionFeedbackStats(
-                            source = context.source,
-                            candidateKind = context.candidateKind,
-                            tokenPosition = context.tokenPosition,
-                            replacementStartOffset = context.replacementStartOffset,
-                            replacementEndOffset = context.replacementEndOffset,
-                            profileId = profileId,
-                            workingDirectoryUri = workingDirectoryUri,
-                        )
-                    feedbackEntries += update(initial)
-                }
-                feedbackEntries.sortWith(TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER)
-            }
         }
 
         private fun TerminalCommandCompletionStats.toCandidate(request: TerminalCompletionRequest): TerminalCompletionCandidate =
@@ -433,108 +259,6 @@ class TerminalCommandStatsCompletionSource
                 counterScore = counterScore,
             )
         }
-
-        private fun ArrayList<TerminalCommandCompletionStats>.indexOfKey(record: TerminalCommandCompletionStats): Int =
-            indexOfKey(record.normalizedCommandLine, record.profileId, record.workingDirectoryUri)
-
-        private fun List<TerminalCommandCompletionStats>.indexOfKey(
-            normalizedCommandLine: String,
-            profileId: String?,
-            workingDirectoryUri: String?,
-        ): Int {
-            var index = 0
-            while (index < size) {
-                val entry = this[index]
-                if (entry.normalizedCommandLine == normalizedCommandLine &&
-                    entry.profileId == profileId &&
-                    entry.workingDirectoryUri == workingDirectoryUri
-                ) {
-                    return index
-                }
-                index++
-            }
-            return -1
-        }
-
-        private fun ArrayList<TerminalCommandShapeStats>.indexOfShapeKey(record: TerminalCommandShapeStats): Int =
-            indexOfShapeKey(record.shape.normalizedShapeKey, record.profileId, record.workingDirectoryUri)
-
-        private fun List<TerminalCommandShapeStats>.indexOfShapeKey(
-            normalizedShapeKey: String,
-            profileId: String?,
-            workingDirectoryUri: String?,
-        ): Int {
-            var index = 0
-            while (index < size) {
-                val entry = this[index]
-                if (entry.shape.normalizedShapeKey == normalizedShapeKey &&
-                    entry.profileId == profileId &&
-                    entry.workingDirectoryUri == workingDirectoryUri
-                ) {
-                    return index
-                }
-                index++
-            }
-            return -1
-        }
-
-        private fun ArrayList<TerminalCompletionFeedbackStats>.indexOfFeedbackKey(record: TerminalCompletionFeedbackStats): Int =
-            indexOfFeedbackKey(
-                source = record.source,
-                candidateKind = record.candidateKind,
-                tokenPosition = record.tokenPosition,
-                replacementStartOffset = record.replacementStartOffset,
-                replacementEndOffset = record.replacementEndOffset,
-                profileId = record.profileId,
-                workingDirectoryUri = record.workingDirectoryUri,
-            )
-
-        private fun List<TerminalCompletionFeedbackStats>.indexOfFeedbackKey(
-            context: TerminalCompletionFeedbackContext,
-            profileId: String?,
-            workingDirectoryUri: String?,
-        ): Int =
-            indexOfFeedbackKey(
-                source = context.source,
-                candidateKind = context.candidateKind,
-                tokenPosition = context.tokenPosition,
-                replacementStartOffset = context.replacementStartOffset,
-                replacementEndOffset = context.replacementEndOffset,
-                profileId = profileId,
-                workingDirectoryUri = workingDirectoryUri,
-            )
-
-        private fun List<TerminalCompletionFeedbackStats>.indexOfFeedbackKey(
-            source: String,
-            candidateKind: TerminalCompletionCandidateKind,
-            tokenPosition: TerminalCompletionTokenPosition,
-            replacementStartOffset: Int,
-            replacementEndOffset: Int,
-            profileId: String?,
-            workingDirectoryUri: String?,
-        ): Int {
-            var index = 0
-            while (index < size) {
-                val entry = this[index]
-                if (entry.source == source &&
-                    entry.candidateKind == candidateKind &&
-                    entry.tokenPosition == tokenPosition &&
-                    entry.replacementStartOffset == replacementStartOffset &&
-                    entry.replacementEndOffset == replacementEndOffset &&
-                    entry.profileId == profileId &&
-                    entry.workingDirectoryUri == workingDirectoryUri
-                ) {
-                    return index
-                }
-                index++
-            }
-            return -1
-        }
-
-        private fun shapeFor(commandLine: String): TerminalCommandLineShape? =
-            TerminalCommandLineClassifier
-                .classify(commandLine, commandSpecs)
-                ?.shape
 
         private companion object {
             private const val DEFAULT_CAPACITY = 2048
