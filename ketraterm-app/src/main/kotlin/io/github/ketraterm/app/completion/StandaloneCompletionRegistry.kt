@@ -55,7 +55,7 @@ internal class StandaloneCompletionRegistry(
                         commandSpecs = specs,
                     )
                 }
-            }
+            }.let(::feedbackAware)
     private val sessionMruSources = HashMap<String, TerminalSessionMruCompletionSource>()
 
     /**
@@ -80,11 +80,12 @@ internal class StandaloneCompletionRegistry(
         synchronized(lock) {
             sessionMruSources[sessionId] = mruSource
         }
+        val rankedMruSource = feedbackAware(mruSource)
         val sources =
             ArrayList<TerminalCompletionSourceEntry>(COMPOSED_SOURCE_CAPACITY).apply {
-                add(TerminalCompletionSourceEntry(mruSource, priority = SESSION_MRU_PRIORITY))
+                add(TerminalCompletionSourceEntry(rankedMruSource, priority = SESSION_MRU_PRIORITY))
                 persistentStatsSource?.let { source ->
-                    add(TerminalCompletionSourceEntry(source, priority = PERSISTENT_STATS_PRIORITY))
+                    add(TerminalCompletionSourceEntry(feedbackAware(source), priority = PERSISTENT_STATS_PRIORITY))
                 }
                 add(TerminalCompletionSourceEntry(specSource, priority = SPEC_PRIORITY))
             }
@@ -141,6 +142,13 @@ internal class StandaloneCompletionRegistry(
                 sessionMruSources.remove(sessionId)
             }
         source?.clear()
+    }
+
+    private fun feedbackAware(source: TerminalCompletionSource): TerminalCompletionSource {
+        val statsSource = persistentStatsSource ?: return source
+        return TerminalCompletionSources.feedbackAware(source) {
+            statsSource.feedbackSnapshot()
+        }
     }
 
     private companion object {

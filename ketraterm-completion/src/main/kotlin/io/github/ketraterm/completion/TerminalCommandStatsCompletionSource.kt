@@ -60,6 +60,32 @@ enum class TerminalCompletionTokenPosition {
      * Candidate position could not be classified safely.
      */
     UNKNOWN,
+
+    ;
+
+    companion object {
+        /**
+         * Maps a candidate kind to its default command-line token position.
+         *
+         * Hosts may override the position when they have richer parser context,
+         * but this mapping is the shared fallback used by generic completion
+         * sources and host adapters.
+         *
+         * @param candidateKind semantic candidate kind.
+         * @return default token position for [candidateKind].
+         */
+        @JvmStatic
+        fun fromCandidateKind(candidateKind: TerminalCompletionCandidateKind): TerminalCompletionTokenPosition =
+            when (candidateKind) {
+                TerminalCompletionCandidateKind.COMMAND -> COMMAND
+                TerminalCompletionCandidateKind.SUBCOMMAND -> SUBCOMMAND
+                TerminalCompletionCandidateKind.OPTION -> OPTION
+                TerminalCompletionCandidateKind.ARGUMENT,
+                TerminalCompletionCandidateKind.PATH,
+                -> ARGUMENT
+                TerminalCompletionCandidateKind.HISTORY -> UNKNOWN
+            }
+    }
 }
 
 /**
@@ -214,10 +240,6 @@ data class TerminalCommandCompletionStats
  * Hosts feed this source from compact persisted metadata and live command or
  * suggestion feedback. The source never scans raw history, performs I/O, spawns
  * shells, or depends on UI frameworks. All public methods are thread-safe.
- *
- * TODO(completion-ranking): Apply persisted [TerminalCompletionFeedbackStats]
- * to source-specific ranking once static, path, and IDE providers all supply
- * comparable feedback contexts.
  *
  * @param capacity maximum distinct command/profile/directory rows retained.
  * @param commandSpecs command specifications used to classify command-family

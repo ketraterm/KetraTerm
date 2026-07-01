@@ -134,6 +134,24 @@ object TerminalCompletionSources {
             shapeStatsProvider = shapeStatsProvider,
             commandSpecs = commandSpecs,
         )
+
+    /**
+     * Wraps [source] with source-specific feedback score adjustment.
+     *
+     * @param source source whose candidates should be feedback-ranked.
+     * @param feedbackStatsProvider supplier for the latest source-specific
+     * feedback stats snapshot.
+     * @return source that returns the same candidates with adjusted scores.
+     */
+    @JvmStatic
+    fun feedbackAware(
+        source: TerminalCompletionSource,
+        feedbackStatsProvider: () -> List<TerminalCompletionFeedbackStats>,
+    ): TerminalCompletionSource =
+        FeedbackAwareCompletionSource(
+            delegate = source,
+            feedbackStatsProvider = feedbackStatsProvider,
+        )
 }
 
 /**

@@ -101,22 +101,11 @@ internal class StandaloneCompletionFeedbackRecorder(
             return TerminalCompletionFeedbackContext(
                 source = source,
                 candidateKind = candidateKind,
-                tokenPosition = candidateKind.tokenPosition(),
+                tokenPosition = TerminalCompletionTokenPosition.fromCandidateKind(candidateKind),
                 replacementStartOffset = suggestion.replacementStartOffset,
                 replacementEndOffset = suggestion.replacementEndOffset,
             )
         }
-
-        private fun TerminalCompletionCandidateKind.tokenPosition(): TerminalCompletionTokenPosition =
-            when (this) {
-                TerminalCompletionCandidateKind.COMMAND -> TerminalCompletionTokenPosition.COMMAND
-                TerminalCompletionCandidateKind.SUBCOMMAND -> TerminalCompletionTokenPosition.SUBCOMMAND
-                TerminalCompletionCandidateKind.OPTION -> TerminalCompletionTokenPosition.OPTION
-                TerminalCompletionCandidateKind.ARGUMENT,
-                TerminalCompletionCandidateKind.PATH,
-                -> TerminalCompletionTokenPosition.ARGUMENT
-                TerminalCompletionCandidateKind.HISTORY -> TerminalCompletionTokenPosition.UNKNOWN
-            }
 
         private fun commandLineAfterSuggestion(feedback: SwingShellSuggestionFeedback): String? {
             val request = feedback.request
