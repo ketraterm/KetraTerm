@@ -34,7 +34,7 @@ internal class SpecCompletionSource(
                 completeCommandBody(context)
             }
         return candidates
-            .sortedWith(CANDIDATE_ORDER)
+            .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
             .take(request.maxCandidates)
     }
 
@@ -165,10 +165,6 @@ internal class SpecCompletionSource(
         private const val COMMAND_BASE_SCORE = 300
         private const val SUBCOMMAND_BASE_SCORE = 250
         private const val OPTION_BASE_SCORE = 220
-
-        private val CANDIDATE_ORDER =
-            compareByDescending<TerminalCompletionCandidate> { it.score }
-                .thenBy { it.displayText }
 
         private fun findSpec(
             specs: List<TerminalCommandSpec>,

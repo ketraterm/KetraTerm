@@ -193,28 +193,8 @@ class TerminalConfigTest {
     }
 
     @Test
-    fun `test TerminalWorkspaceConfigManager reads legacy persistent command history key`() {
-        val tempDir = Files.createTempDirectory("ketraterm-config-test-legacy-suggestion-learning")
-        val configFile = tempDir.resolve("config.toml")
-        val manager = TerminalWorkspaceConfigManager(configFile)
-
-        Files.writeString(
-            configFile,
-            """
-            [behavior]
-            persistent_command_history_enabled = true
-            """.trimIndent(),
-        )
-
-        assertTrue(manager.load().persistentSuggestionLearningEnabled)
-
-        Files.deleteIfExists(configFile)
-        Files.deleteIfExists(tempDir)
-    }
-
-    @Test
-    fun `test TerminalWorkspaceConfigManager prefers new suggestion learning key over legacy key`() {
-        val tempDir = Files.createTempDirectory("ketraterm-config-test-new-suggestion-learning")
+    fun `test TerminalWorkspaceConfigManager ignores obsolete command history key`() {
+        val tempDir = Files.createTempDirectory("ketraterm-config-test-obsolete-command-history")
         val configFile = tempDir.resolve("config.toml")
         val manager = TerminalWorkspaceConfigManager(configFile)
 
@@ -228,17 +208,6 @@ class TerminalConfigTest {
         )
 
         assertFalse(manager.load().persistentSuggestionLearningEnabled)
-
-        Files.writeString(
-            configFile,
-            """
-            [behavior]
-            persistent_command_history_enabled = false
-            persistent_suggestion_learning_enabled = true
-            """.trimIndent(),
-        )
-
-        assertTrue(manager.load().persistentSuggestionLearningEnabled)
 
         Files.deleteIfExists(configFile)
         Files.deleteIfExists(tempDir)

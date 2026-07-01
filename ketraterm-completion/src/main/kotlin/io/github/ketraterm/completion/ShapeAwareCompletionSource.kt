@@ -62,7 +62,7 @@ class ShapeAwareCompletionSource(
             adjusted += candidate.copy(score = candidate.score + adjustment)
         }
         return adjusted
-            .sortedWith(CANDIDATE_ORDER)
+            .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
             .take(request.maxCandidates)
     }
 
@@ -162,10 +162,5 @@ class ShapeAwareCompletionSource(
         private const val MAX_COUNTER_SCORE_UNITS = 25
         private const val MIN_SCORE_ADJUSTMENT = -180
         private const val MAX_SCORE_ADJUSTMENT = 180
-
-        private val CANDIDATE_ORDER =
-            compareByDescending<TerminalCompletionCandidate> { it.score }
-                .thenBy { it.displayText }
-                .thenBy { it.replacementText }
     }
 }

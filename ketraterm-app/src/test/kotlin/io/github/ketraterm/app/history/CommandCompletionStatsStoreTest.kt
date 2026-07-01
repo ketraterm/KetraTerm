@@ -75,12 +75,12 @@ class CommandCompletionStatsStoreTest {
             )
 
         CommandCompletionStatsStore(path).use { store ->
-            store.persist(TerminalCommandCompletionStatsSnapshot(emptyList(), listOf(shapeRecord)))
+            store.persist(TerminalCommandCompletionStatsSnapshot(shapeStats = listOf(shapeRecord)))
             store.flush()
         }
 
         CommandCompletionStatsStore(path).use { reloaded ->
-            assertEquals(TerminalCommandCompletionStatsSnapshot(emptyList(), listOf(shapeRecord)), reloaded.loadSnapshot())
+            assertEquals(TerminalCommandCompletionStatsSnapshot(shapeStats = listOf(shapeRecord)), reloaded.loadSnapshot())
         }
         val persisted = Files.readString(path)
         assertEquals(false, persisted.contains("secret-branch"))
@@ -156,12 +156,12 @@ class CommandCompletionStatsStoreTest {
             )
 
         CommandCompletionStatsStore(path).use { store ->
-            store.persist(TerminalCommandCompletionStatsSnapshot(emptyList(), listOf(safe, sensitive)))
+            store.persist(TerminalCommandCompletionStatsSnapshot(shapeStats = listOf(safe, sensitive)))
             store.flush()
         }
 
         CommandCompletionStatsStore(path).use { reloaded ->
-            assertEquals(TerminalCommandCompletionStatsSnapshot(emptyList(), listOf(safe)), reloaded.loadSnapshot())
+            assertEquals(TerminalCommandCompletionStatsSnapshot(shapeStats = listOf(safe)), reloaded.loadSnapshot())
         }
     }
 
@@ -179,6 +179,45 @@ class CommandCompletionStatsStoreTest {
 
         CommandCompletionStatsStore(path).use { reloaded ->
             assertEquals(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(record)), reloaded.loadSnapshot())
+        }
+    }
+
+    @Test
+    fun `loads version two command and shape files without feedback stats`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("completion-stats.tsv")
+        val commandRecord = stats(commandLine = "git status", normalizedCommandLine = "git status")
+        val shapeRecord =
+            TerminalCommandShapeStats(
+                shape = TerminalCommandLineShape.fromCommandLine("git log --stat main")!!,
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo",
+                useCount = 3,
+                successCount = 2,
+                failureCount = 1,
+                acceptedCount = 1,
+                dismissedCount = 1,
+                lastUsedEpochMillis = 200,
+            )
+        Files.writeString(
+            path,
+            "KetraTerm_COMMAND_COMPLETION_STATS\t2\n" +
+                versionTwoCommandLine(commandRecord) +
+                "\n" +
+                versionTwoShapeLine(shapeRecord) +
+                "\n",
+            StandardCharsets.UTF_8,
+        )
+
+        CommandCompletionStatsStore(path).use { reloaded ->
+            assertEquals(
+                TerminalCommandCompletionStatsSnapshot(
+                    commandStats = listOf(commandRecord),
+                    shapeStats = listOf(shapeRecord),
+                ),
+                reloaded.loadSnapshot(),
+            )
         }
     }
 
@@ -202,6 +241,38 @@ class CommandCompletionStatsStoreTest {
 
         CommandCompletionStatsStore(path).use { reloaded ->
             assertEquals(listOf(valid), reloaded.load())
+        }
+    }
+
+    @Test
+    fun `ignores malformed feedback rows independently`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("completion-stats.tsv")
+        val feedbackRecord =
+            TerminalCompletionFeedbackStats(
+                source = "spec",
+                candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
+                tokenPosition = TerminalCompletionTokenPosition.SUBCOMMAND,
+                replacementStartOffset = 4,
+                replacementEndOffset = 10,
+                acceptedCount = 1,
+                lastUsedEpochMillis = 100,
+            )
+
+        CommandCompletionStatsStore(path).use { store ->
+            store.persist(TerminalCommandCompletionStatsSnapshot(feedbackStats = listOf(feedbackRecord)))
+            store.flush()
+        }
+        Files.writeString(
+            path,
+            Files.readString(path) +
+                malformedFeedbackLine() +
+                "\n",
+        )
+
+        CommandCompletionStatsStore(path).use { reloaded ->
+            assertEquals(TerminalCommandCompletionStatsSnapshot(feedbackStats = listOf(feedbackRecord)), reloaded.loadSnapshot())
         }
     }
 
@@ -278,6 +349,44 @@ class CommandCompletionStatsStoreTest {
             record.dismissedCount.toString(),
             record.lastUsedEpochMillis.toString(),
         ).joinToString("\t")
+
+    private fun versionTwoCommandLine(record: TerminalCommandCompletionStats): String = "C\t${legacyLine(record)}"
+
+    private fun versionTwoShapeLine(record: TerminalCommandShapeStats): String =
+        listOf(
+            "S",
+            encodeText(record.shape.executable),
+            encodeTextList(record.shape.subcommands),
+            encodeTextList(record.shape.optionNames),
+            record.shape.positionalArgumentCount.toString(),
+            record.shape.optionValueCount.toString(),
+            encodeText(record.shape.normalizedShapeKey),
+            encodeText(record.profileId.orEmpty()),
+            encodeText(record.workingDirectoryUri.orEmpty()),
+            record.useCount.toString(),
+            record.successCount.toString(),
+            record.failureCount.toString(),
+            record.acceptedCount.toString(),
+            record.dismissedCount.toString(),
+            record.lastUsedEpochMillis.toString(),
+        ).joinToString("\t")
+
+    private fun malformedFeedbackLine(): String =
+        listOf(
+            "F",
+            encodeText("spec"),
+            "NOT_A_KIND",
+            TerminalCompletionTokenPosition.SUBCOMMAND.name,
+            "4",
+            "10",
+            "",
+            "",
+            "1",
+            "0",
+            "100",
+        ).joinToString("\t")
+
+    private fun encodeTextList(values: List<String>): String = values.joinToString(",") { encodeText(it) }
 
     private fun encodeText(value: String): String =
         Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray(StandardCharsets.UTF_8))

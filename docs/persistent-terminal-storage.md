@@ -40,13 +40,15 @@ file to `config.toml.broken`, then writes clean defaults so the app can start.
 ### `command-completion-stats-v1.tsv`
 
 An opt-in, compact suggestion-learning index. This is not raw shell history.
-The file stores aggregate exact-command counters and privacy-preserving command
-shape counters used by the completion engine:
+The file stores aggregate exact-command counters, privacy-preserving command
+shape counters, and source-specific suggestion feedback counters used by the
+completion engine:
 
 ```tsv
-KetraTerm_COMMAND_COMPLETION_STATS	2
+KetraTerm_COMMAND_COMPLETION_STATS	3
 C	<commandBase64>	<normalizedBase64>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
 S	<executableBase64>	<subcommandsBase64List>	<optionNamesBase64List>	<positionalArgumentCount>	<optionValueCount>	<shapeKeyBase64>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
+F	<sourceBase64>	<candidateKind>	<tokenPosition>	<replacementStartOffset>	<replacementEndOffset>	<profileBase64>	<cwdBase64>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
 ```
 
 Text fields are Base64URL-encoded without padding so tabs and Unicode text do
@@ -57,9 +59,7 @@ committed through atomic replacement when the filesystem supports it.
 
 Persistent suggestion learning is disabled by default. It can be enabled with
 `persistent_suggestion_learning_enabled = true` under `[behavior]` in
-`config.toml`. KetraTerm still reads the legacy
-`persistent_command_history_enabled` key for compatibility, but saves only the
-new suggestion-learning key and no longer stores a raw command-history file.
+`config.toml`. KetraTerm does not store a raw command-history file.
 
 Before any exact command or shape row is recorded or persisted, the standalone
 host applies `CommandPersistencePrivacyPolicy`:

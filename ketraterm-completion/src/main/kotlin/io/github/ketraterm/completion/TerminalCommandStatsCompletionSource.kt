@@ -15,225 +15,6 @@
  */
 package io.github.ketraterm.completion
 
-private fun String.hasLineBreak(): Boolean = indexOf('\n') >= 0 || indexOf('\r') >= 0
-
-/**
- * User feedback category recorded for a command completion candidate.
- */
-enum class TerminalCompletionFeedbackKind {
-    /**
-     * The user accepted a suggestion and asked the host to apply it.
-     */
-    ACCEPTED,
-
-    /**
-     * The user explicitly dismissed a suggestion without applying it.
-     */
-    DISMISSED,
-}
-
-/**
- * Position of a completion candidate within the command line that produced it.
- */
-enum class TerminalCompletionTokenPosition {
-    /**
-     * Candidate replaces or completes the executable token.
-     */
-    COMMAND,
-
-    /**
-     * Candidate replaces or completes a command-specific subcommand token.
-     */
-    SUBCOMMAND,
-
-    /**
-     * Candidate replaces or completes an option or flag token.
-     */
-    OPTION,
-
-    /**
-     * Candidate replaces or completes a positional argument or option value.
-     */
-    ARGUMENT,
-
-    /**
-     * Candidate position could not be classified safely.
-     */
-    UNKNOWN,
-
-    ;
-
-    companion object {
-        /**
-         * Maps a candidate kind to its default command-line token position.
-         *
-         * Hosts may override the position when they have richer parser context,
-         * but this mapping is the shared fallback used by generic completion
-         * sources and host adapters.
-         *
-         * @param candidateKind semantic candidate kind.
-         * @return default token position for [candidateKind].
-         */
-        @JvmStatic
-        fun fromCandidateKind(candidateKind: TerminalCompletionCandidateKind): TerminalCompletionTokenPosition =
-            when (candidateKind) {
-                TerminalCompletionCandidateKind.COMMAND -> COMMAND
-                TerminalCompletionCandidateKind.SUBCOMMAND -> SUBCOMMAND
-                TerminalCompletionCandidateKind.OPTION -> OPTION
-                TerminalCompletionCandidateKind.ARGUMENT,
-                TerminalCompletionCandidateKind.PATH,
-                -> ARGUMENT
-                TerminalCompletionCandidateKind.HISTORY -> UNKNOWN
-            }
-    }
-}
-
-/**
- * Source-specific context attached to suggestion feedback.
- *
- * This model deliberately stores provider and replacement metadata, not raw
- * private argument values. Hosts should create it from the candidate that was
- * actually displayed to the user so ranking can later distinguish feedback for
- * history, static specs, path completion, and IDE context providers.
- *
- * @property source compact provider/source label from the candidate.
- * @property candidateKind semantic kind of candidate that received feedback.
- * @property tokenPosition classified command-line position of the candidate.
- * @property replacementStartOffset inclusive UTF-16 replacement start offset.
- * @property replacementEndOffset exclusive UTF-16 replacement end offset.
- */
-data class TerminalCompletionFeedbackContext
-    @JvmOverloads
-    constructor(
-        val source: String,
-        val candidateKind: TerminalCompletionCandidateKind,
-        val tokenPosition: TerminalCompletionTokenPosition = TerminalCompletionTokenPosition.UNKNOWN,
-        val replacementStartOffset: Int = -1,
-        val replacementEndOffset: Int = -1,
-    ) {
-        init {
-            require(source.isNotBlank()) { "source must not be blank" }
-            require(
-                (replacementStartOffset == -1 && replacementEndOffset == -1) ||
-                    (replacementStartOffset >= 0 && replacementEndOffset >= replacementStartOffset),
-            ) {
-                "replacement range must be unset or satisfy 0 <= start <= end, was " +
-                    "$replacementStartOffset..$replacementEndOffset"
-            }
-        }
-    }
-
-/**
- * Aggregated source-specific feedback counters.
- *
- * Rows are keyed by provider source, candidate kind, token position, replacement
- * range, profile, and working directory. They do not contain command text or
- * raw argument values.
- *
- * @property source compact provider/source label from the displayed candidate.
- * @property candidateKind semantic kind of candidate that received feedback.
- * @property tokenPosition classified command-line position of the candidate.
- * @property replacementStartOffset inclusive UTF-16 replacement start offset,
- * or `-1` when unknown.
- * @property replacementEndOffset exclusive UTF-16 replacement end offset, or
- * `-1` when unknown.
- * @property profileId optional host profile id associated with this row.
- * @property workingDirectoryUri optional working directory URI associated with
- * this row.
- * @property acceptedCount number of accepted suggestions for this context.
- * @property dismissedCount number of explicitly dismissed suggestions for this context.
- * @property lastUsedEpochMillis host timestamp for the newest represented event.
- */
-data class TerminalCompletionFeedbackStats
-    @JvmOverloads
-    constructor(
-        val source: String,
-        val candidateKind: TerminalCompletionCandidateKind,
-        val tokenPosition: TerminalCompletionTokenPosition = TerminalCompletionTokenPosition.UNKNOWN,
-        val replacementStartOffset: Int = -1,
-        val replacementEndOffset: Int = -1,
-        val profileId: String? = null,
-        val workingDirectoryUri: String? = null,
-        val acceptedCount: Int = 0,
-        val dismissedCount: Int = 0,
-        val lastUsedEpochMillis: Long = 0L,
-    ) {
-        init {
-            require(source.isNotBlank()) { "source must not be blank" }
-            require(
-                (replacementStartOffset == -1 && replacementEndOffset == -1) ||
-                    (replacementStartOffset >= 0 && replacementEndOffset >= replacementStartOffset),
-            ) {
-                "replacement range must be unset or satisfy 0 <= start <= end, was " +
-                    "$replacementStartOffset..$replacementEndOffset"
-            }
-            require(acceptedCount >= 0) { "acceptedCount must be >= 0, was $acceptedCount" }
-            require(dismissedCount >= 0) { "dismissedCount must be >= 0, was $dismissedCount" }
-            require(lastUsedEpochMillis >= 0L) { "lastUsedEpochMillis must be >= 0, was $lastUsedEpochMillis" }
-        }
-    }
-
-/**
- * Aggregated command statistics used by indexed history completion.
- *
- * The model stores compact counters instead of raw repeated history rows.
- * Hosts own persistence and import/export these values into
- * [TerminalCommandStatsCompletionSource]; this shared model performs no I/O.
- *
- * @property commandLine canonical command text shown to the user.
- * @property normalizedCommandLine normalized command key used for prefix
- * matching and deduplication.
- * @property profileId optional host profile id associated with the stats row.
- * @property workingDirectoryUri optional working directory URI associated with
- * the stats row.
- * @property useCount number of observed command executions.
- * @property successCount number of executions that completed successfully.
- * @property failureCount number of executions that completed unsuccessfully.
- * @property acceptedCount number of times this command was accepted from a
- * suggestion popup.
- * @property dismissedCount number of times this command was explicitly
- * dismissed from a suggestion popup.
- * @property lastUsedEpochMillis host wall-clock timestamp for the newest
- * execution or feedback event represented by this row.
- */
-data class TerminalCommandCompletionStats
-    @JvmOverloads
-    constructor(
-        val commandLine: String,
-        val normalizedCommandLine: String = normalizeCommandLine(commandLine),
-        val profileId: String? = null,
-        val workingDirectoryUri: String? = null,
-        val useCount: Int = 0,
-        val successCount: Int = 0,
-        val failureCount: Int = 0,
-        val acceptedCount: Int = 0,
-        val dismissedCount: Int = 0,
-        val lastUsedEpochMillis: Long = 0L,
-    ) {
-        init {
-            require(commandLine.isNotBlank()) { "commandLine must not be blank" }
-            require(!commandLine.hasLineBreak()) { "commandLine must not contain line breaks" }
-            require(normalizedCommandLine.isNotBlank()) { "normalizedCommandLine must not be blank" }
-            require(useCount >= 0) { "useCount must be >= 0, was $useCount" }
-            require(successCount >= 0) { "successCount must be >= 0, was $successCount" }
-            require(failureCount >= 0) { "failureCount must be >= 0, was $failureCount" }
-            require(acceptedCount >= 0) { "acceptedCount must be >= 0, was $acceptedCount" }
-            require(dismissedCount >= 0) { "dismissedCount must be >= 0, was $dismissedCount" }
-            require(lastUsedEpochMillis >= 0L) { "lastUsedEpochMillis must be >= 0, was $lastUsedEpochMillis" }
-        }
-
-        companion object {
-            /**
-             * Normalizes command text for case-insensitive prefix matching.
-             *
-             * @param commandLine command text to normalize.
-             * @return trimmed lowercase key.
-             */
-            @JvmStatic
-            fun normalizeCommandLine(commandLine: String): String = commandLine.trim().lowercase()
-        }
-    }
-
 /**
  * Bounded in-memory completion source backed by aggregated command statistics.
  *
@@ -282,7 +63,7 @@ class TerminalCommandStatsCompletionSource
                     compacted += record
                 }
             }
-            compacted.sortWith(RECORD_ORDER)
+            compacted.sortWith(TERMINAL_COMMAND_COMPLETION_STATS_ORDER)
             synchronized(lock) {
                 entries.clear()
                 entries.addAll(compacted.take(capacity))
@@ -309,7 +90,7 @@ class TerminalCommandStatsCompletionSource
                     compacted += record
                 }
             }
-            compacted.sortWith(SHAPE_RECORD_ORDER)
+            compacted.sortWith(TERMINAL_COMMAND_SHAPE_STATS_ORDER)
             synchronized(lock) {
                 shapeEntries.clear()
                 shapeEntries.addAll(compacted.take(capacity))
@@ -336,7 +117,7 @@ class TerminalCommandStatsCompletionSource
                     compacted += record
                 }
             }
-            compacted.sortWith(FEEDBACK_RECORD_ORDER)
+            compacted.sortWith(TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER)
             synchronized(lock) {
                 feedbackEntries.clear()
                 feedbackEntries.addAll(compacted.take(capacity))
@@ -406,21 +187,41 @@ class TerminalCommandStatsCompletionSource
             workingDirectoryUri: String?,
             usedAtEpochMillis: Long,
         ) {
-            if (!isRecordableCommand(commandLine) || usedAtEpochMillis < 0L) return
+            if (!isRecordableTerminalCompletionCommand(commandLine) || usedAtEpochMillis < 0L) return
             mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
                 previous.copy(
                     commandLine = canonical,
-                    useCount = saturatedIncrement(previous.useCount),
-                    successCount = if (successful) saturatedIncrement(previous.successCount) else previous.successCount,
-                    failureCount = if (successful) previous.failureCount else saturatedIncrement(previous.failureCount),
+                    useCount = saturatedCompletionCounterIncrement(previous.useCount),
+                    successCount =
+                        if (successful) {
+                            saturatedCompletionCounterIncrement(previous.successCount)
+                        } else {
+                            previous.successCount
+                        },
+                    failureCount =
+                        if (successful) {
+                            previous.failureCount
+                        } else {
+                            saturatedCompletionCounterIncrement(previous.failureCount)
+                        },
                     lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, usedAtEpochMillis),
                 )
             }
             mutateShape(commandLine, profileId, workingDirectoryUri) { previous ->
                 previous.copy(
-                    useCount = saturatedIncrement(previous.useCount),
-                    successCount = if (successful) saturatedIncrement(previous.successCount) else previous.successCount,
-                    failureCount = if (successful) previous.failureCount else saturatedIncrement(previous.failureCount),
+                    useCount = saturatedCompletionCounterIncrement(previous.useCount),
+                    successCount =
+                        if (successful) {
+                            saturatedCompletionCounterIncrement(previous.successCount)
+                        } else {
+                            previous.successCount
+                        },
+                    failureCount =
+                        if (successful) {
+                            previous.failureCount
+                        } else {
+                            saturatedCompletionCounterIncrement(previous.failureCount)
+                        },
                     lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, usedAtEpochMillis),
                 )
             }
@@ -445,19 +246,19 @@ class TerminalCommandStatsCompletionSource
             feedbackAtEpochMillis: Long,
             context: TerminalCompletionFeedbackContext? = null,
         ) {
-            if (!isRecordableCommand(commandLine) || feedbackAtEpochMillis < 0L) return
+            if (!isRecordableTerminalCompletionCommand(commandLine) || feedbackAtEpochMillis < 0L) return
             mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
                 previous.copy(
                     commandLine = canonical,
                     acceptedCount =
                         if (feedback == TerminalCompletionFeedbackKind.ACCEPTED) {
-                            saturatedIncrement(previous.acceptedCount)
+                            saturatedCompletionCounterIncrement(previous.acceptedCount)
                         } else {
                             previous.acceptedCount
                         },
                     dismissedCount =
                         if (feedback == TerminalCompletionFeedbackKind.DISMISSED) {
-                            saturatedIncrement(previous.dismissedCount)
+                            saturatedCompletionCounterIncrement(previous.dismissedCount)
                         } else {
                             previous.dismissedCount
                         },
@@ -468,13 +269,13 @@ class TerminalCommandStatsCompletionSource
                 previous.copy(
                     acceptedCount =
                         if (feedback == TerminalCompletionFeedbackKind.ACCEPTED) {
-                            saturatedIncrement(previous.acceptedCount)
+                            saturatedCompletionCounterIncrement(previous.acceptedCount)
                         } else {
                             previous.acceptedCount
                         },
                     dismissedCount =
                         if (feedback == TerminalCompletionFeedbackKind.DISMISSED) {
-                            saturatedIncrement(previous.dismissedCount)
+                            saturatedCompletionCounterIncrement(previous.dismissedCount)
                         } else {
                             previous.dismissedCount
                         },
@@ -486,13 +287,13 @@ class TerminalCommandStatsCompletionSource
                     previous.copy(
                         acceptedCount =
                             if (feedback == TerminalCompletionFeedbackKind.ACCEPTED) {
-                                saturatedIncrement(previous.acceptedCount)
+                                saturatedCompletionCounterIncrement(previous.acceptedCount)
                             } else {
                                 previous.acceptedCount
                             },
                         dismissedCount =
                             if (feedback == TerminalCompletionFeedbackKind.DISMISSED) {
-                                saturatedIncrement(previous.dismissedCount)
+                                saturatedCompletionCounterIncrement(previous.dismissedCount)
                             } else {
                                 previous.dismissedCount
                             },
@@ -516,7 +317,7 @@ class TerminalCommandStatsCompletionSource
                 candidates += entry.toCandidate(request)
             }
             return candidates
-                .sortedWith(CANDIDATE_ORDER)
+                .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
                 .take(request.maxCandidates)
         }
 
@@ -533,7 +334,7 @@ class TerminalCommandStatsCompletionSource
                 if (existingIndex >= 0) {
                     entries[existingIndex] = update(entries[existingIndex], canonical)
                 } else {
-                    if (entries.size == capacity) removeLeastRelevantLocked()
+                    if (entries.size == capacity) entries.removeLeastRelevantBy(TERMINAL_COMMAND_COMPLETION_STATS_ORDER)
                     val initial =
                         TerminalCommandCompletionStats(
                             commandLine = canonical,
@@ -543,7 +344,7 @@ class TerminalCommandStatsCompletionSource
                         )
                     entries += update(initial, canonical)
                 }
-                entries.sortWith(RECORD_ORDER)
+                entries.sortWith(TERMINAL_COMMAND_COMPLETION_STATS_ORDER)
             }
         }
 
@@ -559,7 +360,7 @@ class TerminalCommandStatsCompletionSource
                 if (existingIndex >= 0) {
                     shapeEntries[existingIndex] = update(shapeEntries[existingIndex])
                 } else {
-                    if (shapeEntries.size == capacity) removeLeastRelevantShapeLocked()
+                    if (shapeEntries.size == capacity) shapeEntries.removeLeastRelevantBy(TERMINAL_COMMAND_SHAPE_STATS_ORDER)
                     val initial =
                         TerminalCommandShapeStats(
                             shape = shape,
@@ -568,7 +369,7 @@ class TerminalCommandStatsCompletionSource
                         )
                     shapeEntries += update(initial)
                 }
-                shapeEntries.sortWith(SHAPE_RECORD_ORDER)
+                shapeEntries.sortWith(TERMINAL_COMMAND_SHAPE_STATS_ORDER)
             }
         }
 
@@ -583,7 +384,9 @@ class TerminalCommandStatsCompletionSource
                 if (existingIndex >= 0) {
                     feedbackEntries[existingIndex] = update(feedbackEntries[existingIndex])
                 } else {
-                    if (feedbackEntries.size == capacity) removeLeastRelevantFeedbackLocked()
+                    if (feedbackEntries.size == capacity) {
+                        feedbackEntries.removeLeastRelevantBy(TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER)
+                    }
                     val initial =
                         TerminalCompletionFeedbackStats(
                             source = context.source,
@@ -596,7 +399,7 @@ class TerminalCommandStatsCompletionSource
                         )
                     feedbackEntries += update(initial)
                 }
-                feedbackEntries.sortWith(FEEDBACK_RECORD_ORDER)
+                feedbackEntries.sortWith(TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER)
             }
         }
 
@@ -626,41 +429,6 @@ class TerminalCommandStatsCompletionSource
                 score += WORKING_DIRECTORY_MATCH_SCORE
             }
             return score
-        }
-
-        private fun removeLeastRelevantLocked() {
-            if (entries.isEmpty()) return
-            var removeIndex = 0
-            var index = 1
-            while (index < entries.size) {
-                if (RECORD_ORDER.compare(entries[index], entries[removeIndex]) > 0) removeIndex = index
-                index++
-            }
-            entries.removeAt(removeIndex)
-        }
-
-        private fun removeLeastRelevantShapeLocked() {
-            if (shapeEntries.isEmpty()) return
-            var removeIndex = 0
-            var index = 1
-            while (index < shapeEntries.size) {
-                if (SHAPE_RECORD_ORDER.compare(shapeEntries[index], shapeEntries[removeIndex]) > 0) removeIndex = index
-                index++
-            }
-            shapeEntries.removeAt(removeIndex)
-        }
-
-        private fun removeLeastRelevantFeedbackLocked() {
-            if (feedbackEntries.isEmpty()) return
-            var removeIndex = 0
-            var index = 1
-            while (index < feedbackEntries.size) {
-                if (FEEDBACK_RECORD_ORDER.compare(feedbackEntries[index], feedbackEntries[removeIndex]) > 0) {
-                    removeIndex = index
-                }
-                index++
-            }
-            feedbackEntries.removeAt(removeIndex)
         }
 
         private fun ArrayList<TerminalCommandCompletionStats>.indexOfKey(record: TerminalCommandCompletionStats): Int =
@@ -779,35 +547,5 @@ class TerminalCommandStatsCompletionSource
             private const val WORKING_DIRECTORY_MATCH_SCORE = 80
             private const val RECENCY_SCORE_BUCKET_MILLIS = 60_000L
             private const val MAX_RECENCY_SCORE = 200L
-
-            private val RECORD_ORDER =
-                compareByDescending<TerminalCommandCompletionStats> { it.lastUsedEpochMillis }
-                    .thenByDescending { it.acceptedCount }
-                    .thenByDescending { it.successCount }
-                    .thenBy { it.dismissedCount }
-                    .thenBy { it.commandLine }
-
-            private val SHAPE_RECORD_ORDER =
-                compareByDescending<TerminalCommandShapeStats> { it.lastUsedEpochMillis }
-                    .thenByDescending { it.acceptedCount }
-                    .thenByDescending { it.successCount }
-                    .thenBy { it.dismissedCount }
-                    .thenBy { it.shape.normalizedShapeKey }
-
-            private val FEEDBACK_RECORD_ORDER =
-                compareByDescending<TerminalCompletionFeedbackStats> { it.lastUsedEpochMillis }
-                    .thenByDescending { it.acceptedCount }
-                    .thenBy { it.dismissedCount }
-                    .thenBy { it.source }
-                    .thenBy { it.candidateKind.name }
-                    .thenBy { it.tokenPosition.name }
-
-            private val CANDIDATE_ORDER =
-                compareByDescending<TerminalCompletionCandidate> { it.score }
-                    .thenBy { it.displayText }
-
-            private fun isRecordableCommand(commandLine: String): Boolean = commandLine.isNotBlank() && !commandLine.hasLineBreak()
-
-            private fun saturatedIncrement(value: Int): Int = if (value == Int.MAX_VALUE) value else value + 1
         }
     }

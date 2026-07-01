@@ -249,18 +249,3 @@ data class TerminalCommandShapeStats
             require(lastUsedEpochMillis >= 0L) { "lastUsedEpochMillis must be >= 0, was $lastUsedEpochMillis" }
         }
     }
-
-/**
- * Complete snapshot of exact command and structural shape statistics.
- *
- * @property commandStats exact command-line rows used for concrete suggestions.
- * @property shapeStats privacy-preserving command-shape rows used for ranking
- * analytics and future shape-aware suggestion ranking.
- * @property feedbackStats source-specific feedback rows used for future
- * provider-aware ranking.
- */
-data class TerminalCommandCompletionStatsSnapshot(
-    val commandStats: List<TerminalCommandCompletionStats> = emptyList(),
-    val shapeStats: List<TerminalCommandShapeStats> = emptyList(),
-    val feedbackStats: List<TerminalCompletionFeedbackStats> = emptyList(),
-)

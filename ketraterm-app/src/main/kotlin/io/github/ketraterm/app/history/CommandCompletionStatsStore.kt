@@ -64,18 +64,18 @@ internal class CommandCompletionStatsStore(
      * @return decoded completion stats snapshot.
      */
     fun loadSnapshot(): TerminalCommandCompletionStatsSnapshot {
-        if (!Files.isRegularFile(path)) return TerminalCommandCompletionStatsSnapshot(emptyList(), emptyList())
+        if (!Files.isRegularFile(path)) return TerminalCommandCompletionStatsSnapshot()
         return runCatching {
             val lines = Files.readAllLines(path, StandardCharsets.UTF_8)
             when (lines.firstOrNull()) {
                 COMMAND_COMPLETION_STATS_HEADER_V1 -> loadVersionOne(lines)
                 COMMAND_COMPLETION_STATS_HEADER_V2 -> loadVersionTwo(lines)
                 COMMAND_COMPLETION_STATS_HEADER_V3 -> loadVersionThree(lines)
-                else -> TerminalCommandCompletionStatsSnapshot(emptyList(), emptyList())
+                else -> TerminalCommandCompletionStatsSnapshot()
             }
         }.onFailure { exception ->
             System.err.println("Failed to load command completion stats from $path: ${exception.message}")
-        }.getOrElse { TerminalCommandCompletionStatsSnapshot(emptyList(), emptyList()) }
+        }.getOrElse { TerminalCommandCompletionStatsSnapshot() }
     }
 
     /**
@@ -84,7 +84,7 @@ internal class CommandCompletionStatsStore(
      * @param records compact exact command rows produced by the shared completion index.
      */
     fun persist(records: List<TerminalCommandCompletionStats>) {
-        persist(TerminalCommandCompletionStatsSnapshot(commandStats = records, shapeStats = emptyList()))
+        persist(TerminalCommandCompletionStatsSnapshot(commandStats = records))
     }
 
     /**
@@ -106,7 +106,7 @@ internal class CommandCompletionStatsStore(
             decodeCommandV1(lines[index])?.let(records::add)
             index++
         }
-        return sanitizeSnapshot(TerminalCommandCompletionStatsSnapshot(commandStats = records, shapeStats = emptyList()))
+        return sanitizeSnapshot(TerminalCommandCompletionStatsSnapshot(commandStats = records))
     }
 
     private fun loadVersionTwo(lines: List<String>): TerminalCommandCompletionStatsSnapshot {

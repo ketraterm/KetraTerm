@@ -59,9 +59,9 @@ class TerminalSessionMruCompletionSource
             workingDirectoryUri: String? = null,
         ) {
             val command = commandLine.trim()
-            if (command.isEmpty() || command.hasLineBreak()) return
+            if (!isRecordableTerminalCompletionCommand(command)) return
 
-            val normalized = normalize(command)
+            val normalized = TerminalCommandCompletionStats.normalizeCommandLine(command)
             synchronized(lock) {
                 val sequence = nextSequenceLocked()
                 val index = indexOfNormalizedLocked(normalized)
@@ -72,7 +72,7 @@ class TerminalSessionMruCompletionSource
                             commandLine = command,
                             profileId = profileId,
                             workingDirectoryUri = workingDirectoryUri,
-                            useCount = saturatedIncrement(entry.useCount),
+                            useCount = saturatedCompletionCounterIncrement(entry.useCount),
                             lastUsedSequence = sequence,
                         )
                 } else {
@@ -101,7 +101,7 @@ class TerminalSessionMruCompletionSource
 
         override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
             val prefix = request.commandLine.substring(0, request.cursorOffset).trimStart()
-            val normalizedPrefix = normalize(prefix)
+            val normalizedPrefix = TerminalCommandCompletionStats.normalizeCommandLine(prefix)
             val snapshot =
                 synchronized(lock) {
                     entries.toList()
@@ -115,7 +115,7 @@ class TerminalSessionMruCompletionSource
                 candidates += entry.toCandidate(request)
             }
             return candidates
-                .sortedWith(CANDIDATE_ORDER)
+                .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
                 .take(request.maxCandidates)
         }
 
@@ -189,15 +189,5 @@ class TerminalSessionMruCompletionSource
             private const val MAX_RECENCY_SCORE = 100L
             private const val PROFILE_MATCH_SCORE = 60
             private const val WORKING_DIRECTORY_MATCH_SCORE = 90
-
-            private val CANDIDATE_ORDER =
-                compareByDescending<TerminalCompletionCandidate> { it.score }
-                    .thenBy { it.displayText }
-
-            private fun saturatedIncrement(value: Int): Int = if (value == Int.MAX_VALUE) value else value + 1
-
-            private fun normalize(commandLine: String): String = commandLine.trim().lowercase()
-
-            private fun String.hasLineBreak(): Boolean = indexOf('\n') >= 0 || indexOf('\r') >= 0
         }
     }

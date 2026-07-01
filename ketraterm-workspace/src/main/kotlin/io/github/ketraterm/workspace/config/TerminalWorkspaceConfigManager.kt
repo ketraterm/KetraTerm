@@ -25,7 +25,6 @@ import java.nio.file.StandardCopyOption
 import java.util.*
 
 private const val PERSISTENT_SUGGESTION_LEARNING_KEY = "persistent_suggestion_learning_enabled"
-private const val LEGACY_PERSISTENT_COMMAND_HISTORY_KEY = "persistent_command_history_enabled"
 
 /**
  * Manages loading and saving the [TerminalConfig] TOML file.
@@ -131,7 +130,6 @@ class TerminalWorkspaceConfigManager(
                 behavior["shell_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.shellSuggestionsEnabled
             val persistentSuggestionLearningEnabled =
                 behavior[PERSISTENT_SUGGESTION_LEARNING_KEY]?.toBooleanStrictOrNull()
-                    ?: behavior[LEGACY_PERSISTENT_COMMAND_HISTORY_KEY]?.toBooleanStrictOrNull()
                     ?: default.persistentSuggestionLearningEnabled
             val scrollbackLines =
                 parseIntSetting(

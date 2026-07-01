@@ -48,7 +48,7 @@ class FeedbackAwareCompletionSource(
             adjusted += candidate.copy(score = candidate.score + feedbackStats.adjustmentFor(candidate, request))
         }
         return adjusted
-            .sortedWith(CANDIDATE_ORDER)
+            .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
             .take(request.maxCandidates)
     }
 
@@ -121,10 +121,5 @@ class FeedbackAwareCompletionSource(
         private const val MAX_COUNTER_SCORE_UNITS = 12
         private const val MIN_SCORE_ADJUSTMENT = -160
         private const val MAX_SCORE_ADJUSTMENT = 160
-
-        private val CANDIDATE_ORDER =
-            compareByDescending<TerminalCompletionCandidate> { it.score }
-                .thenBy { it.displayText }
-                .thenBy { it.replacementText }
     }
 }

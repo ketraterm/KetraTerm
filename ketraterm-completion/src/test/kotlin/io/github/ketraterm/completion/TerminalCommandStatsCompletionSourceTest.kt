@@ -364,6 +364,42 @@ class TerminalCommandStatsCompletionSourceTest {
         assertEquals(listOf("spec", "stats"), source.feedbackSnapshot().map { it.source })
     }
 
+    @Test
+    fun `recorded counters saturate at integer maximum`() {
+        val source = TerminalCommandStatsCompletionSource()
+        source.replaceAll(
+            listOf(
+                TerminalCommandCompletionStats(
+                    commandLine = "git status",
+                    useCount = Int.MAX_VALUE,
+                    successCount = Int.MAX_VALUE,
+                    acceptedCount = Int.MAX_VALUE,
+                    lastUsedEpochMillis = 10,
+                ),
+            ),
+        )
+
+        source.recordCommandResult(
+            commandLine = "git status",
+            successful = true,
+            profileId = null,
+            workingDirectoryUri = null,
+            usedAtEpochMillis = 20,
+        )
+        source.recordSuggestionFeedback(
+            commandLine = "git status",
+            feedback = TerminalCompletionFeedbackKind.ACCEPTED,
+            profileId = null,
+            workingDirectoryUri = null,
+            feedbackAtEpochMillis = 30,
+        )
+
+        val stats = source.snapshot().single()
+        assertEquals(Int.MAX_VALUE, stats.useCount)
+        assertEquals(Int.MAX_VALUE, stats.successCount)
+        assertEquals(Int.MAX_VALUE, stats.acceptedCount)
+    }
+
     private fun request(
         commandLine: String,
         profileId: String? = null,
