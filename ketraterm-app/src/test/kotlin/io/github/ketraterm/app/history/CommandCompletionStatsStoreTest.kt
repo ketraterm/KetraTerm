@@ -87,7 +87,7 @@ class CommandCompletionStatsStoreTest {
     }
 
     @Test
-    fun `persists source-specific feedback stats as version three rows`(
+    fun `persists source-specific feedback stats as current format rows`(
         @TempDir directory: Path,
     ) {
         val path = directory.resolve("completion-stats.tsv")
@@ -113,7 +113,7 @@ class CommandCompletionStatsStoreTest {
         CommandCompletionStatsStore(path).use { reloaded ->
             assertEquals(TerminalCommandCompletionStatsSnapshot(feedbackStats = listOf(feedbackRecord)), reloaded.loadSnapshot())
         }
-        assertEquals(true, Files.readString(path).startsWith("KetraTerm_COMMAND_COMPLETION_STATS\t3"))
+        assertEquals(true, Files.readString(path).startsWith("KetraTerm_COMMAND_COMPLETION_STATS\t1"))
     }
 
     @Test
@@ -162,62 +162,6 @@ class CommandCompletionStatsStoreTest {
 
         CommandCompletionStatsStore(path).use { reloaded ->
             assertEquals(TerminalCommandCompletionStatsSnapshot(shapeStats = listOf(safe)), reloaded.loadSnapshot())
-        }
-    }
-
-    @Test
-    fun `loads version one exact command files without shape stats`(
-        @TempDir directory: Path,
-    ) {
-        val path = directory.resolve("completion-stats.tsv")
-        val record = stats(commandLine = "git status", normalizedCommandLine = "git status")
-        Files.writeString(
-            path,
-            "KetraTerm_COMMAND_COMPLETION_STATS\t1\n" + legacyLine(record) + "\n",
-            StandardCharsets.UTF_8,
-        )
-
-        CommandCompletionStatsStore(path).use { reloaded ->
-            assertEquals(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(record)), reloaded.loadSnapshot())
-        }
-    }
-
-    @Test
-    fun `loads version two command and shape files without feedback stats`(
-        @TempDir directory: Path,
-    ) {
-        val path = directory.resolve("completion-stats.tsv")
-        val commandRecord = stats(commandLine = "git status", normalizedCommandLine = "git status")
-        val shapeRecord =
-            TerminalCommandShapeStats(
-                shape = TerminalCommandLineShape.fromCommandLine("git log --stat main")!!,
-                profileId = "bash",
-                workingDirectoryUri = "file:///repo",
-                useCount = 3,
-                successCount = 2,
-                failureCount = 1,
-                acceptedCount = 1,
-                dismissedCount = 1,
-                lastUsedEpochMillis = 200,
-            )
-        Files.writeString(
-            path,
-            "KetraTerm_COMMAND_COMPLETION_STATS\t2\n" +
-                versionTwoCommandLine(commandRecord) +
-                "\n" +
-                versionTwoShapeLine(shapeRecord) +
-                "\n",
-            StandardCharsets.UTF_8,
-        )
-
-        CommandCompletionStatsStore(path).use { reloaded ->
-            assertEquals(
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats = listOf(commandRecord),
-                    shapeStats = listOf(shapeRecord),
-                ),
-                reloaded.loadSnapshot(),
-            )
         }
     }
 
@@ -336,41 +280,6 @@ class CommandCompletionStatsStoreTest {
             "100",
         ).joinToString("\t")
 
-    private fun legacyLine(record: TerminalCommandCompletionStats): String =
-        listOf(
-            encodeText(record.commandLine),
-            encodeText(record.normalizedCommandLine),
-            encodeText(record.profileId.orEmpty()),
-            encodeText(record.workingDirectoryUri.orEmpty()),
-            record.useCount.toString(),
-            record.successCount.toString(),
-            record.failureCount.toString(),
-            record.acceptedCount.toString(),
-            record.dismissedCount.toString(),
-            record.lastUsedEpochMillis.toString(),
-        ).joinToString("\t")
-
-    private fun versionTwoCommandLine(record: TerminalCommandCompletionStats): String = "C\t${legacyLine(record)}"
-
-    private fun versionTwoShapeLine(record: TerminalCommandShapeStats): String =
-        listOf(
-            "S",
-            encodeText(record.shape.executable),
-            encodeTextList(record.shape.subcommands),
-            encodeTextList(record.shape.optionNames),
-            record.shape.positionalArgumentCount.toString(),
-            record.shape.optionValueCount.toString(),
-            encodeText(record.shape.normalizedShapeKey),
-            encodeText(record.profileId.orEmpty()),
-            encodeText(record.workingDirectoryUri.orEmpty()),
-            record.useCount.toString(),
-            record.successCount.toString(),
-            record.failureCount.toString(),
-            record.acceptedCount.toString(),
-            record.dismissedCount.toString(),
-            record.lastUsedEpochMillis.toString(),
-        ).joinToString("\t")
-
     private fun malformedFeedbackLine(): String =
         listOf(
             "F",
@@ -385,8 +294,6 @@ class CommandCompletionStatsStoreTest {
             "0",
             "100",
         ).joinToString("\t")
-
-    private fun encodeTextList(values: List<String>): String = values.joinToString(",") { encodeText(it) }
 
     private fun encodeText(value: String): String =
         Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray(StandardCharsets.UTF_8))

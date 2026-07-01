@@ -55,11 +55,8 @@ internal class CommandCompletionStatsStore(
     fun load(): List<TerminalCommandCompletionStats> = loadSnapshot().commandStats
 
     /**
-     * Loads exact command and structural shape stats from disk.
-     *
-     * Version 1 files are exact-command only and are upgraded in memory by
-     * returning an empty shape list. Version 2 files contain typed exact command
-     * and shape rows. Version 3 also contains source-specific feedback rows.
+     * Loads exact command, structural shape, and source-specific feedback stats
+     * from disk.
      *
      * @return decoded completion stats snapshot.
      */
@@ -68,9 +65,7 @@ internal class CommandCompletionStatsStore(
         return runCatching {
             val lines = Files.readAllLines(path, StandardCharsets.UTF_8)
             when (lines.firstOrNull()) {
-                COMMAND_COMPLETION_STATS_HEADER_V1 -> loadVersionOne(lines)
-                COMMAND_COMPLETION_STATS_HEADER_V2 -> loadVersionTwo(lines)
-                COMMAND_COMPLETION_STATS_HEADER_V3 -> loadVersionThree(lines)
+                COMMAND_COMPLETION_STATS_HEADER -> loadCurrentVersion(lines)
                 else -> TerminalCommandCompletionStatsSnapshot()
             }
         }.onFailure { exception ->
@@ -99,32 +94,7 @@ internal class CommandCompletionStatsStore(
         }
     }
 
-    private fun loadVersionOne(lines: List<String>): TerminalCommandCompletionStatsSnapshot {
-        val records = ArrayList<TerminalCommandCompletionStats>(lines.size - 1)
-        var index = 1
-        while (index < lines.size) {
-            decodeCommandV1(lines[index])?.let(records::add)
-            index++
-        }
-        return sanitizeSnapshot(TerminalCommandCompletionStatsSnapshot(commandStats = records))
-    }
-
-    private fun loadVersionTwo(lines: List<String>): TerminalCommandCompletionStatsSnapshot {
-        val commandRecords = ArrayList<TerminalCommandCompletionStats>(lines.size - 1)
-        val shapeRecords = ArrayList<TerminalCommandShapeStats>(lines.size - 1)
-        var index = 1
-        while (index < lines.size) {
-            val fields = lines[index].split('\t')
-            when (fields.firstOrNull()) {
-                ROW_COMMAND -> decodeCommandV2(fields)?.let(commandRecords::add)
-                ROW_SHAPE -> decodeShapeV2(fields)?.let(shapeRecords::add)
-            }
-            index++
-        }
-        return sanitizeSnapshot(TerminalCommandCompletionStatsSnapshot(commandStats = commandRecords, shapeStats = shapeRecords))
-    }
-
-    private fun loadVersionThree(lines: List<String>): TerminalCommandCompletionStatsSnapshot {
+    private fun loadCurrentVersion(lines: List<String>): TerminalCommandCompletionStatsSnapshot {
         val commandRecords = ArrayList<TerminalCommandCompletionStats>(lines.size - 1)
         val shapeRecords = ArrayList<TerminalCommandShapeStats>(lines.size - 1)
         val feedbackRecords = ArrayList<TerminalCompletionFeedbackStats>(lines.size - 1)
@@ -132,9 +102,9 @@ internal class CommandCompletionStatsStore(
         while (index < lines.size) {
             val fields = lines[index].split('\t')
             when (fields.firstOrNull()) {
-                ROW_COMMAND -> decodeCommandV2(fields)?.let(commandRecords::add)
-                ROW_SHAPE -> decodeShapeV2(fields)?.let(shapeRecords::add)
-                ROW_FEEDBACK -> decodeFeedbackV3(fields)?.let(feedbackRecords::add)
+                ROW_COMMAND -> decodeCommandRow(fields)?.let(commandRecords::add)
+                ROW_SHAPE -> decodeShapeRow(fields)?.let(shapeRecords::add)
+                ROW_FEEDBACK -> decodeFeedbackRow(fields)?.let(feedbackRecords::add)
             }
             index++
         }
@@ -168,10 +138,10 @@ internal class CommandCompletionStatsStore(
             path.parent?.let(Files::createDirectories)
             val temporary = path.resolveSibling("${path.fileName}.tmp")
             Files.newBufferedWriter(temporary, StandardCharsets.UTF_8).use { writer ->
-                writer.appendLine(COMMAND_COMPLETION_STATS_HEADER_V3)
-                for (record in snapshot.commandStats) writer.appendLine(encodeCommandV2(record))
-                for (record in snapshot.shapeStats) writer.appendLine(encodeShapeV2(record))
-                for (record in snapshot.feedbackStats) writer.appendLine(encodeFeedbackV3(record))
+                writer.appendLine(COMMAND_COMPLETION_STATS_HEADER)
+                for (record in snapshot.commandStats) writer.appendLine(encodeCommandRow(record))
+                for (record in snapshot.shapeStats) writer.appendLine(encodeShapeRow(record))
+                for (record in snapshot.feedbackStats) writer.appendLine(encodeFeedbackRow(record))
             }
             try {
                 Files.move(
@@ -195,7 +165,7 @@ internal class CommandCompletionStatsStore(
             feedbackStats = snapshot.feedbackStats,
         )
 
-    private fun encodeCommandV2(record: TerminalCommandCompletionStats): String =
+    private fun encodeCommandRow(record: TerminalCommandCompletionStats): String =
         listOf(
             ROW_COMMAND,
             encodeText(record.commandLine),
@@ -210,7 +180,7 @@ internal class CommandCompletionStatsStore(
             record.lastUsedEpochMillis.toString(),
         ).joinToString("\t")
 
-    private fun encodeShapeV2(record: TerminalCommandShapeStats): String =
+    private fun encodeShapeRow(record: TerminalCommandShapeStats): String =
         listOf(
             ROW_SHAPE,
             encodeText(record.shape.executable),
@@ -229,7 +199,7 @@ internal class CommandCompletionStatsStore(
             record.lastUsedEpochMillis.toString(),
         ).joinToString("\t")
 
-    private fun encodeFeedbackV3(record: TerminalCompletionFeedbackStats): String =
+    private fun encodeFeedbackRow(record: TerminalCompletionFeedbackStats): String =
         listOf(
             ROW_FEEDBACK,
             encodeText(record.source),
@@ -244,14 +214,8 @@ internal class CommandCompletionStatsStore(
             record.lastUsedEpochMillis.toString(),
         ).joinToString("\t")
 
-    private fun decodeCommandV1(line: String): TerminalCommandCompletionStats? {
-        val fields = line.split('\t')
-        if (fields.size != COMMAND_COMPLETION_STATS_FIELD_COUNT_V1) return null
-        return decodeCommandFields(fields, offset = 0)
-    }
-
-    private fun decodeCommandV2(fields: List<String>): TerminalCommandCompletionStats? {
-        if (fields.size != COMMAND_COMPLETION_STATS_FIELD_COUNT_V2) return null
+    private fun decodeCommandRow(fields: List<String>): TerminalCommandCompletionStats? {
+        if (fields.size != COMMAND_STATS_FIELD_COUNT) return null
         return decodeCommandFields(fields, offset = 1)
     }
 
@@ -274,8 +238,8 @@ internal class CommandCompletionStatsStore(
             )
         }.getOrNull()
 
-    private fun decodeShapeV2(fields: List<String>): TerminalCommandShapeStats? {
-        if (fields.size != SHAPE_STATS_FIELD_COUNT_V2) return null
+    private fun decodeShapeRow(fields: List<String>): TerminalCommandShapeStats? {
+        if (fields.size != SHAPE_STATS_FIELD_COUNT) return null
         return runCatching {
             TerminalCommandShapeStats(
                 shape =
@@ -299,8 +263,8 @@ internal class CommandCompletionStatsStore(
         }.getOrNull()
     }
 
-    private fun decodeFeedbackV3(fields: List<String>): TerminalCompletionFeedbackStats? {
-        if (fields.size != FEEDBACK_STATS_FIELD_COUNT_V3) return null
+    private fun decodeFeedbackRow(fields: List<String>): TerminalCompletionFeedbackStats? {
+        if (fields.size != FEEDBACK_STATS_FIELD_COUNT) return null
         return runCatching {
             TerminalCompletionFeedbackStats(
                 source = decodeText(fields[1]),
@@ -331,13 +295,10 @@ internal class CommandCompletionStatsStore(
         }
 
     private companion object {
-        private const val COMMAND_COMPLETION_STATS_HEADER_V1 = "KetraTerm_COMMAND_COMPLETION_STATS\t1"
-        private const val COMMAND_COMPLETION_STATS_HEADER_V2 = "KetraTerm_COMMAND_COMPLETION_STATS\t2"
-        private const val COMMAND_COMPLETION_STATS_HEADER_V3 = "KetraTerm_COMMAND_COMPLETION_STATS\t3"
-        private const val COMMAND_COMPLETION_STATS_FIELD_COUNT_V1 = 10
-        private const val COMMAND_COMPLETION_STATS_FIELD_COUNT_V2 = 11
-        private const val SHAPE_STATS_FIELD_COUNT_V2 = 15
-        private const val FEEDBACK_STATS_FIELD_COUNT_V3 = 11
+        private const val COMMAND_COMPLETION_STATS_HEADER = "KetraTerm_COMMAND_COMPLETION_STATS\t1"
+        private const val COMMAND_STATS_FIELD_COUNT = 11
+        private const val SHAPE_STATS_FIELD_COUNT = 15
+        private const val FEEDBACK_STATS_FIELD_COUNT = 11
         private const val ROW_COMMAND = "C"
         private const val ROW_SHAPE = "S"
         private const val ROW_FEEDBACK = "F"

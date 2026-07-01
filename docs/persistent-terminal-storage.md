@@ -45,7 +45,7 @@ shape counters, and source-specific suggestion feedback counters used by the
 completion engine:
 
 ```tsv
-KetraTerm_COMMAND_COMPLETION_STATS	3
+KetraTerm_COMMAND_COMPLETION_STATS	1
 C	<commandBase64>	<normalizedBase64>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
 S	<executableBase64>	<subcommandsBase64List>	<optionNamesBase64List>	<positionalArgumentCount>	<optionValueCount>	<shapeKeyBase64>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
 F	<sourceBase64>	<candidateKind>	<tokenPosition>	<replacementStartOffset>	<replacementEndOffset>	<profileBase64>	<cwdBase64>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
