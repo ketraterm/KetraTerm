@@ -311,6 +311,8 @@ class SwingTerminal
 
                     override fun pasteClipboardText(): Boolean = this@SwingTerminal.pasteClipboardText()
 
+                    override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
+
                     override fun handlePromptMarkerMousePressed(event: MouseEvent): Boolean =
                         this@SwingTerminal.handlePromptMarkerMousePressed(event)
 

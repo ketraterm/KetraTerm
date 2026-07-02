@@ -72,6 +72,19 @@ class SwingTerminalMouseControllerTest {
             assertEquals(1, host.hyperlinkPressCount)
             assertEquals(0, host.selectionPressCount)
         }
+
+        @Test
+        fun `mouse press requests focus in window even when mouse tracking is active`() {
+            val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL)
+            val controller = SwingTerminalMouseController(host)
+            val event = mousePressed(button = MouseEvent.BUTTON1, modifiers = InputEvent.BUTTON1_DOWN_MASK)
+
+            controller.mouseListener.mousePressed(event)
+
+            assertEquals(1, host.requestFocusInWindowCount)
+            assertEquals(1, host.mouseReports.size)
+            assertTrue(event.isConsumed)
+        }
     }
 
     @Nested
@@ -301,6 +314,7 @@ class SwingTerminalMouseControllerTest {
 
         var scrollCount = 0
         var pasteCount = 0
+        var requestFocusInWindowCount = 0
         var hyperlinkPressCount = 0
         var hyperlinkMoveCount = 0
         var hyperlinkExitCount = 0
@@ -343,6 +357,11 @@ class SwingTerminalMouseControllerTest {
 
         override fun pasteClipboardText(): Boolean {
             pasteCount++
+            return true
+        }
+
+        override fun requestFocusInWindow(): Boolean {
+            requestFocusInWindowCount++
             return true
         }
 
