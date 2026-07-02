@@ -281,7 +281,8 @@ internal class TerminalCompletionArchitectureTest {
         private val PUBLIC_MODEL_MEMBER_FUNCTIONS =
             mapOf(
                 "model/TerminalCommandCompletionStatsSnapshotCodec.kt" to setOf("currentFileName", "decode", "encode"),
-                "model/TerminalCommandSpecs.kt" to setOf("defaults", "docker", "git", "gradle", "npm"),
+                "model/TerminalCommandSpecs.kt" to
+                    setOf("defaults", "docker", "git", "gradle", "npm", "cargo", "kubectl", "gh", "pip", "go", "aws", "ketra"),
                 "model/TerminalCompletionFeedbackStats.kt" to setOf("fromCandidateKind"),
             )
         private val PUBLIC_API_MEMBER_FUNCTIONS =

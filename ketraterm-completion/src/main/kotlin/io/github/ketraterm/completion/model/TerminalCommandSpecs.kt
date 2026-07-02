@@ -33,6 +33,13 @@ object TerminalCommandSpecs {
             gradle(),
             npm(),
             docker(),
+            cargo(),
+            kubectl(),
+            gh(),
+            pip(),
+            go(),
+            aws(),
+            ketra(),
         )
 
     /**
@@ -172,6 +179,213 @@ object TerminalCommandSpecs {
                     TerminalOptionSpec(listOf("--help"), "show help"),
                     TerminalOptionSpec(listOf("--version", "-v"), "show version"),
                     TerminalOptionSpec(listOf("--context"), "select Docker context", requiresValue = true),
+                ),
+        )
+
+    /**
+     * Returns a Cargo command spec for Rust package management.
+     *
+     * @return Cargo command specification.
+     */
+    @JvmStatic
+    fun cargo(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "cargo",
+            description = "Rust package manager",
+            subcommands =
+                listOf(
+                    TerminalCommandSpec("build", "compile the current package"),
+                    TerminalCommandSpec("run", "run a binary or example of the local package"),
+                    TerminalCommandSpec("test", "execute all unit and integration tests"),
+                    TerminalCommandSpec("check", "analyze the current package and report errors"),
+                    TerminalCommandSpec("clean", "remove artifacts that cargo has generated"),
+                    TerminalCommandSpec("new", "create a new cargo package"),
+                    TerminalCommandSpec("init", "create a new cargo package in an existing directory"),
+                    TerminalCommandSpec("update", "update dependencies as recorded in the local lock file"),
+                    TerminalCommandSpec("doc", "build this package's and its dependencies' documentation"),
+                    TerminalCommandSpec("publish", "package and upload this package to the registry"),
+                ),
+            options =
+                listOf(
+                    TerminalOptionSpec(listOf("--help", "-h"), "show help"),
+                    TerminalOptionSpec(listOf("--version", "-v"), "show version"),
+                    TerminalOptionSpec(listOf("--verbose", "-v"), "use verbose output"),
+                    TerminalOptionSpec(listOf("--quiet", "-q"), "do not print cargo log messages"),
+                    TerminalOptionSpec(listOf("--manifest-path"), "path to Cargo.toml", requiresValue = true),
+                ),
+        )
+
+    /**
+     * Returns a kubectl command spec for Kubernetes cluster management.
+     *
+     * @return kubectl command specification.
+     */
+    @JvmStatic
+    fun kubectl(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "kubectl",
+            description = "Kubernetes cluster CLI",
+            subcommands =
+                listOf(
+                    TerminalCommandSpec("get", "display one or many resources"),
+                    TerminalCommandSpec("describe", "show details of a specific resource or group of resources"),
+                    TerminalCommandSpec("logs", "print the logs for a container in a pod"),
+                    TerminalCommandSpec("exec", "execute a command in a container"),
+                    TerminalCommandSpec("apply", "apply a configuration to a resource by file name or stdin"),
+                    TerminalCommandSpec("delete", "delete resources by file names, stdin, resources and names"),
+                    TerminalCommandSpec("port-forward", "forward one or more local ports to a pod"),
+                    TerminalCommandSpec("config", "modify kubeconfig files"),
+                    TerminalCommandSpec("run", "run a particular image on the cluster"),
+                    TerminalCommandSpec("explain", "get documentation for a resource"),
+                ),
+            options =
+                listOf(
+                    TerminalOptionSpec(listOf("--help"), "show help"),
+                    TerminalOptionSpec(listOf("--kubeconfig"), "path to the kubeconfig file", requiresValue = true),
+                    TerminalOptionSpec(listOf("--namespace", "-n"), "kubernetes namespace to use", requiresValue = true),
+                    TerminalOptionSpec(listOf("--context"), "name of the kubeconfig context to use", requiresValue = true),
+                ),
+        )
+
+    /**
+     * Returns a GitHub CLI spec for common workflows.
+     *
+     * @return GitHub CLI command specification.
+     */
+    @JvmStatic
+    fun gh(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "gh",
+            description = "GitHub CLI",
+            subcommands =
+                listOf(
+                    TerminalCommandSpec("pr", "manage pull requests"),
+                    TerminalCommandSpec("issue", "manage issues"),
+                    TerminalCommandSpec("repo", "manage repositories"),
+                    TerminalCommandSpec("auth", "login, logout, and select active accounts"),
+                    TerminalCommandSpec("run", "view details of workflow runs"),
+                    TerminalCommandSpec("workflow", "view and run GitHub Actions workflows"),
+                    TerminalCommandSpec("gist", "manage gists"),
+                    TerminalCommandSpec("secret", "manage GitHub secrets"),
+                    TerminalCommandSpec("api", "make an authenticated GitHub API request"),
+                    TerminalCommandSpec("completion", "generate shell completion scripts"),
+                ),
+            options =
+                listOf(
+                    TerminalOptionSpec(listOf("--help"), "show help"),
+                    TerminalOptionSpec(listOf("--version"), "show version"),
+                ),
+        )
+
+    /**
+     * Returns a pip command spec for Python package management.
+     *
+     * @return pip command specification.
+     */
+    @JvmStatic
+    fun pip(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "pip",
+            description = "Python package installer",
+            subcommands =
+                listOf(
+                    TerminalCommandSpec("install", "install packages"),
+                    TerminalCommandSpec("uninstall", "uninstall packages"),
+                    TerminalCommandSpec("list", "list installed packages"),
+                    TerminalCommandSpec("show", "show information about installed packages"),
+                    TerminalCommandSpec("search", "search PyPI for packages"),
+                    TerminalCommandSpec("freeze", "output installed packages in requirements format"),
+                    TerminalCommandSpec("wheel", "build wheels from your requirements"),
+                    TerminalCommandSpec("cache", "inspect and manage pip's wheel cache"),
+                ),
+            options =
+                listOf(
+                    TerminalOptionSpec(listOf("--help", "-h"), "show help"),
+                    TerminalOptionSpec(listOf("--version", "-V"), "show version"),
+                    TerminalOptionSpec(listOf("--verbose", "-v"), "give more output"),
+                    TerminalOptionSpec(listOf("--quiet", "-q"), "give less output"),
+                ),
+        )
+
+    /**
+     * Returns a Go command spec for Go toolchain development.
+     *
+     * @return Go command specification.
+     */
+    @JvmStatic
+    fun go(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "go",
+            description = "Go toolchain CLI",
+            subcommands =
+                listOf(
+                    TerminalCommandSpec("build", "compile packages and dependencies"),
+                    TerminalCommandSpec("run", "compile and run Go program"),
+                    TerminalCommandSpec("test", "test packages"),
+                    TerminalCommandSpec("fmt", "gofmt (reformat) package sources"),
+                    TerminalCommandSpec("get", "add dependencies to current module and install them"),
+                    TerminalCommandSpec("install", "compile and install packages and dependencies"),
+                    TerminalCommandSpec("mod", "module maintenance"),
+                    TerminalCommandSpec("clean", "remove object files and cached files"),
+                    TerminalCommandSpec("doc", "show documentation for package or symbol"),
+                    TerminalCommandSpec("vet", "report likely mistakes in packages"),
+                    TerminalCommandSpec("version", "print Go version"),
+                    TerminalCommandSpec("env", "print Go environment information"),
+                ),
+            options =
+                listOf(
+                    TerminalOptionSpec(listOf("-h"), "show help"),
+                ),
+        )
+
+    /**
+     * Returns an AWS CLI command spec for cloud resource operations.
+     *
+     * @return AWS CLI command specification.
+     */
+    @JvmStatic
+    fun aws(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "aws",
+            description = "AWS Unified Command Line Interface",
+            subcommands =
+                listOf(
+                    TerminalCommandSpec("s3", "manage S3 storage resources"),
+                    TerminalCommandSpec("ec2", "manage elastic compute cloud resources"),
+                    TerminalCommandSpec("rds", "manage relational database service instances"),
+                    TerminalCommandSpec("dynamodb", "manage DynamoDB tables and items"),
+                    TerminalCommandSpec("lambda", "manage AWS Lambda functions"),
+                    TerminalCommandSpec("iam", "manage Identity and Access Management"),
+                    TerminalCommandSpec("sts", "manage Security Token Service credentials"),
+                    TerminalCommandSpec("configure", "configure AWS CLI settings"),
+                    TerminalCommandSpec("cloudformation", "manage CloudFormation stacks"),
+                ),
+            options =
+                listOf(
+                    TerminalOptionSpec(listOf("--help"), "show help"),
+                    TerminalOptionSpec(listOf("--version"), "show version"),
+                    TerminalOptionSpec(listOf("--profile"), "select AWS CLI profile to use", requiresValue = true),
+                    TerminalOptionSpec(listOf("--region"), "AWS region to target", requiresValue = true),
+                    TerminalOptionSpec(listOf("--output"), "output format json, text, table", requiresValue = true),
+                ),
+        )
+
+    /**
+     * Returns a KetraTerm launcher command spec.
+     *
+     * @return KetraTerm launcher command specification.
+     */
+    @JvmStatic
+    fun ketra(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "ketra",
+            description = "KetraTerm launcher CLI",
+            options =
+                listOf(
+                    TerminalOptionSpec(listOf("--help", "-h"), "show help"),
+                    TerminalOptionSpec(listOf("--version", "-v"), "show version"),
+                    TerminalOptionSpec(listOf("--profile", "-p"), "launch with specific shell profile", requiresValue = true),
+                    TerminalOptionSpec(listOf("--directory", "-d"), "start in specific directory", requiresValue = true),
                 ),
         )
 }

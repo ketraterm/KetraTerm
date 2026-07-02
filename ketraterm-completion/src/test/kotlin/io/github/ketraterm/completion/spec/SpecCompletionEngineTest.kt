@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.spec
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalOptionSpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -181,6 +182,42 @@ class SpecCompletionEngineTest {
 
         val candidates = engine.complete(request("docker compose --context my-context p"))
         assertEquals(listOf("ps"), candidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `default specs registration and matching`() {
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                TerminalCompletionSources.fromSpecs(TerminalCommandSpecs.defaults()),
+            )
+
+        // Test cargo matching
+        val cargoCandidates = engine.complete(request("cargo bui"))
+        assertEquals(listOf("build"), cargoCandidates.map { it.replacementText })
+
+        // Test kubectl matching
+        val kubectlCandidates = engine.complete(request("kubectl ge"))
+        assertEquals(listOf("get"), kubectlCandidates.map { it.replacementText })
+
+        // Test gh matching
+        val ghCandidates = engine.complete(request("gh work"))
+        assertEquals(listOf("workflow"), ghCandidates.map { it.replacementText })
+
+        // Test pip matching
+        val pipCandidates = engine.complete(request("pip inst"))
+        assertEquals(listOf("install"), pipCandidates.map { it.replacementText })
+
+        // Test go matching
+        val goCandidates = engine.complete(request("go fm"))
+        assertEquals(listOf("fmt"), goCandidates.map { it.replacementText })
+
+        // Test aws matching
+        val awsCandidates = engine.complete(request("aws s"))
+        assertEquals(listOf("s3", "sts"), awsCandidates.map { it.replacementText })
+
+        // Test ketra matching
+        val ketraCandidates = engine.complete(request("ketra --prof"))
+        assertEquals(listOf("--profile"), ketraCandidates.map { it.replacementText })
     }
 
     private fun engine(): TerminalCompletionEngine =
