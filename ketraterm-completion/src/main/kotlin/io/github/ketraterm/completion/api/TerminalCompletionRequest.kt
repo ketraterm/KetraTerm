@@ -18,6 +18,21 @@ package io.github.ketraterm.completion.api
 import io.github.ketraterm.completion.internal.isTerminalCompletionUtf16Boundary
 
 /**
+ * Shell-specific quoting policy for replacement text produced by completion
+ * sources.
+ */
+enum class TerminalShellQuotingPolicy {
+    /** Infer a safe policy from request metadata, falling back to POSIX style. */
+    AUTO,
+
+    /** POSIX shell escaping using backslash escapes and POSIX quote rules. */
+    POSIX,
+
+    /** PowerShell escaping using single-quoted literals by default. */
+    POWERSHELL,
+}
+
+/**
  * Immutable command-line context used to request completion candidates.
  *
  * Hosts should construct one request per popup refresh from the visible command
@@ -30,6 +45,7 @@ import io.github.ketraterm.completion.internal.isTerminalCompletionUtf16Boundary
  * @property workingDirectoryUri optional current working directory URI.
  * @property profileId optional host profile id, such as `pwsh`, `bash`, or `zsh`.
  * @property maxCandidates maximum number of candidates to return.
+ * @property shellQuotingPolicy shell escaping policy for replacement text.
  */
 data class TerminalCompletionRequest
     @JvmOverloads
@@ -39,6 +55,7 @@ data class TerminalCompletionRequest
         val workingDirectoryUri: String? = null,
         val profileId: String? = null,
         val maxCandidates: Int = DEFAULT_MAX_CANDIDATES,
+        val shellQuotingPolicy: TerminalShellQuotingPolicy = TerminalShellQuotingPolicy.AUTO,
     ) {
         init {
             require(cursorOffset in 0..commandLine.length) {

@@ -15,6 +15,13 @@
  */
 package io.github.ketraterm.completion.api
 
+import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
+import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+
 /**
  * Pure evaluation engine that determines if a command line should trigger completions.
  *
@@ -29,14 +36,17 @@ object TerminalCompletionTriggerEvaluator {
      * @param commandLine visible command text.
      * @param cursorOffset UTF-16 cursor position.
      * @param minimumNonWhitespaceCharacters minimum characters required for default typing.
+     * @param commandSpecs command specs used for context-aware live triggers.
      * @return `true` if suggestions should be requested.
      */
+    @JvmOverloads
     fun shouldTrigger(
         commandLine: String,
         cursorOffset: Int,
         minimumNonWhitespaceCharacters: Int,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     ): Boolean {
-        if (isLiveTrigger(commandLine, cursorOffset)) return true
+        if (isLiveTrigger(commandLine, cursorOffset, commandSpecs)) return true
         return nonWhitespaceCount(commandLine) >= minimumNonWhitespaceCharacters
     }
 
@@ -47,11 +57,14 @@ object TerminalCompletionTriggerEvaluator {
      *
      * @param commandLine visible command text.
      * @param cursorOffset UTF-16 cursor position.
+     * @param commandSpecs command specs used for context-aware space triggers.
      * @return `true` if cursor is immediately after a live trigger token.
      */
+    @JvmOverloads
     fun isLiveTrigger(
         commandLine: String,
         cursorOffset: Int,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     ): Boolean {
         if (cursorOffset <= 0) return false
 
@@ -66,17 +79,38 @@ object TerminalCompletionTriggerEvaluator {
         // 3. Environment variable trigger (e.g. '$')
         if (lastChar == '$') return true
 
-        // 4. Finished-word space trigger (single space after a non-space character of at least 2 chars)
+        // 4. Context-aware finished-word space trigger
         if (lastChar == ' ') {
             val prevChar = commandLine.getOrNull(cursorOffset - 2)
-            if (prevChar != null && prevChar != ' ') {
-                val wordStart = commandLine.substring(0, cursorOffset - 1).lastIndexOf(' ')
-                val word = commandLine.substring(wordStart + 1, cursorOffset - 1)
-                return word.length >= 2
-            }
+            if (prevChar != null && prevChar != ' ') return isContextualSpaceTrigger(commandLine, cursorOffset, commandSpecs)
         }
 
         return false
+    }
+
+    private fun isContextualSpaceTrigger(
+        commandLine: String,
+        cursorOffset: Int,
+        commandSpecs: List<TerminalCommandSpec>,
+    ): Boolean {
+        val context =
+            TerminalCompletionContextResolver.resolve(
+                commandLine = commandLine,
+                cursorOffset = cursorOffset,
+                commandSpecs = commandSpecs,
+            )
+        return when (context.activePosition) {
+            TerminalCompletionActivePosition.COMMAND -> false
+            TerminalCompletionActivePosition.SUBCOMMAND -> context.subcommandCandidateSource != null
+            TerminalCompletionActivePosition.OPTION_NAME -> false
+            TerminalCompletionActivePosition.OPTION_VALUE ->
+                context.staticValueCandidates.isNotEmpty() ||
+                    context.expectedPathKind != TerminalPathArgumentKind.NONE ||
+                    context.expectedValueDomain != TerminalCompletionValueDomain.NONE
+            TerminalCompletionActivePosition.POSITIONAL_ARGUMENT ->
+                context.expectedPathKind != TerminalPathArgumentKind.NONE ||
+                    context.expectedValueDomain != TerminalCompletionValueDomain.NONE
+        }
     }
 
     private fun nonWhitespaceCount(text: String): Int {

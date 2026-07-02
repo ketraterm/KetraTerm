@@ -102,7 +102,9 @@ internal class PathCompletionSource(
                 val rawReplacement = directoryPortion + entry.name + rawSuffix
                 val replacementText =
                     replacementText(
+                        request = request,
                         activeTokenQuote = context.activeTokenQuote,
+                        activeTokenText = request.commandLine.substring(context.replacementStartOffset, context.replacementEndOffset),
                         rawReplacement = rawReplacement,
                         pathSeparator = pathSeparator,
                     )
@@ -125,29 +127,116 @@ internal class PathCompletionSource(
     }
 
     private fun replacementText(
+        request: TerminalCompletionRequest,
         activeTokenQuote: Char,
+        activeTokenText: String,
         rawReplacement: String,
         pathSeparator: Char,
     ): String {
         val normalizedReplacement = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement
         return when (activeTokenQuote) {
-            SINGLE_QUOTE -> quoteSingle(normalizedReplacement)
-            DOUBLE_QUOTE -> quoteDouble(normalizedReplacement)
-            else -> normalizedReplacement
+            SINGLE_QUOTE -> quoteSingle(normalizedReplacement, request.resolvedQuotingPolicy())
+            DOUBLE_QUOTE -> quoteDouble(normalizedReplacement, request.resolvedQuotingPolicy())
+            else -> unquotedReplacement(normalizedReplacement, activeTokenText, request.resolvedQuotingPolicy())
         }
     }
 
-    private fun quoteSingle(value: String): String = "'${value.replace("'", "'\\''")}'"
+    private fun unquotedReplacement(
+        value: String,
+        activeTokenText: String,
+        policy: TerminalShellQuotingPolicy,
+    ): String {
+        if (!needsEscaping(value)) return value
+        if (activeTokenText.contains(BACKSLASH) || policy == TerminalShellQuotingPolicy.POSIX) {
+            return escapePosixUnquoted(value)
+        }
+        return quoteSingle(value, policy)
+    }
 
-    private fun quoteDouble(value: String): String =
-        buildString(value.length + 2) {
-            append(DOUBLE_QUOTE)
+    private fun quoteSingle(
+        value: String,
+        policy: TerminalShellQuotingPolicy,
+    ): String =
+        when (policy) {
+            TerminalShellQuotingPolicy.POWERSHELL -> "'${value.replace("'", "''")}'"
+            TerminalShellQuotingPolicy.AUTO,
+            TerminalShellQuotingPolicy.POSIX,
+            -> "'${value.replace("'", "'\\''")}'"
+        }
+
+    private fun quoteDouble(
+        value: String,
+        policy: TerminalShellQuotingPolicy,
+    ): String =
+        when (policy) {
+            TerminalShellQuotingPolicy.POWERSHELL ->
+                buildString(value.length + 2) {
+                    append(DOUBLE_QUOTE)
+                    for (ch in value) {
+                        if (ch == DOUBLE_QUOTE || ch == BACKTICK || ch == DOLLAR) append(BACKTICK)
+                        append(ch)
+                    }
+                    append(DOUBLE_QUOTE)
+                }
+            TerminalShellQuotingPolicy.AUTO,
+            TerminalShellQuotingPolicy.POSIX,
+            ->
+                buildString(value.length + 2) {
+                    append(DOUBLE_QUOTE)
+                    for (ch in value) {
+                        if (ch == DOUBLE_QUOTE || ch == BACKSLASH || ch == DOLLAR || ch == BACKTICK) append(BACKSLASH)
+                        append(ch)
+                    }
+                    append(DOUBLE_QUOTE)
+                }
+        }
+
+    private fun escapePosixUnquoted(value: String): String =
+        buildString(value.length) {
             for (ch in value) {
-                if (ch == DOUBLE_QUOTE || ch == BACKSLASH) append(BACKSLASH)
+                if (ch.needsPosixUnquotedEscape()) append(BACKSLASH)
                 append(ch)
             }
-            append(DOUBLE_QUOTE)
         }
+
+    private fun TerminalCompletionRequest.resolvedQuotingPolicy(): TerminalShellQuotingPolicy =
+        when (shellQuotingPolicy) {
+            TerminalShellQuotingPolicy.AUTO ->
+                if (profileId.isPowerShellProfile()) {
+                    TerminalShellQuotingPolicy.POWERSHELL
+                } else {
+                    TerminalShellQuotingPolicy.POSIX
+                }
+            TerminalShellQuotingPolicy.POSIX -> TerminalShellQuotingPolicy.POSIX
+            TerminalShellQuotingPolicy.POWERSHELL -> TerminalShellQuotingPolicy.POWERSHELL
+        }
+
+    private fun String?.isPowerShellProfile(): Boolean {
+        val profile = this?.lowercase() ?: return false
+        return profile == "pwsh" || profile == "powershell" || profile.contains("powershell")
+    }
+
+    private fun needsEscaping(value: String): Boolean =
+        value.any {
+            it.isShellWhitespace() ||
+                it == SINGLE_QUOTE ||
+                it == DOUBLE_QUOTE ||
+                it == DOLLAR
+        }
+
+    private fun Char.needsPosixUnquotedEscape(): Boolean =
+        isShellWhitespace() ||
+            this == SINGLE_QUOTE ||
+            this == DOUBLE_QUOTE ||
+            this == BACKSLASH ||
+            this == DOLLAR ||
+            this == BACKTICK ||
+            this == SEMICOLON ||
+            this == AMPERSAND ||
+            this == LEFT_PAREN ||
+            this == RIGHT_PAREN
+
+    private fun Char.isShellWhitespace(): Boolean = this == ' ' || this == '\t' || this == '\r' || this == '\n'
 
     private fun isPathLike(prefix: String): Boolean =
         prefix.startsWith("/") ||
@@ -180,6 +269,12 @@ internal class PathCompletionSource(
         private const val SINGLE_QUOTE = '\''
         private const val DOUBLE_QUOTE = '"'
         private const val BACKSLASH = '\\'
+        private const val BACKTICK = '`'
+        private const val DOLLAR = '$'
+        private const val SEMICOLON = ';'
+        private const val AMPERSAND = '&'
+        private const val LEFT_PAREN = '('
+        private const val RIGHT_PAREN = ')'
     }
 
     private fun TerminalPathArgumentKind.accepts(entry: TerminalFileEntry): Boolean =

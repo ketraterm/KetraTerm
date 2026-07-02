@@ -44,8 +44,8 @@ resolver. Sources and ranking decorators should use it instead of independently
 guessing command position, subcommand position, option-name position,
 option-value position, positional-argument position, active option metadata,
 expected path kind, expected dynamic value domain, repeatable subcommand source,
-static value candidates, replacement offsets, or active quote state from raw
-command text.
+static value candidates, context-aware live trigger state, replacement offsets,
+or active quote state from raw command text.
 
 ## Internal Implementation
 
@@ -94,7 +94,18 @@ candidates, while commands such as `git add` and `kubectl apply` may request
 file-or-directory candidates. Dot-prefixed entries are hidden for an empty path
 prefix and appear once the user types `.`. When the active path token begins
 with a quote, path candidates replace the whole token with a matching quoted
-replacement instead of dropping the quote.
+replacement instead of dropping the quote. Unquoted path replacements are
+escaped according to `TerminalCompletionRequest.shellQuotingPolicy`, preserving
+existing backslash-escaped style where the user has already chosen it. `AUTO`
+uses `profileId` to select PowerShell escaping for PowerShell profiles and POSIX
+escaping otherwise.
+
+Live trigger policy is command-context aware. Hyphen, path separator, and
+environment-variable triggers remain immediate. A trailing space is immediate
+only when the resolved context expects useful candidates, such as paths after
+`cd `, domain values after `git switch `, or repeatable tasks after
+`./gradlew `. Unknown command arguments do not become live triggers just because
+the user typed a space.
 
 Static bounded option domains belong in `TerminalOptionSpec.valueCandidates`.
 Examples are output formats, log levels, or other values that are stable and do

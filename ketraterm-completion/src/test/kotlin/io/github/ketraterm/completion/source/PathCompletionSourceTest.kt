@@ -74,7 +74,8 @@ class PathCompletionSourceTest {
         val request = request("cd ", "file:///project")
         val candidates = source.complete(request)
 
-        assertEquals(listOf("src/", "Idea Projects/", "O'Brien/"), candidates.map { it.replacementText })
+        assertEquals(listOf("src/", "Idea\\ Projects/", "O\\'Brien/"), candidates.map { it.replacementText })
+        assertEquals(listOf("src/", "Idea Projects/", "O'Brien/"), candidates.map { it.displayText })
         assertTrue(candidates.all { it.detail == "directory" })
     }
 
@@ -117,7 +118,7 @@ class PathCompletionSourceTest {
         val candidates = source.complete(request("tool open ", "file:///project"))
 
         assertEquals(
-            listOf("src/", "Idea Projects/", "O'Brien/", "README.md", "LICENSE"),
+            listOf("src/", "Idea\\ Projects/", "O\\'Brien/", "README.md", "LICENSE"),
             candidates.map { it.replacementText },
         )
     }
@@ -145,7 +146,7 @@ class PathCompletionSourceTest {
 
         val candidates = source.complete(request("tool --cwd ", "file:///project"))
 
-        assertEquals(listOf("src/", "Idea Projects/", "O'Brien/"), candidates.map { it.replacementText })
+        assertEquals(listOf("src/", "Idea\\ Projects/", "O\\'Brien/"), candidates.map { it.replacementText })
     }
 
     @Test
@@ -171,11 +172,53 @@ class PathCompletionSourceTest {
     }
 
     @Test
+    fun `quoted path completion preserves single quoted token replacement`() {
+        val request = request("cd 'Idea Pro", "file:///project")
+        val candidates = source.complete(request)
+
+        assertEquals("'Idea Projects/'", candidates.single().replacementText)
+    }
+
+    @Test
     fun `quoted path completion escapes single quote in single quoted token replacement`() {
         val request = request("cd 'O", "file:///project")
         val candidates = source.complete(request)
 
         assertEquals("'O'\\''Brien/'", candidates.single().replacementText)
+    }
+
+    @Test
+    fun `unquoted path completion preserves existing backslash escaped style`() {
+        val request = request("cd Idea\\ Pro", "file:///project")
+        val candidates = source.complete(request)
+
+        assertEquals("Idea\\ Projects/", candidates.single().replacementText)
+    }
+
+    @Test
+    fun `powershell path completion quotes unquoted paths with spaces`() {
+        val request =
+            request(
+                commandLine = "cd Idea",
+                workingDirectoryUri = "file:///project",
+                shellQuotingPolicy = TerminalShellQuotingPolicy.POWERSHELL,
+            )
+        val candidates = source.complete(request)
+
+        assertEquals("'Idea Projects/'", candidates.single().replacementText)
+    }
+
+    @Test
+    fun `powershell path completion escapes single quote in single quoted token replacement`() {
+        val request =
+            request(
+                commandLine = "cd 'O",
+                workingDirectoryUri = "file:///project",
+                shellQuotingPolicy = TerminalShellQuotingPolicy.POWERSHELL,
+            )
+        val candidates = source.complete(request)
+
+        assertEquals("'O''Brien/'", candidates.single().replacementText)
     }
 
     @Test
@@ -233,11 +276,13 @@ class PathCompletionSourceTest {
     private fun request(
         commandLine: String,
         workingDirectoryUri: String?,
+        shellQuotingPolicy: TerminalShellQuotingPolicy = TerminalShellQuotingPolicy.AUTO,
     ): TerminalCompletionRequest =
         TerminalCompletionRequest(
             commandLine = commandLine,
             cursorOffset = commandLine.length,
             workingDirectoryUri = workingDirectoryUri,
+            shellQuotingPolicy = shellQuotingPolicy,
         )
 
     private class FakeFileSystemProvider : TerminalFileSystemProvider {

@@ -52,13 +52,17 @@ class TerminalCompletionTriggerEvaluatorTest {
     fun `isLiveTrigger matches single space after finished word of at least length two`() {
         assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("go ", 3))
         assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("git ", 4))
-        assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("docker run ", 11))
+        assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("cd ", 3))
+        assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("git switch ", 11))
+        assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("./gradlew ", 10))
     }
 
     @Test
-    fun `isLiveTrigger rejects space after too short words`() {
+    fun `isLiveTrigger rejects non contextual spaces`() {
         assertFalse(TerminalCompletionTriggerEvaluator.isLiveTrigger("g ", 2))
         assertFalse(TerminalCompletionTriggerEvaluator.isLiveTrigger("a ", 2))
+        assertFalse(TerminalCompletionTriggerEvaluator.isLiveTrigger("unknown arg ", 12))
+        assertFalse(TerminalCompletionTriggerEvaluator.isLiveTrigger("docker run ", 11))
     }
 
     @Test
