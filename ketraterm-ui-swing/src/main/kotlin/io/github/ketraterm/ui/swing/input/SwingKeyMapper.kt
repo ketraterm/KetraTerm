@@ -118,9 +118,15 @@ internal class SwingKeyMapper {
     private fun modifiers(event: KeyEvent): Int {
         var modifiers = TerminalModifiers.NONE
         if (event.isShiftDown) modifiers = modifiers or TerminalModifiers.SHIFT
-        if (event.isAltDown || event.isAltGraphDown) modifiers = modifiers or TerminalModifiers.ALT
-        if (event.isControlDown) modifiers = modifiers or TerminalModifiers.CTRL
         if (event.isMetaDown) modifiers = modifiers or TerminalModifiers.META
+
+        if (event.isAltGraphDown) {
+            // AltGr is active. On Windows/Linux, this sets isControlDown and isAltDown.
+            // We do not map these to terminal modifiers.
+        } else {
+            if (event.isAltDown) modifiers = modifiers or TerminalModifiers.ALT
+            if (event.isControlDown) modifiers = modifiers or TerminalModifiers.CTRL
+        }
         return modifiers
     }
 

@@ -119,6 +119,31 @@ class SwingKeyMapperTest {
         assertNull(mapper.keyPressed(pressed(KeyEvent.VK_A)))
     }
 
+    @Test
+    fun ignoresAltGrKeyPressedForPrintableCharacters() {
+        val modifiers = KeyEvent.CTRL_DOWN_MASK or KeyEvent.ALT_DOWN_MASK or KeyEvent.ALT_GRAPH_DOWN_MASK
+        val mapped = mapper.keyPressed(pressed(KeyEvent.VK_0, modifiers = modifiers))
+        assertNull(mapped)
+    }
+
+    @Test
+    fun mapsAltGrKeyTypedCharacterWithoutCtrlAltModifiers() {
+        val modifiers = KeyEvent.CTRL_DOWN_MASK or KeyEvent.ALT_DOWN_MASK or KeyEvent.ALT_GRAPH_DOWN_MASK
+        val mapped = mapper.keyTyped(typed('@', modifiers = modifiers))
+
+        assertEquals('@'.code, mapped?.codepoint)
+        assertEquals(TerminalModifiers.NONE, mapped?.modifiers)
+    }
+
+    @Test
+    fun mapsShiftAltGrKeyTypedCharacterWithShiftModifier() {
+        val modifiers = KeyEvent.CTRL_DOWN_MASK or KeyEvent.ALT_DOWN_MASK or KeyEvent.ALT_GRAPH_DOWN_MASK or KeyEvent.SHIFT_DOWN_MASK
+        val mapped = mapper.keyTyped(typed('Ω', modifiers = modifiers))
+
+        assertEquals('Ω'.code, mapped?.codepoint)
+        assertEquals(TerminalModifiers.SHIFT, mapped?.modifiers)
+    }
+
     private fun typed(
         char: Char,
         modifiers: Int = 0,
