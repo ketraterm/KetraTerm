@@ -24,6 +24,8 @@ import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
+import io.github.ketraterm.ui.swing.suggestion.replacementFor
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
@@ -75,6 +77,37 @@ internal class TerminalPane private constructor(
         ): TerminalPane {
             val scrollbar = JScrollBar(Adjustable.VERTICAL)
             val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
+            lateinit var terminalRef: SwingTerminal
+            val completionTriggerController =
+                StandaloneCompletionTriggerController(
+                    activeCommandLine = tab.session::activeShellCommandLine,
+                    requestSuggestions = { snapshot -> terminalRef.requestShellSuggestionsForSnapshot(snapshot) },
+                    hideSuggestions = { terminalRef.hideShellSuggestions() },
+                    rankingContextKey = { tab.currentWorkingDirectoryUri },
+                    suggestionsEnabled = { settings.shellSuggestionsEnabled },
+                )
+
+            val defaultHandler = SwingShellSuggestionHandler.createDefault(tab.session)
+            val shellSuggestionHandler =
+                SwingShellSuggestionHandler { acceptance ->
+                    val request = acceptance.request
+                    val replacement = acceptance.suggestion.replacementFor(request)
+                    if (replacement != null) {
+                        val resultText = acceptance.suggestion.commandTextAfterReplacement(request)
+                        if (resultText != null) {
+                            val resultCursor = replacement.startOffset + replacement.replacementText.length
+                            completionTriggerController.suppressNextTriggerFor(resultText, resultCursor)
+                        }
+                    }
+                    defaultHandler.onSuggestionAccepted(acceptance)
+                }
+
+            val wrappedFeedbackHandler =
+                SwingShellSuggestionFeedbackHandler { feedback ->
+                    completionTriggerController.invalidateLastRequest()
+                    suggestionFeedbackHandler.onSuggestionFeedback(feedback)
+                }
+
             val terminal =
                 SwingTerminal(
                     settingsProvider = { settings.current() },
@@ -82,22 +115,16 @@ internal class TerminalPane private constructor(
                         SwingHostServices(
                             viewportListener = scrollbarAdapter,
                             shellSuggestionProvider = suggestionProvider,
-                            shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
-                            shellSuggestionFeedbackHandler = suggestionFeedbackHandler,
+                            shellSuggestionHandler = shellSuggestionHandler,
+                            shellSuggestionFeedbackHandler = wrappedFeedbackHandler,
                         ),
                 )
+            terminalRef = terminal
+
             scrollbarAdapter.attach(terminal)
             configureScrollbar(scrollbar)
 
             terminal.bind(tab.session)
-            val completionTriggerController =
-                StandaloneCompletionTriggerController(
-                    activeCommandLine = tab.session::activeShellCommandLine,
-                    requestSuggestions = { snapshot -> terminal.requestShellSuggestionsForSnapshot(snapshot) },
-                    hideSuggestions = terminal::hideShellSuggestions,
-                    rankingContextKey = { tab.currentWorkingDirectoryUri },
-                    suggestionsEnabled = { settings.shellSuggestionsEnabled },
-                )
             val completionDirtyListener = completionTriggerController::scheduleRefresh
             tab.session.addDirtyListener(completionDirtyListener)
 

@@ -77,6 +77,26 @@ internal class StandaloneCompletionTriggerController(
         }
     }
 
+    private var suppressedCommandText: String? = null
+    private var suppressedCursorOffset: Int = -1
+
+    /**
+     * Configures the controller to suppress trigger evaluation for a specific
+     * command-line text and cursor offset.
+     *
+     * This is useful to prevent auto-reopening the suggestion popup immediately
+     * after inserting a completion candidate (which often ends with a live-trigger
+     * path separator or space). The suppression is automatically cleared as soon as
+     * the command line diverges from this state.
+     */
+    fun suppressNextTriggerFor(
+        commandText: String,
+        cursorOffset: Int,
+    ) {
+        suppressedCommandText = commandText
+        suppressedCursorOffset = cursorOffset
+    }
+
     /**
      * Immediately refreshes suggestions from the latest command snapshot.
      *
@@ -96,6 +116,12 @@ internal class StandaloneCompletionTriggerController(
             hideSuggestions()
             return
         }
+        if (snapshot.commandText == suppressedCommandText && snapshot.cursorOffset == suppressedCursorOffset) {
+            return
+        }
+        suppressedCommandText = null
+        suppressedCursorOffset = -1
+
         val shouldTrigger =
             TerminalCompletionTriggerEvaluator.shouldTrigger(
                 commandLine = snapshot.commandText,

@@ -285,6 +285,28 @@ class StandaloneCompletionTriggerControllerTest {
         assertEquals(2, hidden.count)
     }
 
+    @Test
+    fun `refresh suppresses suggestions when next trigger is suppressed`() {
+        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+        var activeSnapshot = snapshot("cd A/")
+        val controller =
+            controller(
+                activeCommandLine = { activeSnapshot },
+                requestSuggestions = { requested += it },
+            )
+
+        controller.suppressNextTriggerFor("cd A/", 5)
+        controller.refreshNow()
+
+        // Should be suppressed and not request suggestions
+        assertEquals(0, requested.size)
+
+        // As soon as command diverges, it should request suggestions normally
+        activeSnapshot = snapshot("cd A/B")
+        controller.refreshNow()
+        assertEquals(listOf(activeSnapshot), requested)
+    }
+
     private fun controller(
         activeCommandLine: () -> TerminalShellCommandLineSnapshot? = { snapshot("git s") },
         requestSuggestions: (TerminalShellCommandLineSnapshot) -> Unit = { },
