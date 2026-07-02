@@ -34,10 +34,13 @@ internal class SwingTerminalInputController(
             override fun keyPressed(event: KeyEvent) {
                 host.updateHyperlinkActivationHover(event.isControlDown)
                 host.resetCursorBlink(forceRepaint = true)
-                if (host.handleShellSuggestionKeyPressed(event)) return
-                if (handleViewportScrollShortcut(event)) return
-                if (handleSearchShortcut(event)) return
-                if (handleClipboardShortcut(event)) return
+
+                if (!event.isAltGraphDown) {
+                    if (host.handleShellSuggestionKeyPressed(event)) return
+                    if (handleViewportScrollShortcut(event)) return
+                    if (handleSearchShortcut(event)) return
+                    if (handleClipboardShortcut(event)) return
+                }
 
                 val keyEvent = keyMapper.keyPressed(event) ?: return
                 host.session?.encodeKey(keyEvent)
