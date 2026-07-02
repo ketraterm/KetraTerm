@@ -207,10 +207,16 @@ jobs:
             else
               PORTABLE_NAME="KetraTerm-macOS-Apple-Silicon-Portable.zip"
             fi
-            ditto -c -k --keepParent packaging/app-image/KetraTerm.app dist/$PORTABLE_NAME
+            mkdir -p packaging/mac-portable
+            cp -R packaging/app-image/KetraTerm.app packaging/mac-portable/
+            cp packaging/README.txt packaging/mac-portable/
+            ditto -c -k packaging/mac-portable dist/$PORTABLE_NAME
+            rm -rf packaging/mac-portable
           elif [ "${{ runner.os }}" = "Windows" ]; then
+            cp packaging/README.txt packaging/app-image/KetraTerm/README.txt
             powershell -Command "Compress-Archive -Path packaging/app-image/KetraTerm -DestinationPath dist/KetraTerm-Windows-Portable-x64.zip -Force"
           else
+            cp packaging/README.txt packaging/app-image/KetraTerm/README.txt
             tar -czf dist/KetraTerm-Linux-x64.tar.gz -C packaging/app-image KetraTerm
           fi
 
