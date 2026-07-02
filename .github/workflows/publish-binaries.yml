@@ -31,13 +31,13 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp ketraterm-app/build/distributions/ketraterm-app-*.zip dist/KetraTerm-no-runtime.zip
+          cp ketraterm-app/build/distributions/ketraterm-app-*.zip dist/KetraTerm-Java-Preinstalled.zip
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: KetraTerm-no-runtime
-          path: dist/KetraTerm-no-runtime.zip
+          path: dist/KetraTerm-Java-Preinstalled.zip
 
   build-native:
     strategy:
@@ -203,15 +203,15 @@ jobs:
           mkdir -p dist
           if [ "${{ runner.os }}" = "macOS" ]; then
             if [ "${{ matrix.platform }}" = "macos-x64" ]; then
-              PORTABLE_NAME="KetraTerm-Portable-macOS-Intel.zip"
+              PORTABLE_NAME="KetraTerm-macOS-Intel-Portable.zip"
             else
-              PORTABLE_NAME="KetraTerm-Portable-macOS-AppleSilicon.zip"
+              PORTABLE_NAME="KetraTerm-macOS-Apple-Silicon-Portable.zip"
             fi
             ditto -c -k --keepParent packaging/app-image/KetraTerm.app dist/$PORTABLE_NAME
           elif [ "${{ runner.os }}" = "Windows" ]; then
-            powershell -Command "Compress-Archive -Path packaging/app-image/KetraTerm -DestinationPath dist/KetraTerm-Portable.zip -Force"
+            powershell -Command "Compress-Archive -Path packaging/app-image/KetraTerm -DestinationPath dist/KetraTerm-Windows-Portable-x64.zip -Force"
           else
-            tar -czf dist/KetraTerm-Portable-Linux.tar.gz -C packaging/app-image KetraTerm
+            tar -czf dist/KetraTerm-Linux-x64.tar.gz -C packaging/app-image KetraTerm
           fi
 
       - name: Build Native Installer(s)
@@ -252,20 +252,20 @@ jobs:
           mkdir -p dist
           if [ "${{ runner.os }}" = "Windows" ]; then
             EXE_FILE=$(find packaging/installer -maxdepth 1 -name "*.exe" | head -n 1)
-            cp "$EXE_FILE" dist/KetraTerm-Setup.exe
+            cp "$EXE_FILE" dist/KetraTerm-Windows-Setup-x64.exe
           elif [ "${{ runner.os }}" = "macOS" ]; then
             DMG_FILE=$(find packaging/installer -maxdepth 1 -name "*.dmg" | head -n 1)
             if [ "${{ matrix.platform }}" = "macos-x64" ]; then
               cp "$DMG_FILE" dist/KetraTerm-macOS-Intel.dmg
             else
-              cp "$DMG_FILE" dist/KetraTerm-macOS-AppleSilicon.dmg
+              cp "$DMG_FILE" dist/KetraTerm-macOS-Apple-Silicon.dmg
             fi
           else
             DEB_FILE=$(find packaging/installer -maxdepth 1 -name "*.deb" | head -n 1)
-            cp "$DEB_FILE" dist/ketraterm_amd64.deb
+            cp "$DEB_FILE" dist/KetraTerm-Linux-x64.deb
             
             RPM_FILE=$(find packaging/installer -maxdepth 1 -name "*.rpm" | head -n 1)
-            cp "$RPM_FILE" dist/ketraterm-x86_64.rpm
+            cp "$RPM_FILE" dist/KetraTerm-Linux-x64.rpm
           fi
 
       - name: Upload Installer Artifact
@@ -283,9 +283,8 @@ jobs:
         with:
           name: ${{ matrix.portable_name }}
           path: |
-            dist/*-Portable.zip
-            dist/*-Portable-*.zip
-            dist/*-Portable-*.tar.gz
+            dist/*.zip
+            dist/*.tar.gz
 
   publish-github-release:
     needs: [build-no-runtime, build-native]
