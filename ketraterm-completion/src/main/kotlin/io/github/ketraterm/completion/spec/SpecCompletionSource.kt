@@ -20,13 +20,12 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSource
 import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
-import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
-import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
-import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
+import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
+import io.github.ketraterm.completion.commandline.TerminalCompletionContext
+import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalOptionSpec
-import io.github.ketraterm.completion.spec.CommandSpecResolver.findSpec
 
 internal class SpecCompletionSource(
     specs: List<TerminalCommandSpec>,
@@ -39,13 +38,19 @@ internal class SpecCompletionSource(
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
         if (specs.isEmpty()) return emptyList()
-        val context = TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset)
-        val commandTokenIndex = context.tokens.firstCommandTokenIndex()
+        val context =
+            TerminalCompletionContextResolver.resolve(
+                commandLine = request.commandLine,
+                cursorOffset = request.cursorOffset,
+                commandSpecs = specs,
+            )
         val candidates =
-            if (context.activeTokenIndex <= commandTokenIndex) {
-                completeCommands(context)
-            } else {
-                completeCommandBody(context, commandTokenIndex)
+            when (context.activePosition) {
+                TerminalCompletionActivePosition.COMMAND -> completeCommands(context.commandLineContext)
+                TerminalCompletionActivePosition.OPTION_NAME -> completeOptions(context)
+                TerminalCompletionActivePosition.OPTION_VALUE -> completeOptionValues(context)
+                TerminalCompletionActivePosition.SUBCOMMAND -> completeSubcommands(context)
+                TerminalCompletionActivePosition.POSITIONAL_ARGUMENT -> emptyList()
             }
         return candidates
             .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
@@ -67,27 +72,10 @@ internal class SpecCompletionSource(
                 )
             }.toList()
 
-    private fun completeCommandBody(
-        context: TerminalCommandLineContext,
-        commandTokenIndex: Int,
-    ): List<TerminalCompletionCandidate> {
-        val resolved = resolvePath(context, commandTokenIndex) ?: return emptyList()
-        val valueOption = optionBeforeActiveValue(context, commandTokenIndex, resolved.commands)
-        if (valueOption != null && valueOption.valueCandidates.isNotEmpty()) {
-            return completeOptionValues(valueOption, context)
-        }
-        return if (context.activePrefix.startsWith("-")) {
-            completeOptions(resolved, context)
-        } else {
-            completeSubcommands(resolved.current, context)
-        }
-    }
-
-    private fun completeSubcommands(
-        command: TerminalCommandSpec,
-        context: TerminalCommandLineContext,
-    ): List<TerminalCompletionCandidate> =
-        command.subcommands
+    private fun completeSubcommands(context: TerminalCompletionContext): List<TerminalCompletionCandidate> =
+        context.currentCommand
+            ?.subcommands
+            .orEmpty()
             .asSequence()
             .filter { matchesCompletablePrefix(it.name, context.activePrefix) }
             .mapIndexed { orderIndex, spec ->
@@ -96,17 +84,14 @@ internal class SpecCompletionSource(
                     displayText = spec.name,
                     detail = spec.description,
                     kind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                    context = context,
+                    context = context.commandLineContext,
                     score = score(spec.name, context.activePrefix, SUBCOMMAND_BASE_SCORE, orderIndex),
                 )
             }.toList()
 
-    private fun completeOptions(
-        resolved: ResolvedCommandPath,
-        context: TerminalCommandLineContext,
-    ): List<TerminalCompletionCandidate> {
+    private fun completeOptions(context: TerminalCompletionContext): List<TerminalCompletionCandidate> {
         val options = ArrayList<TerminalOptionSpec>()
-        for (command in resolved.commands) {
+        for (command in context.commandPath) {
             options += command.options
         }
 
@@ -121,7 +106,7 @@ internal class SpecCompletionSource(
                             displayText = name,
                             detail = option.description,
                             kind = TerminalCompletionCandidateKind.OPTION,
-                            context = context,
+                            context = context.commandLineContext,
                             score = score(name, context.activePrefix, OPTION_BASE_SCORE, orderIndex),
                         )
                 }
@@ -131,76 +116,20 @@ internal class SpecCompletionSource(
         return candidates
     }
 
-    private fun completeOptionValues(
-        option: TerminalOptionSpec,
-        context: TerminalCommandLineContext,
-    ): List<TerminalCompletionCandidate> =
-        option.valueCandidates
+    private fun completeOptionValues(context: TerminalCompletionContext): List<TerminalCompletionCandidate> =
+        context.staticValueCandidates
             .asSequence()
             .filter { matchesCompletablePrefix(it, context.activePrefix) }
             .mapIndexed { orderIndex, value ->
                 candidate(
                     replacementText = value,
                     displayText = value,
-                    detail = option.description,
+                    detail = context.activeOption?.description.orEmpty(),
                     kind = TerminalCompletionCandidateKind.ARGUMENT,
-                    context = context,
+                    context = context.commandLineContext,
                     score = score(value, context.activePrefix, OPTION_VALUE_BASE_SCORE, orderIndex),
                 )
             }.toList()
-
-    private fun resolvePath(
-        context: TerminalCommandLineContext,
-        commandTokenIndex: Int,
-    ): ResolvedCommandPath? {
-        val tokens = context.tokens
-        if (commandTokenIndex >= tokens.size) return null
-        val root = findSpec(specs, normalizeTerminalCommandToken(tokens[commandTokenIndex].text)) ?: return null
-        val commands = ArrayList<TerminalCommandSpec>()
-        commands += root
-        var current = root
-        var index = commandTokenIndex + 1
-        while (index < context.activeTokenIndex) {
-            val token = tokens[index].text
-            if (token.startsWith("-")) {
-                val normalizedOption = normalizeTerminalCommandToken(token)
-                val option =
-                    commands.asReversed().firstNotNullOfOrNull { spec ->
-                        spec.options.firstOrNull { option ->
-                            option.names.any { normalizeTerminalCommandToken(it) == normalizedOption }
-                        }
-                    }
-                if (option?.requiresValue == true) index++
-                index++
-                continue
-            }
-
-            val next = findSpec(current.subcommands, normalizeTerminalCommandToken(token)) ?: break
-            current = next
-            commands += current
-            index++
-        }
-        return ResolvedCommandPath(commands)
-    }
-
-    private fun optionBeforeActiveValue(
-        context: TerminalCommandLineContext,
-        commandTokenIndex: Int,
-        commands: List<TerminalCommandSpec>,
-    ): TerminalOptionSpec? {
-        val optionIndex = context.activeTokenIndex - 1
-        if (optionIndex <= commandTokenIndex) return null
-        val optionToken = context.tokens.getOrNull(optionIndex) ?: return null
-        if (!optionToken.text.startsWith("-")) return null
-        val normalizedOption = normalizeTerminalCommandToken(optionToken.text)
-        val option =
-            commands.asReversed().firstNotNullOfOrNull { spec ->
-                spec.options.firstOrNull { candidate ->
-                    candidate.names.any { normalizeTerminalCommandToken(it) == normalizedOption }
-                }
-            } ?: return null
-        return if (option.requiresValue) option else null
-    }
 
     private fun candidate(
         replacementText: String,
@@ -220,12 +149,6 @@ internal class SpecCompletionSource(
             kind = kind,
             score = score,
         )
-
-    private data class ResolvedCommandPath(
-        val commands: List<TerminalCommandSpec>,
-    ) {
-        val current: TerminalCommandSpec get() = commands.last()
-    }
 
     private companion object {
         private const val SOURCE_SPEC = "spec"

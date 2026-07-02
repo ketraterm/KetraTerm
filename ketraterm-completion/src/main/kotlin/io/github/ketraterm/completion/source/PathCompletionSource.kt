@@ -16,17 +16,12 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
-import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
-import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
-import io.github.ketraterm.completion.commandline.isTerminalOptionToken
-import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
+import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
+import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.completion.model.TerminalOptionSpec
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
-import io.github.ketraterm.completion.spec.CommandSpecResolver.findSpec
 
 /**
  * Autocomplete source for directory contents and file paths.
@@ -46,19 +41,25 @@ internal class PathCompletionSource(
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
         val workingDir = request.workingDirectoryUri ?: return emptyList()
-        val context = TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset)
+        val context =
+            TerminalCompletionContextResolver.resolve(
+                commandLine = request.commandLine,
+                cursorOffset = request.cursorOffset,
+                commandSpecs = commandSpecs,
+            )
         val prefix = context.activePrefix
 
         // Don't autocomplete paths if the active prefix looks like an option flag
-        if (prefix.startsWith("-")) return emptyList()
-
-        val commandTokenIndex = context.tokens.firstCommandTokenIndex()
-        val isCommandToken = context.activeTokenIndex <= commandTokenIndex
-        val pathKind = pathKind(context, commandTokenIndex, isCommandToken)
+        if (context.activePosition == TerminalCompletionActivePosition.OPTION_NAME) return emptyList()
 
         // If we are in the command position, only complete paths if prefix is explicitly path-like
-        if (isCommandToken && !isPathLike(prefix)) return emptyList()
-        if (!isCommandToken && pathKind == TerminalPathArgumentKind.NONE && !isPathLike(prefix)) return emptyList()
+        if (context.activePosition == TerminalCompletionActivePosition.COMMAND && !isPathLike(prefix)) return emptyList()
+        if (context.activePosition != TerminalCompletionActivePosition.COMMAND &&
+            context.expectedPathKind == TerminalPathArgumentKind.NONE &&
+            !isPathLike(prefix)
+        ) {
+            return emptyList()
+        }
 
         // Slashes normalized to forward slashes for URL path resolution
         val normalizedPrefix = prefix.replace('\\', '/')
@@ -94,15 +95,14 @@ internal class PathCompletionSource(
         var orderIndex = 0
 
         for (entry in entries) {
-            if (!pathKind.accepts(entry)) continue
+            if (!context.expectedPathKind.accepts(entry)) continue
             if (filePrefix.isEmpty() && entry.name.startsWith(".")) continue
             if (matchesPrefix(entry.name, filePrefix)) {
                 val rawSuffix = if (entry.isDirectory) "$pathSeparator" else ""
                 val rawReplacement = directoryPortion + entry.name + rawSuffix
                 val replacementText =
                     replacementText(
-                        commandLine = request.commandLine,
-                        replacementStartOffset = context.replacementStartOffset,
+                        activeTokenQuote = context.activeTokenQuote,
                         rawReplacement = rawReplacement,
                         pathSeparator = pathSeparator,
                     )
@@ -125,14 +125,12 @@ internal class PathCompletionSource(
     }
 
     private fun replacementText(
-        commandLine: String,
-        replacementStartOffset: Int,
+        activeTokenQuote: Char,
         rawReplacement: String,
         pathSeparator: Char,
     ): String {
         val normalizedReplacement = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement
-        val quote = commandLine.getOrNull(replacementStartOffset)
-        return when (quote) {
+        return when (activeTokenQuote) {
             SINGLE_QUOTE -> quoteSingle(normalizedReplacement)
             DOUBLE_QUOTE -> quoteDouble(normalizedReplacement)
             else -> normalizedReplacement
@@ -159,72 +157,6 @@ internal class PathCompletionSource(
             prefix.contains("/") ||
             prefix.contains("\\")
 
-    private fun pathKind(
-        context: TerminalCommandLineContext,
-        commandTokenIndex: Int,
-        isCommandToken: Boolean,
-    ): TerminalPathArgumentKind {
-        if (isCommandToken) return TerminalPathArgumentKind.FILE_OR_DIRECTORY
-        val commandToken = context.tokens.getOrNull(commandTokenIndex) ?: return TerminalPathArgumentKind.NONE
-        val root = findSpec(commandSpecs, normalizeTerminalCommandToken(commandToken.text)) ?: return TerminalPathArgumentKind.NONE
-        val resolved = resolveCommandPath(context, commandTokenIndex, root)
-        optionBeforeActiveValue(context, commandTokenIndex, resolved.commands)?.let { option ->
-            if (option.valuePathKind != TerminalPathArgumentKind.NONE) return option.valuePathKind
-        }
-        return resolved.current.positionalArgumentPathKind
-    }
-
-    private fun resolveCommandPath(
-        context: TerminalCommandLineContext,
-        commandTokenIndex: Int,
-        root: TerminalCommandSpec,
-    ): ResolvedCommandPath {
-        val commands = ArrayList<TerminalCommandSpec>()
-        commands += root
-        var current = root
-        var index = commandTokenIndex + 1
-        while (index < context.activeTokenIndex) {
-            val token = context.tokens[index].text
-            if (token.isTerminalOptionToken()) {
-                val option = findOption(commands, token)
-                if (option?.requiresValue == true) index++
-                index++
-                continue
-            }
-
-            val next = findSpec(current.subcommands, normalizeTerminalCommandToken(token)) ?: break
-            current = next
-            commands += current
-            index++
-        }
-        return ResolvedCommandPath(commands)
-    }
-
-    private fun optionBeforeActiveValue(
-        context: TerminalCommandLineContext,
-        commandTokenIndex: Int,
-        commands: List<TerminalCommandSpec>,
-    ): TerminalOptionSpec? {
-        val optionIndex = context.activeTokenIndex - 1
-        if (optionIndex <= commandTokenIndex) return null
-        val optionToken = context.tokens.getOrNull(optionIndex) ?: return null
-        if (!optionToken.text.isTerminalOptionToken()) return null
-        val option = findOption(commands, optionToken.text) ?: return null
-        return if (option.requiresValue) option else null
-    }
-
-    private fun findOption(
-        commands: List<TerminalCommandSpec>,
-        token: String,
-    ): TerminalOptionSpec? {
-        val normalized = normalizeTerminalCommandToken(token)
-        return commands.asReversed().firstNotNullOfOrNull { command ->
-            command.options.firstOrNull { option ->
-                option.names.any { name -> normalizeTerminalCommandToken(name) == normalized }
-            }
-        }
-    }
-
     private fun matchesPrefix(
         value: String,
         prefix: String,
@@ -248,12 +180,6 @@ internal class PathCompletionSource(
         private const val SINGLE_QUOTE = '\''
         private const val DOUBLE_QUOTE = '"'
         private const val BACKSLASH = '\\'
-    }
-
-    private data class ResolvedCommandPath(
-        val commands: List<TerminalCommandSpec>,
-    ) {
-        val current: TerminalCommandSpec get() = commands.last()
     }
 
     private fun TerminalPathArgumentKind.accepts(entry: TerminalFileEntry): Boolean =

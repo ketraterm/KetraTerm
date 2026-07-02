@@ -38,6 +38,13 @@ constructor state.
 Types used only to tokenize, classify, rank, merge, or index suggestions belong
 in implementation packages and must stay `internal`.
 
+`TerminalCompletionContextResolver` is the shared internal command-line context
+resolver. Sources and ranking decorators should use it instead of independently
+guessing command position, subcommand position, option-name position,
+option-value position, positional-argument position, active option metadata,
+expected path kind, static value candidates, replacement offsets, or active
+quote state from raw command text.
+
 ## Internal Implementation
 
 These packages are implementation detail and must not be imported by app,
@@ -109,10 +116,10 @@ indexes, watch files, or block on host I/O.
 ## Ranking Policy Direction
 
 Current ranking is deterministic source-priority plus candidate-score ordering.
-Future source-aware ranking should make the active command-line context explicit
-instead of hardcoding host behavior: command position, subcommand position,
-option name, option value, positional value, expected argument kind, command
-family, and source kind should all be available to ranking decorators. This is
-the place to prefer branches over paths for `git switch`, paths over MRU for
-`cd`, and option values after value-taking options without mixing standalone or
-IDE-specific provider code into the shared engine.
+Future source-aware ranking should consume `TerminalCompletionContext` instead
+of hardcoding host behavior: command position, subcommand position, option name,
+option value, positional value, expected argument kind, command family, and
+source kind should all be available to ranking decorators. This is the place to
+prefer branches over paths for `git switch`, paths over MRU for `cd`, and option
+values after value-taking options without mixing standalone or IDE-specific
+provider code into the shared engine.
