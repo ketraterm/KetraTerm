@@ -54,7 +54,7 @@ class KetraTermIntellijSettingsTest {
                 KetraTermIntellijSettings.State(themeId = "nord"),
             )
 
-        assertEquals(Insets(0, 20, 8, 8), settings.padding)
+        assertEquals(Insets(0, 20, 8, 0), settings.padding)
         assertEquals(4, settings.padding.left - settings.shellIntegrationDecorationGutterWidth)
     }
 

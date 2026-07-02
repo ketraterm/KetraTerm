@@ -106,7 +106,8 @@ internal class KetraTermTerminalPane private constructor(
         private fun configureScrollbar(scrollbar: JBScrollBar) {
             scrollbar.unitIncrement = 1
             scrollbar.blockIncrement = 8
-            scrollbar.isVisible = false
+            scrollbar.isVisible = true
+            scrollbar.isEnabled = false
             scrollbar.isFocusable = false
             scrollbar.isOpaque = false
         }

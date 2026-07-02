@@ -16,6 +16,9 @@
 package io.github.ketraterm.ui.swing.api
 
 import java.awt.Adjustable
+import java.awt.BorderLayout
+import java.awt.Dimension
+import javax.swing.JPanel
 import javax.swing.JScrollBar
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -64,10 +67,37 @@ class SwingScrollbarAdapterTest {
         adapter.viewportStateChanged(viewportState(renderOffset = 3))
 
         assertTrue(scrollbar.isVisible)
+        assertTrue(scrollbar.isEnabled)
         assertEquals(70, scrollbar.value)
         assertEquals(10, scrollbar.unitIncrement)
         assertEquals(30, scrollbar.blockIncrement)
         assertEquals(130, scrollbar.maximum)
+    }
+
+    @Test
+    fun `scrollback appearing keeps terminal layout width stable`() {
+        val terminal = JPanel()
+        terminal.preferredSize = Dimension(100, 30)
+        val scrollbar = JScrollBar(Adjustable.VERTICAL)
+        scrollbar.preferredSize = Dimension(10, 30)
+        val container =
+            JPanel(BorderLayout()).apply {
+                add(terminal, BorderLayout.CENTER)
+                add(scrollbar, BorderLayout.EAST)
+                setBounds(0, 0, 110, 30)
+            }
+        val adapter = SwingScrollbarAdapter(scrollbar)
+
+        adapter.viewportStateChanged(viewportState(historySize = 0, renderOffset = 0))
+        container.doLayout()
+        val widthWithoutHistory = terminal.width
+
+        adapter.viewportStateChanged(viewportState(historySize = 10, renderOffset = 0))
+        container.doLayout()
+
+        assertTrue(scrollbar.isVisible)
+        assertEquals(widthWithoutHistory, terminal.width)
+        assertEquals(100, terminal.width)
     }
 
     @Test
@@ -85,17 +115,18 @@ class SwingScrollbarAdapterTest {
     }
 
     private fun viewportState(
+        historySize: Int = 10,
         renderOffset: Int,
         scrollbackOffset: Double = renderOffset.toDouble(),
     ): TerminalViewportState =
         TerminalViewportState(
-            historySize = 10,
+            historySize = historySize,
             scrollbackOffset = scrollbackOffset,
             renderOffset = renderOffset,
             visibleRows = 3,
             requestedRows = 3,
             visualScrollOffsetPixels = scrollbackOffset * 10.0,
-            visualScrollRangePixels = 100,
+            visualScrollRangePixels = historySize * 10,
             viewportHeightPixels = 30,
             contentHeightPixels = 30,
             cellHeightPixels = 10,

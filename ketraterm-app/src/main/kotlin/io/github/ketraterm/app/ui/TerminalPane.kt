@@ -120,7 +120,8 @@ internal class TerminalPane private constructor(
             scrollbar.blockIncrement = 8
             scrollbar.preferredSize = Chrome.scrollbarSize
             scrollbar.ui = ScrollBarUi()
-            scrollbar.isVisible = false
+            scrollbar.isVisible = true
+            scrollbar.isEnabled = false
             scrollbar.isFocusable = false
             scrollbar.isOpaque = false
         }

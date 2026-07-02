@@ -73,8 +73,10 @@ import java.util.*
  * @property shellIntegrationFailedCommandRailWidth failed-command rail width in pixels.
  * @property padding optional host-owned visual inset around the terminal grid
  * in pixels. The default keeps top padding at zero so smooth scrolling can
- * enter through the top edge, while retaining a compact right edge, the
- * shell-integration decoration gutter, and a small bottom visual spacer.
+ * enter through the top edge, while retaining the shell-integration decoration
+ * gutter and a small bottom visual spacer. Hosts with a side scrollbar should
+ * reserve scrollbar width outside the component instead of adding right padding
+ * inside the terminal grid.
  * Alternate-screen rendering replaces the inactive prompt gutter with symmetric
  * side insets and resizes the terminal grid to the newly available columns.
  * @property pasteOnMiddleClick whether middle mouse button click triggers a clipboard paste.
@@ -118,7 +120,7 @@ data class SwingSettings
         val shellIntegrationFailedCommandRailsVisible: Boolean = true,
         val shellIntegrationFailedCommandRailColor: Int = DEFAULT_SHELL_INTEGRATION_FAILED_COMMAND_RAIL_COLOR,
         val shellIntegrationFailedCommandRailWidth: Int = 3,
-        val padding: Insets = Insets(0, 20, 8, 8),
+        val padding: Insets = Insets(0, 20, 8, 0),
         val pasteOnMiddleClick: Boolean = true,
         val pasteSanitizationPolicy: PasteSanitizationPolicy = PasteSanitizationPolicy.RAW,
         val cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK,
