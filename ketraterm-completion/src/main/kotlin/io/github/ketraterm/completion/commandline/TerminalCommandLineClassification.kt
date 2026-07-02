@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.completion.model
+package io.github.ketraterm.completion.commandline
+
+import io.github.ketraterm.completion.model.TerminalCommandLineShape
 
 /**
  * Privacy-preserving category for one command-line argument token.

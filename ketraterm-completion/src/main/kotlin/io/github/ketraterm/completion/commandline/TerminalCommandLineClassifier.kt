@@ -16,7 +16,8 @@
 package io.github.ketraterm.completion.commandline
 
 import io.github.ketraterm.completion.internal.hasTerminalCompletionLineBreak
-import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.model.TerminalCommandLineShape
+import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.spec.CommandSpecResolver
 
 /**

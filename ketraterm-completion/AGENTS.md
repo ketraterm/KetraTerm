@@ -3,6 +3,19 @@
 `ketraterm-completion` owns dependency-free command-line completion models,
 tokenization, ranking, and static/spec-backed candidate evaluation.
 
+## Public API Surface
+
+External modules must import completion through:
+
+- `io.github.ketraterm.completion.api`
+- `io.github.ketraterm.completion.model`
+
+Implementation packages are not product API. Keep top-level declarations in
+`commandline`, `engine`, `internal`, `ranking`, `source`, `spec`, and `stats`
+`internal` unless a deliberate design change promotes the type into `api` or
+`model`. Update `docs/completion-architecture.md` and the architecture guard
+test when changing this boundary.
+
 ## Boundary
 
 This module may:

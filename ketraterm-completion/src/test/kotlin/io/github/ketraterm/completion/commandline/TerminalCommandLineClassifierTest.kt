@@ -15,9 +15,6 @@
  */
 package io.github.ketraterm.completion.commandline
 
-import io.github.ketraterm.completion.model.TerminalCommandArgumentKind
-import io.github.ketraterm.completion.model.TerminalCommandArgumentShape
-import io.github.ketraterm.completion.model.TerminalCommandLineClassification
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import kotlin.test.*
 
