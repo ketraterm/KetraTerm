@@ -58,7 +58,12 @@ jobs:
       - name: Prepare Website & Docs Bundle
         shell: bash
         run: |
-          VERSION=$(cat VERSION | tr -d '\r\n')
+          # Extract version from tag name if available (v0.1.1 -> 0.1.1), otherwise fall back to VERSION file
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(cat VERSION | tr -d '\r\n')
+          fi
           
           # Check if the version is stable (does not contain pre-release tags like alpha, beta, rc, SNAPSHOT, etc.)
           IS_STABLE=true
