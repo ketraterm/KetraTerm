@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.app.history
+package io.github.ketraterm.workspace.persistence
 
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import java.util.concurrent.Executors
@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit
  * @param threadName daemon worker thread name.
  * @param closeTimeoutSeconds maximum time to wait for worker shutdown.
  */
-internal class CommandCompletionStatsWriteQueue(
+class CommandCompletionStatsWriteQueue(
     private val writeSnapshot: (TerminalCommandCompletionStatsSnapshot) -> Unit,
     threadName: String = DEFAULT_THREAD_NAME,
     private val closeTimeoutSeconds: Long = DEFAULT_CLOSE_TIMEOUT_SECONDS,

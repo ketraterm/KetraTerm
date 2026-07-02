@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.app.history
+package io.github.ketraterm.completion.history
 
 /**
  * Reason category for a persisted command-learning privacy decision.
  */
-internal enum class CommandPersistencePrivacyDecisionKind {
+enum class CommandPersistencePrivacyDecisionKind {
     /**
      * The command-learning row is safe enough for local persisted learning.
      */
@@ -45,7 +45,7 @@ internal enum class CommandPersistencePrivacyDecisionKind {
 /**
  * Field or metadata surface that produced a privacy decision.
  */
-internal enum class CommandPersistencePrivacyDecisionLocation {
+enum class CommandPersistencePrivacyDecisionLocation {
     /**
      * Raw exact command text.
      */
@@ -74,7 +74,7 @@ internal enum class CommandPersistencePrivacyDecisionLocation {
  * @property matchedText optional vocabulary fragment that caused rejection.
  * @property location optional field or metadata surface that produced the decision.
  */
-internal data class CommandPersistencePrivacyDecision(
+data class CommandPersistencePrivacyDecision(
     val kind: CommandPersistencePrivacyDecisionKind,
     val matchedText: String? = null,
     val location: CommandPersistencePrivacyDecisionLocation? = null,

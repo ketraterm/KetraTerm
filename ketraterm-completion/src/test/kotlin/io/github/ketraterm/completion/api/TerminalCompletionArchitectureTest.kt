@@ -266,6 +266,7 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCompletionSourceEntry",
                 "TerminalCompletionSources",
                 "TerminalSessionMruCompletionSource",
+                "TerminalCompletionTriggerEvaluator",
             )
         private val PUBLIC_COMPLETION_SOURCE_FACTORIES =
             setOf(
@@ -302,6 +303,7 @@ internal class TerminalCompletionArchitectureTest {
                 "api/TerminalCompletionSource.kt" to setOf("complete"),
                 "api/TerminalCompletionSources.kt" to setOf("commandStats", "feedbackAware", "fromSpecs", "sessionMru"),
                 "api/TerminalSessionMruCompletionSource.kt" to setOf("recordSuccessfulCommand", "clear"),
+                "api/TerminalCompletionTriggerEvaluator.kt" to setOf("shouldTrigger", "isLiveTrigger"),
             )
 
         private val PUBLIC_TOP_LEVEL_DECLARATION =

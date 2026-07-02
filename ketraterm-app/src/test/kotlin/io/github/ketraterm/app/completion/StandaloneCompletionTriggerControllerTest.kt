@@ -186,6 +186,105 @@ class StandaloneCompletionTriggerControllerTest {
         assertEquals(0, requested.size)
     }
 
+    @Test
+    fun `refresh requests suggestions for hyphen option triggers bypassing length rules`() {
+        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+        val hidden = Counter()
+        val activeSnapshot = snapshot("-")
+        val controller =
+            controller(
+                activeCommandLine = { activeSnapshot },
+                requestSuggestions = { requested += it },
+                hideSuggestions = hidden::increment,
+            )
+
+        controller.refreshNow()
+
+        assertEquals(listOf(activeSnapshot), requested)
+        assertEquals(0, hidden.count)
+    }
+
+    @Test
+    fun `refresh requests suggestions for path separator triggers bypassing length rules`() {
+        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+        val hidden = Counter()
+        val activeSnapshot = snapshot("/")
+        val controller =
+            controller(
+                activeCommandLine = { activeSnapshot },
+                requestSuggestions = { requested += it },
+                hideSuggestions = hidden::increment,
+            )
+
+        controller.refreshNow()
+
+        assertEquals(listOf(activeSnapshot), requested)
+        assertEquals(0, hidden.count)
+    }
+
+    @Test
+    fun `refresh requests suggestions for environment variable triggers bypassing length rules`() {
+        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+        val hidden = Counter()
+        val activeSnapshot = snapshot("$")
+        val controller =
+            controller(
+                activeCommandLine = { activeSnapshot },
+                requestSuggestions = { requested += it },
+                hideSuggestions = hidden::increment,
+            )
+
+        controller.refreshNow()
+
+        assertEquals(listOf(activeSnapshot), requested)
+        assertEquals(0, hidden.count)
+    }
+
+    @Test
+    fun `refresh requests suggestions for single space after word bypassing length rules`() {
+        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+        val hidden = Counter()
+        val activeSnapshot = snapshot("go ")
+        val controller =
+            StandaloneCompletionTriggerController(
+                activeCommandLine = { activeSnapshot },
+                requestSuggestions = { requested += it },
+                hideSuggestions = hidden::increment,
+                suggestionsEnabled = { true },
+                scheduler = FakeScheduler(),
+                debounceMillis = 50,
+                minimumNonWhitespaceCharacters = 3,
+            )
+
+        controller.refreshNow()
+
+        assertEquals(listOf(activeSnapshot), requested)
+        assertEquals(0, hidden.count)
+    }
+
+    @Test
+    fun `refresh hides popup for multiple trailing spaces or space on empty command`() {
+        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+        val hidden = Counter()
+        var activeSnapshot = snapshot("g  ") // double space
+        val controller =
+            controller(
+                activeCommandLine = { activeSnapshot },
+                requestSuggestions = { requested += it },
+                hideSuggestions = hidden::increment,
+            )
+
+        controller.refreshNow()
+
+        assertEquals(0, requested.size)
+        assertEquals(1, hidden.count)
+
+        activeSnapshot = snapshot(" ") // space on empty
+        controller.refreshNow()
+        assertEquals(0, requested.size)
+        assertEquals(2, hidden.count)
+    }
+
     private fun controller(
         activeCommandLine: () -> TerminalShellCommandLineSnapshot? = { snapshot("git s") },
         requestSuggestions: (TerminalShellCommandLineSnapshot) -> Unit = { },

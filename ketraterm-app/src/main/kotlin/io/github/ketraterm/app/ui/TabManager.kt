@@ -18,15 +18,15 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.app.completion.StandaloneCompletionFeedbackRecorder
 import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
 import io.github.ketraterm.app.config.KetraTermSettings
-import io.github.ketraterm.app.history.CommandCompletionStatsStore
-import io.github.ketraterm.app.history.CommandPersistencePrivacyPolicy
 import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.history.CommandPersistencePrivacyPolicy
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.workspace.*
+import io.github.ketraterm.workspace.persistence.CommandCompletionStatsStore
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.completion
 
+import io.github.ketraterm.completion.api.TerminalCompletionTriggerEvaluator
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import javax.swing.SwingUtilities
 import javax.swing.Timer
@@ -90,7 +91,18 @@ internal class StandaloneCompletionTriggerController(
             return
         }
         val snapshot = activeCommandLine()
-        if (snapshot == null || snapshot.nonWhitespaceCount() < minimumNonWhitespaceCharacters) {
+        if (snapshot == null) {
+            lastRequestedSnapshotKey = null
+            hideSuggestions()
+            return
+        }
+        val shouldTrigger =
+            TerminalCompletionTriggerEvaluator.shouldTrigger(
+                commandLine = snapshot.commandText,
+                cursorOffset = snapshot.cursorOffset,
+                minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
+            )
+        if (!shouldTrigger) {
             lastRequestedSnapshotKey = null
             hideSuggestions()
             return

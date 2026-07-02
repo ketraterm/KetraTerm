@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.app.history
+package io.github.ketraterm.completion.history
 
-import io.github.ketraterm.app.history.CommandPersistencePrivacyDecisionLocation.*
-import io.github.ketraterm.app.history.CommandPersistencePrivacyPolicy.allowsCommand
+import io.github.ketraterm.completion.history.CommandPersistencePrivacyDecisionLocation.*
+import io.github.ketraterm.completion.history.CommandPersistencePrivacyPolicy.allowsCommand
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandShapeStats
 
@@ -28,7 +28,7 @@ import io.github.ketraterm.completion.model.TerminalCommandShapeStats
  * structural command shapes are persisted, preserving shell ignorespace
  * behavior and avoiding common credential-bearing commands.
  */
-internal object CommandPersistencePrivacyPolicy {
+object CommandPersistencePrivacyPolicy {
     /**
      * Returns whether [command] may be learned or written to disk.
      *

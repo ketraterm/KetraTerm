@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.app.history
+package io.github.ketraterm.workspace.persistence
 
+import io.github.ketraterm.completion.history.CommandCompletionStatsSanitizer
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshotCodec
 import java.nio.charset.StandardCharsets
@@ -34,7 +35,7 @@ import java.nio.file.StandardCopyOption
  *
  * @property path destination file for the versioned tab-separated stats index.
  */
-internal class CommandCompletionStatsStore(
+class CommandCompletionStatsStore(
     private val path: Path,
 ) : AutoCloseable {
     private val writeQueue = CommandCompletionStatsWriteQueue(::writeSnapshot)

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.app.history
+package io.github.ketraterm.completion.history
 
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 
@@ -26,7 +26,7 @@ import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapsh
  * contract because they contain provider/source metadata and UX counters, not
  * raw command arguments.
  */
-internal object CommandCompletionStatsSanitizer {
+object CommandCompletionStatsSanitizer {
     /**
      * Returns a snapshot safe enough for local persisted suggestion learning.
      *

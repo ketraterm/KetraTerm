@@ -20,6 +20,7 @@ plugins {
 
 dependencies {
     api(project(":ketraterm-session"))
+    api(project(":ketraterm-completion"))
     implementation(project(":ketraterm-pty"))
     implementation(project(":ketraterm-render-api"))
 
