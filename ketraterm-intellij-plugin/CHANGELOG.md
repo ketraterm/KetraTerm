@@ -2,7 +2,9 @@
 
 ## [Unreleased]
 
-- No unreleased changes.
+- Fixed AltGr character input and terminal grid corruption on AZERTY keyboards for Windows/Linux.
+- Fixed terminal tool window focus issue where clicking on the terminal component (including Vim/Neovim mouse tracking and hyperlinks) failed to transfer focus back from the editor.
+- Fixed Settings dialog EDT blocking exception when opening settings from the tool window gear icon.
 
 ## [0.1.0] - 2026-06-30
 

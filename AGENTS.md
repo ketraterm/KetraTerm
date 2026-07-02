@@ -31,8 +31,8 @@ The project is split into strict layers:
 - `ketraterm-ui-swing`: reusable Swing terminal UI component, painting,
   selection, input event handling, clipboard/font/settings abstractions, and
   viewport/scrollbar model.
-- `ketraterm-ui-swing-demo`: standalone Swing demo host that wires the reusable
-  UI component to a local PTY-backed session for manual testing.
+- `ketraterm-app`: standalone Swing desktop application hosting the reusable UI
+  component, managing tab states, window framing, and PTY processes.
 - `ketraterm-testkit`: reusable public test fakes for connector/session tests.
 - `ketraterm-pty`: local PTY process lifecycle exposed as transport connectors.
 - `ketraterm-benchmarks`: JMH benchmarks for performance-sensitive terminal
@@ -159,8 +159,8 @@ A change is not done until:
 - Session tests: `./gradlew :ketraterm-session:test`
 - Render cache tests: `./gradlew :ketraterm-render-cache:test`
 - Swing UI tests: `./gradlew :ketraterm-ui-swing:test`
-- Swing UI demo: `./gradlew :ketraterm-ui-swing-demo:run`
-  - Custom shell: `./gradlew :ketraterm-ui-swing-demo:run --args="cmd.exe"`
+- Standalone UI application: `./gradlew :ketraterm-app:run`
+  - Custom shell: `./gradlew :ketraterm-app:run --args="cmd.exe"`
 - PTY tests: `./gradlew :ketraterm-pty:test`
 - Benchmarks: `./gradlew :ketraterm-benchmarks:jmh`
 
