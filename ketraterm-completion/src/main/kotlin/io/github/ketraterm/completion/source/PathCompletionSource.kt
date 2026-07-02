@@ -18,10 +18,18 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
+import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 
 /**
  * Autocomplete source for directory contents and file paths.
+ *
+ * Path completion is conservative for bare argument positions so command and
+ * subcommand suggestions are not drowned out by every file in the current
+ * directory. Known path-taking commands may request file, directory, or
+ * directory-only completion from an empty argument prefix; otherwise callers
+ * must type an explicitly path-like prefix such as `./`, `/`, `~`, or a token
+ * containing a path separator.
  */
 internal class PathCompletionSource(
     private val fileSystemProvider: TerminalFileSystemProvider,
@@ -36,9 +44,11 @@ internal class PathCompletionSource(
 
         val commandTokenIndex = context.tokens.firstCommandTokenIndex()
         val isCommandToken = context.activeTokenIndex <= commandTokenIndex
+        val pathPolicy = pathPolicy(context.tokens.getOrNull(commandTokenIndex)?.text)
 
         // If we are in the command position, only complete paths if prefix is explicitly path-like
         if (isCommandToken && !isPathLike(prefix)) return emptyList()
+        if (!isCommandToken && pathPolicy == PathArgumentPolicy.NONE && !isPathLike(prefix)) return emptyList()
 
         // Slashes normalized to forward slashes for URL path resolution
         val normalizedPrefix = prefix.replace('\\', '/')
@@ -74,6 +84,8 @@ internal class PathCompletionSource(
         var orderIndex = 0
 
         for (entry in entries) {
+            if (pathPolicy == PathArgumentPolicy.DIRECTORY_ONLY && !entry.isDirectory) continue
+            if (filePrefix.isEmpty() && entry.name.startsWith(".")) continue
             if (matchesPrefix(entry.name, filePrefix)) {
                 val rawSuffix = if (entry.isDirectory) "$pathSeparator" else ""
                 val rawReplacement = directoryPortion + entry.name + rawSuffix
@@ -104,6 +116,39 @@ internal class PathCompletionSource(
             prefix.contains("/") ||
             prefix.contains("\\")
 
+    private fun pathPolicy(commandToken: String?): PathArgumentPolicy {
+        if (commandToken == null) return PathArgumentPolicy.NONE
+        return when (normalizeTerminalCommandToken(commandToken)) {
+            "cd",
+            "chdir",
+            "sl",
+            "set-location",
+            "pushd",
+            "popd",
+            -> PathArgumentPolicy.DIRECTORY_ONLY
+            "cat",
+            "cp",
+            "copy",
+            "code",
+            "del",
+            "dir",
+            "erase",
+            "less",
+            "ls",
+            "mkdir",
+            "more",
+            "move",
+            "mv",
+            "open",
+            "rd",
+            "rm",
+            "rmdir",
+            "type",
+            -> PathArgumentPolicy.ANY
+            else -> PathArgumentPolicy.NONE
+        }
+    }
+
     private fun matchesPrefix(
         value: String,
         prefix: String,
@@ -124,5 +169,11 @@ internal class PathCompletionSource(
     private companion object {
         private const val SOURCE_PATH = "path"
         private const val PATH_BASE_SCORE = 200
+    }
+
+    private enum class PathArgumentPolicy {
+        NONE,
+        ANY,
+        DIRECTORY_ONLY,
     }
 }

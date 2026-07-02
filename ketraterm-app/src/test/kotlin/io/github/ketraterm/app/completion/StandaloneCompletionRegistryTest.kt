@@ -22,6 +22,7 @@ import io.github.ketraterm.completion.model.TerminalCommandLineShape
 import io.github.ketraterm.completion.model.TerminalCommandShapeStats
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -50,6 +51,60 @@ class StandaloneCompletionRegistryTest {
         assertEquals(0, suggestions[0].replacementStartOffset)
         assertEquals(5, suggestions[0].replacementEndOffset)
         assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
+    }
+
+    @Test
+    fun `directory path suggestions rank ahead of command MRU after cd space`() {
+        val directory = Files.createTempDirectory("ketraterm-completion")
+        try {
+            Files.createDirectory(directory.resolve("alpha"))
+            Files.createDirectory(directory.resolve(".hidden"))
+            Files.writeString(directory.resolve("README.md"), "not a directory")
+            val registry = registry(emptyList())
+            val provider =
+                registry.createProvider(
+                    sessionId = "session-1",
+                    profileId = "pwsh",
+                    workingDirectoryUriProvider = { directory.toUri().toString() },
+                )
+            registry.recordSuccessfulCommand(
+                sessionId = "session-1",
+                commandLine = "cd remembered",
+                profileId = "pwsh",
+                workingDirectoryUri = directory.toUri().toString(),
+            )
+
+            val suggestions = provider.suggestions(request("cd "))
+
+            assertEquals("alpha/", suggestions.first().replacementText)
+            assertEquals("path", suggestions.first().source)
+            assertTrue(suggestions.none { it.replacementText == ".hidden/" })
+            assertTrue(suggestions.none { it.replacementText == "README.md" })
+            assertTrue(suggestions.any { it.replacementText == "cd remembered" && it.source == "mru" })
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `bare path entries do not pollute command subcommand completion`() {
+        val directory = Files.createTempDirectory("ketraterm-completion")
+        try {
+            Files.createDirectory(directory.resolve("status"))
+            val provider =
+                registry().createProvider(
+                    sessionId = "session-1",
+                    profileId = "bash",
+                    workingDirectoryUriProvider = { directory.toUri().toString() },
+                )
+
+            val suggestions = provider.suggestions(request("git s"))
+
+            assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
+            assertTrue(suggestions.none { it.source == "path" })
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
     }
 
     @Test

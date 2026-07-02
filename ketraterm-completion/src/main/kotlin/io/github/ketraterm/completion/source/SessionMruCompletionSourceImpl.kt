@@ -120,7 +120,8 @@ internal class SessionMruCompletionSourceImpl(
                         if (isRelativeCdCommand(entry.commandLine)) {
                             val entryUri = entry.workingDirectoryUri
                             val requestUri = request.workingDirectoryUri
-                            if (entryUri != null && requestUri != null &&
+                            if (entryUri != null &&
+                                requestUri != null &&
                                 canonicalizeWorkingDirectoryUri(entryUri) != canonicalizeWorkingDirectoryUri(requestUri)
                             ) {
                                 continue

@@ -185,7 +185,17 @@ internal class ShellIntegrationCommandTextExtractor(
     private fun lastTextColumnExclusive(columns: Int): Int {
         var column = columns - 1
         while (column >= 0) {
-            if (flags[column] != TerminalRenderCellFlags.EMPTY) return column + 1
+            val cellFlags = flags[column]
+            if (cellFlags != TerminalRenderCellFlags.EMPTY) {
+                if (cellFlags and TerminalRenderCellFlags.CODEPOINT != 0) {
+                    val code = codeWords[column]
+                    if (code != 0 && code != 0x20) {
+                        return column + 1
+                    }
+                } else {
+                    return column + 1
+                }
+            }
             column--
         }
         return 0

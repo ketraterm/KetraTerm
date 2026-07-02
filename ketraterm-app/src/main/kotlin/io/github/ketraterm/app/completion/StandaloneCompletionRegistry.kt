@@ -179,9 +179,9 @@ internal class StandaloneCompletionRegistry(
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
         private const val COMPOSED_SOURCE_CAPACITY = 4
+        private const val PATH_PRIORITY = 125
         private const val SESSION_MRU_PRIORITY = 100
         private const val PERSISTENT_STATS_PRIORITY = 50
         private const val SPEC_PRIORITY = 0
-        private const val PATH_PRIORITY = -10
     }
 }

@@ -29,6 +29,7 @@ class PathCompletionSourceTest {
             "file:///project/",
             listOf(
                 TerminalFileEntry("src", isDirectory = true),
+                TerminalFileEntry(".hidden", isDirectory = true),
                 TerminalFileEntry("README.md", isDirectory = false),
                 TerminalFileEntry("LICENSE", isDirectory = false),
             ),
@@ -61,6 +62,31 @@ class PathCompletionSourceTest {
         assertEquals("README.md", candidate.displayText)
         assertEquals(TerminalCompletionCandidateKind.PATH, candidate.kind)
         assertEquals("file", candidate.detail)
+    }
+
+    @Test
+    fun `completed command space lists visible directories for directory-changing commands`() {
+        val request = request("cd ", "file:///project")
+        val candidates = source.complete(request)
+
+        assertEquals(listOf("src/"), candidates.map { it.replacementText })
+        assertTrue(candidates.all { it.detail == "directory" })
+    }
+
+    @Test
+    fun `empty path argument prefix hides dot entries until dot is typed`() {
+        val emptyPrefixCandidates = source.complete(request("cat ", "file:///project"))
+        assertTrue(emptyPrefixCandidates.none { it.replacementText.startsWith(".") })
+
+        val dotPrefixCandidates = source.complete(request("cat .", "file:///project"))
+        assertEquals(listOf(".hidden/"), dotPrefixCandidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `suppresses bare path completion for commands without path argument policy`() {
+        val candidates = source.complete(request("git s", "file:///project"))
+
+        assertTrue(candidates.isEmpty())
     }
 
     @Test

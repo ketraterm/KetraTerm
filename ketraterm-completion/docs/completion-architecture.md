@@ -66,3 +66,17 @@ candidates to their own UI presentation.
 The public API should not grow by convenience. New public functions must be
 durable host contracts, used by standalone/plugin integration, or explicitly
 documented persistence/model contracts.
+
+## Command-Line Context Policy
+
+Completion treats trailing space as a semantic boundary. With the cursor inside
+`cd`, sources complete the command token. With the cursor after `cd `, sources
+complete a new empty argument at the cursor while full-command MRU and stats
+sources may still match the normalized visible command prefix.
+
+Path completion is intentionally conservative. In command position it only
+returns candidates for explicitly path-like prefixes. In argument position it
+returns bare current-directory entries only for known path-taking commands, and
+directory-changing commands such as `cd`, `chdir`, `pushd`, and PowerShell
+`Set-Location` aliases receive directory-only candidates. Dot-prefixed entries
+are hidden for an empty path prefix and appear once the user types `.`.
