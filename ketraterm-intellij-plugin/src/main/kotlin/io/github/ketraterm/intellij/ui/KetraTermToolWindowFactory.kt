@@ -169,7 +169,7 @@ class KetraTermToolWindowFactory : ToolWindowFactory, DumbAware {
             AllIcons.General.Settings,
         ) {
         override fun actionPerformed(event: AnActionEvent) {
-            ShowSettingsUtil.getInstance().showSettingsDialog(project, KetraTermSettingsConfigurable::class.java)
+            ShowSettingsUtil.getInstance().showSettingsDialog(project, "io.github.ketraterm.terminal.settings")
         }
 
         override fun update(event: AnActionEvent) {
