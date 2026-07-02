@@ -19,15 +19,29 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionEngine
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
+import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.ranking.TerminalCompletionRankingContext
 
 internal class MergedCompletionEngine(
     sources: List<TerminalCompletionSourceEntry>,
+    commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
 ) : TerminalCompletionEngine {
     private val sources = sources.toList()
+    private val commandSpecs = commandSpecs.toList()
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
         if (sources.isEmpty()) return emptyList()
 
+        val rankingContext =
+            TerminalCompletionRankingContext(
+                TerminalCompletionContextResolver.resolve(
+                    commandLine = request.commandLine,
+                    cursorOffset = request.cursorOffset,
+                    commandSpecs = commandSpecs,
+                ),
+            )
         val deduplicated = LinkedHashMap<CandidateKey, RankedCandidate>()
         for (sourceIndex in sources.indices) {
             val entry = sources[sourceIndex]
@@ -38,6 +52,7 @@ internal class MergedCompletionEngine(
                     RankedCandidate(
                         candidate = candidate,
                         sourcePriority = entry.priority,
+                        contextPriorityAdjustment = rankingContext.priorityAdjustment(candidate),
                         sourceIndex = sourceIndex,
                         candidateIndex = candidateIndex,
                     )
@@ -71,16 +86,20 @@ internal class MergedCompletionEngine(
     private data class RankedCandidate(
         val candidate: TerminalCompletionCandidate,
         val sourcePriority: Int,
+        val contextPriorityAdjustment: Int,
         val sourceIndex: Int,
         val candidateIndex: Int,
-    )
+    ) {
+        val effectiveSourcePriority: Int = sourcePriority + contextPriorityAdjustment
+    }
 
     private companion object {
         private val RANKING =
-            compareByDescending<RankedCandidate> { it.sourcePriority }
+            compareByDescending<RankedCandidate> { it.effectiveSourcePriority }
                 .thenByDescending { it.candidate.score }
                 .thenBy { it.candidate.displayText }
                 .thenBy { it.candidate.replacementText }
+                .thenByDescending { it.sourcePriority }
                 .thenBy { it.sourceIndex }
                 .thenBy { it.candidateIndex }
     }

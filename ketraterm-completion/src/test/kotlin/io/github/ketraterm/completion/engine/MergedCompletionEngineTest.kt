@@ -107,6 +107,178 @@ class MergedCompletionEngineTest {
     }
 
     @Test
+    fun `path candidates outrank history in cd positional path position`() {
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                listOf(
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "cd remembered",
+                                start = 0,
+                                end = 3,
+                                source = "mru",
+                                kind = TerminalCompletionCandidateKind.HISTORY,
+                            ),
+                        ),
+                        priority = 100,
+                    ),
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "src/",
+                                start = 3,
+                                end = 3,
+                                source = "path",
+                                kind = TerminalCompletionCandidateKind.PATH,
+                            ),
+                        ),
+                        priority = 0,
+                    ),
+                ),
+            )
+
+        val candidates = engine.complete(request(commandLine = "cd ", maxCandidates = 8))
+
+        assertEquals(listOf("src/", "cd remembered"), candidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `subcommand candidates outrank history and paths in subcommand position`() {
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                listOf(
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "git stash",
+                                start = 0,
+                                end = 5,
+                                source = "mru",
+                                kind = TerminalCompletionCandidateKind.HISTORY,
+                            ),
+                        ),
+                        priority = 100,
+                    ),
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "src/",
+                                start = 4,
+                                end = 5,
+                                source = "path",
+                                kind = TerminalCompletionCandidateKind.PATH,
+                            ),
+                        ),
+                        priority = 100,
+                    ),
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "status",
+                                start = 4,
+                                end = 5,
+                                source = "spec",
+                                kind = TerminalCompletionCandidateKind.SUBCOMMAND,
+                            ),
+                        ),
+                        priority = 0,
+                    ),
+                ),
+            )
+
+        val candidates = engine.complete(request(commandLine = "git s", maxCandidates = 8))
+
+        assertEquals("status", candidates.first().replacementText)
+    }
+
+    @Test
+    fun `static option values outrank history in option value position`() {
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                listOf(
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "aws --output table",
+                                start = 0,
+                                end = 14,
+                                source = "mru",
+                                kind = TerminalCompletionCandidateKind.HISTORY,
+                            ),
+                        ),
+                        priority = 100,
+                    ),
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "text",
+                                start = 13,
+                                end = 14,
+                                source = "spec",
+                                kind = TerminalCompletionCandidateKind.ARGUMENT,
+                            ),
+                        ),
+                        priority = 0,
+                    ),
+                ),
+            )
+
+        val candidates = engine.complete(request(commandLine = "aws --output t", maxCandidates = 8))
+
+        assertEquals(listOf("text", "aws --output table"), candidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `option names outrank history and paths in option name position`() {
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                listOf(
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "git status",
+                                start = 0,
+                                end = 5,
+                                source = "mru",
+                                kind = TerminalCompletionCandidateKind.HISTORY,
+                            ),
+                        ),
+                        priority = 100,
+                    ),
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "src/",
+                                start = 4,
+                                end = 5,
+                                source = "path",
+                                kind = TerminalCompletionCandidateKind.PATH,
+                            ),
+                        ),
+                        priority = 100,
+                    ),
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "--help",
+                                start = 4,
+                                end = 5,
+                                source = "spec",
+                                kind = TerminalCompletionCandidateKind.OPTION,
+                            ),
+                        ),
+                        priority = 0,
+                    ),
+                ),
+            )
+
+        val candidates = engine.complete(request(commandLine = "git -", maxCandidates = 8))
+
+        assertEquals("--help", candidates.first().replacementText)
+    }
+
+    @Test
     fun `empty source list returns no candidates`() {
         val engine = TerminalCompletionEngines.fromSources(emptyList<TerminalCompletionSourceEntry>())
 
@@ -146,10 +318,13 @@ class MergedCompletionEngineTest {
             score = score,
         )
 
-    private fun request(maxCandidates: Int): TerminalCompletionRequest =
+    private fun request(
+        commandLine: String = "s",
+        maxCandidates: Int,
+    ): TerminalCompletionRequest =
         TerminalCompletionRequest(
-            commandLine = "s",
-            cursorOffset = 1,
+            commandLine = commandLine,
+            cursorOffset = commandLine.length,
             maxCandidates = maxCandidates,
         )
 }

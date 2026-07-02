@@ -16,6 +16,8 @@
 package io.github.ketraterm.completion.api
 
 import io.github.ketraterm.completion.engine.MergedCompletionEngine
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
 
 /**
  * Factories for production completion engines.
@@ -24,19 +26,29 @@ object TerminalCompletionEngines {
     /**
      * Creates a deterministic merged engine from prioritized completion sources.
      *
-     * Candidates are deduplicated by replacement range and replacement text,
-     * then ranked by source priority, candidate score, and stable text
-     * tie-breakers before [TerminalCompletionRequest.maxCandidates] is applied.
+     * Candidates are deduplicated by replacement range and replacement text.
+     * Ranking combines source priority with command-line context derived from
+     * [commandSpecs], then applies candidate score and stable text tie-breakers
+     * before [TerminalCompletionRequest.maxCandidates] is applied.
      *
      * @param sources prioritized source registrations.
+     * @param commandSpecs command specs used to classify the active command-line
+     * position for ranking.
      * @return merged completion engine.
      */
     @JvmStatic
-    fun fromSources(sources: List<TerminalCompletionSourceEntry>): TerminalCompletionEngine =
+    @JvmOverloads
+    fun fromSources(
+        sources: List<TerminalCompletionSourceEntry>,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    ): TerminalCompletionEngine =
         if (sources.isEmpty()) {
             TerminalCompletionEngine.NONE
         } else {
-            MergedCompletionEngine(sources)
+            MergedCompletionEngine(
+                sources = sources,
+                commandSpecs = commandSpecs,
+            )
         }
 
     /**

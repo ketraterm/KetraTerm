@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
 
 class StandaloneCompletionRegistryTest {
     @Test
-    fun `session MRU suggestions rank ahead of static spec suggestions`() {
+    fun `static subcommand suggestions rank ahead of session MRU in subcommand position`() {
         val registry = registry()
         val provider =
             registry.createProvider(
@@ -47,11 +47,11 @@ class StandaloneCompletionRegistryTest {
 
         val suggestions = provider.suggestions(request("git s"))
 
-        assertEquals("git switch main", suggestions[0].replacementText)
-        assertEquals("mru", suggestions[0].source)
-        assertEquals(0, suggestions[0].replacementStartOffset)
-        assertEquals(5, suggestions[0].replacementEndOffset)
-        assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
+        assertEquals("status", suggestions[0].replacementText)
+        assertEquals("spec", suggestions[0].source)
+        val mruSuggestion = suggestions.single { it.replacementText == "git switch main" && it.source == "mru" }
+        assertEquals(0, mruSuggestion.replacementStartOffset)
+        assertEquals(5, mruSuggestion.replacementEndOffset)
     }
 
     @Test
@@ -109,7 +109,7 @@ class StandaloneCompletionRegistryTest {
     }
 
     @Test
-    fun `persistent stats suggestions rank between session MRU and static specs`() {
+    fun `persistent stats suggestions rank below static subcommands and session MRU in subcommand position`() {
         val persistentStats = TerminalCompletionSources.commandStats()
         persistentStats.recordCommandResult(
             commandLine = "git show --stat",
@@ -134,11 +134,14 @@ class StandaloneCompletionRegistryTest {
 
         val suggestions = provider.suggestions(request("git s"))
 
-        assertEquals("git switch main", suggestions[0].replacementText)
-        assertEquals("mru", suggestions[0].source)
-        assertEquals("git show --stat", suggestions[1].replacementText)
-        assertEquals("stats", suggestions[1].source)
-        assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
+        assertEquals("status", suggestions[0].replacementText)
+        assertEquals("spec", suggestions[0].source)
+        assertTrue(suggestions.indexOfFirst { it.replacementText == "git switch main" && it.source == "mru" } > 0)
+        assertTrue(suggestions.indexOfFirst { it.replacementText == "git show --stat" && it.source == "stats" } > 0)
+        assertTrue(
+            suggestions.indexOfFirst { it.replacementText == "git switch main" && it.source == "mru" } <
+                suggestions.indexOfFirst { it.replacementText == "git show --stat" && it.source == "stats" },
+        )
     }
 
     @Test

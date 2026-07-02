@@ -113,13 +113,21 @@ contracts and let the shared engine merge, deduplicate, and rank candidates.
 `ketraterm-completion` must stay pure: it should not shell out to Git, read IDE
 indexes, watch files, or block on host I/O.
 
-## Ranking Policy Direction
+## Ranking Policy
 
-Current ranking is deterministic source-priority plus candidate-score ordering.
-Future source-aware ranking should consume `TerminalCompletionContext` instead
-of hardcoding host behavior: command position, subcommand position, option name,
-option value, positional value, expected argument kind, command family, and
-source kind should all be available to ranking decorators. This is the place to
-prefer branches over paths for `git switch`, paths over MRU for `cd`, and option
-values after value-taking options without mixing standalone or IDE-specific
-provider code into the shared engine.
+The merged engine keeps ranking deterministic while applying a small
+source-aware context adjustment before candidate score and stable text
+tie-breakers. `TerminalCompletionRankingContext` consumes
+`TerminalCompletionContext` so command position prefers command candidates,
+subcommand position prefers subcommands, option-name position prefers options,
+option-value position prefers static value candidates or paths when the active
+option declares path metadata, and path-taking positional arguments prefer path
+candidates over whole-command history.
+
+This base policy is intentionally host-neutral. Standalone and IntelliJ
+providers should still choose source priority for their own data quality, while
+shared ranking keeps common terminal semantics such as paths over MRU for `cd `
+and option names after `-`. Future dynamic providers can extend the same model
+with command-family-aware candidates, for example preferring Git branches over
+paths for `git switch`, without embedding standalone process calls or IDE
+service lookups in the shared engine.

@@ -97,7 +97,8 @@ internal class StandaloneCompletionRegistry(
         return StandaloneCompletionSuggestionProvider(
             engine =
                 TerminalCompletionEngines.fromSources(
-                    sources,
+                    sources = sources,
+                    commandSpecs = commandSpecs,
                 ),
             contextProvider = {
                 StandaloneCompletionSuggestionContext(
