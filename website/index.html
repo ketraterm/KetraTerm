@@ -34,6 +34,7 @@
             <li><a href="#security" id="nav-security">Security Policies</a></li>
             <li><a href="#compare" id="nav-compare">Comparison</a></li>
             <li><a href="#config" id="nav-config">Configuration</a></li>
+            <li><a href="#download" id="nav-download">Download</a></li>
             <li><a href="gallery.html" id="nav-gallery">Gallery</a></li>
             <li><a href="library.html" id="nav-library">Library Integrator Docs</a></li>
             <li><a href="https://github.com/ketraterm/ketraterm" class="btn btn-secondary" style="padding: 6px 14px;" id="nav-github">GitHub</a></li>
@@ -49,7 +50,7 @@
         <p>Fast, robust, and highly configurable. KetraTerm delivers deep shell integration, state-of-the-art text layout, and precision terminal behavior without the bloat.</p>
 
         <div class="hero-cta">
-            <a href="#features" class="btn btn-primary" id="cta-features">Explore Features</a>
+            <a href="#download" class="btn btn-primary" id="cta-download">Download & Install</a>
             <a href="library.html" class="btn btn-secondary" id="cta-library">Developer & Integration Guide</a>
         </div>
 
@@ -345,6 +346,44 @@
             </div>
         </div>
     </section>
+
+    <!-- Get KetraTerm Section -->
+    <section id="download" class="section container" style="border-top: 1px solid var(--border-color); padding-top: 60px; text-align: center;">
+        <h2 style="font-size: 34px; margin-bottom: 16px;">Get KetraTerm</h2>
+        <p class="text-dim" style="font-size: 16px; max-width: 600px; margin: 0 auto 40px;">
+            Choose how you want to run KetraTerm. Download the standalone desktop application or install the plugin directly in your favorite JetBrains IDE.
+        </p>
+
+        <div style="display: flex; justify-content: center; align-items: stretch; gap: 40px; flex-wrap: wrap; margin-top: 40px;">
+            <!-- Standalone App Card -->
+            <div class="card" style="flex: 1; min-width: 300px; max-width: 400px; display: flex; flex-direction: column; justify-content: space-between; text-align: left; padding: 32px;">
+                <div>
+                    <div class="icon-wrapper" style="margin-bottom: 24px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                    </div>
+                    <h3 style="font-size: 22px; margin-bottom: 12px;">Standalone Desktop App</h3>
+                    <p class="text-dim" style="font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
+                        A native, high-performance standalone terminal window with multi-tab support, configuration profiles, and custom shell mapping for Windows, macOS, and Linux.
+                    </p>
+                </div>
+                <a href="https://github.com/ketraterm/ketraterm/releases" class="btn btn-primary" style="text-align: center;" id="download-standalone">Download Standalone App</a>
+            </div>
+
+            <!-- JetBrains Plugin Card -->
+            <div class="card" style="flex: 1; min-width: 300px; max-width: 400px; display: flex; flex-direction: column; justify-content: space-between; text-align: left; padding: 32px;">
+                <div>
+                    <div class="icon-wrapper" style="margin-bottom: 24px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="M12 6v12"></path><path d="M6 12h12"></path></svg>
+                    </div>
+                    <h3 style="font-size: 22px; margin-bottom: 12px;">IntelliJ Platform Plugin</h3>
+                    <p class="text-dim" style="font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
+                        Embed the modern terminal directly into your IDE. Replaces the default terminal with project-aware shell profiles, custom typography, and color schemes.
+                    </p>
+                </div>
+                <div id="jetbrains-marketplace-card" style="margin-top: 12px; min-height: 120px; display: flex; justify-content: center;"></div>
+            </div>
+        </div>
+    </section>
 </main>
 
 <footer id="site-footer">
@@ -359,5 +398,9 @@
     </div>
 </footer>
 
+<script src="https://plugins.jetbrains.com/assets/scripts/mp-widget.js"></script>
+<script>
+  MarketplaceWidget.setupMarketplaceWidget('card', 32589, "#jetbrains-marketplace-card");
+</script>
 </body>
 </html>
