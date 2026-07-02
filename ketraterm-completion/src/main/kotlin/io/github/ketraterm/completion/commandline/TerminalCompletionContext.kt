@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.commandline
 
 import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalOptionSpec
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
@@ -35,6 +36,7 @@ internal data class TerminalCompletionContext(
     val activePosition: TerminalCompletionActivePosition,
     val activeOption: TerminalOptionSpec?,
     val expectedPathKind: TerminalPathArgumentKind,
+    val expectedValueDomain: TerminalCompletionValueDomain,
     val staticValueCandidates: List<String>,
     val activeTokenQuote: Char,
 ) {
@@ -63,6 +65,7 @@ internal object TerminalCompletionContextResolver {
                 activePosition = TerminalCompletionActivePosition.COMMAND,
                 activeOption = null,
                 expectedPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                expectedValueDomain = TerminalCompletionValueDomain.NONE,
                 staticValueCandidates = emptyList(),
                 activeTokenQuote = activeTokenQuote,
             )
@@ -86,6 +89,7 @@ internal object TerminalCompletionContextResolver {
                     },
                 activeOption = null,
                 expectedPathKind = TerminalPathArgumentKind.NONE,
+                expectedValueDomain = TerminalCompletionValueDomain.NONE,
                 staticValueCandidates = emptyList(),
                 activeTokenQuote = activeTokenQuote,
             )
@@ -108,6 +112,12 @@ internal object TerminalCompletionContextResolver {
             } else {
                 commandPath.last().positionalArgumentPathKind
             }
+        val expectedValueDomain =
+            if (activeOption != null && activeOption.valueDomain != TerminalCompletionValueDomain.NONE) {
+                activeOption.valueDomain
+            } else {
+                commandPath.last().positionalArgumentValueDomain
+            }
 
         return TerminalCompletionContext(
             commandLineContext = lineContext,
@@ -117,6 +127,7 @@ internal object TerminalCompletionContextResolver {
             activePosition = activePosition,
             activeOption = activeOption,
             expectedPathKind = expectedPathKind,
+            expectedValueDomain = expectedValueDomain,
             staticValueCandidates = activeOption?.valueCandidates ?: emptyList(),
             activeTokenQuote = activeTokenQuote,
         )

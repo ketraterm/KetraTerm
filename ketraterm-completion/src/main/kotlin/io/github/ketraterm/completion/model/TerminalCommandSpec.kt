@@ -30,6 +30,8 @@ package io.github.ketraterm.completion.model
  * @property options options available at this command level.
  * @property positionalArgumentPathKind file-system path kind accepted by bare
  * positional arguments after this command or subcommand.
+ * @property positionalArgumentValueDomain dynamic host-owned value domain
+ * accepted by bare positional arguments after this command or subcommand.
  */
 data class TerminalCommandSpec
     @JvmOverloads
@@ -40,6 +42,7 @@ data class TerminalCommandSpec
         val subcommands: List<TerminalCommandSpec> = emptyList(),
         val options: List<TerminalOptionSpec> = emptyList(),
         val positionalArgumentPathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
+        val positionalArgumentValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
     ) {
         init {
             require(name.isNotBlank()) { "name must not be blank" }
@@ -58,6 +61,8 @@ data class TerminalCommandSpec
  * separate value token when [requiresValue] is true.
  * @property valueCandidates static bounded option values, such as log levels or
  * output modes. Dynamic host-owned domains belong in host providers instead.
+ * @property valueDomain dynamic host-owned value domain accepted by the option's
+ * separate value token when [requiresValue] is true.
  */
 data class TerminalOptionSpec
     @JvmOverloads
@@ -67,6 +72,7 @@ data class TerminalOptionSpec
         val requiresValue: Boolean = false,
         val valuePathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
         val valueCandidates: List<String> = emptyList(),
+        val valueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
     ) {
         init {
             require(names.isNotEmpty()) { "names must not be empty" }
@@ -91,4 +97,62 @@ enum class TerminalPathArgumentKind {
 
     /** The argument should reference a regular file. */
     FILE,
+}
+
+/**
+ * Stable identifier for a dynamic value domain supplied by host-owned
+ * completion providers.
+ *
+ * The shared completion engine uses this value only for context-aware ranking.
+ * It does not fetch domain values itself. Standalone and plugin integrations may
+ * provide candidates with matching domains using local process caches, IDE
+ * services, project indexes, or other host-owned data sources.
+ *
+ * @property id stable lowercase domain id.
+ */
+data class TerminalCompletionValueDomain(
+    val id: String,
+) {
+    init {
+        require(id.isNotBlank()) { "id must not be blank" }
+        require(id == id.lowercase()) { "id must be lowercase, was $id" }
+    }
+
+    companion object {
+        /** No known dynamic value domain. */
+        @JvmField
+        val NONE: TerminalCompletionValueDomain = TerminalCompletionValueDomain("none")
+
+        /** Git branch or ref name. */
+        @JvmField
+        val GIT_BRANCH: TerminalCompletionValueDomain = TerminalCompletionValueDomain("git.branch")
+
+        /** Docker CLI context name. */
+        @JvmField
+        val DOCKER_CONTEXT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("docker.context")
+
+        /** Kubernetes namespace name. */
+        @JvmField
+        val KUBERNETES_NAMESPACE: TerminalCompletionValueDomain = TerminalCompletionValueDomain("kubernetes.namespace")
+
+        /** Kubernetes kubeconfig context name. */
+        @JvmField
+        val KUBERNETES_CONTEXT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("kubernetes.context")
+
+        /** npm package script name. */
+        @JvmField
+        val NPM_SCRIPT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("npm.script")
+
+        /** Host IDE run configuration name. */
+        @JvmField
+        val IDE_RUN_CONFIGURATION: TerminalCompletionValueDomain = TerminalCompletionValueDomain("ide.run-configuration")
+
+        /** AWS CLI profile name. */
+        @JvmField
+        val AWS_PROFILE: TerminalCompletionValueDomain = TerminalCompletionValueDomain("aws.profile")
+
+        /** AWS region name. */
+        @JvmField
+        val AWS_REGION: TerminalCompletionValueDomain = TerminalCompletionValueDomain("aws.region")
+    }
 }

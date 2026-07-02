@@ -23,6 +23,7 @@ or construct:
 
 - `TerminalCommandSpec` and `TerminalOptionSpec`
 - `TerminalPathArgumentKind`
+- `TerminalCompletionValueDomain`
 - `TerminalCommandSpecs`
 - `TerminalCommandCompletionStats`
 - `TerminalCommandShapeStats` and `TerminalCommandLineShape`
@@ -42,8 +43,8 @@ in implementation packages and must stay `internal`.
 resolver. Sources and ranking decorators should use it instead of independently
 guessing command position, subcommand position, option-name position,
 option-value position, positional-argument position, active option metadata,
-expected path kind, static value candidates, replacement offsets, or active
-quote state from raw command text.
+expected path kind, expected dynamic value domain, static value candidates,
+replacement offsets, or active quote state from raw command text.
 
 ## Internal Implementation
 
@@ -96,9 +97,13 @@ replacement instead of dropping the quote.
 
 Static bounded option domains belong in `TerminalOptionSpec.valueCandidates`.
 Examples are output formats, log levels, or other values that are stable and do
-not require host I/O. Dynamic domains such as Git branches, Docker contexts,
+not require host I/O. Dynamic domains are declared with
+`TerminalCompletionValueDomain` through `TerminalOptionSpec.valueDomain`,
+`TerminalCommandSpec.positionalArgumentValueDomain`, and
+`TerminalCompletionCandidate.valueDomain`. Git branches, Docker contexts,
 Kubernetes namespaces, IDE run configurations, project files, or indexed symbols
-must come from host-owned providers.
+must still come from host-owned providers; the shared module only models and
+ranks those values.
 
 ## Host Dynamic Providers
 
@@ -120,14 +125,16 @@ source-aware context adjustment before candidate score and stable text
 tie-breakers. `TerminalCompletionRankingContext` consumes
 `TerminalCompletionContext` so command position prefers command candidates,
 subcommand position prefers subcommands, option-name position prefers options,
-option-value position prefers static value candidates or paths when the active
-option declares path metadata, and path-taking positional arguments prefer path
-candidates over whole-command history.
+option-value position prefers static value candidates, domain-matching dynamic
+value candidates, or paths when the active option declares path metadata, and
+path-taking positional arguments prefer path candidates over whole-command
+history. Domain-matching dynamic argument candidates receive the strongest
+context boost, so a host-owned Git branch provider can outrank generic paths and
+whole-command history for `git switch <branch>`.
 
 This base policy is intentionally host-neutral. Standalone and IntelliJ
 providers should still choose source priority for their own data quality, while
 shared ranking keeps common terminal semantics such as paths over MRU for `cd `
 and option names after `-`. Future dynamic providers can extend the same model
-with command-family-aware candidates, for example preferring Git branches over
-paths for `git switch`, without embedding standalone process calls or IDE
-service lookups in the shared engine.
+with provider-specific data, for example Git branches for `git switch`, without
+embedding standalone process calls or IDE service lookups in the shared engine.

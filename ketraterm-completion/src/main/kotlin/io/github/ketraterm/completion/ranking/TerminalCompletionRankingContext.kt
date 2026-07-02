@@ -19,6 +19,7 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.commandline.TerminalCompletionContext
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 internal class TerminalCompletionRankingContext(
@@ -59,7 +60,12 @@ internal class TerminalCompletionRankingContext(
 
     private fun optionValuePositionAdjustment(candidate: TerminalCompletionCandidate): Int =
         when (candidate.kind) {
-            TerminalCompletionCandidateKind.ARGUMENT -> STRONG_CONTEXT_BOOST
+            TerminalCompletionCandidateKind.ARGUMENT ->
+                if (candidate.matchesExpectedDomain()) {
+                    DOMAIN_CONTEXT_BOOST
+                } else {
+                    STRONG_CONTEXT_BOOST
+                }
             TerminalCompletionCandidateKind.PATH ->
                 if (context.expectedPathKind == TerminalPathArgumentKind.NONE) {
                     PATH_CONTEXT_PENALTY
@@ -72,19 +78,29 @@ internal class TerminalCompletionRankingContext(
 
     private fun positionalArgumentAdjustment(candidate: TerminalCompletionCandidate): Int =
         when (candidate.kind) {
+            TerminalCompletionCandidateKind.ARGUMENT ->
+                if (candidate.matchesExpectedDomain()) {
+                    DOMAIN_CONTEXT_BOOST
+                } else {
+                    MEDIUM_CONTEXT_BOOST
+                }
             TerminalCompletionCandidateKind.PATH ->
                 if (context.expectedPathKind == TerminalPathArgumentKind.NONE) {
                     0
                 } else {
                     STRONG_CONTEXT_BOOST
                 }
-            TerminalCompletionCandidateKind.ARGUMENT -> MEDIUM_CONTEXT_BOOST
             TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
             TerminalCompletionCandidateKind.SUBCOMMAND -> PATH_CONTEXT_PENALTY
             else -> 0
         }
 
+    private fun TerminalCompletionCandidate.matchesExpectedDomain(): Boolean =
+        context.expectedValueDomain != TerminalCompletionValueDomain.NONE &&
+            valueDomain == context.expectedValueDomain
+
     private companion object {
+        private const val DOMAIN_CONTEXT_BOOST = 320
         private const val STRONG_CONTEXT_BOOST = 160
         private const val MEDIUM_CONTEXT_BOOST = 80
         private const val WEAK_CONTEXT_BOOST = 40

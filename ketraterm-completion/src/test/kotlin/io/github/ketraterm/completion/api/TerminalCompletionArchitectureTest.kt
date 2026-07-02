@@ -252,6 +252,7 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCompletionFeedbackKind",
                 "TerminalCompletionFeedbackStats",
                 "TerminalCompletionTokenPosition",
+                "TerminalCompletionValueDomain",
                 "TerminalOptionSpec",
                 "TerminalPathArgumentKind",
             )

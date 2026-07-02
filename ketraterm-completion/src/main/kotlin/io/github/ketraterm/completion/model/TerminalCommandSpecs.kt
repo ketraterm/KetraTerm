@@ -147,8 +147,17 @@ object TerminalCommandSpecs {
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                     ),
                     TerminalCommandSpec("commit", "record changes to the repository"),
-                    TerminalCommandSpec("checkout", "switch branches or restore files", aliases = listOf("co")),
-                    TerminalCommandSpec("switch", "switch branches"),
+                    TerminalCommandSpec(
+                        name = "checkout",
+                        description = "switch branches or restore files",
+                        aliases = listOf("co"),
+                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    ),
+                    TerminalCommandSpec(
+                        name = "switch",
+                        description = "switch branches",
+                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    ),
                     TerminalCommandSpec("branch", "list, create, or delete branches"),
                     TerminalCommandSpec("pull", "fetch from and integrate with another repository"),
                     TerminalCommandSpec("push", "update remote refs"),
@@ -226,7 +235,11 @@ object TerminalCommandSpecs {
             subcommands =
                 listOf(
                     TerminalCommandSpec("install", "install package dependencies", aliases = listOf("i")),
-                    TerminalCommandSpec("run", "run a package script"),
+                    TerminalCommandSpec(
+                        name = "run",
+                        description = "run a package script",
+                        positionalArgumentValueDomain = TerminalCompletionValueDomain.NPM_SCRIPT,
+                    ),
                     TerminalCommandSpec("test", "run the test script"),
                     TerminalCommandSpec("start", "run the start script"),
                     TerminalCommandSpec("update", "update packages"),
@@ -275,7 +288,12 @@ object TerminalCommandSpecs {
                 listOf(
                     TerminalOptionSpec(listOf("--help"), "show help"),
                     TerminalOptionSpec(listOf("--version", "-v"), "show version"),
-                    TerminalOptionSpec(listOf("--context"), "select Docker context", requiresValue = true),
+                    TerminalOptionSpec(
+                        names = listOf("--context"),
+                        description = "select Docker context",
+                        requiresValue = true,
+                        valueDomain = TerminalCompletionValueDomain.DOCKER_CONTEXT,
+                    ),
                 ),
         )
 
@@ -357,8 +375,18 @@ object TerminalCommandSpecs {
                         requiresValue = true,
                         valuePathKind = TerminalPathArgumentKind.FILE,
                     ),
-                    TerminalOptionSpec(listOf("--namespace", "-n"), "kubernetes namespace to use", requiresValue = true),
-                    TerminalOptionSpec(listOf("--context"), "name of the kubeconfig context to use", requiresValue = true),
+                    TerminalOptionSpec(
+                        names = listOf("--namespace", "-n"),
+                        description = "kubernetes namespace to use",
+                        requiresValue = true,
+                        valueDomain = TerminalCompletionValueDomain.KUBERNETES_NAMESPACE,
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("--context"),
+                        description = "name of the kubeconfig context to use",
+                        requiresValue = true,
+                        valueDomain = TerminalCompletionValueDomain.KUBERNETES_CONTEXT,
+                    ),
                 ),
         )
 
@@ -479,8 +507,18 @@ object TerminalCommandSpecs {
                 listOf(
                     TerminalOptionSpec(listOf("--help"), "show help"),
                     TerminalOptionSpec(listOf("--version"), "show version"),
-                    TerminalOptionSpec(listOf("--profile"), "select AWS CLI profile to use", requiresValue = true),
-                    TerminalOptionSpec(listOf("--region"), "AWS region to target", requiresValue = true),
+                    TerminalOptionSpec(
+                        names = listOf("--profile"),
+                        description = "select AWS CLI profile to use",
+                        requiresValue = true,
+                        valueDomain = TerminalCompletionValueDomain.AWS_PROFILE,
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("--region"),
+                        description = "AWS region to target",
+                        requiresValue = true,
+                        valueDomain = TerminalCompletionValueDomain.AWS_REGION,
+                    ),
                     TerminalOptionSpec(
                         names = listOf("--output"),
                         description = "output format json, text, table",

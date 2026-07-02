@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -279,6 +280,95 @@ class MergedCompletionEngineTest {
     }
 
     @Test
+    fun `dynamic positional domain candidates outrank paths and history`() {
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                listOf(
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "main/",
+                                start = 11,
+                                end = 14,
+                                source = "path",
+                                kind = TerminalCompletionCandidateKind.PATH,
+                            ),
+                        ),
+                        priority = 100,
+                    ),
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "git switch main",
+                                start = 0,
+                                end = 14,
+                                source = "mru",
+                                kind = TerminalCompletionCandidateKind.HISTORY,
+                            ),
+                        ),
+                        priority = 100,
+                    ),
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "main",
+                                start = 11,
+                                end = 14,
+                                source = "git-branches",
+                                kind = TerminalCompletionCandidateKind.ARGUMENT,
+                                valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                            ),
+                        ),
+                        priority = 0,
+                    ),
+                ),
+            )
+
+        val candidates = engine.complete(request(commandLine = "git switch mai", maxCandidates = 8))
+
+        assertEquals("main", candidates.first().replacementText)
+        assertEquals("git-branches", candidates.first().source)
+    }
+
+    @Test
+    fun `dynamic option domain candidates outrank generic argument candidates`() {
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                listOf(
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "default-history",
+                                start = 20,
+                                end = 23,
+                                source = "stats",
+                                kind = TerminalCompletionCandidateKind.ARGUMENT,
+                            ),
+                        ),
+                        priority = 100,
+                    ),
+                    entry(
+                        source(
+                            candidate(
+                                replacement = "default",
+                                start = 20,
+                                end = 23,
+                                source = "kubernetes",
+                                kind = TerminalCompletionCandidateKind.ARGUMENT,
+                                valueDomain = TerminalCompletionValueDomain.KUBERNETES_NAMESPACE,
+                            ),
+                        ),
+                        priority = 0,
+                    ),
+                ),
+            )
+
+        val candidates = engine.complete(request(commandLine = "kubectl --namespace def", maxCandidates = 8))
+
+        assertEquals(listOf("default", "default-history"), candidates.map { it.replacementText })
+    }
+
+    @Test
     fun `empty source list returns no candidates`() {
         val engine = TerminalCompletionEngines.fromSources(emptyList<TerminalCompletionSourceEntry>())
 
@@ -306,6 +396,7 @@ class MergedCompletionEngineTest {
         source: String = "test",
         kind: TerminalCompletionCandidateKind = TerminalCompletionCandidateKind.ARGUMENT,
         score: Int = 0,
+        valueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
     ): TerminalCompletionCandidate =
         TerminalCompletionCandidate(
             replacementText = replacement,
@@ -316,6 +407,7 @@ class MergedCompletionEngineTest {
             displayText = display,
             detail = detail,
             score = score,
+            valueDomain = valueDomain,
         )
 
     private fun request(

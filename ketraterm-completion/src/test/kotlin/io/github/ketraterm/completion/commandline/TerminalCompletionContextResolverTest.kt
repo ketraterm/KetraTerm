@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.commandline
 
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -56,6 +57,24 @@ class TerminalCompletionContextResolverTest {
         assertEquals(TerminalCompletionActivePosition.OPTION_VALUE, context.activePosition)
         assertEquals(listOf("json", "text", "table", "yaml", "yaml-stream"), context.staticValueCandidates)
         assertEquals("t", context.activePrefix)
+    }
+
+    @Test
+    fun `dynamic option value domain is exposed through context`() {
+        val context = resolve("kubectl --namespace def")
+
+        assertEquals(TerminalCompletionActivePosition.OPTION_VALUE, context.activePosition)
+        assertEquals(TerminalCompletionValueDomain.KUBERNETES_NAMESPACE, context.expectedValueDomain)
+        assertEquals("def", context.activePrefix)
+    }
+
+    @Test
+    fun `dynamic positional value domain is exposed through context`() {
+        val context = resolve("git switch mai")
+
+        assertEquals(TerminalCompletionActivePosition.POSITIONAL_ARGUMENT, context.activePosition)
+        assertEquals(TerminalCompletionValueDomain.GIT_BRANCH, context.expectedValueDomain)
+        assertEquals("mai", context.activePrefix)
     }
 
     @Test

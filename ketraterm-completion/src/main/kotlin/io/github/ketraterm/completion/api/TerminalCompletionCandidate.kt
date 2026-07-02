@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.completion.api
 
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+
 /**
  * Completion candidate category used by hosts for grouping, ranking display,
  * and source-specific styling.
@@ -53,6 +55,8 @@ enum class TerminalCompletionCandidateKind {
  * @property displayText primary text shown in suggestion UI.
  * @property detail optional secondary text explaining the candidate.
  * @property score deterministic ranking score; larger values are better.
+ * @property valueDomain dynamic value domain for argument candidates supplied by
+ * host-owned providers.
  */
 data class TerminalCompletionCandidate
     @JvmOverloads
@@ -65,6 +69,7 @@ data class TerminalCompletionCandidate
         val displayText: String = replacementText,
         val detail: String = "",
         val score: Int = 0,
+        val valueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }
