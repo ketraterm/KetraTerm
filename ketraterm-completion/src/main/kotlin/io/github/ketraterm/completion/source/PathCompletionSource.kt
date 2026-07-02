@@ -99,7 +99,13 @@ internal class PathCompletionSource(
             if (matchesPrefix(entry.name, filePrefix)) {
                 val rawSuffix = if (entry.isDirectory) "$pathSeparator" else ""
                 val rawReplacement = directoryPortion + entry.name + rawSuffix
-                val replacementText = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement
+                val replacementText =
+                    replacementText(
+                        commandLine = request.commandLine,
+                        replacementStartOffset = context.replacementStartOffset,
+                        rawReplacement = rawReplacement,
+                        pathSeparator = pathSeparator,
+                    )
 
                 candidates +=
                     TerminalCompletionCandidate(
@@ -117,6 +123,33 @@ internal class PathCompletionSource(
 
         return candidates.sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER).take(request.maxCandidates)
     }
+
+    private fun replacementText(
+        commandLine: String,
+        replacementStartOffset: Int,
+        rawReplacement: String,
+        pathSeparator: Char,
+    ): String {
+        val normalizedReplacement = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement
+        val quote = commandLine.getOrNull(replacementStartOffset)
+        return when (quote) {
+            SINGLE_QUOTE -> quoteSingle(normalizedReplacement)
+            DOUBLE_QUOTE -> quoteDouble(normalizedReplacement)
+            else -> normalizedReplacement
+        }
+    }
+
+    private fun quoteSingle(value: String): String = "'${value.replace("'", "'\\''")}'"
+
+    private fun quoteDouble(value: String): String =
+        buildString(value.length + 2) {
+            append(DOUBLE_QUOTE)
+            for (ch in value) {
+                if (ch == DOUBLE_QUOTE || ch == BACKSLASH) append(BACKSLASH)
+                append(ch)
+            }
+            append(DOUBLE_QUOTE)
+        }
 
     private fun isPathLike(prefix: String): Boolean =
         prefix.startsWith("/") ||
@@ -212,6 +245,9 @@ internal class PathCompletionSource(
     private companion object {
         private const val SOURCE_PATH = "path"
         private const val PATH_BASE_SCORE = 200
+        private const val SINGLE_QUOTE = '\''
+        private const val DOUBLE_QUOTE = '"'
+        private const val BACKSLASH = '\\'
     }
 
     private data class ResolvedCommandPath(

@@ -200,6 +200,12 @@ object TerminalCommandSpecs {
                 listOf(
                     TerminalOptionSpec(listOf("--help", "-h"), "show help"),
                     TerminalOptionSpec(listOf("--version", "-v"), "show version"),
+                    TerminalOptionSpec(
+                        names = listOf("--console"),
+                        description = "console output style",
+                        requiresValue = true,
+                        valueCandidates = listOf("auto", "plain", "rich", "verbose"),
+                    ),
                     TerminalOptionSpec(listOf("--info", "-i"), "set log level to info"),
                     TerminalOptionSpec(listOf("--debug", "-d"), "set log level to debug"),
                     TerminalOptionSpec(listOf("--scan"), "create a build scan"),
@@ -475,7 +481,12 @@ object TerminalCommandSpecs {
                     TerminalOptionSpec(listOf("--version"), "show version"),
                     TerminalOptionSpec(listOf("--profile"), "select AWS CLI profile to use", requiresValue = true),
                     TerminalOptionSpec(listOf("--region"), "AWS region to target", requiresValue = true),
-                    TerminalOptionSpec(listOf("--output"), "output format json, text, table", requiresValue = true),
+                    TerminalOptionSpec(
+                        names = listOf("--output"),
+                        description = "output format json, text, table",
+                        requiresValue = true,
+                        valueCandidates = listOf("json", "text", "table", "yaml", "yaml-stream"),
+                    ),
                 ),
         )
 

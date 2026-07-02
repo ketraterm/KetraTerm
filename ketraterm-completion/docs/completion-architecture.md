@@ -83,4 +83,36 @@ returns bare current-directory entries only when the resolved
 `pushd`, and PowerShell `Set-Location` aliases receive directory-only
 candidates, while commands such as `git add` and `kubectl apply` may request
 file-or-directory candidates. Dot-prefixed entries are hidden for an empty path
-prefix and appear once the user types `.`.
+prefix and appear once the user types `.`. When the active path token begins
+with a quote, path candidates replace the whole token with a matching quoted
+replacement instead of dropping the quote.
+
+Static bounded option domains belong in `TerminalOptionSpec.valueCandidates`.
+Examples are output formats, log levels, or other values that are stable and do
+not require host I/O. Dynamic domains such as Git branches, Docker contexts,
+Kubernetes namespaces, IDE run configurations, project files, or indexed symbols
+must come from host-owned providers.
+
+## Host Dynamic Providers
+
+Standalone and IntelliJ completion providers are expected to differ internally.
+The standalone app may use bounded local filesystem/process adapters with
+timeouts and background caches. The IntelliJ plugin should prefer IDE services
+for VCS roots, branches, changelists, project files, indexes, SDKs, run
+configurations, and other project context.
+
+Both hosts should map their data into the shared request/candidate/source
+contracts and let the shared engine merge, deduplicate, and rank candidates.
+`ketraterm-completion` must stay pure: it should not shell out to Git, read IDE
+indexes, watch files, or block on host I/O.
+
+## Ranking Policy Direction
+
+Current ranking is deterministic source-priority plus candidate-score ordering.
+Future source-aware ranking should make the active command-line context explicit
+instead of hardcoding host behavior: command position, subcommand position,
+option name, option value, positional value, expected argument kind, command
+family, and source kind should all be available to ranking decorators. This is
+the place to prefer branches over paths for `git switch`, paths over MRU for
+`cd`, and option values after value-taking options without mixing standalone or
+IDE-specific provider code into the shared engine.

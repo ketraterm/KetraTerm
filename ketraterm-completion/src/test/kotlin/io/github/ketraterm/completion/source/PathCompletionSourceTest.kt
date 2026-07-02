@@ -33,6 +33,8 @@ class PathCompletionSourceTest {
             listOf(
                 TerminalFileEntry("src", isDirectory = true),
                 TerminalFileEntry(".hidden", isDirectory = true),
+                TerminalFileEntry("Idea Projects", isDirectory = true),
+                TerminalFileEntry("O'Brien", isDirectory = true),
                 TerminalFileEntry("README.md", isDirectory = false),
                 TerminalFileEntry("LICENSE", isDirectory = false),
             ),
@@ -72,7 +74,7 @@ class PathCompletionSourceTest {
         val request = request("cd ", "file:///project")
         val candidates = source.complete(request)
 
-        assertEquals(listOf("src/"), candidates.map { it.replacementText })
+        assertEquals(listOf("src/", "Idea Projects/", "O'Brien/"), candidates.map { it.replacementText })
         assertTrue(candidates.all { it.detail == "directory" })
     }
 
@@ -114,7 +116,10 @@ class PathCompletionSourceTest {
 
         val candidates = source.complete(request("tool open ", "file:///project"))
 
-        assertEquals(listOf("src/", "README.md", "LICENSE"), candidates.map { it.replacementText })
+        assertEquals(
+            listOf("src/", "Idea Projects/", "O'Brien/", "README.md", "LICENSE"),
+            candidates.map { it.replacementText },
+        )
     }
 
     @Test
@@ -140,7 +145,7 @@ class PathCompletionSourceTest {
 
         val candidates = source.complete(request("tool --cwd ", "file:///project"))
 
-        assertEquals(listOf("src/"), candidates.map { it.replacementText })
+        assertEquals(listOf("src/", "Idea Projects/", "O'Brien/"), candidates.map { it.replacementText })
     }
 
     @Test
@@ -153,6 +158,24 @@ class PathCompletionSourceTest {
         assertEquals("src/main/", candidate.replacementText)
         assertEquals("main/", candidate.displayText)
         assertEquals("directory", candidate.detail)
+    }
+
+    @Test
+    fun `quoted path completion preserves double quoted token replacement`() {
+        val request = request("cd \"Idea Pro", "file:///project")
+        val candidates = source.complete(request)
+
+        assertEquals("\"Idea Projects/\"", candidates.single().replacementText)
+        assertEquals(3, candidates.single().replacementStartOffset)
+        assertEquals(12, candidates.single().replacementEndOffset)
+    }
+
+    @Test
+    fun `quoted path completion escapes single quote in single quoted token replacement`() {
+        val request = request("cd 'O", "file:///project")
+        val candidates = source.complete(request)
+
+        assertEquals("'O'\\''Brien/'", candidates.single().replacementText)
     }
 
     @Test

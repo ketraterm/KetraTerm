@@ -56,6 +56,8 @@ data class TerminalCommandSpec
  * value.
  * @property valuePathKind file-system path kind accepted by the option's
  * separate value token when [requiresValue] is true.
+ * @property valueCandidates static bounded option values, such as log levels or
+ * output modes. Dynamic host-owned domains belong in host providers instead.
  */
 data class TerminalOptionSpec
     @JvmOverloads
@@ -64,10 +66,12 @@ data class TerminalOptionSpec
         val description: String = "",
         val requiresValue: Boolean = false,
         val valuePathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
+        val valueCandidates: List<String> = emptyList(),
     ) {
         init {
             require(names.isNotEmpty()) { "names must not be empty" }
             require(names.none(String::isBlank)) { "names must not contain blank values" }
+            require(valueCandidates.none(String::isBlank)) { "valueCandidates must not contain blank values" }
         }
     }
 

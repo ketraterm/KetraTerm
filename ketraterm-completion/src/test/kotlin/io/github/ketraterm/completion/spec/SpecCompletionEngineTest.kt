@@ -85,6 +85,28 @@ class SpecCompletionEngineTest {
     }
 
     @Test
+    fun `option value candidates complete value token`() {
+        val candidates = engine().complete(request("gradle --console r"))
+
+        assertEquals(listOf("rich"), candidates.map { it.replacementText })
+        assertTrue(candidates.all { it.kind == TerminalCompletionCandidateKind.ARGUMENT })
+        assertEquals(17, candidates.single().replacementStartOffset)
+        assertEquals(18, candidates.single().replacementEndOffset)
+    }
+
+    @Test
+    fun `default specs expose static option value domains`() {
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                TerminalCompletionSources.fromSpecs(TerminalCommandSpecs.defaults()),
+            )
+
+        val candidates = engine.complete(request("aws --output t"))
+
+        assertEquals(listOf("text", "table"), candidates.map { it.replacementText })
+    }
+
+    @Test
     fun `exact option token does not return no-op option suggestion`() {
         val candidates = engine().complete(request("git --help"))
 
@@ -246,6 +268,15 @@ class SpecCompletionEngineTest {
                             listOf(
                                 TerminalCommandSpec("test", "run tests"),
                                 TerminalCommandSpec("tasks", "list tasks"),
+                            ),
+                        options =
+                            listOf(
+                                TerminalOptionSpec(
+                                    names = listOf("--console"),
+                                    description = "console output style",
+                                    requiresValue = true,
+                                    valueCandidates = listOf("auto", "plain", "rich", "verbose"),
+                                ),
                             ),
                     ),
                 ),

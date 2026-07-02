@@ -72,6 +72,10 @@ internal class SpecCompletionSource(
         commandTokenIndex: Int,
     ): List<TerminalCompletionCandidate> {
         val resolved = resolvePath(context, commandTokenIndex) ?: return emptyList()
+        val valueOption = optionBeforeActiveValue(context, commandTokenIndex, resolved.commands)
+        if (valueOption != null && valueOption.valueCandidates.isNotEmpty()) {
+            return completeOptionValues(valueOption, context)
+        }
         return if (context.activePrefix.startsWith("-")) {
             completeOptions(resolved, context)
         } else {
@@ -127,6 +131,24 @@ internal class SpecCompletionSource(
         return candidates
     }
 
+    private fun completeOptionValues(
+        option: TerminalOptionSpec,
+        context: TerminalCommandLineContext,
+    ): List<TerminalCompletionCandidate> =
+        option.valueCandidates
+            .asSequence()
+            .filter { matchesCompletablePrefix(it, context.activePrefix) }
+            .mapIndexed { orderIndex, value ->
+                candidate(
+                    replacementText = value,
+                    displayText = value,
+                    detail = option.description,
+                    kind = TerminalCompletionCandidateKind.ARGUMENT,
+                    context = context,
+                    score = score(value, context.activePrefix, OPTION_VALUE_BASE_SCORE, orderIndex),
+                )
+            }.toList()
+
     private fun resolvePath(
         context: TerminalCommandLineContext,
         commandTokenIndex: Int,
@@ -161,6 +183,25 @@ internal class SpecCompletionSource(
         return ResolvedCommandPath(commands)
     }
 
+    private fun optionBeforeActiveValue(
+        context: TerminalCommandLineContext,
+        commandTokenIndex: Int,
+        commands: List<TerminalCommandSpec>,
+    ): TerminalOptionSpec? {
+        val optionIndex = context.activeTokenIndex - 1
+        if (optionIndex <= commandTokenIndex) return null
+        val optionToken = context.tokens.getOrNull(optionIndex) ?: return null
+        if (!optionToken.text.startsWith("-")) return null
+        val normalizedOption = normalizeTerminalCommandToken(optionToken.text)
+        val option =
+            commands.asReversed().firstNotNullOfOrNull { spec ->
+                spec.options.firstOrNull { candidate ->
+                    candidate.names.any { normalizeTerminalCommandToken(it) == normalizedOption }
+                }
+            } ?: return null
+        return if (option.requiresValue) option else null
+    }
+
     private fun candidate(
         replacementText: String,
         displayText: String,
@@ -191,6 +232,7 @@ internal class SpecCompletionSource(
         private const val COMMAND_BASE_SCORE = 300
         private const val SUBCOMMAND_BASE_SCORE = 250
         private const val OPTION_BASE_SCORE = 220
+        private const val OPTION_VALUE_BASE_SCORE = 210
 
         private fun matchesCompletablePrefix(
             value: String,
