@@ -22,6 +22,7 @@ import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
 import io.github.ketraterm.completion.ranking.FeedbackAwareCompletionSource
 import io.github.ketraterm.completion.ranking.ShapeAwareCompletionSource
 import io.github.ketraterm.completion.source.CommandStatsCompletionSourceImpl
+import io.github.ketraterm.completion.source.PathCompletionSource
 import io.github.ketraterm.completion.source.SessionMruCompletionSourceImpl
 import io.github.ketraterm.completion.spec.SpecCompletionSource
 
@@ -110,4 +111,13 @@ object TerminalCompletionSources {
             delegate = source,
             feedbackStatsProvider = feedbackStatsProvider,
         )
+
+    /**
+     * Creates a path autocomplete source backed by a host-provided file system lister.
+     *
+     * @param fileSystemProvider host-implemented directory lister.
+     * @return path completion source.
+     */
+    @JvmStatic
+    fun path(fileSystemProvider: TerminalFileSystemProvider): TerminalCompletionSource = PathCompletionSource(fileSystemProvider)
 }

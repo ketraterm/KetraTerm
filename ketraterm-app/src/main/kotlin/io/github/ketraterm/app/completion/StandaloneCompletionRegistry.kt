@@ -83,6 +83,7 @@ internal class StandaloneCompletionRegistry(
                     add(TerminalCompletionSourceEntry(feedbackAware(source), priority = PERSISTENT_STATS_PRIORITY))
                 }
                 add(TerminalCompletionSourceEntry(specSource, priority = SPEC_PRIORITY))
+                add(TerminalCompletionSourceEntry(TerminalCompletionSources.path(StandaloneFileSystemProvider), priority = PATH_PRIORITY))
             }
         return StandaloneCompletionSuggestionProvider(
             engine =
@@ -146,11 +147,41 @@ internal class StandaloneCompletionRegistry(
         }
     }
 
+    private object StandaloneFileSystemProvider : TerminalFileSystemProvider {
+        override fun listDirectory(directoryUri: String): List<TerminalFileEntry> {
+            return try {
+                val uri = java.net.URI(directoryUri)
+                val path =
+                    java.nio.file.Paths
+                        .get(uri)
+                if (!java.nio.file.Files
+                        .isDirectory(path)
+                ) {
+                    return emptyList()
+                }
+
+                java.nio.file.Files.newDirectoryStream(path).use { stream ->
+                    stream.map { child ->
+                        TerminalFileEntry(
+                            name = child.fileName.toString(),
+                            isDirectory =
+                                java.nio.file.Files
+                                    .isDirectory(child),
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+    }
+
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
-        private const val COMPOSED_SOURCE_CAPACITY = 3
+        private const val COMPOSED_SOURCE_CAPACITY = 4
         private const val SESSION_MRU_PRIORITY = 100
         private const val PERSISTENT_STATS_PRIORITY = 50
         private const val SPEC_PRIORITY = 0
+        private const val PATH_PRIORITY = -10
     }
 }

@@ -267,6 +267,9 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCompletionSources",
                 "TerminalSessionMruCompletionSource",
                 "TerminalCompletionTriggerEvaluator",
+                "TerminalFileEntry",
+                "TerminalFileSystemProvider",
+                "canonicalizeDirectoryUri",
             )
         private val PUBLIC_COMPLETION_SOURCE_FACTORIES =
             setOf(
@@ -274,6 +277,7 @@ internal class TerminalCompletionArchitectureTest {
                 "feedbackAware",
                 "fromSpecs",
                 "sessionMru",
+                "path",
             )
         private val PUBLIC_COMPLETION_ENGINE_FACTORIES =
             setOf(
@@ -301,9 +305,10 @@ internal class TerminalCompletionArchitectureTest {
                 "api/TerminalCompletionEngine.kt" to setOf("complete"),
                 "api/TerminalCompletionEngines.kt" to setOf("fromSources"),
                 "api/TerminalCompletionSource.kt" to setOf("complete"),
-                "api/TerminalCompletionSources.kt" to setOf("commandStats", "feedbackAware", "fromSpecs", "sessionMru"),
+                "api/TerminalCompletionSources.kt" to setOf("commandStats", "feedbackAware", "fromSpecs", "sessionMru", "path"),
                 "api/TerminalSessionMruCompletionSource.kt" to setOf("recordSuccessfulCommand", "clear"),
                 "api/TerminalCompletionTriggerEvaluator.kt" to setOf("shouldTrigger", "isLiveTrigger"),
+                "api/TerminalFileSystemProvider.kt" to setOf("listDirectory", "canonicalizeDirectoryUri"),
             )
 
         private val PUBLIC_TOP_LEVEL_DECLARATION =
