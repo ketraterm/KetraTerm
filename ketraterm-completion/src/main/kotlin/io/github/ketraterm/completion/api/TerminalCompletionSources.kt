@@ -116,8 +116,18 @@ object TerminalCompletionSources {
      * Creates a path autocomplete source backed by a host-provided file system lister.
      *
      * @param fileSystemProvider host-implemented directory lister.
+     * @param commandSpecs command specs whose path argument metadata controls
+     * bare argument path completion.
      * @return path completion source.
      */
     @JvmStatic
-    fun path(fileSystemProvider: TerminalFileSystemProvider): TerminalCompletionSource = PathCompletionSource(fileSystemProvider)
+    @JvmOverloads
+    fun path(
+        fileSystemProvider: TerminalFileSystemProvider,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    ): TerminalCompletionSource =
+        PathCompletionSource(
+            fileSystemProvider = fileSystemProvider,
+            commandSpecs = commandSpecs,
+        )
 }

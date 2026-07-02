@@ -21,6 +21,7 @@ import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapsh
 import io.github.ketraterm.completion.model.TerminalCommandLineShape
 import io.github.ketraterm.completion.model.TerminalCommandShapeStats
 import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import java.nio.file.Files
 import kotlin.test.Test
@@ -60,7 +61,7 @@ class StandaloneCompletionRegistryTest {
             Files.createDirectory(directory.resolve("alpha"))
             Files.createDirectory(directory.resolve(".hidden"))
             Files.writeString(directory.resolve("README.md"), "not a directory")
-            val registry = registry(emptyList())
+            val registry = registry(specs = TerminalCommandSpecs.defaults())
             val provider =
                 registry.createProvider(
                     sessionId = "session-1",

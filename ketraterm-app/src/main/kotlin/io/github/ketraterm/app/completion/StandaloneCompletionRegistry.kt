@@ -43,12 +43,13 @@ internal class StandaloneCompletionRegistry(
         require(sessionMruCapacity > 0) { "sessionMruCapacity must be > 0, was $sessionMruCapacity" }
     }
 
+    private val commandSpecs = specs.toList()
     private val lock = Any()
     private val shapeStatsProvider = persistentStatsSource?.let { source -> { source.shapeSnapshot() } }
     private val specSource =
         TerminalCompletionSources
             .fromSpecs(
-                specs = specs,
+                specs = commandSpecs,
                 shapeStatsProvider = shapeStatsProvider,
             ).let(::feedbackAware)
     private val sessionMruSources = HashMap<String, TerminalSessionMruCompletionSource>()
@@ -83,7 +84,15 @@ internal class StandaloneCompletionRegistry(
                     add(TerminalCompletionSourceEntry(feedbackAware(source), priority = PERSISTENT_STATS_PRIORITY))
                 }
                 add(TerminalCompletionSourceEntry(specSource, priority = SPEC_PRIORITY))
-                add(TerminalCompletionSourceEntry(TerminalCompletionSources.path(StandaloneFileSystemProvider), priority = PATH_PRIORITY))
+                add(
+                    TerminalCompletionSourceEntry(
+                        TerminalCompletionSources.path(
+                            fileSystemProvider = StandaloneFileSystemProvider,
+                            commandSpecs = commandSpecs,
+                        ),
+                        priority = PATH_PRIORITY,
+                    ),
+                )
             }
         return StandaloneCompletionSuggestionProvider(
             engine =

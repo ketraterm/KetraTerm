@@ -29,6 +29,15 @@ object TerminalCommandSpecs {
     @JvmStatic
     fun defaults(): List<TerminalCommandSpec> =
         listOf(
+            cd(),
+            pushd(),
+            ls(),
+            cat(),
+            mkdir(),
+            rm(),
+            cp(),
+            mv(),
+            code(),
             git(),
             gradle(),
             npm(),
@@ -40,6 +49,75 @@ object TerminalCommandSpecs {
             go(),
             aws(),
             ketra(),
+        )
+
+    private fun cd(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "cd",
+            description = "change directory",
+            aliases = listOf("chdir", "sl", "set-location"),
+            positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+        )
+
+    private fun pushd(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "pushd",
+            description = "change directory and save the current location",
+            positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+        )
+
+    private fun ls(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "ls",
+            description = "list directory contents",
+            aliases = listOf("dir"),
+            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+        )
+
+    private fun cat(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "cat",
+            description = "print file contents",
+            aliases = listOf("type"),
+            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+        )
+
+    private fun mkdir(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "mkdir",
+            description = "create directories",
+            positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+        )
+
+    private fun rm(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "rm",
+            description = "remove files or directories",
+            aliases = listOf("del", "erase"),
+            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+        )
+
+    private fun cp(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "cp",
+            description = "copy files or directories",
+            aliases = listOf("copy"),
+            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+        )
+
+    private fun mv(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "mv",
+            description = "move files or directories",
+            aliases = listOf("move"),
+            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+        )
+
+    private fun code(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "code",
+            description = "open files or directories in Visual Studio Code",
+            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
         )
 
     /**
@@ -63,7 +141,11 @@ object TerminalCommandSpecs {
                                 TerminalOptionSpec(listOf("--branch", "-b"), "show branch information"),
                             ),
                     ),
-                    TerminalCommandSpec("add", "add file contents to the index"),
+                    TerminalCommandSpec(
+                        name = "add",
+                        description = "add file contents to the index",
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
                     TerminalCommandSpec("commit", "record changes to the repository"),
                     TerminalCommandSpec("checkout", "switch branches or restore files", aliases = listOf("co")),
                     TerminalCommandSpec("switch", "switch branches"),
@@ -74,14 +156,23 @@ object TerminalCommandSpecs {
                     TerminalCommandSpec("merge", "join development histories"),
                     TerminalCommandSpec("rebase", "reapply commits on top of another base"),
                     TerminalCommandSpec("log", "show commit logs"),
-                    TerminalCommandSpec("diff", "show changes between commits, trees, or files"),
+                    TerminalCommandSpec(
+                        name = "diff",
+                        description = "show changes between commits, trees, or files",
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
                     TerminalCommandSpec("stash", "stash local modifications"),
                 ),
             options =
                 listOf(
                     TerminalOptionSpec(listOf("--help", "-h"), "show help"),
                     TerminalOptionSpec(listOf("--version"), "show version"),
-                    TerminalOptionSpec(listOf("-C"), "run as if git was started in path", requiresValue = true),
+                    TerminalOptionSpec(
+                        names = listOf("-C"),
+                        description = "run as if git was started in path",
+                        requiresValue = true,
+                        valuePathKind = TerminalPathArgumentKind.DIRECTORY,
+                    ),
                 ),
         )
 
@@ -211,7 +302,12 @@ object TerminalCommandSpecs {
                     TerminalOptionSpec(listOf("--version", "-v"), "show version"),
                     TerminalOptionSpec(listOf("--verbose", "-v"), "use verbose output"),
                     TerminalOptionSpec(listOf("--quiet", "-q"), "do not print cargo log messages"),
-                    TerminalOptionSpec(listOf("--manifest-path"), "path to Cargo.toml", requiresValue = true),
+                    TerminalOptionSpec(
+                        names = listOf("--manifest-path"),
+                        description = "path to Cargo.toml",
+                        requiresValue = true,
+                        valuePathKind = TerminalPathArgumentKind.FILE,
+                    ),
                 ),
         )
 
@@ -231,8 +327,16 @@ object TerminalCommandSpecs {
                     TerminalCommandSpec("describe", "show details of a specific resource or group of resources"),
                     TerminalCommandSpec("logs", "print the logs for a container in a pod"),
                     TerminalCommandSpec("exec", "execute a command in a container"),
-                    TerminalCommandSpec("apply", "apply a configuration to a resource by file name or stdin"),
-                    TerminalCommandSpec("delete", "delete resources by file names, stdin, resources and names"),
+                    TerminalCommandSpec(
+                        name = "apply",
+                        description = "apply a configuration to a resource by file name or stdin",
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                    TerminalCommandSpec(
+                        name = "delete",
+                        description = "delete resources by file names, stdin, resources and names",
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
                     TerminalCommandSpec("port-forward", "forward one or more local ports to a pod"),
                     TerminalCommandSpec("config", "modify kubeconfig files"),
                     TerminalCommandSpec("run", "run a particular image on the cluster"),
@@ -241,7 +345,12 @@ object TerminalCommandSpecs {
             options =
                 listOf(
                     TerminalOptionSpec(listOf("--help"), "show help"),
-                    TerminalOptionSpec(listOf("--kubeconfig"), "path to the kubeconfig file", requiresValue = true),
+                    TerminalOptionSpec(
+                        names = listOf("--kubeconfig"),
+                        description = "path to the kubeconfig file",
+                        requiresValue = true,
+                        valuePathKind = TerminalPathArgumentKind.FILE,
+                    ),
                     TerminalOptionSpec(listOf("--namespace", "-n"), "kubernetes namespace to use", requiresValue = true),
                     TerminalOptionSpec(listOf("--context"), "name of the kubeconfig context to use", requiresValue = true),
                 ),
@@ -385,7 +494,12 @@ object TerminalCommandSpecs {
                     TerminalOptionSpec(listOf("--help", "-h"), "show help"),
                     TerminalOptionSpec(listOf("--version", "-v"), "show version"),
                     TerminalOptionSpec(listOf("--profile", "-p"), "launch with specific shell profile", requiresValue = true),
-                    TerminalOptionSpec(listOf("--directory", "-d"), "start in specific directory", requiresValue = true),
+                    TerminalOptionSpec(
+                        names = listOf("--directory", "-d"),
+                        description = "start in specific directory",
+                        requiresValue = true,
+                        valuePathKind = TerminalPathArgumentKind.DIRECTORY,
+                    ),
                 ),
         )
 }

@@ -253,6 +253,7 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCompletionFeedbackStats",
                 "TerminalCompletionTokenPosition",
                 "TerminalOptionSpec",
+                "TerminalPathArgumentKind",
             )
         private val PUBLIC_API_DECLARATIONS =
             setOf(

@@ -28,6 +28,8 @@ package io.github.ketraterm.completion.model
  * @property aliases additional tokens that resolve to this command.
  * @property subcommands nested subcommands available after this command.
  * @property options options available at this command level.
+ * @property positionalArgumentPathKind file-system path kind accepted by bare
+ * positional arguments after this command or subcommand.
  */
 data class TerminalCommandSpec
     @JvmOverloads
@@ -37,6 +39,7 @@ data class TerminalCommandSpec
         val aliases: List<String> = emptyList(),
         val subcommands: List<TerminalCommandSpec> = emptyList(),
         val options: List<TerminalOptionSpec> = emptyList(),
+        val positionalArgumentPathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
     ) {
         init {
             require(name.isNotBlank()) { "name must not be blank" }
@@ -51,6 +54,8 @@ data class TerminalCommandSpec
  * @property description short human-readable description.
  * @property requiresValue whether this option consumes the following token as a
  * value.
+ * @property valuePathKind file-system path kind accepted by the option's
+ * separate value token when [requiresValue] is true.
  */
 data class TerminalOptionSpec
     @JvmOverloads
@@ -58,9 +63,28 @@ data class TerminalOptionSpec
         val names: List<String>,
         val description: String = "",
         val requiresValue: Boolean = false,
+        val valuePathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
     ) {
         init {
             require(names.isNotEmpty()) { "names must not be empty" }
             require(names.none(String::isBlank)) { "names must not contain blank values" }
         }
     }
+
+/**
+ * File-system path category accepted by a command positional argument or option
+ * value.
+ */
+enum class TerminalPathArgumentKind {
+    /** The argument has no known path semantics. */
+    NONE,
+
+    /** The argument may reference either a file or directory. */
+    FILE_OR_DIRECTORY,
+
+    /** The argument should reference a directory. */
+    DIRECTORY,
+
+    /** The argument should reference a regular file. */
+    FILE,
+}

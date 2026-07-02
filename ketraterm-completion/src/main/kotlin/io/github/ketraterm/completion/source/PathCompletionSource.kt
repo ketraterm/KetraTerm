@@ -16,10 +16,17 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
+import io.github.ketraterm.completion.commandline.isTerminalOptionToken
 import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.TerminalOptionSpec
+import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+import io.github.ketraterm.completion.spec.CommandSpecResolver.findSpec
 
 /**
  * Autocomplete source for directory contents and file paths.
@@ -33,7 +40,10 @@ import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORD
  */
 internal class PathCompletionSource(
     private val fileSystemProvider: TerminalFileSystemProvider,
+    commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
 ) : TerminalCompletionSource {
+    private val commandSpecs = commandSpecs.toList()
+
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
         val workingDir = request.workingDirectoryUri ?: return emptyList()
         val context = TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset)
@@ -44,11 +54,11 @@ internal class PathCompletionSource(
 
         val commandTokenIndex = context.tokens.firstCommandTokenIndex()
         val isCommandToken = context.activeTokenIndex <= commandTokenIndex
-        val pathPolicy = pathPolicy(context.tokens.getOrNull(commandTokenIndex)?.text)
+        val pathKind = pathKind(context, commandTokenIndex, isCommandToken)
 
         // If we are in the command position, only complete paths if prefix is explicitly path-like
         if (isCommandToken && !isPathLike(prefix)) return emptyList()
-        if (!isCommandToken && pathPolicy == PathArgumentPolicy.NONE && !isPathLike(prefix)) return emptyList()
+        if (!isCommandToken && pathKind == TerminalPathArgumentKind.NONE && !isPathLike(prefix)) return emptyList()
 
         // Slashes normalized to forward slashes for URL path resolution
         val normalizedPrefix = prefix.replace('\\', '/')
@@ -84,7 +94,7 @@ internal class PathCompletionSource(
         var orderIndex = 0
 
         for (entry in entries) {
-            if (pathPolicy == PathArgumentPolicy.DIRECTORY_ONLY && !entry.isDirectory) continue
+            if (!pathKind.accepts(entry)) continue
             if (filePrefix.isEmpty() && entry.name.startsWith(".")) continue
             if (matchesPrefix(entry.name, filePrefix)) {
                 val rawSuffix = if (entry.isDirectory) "$pathSeparator" else ""
@@ -116,36 +126,69 @@ internal class PathCompletionSource(
             prefix.contains("/") ||
             prefix.contains("\\")
 
-    private fun pathPolicy(commandToken: String?): PathArgumentPolicy {
-        if (commandToken == null) return PathArgumentPolicy.NONE
-        return when (normalizeTerminalCommandToken(commandToken)) {
-            "cd",
-            "chdir",
-            "sl",
-            "set-location",
-            "pushd",
-            "popd",
-            -> PathArgumentPolicy.DIRECTORY_ONLY
-            "cat",
-            "cp",
-            "copy",
-            "code",
-            "del",
-            "dir",
-            "erase",
-            "less",
-            "ls",
-            "mkdir",
-            "more",
-            "move",
-            "mv",
-            "open",
-            "rd",
-            "rm",
-            "rmdir",
-            "type",
-            -> PathArgumentPolicy.ANY
-            else -> PathArgumentPolicy.NONE
+    private fun pathKind(
+        context: TerminalCommandLineContext,
+        commandTokenIndex: Int,
+        isCommandToken: Boolean,
+    ): TerminalPathArgumentKind {
+        if (isCommandToken) return TerminalPathArgumentKind.FILE_OR_DIRECTORY
+        val commandToken = context.tokens.getOrNull(commandTokenIndex) ?: return TerminalPathArgumentKind.NONE
+        val root = findSpec(commandSpecs, normalizeTerminalCommandToken(commandToken.text)) ?: return TerminalPathArgumentKind.NONE
+        val resolved = resolveCommandPath(context, commandTokenIndex, root)
+        optionBeforeActiveValue(context, commandTokenIndex, resolved.commands)?.let { option ->
+            if (option.valuePathKind != TerminalPathArgumentKind.NONE) return option.valuePathKind
+        }
+        return resolved.current.positionalArgumentPathKind
+    }
+
+    private fun resolveCommandPath(
+        context: TerminalCommandLineContext,
+        commandTokenIndex: Int,
+        root: TerminalCommandSpec,
+    ): ResolvedCommandPath {
+        val commands = ArrayList<TerminalCommandSpec>()
+        commands += root
+        var current = root
+        var index = commandTokenIndex + 1
+        while (index < context.activeTokenIndex) {
+            val token = context.tokens[index].text
+            if (token.isTerminalOptionToken()) {
+                val option = findOption(commands, token)
+                if (option?.requiresValue == true) index++
+                index++
+                continue
+            }
+
+            val next = findSpec(current.subcommands, normalizeTerminalCommandToken(token)) ?: break
+            current = next
+            commands += current
+            index++
+        }
+        return ResolvedCommandPath(commands)
+    }
+
+    private fun optionBeforeActiveValue(
+        context: TerminalCommandLineContext,
+        commandTokenIndex: Int,
+        commands: List<TerminalCommandSpec>,
+    ): TerminalOptionSpec? {
+        val optionIndex = context.activeTokenIndex - 1
+        if (optionIndex <= commandTokenIndex) return null
+        val optionToken = context.tokens.getOrNull(optionIndex) ?: return null
+        if (!optionToken.text.isTerminalOptionToken()) return null
+        val option = findOption(commands, optionToken.text) ?: return null
+        return if (option.requiresValue) option else null
+    }
+
+    private fun findOption(
+        commands: List<TerminalCommandSpec>,
+        token: String,
+    ): TerminalOptionSpec? {
+        val normalized = normalizeTerminalCommandToken(token)
+        return commands.asReversed().firstNotNullOfOrNull { command ->
+            command.options.firstOrNull { option ->
+                option.names.any { name -> normalizeTerminalCommandToken(name) == normalized }
+            }
         }
     }
 
@@ -171,9 +214,18 @@ internal class PathCompletionSource(
         private const val PATH_BASE_SCORE = 200
     }
 
-    private enum class PathArgumentPolicy {
-        NONE,
-        ANY,
-        DIRECTORY_ONLY,
+    private data class ResolvedCommandPath(
+        val commands: List<TerminalCommandSpec>,
+    ) {
+        val current: TerminalCommandSpec get() = commands.last()
     }
+
+    private fun TerminalPathArgumentKind.accepts(entry: TerminalFileEntry): Boolean =
+        when (this) {
+            TerminalPathArgumentKind.NONE,
+            TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+            -> true
+            TerminalPathArgumentKind.DIRECTORY -> entry.isDirectory
+            TerminalPathArgumentKind.FILE -> !entry.isDirectory
+        }
 }

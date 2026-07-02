@@ -16,6 +16,9 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalOptionSpec
+import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -87,6 +90,57 @@ class PathCompletionSourceTest {
         val candidates = source.complete(request("git s", "file:///project"))
 
         assertTrue(candidates.isEmpty())
+    }
+
+    @Test
+    fun `command spec positional path metadata enables subcommand path completion`() {
+        val source =
+            PathCompletionSource(
+                fileSystemProvider = mockProvider,
+                commandSpecs =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "tool",
+                            subcommands =
+                                listOf(
+                                    TerminalCommandSpec(
+                                        name = "open",
+                                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                                    ),
+                                ),
+                        ),
+                    ),
+            )
+
+        val candidates = source.complete(request("tool open ", "file:///project"))
+
+        assertEquals(listOf("src/", "README.md", "LICENSE"), candidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `option value path metadata enables directory-only path completion`() {
+        val source =
+            PathCompletionSource(
+                fileSystemProvider = mockProvider,
+                commandSpecs =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "tool",
+                            options =
+                                listOf(
+                                    TerminalOptionSpec(
+                                        names = listOf("--cwd"),
+                                        requiresValue = true,
+                                        valuePathKind = TerminalPathArgumentKind.DIRECTORY,
+                                    ),
+                                ),
+                        ),
+                    ),
+            )
+
+        val candidates = source.complete(request("tool --cwd ", "file:///project"))
+
+        assertEquals(listOf("src/"), candidates.map { it.replacementText })
     }
 
     @Test

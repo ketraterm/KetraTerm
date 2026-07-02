@@ -22,6 +22,7 @@ The `model` package contains durable public data models that hosts may persist
 or construct:
 
 - `TerminalCommandSpec` and `TerminalOptionSpec`
+- `TerminalPathArgumentKind`
 - `TerminalCommandSpecs`
 - `TerminalCommandCompletionStats`
 - `TerminalCommandShapeStats` and `TerminalCommandLineShape`
@@ -76,7 +77,10 @@ sources may still match the normalized visible command prefix.
 
 Path completion is intentionally conservative. In command position it only
 returns candidates for explicitly path-like prefixes. In argument position it
-returns bare current-directory entries only for known path-taking commands, and
-directory-changing commands such as `cd`, `chdir`, `pushd`, and PowerShell
-`Set-Location` aliases receive directory-only candidates. Dot-prefixed entries
-are hidden for an empty path prefix and appear once the user types `.`.
+returns bare current-directory entries only when the resolved
+`TerminalCommandSpec` or `TerminalOptionSpec` declares path metadata through
+`TerminalPathArgumentKind`. Directory-changing commands such as `cd`, `chdir`,
+`pushd`, and PowerShell `Set-Location` aliases receive directory-only
+candidates, while commands such as `git add` and `kubectl apply` may request
+file-or-directory candidates. Dot-prefixed entries are hidden for an empty path
+prefix and appear once the user types `.`.
