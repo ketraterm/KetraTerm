@@ -80,3 +80,47 @@ internal fun TerminalCompletionRequest.commandLineAfterCandidate(candidate: Term
 }
 
 internal fun saturatedCompletionCounterIncrement(value: Int): Int = if (value == Int.MAX_VALUE) value else value + 1
+
+internal fun isRelativeCdCommand(commandLine: String): Boolean {
+    val tokens =
+        try {
+            io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
+                .parse(commandLine, commandLine.length)
+                .tokens
+        } catch (_: Exception) {
+            return false
+        }
+    if (tokens.isEmpty()) return false
+    val first = tokens[0].text.lowercase()
+    if (first != "cd" && first != "chdir" && first != "pushd" && first != "set-location" && first != "sl") {
+        return false
+    }
+    if (tokens.size < 2) return false
+    val arg = tokens[1].text
+    if (arg.isEmpty()) return false
+    if (arg.startsWith("/") || arg.startsWith("\\") || arg.startsWith("~")) {
+        return false
+    }
+    if (arg.length >= 2 && arg[0].isLetter() && arg[1] == ':') {
+        return false
+    }
+    if (isPureTraversalPath(arg)) {
+        return false
+    }
+    return true
+}
+
+private fun isPureTraversalPath(path: String): Boolean {
+    for (i in path.indices) {
+        val ch = path[i]
+        if (ch != '.' && ch != '/' && ch != '\\') {
+            return false
+        }
+    }
+    return true
+}
+
+internal fun canonicalizeWorkingDirectoryUri(uri: String): String {
+    val trimmed = uri.trim()
+    return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
+}

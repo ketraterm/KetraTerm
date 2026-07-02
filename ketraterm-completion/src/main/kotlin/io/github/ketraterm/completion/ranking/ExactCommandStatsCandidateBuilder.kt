@@ -19,6 +19,8 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
+import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
+import io.github.ketraterm.completion.internal.isRelativeCdCommand
 import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 
@@ -43,6 +45,16 @@ internal object ExactCommandStatsCandidateBuilder {
             if (!entry.hasPositiveSuggestionSignal()) continue
             if (!entry.normalizedCommandLine.startsWith(normalizedPrefix)) continue
             if (entry.normalizedCommandLine == normalizedPrefix) continue
+            if (isRelativeCdCommand(entry.commandLine)) {
+                val entryUri = entry.workingDirectoryUri
+                val requestUri = request.workingDirectoryUri
+                if (entryUri != null &&
+                    requestUri != null &&
+                    canonicalizeWorkingDirectoryUri(entryUri) != canonicalizeWorkingDirectoryUri(requestUri)
+                ) {
+                    continue
+                }
+            }
             candidates += entry.toCandidate(request)
         }
         return candidates

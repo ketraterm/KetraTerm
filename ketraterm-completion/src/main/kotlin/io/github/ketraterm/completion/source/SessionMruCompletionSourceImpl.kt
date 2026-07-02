@@ -20,7 +20,9 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalSessionMruCompletionSource
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
+import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
+import io.github.ketraterm.completion.internal.isRelativeCdCommand
 import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
 import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncrement
 
@@ -115,6 +117,15 @@ internal class SessionMruCompletionSourceImpl(
                 for (i in entries.indices) {
                     val entry = entries[i]
                     if (entry.normalizedCommandLine.startsWith(normalizedPrefix) && entry.normalizedCommandLine != normalizedPrefix) {
+                        if (isRelativeCdCommand(entry.commandLine)) {
+                            val entryUri = entry.workingDirectoryUri
+                            val requestUri = request.workingDirectoryUri
+                            if (entryUri != null && requestUri != null &&
+                                canonicalizeWorkingDirectoryUri(entryUri) != canonicalizeWorkingDirectoryUri(requestUri)
+                            ) {
+                                continue
+                            }
+                        }
                         result += entry.toCandidate(request)
                     }
                 }

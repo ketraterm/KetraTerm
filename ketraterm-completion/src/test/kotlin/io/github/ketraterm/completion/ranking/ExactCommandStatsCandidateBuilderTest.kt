@@ -151,6 +151,39 @@ class ExactCommandStatsCandidateBuilderTest {
         assertEquals(listOf("git three", "git two"), candidates.map { it.replacementText })
     }
 
+    @Test
+    fun `builder filters out relative cd command matches when working directory differs`() {
+        val candidates =
+            ExactCommandStatsCandidateBuilder.complete(
+                request("c", workingDirectoryUri = "file:///C:/Users/gagik/IdeaProjects/JvTerm"),
+                listOf(
+                    stats("cd IdeaProjects/JvTerm/", successCount = 1, workingDirectoryUri = "file:///C:/Users/gagik"),
+                    stats("cd /usr/bin", successCount = 1, workingDirectoryUri = "file:///C:/Users/gagik"),
+                    stats("cd ..", successCount = 1, workingDirectoryUri = "file:///C:/Users/gagik"),
+                    stats("cat relative/file.txt", successCount = 1, workingDirectoryUri = "file:///C:/Users/gagik"),
+                ),
+            )
+
+        val replacementTexts = candidates.map { it.replacementText }
+        assertTrue("cd IdeaProjects/JvTerm/" !in replacementTexts)
+        assertTrue("cd /usr/bin" in replacementTexts)
+        assertTrue("cd .." in replacementTexts)
+        assertTrue("cat relative/file.txt" in replacementTexts)
+    }
+
+    @Test
+    fun `builder suggests relative cd command matches when working directory matches`() {
+        val candidates =
+            ExactCommandStatsCandidateBuilder.complete(
+                request("cd ", workingDirectoryUri = "file:///C:/Users/gagik/"),
+                listOf(
+                    stats("cd IdeaProjects/JvTerm/", successCount = 1, workingDirectoryUri = "file:///C:/Users/gagik"),
+                ),
+            )
+
+        assertEquals(listOf("cd IdeaProjects/JvTerm/"), candidates.map { it.replacementText })
+    }
+
     private fun request(
         commandLine: String,
         profileId: String? = null,

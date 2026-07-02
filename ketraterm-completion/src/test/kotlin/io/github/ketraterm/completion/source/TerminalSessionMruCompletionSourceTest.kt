@@ -139,6 +139,49 @@ class TerminalSessionMruCompletionSourceTest {
         assertEquals(listOf("git status"), candidates.map { it.replacementText })
     }
 
+    @Test
+    fun `filters out relative cd command matches when working directory differs`() {
+        val source = TerminalCompletionSources.sessionMru()
+        source.recordSuccessfulCommand("cd IdeaProjects/JvTerm/", workingDirectoryUri = "file:///C:/Users/gagik")
+        source.recordSuccessfulCommand("cd /usr/bin", workingDirectoryUri = "file:///C:/Users/gagik")
+        source.recordSuccessfulCommand("cd ..", workingDirectoryUri = "file:///C:/Users/gagik")
+        source.recordSuccessfulCommand("cat relative/file.txt", workingDirectoryUri = "file:///C:/Users/gagik")
+
+        // Request from different directory
+        val candidates =
+            source.complete(
+                request(
+                    commandLine = "c",
+                    workingDirectoryUri = "file:///C:/Users/gagik/IdeaProjects/JvTerm",
+                ),
+            )
+
+        val replacementTexts = candidates.map { it.replacementText }
+        // Should NOT contain "cd IdeaProjects/JvTerm/"
+        assertTrue("cd IdeaProjects/JvTerm/" !in replacementTexts)
+        // Should contain absolute, traversal, and non-cd relative commands
+        assertTrue("cd /usr/bin" in replacementTexts)
+        assertTrue("cd .." in replacementTexts)
+        assertTrue("cat relative/file.txt" in replacementTexts)
+    }
+
+    @Test
+    fun `suggests relative cd command matches when working directory matches`() {
+        val source = TerminalCompletionSources.sessionMru()
+        source.recordSuccessfulCommand("cd IdeaProjects/JvTerm/", workingDirectoryUri = "file:///C:/Users/gagik")
+
+        // Request from matching directory
+        val candidates =
+            source.complete(
+                request(
+                    commandLine = "cd ",
+                    workingDirectoryUri = "file:///C:/Users/gagik/",
+                ),
+            )
+
+        assertEquals(listOf("cd IdeaProjects/JvTerm/"), candidates.map { it.replacementText })
+    }
+
     private fun request(
         commandLine: String,
         profileId: String? = null,
