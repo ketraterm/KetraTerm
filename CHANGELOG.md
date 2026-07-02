@@ -1,6 +1,6 @@
 # KetraTerm Standalone App Changelog
 
-## [Unreleased]
+## [0.1.1] - 2026-07-02
 
 - Fixed AltGr character input and terminal grid corruption on AZERTY keyboards for Windows/Linux.
 
