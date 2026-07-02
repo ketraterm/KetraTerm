@@ -37,6 +37,7 @@ internal data class TerminalCompletionContext(
     val activeOption: TerminalOptionSpec?,
     val expectedPathKind: TerminalPathArgumentKind,
     val expectedValueDomain: TerminalCompletionValueDomain,
+    val subcommandCandidateSource: TerminalCommandSpec?,
     val staticValueCandidates: List<String>,
     val activeTokenQuote: Char,
 ) {
@@ -66,6 +67,7 @@ internal object TerminalCompletionContextResolver {
                 activeOption = null,
                 expectedPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                 expectedValueDomain = TerminalCompletionValueDomain.NONE,
+                subcommandCandidateSource = null,
                 staticValueCandidates = emptyList(),
                 activeTokenQuote = activeTokenQuote,
             )
@@ -90,6 +92,7 @@ internal object TerminalCompletionContextResolver {
                 activeOption = null,
                 expectedPathKind = TerminalPathArgumentKind.NONE,
                 expectedValueDomain = TerminalCompletionValueDomain.NONE,
+                subcommandCandidateSource = null,
                 staticValueCandidates = emptyList(),
                 activeTokenQuote = activeTokenQuote,
             )
@@ -97,13 +100,14 @@ internal object TerminalCompletionContextResolver {
 
         val commandPath = resolveCommandPath(lineContext, commandTokenIndex, root)
         val activeOption = optionBeforeActiveValue(lineContext, commandTokenIndex, commandPath)
+        val subcommandCandidateSource = subcommandCandidateSource(commandPath)
         val activePosition =
             when {
                 activeOption != null -> TerminalCompletionActivePosition.OPTION_VALUE
                 lineContext.activePrefix.isOptionNamePrefix() -> TerminalCompletionActivePosition.OPTION_NAME
                 commandPath.last().positionalArgumentPathKind != TerminalPathArgumentKind.NONE ->
                     TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
-                commandPath.last().subcommands.isNotEmpty() -> TerminalCompletionActivePosition.SUBCOMMAND
+                subcommandCandidateSource != null -> TerminalCompletionActivePosition.SUBCOMMAND
                 else -> TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
             }
         val expectedPathKind =
@@ -128,9 +132,18 @@ internal object TerminalCompletionContextResolver {
             activeOption = activeOption,
             expectedPathKind = expectedPathKind,
             expectedValueDomain = expectedValueDomain,
+            subcommandCandidateSource = subcommandCandidateSource,
             staticValueCandidates = activeOption?.valueCandidates ?: emptyList(),
             activeTokenQuote = activeTokenQuote,
         )
+    }
+
+    private fun subcommandCandidateSource(commandPath: List<TerminalCommandSpec>): TerminalCommandSpec? {
+        val current = commandPath.last()
+        if (current.subcommands.isNotEmpty()) return current
+        if (commandPath.size < 2) return null
+
+        return commandPath.asReversed().firstOrNull { it.repeatableSubcommands }
     }
 
     private fun resolveCommandPath(
@@ -151,13 +164,24 @@ internal object TerminalCompletionContextResolver {
                 continue
             }
 
-            val next = findSpec(current.subcommands, normalizeTerminalCommandToken(token)) ?: break
+            val next = findNextSubcommand(commands, current, normalizeTerminalCommandToken(token)) ?: break
             current = next
             commands += current
             index++
         }
         return commands
     }
+
+    private fun findNextSubcommand(
+        commands: List<TerminalCommandSpec>,
+        current: TerminalCommandSpec,
+        normalizedToken: String,
+    ): TerminalCommandSpec? =
+        findSpec(current.subcommands, normalizedToken)
+            ?: commands
+                .asReversed()
+                .firstOrNull { it.repeatableSubcommands }
+                ?.let { repeatableSource -> findSpec(repeatableSource.subcommands, normalizedToken) }
 
     private fun optionBeforeActiveValue(
         context: TerminalCommandLineContext,

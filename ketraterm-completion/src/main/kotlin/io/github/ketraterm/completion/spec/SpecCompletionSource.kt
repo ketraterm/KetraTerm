@@ -73,10 +73,11 @@ internal class SpecCompletionSource(
             }.toList()
 
     private fun completeSubcommands(context: TerminalCompletionContext): List<TerminalCompletionCandidate> =
-        context.currentCommand
+        context.subcommandCandidateSource
             ?.subcommands
             .orEmpty()
             .asSequence()
+            .filterNot { context.isAlreadyUsedRepeatableSubcommand(it) }
             .filter { matchesCompletablePrefix(it.name, context.activePrefix) }
             .mapIndexed { orderIndex, spec ->
                 candidate(
@@ -88,6 +89,14 @@ internal class SpecCompletionSource(
                     score = score(spec.name, context.activePrefix, SUBCOMMAND_BASE_SCORE, orderIndex),
                 )
             }.toList()
+
+    private fun TerminalCompletionContext.isAlreadyUsedRepeatableSubcommand(spec: TerminalCommandSpec): Boolean {
+        val source = subcommandCandidateSource ?: return false
+        if (!source.repeatableSubcommands) return false
+        return commandPath.dropWhile { it != source }.drop(1).any { command ->
+            command.name.equals(spec.name, ignoreCase = true)
+        }
+    }
 
     private fun completeOptions(context: TerminalCompletionContext): List<TerminalCompletionCandidate> {
         val options = ArrayList<TerminalOptionSpec>()

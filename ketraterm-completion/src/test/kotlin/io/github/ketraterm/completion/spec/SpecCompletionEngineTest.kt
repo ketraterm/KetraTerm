@@ -130,6 +130,23 @@ class SpecCompletionEngineTest {
     }
 
     @Test
+    fun `repeatable subcommands suggest sibling tasks after an existing task`() {
+        val candidates = engine().complete(request("./gradlew clean bu"))
+
+        assertEquals(listOf("build"), candidates.map { it.replacementText })
+        assertEquals(TerminalCompletionCandidateKind.SUBCOMMAND, candidates.single().kind)
+        assertEquals(16, candidates.single().replacementStartOffset)
+        assertEquals(18, candidates.single().replacementEndOffset)
+    }
+
+    @Test
+    fun `repeatable subcommands omit already used sibling tasks after whitespace`() {
+        val candidates = engine().complete(request("./gradlew clean "))
+
+        assertEquals(listOf("build", "test", "tasks"), candidates.map { it.replacementText })
+    }
+
+    @Test
     fun `leading environment assignments preserve command completion`() {
         val candidates = engine().complete(request("NODE_ENV=test gr"))
 
@@ -264,8 +281,11 @@ class SpecCompletionEngineTest {
                     TerminalCommandSpec(
                         name = "gradle",
                         aliases = listOf("gradlew", "./gradlew"),
+                        repeatableSubcommands = true,
                         subcommands =
                             listOf(
+                                TerminalCommandSpec("clean", "delete build outputs"),
+                                TerminalCommandSpec("build", "assemble and test the project"),
                                 TerminalCommandSpec("test", "run tests"),
                                 TerminalCommandSpec("tasks", "list tasks"),
                             ),

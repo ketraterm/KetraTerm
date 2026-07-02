@@ -72,6 +72,16 @@ class TerminalCommandLineClassifierTest {
     }
 
     @Test
+    fun `classifies repeated gradle tasks as known subcommands`() {
+        val classification = classify("./gradlew clean build")
+
+        assertEquals("gradle", classification.shape.executable)
+        assertEquals(listOf("clean", "build"), classification.shape.subcommands)
+        assertEquals(0, classification.shape.positionalArgumentCount)
+        assertEquals(emptyList(), classification.arguments)
+    }
+
+    @Test
     fun `classifies option terminator after known command as private positional`() {
         val classification = classify("git status -- --short")
 

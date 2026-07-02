@@ -78,6 +78,16 @@ class TerminalCompletionContextResolverTest {
     }
 
     @Test
+    fun `repeatable subcommands keep suggesting siblings after an existing sibling`() {
+        val context = resolve("./gradlew clean bu")
+
+        assertEquals(TerminalCompletionActivePosition.SUBCOMMAND, context.activePosition)
+        assertEquals(listOf("gradle", "clean"), context.commandPath.map { it.name })
+        assertEquals("gradle", context.subcommandCandidateSource?.name)
+        assertEquals("bu", context.activePrefix)
+    }
+
+    @Test
     fun `quoted directory argument exposes path and quote context`() {
         val context = resolve("cd \"Idea")
 

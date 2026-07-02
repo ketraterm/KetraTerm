@@ -32,6 +32,10 @@ package io.github.ketraterm.completion.model
  * positional arguments after this command or subcommand.
  * @property positionalArgumentValueDomain dynamic host-owned value domain
  * accepted by bare positional arguments after this command or subcommand.
+ * @property repeatableSubcommands whether multiple child subcommand tokens may
+ * appear as sibling positional command values. This models task-style CLIs such
+ * as Gradle, where `gradle clean build` is a sequence of tasks rather than
+ * `build` being nested below `clean`.
  */
 data class TerminalCommandSpec
     @JvmOverloads
@@ -43,6 +47,7 @@ data class TerminalCommandSpec
         val options: List<TerminalOptionSpec> = emptyList(),
         val positionalArgumentPathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
         val positionalArgumentValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
+        val repeatableSubcommands: Boolean = false,
     ) {
         init {
             require(name.isNotBlank()) { "name must not be blank" }

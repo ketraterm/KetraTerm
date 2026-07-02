@@ -196,6 +196,7 @@ object TerminalCommandSpecs {
             name = "gradle",
             description = "build automation",
             aliases = listOf("./gradlew", "gradlew"),
+            repeatableSubcommands = true,
             subcommands =
                 listOf(
                     TerminalCommandSpec("build", "assemble and test the project"),

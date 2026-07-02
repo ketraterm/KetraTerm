@@ -43,8 +43,9 @@ in implementation packages and must stay `internal`.
 resolver. Sources and ranking decorators should use it instead of independently
 guessing command position, subcommand position, option-name position,
 option-value position, positional-argument position, active option metadata,
-expected path kind, expected dynamic value domain, static value candidates,
-replacement offsets, or active quote state from raw command text.
+expected path kind, expected dynamic value domain, repeatable subcommand source,
+static value candidates, replacement offsets, or active quote state from raw
+command text.
 
 ## Internal Implementation
 
@@ -104,6 +105,12 @@ not require host I/O. Dynamic domains are declared with
 Kubernetes namespaces, IDE run configurations, project files, or indexed symbols
 must still come from host-owned providers; the shared module only models and
 ranks those values.
+
+Task-style CLIs that accept several sibling command values on one line should
+set `TerminalCommandSpec.repeatableSubcommands`. Gradle is the built-in example:
+after `./gradlew clean bu`, the context remains attached to the root Gradle
+task set and the spec source can suggest `build` while omitting already-used
+tasks such as `clean`.
 
 ## Host Dynamic Providers
 

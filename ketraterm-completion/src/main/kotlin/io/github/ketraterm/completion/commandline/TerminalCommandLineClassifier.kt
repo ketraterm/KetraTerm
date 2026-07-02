@@ -56,11 +56,13 @@ internal object TerminalCommandLineClassifier {
         tokenIndex++
         var currentSpec = rootSpec
         val subcommands = ArrayList<String>(TERMINAL_COMMAND_LIST_CAPACITY)
+        val commandPath = ArrayList<TerminalCommandSpec>(TERMINAL_COMMAND_LIST_CAPACITY)
         val optionNames = ArrayList<String>(TERMINAL_COMMAND_LIST_CAPACITY)
         val arguments = ArrayList<TerminalCommandArgumentShape>(TERMINAL_COMMAND_LIST_CAPACITY)
         var expectingOptionValue: String? = null
         var acceptingSubcommands = true
         var optionsEnabled = true
+        commandPath += rootSpec
 
         while (tokenIndex < tokens.size) {
             val normalized = normalizeTerminalCommandToken(tokens[tokenIndex].text)
@@ -89,10 +91,11 @@ internal object TerminalCommandLineClassifier {
                     }
                 }
                 acceptingSubcommands -> {
-                    val next = CommandSpecResolver.findSpec(currentSpec.subcommands, normalized)
+                    val next = findNextSubcommand(commandPath, currentSpec, normalized)
                     if (next != null) {
                         subcommands += normalizeTerminalCommandToken(next.name)
                         currentSpec = next
+                        commandPath += next
                     } else {
                         arguments += TerminalCommandArgumentShape(TerminalCommandArgumentKind.POSITIONAL)
                         acceptingSubcommands = false
@@ -125,6 +128,17 @@ internal object TerminalCommandLineClassifier {
             matchedSpec = true,
         )
     }
+
+    private fun findNextSubcommand(
+        commandPath: List<TerminalCommandSpec>,
+        currentSpec: TerminalCommandSpec,
+        normalizedToken: String,
+    ): TerminalCommandSpec? =
+        CommandSpecResolver.findSpec(currentSpec.subcommands, normalizedToken)
+            ?: commandPath
+                .asReversed()
+                .firstOrNull { it.repeatableSubcommands }
+                ?.let { repeatableSource -> CommandSpecResolver.findSpec(repeatableSource.subcommands, normalizedToken) }
 
     private fun classifyWithoutSpec(commandLine: String): TerminalCommandLineClassification? {
         val shape = GenericCommandLineShapeClassifier.classify(commandLine) ?: return null
