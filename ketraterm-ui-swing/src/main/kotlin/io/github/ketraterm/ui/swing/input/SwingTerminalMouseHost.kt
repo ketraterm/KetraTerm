@@ -53,6 +53,8 @@ internal interface SwingTerminalMouseHost {
 
     fun pasteClipboardText(): Boolean
 
+    fun requestFocusInWindow(): Boolean
+
     fun handlePromptMarkerMousePressed(event: MouseEvent): Boolean = false
 
     fun handlePromptMarkerMouseMoved(event: MouseEvent): Boolean = false

@@ -39,6 +39,7 @@ internal class SwingTerminalMouseController(
     val mouseListener =
         object : MouseAdapter() {
             override fun mousePressed(event: MouseEvent) {
+                host.requestFocusInWindow()
                 if (host.handlePromptMarkerMousePressed(event)) return
                 if (handleMouseTracking(event, TerminalMouseEventType.PRESS)) return
                 if (host.handleHyperlinkMousePressed(event)) return
