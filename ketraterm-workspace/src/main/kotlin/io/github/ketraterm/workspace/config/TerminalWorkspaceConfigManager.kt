@@ -130,6 +130,8 @@ class TerminalWorkspaceConfigManager(
                 behavior["shell_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.shellSuggestionsEnabled
             val persistentSuggestionLearningEnabled =
                 behavior[SUGGESTION_LEARNING_PERSISTENCE_KEY]?.toBooleanStrictOrNull()
+                    ?: behavior["persistent_suggestion_learning_enabled"]?.toBooleanStrictOrNull()
+                    ?: behavior["persistent_command_history_enabled"]?.toBooleanStrictOrNull()
                     ?: default.persistentSuggestionLearningEnabled
             val scrollbackLines =
                 parseIntSetting(

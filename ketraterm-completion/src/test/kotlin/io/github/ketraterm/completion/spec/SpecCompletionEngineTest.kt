@@ -152,6 +152,37 @@ class SpecCompletionEngineTest {
         assertTrue(engine().complete(request("unknown --")).isEmpty())
     }
 
+    @Test
+    fun `inherited options path resolution with nested subcommands`() {
+        val dockerSpec =
+            TerminalCommandSpec(
+                name = "docker",
+                subcommands =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "compose",
+                            subcommands =
+                                listOf(
+                                    TerminalCommandSpec("up"),
+                                    TerminalCommandSpec("down"),
+                                    TerminalCommandSpec("ps"),
+                                ),
+                        ),
+                    ),
+                options =
+                    listOf(
+                        TerminalOptionSpec(listOf("--context"), requiresValue = true),
+                    ),
+            )
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                TerminalCompletionSources.fromSpecs(listOf(dockerSpec)),
+            )
+
+        val candidates = engine.complete(request("docker compose --context my-context p"))
+        assertEquals(listOf("ps"), candidates.map { it.replacementText })
+    }
+
     private fun engine(): TerminalCompletionEngine =
         TerminalCompletionEngines.fromSources(
             TerminalCompletionSources.fromSpecs(

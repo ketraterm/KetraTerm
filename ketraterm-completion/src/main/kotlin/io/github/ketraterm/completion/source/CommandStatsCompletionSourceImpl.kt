@@ -192,7 +192,9 @@ internal class CommandStatsCompletionSourceImpl(
     }
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        ExactCommandStatsCandidateBuilder.complete(request, snapshot())
+        synchronized(lock) {
+            ExactCommandStatsCandidateBuilder.complete(request, commandStats.rawRows())
+        }
 
     private companion object {
         private const val DEFAULT_CAPACITY = 2048

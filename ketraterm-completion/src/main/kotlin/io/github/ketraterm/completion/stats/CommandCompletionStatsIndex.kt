@@ -43,6 +43,8 @@ internal class CommandCompletionStatsIndex(
 
     fun snapshot(): List<TerminalCommandCompletionStats> = rows.snapshot()
 
+    fun rawRows(): List<TerminalCommandCompletionStats> = rows.rawRows()
+
     fun recordCommandResult(
         commandLine: String,
         successful: Boolean,

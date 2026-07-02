@@ -211,6 +211,36 @@ class TerminalConfigTest {
         Files.deleteIfExists(tempDir)
     }
 
+    @Test
+    fun `test TerminalWorkspaceConfigManager loads legacy suggestion learning config keys`() {
+        val tempDir = Files.createTempDirectory("ketraterm-config-test-suggestion-learning-legacy")
+        val configFile = tempDir.resolve("config.toml")
+        val manager = TerminalWorkspaceConfigManager(configFile)
+
+        // Try persistent_suggestion_learning_enabled
+        Files.writeString(
+            configFile,
+            """
+            [behavior]
+            persistent_suggestion_learning_enabled = true
+            """.trimIndent(),
+        )
+        assertTrue(manager.load().persistentSuggestionLearningEnabled)
+
+        // Try persistent_command_history_enabled
+        Files.writeString(
+            configFile,
+            """
+            [behavior]
+            persistent_command_history_enabled = true
+            """.trimIndent(),
+        )
+        assertTrue(manager.load().persistentSuggestionLearningEnabled)
+
+        Files.deleteIfExists(configFile)
+        Files.deleteIfExists(tempDir)
+    }
+
     fun `test TerminalWorkspaceConfigManager clamps hand edited numeric values`() {
         val tempDir = Files.createTempDirectory("ketraterm-config-test-clamped")
         val configFile = tempDir.resolve("config.toml")

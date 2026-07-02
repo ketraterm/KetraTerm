@@ -143,8 +143,10 @@ internal class SpecCompletionSource(
             if (token.startsWith("-")) {
                 val normalizedOption = normalizeTerminalCommandToken(token)
                 val option =
-                    current.options.firstOrNull { option ->
-                        option.names.any { normalizeTerminalCommandToken(it) == normalizedOption }
+                    commands.asReversed().firstNotNullOfOrNull { spec ->
+                        spec.options.firstOrNull { option ->
+                            option.names.any { normalizeTerminalCommandToken(it) == normalizedOption }
+                        }
                     }
                 if (option?.requiresValue == true) index++
                 index++

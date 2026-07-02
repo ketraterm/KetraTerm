@@ -16,7 +16,6 @@
 package io.github.ketraterm.completion.model
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshotCodec.decode
 import java.nio.charset.StandardCharsets
 import java.util.*
 

@@ -53,6 +53,8 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
 
     fun snapshot(): List<Row> = entries.toList()
 
+    fun rawRows(): List<Row> = entries
+
     fun mutate(
         key: Key,
         initialRow: () -> Row,
@@ -62,7 +64,7 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
         if (existingIndex >= 0) {
             entries[existingIndex] = update(entries[existingIndex])
         } else {
-            if (entries.size == capacity) entries.removeLeastRelevantBy(order)
+            if (entries.size == capacity) entries.removeAt(entries.size - 1)
             entries += update(initialRow())
         }
         entries.sortWith(order)

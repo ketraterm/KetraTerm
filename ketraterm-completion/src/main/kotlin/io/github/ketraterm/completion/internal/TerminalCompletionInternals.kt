@@ -80,14 +80,3 @@ internal fun TerminalCompletionRequest.commandLineAfterCandidate(candidate: Term
 }
 
 internal fun saturatedCompletionCounterIncrement(value: Int): Int = if (value == Int.MAX_VALUE) value else value + 1
-
-internal fun <T> MutableList<T>.removeLeastRelevantBy(order: Comparator<T>) {
-    if (isEmpty()) return
-    var removeIndex = 0
-    var index = 1
-    while (index < size) {
-        if (order.compare(this[index], this[removeIndex]) > 0) removeIndex = index
-        index++
-    }
-    removeAt(removeIndex)
-}

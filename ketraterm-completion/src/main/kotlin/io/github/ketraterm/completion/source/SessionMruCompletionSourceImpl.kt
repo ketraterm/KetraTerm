@@ -108,18 +108,19 @@ internal class SessionMruCompletionSourceImpl(
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
         val prefix = request.commandLine.substring(0, request.cursorOffset).trimStart()
         val normalizedPrefix = normalizeTerminalCommandLine(prefix)
-        val snapshot =
+        val candidates =
             synchronized(lock) {
-                entries.toList()
+                if (entries.isEmpty()) return@synchronized emptyList()
+                val result = ArrayList<TerminalCompletionCandidate>()
+                for (i in entries.indices) {
+                    val entry = entries[i]
+                    if (entry.normalizedCommandLine.startsWith(normalizedPrefix) && entry.normalizedCommandLine != normalizedPrefix) {
+                        result += entry.toCandidate(request)
+                    }
+                }
+                result
             }
-        if (snapshot.isEmpty()) return emptyList()
-
-        val candidates = ArrayList<TerminalCompletionCandidate>(minOf(snapshot.size, request.maxCandidates))
-        for (entry in snapshot) {
-            if (!entry.normalizedCommandLine.startsWith(normalizedPrefix)) continue
-            if (entry.normalizedCommandLine == normalizedPrefix) continue
-            candidates += entry.toCandidate(request)
-        }
+        if (candidates.isEmpty()) return emptyList()
         return candidates
             .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
             .take(request.maxCandidates)
