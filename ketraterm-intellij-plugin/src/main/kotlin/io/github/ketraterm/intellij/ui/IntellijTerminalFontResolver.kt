@@ -16,8 +16,8 @@
 
 package io.github.ketraterm.intellij.ui
 
+import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.impl.ComplementaryFontsRegistry
-import com.intellij.openapi.editor.colors.impl.AppFontOptions
 import io.github.ketraterm.ui.swing.api.TerminalFontResolver
 import java.awt.Font
 
@@ -26,7 +26,7 @@ import java.awt.Font
  */
 object IntellijTerminalFontResolver : TerminalFontResolver {
     override fun resolveFallbackFont(codePoint: Int, style: Int, size2D: Float): Font? {
-        val preferences = AppFontOptions.getInstance().fontPreferences
+        val preferences = EditorColorsManager.getInstance().globalScheme.fontPreferences
         val fontInfo = ComplementaryFontsRegistry.getFontAbleToDisplay(
             codePoint,
             style,
