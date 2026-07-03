@@ -61,6 +61,9 @@ fun interface TerminalUiDispatcher {
  * @property clipboardHandler host clipboard adapter for copy and paste actions.
  * @property hyperlinkHandler host policy for explicit Ctrl-click hyperlink
  * activation.
+ * @property hyperlinkDetector host detector for links discovered from the
+ * currently visible terminal viewport. Detection runs outside paint and mouse
+ * movement, and reported actions are invoked only after explicit activation.
  * @property viewportListener host scrollbar adapter notified when the terminal
  * scrollback viewport changes.
  * @property scrollbarOverlayEnabled whether the reusable component should draw
@@ -78,6 +81,7 @@ data class SwingHostServices
         val uiDispatcher: TerminalUiDispatcher = SWING,
         val clipboardHandler: TerminalClipboardHandler = TerminalClipboardHandler.SYSTEM,
         val hyperlinkHandler: TerminalHyperlinkHandler = TerminalHyperlinkHandler.SYSTEM,
+        val hyperlinkDetector: SwingHyperlinkDetector = SwingHyperlinkDetector.NONE,
         val viewportListener: TerminalViewportListener = TerminalViewportListener.NONE,
         val scrollbarOverlayEnabled: Boolean = true,
         val shellSuggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,

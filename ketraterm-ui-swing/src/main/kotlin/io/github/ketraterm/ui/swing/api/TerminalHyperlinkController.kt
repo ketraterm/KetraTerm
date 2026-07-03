@@ -16,15 +16,12 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.render.cache.TerminalRenderCache
-import io.github.ketraterm.session.TerminalSession
 import java.awt.Cursor
 import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
 
 internal interface TerminalHyperlinkHost {
     val renderCache: TerminalRenderCache
-    val session: TerminalSession?
-    val hostServices: SwingHostServices
     var cursor: Cursor
 
     fun cellAt(
@@ -38,6 +35,15 @@ internal interface TerminalHyperlinkHost {
         endRow: Int,
         endColumn: Int,
     )
+
+    fun hyperlinkIdAt(
+        row: Int,
+        column: Int,
+    ): Int
+
+    fun isHyperlinkResolvable(hyperlinkId: Int): Boolean
+
+    fun openHyperlink(hyperlinkId: Int): Boolean
 }
 
 internal class TerminalHyperlinkController(
@@ -77,8 +83,9 @@ internal class TerminalHyperlinkController(
 
     fun handleMousePressed(event: MouseEvent): Boolean {
         if (!SwingUtilities.isLeftMouseButton(event) || !event.isControlDown) return false
-        val uri = hyperlinkUriAt(event) ?: return false
-        if (!host.hostServices.hyperlinkHandler.openHyperlink(uri)) return false
+        val hyperlinkId = hyperlinkIdAt(event, host.renderCache)
+        if (hyperlinkId == NO_HYPERLINK_ID) return false
+        if (!host.openHyperlink(hyperlinkId)) return false
         event.consume()
         return true
     }
@@ -162,17 +169,10 @@ internal class TerminalHyperlinkController(
         host.repaintHyperlinkSpan(startRow, startColumn, endRow, endColumn)
     }
 
-    private fun hyperlinkUriAt(event: MouseEvent): String? {
-        val hyperlinkId = hyperlinkIdAt(event, host.renderCache)
-        if (hyperlinkId == NO_HYPERLINK_ID) return null
-        return host.session?.hyperlinkUri(hyperlinkId)
-    }
-
     private fun resolvableHyperlinkIdAt(event: MouseEvent): Int {
         val hyperlinkId = hyperlinkIdAt(event, host.renderCache)
         if (hyperlinkId == NO_HYPERLINK_ID) return NO_HYPERLINK_ID
-        val boundSession = host.session ?: return NO_HYPERLINK_ID
-        return if (boundSession.hyperlinkUri(hyperlinkId) != null) hyperlinkId else NO_HYPERLINK_ID
+        return if (host.isHyperlinkResolvable(hyperlinkId)) hyperlinkId else NO_HYPERLINK_ID
     }
 
     private var pendingHoverStartRow: Int = NO_HYPERLINK_ROW
@@ -251,5 +251,5 @@ internal class TerminalHyperlinkController(
         cache: TerminalRenderCache,
         row: Int,
         column: Int,
-    ): Int = cache.hyperlinkIds[cache.rowOffset(row) + column]
+    ): Int = host.hyperlinkIdAt(row, column)
 }

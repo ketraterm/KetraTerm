@@ -16,6 +16,7 @@
 package io.github.ketraterm.intellij.ui
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBScrollBar
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
@@ -59,7 +60,7 @@ internal class KetraTermTerminalPane private constructor(
      * Unbinds the pane from its session before the containing IDE tab is disposed.
      */
     fun close() {
-        terminal.unbind()
+        terminal.dispose()
     }
 
     companion object {
@@ -69,7 +70,10 @@ internal class KetraTermTerminalPane private constructor(
          * @param tab workspace tab whose session should be rendered.
          * @return bound terminal pane.
          */
-        fun create(tab: TerminalWorkspaceTab): KetraTermTerminalPane {
+        fun create(
+            project: Project,
+            tab: TerminalWorkspaceTab,
+        ): KetraTermTerminalPane {
             val scrollbar = JBScrollBar(Adjustable.VERTICAL)
             val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
             val terminal =
@@ -78,6 +82,7 @@ internal class KetraTermTerminalPane private constructor(
                     hostServices =
                         SwingHostServices(
                             clipboardHandler = IntellijTerminalClipboardHandler,
+                            hyperlinkDetector = IntellijTerminalHyperlinkDetector(project),
                             viewportListener = scrollbarAdapter,
                             scrollbarOverlayEnabled = false,
                             uiDispatcher = TerminalUiDispatcher { runnable ->

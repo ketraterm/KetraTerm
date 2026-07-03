@@ -68,6 +68,7 @@ class SwingTerminal
     ) : JComponent(),
         SwingScrollbarScroller {
         private var session: TerminalSession? = null
+        private var disposed: Boolean = false
         private var settings: SwingSettings = settingsProvider.currentSettings()
         private var metrics: SwingMetrics = buildMetrics(settings)
         private var terminalFocused: Boolean = false
@@ -77,7 +78,6 @@ class SwingTerminal
         private var lastResizedColumns: Int = NO_RESIZE_DIMENSION
         private var lastResizedRows: Int = NO_RESIZE_DIMENSION
         private val unbindRunnable = Runnable { unbindOnEdt() }
-        private val reloadSettingsRunnable = Runnable { reloadSettingsOnEdt() }
 
         private val painter = GridPainter(hostServices.fontResolver)
         private val visualBellController =
@@ -224,12 +224,28 @@ class SwingTerminal
                 },
             )
 
+        private val hyperlinkDiscoveryController =
+            TerminalHyperlinkDiscoveryController(
+                object : TerminalHyperlinkDiscoveryHost {
+                    override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
+                    override val hyperlinkDetector: SwingHyperlinkDetector get() = this@SwingTerminal.hostServices.hyperlinkDetector
+
+                    override fun dispatch(action: Runnable) {
+                        hostServices.uiDispatcher.dispatch(action)
+                    }
+
+                    override fun repaintHyperlinkSpan(
+                        startRow: Int,
+                        startColumn: Int,
+                        endRow: Int,
+                        endColumn: Int,
+                    ) = this@SwingTerminal.repaintHyperlinkSpan(startRow, startColumn, endRow, endColumn)
+                },
+            )
         private val hyperlinkController =
             TerminalHyperlinkController(
                 object : TerminalHyperlinkHost {
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
-                    override val session: TerminalSession? get() = this@SwingTerminal.session
-                    override val hostServices: SwingHostServices get() = this@SwingTerminal.hostServices
                     override var cursor: Cursor
                         get() = this@SwingTerminal.cursor
                         set(value) {
@@ -247,6 +263,15 @@ class SwingTerminal
                         endRow: Int,
                         endColumn: Int,
                     ) = this@SwingTerminal.repaintHyperlinkSpan(startRow, startColumn, endRow, endColumn)
+
+                    override fun hyperlinkIdAt(
+                        row: Int,
+                        column: Int,
+                    ): Int = hyperlinkDiscoveryController.hyperlinkIdAt(row, column, this@SwingTerminal.renderCache)
+
+                    override fun isHyperlinkResolvable(hyperlinkId: Int): Boolean = this@SwingTerminal.isHyperlinkResolvable(hyperlinkId)
+
+                    override fun openHyperlink(hyperlinkId: Int): Boolean = this@SwingTerminal.openHyperlink(hyperlinkId)
                 },
             )
         private val searchController =
@@ -573,6 +598,7 @@ class SwingTerminal
         fun bind(session: TerminalSession) {
             runOnEdt(
                 Runnable {
+                    if (disposed) return@Runnable
                     bindOnEdt(session)
                 },
             )
@@ -589,13 +615,33 @@ class SwingTerminal
         }
 
         /**
+         * Permanently releases UI-side resources owned by this terminal component.
+         *
+         * Hosts should call this when a terminal tab is closed. The bound session,
+         * if any, is unbound but remains host-owned. A disposed component must not
+         * be rebound to another session.
+         */
+        fun dispose() {
+            runOnEdt(
+                Runnable {
+                    disposeOnEdt()
+                },
+            )
+        }
+
+        /**
          * Rebuilds settings, metrics, preferred size, and repaint state.
          *
          * This method may be called from any thread; component state is updated
          * asynchronously on the EDT.
          */
         fun reloadSettings() {
-            runOnEdt(reloadSettingsRunnable)
+            runOnEdt(
+                Runnable {
+                    if (disposed) return@Runnable
+                    reloadSettingsOnEdt()
+                },
+            )
         }
 
         /**
@@ -867,6 +913,7 @@ class SwingTerminal
             visualBellController.stop()
             rowScroller.finish()
             selectionController.stopSelectionDrag()
+            hyperlinkDiscoveryController.reset()
 
             ancestorWindow?.removeWindowStateListener(windowStateListener)
             ancestorWindow = null
@@ -960,6 +1007,7 @@ class SwingTerminal
                     searchHighlights = searchController.viewportHighlights,
                     shellIntegrationDecorations = shellIntegrationDecorations,
                     hoveredPromptMarkerRow = hoveredPromptMarkerRow,
+                    hyperlinkIds = hyperlinkDiscoveryController.hyperlinkIdsFor(renderCache),
                     hoveredHyperlinkId = hyperlinkController.hoveredHyperlinkId,
                     hoveredHyperlinkStartRow = hyperlinkController.hoveredHyperlinkStartRow,
                     hoveredHyperlinkStartColumn = hyperlinkController.hoveredHyperlinkStartColumn,
@@ -985,6 +1033,7 @@ class SwingTerminal
         }
 
         private fun bindOnEdt(session: TerminalSession) {
+            if (disposed) return
             this.session?.removeDirtyListener(dirtyListener)
             this.session = session
             updateMinimizedStateFromAncestor()
@@ -1003,6 +1052,7 @@ class SwingTerminal
             lastResizedRows = NO_RESIZE_DIMENSION
             renderFrameController.reset()
             hyperlinkController.clearHyperlinkHover()
+            hyperlinkDiscoveryController.reset()
             resizeSessionToVisibleGridOnEdt()
             refreshRenderCacheFromSession(session)
             refreshShellIntegrationDecorations(session)
@@ -1025,11 +1075,24 @@ class SwingTerminal
             lastResizedRows = NO_RESIZE_DIMENSION
             renderFrameController.reset()
             hyperlinkController.clearHyperlinkHover()
+            hyperlinkDiscoveryController.reset()
             publishViewportState(0)
             repaint()
         }
 
+        private fun disposeOnEdt() {
+            if (disposed) return
+            disposed = true
+            unbindOnEdt()
+            cursorTimer.stop()
+            visualBellController.stop()
+            rowScroller.finish()
+            selectionController.stopSelectionDrag()
+            hyperlinkDiscoveryController.dispose()
+        }
+
         private fun reloadSettingsOnEdt() {
+            if (disposed) return
             settings = settingsProvider.currentSettings()
             font = settings.font
             background = Color(settings.palette.defaultBackground, true)
@@ -1047,6 +1110,7 @@ class SwingTerminal
             selectionController.clearSelection()
             searchController.updateViewportHighlights()
             hyperlinkController.clearHyperlinkHover()
+            hyperlinkDiscoveryController.reset()
             resizeSessionToVisibleGridOnEdt()
             session?.let {
                 refreshRenderCacheFromSession(it)
@@ -1318,6 +1382,21 @@ class SwingTerminal
             return true
         }
 
+        private fun isHyperlinkResolvable(hyperlinkId: Int): Boolean {
+            if (hyperlinkId == NO_HYPERLINK_ID) return false
+            if (hyperlinkId > 0) return session?.hyperlinkUri(hyperlinkId) != null
+            return hyperlinkDiscoveryController.isDiscoveredHyperlinkResolvable(hyperlinkId, renderCache)
+        }
+
+        private fun openHyperlink(hyperlinkId: Int): Boolean {
+            if (hyperlinkId == NO_HYPERLINK_ID) return false
+            if (hyperlinkId > 0) {
+                val uri = session?.hyperlinkUri(hyperlinkId) ?: return false
+                return hostServices.hyperlinkHandler.openHyperlink(uri)
+            }
+            return hyperlinkDiscoveryController.openDiscoveredHyperlink(hyperlinkId, renderCache)
+        }
+
         private fun cellAt(
             x: Int,
             y: Int,
@@ -1556,6 +1635,7 @@ class SwingTerminal
                 scrollbackOffset = viewportController.requestedOffset,
                 viewportRows = requestedRenderRows(),
             )
+            hyperlinkDiscoveryController.scheduleForFrame()
         }
 
         private fun refreshShellIntegrationDecorations(session: TerminalSession): Boolean {
@@ -1602,6 +1682,7 @@ class SwingTerminal
         }
 
         private companion object {
+            private const val NO_HYPERLINK_ID = 0
             private const val NO_PROMPT_MARKER_ROW = -1
             private const val NO_RESIZE_DIMENSION = -1
             private const val MIN_TIMER_DELAY_MILLIS = 1

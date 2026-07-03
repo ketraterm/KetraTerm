@@ -262,7 +262,7 @@ class KetraTermProjectTerminalService(
         pendingTab: PendingTerminalTab,
         workspaceTab: TerminalWorkspaceTab,
     ) {
-        val pane = KetraTermTerminalPane.create(workspaceTab)
+        val pane = KetraTermTerminalPane.create(project, workspaceTab)
         replaceContent(pendingTab.container, pane.component)
         pendingTab.content.displayName = workspaceTab.title
         pendingTab.content.preferredFocusableComponent = pane.terminal

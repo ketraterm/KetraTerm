@@ -246,7 +246,7 @@ class TerminalTextPainterTest {
     @Nested
     inner class HyperlinkRendering {
         @Test
-        fun `hyperlinks get dotted underline by default`() {
+        fun `hyperlinks get solid underline by default`() {
             val fixture = fixture()
             val cache =
                 renderCache(
@@ -266,7 +266,7 @@ class TerminalTextPainterTest {
             fixture.paintRow(cache)
 
             assertEquals(TEST_RED, fixture.image.getRGB(0, fixture.metrics.underlineY))
-            assertTrue(fixture.image.getRGB(1, fixture.metrics.underlineY) != TEST_RED)
+            assertEquals(TEST_RED, fixture.image.getRGB(1, fixture.metrics.underlineY))
         }
 
         @Test
