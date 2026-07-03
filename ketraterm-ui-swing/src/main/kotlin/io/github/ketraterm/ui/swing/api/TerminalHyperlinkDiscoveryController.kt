@@ -1,0 +1,488 @@
+/*
+ * Copyright 2026 Gagik Sargsyan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.github.ketraterm.ui.swing.api
+
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
+import io.github.ketraterm.render.api.TerminalRenderCellFlags
+import io.github.ketraterm.render.cache.TerminalRenderCache
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
+import javax.swing.Timer
+
+internal interface TerminalHyperlinkDiscoveryHost {
+    val renderCache: TerminalRenderCache
+    val hyperlinkDetector: SwingHyperlinkDetector
+
+    fun dispatch(action: Runnable)
+
+    fun repaintHyperlinkSpan(
+        startRow: Int,
+        startColumn: Int,
+        endRow: Int,
+        endColumn: Int,
+    )
+}
+
+internal class TerminalHyperlinkDiscoveryController(
+    private val host: TerminalHyperlinkDiscoveryHost,
+) {
+    private val snapshotBuilder = TerminalHyperlinkViewportSnapshotBuilder()
+    private val overlay = TerminalHyperlinkOverlay()
+    private val analysisExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "terminal-hyperlink-discovery-${WORKER_COUNTER.getAndIncrement()}").apply {
+                isDaemon = true
+            }
+        }
+    private val debounceTimer =
+        Timer(DEBOUNCE_MILLIS) {
+            startAnalysisOnEdt()
+        }.apply {
+            isRepeats = false
+        }
+    private var analysisSequence: Long = 0L
+    private var disposed: Boolean = false
+
+    fun reset() {
+        analysisSequence++
+        debounceTimer.stop()
+        overlay.clear()
+    }
+
+    fun dispose() {
+        if (disposed) return
+        disposed = true
+        reset()
+        analysisExecutor.shutdownNow()
+    }
+
+    fun scheduleForFrame() {
+        if (disposed) return
+        analysisSequence++
+        if (host.hyperlinkDetector === SwingHyperlinkDetector.NONE) {
+            publishOverlay(currentFrameKey(host.renderCache), candidate = null)
+            debounceTimer.stop()
+            return
+        }
+        debounceTimer.restart()
+    }
+
+    fun hyperlinkIdsFor(cache: TerminalRenderCache): IntArray = overlay.idsFor(cache)
+
+    fun hyperlinkIdAt(
+        row: Int,
+        column: Int,
+        cache: TerminalRenderCache,
+    ): Int {
+        if (row !in 0 until cache.rows || column !in 0 until cache.columns) return NO_HYPERLINK_ID
+        return hyperlinkIdsFor(cache)[cache.rowOffset(row) + column]
+    }
+
+    fun isDiscoveredHyperlinkResolvable(
+        hyperlinkId: Int,
+        cache: TerminalRenderCache,
+    ): Boolean = overlay.actionFor(hyperlinkId, cache) != null
+
+    fun openDiscoveredHyperlink(
+        hyperlinkId: Int,
+        cache: TerminalRenderCache,
+    ): Boolean = overlay.actionFor(hyperlinkId, cache)?.open() == true
+
+    private fun startAnalysisOnEdt() {
+        if (disposed) return
+        val detector = host.hyperlinkDetector
+        if (detector === SwingHyperlinkDetector.NONE) {
+            publishOverlay(currentFrameKey(host.renderCache), candidate = null)
+            return
+        }
+
+        val sequence = analysisSequence
+        val snapshot = snapshotBuilder.snapshot(host.renderCache)
+        analysisExecutor.execute {
+            val accumulator = TerminalHyperlinkDetectionAccumulator()
+            try {
+                detector.detect(snapshot.request, accumulator)
+            } catch (_: Exception) {
+                return@execute
+            }
+
+            val candidate = snapshot.buildOverlay(accumulator.detectedLinks)
+            host.dispatch(
+                Runnable {
+                    if (disposed) return@Runnable
+                    if (sequence != analysisSequence) return@Runnable
+                    if (!snapshot.key.matches(host.renderCache)) return@Runnable
+                    publishOverlay(snapshot.key, candidate)
+                },
+            )
+        }
+    }
+
+    private fun publishOverlay(
+        key: TerminalHyperlinkFrameKey,
+        candidate: TerminalHyperlinkOverlayCandidate?,
+    ) {
+        val cache = host.renderCache
+        if (!key.matches(cache)) return
+
+        val previousIds = overlay.idsFor(cache)
+        val nextIds = candidate?.hyperlinkIds ?: cache.hyperlinkIds
+        repaintChangedHyperlinkCells(cache, previousIds, nextIds)
+        overlay.replace(key, candidate)
+    }
+
+    private fun repaintChangedHyperlinkCells(
+        cache: TerminalRenderCache,
+        previousIds: IntArray,
+        nextIds: IntArray,
+    ) {
+        var row = 0
+        while (row < cache.rows) {
+            val rowOffset = cache.rowOffset(row)
+            var column = 0
+            while (column < cache.columns) {
+                val index = rowOffset + column
+                if (previousIds[index] == nextIds[index]) {
+                    column++
+                    continue
+                }
+
+                val startColumn = column
+                column++
+                while (column < cache.columns && previousIds[rowOffset + column] != nextIds[rowOffset + column]) {
+                    column++
+                }
+                host.repaintHyperlinkSpan(row, startColumn, row, column)
+            }
+            row++
+        }
+    }
+
+    private companion object {
+        private const val DEBOUNCE_MILLIS = 125
+        private const val NO_HYPERLINK_ID = 0
+        private val WORKER_COUNTER = AtomicInteger(1)
+    }
+}
+
+internal data class TerminalHyperlinkFrameKey(
+    val frameGeneration: Long,
+    val structureGeneration: Long,
+    val scrollbackOffset: Int,
+    val discardedCount: Long,
+    val activeBuffer: TerminalRenderBufferKind,
+    val columns: Int,
+    val rows: Int,
+)
+
+internal fun currentFrameKey(cache: TerminalRenderCache): TerminalHyperlinkFrameKey =
+    TerminalHyperlinkFrameKey(
+        frameGeneration = cache.frameGeneration,
+        structureGeneration = cache.structureGeneration,
+        scrollbackOffset = cache.scrollbackOffset,
+        discardedCount = cache.discardedCount,
+        activeBuffer = cache.activeBuffer,
+        columns = cache.columns,
+        rows = cache.rows,
+    )
+
+private fun TerminalHyperlinkFrameKey.matches(cache: TerminalRenderCache): Boolean =
+    frameGeneration == cache.frameGeneration &&
+        structureGeneration == cache.structureGeneration &&
+        scrollbackOffset == cache.scrollbackOffset &&
+        discardedCount == cache.discardedCount &&
+        activeBuffer == cache.activeBuffer &&
+        columns == cache.columns &&
+        rows == cache.rows
+
+private class TerminalHyperlinkOverlay {
+    private var key: TerminalHyperlinkFrameKey? = null
+    private var hyperlinkIds: IntArray = IntArray(0)
+    private var actions: Array<SwingHyperlinkAction> = emptyArray()
+
+    fun clear() {
+        key = null
+        hyperlinkIds = IntArray(0)
+        actions = emptyArray()
+    }
+
+    fun replace(
+        nextKey: TerminalHyperlinkFrameKey,
+        candidate: TerminalHyperlinkOverlayCandidate?,
+    ) {
+        if (candidate == null) {
+            clear()
+            return
+        }
+        key = nextKey
+        hyperlinkIds = candidate.hyperlinkIds
+        actions = candidate.actions
+    }
+
+    fun idsFor(cache: TerminalRenderCache): IntArray =
+        if (key?.matches(cache) == true) {
+            hyperlinkIds
+        } else {
+            cache.hyperlinkIds
+        }
+
+    fun actionFor(
+        hyperlinkId: Int,
+        cache: TerminalRenderCache,
+    ): SwingHyperlinkAction? {
+        if (hyperlinkId >= 0 || key?.matches(cache) != true) return null
+        val actionIndex = -hyperlinkId - 1
+        return if (actionIndex in actions.indices) actions[actionIndex] else null
+    }
+}
+
+private class TerminalHyperlinkDetectionAccumulator : SwingHyperlinkDetectionSink {
+    val detectedLinks = ArrayList<TerminalDetectedHyperlink>()
+
+    override fun addHyperlink(
+        lineIndex: Int,
+        startOffset: Int,
+        endOffset: Int,
+        action: SwingHyperlinkAction,
+    ) {
+        if (startOffset >= endOffset) return
+        detectedLinks += TerminalDetectedHyperlink(lineIndex, startOffset, endOffset, action)
+    }
+}
+
+internal data class TerminalDetectedHyperlink(
+    val lineIndex: Int,
+    val startOffset: Int,
+    val endOffset: Int,
+    val action: SwingHyperlinkAction,
+)
+
+internal data class TerminalHyperlinkOverlayCandidate(
+    val hyperlinkIds: IntArray,
+    val actions: Array<SwingHyperlinkAction>,
+)
+
+internal class TerminalHyperlinkDetectionSnapshot(
+    val key: TerminalHyperlinkFrameKey,
+    val request: SwingHyperlinkDetectionRequest,
+    private val terminalHyperlinkIds: IntArray,
+    private val lineRows: Array<IntArray>,
+    private val lineStartColumns: Array<IntArray>,
+    private val lineEndColumns: Array<IntArray>,
+) {
+    fun buildOverlay(detectedLinks: List<TerminalDetectedHyperlink>): TerminalHyperlinkOverlayCandidate? {
+        if (detectedLinks.isEmpty()) return null
+
+        var effectiveIds: IntArray? = null
+        val actions = ArrayList<SwingHyperlinkAction>(detectedLinks.size)
+        for (link in detectedLinks) {
+            if (link.lineIndex !in lineRows.indices) continue
+
+            val rows = lineRows[link.lineIndex]
+            if (rows.isEmpty()) continue
+            val startOffset = link.startOffset.coerceIn(0, rows.size)
+            val endOffset = link.endOffset.coerceIn(startOffset, rows.size)
+            if (startOffset >= endOffset) continue
+
+            val nextId = -(actions.size + 1)
+            val ids = effectiveIds ?: terminalHyperlinkIds.copyOf().also { effectiveIds = it }
+            var accepted = false
+            var offset = startOffset
+            while (offset < endOffset) {
+                val row = rows[offset]
+                val startColumn = lineStartColumns[link.lineIndex][offset]
+                val endColumn = lineEndColumns[link.lineIndex][offset]
+                var column = startColumn
+                while (column < endColumn) {
+                    val index = row * key.columns + column
+                    if (terminalHyperlinkIds[index] == NO_HYPERLINK_ID && ids[index] == NO_HYPERLINK_ID) {
+                        ids[index] = nextId
+                        accepted = true
+                    }
+                    column++
+                }
+                offset++
+            }
+
+            if (accepted) {
+                actions += link.action
+            }
+        }
+
+        val ids = effectiveIds ?: return null
+        if (actions.isEmpty()) return null
+        return TerminalHyperlinkOverlayCandidate(ids, actions.toTypedArray())
+    }
+
+    private companion object {
+        private const val NO_HYPERLINK_ID = 0
+    }
+}
+
+internal class TerminalHyperlinkViewportSnapshotBuilder {
+    private val rowText = StringBuilder(INITIAL_LINE_CAPACITY)
+    private var offsetRows = IntArray(INITIAL_LINE_CAPACITY)
+    private var offsetStartColumns = IntArray(INITIAL_LINE_CAPACITY)
+    private var offsetEndColumns = IntArray(INITIAL_LINE_CAPACITY)
+    private var offsetCount = 0
+
+    fun snapshot(cache: TerminalRenderCache): TerminalHyperlinkDetectionSnapshot {
+        val lines = ArrayList<String>(cache.rows)
+        val lineStartOffsets = ArrayList<Int>(cache.rows)
+        val lineEndOffsets = ArrayList<Int>(cache.rows)
+        val lineRows = ArrayList<IntArray>(cache.rows)
+        val lineStartColumns = ArrayList<IntArray>(cache.rows)
+        val lineEndColumns = ArrayList<IntArray>(cache.rows)
+        var cumulativeOffset = 0
+        var row = 0
+
+        while (row < cache.rows) {
+            rowText.setLength(0)
+            offsetCount = 0
+
+            var logicalLineComplete = false
+            while (!logicalLineComplete && row < cache.rows) {
+                appendRow(cache, row)
+                logicalLineComplete = !cache.lineWrapped[row] || row + 1 >= cache.rows
+                row++
+            }
+
+            trimTrailingSpaces()
+            val line = rowText.toString() + '\n'
+            lines += line
+            lineStartOffsets += cumulativeOffset
+            cumulativeOffset += line.length
+            lineEndOffsets += cumulativeOffset
+            lineRows += offsetRows.copyOf(offsetCount)
+            lineStartColumns += offsetStartColumns.copyOf(offsetCount)
+            lineEndColumns += offsetEndColumns.copyOf(offsetCount)
+        }
+
+        return TerminalHyperlinkDetectionSnapshot(
+            key = currentFrameKey(cache),
+            request =
+                SwingHyperlinkDetectionRequest(
+                    lines = lines.toTypedArray(),
+                    lineStartOffsets = lineStartOffsets.toIntArray(),
+                    lineEndOffsets = lineEndOffsets.toIntArray(),
+                ),
+            terminalHyperlinkIds = cache.hyperlinkIds.copyOf(cache.rows * cache.columns),
+            lineRows = lineRows.toTypedArray(),
+            lineStartColumns = lineStartColumns.toTypedArray(),
+            lineEndColumns = lineEndColumns.toTypedArray(),
+        )
+    }
+
+    private fun appendRow(
+        cache: TerminalRenderCache,
+        row: Int,
+    ) {
+        val rowOffset = cache.rowOffset(row)
+        var column = 0
+        while (column < cache.columns) {
+            val index = rowOffset + column
+            val flags = cache.flags[index]
+            if (flags and TerminalRenderCellFlags.WIDE_TRAILING != 0) {
+                column++
+                continue
+            }
+
+            val span = cellSpan(flags)
+            val endColumn = minOf(cache.columns, column + span)
+            when {
+                flags and TerminalRenderCellFlags.CLUSTER != 0 -> appendCluster(cache, index, row, column, endColumn)
+                flags and TerminalRenderCellFlags.CODEPOINT != 0 -> appendCodePoint(cache.codeWords[index], row, column, endColumn)
+                else -> appendCodePoint(SPACE_CODE_POINT, row, column, endColumn)
+            }
+            column += span
+        }
+    }
+
+    private fun appendCluster(
+        cache: TerminalRenderCache,
+        index: Int,
+        row: Int,
+        column: Int,
+        endColumn: Int,
+    ) {
+        val ref = cache.clusterRefs[index]
+        if (ref == NO_CLUSTER_REF) {
+            appendCodePoint(SPACE_CODE_POINT, row, column, endColumn)
+            return
+        }
+
+        val offset = cache.clusterOffset(ref)
+        val end = offset + cache.clusterLength(ref)
+        var clusterIndex = offset
+        while (clusterIndex < end) {
+            appendCodePoint(cache.clusterCodepoints[clusterIndex], row, column, endColumn)
+            clusterIndex++
+        }
+    }
+
+    private fun appendCodePoint(
+        codePoint: Int,
+        row: Int,
+        column: Int,
+        endColumn: Int,
+    ) {
+        val before = rowText.length
+        if (Character.isValidCodePoint(codePoint)) {
+            rowText.appendCodePoint(codePoint)
+        } else {
+            rowText.append(REPLACEMENT_CHAR)
+        }
+        val after = rowText.length
+        ensureOffsetCapacity(after)
+        var offset = before
+        while (offset < after) {
+            offsetRows[offset] = row
+            offsetStartColumns[offset] = column
+            offsetEndColumns[offset] = endColumn
+            offset++
+        }
+        offsetCount = after
+    }
+
+    private fun trimTrailingSpaces() {
+        while (rowText.isNotEmpty() && rowText[rowText.length - 1] == ' ') {
+            rowText.setLength(rowText.length - 1)
+        }
+        offsetCount = rowText.length
+    }
+
+    private fun ensureOffsetCapacity(required: Int) {
+        if (required <= offsetRows.size) return
+        var capacity = offsetRows.size
+        while (capacity < required) {
+            capacity *= 2
+        }
+        offsetRows = offsetRows.copyOf(capacity)
+        offsetStartColumns = offsetStartColumns.copyOf(capacity)
+        offsetEndColumns = offsetEndColumns.copyOf(capacity)
+    }
+
+    private fun cellSpan(flags: Int): Int = if (flags and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1
+
+    private companion object {
+        private const val INITIAL_LINE_CAPACITY = 256
+        private const val NO_CLUSTER_REF = 0L
+        private const val SPACE_CODE_POINT = 0x20
+        private const val REPLACEMENT_CHAR = '\uFFFD'
+    }
+}
+
+private fun ArrayList<Int>.toIntArray(): IntArray = IntArray(size) { this[it] }

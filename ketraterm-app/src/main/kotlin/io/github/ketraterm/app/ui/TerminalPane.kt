@@ -46,7 +46,7 @@ internal class TerminalPane private constructor(
     }
 
     fun close() {
-        terminal.unbind()
+        terminal.dispose()
     }
 
     internal companion object {
