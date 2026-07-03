@@ -134,6 +134,7 @@ data class SwingSettings
         val shellRequestResizeWindow: Boolean = false,
         val shellRequestWindowManipulation: Boolean = false,
         val shellSuggestionsEnabled: Boolean = true,
+        val scrollOnOutput: Boolean = true,
     ) {
         init {
             require(columns > 0) { "columns must be > 0, was $columns" }

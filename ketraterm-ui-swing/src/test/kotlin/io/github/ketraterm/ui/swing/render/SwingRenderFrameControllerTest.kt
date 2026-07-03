@@ -196,7 +196,10 @@ class SwingRenderFrameControllerTest {
             return syncGridToChromeResult
         }
 
-        override fun clampViewport(historySize: Int): Boolean = clampViewportResult
+        override fun clampViewport(
+            historySize: Int,
+            discardedCount: Long,
+        ): Boolean = clampViewportResult
 
         override fun requestedViewportOffset(): Int = 0
 
