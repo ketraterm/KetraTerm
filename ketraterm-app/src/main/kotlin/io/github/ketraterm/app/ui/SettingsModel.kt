@@ -58,6 +58,7 @@ internal class SettingsModel(
             clipboardMaxDecodedBytes = settings.clipboardMaxDecodedBytes,
             titleLocalPermission = settings.titleLocalPermission,
             titleRemotePermission = settings.titleRemotePermission,
+            scrollOnOutput = settings.scrollOnOutput,
         )
 
     fun hasChanges(uiState: SettingsState): Boolean = uiState != initialUiState
@@ -102,6 +103,7 @@ internal class SettingsModel(
         settings.clipboardMaxDecodedBytes = uiState.clipboardMaxDecodedBytes
         settings.titleLocalPermission = uiState.titleLocalPermission
         settings.titleRemotePermission = uiState.titleRemotePermission
+        settings.scrollOnOutput = uiState.scrollOnOutput
 
         settings.theme = TerminalTheme.entries.firstOrNull { it.name == uiState.theme } ?: TerminalTheme.TOKYO_NIGHT
 
@@ -138,4 +140,5 @@ internal data class SettingsState(
     val clipboardMaxDecodedBytes: Int,
     val titleLocalPermission: TerminalTitlePermission,
     val titleRemotePermission: TerminalTitlePermission,
+    val scrollOnOutput: Boolean,
 )

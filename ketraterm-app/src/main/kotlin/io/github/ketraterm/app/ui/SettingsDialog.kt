@@ -193,6 +193,7 @@ internal class SettingsDialog(
         JCheckBox("Show shell suggestions", settings.shellSuggestionsEnabled)
     private val persistentCommandHistoryCheckbox =
         JCheckBox("Persist command history", settings.persistentCommandHistoryEnabled)
+    private val scrollOnOutputCheckbox = JCheckBox("Scroll on output", settings.scrollOnOutput)
     private val cursorBlinkSpinner =
         createSpinner(settings.cursorBlinkMillis, TerminalConfig.CURSOR_BLINK_MIN, TerminalConfig.CURSOR_BLINK_MAX, 50, 70)
     private val cursorShapeCombo = createComboBox(arrayOf("block", "underline", "beam"), settings.cursorShape.lowercase(Locale.ROOT), 150)
@@ -289,6 +290,7 @@ internal class SettingsDialog(
         registerChangeListener(shellRequestWindowManipulationCheckbox, updateApplyState)
         registerChangeListener(shellSuggestionsCheckbox, updateApplyState)
         registerChangeListener(persistentCommandHistoryCheckbox, updateApplyState)
+        registerChangeListener(scrollOnOutputCheckbox, updateApplyState)
         registerChangeListener(cursorBlinkSpinner, updateApplyState)
         registerChangeListener(cursorShapeCombo, updateApplyState)
     }
@@ -527,6 +529,16 @@ internal class SettingsDialog(
         )
         panel.add(mouseSection)
 
+        panel.add(SectionHeader("Scrolling"))
+        val scrollingSection = createSectionPanel()
+        addCheckboxRow(
+            scrollingSection,
+            0,
+            scrollOnOutputCheckbox,
+            "Automatically scroll to the bottom when new process output is received.",
+        )
+        panel.add(scrollingSection)
+
         return panel
     }
 
@@ -747,6 +759,7 @@ internal class SettingsDialog(
         shellRequestWindowManipulationCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
         shellSuggestionsCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED
         persistentCommandHistoryCheckbox.isSelected = TerminalConfig.DEFAULT_PERSISTENT_COMMAND_HISTORY_ENABLED
+        scrollOnOutputCheckbox.isSelected = TerminalConfig.DEFAULT_SCROLL_ON_OUTPUT
         cursorBlinkSpinner.value = TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS
         cursorShapeCombo.selectedItem = TerminalConfig.DEFAULT_CURSOR_SHAPE
 
@@ -846,6 +859,7 @@ internal class SettingsDialog(
                 } else {
                     TerminalTitlePermission.DENY
                 },
+            scrollOnOutput = scrollOnOutputCheckbox.isSelected,
         )
     }
 
