@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.MouseTrackingMode
@@ -329,6 +330,7 @@ class SwingTerminal
                     override val settings: SwingSettings get() = this@SwingTerminal.settings
                     override val metrics: SwingMetrics get() = this@SwingTerminal.metrics
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
+                    override val session: TerminalInputEncoder? get() = this@SwingTerminal.session
 
                     override fun mouseTrackingMode(): MouseTrackingMode =
                         this@SwingTerminal

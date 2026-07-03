@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.ui.swing.input
 
+import io.github.ketraterm.input.api.TerminalInputEncoder
+import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.render.api.*
@@ -182,6 +184,85 @@ class SwingTerminalMouseControllerTest {
             assertEquals(0, host.scrollCount)
             assertTrue(event.isConsumed)
         }
+
+        @Test
+        fun `scroll up in alternate screen buffer with mouse tracking off translates to UP keys`() {
+            val encodedKeys = ArrayList<io.github.ketraterm.input.event.TerminalKeyEvent>()
+            val fakeSession =
+                object : TerminalInputEncoder {
+                    override fun encodeKey(event: io.github.ketraterm.input.event.TerminalKeyEvent) {
+                        encodedKeys += event
+                    }
+
+                    override fun encodePaste(event: io.github.ketraterm.input.event.TerminalPasteEvent) {}
+
+                    override fun encodeFocus(event: io.github.ketraterm.input.event.TerminalFocusEvent) {}
+
+                    override fun encodeMouse(event: TerminalMouseEvent) {}
+                }
+
+            val host = RecordingMouseHost(session = fakeSession)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+
+            // rotation = -1.0 means scrolling UP (clicks = 1.0, delta = 3.0)
+            val event = mouseWheel(rotation = -1.0)
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertEquals(3, encodedKeys.size)
+            assertTrue(encodedKeys.all { it.key == TerminalKey.UP })
+            assertEquals(0, host.scrollCount)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `scroll down in alternate screen buffer with mouse tracking off translates to DOWN keys`() {
+            val encodedKeys = ArrayList<io.github.ketraterm.input.event.TerminalKeyEvent>()
+            val fakeSession =
+                object : TerminalInputEncoder {
+                    override fun encodeKey(event: io.github.ketraterm.input.event.TerminalKeyEvent) {
+                        encodedKeys += event
+                    }
+
+                    override fun encodePaste(event: io.github.ketraterm.input.event.TerminalPasteEvent) {}
+
+                    override fun encodeFocus(event: io.github.ketraterm.input.event.TerminalFocusEvent) {}
+
+                    override fun encodeMouse(event: TerminalMouseEvent) {}
+                }
+
+            val host = RecordingMouseHost(session = fakeSession)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+
+            // rotation = 1.0 means scrolling DOWN (clicks = -1.0, delta = -3.0)
+            val event = mouseWheel(rotation = 1.0)
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertEquals(3, encodedKeys.size)
+            assertTrue(encodedKeys.all { it.key == TerminalKey.DOWN })
+            assertEquals(0, host.scrollCount)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `scroll in alternate screen buffer does not crash and consumes event when session is null`() {
+            val host = RecordingMouseHost(session = null)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+
+            val event = mouseWheel(rotation = -1.0)
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertEquals(0, host.scrollCount)
+            assertTrue(event.isConsumed)
+        }
     }
 
     @Nested
@@ -299,6 +380,7 @@ class SwingTerminalMouseControllerTest {
         private val hyperlinkPressHandled: Boolean = false,
         private val scrollResult: Boolean = true,
         private val mouseTrackingMode: MouseTrackingMode = MouseTrackingMode.OFF,
+        override val session: TerminalInputEncoder? = null,
     ) : SwingTerminalMouseHost {
         override val metrics =
             SwingMetrics(
@@ -421,12 +503,12 @@ class SwingTerminalMouseControllerTest {
     private class FakeFrame(
         override val historySize: Int,
         override val rows: Int,
+        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
     ) : TerminalRenderFrame {
         override val columns: Int = 80
         override val scrollbackOffset: Int = 0
         override val frameGeneration: Long = 1L
         override val structureGeneration: Long = 1L
-        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
         override val cursor = TerminalRenderCursor(0, 0, false, false, TerminalRenderCursorShape.BLOCK, 1L)
         override val discardedCount: Long = 0L
 

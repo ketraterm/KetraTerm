@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.input
 
+import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.render.cache.TerminalRenderCache
@@ -29,6 +30,7 @@ internal interface SwingTerminalMouseHost {
     val settings: SwingSettings
     val metrics: SwingMetrics
     val renderCache: TerminalRenderCache
+    val session: TerminalInputEncoder?
 
     fun mouseTrackingMode(): MouseTrackingMode
 
