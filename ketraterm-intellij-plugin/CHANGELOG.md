@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added option to toggle "Scroll on output" under terminal behavior settings, allowing users to lock their scroll position while background tasks compile or output text.
+- Fixed selection copying to support selecting and copying text spanning across the entire terminal scrollback history.
 - Fixed first-run TUI wrapping corruption.
 
 ## [0.1.1] - 2026-07-02
