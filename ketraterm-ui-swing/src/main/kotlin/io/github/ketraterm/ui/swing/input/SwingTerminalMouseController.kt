@@ -15,11 +15,9 @@
  */
 package io.github.ketraterm.ui.swing.input
 
-import io.github.ketraterm.input.event.TerminalModifiers
-import io.github.ketraterm.input.event.TerminalMouseButton
-import io.github.ketraterm.input.event.TerminalMouseEvent
-import io.github.ketraterm.input.event.TerminalMouseEventType
+import io.github.ketraterm.input.event.*
 import io.github.ketraterm.protocol.MouseTrackingMode
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.ui.swing.settings.SwingTerminalChrome
 import java.awt.event.*
 import javax.swing.SwingUtilities
@@ -91,6 +89,20 @@ internal class SwingTerminalMouseController(
         }
         val delta = wheelScrollLines(event)
         if (delta == 0.0) {
+            event.consume()
+            return
+        }
+
+        if (host.renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+            val key = if (delta > 0.0) TerminalKey.UP else TerminalKey.DOWN
+            val count = kotlin.math.round(kotlin.math.abs(delta)).toInt()
+            val session = host.session
+            if (session != null && count > 0) {
+                val keyEvent = TerminalKeyEvent.key(key)
+                for (i in 0 until count) {
+                    session.encodeKey(keyEvent)
+                }
+            }
             event.consume()
             return
         }
