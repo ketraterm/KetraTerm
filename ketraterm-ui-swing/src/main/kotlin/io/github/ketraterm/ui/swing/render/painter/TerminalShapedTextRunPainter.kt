@@ -834,8 +834,8 @@ internal class TerminalShapedTextRunPainter(
         private const val COMMON_SCRIPT = 0
 
         @JvmStatic
-        private fun codePointScript(codePoint: Int): Int {
-            return when (val script = Character.UnicodeScript.of(codePoint)) {
+        private fun codePointScript(codePoint: Int): Int =
+            when (val script = Character.UnicodeScript.of(codePoint)) {
                 Character.UnicodeScript.COMMON,
                 Character.UnicodeScript.INHERITED,
                 Character.UnicodeScript.UNKNOWN,
@@ -843,7 +843,6 @@ internal class TerminalShapedTextRunPainter(
 
                 else -> script.ordinal + 1
             }
-        }
 
         @JvmStatic
         private fun isStrongRtl(codePoint: Int): Boolean =
