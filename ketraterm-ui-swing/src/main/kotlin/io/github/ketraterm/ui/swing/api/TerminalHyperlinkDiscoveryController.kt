@@ -78,6 +78,7 @@ internal class TerminalHyperlinkDiscoveryController(
             debounceTimer.stop()
             return
         }
+        hydrateOverlayForCurrentFrame(cache)
         debounceTimer.restart()
     }
 
@@ -147,7 +148,14 @@ internal class TerminalHyperlinkDiscoveryController(
         val previousIds = overlay.idsFor(cache)
         val nextIds = candidate?.hyperlinkIds ?: cache.hyperlinkIds
         repaintChangedHyperlinkCells(cache, previousIds, nextIds)
-        overlay.replace(key, candidate)
+        overlay.replace(key, candidate, cache)
+    }
+
+    private fun hydrateOverlayForCurrentFrame(cache: TerminalRenderCache) {
+        val candidate = overlay.hydrateFor(cache) ?: return
+        val previousIds = overlay.idsFor(cache)
+        repaintChangedHyperlinkCells(cache, previousIds, candidate.hyperlinkIds)
+        overlay.replace(currentFrameKey(cache), candidate, cache)
     }
 
     private fun repaintChangedHyperlinkCells(
@@ -214,20 +222,73 @@ private fun TerminalHyperlinkFrameKey.matches(cache: TerminalRenderCache): Boole
         columns == cache.columns &&
         rows == cache.rows
 
+private fun TerminalHyperlinkFrameKey.canCarryRowsFor(cache: TerminalRenderCache): Boolean =
+    discardedCount == cache.discardedCount &&
+        activeBuffer == cache.activeBuffer &&
+        columns == cache.columns
+
+private fun rowFingerprint(
+    cache: TerminalRenderCache,
+    row: Int,
+): Long {
+    var hash = ROW_FINGERPRINT_OFFSET
+    var hasVisibleCell = false
+    val rowOffset = cache.rowOffset(row)
+    var column = 0
+    while (column < cache.columns) {
+        val index = rowOffset + column
+        val flags = cache.flags[index]
+        val textFlags =
+            flags and
+                (
+                    TerminalRenderCellFlags.CODEPOINT or
+                        TerminalRenderCellFlags.CLUSTER or
+                        TerminalRenderCellFlags.WIDE_LEADING or
+                        TerminalRenderCellFlags.WIDE_TRAILING
+                )
+        if (textFlags != 0) hasVisibleCell = true
+
+        hash = mixRowFingerprint(hash, textFlags)
+        if (flags and TerminalRenderCellFlags.CLUSTER != 0) {
+            val ref = cache.clusterRefs[index]
+            val start = cache.clusterOffset(ref)
+            val end = start + cache.clusterLength(ref)
+            var clusterIndex = start
+            while (clusterIndex < end) {
+                hash = mixRowFingerprint(hash, cache.clusterCodepoints[clusterIndex])
+                clusterIndex++
+            }
+        } else {
+            hash = mixRowFingerprint(hash, cache.codeWords[index])
+        }
+        column++
+    }
+    hash = mixRowFingerprint(hash, if (cache.lineWrapped[row]) 1 else 0)
+    return if (hasVisibleCell) hash else EMPTY_ROW_FINGERPRINT
+}
+
+private fun mixRowFingerprint(
+    hash: Long,
+    value: Int,
+): Long = (hash xor value.toLong()) * ROW_FINGERPRINT_PRIME
+
 private class TerminalHyperlinkOverlay {
     private var key: TerminalHyperlinkFrameKey? = null
     private var hyperlinkIds: IntArray = IntArray(0)
     private var actions: Array<SwingHyperlinkAction> = emptyArray()
+    private var rowEntries: Array<TerminalHyperlinkRowEntry?> = emptyArray()
 
     fun clear() {
         key = null
         hyperlinkIds = IntArray(0)
         actions = emptyArray()
+        rowEntries = emptyArray()
     }
 
     fun replace(
         nextKey: TerminalHyperlinkFrameKey,
         candidate: TerminalHyperlinkOverlayCandidate?,
+        cache: TerminalRenderCache,
     ) {
         if (candidate == null) {
             clear()
@@ -236,6 +297,7 @@ private class TerminalHyperlinkOverlay {
         key = nextKey
         hyperlinkIds = candidate.hyperlinkIds
         actions = candidate.actions
+        rowEntries = buildRowEntries(candidate, cache)
     }
 
     fun idsFor(cache: TerminalRenderCache): IntArray =
@@ -253,7 +315,182 @@ private class TerminalHyperlinkOverlay {
         val actionIndex = -hyperlinkId - 1
         return if (actionIndex in actions.indices) actions[actionIndex] else null
     }
+
+    fun hydrateFor(cache: TerminalRenderCache): TerminalHyperlinkOverlayCandidate? {
+        val previousKey = key ?: return null
+        if (previousKey.matches(cache)) return null
+        if (!previousKey.canCarryRowsFor(cache)) {
+            clear()
+            return null
+        }
+
+        var preservedIds: IntArray? = null
+        val preservedActions = ArrayList<SwingHyperlinkAction>()
+        var targetRow = 0
+        while (targetRow < cache.rows) {
+            val rowEntry = matchingRowEntry(cache, targetRow)
+            if (rowEntry != null) {
+                val targetOffset = cache.rowOffset(targetRow)
+                for (run in rowEntry.runs) {
+                    val nextId = -(preservedActions.size + 1)
+                    var accepted = false
+                    var column = run.startColumn
+                    val endColumn = minOf(run.endColumn, cache.columns)
+                    while (column < endColumn) {
+                        if (cache.hyperlinkIds[targetOffset + column] == NO_HYPERLINK_ID) {
+                            val ids =
+                                preservedIds ?: cache.hyperlinkIds
+                                    .copyOf(cache.rows * cache.columns)
+                                    .also { preservedIds = it }
+                            ids[targetOffset + column] = nextId
+                            accepted = true
+                        }
+                        column++
+                    }
+                    if (accepted) {
+                        preservedActions += run.action
+                    }
+                }
+            }
+            targetRow++
+        }
+
+        val ids =
+            preservedIds ?: run {
+                clear()
+                return null
+            }
+        return TerminalHyperlinkOverlayCandidate(ids, preservedActions.toTypedArray())
+    }
+
+    private fun buildRowEntries(
+        candidate: TerminalHyperlinkOverlayCandidate,
+        cache: TerminalRenderCache,
+    ): Array<TerminalHyperlinkRowEntry?> {
+        val entries = arrayOfNulls<TerminalHyperlinkRowEntry>(cache.rows)
+        var row = 0
+        while (row < cache.rows) {
+            val runs = runsForRow(candidate, cache, row)
+            if (runs.isNotEmpty()) {
+                entries[row] =
+                    TerminalHyperlinkRowEntry(
+                        lineId = cache.lineIds[row],
+                        lineGeneration = cache.lineGenerations[row],
+                        fingerprint = rowFingerprint(cache, row),
+                        wrapped = cache.lineWrapped[row],
+                        activeBuffer = cache.activeBuffer,
+                        runs = runs,
+                    )
+            }
+            row++
+        }
+        return entries
+    }
+
+    private fun runsForRow(
+        candidate: TerminalHyperlinkOverlayCandidate,
+        cache: TerminalRenderCache,
+        row: Int,
+    ): Array<TerminalHyperlinkRowRun> {
+        var runs: ArrayList<TerminalHyperlinkRowRun>? = null
+        val rowOffset = cache.rowOffset(row)
+        var column = 0
+        while (column < cache.columns) {
+            val hyperlinkId = candidate.hyperlinkIds[rowOffset + column]
+            if (hyperlinkId >= NO_HYPERLINK_ID) {
+                column++
+                continue
+            }
+
+            val startColumn = column
+            column++
+            while (column < cache.columns && candidate.hyperlinkIds[rowOffset + column] == hyperlinkId) {
+                column++
+            }
+
+            val actionIndex = -hyperlinkId - 1
+            if (actionIndex in candidate.actions.indices) {
+                val rowRuns = runs ?: ArrayList<TerminalHyperlinkRowRun>().also { runs = it }
+                rowRuns += TerminalHyperlinkRowRun(startColumn, column, candidate.actions[actionIndex])
+            }
+        }
+        return runs?.toTypedArray() ?: EMPTY_ROW_RUNS
+    }
+
+    private fun matchingRowEntry(
+        cache: TerminalRenderCache,
+        targetRow: Int,
+    ): TerminalHyperlinkRowEntry? {
+        val lineId = cache.lineIds[targetRow]
+        if (lineId != NO_LINE_ID) {
+            val lineGeneration = cache.lineGenerations[targetRow]
+            val wrapped = cache.lineWrapped[targetRow]
+            var index = rowEntries.size - 1
+            while (index >= 0) {
+                val entry = rowEntries[index]
+                if (entry != null) {
+                    if (
+                        entry.activeBuffer == cache.activeBuffer &&
+                        entry.lineId == lineId &&
+                        entry.lineGeneration == lineGeneration &&
+                        entry.wrapped == wrapped
+                    ) {
+                        return entry
+                    }
+                }
+                index--
+            }
+            return null
+        }
+
+        val fingerprint = rowFingerprint(cache, targetRow)
+        if (fingerprint == EMPTY_ROW_FINGERPRINT) return null
+        val wrapped = cache.lineWrapped[targetRow]
+        var matchedEntry: TerminalHyperlinkRowEntry? = null
+        var index = rowEntries.size - 1
+        while (index >= 0) {
+            val entry = rowEntries[index]
+            if (entry != null) {
+                if (
+                    entry.activeBuffer == cache.activeBuffer &&
+                    entry.lineId == NO_LINE_ID &&
+                    entry.fingerprint == fingerprint &&
+                    entry.wrapped == wrapped
+                ) {
+                    if (matchedEntry != null) return null
+                    matchedEntry = entry
+                }
+            }
+            index--
+        }
+        return matchedEntry
+    }
+
+    private companion object {
+        private const val NO_HYPERLINK_ID = 0
+        private const val NO_LINE_ID = 0L
+        private val EMPTY_ROW_RUNS = emptyArray<TerminalHyperlinkRowRun>()
+    }
 }
+
+private data class TerminalHyperlinkRowEntry(
+    val lineId: Long,
+    val lineGeneration: Long,
+    val fingerprint: Long,
+    val wrapped: Boolean,
+    val activeBuffer: TerminalRenderBufferKind,
+    val runs: Array<TerminalHyperlinkRowRun>,
+)
+
+private data class TerminalHyperlinkRowRun(
+    val startColumn: Int,
+    val endColumn: Int,
+    val action: SwingHyperlinkAction,
+)
+
+private const val EMPTY_ROW_FINGERPRINT = 0L
+private const val ROW_FINGERPRINT_OFFSET = -3750763034362895579L
+private const val ROW_FINGERPRINT_PRIME = 1099511628211L
 
 private class TerminalHyperlinkDetectionAccumulator : SwingHyperlinkDetectionSink {
     val detectedLinks = ArrayList<TerminalDetectedHyperlink>()
