@@ -23,6 +23,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.ui.content.Content
+import com.intellij.ui.content.ContentManager
+import com.intellij.ui.content.ContentManagerEvent
+import com.intellij.ui.content.ContentManagerListener
 import io.github.ketraterm.host.TerminalClipboardOrigin
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
@@ -52,6 +55,7 @@ class KetraTermProjectTerminalService(
     private val contentsByTabId = LinkedHashMap<String, Content>()
     private val pendingTabsById = LinkedHashMap<String, PendingTerminalTab>()
     private val panesByTabId = LinkedHashMap<String, KetraTermTerminalPane>()
+    private val closeListenersByTabId = LinkedHashMap<String, ContentCloseQueryRegistration>()
     private val workspace = TerminalWorkspace(IntellijWorkspaceListener())
     private val workspaceLock = Any()
     private val nextPendingTabNumber = AtomicInteger(1)
@@ -166,9 +170,15 @@ class KetraTermProjectTerminalService(
         disposed = true
 
         val panes = panesByTabId.values.toList()
+        val closeRegistrations = closeListenersByTabId.values.toList()
+        for (registration in closeRegistrations) {
+            registration.manager.removeContentManagerListener(registration.listener)
+        }
+
         panesByTabId.clear()
         contentsByTabId.clear()
         pendingTabsById.clear()
+        closeListenersByTabId.clear()
 
         for (pane in panes) {
             pane.close()
@@ -184,6 +194,7 @@ class KetraTermProjectTerminalService(
 
         val pane = panesByTabId.remove(tabId)
         val content = contentsByTabId.remove(tabId)
+        removeCloseQueryListener(tabId)
         if (pane == null && content == null) return
 
         pane?.close()
@@ -197,6 +208,7 @@ class KetraTermProjectTerminalService(
 
         val pane = panesByTabId.remove(tab.id) ?: return
         val content = contentsByTabId.remove(tab.id)
+        removeCloseQueryListener(tab.id)
 
         pane.close()
         synchronized(workspaceLock) {
@@ -267,6 +279,7 @@ class KetraTermProjectTerminalService(
         pendingTab.content.displayName = workspaceTab.title
         pendingTab.content.preferredFocusableComponent = pane.terminal
         pendingTab.content.setDisposer(TerminalTabDisposable(workspaceTab.id))
+        installCloseQueryListener(pendingTab.content, workspaceTab)
         contentsByTabId[workspaceTab.id] = pendingTab.content
         panesByTabId[workspaceTab.id] = pane
         pane.requestFocus()
@@ -314,6 +327,48 @@ class KetraTermProjectTerminalService(
             pasteSanitizationPolicy = settings.pasteSanitizationPolicy,
             hostPolicy = KetraTermIntellijSettings.getInstance().createHostPolicy(profile.command),
         )
+
+    private fun installCloseQueryListener(
+        content: Content,
+        tab: TerminalWorkspaceTab,
+    ) {
+        val listener =
+            object : ContentManagerListener {
+                override fun contentRemoveQuery(event: ContentManagerEvent) {
+                    if (event.content !== content) return
+                    if (!confirmLiveProcessClose(tab)) {
+                        event.consume()
+                    }
+                }
+
+                override fun contentRemoved(event: ContentManagerEvent) {
+                    if (event.content !== content) return
+                    removeCloseQueryListener(tab.id)
+                }
+            }
+        val manager = content.manager ?: return
+        manager.addContentManagerListener(listener)
+        closeListenersByTabId[tab.id] = ContentCloseQueryRegistration(manager, listener)
+    }
+
+    private fun removeCloseQueryListener(tabId: String) {
+        val registration = closeListenersByTabId.remove(tabId) ?: return
+        registration.manager.removeContentManagerListener(registration.listener)
+    }
+
+    private fun confirmLiveProcessClose(tab: TerminalWorkspaceTab): Boolean {
+        if (!tab.session.shellIntegrationState.hasRunningCommand()) return true
+        val answer =
+            Messages.showYesNoDialog(
+                project,
+                "Closing \"${tab.title}\" will terminate its running process.",
+                "Terminate Terminal Process?",
+                "Terminate",
+                "Cancel",
+                Messages.getWarningIcon(),
+            )
+        return answer == Messages.YES
+    }
 
     private inner class TerminalTabDisposable(
         private val tabId: String,
@@ -390,8 +445,9 @@ class KetraTermProjectTerminalService(
 
         override fun tabClosed(tabId: String) {
             invokeLaterIfAlive {
-                contentsByTabId.remove(tabId)
+                val content = contentsByTabId.remove(tabId)
                 panesByTabId.remove(tabId)
+                removeCloseQueryListener(tabId)
             }
         }
 
@@ -427,6 +483,11 @@ class KetraTermProjectTerminalService(
     private data class PendingTerminalTab(
         val content: Content,
         val container: JPanel,
+    )
+
+    private data class ContentCloseQueryRegistration(
+        val manager: ContentManager,
+        val listener: ContentManagerListener,
     )
 
     private sealed interface TerminalStartupResult {
