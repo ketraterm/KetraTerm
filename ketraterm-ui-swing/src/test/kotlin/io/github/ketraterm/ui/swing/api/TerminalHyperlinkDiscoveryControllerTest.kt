@@ -57,7 +57,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
             controller.scheduleForFrame()
         }
 
-        assertTrue(repaintObserved.await(3, TimeUnit.SECONDS))
+        awaitRepaintAndDrainEdt(repaintObserved)
 
         val ids = controller.hyperlinkIdsFor(cache)
         assertEquals(-1, ids[0])
@@ -106,7 +106,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
         }
-        assertTrue(repaintObserved.await(3, TimeUnit.SECONDS))
+        awaitRepaintAndDrainEdt(repaintObserved)
         assertEquals(1, detectorCalls.get())
 
         cache.accept(
@@ -117,15 +117,12 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 lineIds = longArrayOf(0L, 0L, 0L),
             ),
         )
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
-        }
+        val carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
 
-        val ids = controller.hyperlinkIdsFor(cache)
-        assertEquals(0, ids[cache.rowOffset(1)])
-        assertEquals(-1, ids[cache.rowOffset(2)])
-        assertEquals(-1, ids[cache.rowOffset(2) + "https://example.com".lastIndex])
-        assertEquals(1, detectorCalls.get())
+        assertEquals(0, carry.ids[cache.rowOffset(1)])
+        assertEquals(-1, carry.ids[cache.rowOffset(2)])
+        assertEquals(-1, carry.ids[cache.rowOffset(2) + "https://example.com".lastIndex])
+        assertEquals(1, carry.detectorCalls)
         assertTrue(controller.openDiscoveredHyperlink(-1, cache))
         assertTrue(opened.get())
     }
@@ -163,7 +160,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
         }
-        assertTrue(repaintObserved.await(3, TimeUnit.SECONDS))
+        awaitRepaintAndDrainEdt(repaintObserved)
 
         cache.accept(
             StaticTextFrame(
@@ -173,11 +170,9 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 lineIds = longArrayOf(0L, 0L, 0L),
             ),
         )
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
-        }
-        assertEquals(-1, controller.hyperlinkIdsFor(cache)[cache.rowOffset(1)])
-        assertEquals(1, detectorCalls.get())
+        var carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
+        assertEquals(-1, carry.ids[cache.rowOffset(1)])
+        assertEquals(1, carry.detectorCalls)
 
         cache.accept(
             StaticTextFrame(
@@ -187,15 +182,12 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 lineIds = longArrayOf(0L, 0L, 0L),
             ),
         )
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
-        }
+        carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
 
-        val ids = controller.hyperlinkIdsFor(cache)
-        assertEquals(0, ids[cache.rowOffset(1)])
-        assertEquals(-1, ids[cache.rowOffset(2)])
-        assertEquals(-1, ids[cache.rowOffset(2) + "https://example.com".lastIndex])
-        assertEquals(1, detectorCalls.get())
+        assertEquals(0, carry.ids[cache.rowOffset(1)])
+        assertEquals(-1, carry.ids[cache.rowOffset(2)])
+        assertEquals(-1, carry.ids[cache.rowOffset(2) + "https://example.com".lastIndex])
+        assertEquals(1, carry.detectorCalls)
     }
 
     @Test
@@ -231,7 +223,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
         }
-        assertTrue(repaintObserved.await(3, TimeUnit.SECONDS))
+        awaitRepaintAndDrainEdt(repaintObserved)
 
         cache.accept(
             StaticTextFrame(
@@ -241,15 +233,12 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 lineIds = longArrayOf(0L, 0L, 0L, 0L),
             ),
         )
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
-        }
+        val carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
 
-        val ids = controller.hyperlinkIdsFor(cache)
-        assertEquals(0, ids[cache.rowOffset(1)])
-        assertEquals(-1, ids[cache.rowOffset(2)])
-        assertEquals(-1, ids[cache.rowOffset(2) + "https://example.com".lastIndex])
-        assertEquals(1, detectorCalls.get())
+        assertEquals(0, carry.ids[cache.rowOffset(1)])
+        assertEquals(-1, carry.ids[cache.rowOffset(2)])
+        assertEquals(-1, carry.ids[cache.rowOffset(2) + "https://example.com".lastIndex])
+        assertEquals(1, carry.detectorCalls)
     }
 
     @Test
@@ -285,7 +274,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
         }
-        assertTrue(repaintObserved.await(3, TimeUnit.SECONDS))
+        awaitRepaintAndDrainEdt(repaintObserved)
 
         cache.accept(
             StaticTextFrame(
@@ -295,10 +284,8 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 lineIds = longArrayOf(0L, 0L),
             ),
         )
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
-        }
-        assertEquals(0, controller.hyperlinkIdsFor(cache)[cache.rowOffset(0)])
+        var carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
+        assertEquals(0, carry.ids[cache.rowOffset(0)])
 
         cache.accept(
             StaticTextFrame(
@@ -308,12 +295,10 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 lineIds = longArrayOf(0L, 0L),
             ),
         )
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
-        }
+        carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
 
-        assertEquals(0, controller.hyperlinkIdsFor(cache)[cache.rowOffset(0)])
-        assertEquals(1, detectorCalls.get())
+        assertEquals(0, carry.ids[cache.rowOffset(0)])
+        assertEquals(1, carry.detectorCalls)
     }
 
     @Test
@@ -349,7 +334,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
         }
-        assertTrue(repaintObserved.await(3, TimeUnit.SECONDS))
+        awaitRepaintAndDrainEdt(repaintObserved)
 
         cache.accept(
             StaticTextFrame(
@@ -360,13 +345,10 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 lineGenerations = longArrayOf(1L, 2L),
             ),
         )
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
-        }
+        val carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
 
-        val ids = controller.hyperlinkIdsFor(cache)
-        assertEquals(0, ids[cache.rowOffset(1)])
-        assertEquals(1, detectorCalls.get())
+        assertEquals(0, carry.ids[cache.rowOffset(1)])
+        assertEquals(1, carry.detectorCalls)
     }
 
     @Test
@@ -400,7 +382,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
         }
-        assertTrue(repaintObserved.await(3, TimeUnit.SECONDS))
+        awaitRepaintAndDrainEdt(repaintObserved)
 
         cache.accept(
             StaticTextFrame(
@@ -415,11 +397,8 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     ),
             ),
         )
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
-        }
+        val ids = scheduleForFrameAndReadIds(controller, cache).ids
 
-        val ids = controller.hyperlinkIdsFor(cache)
         assertEquals(7, ids[cache.rowOffset(1)])
         assertEquals(-1, ids[cache.rowOffset(1) + 1])
         assertFalse(controller.isDiscoveredHyperlinkResolvable(7, cache))
@@ -593,6 +572,32 @@ class TerminalHyperlinkDiscoveryControllerTest {
         cache.flags[index] = flags
         cache.codeWords[index] = codePoint
     }
+
+    private fun scheduleForFrameAndReadIds(
+        controller: TerminalHyperlinkDiscoveryController,
+        cache: TerminalRenderCache,
+        detectorCalls: AtomicInteger? = null,
+    ): FrameScheduleResult {
+        var ids = IntArray(0)
+        var calls = 0
+        SwingUtilities.invokeAndWait {
+            controller.scheduleForFrame()
+            ids = controller.hyperlinkIdsFor(cache).copyOf(cache.rows * cache.columns)
+            calls = detectorCalls?.get() ?: 0
+        }
+        return FrameScheduleResult(ids, calls)
+    }
+
+    private fun awaitRepaintAndDrainEdt(repaintObserved: CountDownLatch) {
+        assertTrue(repaintObserved.await(3, TimeUnit.SECONDS))
+        SwingUtilities.invokeAndWait {
+        }
+    }
+
+    private data class FrameScheduleResult(
+        val ids: IntArray,
+        val detectorCalls: Int,
+    )
 
     private class TestDiscoveryHost(
         override val renderCache: TerminalRenderCache,
