@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 - Added a `scrollOnOutput` configuration policy and UI settings toggle to lock viewport scroll position or snap to bottom when new process output arrives.
+- Added host-provided terminal font fallback resolution through `TerminalFontResolver`, including IntelliJ integration backed by `ComplementaryFontsRegistry`.
+- Added bounded script-run shaping for complex Swing text rendering so Arabic, Indic, and connected-script runs are shaped with full run context while the ASCII path stays fast.
+- Replaced eager system fallback font retention with a bounded `SystemFontLru` cache to reduce AWT native font memory pressure.
 - Overhauled `TerminalSelectionController` to copy multi-line selection text across the entire terminal history by fetching custom render frames instead of clamping to the active visible viewport.
 - Fixed first-run TUI wrapping corruption by drawing the scrollback scrollbar inside a reserved terminal gutter instead of letting scrollbar visibility change the available terminal width.
 
