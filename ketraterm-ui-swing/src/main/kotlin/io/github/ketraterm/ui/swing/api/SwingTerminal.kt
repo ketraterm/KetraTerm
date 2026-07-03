@@ -79,7 +79,7 @@ class SwingTerminal
         private val unbindRunnable = Runnable { unbindOnEdt() }
         private val reloadSettingsRunnable = Runnable { reloadSettingsOnEdt() }
 
-        private val painter = GridPainter()
+        private val painter = GridPainter(hostServices.fontResolver)
         private val visualBellController =
             TerminalVisualBellController {
                 repaint()

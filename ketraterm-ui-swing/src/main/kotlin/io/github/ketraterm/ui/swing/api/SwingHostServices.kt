@@ -70,6 +70,7 @@ fun interface TerminalUiDispatcher {
  * command-line suggestion snapshots.
  * @property shellSuggestionHandler host callback invoked after the user accepts
  * a shell suggestion from the reusable popup.
+ * @property fontResolver custom host font resolver policy.
  */
 data class SwingHostServices
     @JvmOverloads
@@ -81,4 +82,5 @@ data class SwingHostServices
         val scrollbarOverlayEnabled: Boolean = true,
         val shellSuggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
         val shellSuggestionHandler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
+        val fontResolver: TerminalFontResolver? = null,
     )

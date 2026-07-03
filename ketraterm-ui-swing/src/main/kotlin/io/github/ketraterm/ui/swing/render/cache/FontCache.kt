@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.render.cache
 
+import io.github.ketraterm.ui.swing.api.TerminalFontResolver
 import io.github.ketraterm.ui.swing.render.font.TerminalSystemFallbackFonts
 import io.github.ketraterm.ui.swing.render.font.TerminalSystemFontFamilies
 import java.awt.Font
@@ -33,6 +34,7 @@ internal class FontCache(
     codePointFallbackCapacityPerStyle: Int = DEFAULT_CODE_POINT_FALLBACK_CAPACITY_PER_STYLE,
     textFallbackCapacityPerStyle: Int = DEFAULT_TEXT_FALLBACK_CAPACITY_PER_STYLE,
     private val systemFontFamilies: TerminalSystemFontFamilies = TerminalSystemFallbackFonts,
+    private val fontResolver: TerminalFontResolver? = null,
 ) {
     init {
         require(codePointFallbackCapacityPerStyle > 0) {
@@ -137,17 +139,41 @@ internal class FontCache(
         style: Int,
     ): Font {
         val normalizedStyle = style and STYLE_MASK
-        if (isEmojiPresentationCodePoint(codePoint)) {
-            val emojiFont = emojiFontForCodePoint(codePoint, normalizedStyle)
-            if (emojiFont != null) return emojiFont
-        }
-
-        val primary = font(normalizedStyle)
-        if (primary.canDisplay(codePoint)) return primary
-
         val styleResolvedFonts = resolvedCodePointFonts[normalizedStyle]
         val cached = styleResolvedFonts[codePoint]
         if (cached != null) return cached
+
+        val primary = font(normalizedStyle)
+        val isEmoji = isEmojiPresentationCodePoint(codePoint)
+
+        if (isEmoji && fontResolver != null) {
+            val resolved = fontResolver.resolveFallbackFont(codePoint, normalizedStyle, primary.size2D)
+            if (resolved != null) {
+                val derived = resolved.deriveFont(Font.PLAIN, primary.size2D)
+                styleResolvedFonts.put(codePoint, derived)
+                return derived
+            }
+        }
+
+        if (isEmoji) {
+            val emojiFont = emojiFontForCodePoint(codePoint, normalizedStyle)
+            if (emojiFont != null) {
+                styleResolvedFonts.put(codePoint, emojiFont)
+                return emojiFont
+            }
+        }
+
+        if (primary.canDisplay(codePoint)) return primary
+
+        if (fontResolver != null) {
+            val resolved = fontResolver.resolveFallbackFont(codePoint, normalizedStyle, primary.size2D)
+            if (resolved != null) {
+                val effectiveStyle = if (isEmojiFontFamily(resolved.family)) Font.PLAIN else normalizedStyle
+                val derived = resolved.deriveFont(effectiveStyle, primary.size2D)
+                styleResolvedFonts.put(codePoint, derived)
+                return derived
+            }
+        }
 
         var index = 0
         while (index < fallbackBaseFonts.size) {
@@ -189,17 +215,41 @@ internal class FontCache(
         style: Int,
     ): Font {
         val normalizedStyle = style and STYLE_MASK
-        if (containsEmojiPresentation(text)) {
-            val emojiFont = emojiFontForText(text, normalizedStyle)
-            if (emojiFont != null) return emojiFont
-        }
-
-        val primary = font(normalizedStyle)
-        if (primary.canDisplayUpTo(text) < 0) return primary
-
         val styleResolvedTextFonts = resolvedTextFonts[normalizedStyle]
         val cached = styleResolvedTextFonts[text]
         if (cached != null) return cached
+
+        val primary = font(normalizedStyle)
+        val isEmoji = containsEmojiPresentation(text)
+
+        if (isEmoji && fontResolver != null) {
+            val resolved = fontResolver.resolveFallbackFont(text, normalizedStyle, primary.size2D)
+            if (resolved != null) {
+                val derived = resolved.deriveFont(Font.PLAIN, primary.size2D)
+                styleResolvedTextFonts[text] = derived
+                return derived
+            }
+        }
+
+        if (isEmoji) {
+            val emojiFont = emojiFontForText(text, normalizedStyle)
+            if (emojiFont != null) {
+                styleResolvedTextFonts[text] = emojiFont
+                return emojiFont
+            }
+        }
+
+        if (primary.canDisplayUpTo(text) < 0) return primary
+
+        if (fontResolver != null) {
+            val resolved = fontResolver.resolveFallbackFont(text, normalizedStyle, primary.size2D)
+            if (resolved != null) {
+                val effectiveStyle = if (isEmojiFontFamily(resolved.family)) Font.PLAIN else normalizedStyle
+                val derived = resolved.deriveFont(effectiveStyle, primary.size2D)
+                styleResolvedTextFonts[text] = derived
+                return derived
+            }
+        }
 
         var index = 0
         while (index < fallbackBaseFonts.size) {
