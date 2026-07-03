@@ -51,7 +51,7 @@ internal class FontCache(
     private var useSystemFallbackFonts: Boolean = false
     private val styleFonts = arrayOfNulls<Font>(STYLE_COUNT)
     private var fallbackStyleFonts: Array<Array<Font?>> = emptyArray()
-    private var systemStyleFonts: Array<Array<Font?>> = emptyArray()
+    private val systemFontCache = SystemFontLru(DEFAULT_SYSTEM_FONT_CACHE_CAPACITY)
     private val resolvedCodePointFonts =
         Array(STYLE_COUNT) {
             IntFontLru(codePointFallbackCapacityPerStyle)
@@ -103,7 +103,7 @@ internal class FontCache(
         fallbackStyleFonts = Array(fallbackFonts.size) { arrayOfNulls(STYLE_COUNT) }
 
         systemFallbackFamilies = emptyList()
-        systemStyleFonts = emptyArray()
+        systemFontCache.clear()
 
         invalidateResolvedCaches()
         return true
@@ -350,7 +350,7 @@ internal class FontCache(
         if (loadedFamilies == systemFallbackFamilies) return false
 
         systemFallbackFamilies = loadedFamilies
-        systemStyleFonts = Array(loadedFamilies.size) { arrayOfNulls(STYLE_COUNT) }
+        systemFontCache.clear()
         invalidateResolvedCaches()
         return true
     }
@@ -396,23 +396,30 @@ internal class FontCache(
         style: Int,
     ): Font {
         val normalizedStyle = style and STYLE_MASK
-        val cached = systemStyleFonts[index][normalizedStyle]
+        val family = systemFallbackFamilies[index]
+        val key = "$family:$normalizedStyle"
+        val cached = systemFontCache[key]
         if (cached != null) return cached
 
         val base =
             requireNotNull(baseFont) {
                 "FontCache.update must be called before systemFallbackFont"
             }
-        val family = systemFallbackFamilies[index]
         val effectiveStyle = if (isEmojiFontFamily(family)) Font.PLAIN else normalizedStyle
         val fallback =
             Font(family, effectiveStyle, base.size)
                 .deriveFont(base.size2D)
-        systemStyleFonts[index][normalizedStyle] = fallback
+        systemFontCache[key] = fallback
         return fallback
     }
 
     private class StringFontLru(
+        private val capacity: Int,
+    ) : LinkedHashMap<String, Font>(capacity, LOAD_FACTOR, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Font>?): Boolean = size > capacity
+    }
+
+    private class SystemFontLru(
         private val capacity: Int,
     ) : LinkedHashMap<String, Font>(capacity, LOAD_FACTOR, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Font>?): Boolean = size > capacity
@@ -574,6 +581,7 @@ internal class FontCache(
         private const val STYLE_MASK = Font.BOLD or Font.ITALIC
         private const val DEFAULT_CODE_POINT_FALLBACK_CAPACITY_PER_STYLE = 4096
         private const val DEFAULT_TEXT_FALLBACK_CAPACITY_PER_STYLE = 1024
+        private const val DEFAULT_SYSTEM_FONT_CACHE_CAPACITY = 64
         private const val LOAD_FACTOR = 0.75f
         private const val EMPTY = -1
 
