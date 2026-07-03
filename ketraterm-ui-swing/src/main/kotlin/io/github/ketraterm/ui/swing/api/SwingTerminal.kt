@@ -1285,8 +1285,8 @@ class SwingTerminal
          * @return `true` if selection was successfully copied to clipboard, `false` otherwise.
          */
         fun copySelectionToClipboard(): Boolean {
-            if (session == null) return false
-            val selectedText = selectionController.getSelectedText(renderCache) ?: return false
+            val boundSession = session ?: return false
+            val selectedText = selectionController.getSelectedText(boundSession, renderCache) ?: return false
             hostServices.clipboardHandler.copyText(selectedText)
             return true
         }

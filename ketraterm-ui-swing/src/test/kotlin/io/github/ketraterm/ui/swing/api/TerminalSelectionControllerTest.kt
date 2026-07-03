@@ -278,4 +278,103 @@ class TerminalSelectionControllerTest {
         assertEquals(1L, controller.selectionAnchorAbsoluteRow)
         assertEquals(1L, controller.selectionCaretAbsoluteRow)
     }
+
+    @Test
+    fun `getSelectedText extracts text from frame reader for selection spanning history`() {
+        val lines =
+            listOf(
+                "hist0",
+                "hist1",
+                "hist2",
+                "hist3",
+                "hist4",
+                "screen0",
+                "screen1",
+                "screen2",
+                "screen3",
+                "screen4",
+            )
+
+        class MultiLineFakeFrame(
+            override val historySize: Int,
+            override val scrollbackOffset: Int,
+            override val rows: Int,
+            val frameLines: List<String>,
+        ) : TerminalRenderFrame {
+            override val columns = 10
+            override val frameGeneration = 1L
+            override val structureGeneration = 1L
+            override val activeBuffer = TerminalRenderBufferKind.PRIMARY
+            override val cursor = TerminalRenderCursor(0, 0, false, false, TerminalRenderCursorShape.BLOCK, 1L)
+            override val discardedCount = 0L
+
+            override fun lineGeneration(row: Int) = 1L
+
+            override fun lineWrapped(row: Int) = false
+
+            override fun copyLine(
+                row: Int,
+                codeWords: IntArray,
+                codeOffset: Int,
+                attrWords: LongArray,
+                attrOffset: Int,
+                flags: IntArray,
+                flagOffset: Int,
+                extraAttrWords: LongArray?,
+                extraAttrOffset: Int,
+                hyperlinkIds: IntArray?,
+                hyperlinkOffset: Int,
+                clusterSink: TerminalRenderClusterSink?,
+                clusterDataSink: TerminalRenderClusterDataSink?,
+            ) {
+                val lineContent = frameLines[row]
+                for (col in 0 until minOf(columns, lineContent.length)) {
+                    val idx = codeOffset + col
+                    codeWords[idx] = lineContent[col].code
+                    attrWords[idx] = TerminalRenderAttrs.DEFAULT
+                    flags[idx] = TerminalRenderCellFlags.CODEPOINT
+                }
+            }
+        }
+
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {}
+
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {}
+
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    viewportRows: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    val startAbsRow = 5 - scrollbackOffset
+                    val frameLinesSlice = lines.subList(startAbsRow, minOf(lines.size, startAbsRow + viewportRows))
+                    consumer.accept(
+                        MultiLineFakeFrame(
+                            historySize = 5,
+                            scrollbackOffset = scrollbackOffset,
+                            rows = frameLinesSlice.size,
+                            frameLines = frameLinesSlice,
+                        ),
+                    )
+                }
+            }
+
+        val liveCache = TerminalRenderCache(columns = 10, rows = 5)
+        val liveFrame = MultiLineFakeFrame(historySize = 5, scrollbackOffset = 0, rows = 5, frameLines = lines.subList(5, 10))
+        liveCache.accept(liveFrame)
+
+        val host = FakeSelectionHost(liveCache)
+        val controller = TerminalSelectionController(host)
+
+        controller.selectAbsoluteRows(2L, 7L, 10)
+
+        val text = controller.getSelectedText(reader, liveCache)
+        val expected = "hist2\nhist3\nhist4\nscreen0\nscreen1\nscreen2"
+        assertEquals(expected, text)
+    }
 }
