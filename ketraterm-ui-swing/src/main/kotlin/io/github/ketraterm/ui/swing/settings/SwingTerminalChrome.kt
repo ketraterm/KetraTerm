@@ -16,70 +16,76 @@
 package io.github.ketraterm.ui.swing.settings
 
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
-import java.awt.Insets
 
 /**
  * Computes visual terminal chrome insets without changing terminal semantics.
  *
- * Primary screen chrome reserves the prompt gutter and overlay scrollbar
- * gutter. Alternate screen chrome uses its own explicit inset snapshot, so
- * full-screen TUIs can receive an edge-to-edge viewport without hidden coupling
- * to primary-screen padding.
+ * Primary screen chrome composes host/user margin plus terminal-owned gutters:
+ * `left margin | prompt gutter | grid | scrollbar gutter`. Alternate screen
+ * chrome uses its own explicit inset snapshot, so full-screen TUIs can receive
+ * an edge-to-edge viewport without hidden coupling to primary-screen padding.
  */
 internal object SwingTerminalChrome {
-    fun insets(
-        settings: SwingSettings,
-        activeBuffer: TerminalRenderBufferKind,
-    ): Insets =
-        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
-            settings.alternateScreenPadding
-        } else {
-            settings.padding
-        }
-
     fun horizontalInset(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-    ): Int {
-        val insets = insets(settings, activeBuffer)
-        return insets.left + insets.right
-    }
+        promptDecorationGutterVisible: Boolean = false,
+    ): Int = left(settings, activeBuffer, promptDecorationGutterVisible) + right(settings, activeBuffer)
 
     fun verticalInset(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-    ): Int {
-        val insets = insets(settings, activeBuffer)
-        return insets.top + insets.bottom
-    }
+    ): Int = top(settings, activeBuffer) + bottom(settings, activeBuffer)
 
     fun left(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-    ): Int = insets(settings, activeBuffer).left
+        promptDecorationGutterVisible: Boolean = false,
+    ): Int =
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+            settings.alternateScreenPadding.left
+        } else {
+            settings.padding.left + promptDecorationGutterWidth(settings, activeBuffer, promptDecorationGutterVisible)
+        }
 
     fun right(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-    ): Int = insets(settings, activeBuffer).right
+    ): Int =
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+            settings.alternateScreenPadding.right
+        } else {
+            settings.padding.right
+        }
 
     fun top(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-    ): Int = insets(settings, activeBuffer).top
+    ): Int =
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+            settings.alternateScreenPadding.top
+        } else {
+            settings.padding.top
+        }
 
     fun bottom(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-    ): Int = insets(settings, activeBuffer).bottom
+    ): Int =
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+            settings.alternateScreenPadding.bottom
+        } else {
+            settings.padding.bottom
+        }
 
     fun promptDecorationGutterWidth(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
+        promptDecorationGutterVisible: Boolean = false,
     ): Int =
-        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE || !promptDecorationGutterVisible) {
             0
         } else {
-            settings.shellIntegrationDecorationGutterWidth.coerceAtMost(settings.padding.left)
+            settings.shellIntegrationDecorationGutterWidth
         }
 }

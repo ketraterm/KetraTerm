@@ -311,6 +311,7 @@ class SwingTerminalMouseControllerTest {
                 cursorStrokeWidth = 2,
             )
         override val renderCache = TerminalRenderCache(80, 24)
+        override val promptDecorationGutterVisible: Boolean = false
 
         var scrollCount = 0
         var pasteCount = 0

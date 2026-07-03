@@ -141,11 +141,11 @@ class SwingSettingsTest {
         assertEquals(true, settings.shellIntegrationFailedCommandRailsVisible)
         assertEquals(0xFFE74856.toInt(), settings.shellIntegrationFailedCommandRailColor)
         assertEquals(3, settings.shellIntegrationFailedCommandRailWidth)
-        assertEquals(Insets(0, 20, 8, 10), settings.padding)
-        assertEquals(Insets(0, 8, 8, 8), settings.alternateScreenPadding)
-        assertEquals(4, settings.padding.left - settings.shellIntegrationDecorationGutterWidth)
+        assertEquals(Insets(0, 4, 4, 6), settings.padding)
+        assertEquals(Insets(0, 2, 2, 2), settings.alternateScreenPadding)
         assertEquals(0, settings.padding.top)
-        assertEquals(8, settings.padding.bottom)
+        assertEquals(4, settings.padding.left)
+        assertEquals(4, settings.padding.bottom)
     }
 
     @Test
@@ -182,14 +182,27 @@ class SwingSettingsTest {
     fun alternateScreenChromeUsesExplicitAlternatePadding() {
         val settings = SwingSettings()
 
-        assertEquals(20, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(10, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(8, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(8, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(30, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(16, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(8, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(16, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(4, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(20, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY, promptDecorationGutterVisible = true))
+        assertEquals(6, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(2, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(2, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(10, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(
+            26,
+            SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY, promptDecorationGutterVisible = true),
+        )
+        assertEquals(4, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(2, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(0, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(
+            16,
+            SwingTerminalChrome.promptDecorationGutterWidth(
+                settings,
+                TerminalRenderBufferKind.PRIMARY,
+                promptDecorationGutterVisible = true,
+            ),
+        )
         assertEquals(0, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(true, settings.shellSuggestionsEnabled)
     }
@@ -203,10 +216,15 @@ class SwingSettingsTest {
             )
 
         assertEquals(40, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(56, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY, promptDecorationGutterVisible = true))
         assertEquals(14, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(3, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(5, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(54, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(
+            70,
+            SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY, promptDecorationGutterVisible = true),
+        )
         assertEquals(8, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(4, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
     }

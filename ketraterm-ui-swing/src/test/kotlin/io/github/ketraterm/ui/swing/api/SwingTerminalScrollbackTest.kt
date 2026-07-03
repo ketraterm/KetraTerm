@@ -433,7 +433,7 @@ class SwingTerminalScrollbackTest {
     }
 
     @Test
-    fun `enabling command gutter guides does not resize terminal geometry`() {
+    fun `enabling command gutter guides reserves visible gutter geometry`() {
         val connector = RecordingConnector()
         val shellIntegrationState = TerminalShellIntegrationState()
         shellIntegrationState.recordPromptStart(1)
@@ -473,10 +473,11 @@ class SwingTerminalScrollbackTest {
         component.reloadSettings()
         drainEdt()
 
-        assertEquals(1, connector.resizeCount.get())
-        assertEquals(3, connector.lastColumns.get())
+        assertEquals(2, connector.resizeCount.get())
+        assertEquals(1, connector.lastColumns.get())
         assertEquals(3, connector.lastRows.get())
         assertEquals(3, component.visibleGridSize().height)
+        assertEquals(1, component.visibleGridSize().width)
         session.close()
     }
 

@@ -465,12 +465,13 @@ class GridPainterTest {
             cursorBlinkVisible = true,
             shellIntegrationDecorations = decorations,
             visualGeometry = geometry,
+            promptDecorationGutterVisible = true,
         )
         g.dispose()
 
         val nodeCenterY = metrics.cellHeight + metrics.cellHeight / 2
-        assertEquals(GREEN, image.getRGB(4, metrics.cellHeight / 2))
-        assertEquals(GREEN, image.getRGB(4, nodeCenterY))
+        assertEquals(GREEN, image.getRGB(12, metrics.cellHeight / 2))
+        assertEquals(GREEN, image.getRGB(12, nodeCenterY))
         assertEquals(BLACK, image.getRGB(0, nodeCenterY))
         assertEquals(BLACK, image.getRGB(image.width - 1, nodeCenterY))
     }
@@ -557,15 +558,16 @@ class GridPainterTest {
             cursorBlinkVisible = true,
             shellIntegrationDecorations = decorations,
             hoveredPromptMarkerRow = 0,
+            promptDecorationGutterVisible = true,
         )
         g.dispose()
 
         val centerY = metrics.cellHeight / 2
-        assertEquals(GREEN, image.getRGB(6, centerY))
-        assertTrue(image.getRGB(1, centerY) != BLACK)
+        assertEquals(GREEN, image.getRGB(18, centerY))
+        assertTrue(image.getRGB(13, centerY) != BLACK)
         var y = 0
         while (y < metrics.cellHeight) {
-            assertEquals(BLACK, image.getRGB(settings.padding.left, y))
+            assertEquals(BLACK, image.getRGB(settings.padding.left + settings.shellIntegrationDecorationGutterWidth, y))
             y++
         }
     }
@@ -612,11 +614,12 @@ class GridPainterTest {
             cursorBlinkVisible = true,
             shellIntegrationDecorations = decorations,
             visualGeometry = geometry,
+            promptDecorationGutterVisible = true,
         )
         g.dispose()
 
         val nodeCenterY = metrics.cellHeight / 2
-        assertEquals(GREEN, image.getRGB(4, nodeCenterY))
+        assertNotEquals(BLACK, image.getRGB(12, nodeCenterY))
         assertEquals(BLACK, image.getRGB(image.width - 1, nodeCenterY))
     }
 
@@ -724,17 +727,18 @@ class GridPainterTest {
             height = image.height,
             cursorBlinkVisible = true,
             shellIntegrationDecorations = decorations,
+            promptDecorationGutterVisible = true,
         )
         g.dispose()
 
-        assertEquals(RED, image.getRGB(4, metrics.cellHeight / 2))
-        assertTrue(image.getRGB(4, metrics.cellHeight) != RED)
-        assertEquals(RED, image.getRGB(4, metrics.cellHeight + 1))
-        assertEquals(RED, image.getRGB(4, metrics.cellHeight * 2))
-        assertEquals(RED, image.getRGB(4, metrics.cellHeight * 3 - 2))
-        assertTrue(image.getRGB(4, metrics.cellHeight * 3 - 1) != RED)
-        assertEquals(BLACK, image.getRGB(2, metrics.cellHeight + 1))
-        assertEquals(BLACK, image.getRGB(6, metrics.cellHeight + 1))
+        assertEquals(RED, image.getRGB(12, metrics.cellHeight / 2))
+        assertTrue(image.getRGB(12, metrics.cellHeight) != RED)
+        assertEquals(RED, image.getRGB(12, metrics.cellHeight + 1))
+        assertEquals(RED, image.getRGB(12, metrics.cellHeight * 2))
+        assertEquals(RED, image.getRGB(12, metrics.cellHeight * 3 - 2))
+        assertTrue(image.getRGB(12, metrics.cellHeight * 3 - 1) != RED)
+        assertEquals(BLACK, image.getRGB(10, metrics.cellHeight + 1))
+        assertEquals(BLACK, image.getRGB(14, metrics.cellHeight + 1))
     }
 
     @Test
@@ -769,11 +773,12 @@ class GridPainterTest {
             height = image.height,
             cursorBlinkVisible = true,
             shellIntegrationDecorations = decorations,
+            promptDecorationGutterVisible = true,
         )
         g.dispose()
 
-        assertEquals(GREEN, image.getRGB(4, metrics.cellHeight / 2))
-        assertEquals(BLACK, image.getRGB(4, metrics.cellHeight + 1))
+        assertEquals(GREEN, image.getRGB(12, metrics.cellHeight / 2))
+        assertEquals(BLACK, image.getRGB(12, metrics.cellHeight + 1))
     }
 
     @Test

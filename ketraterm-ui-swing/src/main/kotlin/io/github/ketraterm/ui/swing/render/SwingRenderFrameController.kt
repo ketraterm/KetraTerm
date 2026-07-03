@@ -134,7 +134,12 @@ internal class SwingRenderFrameController(
         val settings = host.settings
         val activeBuffer = host.renderCache.activeBuffer
         repaintPaddingScratch.top = SwingTerminalChrome.top(settings, activeBuffer)
-        repaintPaddingScratch.left = SwingTerminalChrome.left(settings, activeBuffer)
+        repaintPaddingScratch.left =
+            SwingTerminalChrome.left(
+                settings,
+                activeBuffer,
+                host.promptDecorationGutterVisible,
+            )
         repaintPaddingScratch.bottom = SwingTerminalChrome.bottom(settings, activeBuffer)
         repaintPaddingScratch.right = SwingTerminalChrome.right(settings, activeBuffer)
         return repaintPaddingScratch

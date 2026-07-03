@@ -142,7 +142,12 @@ internal class SwingTerminalMouseController(
         if (event.isControlDown) mods = mods or TerminalModifiers.CTRL
         if (event.isMetaDown) mods = mods or TerminalModifiers.META
 
-        val paddingLeft = SwingTerminalChrome.left(host.settings, host.renderCache.activeBuffer)
+        val paddingLeft =
+            SwingTerminalChrome.left(
+                host.settings,
+                host.renderCache.activeBuffer,
+                host.promptDecorationGutterVisible,
+            )
         val gridWidth = host.renderCache.columns * host.metrics.cellWidth
         val gridHeight = host.renderCache.rows * host.metrics.cellHeight
         val pixelX = (event.x - paddingLeft).coerceIn(0, gridWidth - 1)

@@ -69,8 +69,9 @@ internal class SwingViewportController(
         componentWidth: Int,
         componentHeight: Int,
         activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
+        promptDecorationGutterVisible: Boolean = false,
     ): Dimension {
-        val packed = updateVisibleGridSize(settings, metrics, componentWidth, componentHeight, activeBuffer)
+        val packed = updateVisibleGridSize(settings, metrics, componentWidth, componentHeight, activeBuffer, promptDecorationGutterVisible)
         return Dimension(unpackVisibleColumns(packed), unpackVisibleRows(packed))
     }
 
@@ -80,8 +81,9 @@ internal class SwingViewportController(
         componentWidth: Int,
         componentHeight: Int,
         activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
+        promptDecorationGutterVisible: Boolean = false,
     ): Long {
-        val columns = visibleGridColumns(settings, metrics, componentWidth, activeBuffer)
+        val columns = visibleGridColumns(settings, metrics, componentWidth, activeBuffer, promptDecorationGutterVisible)
         val rows = visibleGridRows(settings, metrics, componentHeight, activeBuffer)
         val packed = packVisibleGridSize(columns, rows)
         visibleGridSizeSnapshot.set(packed)
@@ -226,10 +228,18 @@ internal class SwingViewportController(
             metrics: SwingMetrics,
             componentWidth: Int,
             activeBuffer: TerminalRenderBufferKind,
+            promptDecorationGutterVisible: Boolean,
         ): Int =
             maxOf(
                 1,
-                (componentWidth - SwingTerminalChrome.horizontalInset(settings, activeBuffer)) / metrics.cellWidth,
+                (
+                    componentWidth -
+                        SwingTerminalChrome.horizontalInset(
+                            settings,
+                            activeBuffer,
+                            promptDecorationGutterVisible,
+                        )
+                ) / metrics.cellWidth,
             )
 
         private fun packVisibleGridSize(

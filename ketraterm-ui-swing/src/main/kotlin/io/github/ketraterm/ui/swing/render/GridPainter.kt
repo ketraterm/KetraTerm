@@ -87,6 +87,7 @@ internal class GridPainter {
         hoveredHyperlinkEndRow: Int = Int.MAX_VALUE,
         hoveredHyperlinkEndColumn: Int = Int.MAX_VALUE,
         hyperlinkActivationHover: Boolean = false,
+        promptDecorationGutterVisible: Boolean = false,
     ) {
         val palette = cache.palette
         textPainter.updateSettings(settings)
@@ -103,13 +104,14 @@ internal class GridPainter {
         val clip = g.getClipBounds(clipScratch)
         backgroundPainter.clear(g, palette, width, height)
 
-        val paddingLeft = SwingTerminalChrome.left(settings, cache.activeBuffer)
+        val paddingLeft = SwingTerminalChrome.left(settings, cache.activeBuffer, promptDecorationGutterVisible)
         val paddingTop = SwingTerminalChrome.top(settings, cache.activeBuffer)
         val paddingBottom = SwingTerminalChrome.bottom(settings, cache.activeBuffer)
         val gridPaintHeight = height - paddingTop - paddingBottom
         if (gridPaintHeight <= 0) return
 
-        val promptGutterWidth = SwingTerminalChrome.promptDecorationGutterWidth(settings, cache.activeBuffer)
+        val promptGutterWidth =
+            SwingTerminalChrome.promptDecorationGutterWidth(settings, cache.activeBuffer, promptDecorationGutterVisible)
         val geometry = visualGeometry?.takeIf { it.rowCount == cache.rows }
         val shellDecorations =
             if (cache.activeBuffer == TerminalRenderBufferKind.ALTERNATE || promptGutterWidth <= 0) {

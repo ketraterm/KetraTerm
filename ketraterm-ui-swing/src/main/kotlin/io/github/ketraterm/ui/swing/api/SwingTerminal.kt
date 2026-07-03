@@ -328,6 +328,8 @@ class SwingTerminal
                     override val settings: SwingSettings get() = this@SwingTerminal.settings
                     override val metrics: SwingMetrics get() = this@SwingTerminal.metrics
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
+                    override val promptDecorationGutterVisible: Boolean
+                        get() = this@SwingTerminal.promptDecorationGutterVisible()
 
                     override fun mouseTrackingMode(): MouseTrackingMode =
                         this@SwingTerminal
@@ -412,6 +414,8 @@ class SwingTerminal
                     override val componentWidth: Int get() = this@SwingTerminal.width
                     override val componentHeight: Int get() = this@SwingTerminal.height
                     override val cursorPresentationEnabled: Boolean get() = this@SwingTerminal.cursorPresentationEnabled
+                    override val promptDecorationGutterVisible: Boolean
+                        get() = this@SwingTerminal.promptDecorationGutterVisible()
 
                     override fun dispatch(action: Runnable) {
                         hostServices.uiDispatcher.dispatch(action)
@@ -512,8 +516,9 @@ class SwingTerminal
         }
 
         private fun promptMarkerRowAt(event: MouseEvent): Int {
-            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer)
-            val gutterWidth = SwingTerminalChrome.promptDecorationGutterWidth(settings, renderCache.activeBuffer)
+            val gutterVisible = promptDecorationGutterVisible()
+            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer, gutterVisible)
+            val gutterWidth = SwingTerminalChrome.promptDecorationGutterWidth(settings, renderCache.activeBuffer, gutterVisible)
             if (gutterWidth <= 0 || event.x !in (paddingLeft - gutterWidth) until paddingLeft) {
                 return NO_PROMPT_MARKER_ROW
             }
@@ -618,7 +623,14 @@ class SwingTerminal
          */
         fun visibleGridSize(): Dimension {
             if (!SwingUtilities.isEventDispatchThread()) return viewportController.visibleGridSizeSnapshot()
-            return viewportController.visibleGridSizeOnEdt(settings, metrics, width, height, renderCache.activeBuffer)
+            return viewportController.visibleGridSizeOnEdt(
+                settings,
+                metrics,
+                width,
+                height,
+                renderCache.activeBuffer,
+                promptDecorationGutterVisible(),
+            )
         }
 
         /**
@@ -872,7 +884,7 @@ class SwingTerminal
             val searchOverlay = searchController.overlay
             val preferred = searchOverlay.preferredSize
             val activeBuffer = renderCache.activeBuffer
-            val paddingLeft = SwingTerminalChrome.left(settings, activeBuffer)
+            val paddingLeft = SwingTerminalChrome.left(settings, activeBuffer, promptDecorationGutterVisible())
             val paddingRight = SwingTerminalChrome.right(settings, activeBuffer)
             val paddingTop = SwingTerminalChrome.top(settings, activeBuffer)
             val availableWidth = width - paddingLeft - paddingRight
@@ -895,7 +907,7 @@ class SwingTerminal
 
             val preferred = popup.preferredSize
             val activeBuffer = renderCache.activeBuffer
-            val paddingLeft = SwingTerminalChrome.left(settings, activeBuffer)
+            val paddingLeft = SwingTerminalChrome.left(settings, activeBuffer, promptDecorationGutterVisible())
             val paddingRight = SwingTerminalChrome.right(settings, activeBuffer)
             val paddingTop = SwingTerminalChrome.top(settings, activeBuffer)
             val availableWidth = width - paddingLeft - paddingRight
@@ -954,6 +966,7 @@ class SwingTerminal
                     hoveredHyperlinkEndRow = hyperlinkController.hoveredHyperlinkEndRow,
                     hoveredHyperlinkEndColumn = hyperlinkController.hoveredHyperlinkEndColumn,
                     hyperlinkActivationHover = hyperlinkController.hyperlinkActivationHover,
+                    promptDecorationGutterVisible = promptDecorationGutterVisible(),
                 )
                 scrollbarOverlay.paint(
                     g = g,
@@ -1305,7 +1318,7 @@ class SwingTerminal
             y: Int,
             cache: TerminalRenderCache,
         ): Long {
-            val paddingLeft = SwingTerminalChrome.left(settings, cache.activeBuffer)
+            val paddingLeft = SwingTerminalChrome.left(settings, cache.activeBuffer, promptDecorationGutterVisible())
             val paddingTop = SwingTerminalChrome.top(settings, cache.activeBuffer)
             val column = ((x - paddingLeft) / metrics.cellWidth).coerceIn(0, cache.columns - 1)
             val row =
@@ -1328,7 +1341,7 @@ class SwingTerminal
             val lastRow = endRow.coerceAtMost(renderCache.rows - 1)
             if (firstRow > lastRow) return
 
-            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer)
+            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer, promptDecorationGutterVisible())
             val paddingTop = SwingTerminalChrome.top(settings, renderCache.activeBuffer)
             val contentOriginY = if (visualGeometry.rowCount == renderCache.rows) visualGeometry.contentOriginY else 0.0
             var row = firstRow
@@ -1479,7 +1492,15 @@ class SwingTerminal
         }
 
         private fun resizeSessionToVisibleGridOnEdt(publishWhenUnchanged: Boolean = true): Boolean {
-            val visibleGridSize = viewportController.visibleGridSizeOnEdt(settings, metrics, width, height, renderCache.activeBuffer)
+            val visibleGridSize =
+                viewportController.visibleGridSizeOnEdt(
+                    settings,
+                    metrics,
+                    width,
+                    height,
+                    renderCache.activeBuffer,
+                    promptDecorationGutterVisible(),
+                )
             val boundSession = session
             if (boundSession == null || width <= 0 || height <= 0) {
                 if (publishWhenUnchanged) publishViewportState(renderCache.historySize)
@@ -1519,6 +1540,13 @@ class SwingTerminal
             } else {
                 renderCache.rows * metrics.cellHeight
             }
+
+        private fun promptDecorationGutterVisible(): Boolean {
+            if (renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE) return false
+            if (settings.shellIntegrationDecorationGutterWidth <= 0) return false
+            if (!settings.shellIntegrationPromptDotsVisible) return false
+            return session?.shellIntegrationState?.recordCount() ?: 0 > 0
+        }
 
         private fun commandNavigationAnchorRow(): Int =
             if (visualGeometry.rowCount == renderCache.rows) {

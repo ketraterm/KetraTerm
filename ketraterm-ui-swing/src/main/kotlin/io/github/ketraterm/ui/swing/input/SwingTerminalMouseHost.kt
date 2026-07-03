@@ -29,6 +29,7 @@ internal interface SwingTerminalMouseHost {
     val settings: SwingSettings
     val metrics: SwingMetrics
     val renderCache: TerminalRenderCache
+    val promptDecorationGutterVisible: Boolean
 
     fun mouseTrackingMode(): MouseTrackingMode
 

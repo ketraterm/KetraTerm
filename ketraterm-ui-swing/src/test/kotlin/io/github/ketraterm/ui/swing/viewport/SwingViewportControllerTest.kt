@@ -59,7 +59,11 @@ class SwingViewportControllerTest {
         @Test
         fun `alternate screen visible grid uses explicit alternate chrome instead of primary gutters`() {
             val controller = SwingViewportController { _, _, _, _, _ -> }
-            val settings = SwingSettings(padding = Insets(0, 20, 8, 12))
+            val settings =
+                SwingSettings(
+                    padding = Insets(0, 4, 8, 12),
+                    alternateScreenPadding = Insets(0, 8, 8, 8),
+                )
 
             val primary =
                 controller.visibleGridSizeOnEdt(
@@ -68,6 +72,7 @@ class SwingViewportControllerTest {
                     componentWidth = 212,
                     componentHeight = 128,
                     activeBuffer = TerminalRenderBufferKind.PRIMARY,
+                    promptDecorationGutterVisible = true,
                 )
             val alternate =
                 controller.visibleGridSizeOnEdt(

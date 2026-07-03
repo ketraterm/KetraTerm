@@ -26,7 +26,7 @@ class TerminalScrollbarOverlayTest {
     @Test
     fun `thumb is painted inside the reserved right inset`() {
         val overlay = TerminalScrollbarOverlay()
-        val settings = SwingSettings(padding = Insets(0, 20, 8, 10))
+        val settings = SwingSettings(padding = Insets(0, 4, 8, 10))
 
         val thumb =
             overlay.thumbBounds(
@@ -47,7 +47,7 @@ class TerminalScrollbarOverlayTest {
     @Test
     fun `alternate screen uses small edge inset and hides thumb`() {
         val overlay = TerminalScrollbarOverlay()
-        val settings = SwingSettings(padding = Insets(0, 20, 8, 10))
+        val settings = SwingSettings(padding = Insets(0, 4, 8, 10))
 
         assertTrue(
             overlay.containsGutter(
@@ -55,7 +55,7 @@ class TerminalScrollbarOverlayTest {
                 activeBuffer = TerminalRenderBufferKind.ALTERNATE,
                 componentWidth = 110,
                 componentHeight = 108,
-                x = 103,
+                x = 109,
                 y = 20,
             ),
         )
@@ -73,7 +73,7 @@ class TerminalScrollbarOverlayTest {
     @Test
     fun `dragging maps bottom origin thumb movement to terminal scrollback offset`() {
         val overlay = TerminalScrollbarOverlay()
-        val settings = SwingSettings(padding = Insets(0, 20, 8, 10))
+        val settings = SwingSettings(padding = Insets(0, 4, 8, 10))
         var requestedOffset = -1
         var requestedAdjusting = false
 
