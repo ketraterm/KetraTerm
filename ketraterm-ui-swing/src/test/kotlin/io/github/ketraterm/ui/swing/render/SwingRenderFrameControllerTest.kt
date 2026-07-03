@@ -163,7 +163,6 @@ class SwingRenderFrameControllerTest {
         override val componentWidth = 800
         override val componentHeight = 480
         override val cursorPresentationEnabled = true
-        override val promptDecorationGutterVisible = false
 
         var dispatchCount = 0
         var fullRepaintCount = 0

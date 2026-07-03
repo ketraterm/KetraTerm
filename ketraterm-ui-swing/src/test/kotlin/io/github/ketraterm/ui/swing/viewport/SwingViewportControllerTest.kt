@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test
 import java.awt.Insets
 
 class SwingViewportControllerTest {
-    private val settings = SwingSettings(padding = Insets(3, 5, 7, 11))
+    private val settings = SwingSettings(padding = Insets(3, 5, 7, 11), shellIntegrationDecorationGutterWidth = 0)
     private val metrics =
         SwingMetrics(
             cellWidth = 10,
@@ -72,7 +72,6 @@ class SwingViewportControllerTest {
                     componentWidth = 212,
                     componentHeight = 128,
                     activeBuffer = TerminalRenderBufferKind.PRIMARY,
-                    promptDecorationGutterVisible = true,
                 )
             val alternate =
                 controller.visibleGridSizeOnEdt(

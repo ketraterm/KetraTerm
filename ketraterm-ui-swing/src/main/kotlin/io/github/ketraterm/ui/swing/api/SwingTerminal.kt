@@ -125,7 +125,7 @@ class SwingTerminal
                 }
 
                 override fun mouseExited(event: MouseEvent) {
-                    if (scrollbarOverlay.handleExited()) repaint()
+                    if (hostServices.scrollbarOverlayEnabled && scrollbarOverlay.handleExited()) repaint()
                     mouseController.mouseListener.mouseExited(event)
                 }
             }
@@ -142,16 +142,17 @@ class SwingTerminal
 
                 override fun mouseMoved(event: MouseEvent) {
                     val changed =
-                        scrollbarOverlay.handleMoved(
-                            x = event.x,
-                            y = event.y,
-                            settings = settings,
-                            activeBuffer = renderCache.activeBuffer,
-                            componentWidth = width,
-                            componentHeight = height,
-                        )
+                        hostServices.scrollbarOverlayEnabled &&
+                            scrollbarOverlay.handleMoved(
+                                x = event.x,
+                                y = event.y,
+                                settings = settings,
+                                activeBuffer = renderCache.activeBuffer,
+                                componentWidth = width,
+                                componentHeight = height,
+                            )
                     if (changed) repaint()
-                    if (scrollbarOverlay.hovered) {
+                    if (hostServices.scrollbarOverlayEnabled && scrollbarOverlay.hovered) {
                         hyperlinkController.clearHyperlinkHover()
                         updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
                         return
@@ -328,8 +329,6 @@ class SwingTerminal
                     override val settings: SwingSettings get() = this@SwingTerminal.settings
                     override val metrics: SwingMetrics get() = this@SwingTerminal.metrics
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
-                    override val promptDecorationGutterVisible: Boolean
-                        get() = this@SwingTerminal.promptDecorationGutterVisible()
 
                     override fun mouseTrackingMode(): MouseTrackingMode =
                         this@SwingTerminal
@@ -414,8 +413,6 @@ class SwingTerminal
                     override val componentWidth: Int get() = this@SwingTerminal.width
                     override val componentHeight: Int get() = this@SwingTerminal.height
                     override val cursorPresentationEnabled: Boolean get() = this@SwingTerminal.cursorPresentationEnabled
-                    override val promptDecorationGutterVisible: Boolean
-                        get() = this@SwingTerminal.promptDecorationGutterVisible()
 
                     override fun dispatch(action: Runnable) {
                         hostServices.uiDispatcher.dispatch(action)
@@ -516,9 +513,8 @@ class SwingTerminal
         }
 
         private fun promptMarkerRowAt(event: MouseEvent): Int {
-            val gutterVisible = promptDecorationGutterVisible()
-            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer, gutterVisible)
-            val gutterWidth = SwingTerminalChrome.promptDecorationGutterWidth(settings, renderCache.activeBuffer, gutterVisible)
+            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer)
+            val gutterWidth = SwingTerminalChrome.promptDecorationGutterWidth(settings, renderCache.activeBuffer)
             if (gutterWidth <= 0 || event.x !in (paddingLeft - gutterWidth) until paddingLeft) {
                 return NO_PROMPT_MARKER_ROW
             }
@@ -629,7 +625,6 @@ class SwingTerminal
                 width,
                 height,
                 renderCache.activeBuffer,
-                promptDecorationGutterVisible(),
             )
         }
 
@@ -884,7 +879,7 @@ class SwingTerminal
             val searchOverlay = searchController.overlay
             val preferred = searchOverlay.preferredSize
             val activeBuffer = renderCache.activeBuffer
-            val paddingLeft = SwingTerminalChrome.left(settings, activeBuffer, promptDecorationGutterVisible())
+            val paddingLeft = SwingTerminalChrome.left(settings, activeBuffer)
             val paddingRight = SwingTerminalChrome.right(settings, activeBuffer)
             val paddingTop = SwingTerminalChrome.top(settings, activeBuffer)
             val availableWidth = width - paddingLeft - paddingRight
@@ -907,7 +902,7 @@ class SwingTerminal
 
             val preferred = popup.preferredSize
             val activeBuffer = renderCache.activeBuffer
-            val paddingLeft = SwingTerminalChrome.left(settings, activeBuffer, promptDecorationGutterVisible())
+            val paddingLeft = SwingTerminalChrome.left(settings, activeBuffer)
             val paddingRight = SwingTerminalChrome.right(settings, activeBuffer)
             val paddingTop = SwingTerminalChrome.top(settings, activeBuffer)
             val availableWidth = width - paddingLeft - paddingRight
@@ -966,17 +961,18 @@ class SwingTerminal
                     hoveredHyperlinkEndRow = hyperlinkController.hoveredHyperlinkEndRow,
                     hoveredHyperlinkEndColumn = hyperlinkController.hoveredHyperlinkEndColumn,
                     hyperlinkActivationHover = hyperlinkController.hyperlinkActivationHover,
-                    promptDecorationGutterVisible = promptDecorationGutterVisible(),
                 )
-                scrollbarOverlay.paint(
-                    g = g,
-                    settings = settings,
-                    activeBuffer = renderCache.activeBuffer,
-                    palette = renderCache.palette,
-                    componentWidth = width,
-                    componentHeight = height,
-                    state = viewportController.viewportStateSnapshot(),
-                )
+                if (hostServices.scrollbarOverlayEnabled) {
+                    scrollbarOverlay.paint(
+                        g = g,
+                        settings = settings,
+                        activeBuffer = renderCache.activeBuffer,
+                        palette = renderCache.palette,
+                        componentWidth = width,
+                        componentHeight = height,
+                        state = viewportController.viewportStateSnapshot(),
+                    )
+                }
                 visualBellController.paint(g, width, height)
             } finally {
                 g.dispose()
@@ -994,7 +990,7 @@ class SwingTerminal
             searchController.reset(renderCache.rows)
             shellSuggestionController.hide()
             shellIntegrationDecorations.reset()
-            scrollbarOverlay.handleExited()
+            if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
             visualGeometry.reset()
             selectionController.stopSelectionDrag()
             visualBellController.stop()
@@ -1017,7 +1013,7 @@ class SwingTerminal
             searchController.reset(renderCache.rows)
             shellSuggestionController.hide()
             shellIntegrationDecorations.reset()
-            scrollbarOverlay.handleExited()
+            if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
             visualGeometry.reset()
             selectionController.stopSelectionDrag()
             lastResizedColumns = NO_RESIZE_DIMENSION
@@ -1208,6 +1204,7 @@ class SwingTerminal
         }
 
         private fun handleScrollbarOverlayPressed(event: MouseEvent): Boolean {
+            if (!hostServices.scrollbarOverlayEnabled) return false
             if (!isInScrollbarOverlayGutter(event)) return false
             if (!SwingUtilities.isLeftMouseButton(event)) {
                 event.consume()
@@ -1233,6 +1230,7 @@ class SwingTerminal
         }
 
         private fun handleScrollbarOverlayDragged(event: MouseEvent): Boolean {
+            if (!hostServices.scrollbarOverlayEnabled) return false
             val handled =
                 scrollbarOverlay.handleDragged(
                     y = event.y,
@@ -1249,16 +1247,18 @@ class SwingTerminal
         }
 
         private fun isInScrollbarOverlayGutter(event: MouseEvent): Boolean =
-            scrollbarOverlay.containsGutter(
-                settings = settings,
-                activeBuffer = renderCache.activeBuffer,
-                componentWidth = width,
-                componentHeight = height,
-                x = event.x,
-                y = event.y,
-            )
+            hostServices.scrollbarOverlayEnabled &&
+                scrollbarOverlay.containsGutter(
+                    settings = settings,
+                    activeBuffer = renderCache.activeBuffer,
+                    componentWidth = width,
+                    componentHeight = height,
+                    x = event.x,
+                    y = event.y,
+                )
 
         private fun handleScrollbarOverlayReleased(event: MouseEvent): Boolean {
+            if (!hostServices.scrollbarOverlayEnabled) return false
             val handled =
                 scrollbarOverlay.handleReleased(
                     y = event.y,
@@ -1318,7 +1318,7 @@ class SwingTerminal
             y: Int,
             cache: TerminalRenderCache,
         ): Long {
-            val paddingLeft = SwingTerminalChrome.left(settings, cache.activeBuffer, promptDecorationGutterVisible())
+            val paddingLeft = SwingTerminalChrome.left(settings, cache.activeBuffer)
             val paddingTop = SwingTerminalChrome.top(settings, cache.activeBuffer)
             val column = ((x - paddingLeft) / metrics.cellWidth).coerceIn(0, cache.columns - 1)
             val row =
@@ -1341,7 +1341,7 @@ class SwingTerminal
             val lastRow = endRow.coerceAtMost(renderCache.rows - 1)
             if (firstRow > lastRow) return
 
-            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer, promptDecorationGutterVisible())
+            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer)
             val paddingTop = SwingTerminalChrome.top(settings, renderCache.activeBuffer)
             val contentOriginY = if (visualGeometry.rowCount == renderCache.rows) visualGeometry.contentOriginY else 0.0
             var row = firstRow
@@ -1483,13 +1483,11 @@ class SwingTerminal
         fun preferredGridSize(
             columns: Int,
             rows: Int,
-        ): Dimension {
-            val padding = settings.padding
-            return Dimension(
-                columns * metrics.cellWidth + padding.left + padding.right,
-                rows * metrics.cellHeight + padding.top + padding.bottom,
+        ): Dimension =
+            Dimension(
+                columns * metrics.cellWidth + SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY),
+                rows * metrics.cellHeight + SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.PRIMARY),
             )
-        }
 
         private fun resizeSessionToVisibleGridOnEdt(publishWhenUnchanged: Boolean = true): Boolean {
             val visibleGridSize =
@@ -1499,7 +1497,6 @@ class SwingTerminal
                     width,
                     height,
                     renderCache.activeBuffer,
-                    promptDecorationGutterVisible(),
                 )
             val boundSession = session
             if (boundSession == null || width <= 0 || height <= 0) {
@@ -1540,13 +1537,6 @@ class SwingTerminal
             } else {
                 renderCache.rows * metrics.cellHeight
             }
-
-        private fun promptDecorationGutterVisible(): Boolean {
-            if (renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE) return false
-            if (settings.shellIntegrationDecorationGutterWidth <= 0) return false
-            if (!settings.shellIntegrationPromptDotsVisible) return false
-            return session?.shellIntegrationState?.recordCount() ?: 0 > 0
-        }
 
         private fun commandNavigationAnchorRow(): Int =
             if (visualGeometry.rowCount == renderCache.rows) {

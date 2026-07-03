@@ -32,7 +32,6 @@ internal interface SwingRenderFrameHost {
     val componentWidth: Int
     val componentHeight: Int
     val cursorPresentationEnabled: Boolean
-    val promptDecorationGutterVisible: Boolean
 
     fun dispatch(action: Runnable)
 

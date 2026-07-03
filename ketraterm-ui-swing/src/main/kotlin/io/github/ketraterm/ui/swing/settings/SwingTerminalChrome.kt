@@ -29,8 +29,7 @@ internal object SwingTerminalChrome {
     fun horizontalInset(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-        promptDecorationGutterVisible: Boolean = false,
-    ): Int = left(settings, activeBuffer, promptDecorationGutterVisible) + right(settings, activeBuffer)
+    ): Int = left(settings, activeBuffer) + right(settings, activeBuffer)
 
     fun verticalInset(
         settings: SwingSettings,
@@ -40,12 +39,11 @@ internal object SwingTerminalChrome {
     fun left(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-        promptDecorationGutterVisible: Boolean = false,
     ): Int =
         if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
             settings.alternateScreenPadding.left
         } else {
-            settings.padding.left + promptDecorationGutterWidth(settings, activeBuffer, promptDecorationGutterVisible)
+            settings.padding.left + promptDecorationGutterWidth(settings, activeBuffer)
         }
 
     fun right(
@@ -81,9 +79,8 @@ internal object SwingTerminalChrome {
     fun promptDecorationGutterWidth(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-        promptDecorationGutterVisible: Boolean = false,
     ): Int =
-        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE || !promptDecorationGutterVisible) {
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
             0
         } else {
             settings.shellIntegrationDecorationGutterWidth

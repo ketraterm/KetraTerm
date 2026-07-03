@@ -63,6 +63,9 @@ fun interface TerminalUiDispatcher {
  * activation.
  * @property viewportListener host scrollbar adapter notified when the terminal
  * scrollback viewport changes.
+ * @property scrollbarOverlayEnabled whether the reusable component should draw
+ * and handle its own overlay scrollbar. Hosts that install a native external
+ * scrollbar should set this to `false`.
  * @property shellSuggestionProvider host provider queried for bounded
  * command-line suggestion snapshots.
  * @property shellSuggestionHandler host callback invoked after the user accepts
@@ -75,6 +78,7 @@ data class SwingHostServices
         val clipboardHandler: TerminalClipboardHandler = TerminalClipboardHandler.SYSTEM,
         val hyperlinkHandler: TerminalHyperlinkHandler = TerminalHyperlinkHandler.SYSTEM,
         val viewportListener: TerminalViewportListener = TerminalViewportListener.NONE,
+        val scrollbarOverlayEnabled: Boolean = true,
         val shellSuggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
         val shellSuggestionHandler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
     )

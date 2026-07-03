@@ -16,11 +16,14 @@
 package io.github.ketraterm.intellij.ui
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.ui.components.JBScrollBar
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
+import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
+import java.awt.Adjustable
 import java.awt.BorderLayout
 import javax.swing.JPanel
 
@@ -67,17 +70,22 @@ internal class KetraTermTerminalPane private constructor(
          * @return bound terminal pane.
          */
         fun create(tab: TerminalWorkspaceTab): KetraTermTerminalPane {
+            val scrollbar = JBScrollBar(Adjustable.VERTICAL)
+            val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
             val terminal =
                 SwingTerminal(
                     settingsProvider = { KetraTermIntellijSettings.current() },
                     hostServices =
                         SwingHostServices(
                             clipboardHandler = IntellijTerminalClipboardHandler,
+                            viewportListener = scrollbarAdapter,
+                            scrollbarOverlayEnabled = false,
                             uiDispatcher = TerminalUiDispatcher { runnable ->
                                 ApplicationManager.getApplication().invokeLater(runnable)
                             },
                         ),
                 )
+            scrollbarAdapter.attach(terminal)
             terminal.bind(tab.session)
 
             val component =
@@ -86,7 +94,8 @@ internal class KetraTermTerminalPane private constructor(
                     background = terminal.background
                     terminal.border = null
                     add(terminal, BorderLayout.CENTER)
-            }
+                    add(scrollbar, BorderLayout.EAST)
+                }
 
             tab.session.notifyRenderDirty()
             return KetraTermTerminalPane(tab, terminal, component)

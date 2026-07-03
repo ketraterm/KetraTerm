@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- Fixed first-run TUI wrapping corruption by drawing the tool-window scrollbar inside a reserved terminal gutter instead of letting scrollbar visibility change the available terminal width.
+- Fixed first-run TUI wrapping corruption.
 
 ## [0.1.1] - 2026-07-02
 

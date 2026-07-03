@@ -146,7 +146,6 @@ internal class SwingTerminalMouseController(
             SwingTerminalChrome.left(
                 host.settings,
                 host.renderCache.activeBuffer,
-                host.promptDecorationGutterVisible,
             )
         val gridWidth = host.renderCache.columns * host.metrics.cellWidth
         val gridHeight = host.renderCache.rows * host.metrics.cellHeight

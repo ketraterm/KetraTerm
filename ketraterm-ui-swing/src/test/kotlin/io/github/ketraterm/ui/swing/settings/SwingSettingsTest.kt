@@ -182,27 +182,14 @@ class SwingSettingsTest {
     fun alternateScreenChromeUsesExplicitAlternatePadding() {
         val settings = SwingSettings()
 
-        assertEquals(4, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(20, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY, promptDecorationGutterVisible = true))
+        assertEquals(20, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(6, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(2, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(2, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(10, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(
-            26,
-            SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY, promptDecorationGutterVisible = true),
-        )
+        assertEquals(26, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(4, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(2, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(0, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(
-            16,
-            SwingTerminalChrome.promptDecorationGutterWidth(
-                settings,
-                TerminalRenderBufferKind.PRIMARY,
-                promptDecorationGutterVisible = true,
-            ),
-        )
+        assertEquals(16, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(0, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(true, settings.shellSuggestionsEnabled)
     }
@@ -215,16 +202,11 @@ class SwingSettingsTest {
                 alternateScreenPadding = Insets(0, 3, 4, 5),
             )
 
-        assertEquals(40, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(56, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY, promptDecorationGutterVisible = true))
+        assertEquals(56, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(14, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(3, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(5, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(54, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(
-            70,
-            SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY, promptDecorationGutterVisible = true),
-        )
+        assertEquals(70, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(8, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(4, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
     }
@@ -362,7 +344,7 @@ class SwingSettingsTest {
     }
 
     @Test
-    fun preferredGridSizeIncludesBothHorizontalPaddingEdges() {
+    fun preferredGridSizeIncludesPrimaryChrome() {
         val component =
             SwingTerminal(settingsProvider = {
                 SwingSettings(columns = 10, rows = 4, padding = Insets(3, 5, 7, 11))
@@ -370,7 +352,7 @@ class SwingSettingsTest {
         val cellWidth = (component.preferredGridSize(2, 1).width - component.preferredGridSize(1, 1).width)
         val cellHeight = (component.preferredGridSize(1, 2).height - component.preferredGridSize(1, 1).height)
 
-        assertEquals(10 * cellWidth + 5 + 11, component.preferredGridSize(10, 4).width)
+        assertEquals(10 * cellWidth + 5 + 16 + 11, component.preferredGridSize(10, 4).width)
         assertEquals(4 * cellHeight + 3 + 7, component.preferredGridSize(10, 4).height)
     }
 }

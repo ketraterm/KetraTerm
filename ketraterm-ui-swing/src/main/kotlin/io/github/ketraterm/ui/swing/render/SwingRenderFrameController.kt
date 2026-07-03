@@ -138,7 +138,6 @@ internal class SwingRenderFrameController(
             SwingTerminalChrome.left(
                 settings,
                 activeBuffer,
-                host.promptDecorationGutterVisible,
             )
         repaintPaddingScratch.bottom = SwingTerminalChrome.bottom(settings, activeBuffer)
         repaintPaddingScratch.right = SwingTerminalChrome.right(settings, activeBuffer)
