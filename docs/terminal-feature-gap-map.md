@@ -31,7 +31,6 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 ### Tier 3: Optional (Graphics & advanced features)
 - Sixel or modern graphics protocols (e.g. Kitty graphics protocol).
 - Richer hyperlink, title, palette, and notification host callbacks.
-- Synchronized output mode extensions.
 
 ---
 
