@@ -83,6 +83,7 @@ internal class KetraTermTerminalPane private constructor(
                             uiDispatcher = TerminalUiDispatcher { runnable ->
                                 ApplicationManager.getApplication().invokeLater(runnable)
                             },
+                            fontResolver = IntellijTerminalFontResolver,
                         ),
                 )
             scrollbarAdapter.attach(terminal)
