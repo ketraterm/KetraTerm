@@ -133,9 +133,13 @@ internal class SwingRenderFrameController(
     private fun repaintPadding(): Insets {
         val settings = host.settings
         val activeBuffer = host.renderCache.activeBuffer
-        repaintPaddingScratch.top = SwingTerminalChrome.top(settings)
-        repaintPaddingScratch.left = SwingTerminalChrome.left(settings, activeBuffer)
-        repaintPaddingScratch.bottom = SwingTerminalChrome.bottom(settings)
+        repaintPaddingScratch.top = SwingTerminalChrome.top(settings, activeBuffer)
+        repaintPaddingScratch.left =
+            SwingTerminalChrome.left(
+                settings,
+                activeBuffer,
+            )
+        repaintPaddingScratch.bottom = SwingTerminalChrome.bottom(settings, activeBuffer)
         repaintPaddingScratch.right = SwingTerminalChrome.right(settings, activeBuffer)
         return repaintPaddingScratch
     }

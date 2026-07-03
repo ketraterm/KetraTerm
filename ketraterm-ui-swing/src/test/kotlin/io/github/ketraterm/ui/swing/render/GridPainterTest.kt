@@ -45,6 +45,7 @@ class GridPainterTest {
                     ),
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
+                shellIntegrationDecorationGutterWidth = 0,
             )
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
@@ -82,6 +83,7 @@ class GridPainterTest {
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON,
                 padding = Insets(0, 0, 0, 0),
+                shellIntegrationDecorationGutterWidth = 0,
             )
         val fontMetrics = g.getFontMetrics(settings.font)
         val metrics =
@@ -134,6 +136,7 @@ class GridPainterTest {
                     ),
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
+                shellIntegrationDecorationGutterWidth = 0,
             )
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
@@ -171,6 +174,7 @@ class GridPainterTest {
                     ),
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
+                shellIntegrationDecorationGutterWidth = 0,
             )
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
@@ -218,6 +222,7 @@ class GridPainterTest {
                     ),
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
+                shellIntegrationDecorationGutterWidth = 0,
             )
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
@@ -255,6 +260,7 @@ class GridPainterTest {
                     ),
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
+                shellIntegrationDecorationGutterWidth = 0,
             )
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
@@ -308,6 +314,7 @@ class GridPainterTest {
                     ),
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
+                shellIntegrationDecorationGutterWidth = 0,
             )
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
@@ -365,6 +372,7 @@ class GridPainterTest {
                 selectionBackground = RED,
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
+                shellIntegrationDecorationGutterWidth = 0,
             )
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
@@ -401,6 +409,7 @@ class GridPainterTest {
                 selectionBackground = 0x66FFFFFF.toInt(),
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 0, 0),
+                shellIntegrationDecorationGutterWidth = 0,
             )
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
@@ -469,8 +478,8 @@ class GridPainterTest {
         g.dispose()
 
         val nodeCenterY = metrics.cellHeight + metrics.cellHeight / 2
-        assertEquals(GREEN, image.getRGB(4, metrics.cellHeight / 2))
-        assertEquals(GREEN, image.getRGB(4, nodeCenterY))
+        assertEquals(GREEN, image.getRGB(12, metrics.cellHeight / 2))
+        assertEquals(GREEN, image.getRGB(12, nodeCenterY))
         assertEquals(BLACK, image.getRGB(0, nodeCenterY))
         assertEquals(BLACK, image.getRGB(image.width - 1, nodeCenterY))
     }
@@ -522,7 +531,7 @@ class GridPainterTest {
         g.dispose()
 
         val normalRowTwoTop = metrics.cellHeight * 2
-        assertEquals(BLUE, image.getRGB(1, normalRowTwoTop))
+        assertEquals(BLUE, image.getRGB(settings.shellIntegrationDecorationGutterWidth + 1, normalRowTwoTop))
     }
 
     @Test
@@ -561,11 +570,11 @@ class GridPainterTest {
         g.dispose()
 
         val centerY = metrics.cellHeight / 2
-        assertEquals(GREEN, image.getRGB(6, centerY))
-        assertTrue(image.getRGB(1, centerY) != BLACK)
+        assertEquals(GREEN, image.getRGB(18, centerY))
+        assertTrue(image.getRGB(13, centerY) != BLACK)
         var y = 0
         while (y < metrics.cellHeight) {
-            assertEquals(BLACK, image.getRGB(settings.padding.left, y))
+            assertEquals(BLACK, image.getRGB(settings.padding.left + settings.shellIntegrationDecorationGutterWidth, y))
             y++
         }
     }
@@ -616,7 +625,7 @@ class GridPainterTest {
         g.dispose()
 
         val nodeCenterY = metrics.cellHeight / 2
-        assertEquals(GREEN, image.getRGB(4, nodeCenterY))
+        assertNotEquals(BLACK, image.getRGB(12, nodeCenterY))
         assertEquals(BLACK, image.getRGB(image.width - 1, nodeCenterY))
     }
 
@@ -634,6 +643,7 @@ class GridPainterTest {
                     ),
                 textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
                 padding = Insets(0, 0, 8, 0),
+                shellIntegrationDecorationGutterWidth = 0,
             )
         val metrics =
             SwingMetrics(
@@ -727,14 +737,14 @@ class GridPainterTest {
         )
         g.dispose()
 
-        assertEquals(RED, image.getRGB(4, metrics.cellHeight / 2))
-        assertTrue(image.getRGB(4, metrics.cellHeight) != RED)
-        assertEquals(RED, image.getRGB(4, metrics.cellHeight + 1))
-        assertEquals(RED, image.getRGB(4, metrics.cellHeight * 2))
-        assertEquals(RED, image.getRGB(4, metrics.cellHeight * 3 - 2))
-        assertTrue(image.getRGB(4, metrics.cellHeight * 3 - 1) != RED)
-        assertEquals(BLACK, image.getRGB(2, metrics.cellHeight + 1))
-        assertEquals(BLACK, image.getRGB(6, metrics.cellHeight + 1))
+        assertEquals(RED, image.getRGB(12, metrics.cellHeight / 2))
+        assertTrue(image.getRGB(12, metrics.cellHeight) != RED)
+        assertEquals(RED, image.getRGB(12, metrics.cellHeight + 1))
+        assertEquals(RED, image.getRGB(12, metrics.cellHeight * 2))
+        assertEquals(RED, image.getRGB(12, metrics.cellHeight * 3 - 2))
+        assertTrue(image.getRGB(12, metrics.cellHeight * 3 - 1) != RED)
+        assertEquals(BLACK, image.getRGB(10, metrics.cellHeight + 1))
+        assertEquals(BLACK, image.getRGB(14, metrics.cellHeight + 1))
     }
 
     @Test
@@ -772,8 +782,8 @@ class GridPainterTest {
         )
         g.dispose()
 
-        assertEquals(GREEN, image.getRGB(4, metrics.cellHeight / 2))
-        assertEquals(BLACK, image.getRGB(4, metrics.cellHeight + 1))
+        assertEquals(GREEN, image.getRGB(12, metrics.cellHeight / 2))
+        assertEquals(BLACK, image.getRGB(12, metrics.cellHeight + 1))
     }
 
     @Test

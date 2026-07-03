@@ -28,6 +28,11 @@ import kotlin.math.roundToInt
  * publications do not overwrite the host-owned thumb coordinate during a
  * drag, and release is already row-aligned.
  *
+ * The scrollbar remains visible even when no history is retained so host
+ * layouts reserve its width before the first scrollback-producing command.
+ * Hiding it after session start would shrink the terminal component and can
+ * make PTY/core width synchronization lag by one cell.
+ *
  * @param scrollbar host-owned vertical scrollbar.
  */
 class SwingScrollbarAdapter(
@@ -41,6 +46,8 @@ class SwingScrollbarAdapter(
     private var viewportHeightPixels = 1
 
     init {
+        scrollbar.isVisible = true
+        scrollbar.isEnabled = false
         scrollbar.addAdjustmentListener(::handleAdjustment)
     }
 
@@ -95,7 +102,8 @@ class SwingScrollbarAdapter(
 
         updatingFromTerminal = true
         try {
-            scrollbar.isVisible = historySize > 0
+            scrollbar.isVisible = true
+            scrollbar.isEnabled = historySize > 0
             scrollbar.model.setRangeProperties(
                 displayedValue,
                 viewportHeightPixels,

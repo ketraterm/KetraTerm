@@ -104,8 +104,8 @@ internal class GridPainter {
         backgroundPainter.clear(g, palette, width, height)
 
         val paddingLeft = SwingTerminalChrome.left(settings, cache.activeBuffer)
-        val paddingTop = SwingTerminalChrome.top(settings)
-        val paddingBottom = SwingTerminalChrome.bottom(settings)
+        val paddingTop = SwingTerminalChrome.top(settings, cache.activeBuffer)
+        val paddingBottom = SwingTerminalChrome.bottom(settings, cache.activeBuffer)
         val gridPaintHeight = height - paddingTop - paddingBottom
         if (gridPaintHeight <= 0) return
 

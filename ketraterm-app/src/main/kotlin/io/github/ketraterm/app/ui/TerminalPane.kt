@@ -17,20 +17,17 @@ package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
-import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
-import java.awt.Adjustable
 import java.awt.BorderLayout
 import javax.swing.JPanel
-import javax.swing.JScrollBar
 
 /**
  * Owns one terminal pane in the standalone host.
  *
  * A pane binds a workspace tab's session to one reusable Swing terminal
- * component and owns pane-local viewport chrome such as the scrollbar.
+ * component.
  */
 internal class TerminalPane private constructor(
     val tab: TerminalWorkspaceTab,
@@ -59,19 +56,14 @@ internal class TerminalPane private constructor(
             suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
             onContextMenu: (TerminalPane, Int, Int) -> Unit,
         ): TerminalPane {
-            val scrollbar = JScrollBar(Adjustable.VERTICAL)
-            val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
             val terminal =
                 SwingTerminal(
                     settingsProvider = { settings.current() },
                     hostServices =
                         SwingHostServices(
-                            viewportListener = scrollbarAdapter,
                             shellSuggestionProvider = suggestionProvider,
                         ),
                 )
-            scrollbarAdapter.attach(terminal)
-            configureScrollbar(scrollbar)
 
             terminal.bind(tab.session)
 
@@ -79,7 +71,7 @@ internal class TerminalPane private constructor(
                 TerminalPane(
                     tab = tab,
                     terminal = terminal,
-                    component = terminalPanel(terminal, scrollbar),
+                    component = terminalPanel(terminal),
                     settings = settings,
                 )
 
@@ -103,26 +95,12 @@ internal class TerminalPane private constructor(
             return pane
         }
 
-        private fun terminalPanel(
-            terminal: SwingTerminal,
-            scrollbar: JScrollBar,
-        ): JPanel =
+        private fun terminalPanel(terminal: SwingTerminal): JPanel =
             JPanel(BorderLayout()).apply {
                 background = terminal.background
                 border = null
                 terminal.border = null
                 add(terminal, BorderLayout.CENTER)
-                add(scrollbar, BorderLayout.EAST)
             }
-
-        private fun configureScrollbar(scrollbar: JScrollBar) {
-            scrollbar.unitIncrement = 1
-            scrollbar.blockIncrement = 8
-            scrollbar.preferredSize = Chrome.scrollbarSize
-            scrollbar.ui = ScrollBarUi()
-            scrollbar.isVisible = false
-            scrollbar.isFocusable = false
-            scrollbar.isOpaque = false
-        }
     }
 }

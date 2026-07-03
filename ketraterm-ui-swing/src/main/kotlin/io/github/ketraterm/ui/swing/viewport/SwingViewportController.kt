@@ -229,7 +229,13 @@ internal class SwingViewportController(
         ): Int =
             maxOf(
                 1,
-                (componentWidth - SwingTerminalChrome.horizontalInset(settings, activeBuffer)) / metrics.cellWidth,
+                (
+                    componentWidth -
+                        SwingTerminalChrome.horizontalInset(
+                            settings,
+                            activeBuffer,
+                        )
+                ) / metrics.cellWidth,
             )
 
         private fun packVisibleGridSize(

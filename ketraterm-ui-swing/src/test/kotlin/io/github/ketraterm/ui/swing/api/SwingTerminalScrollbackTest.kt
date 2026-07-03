@@ -433,7 +433,7 @@ class SwingTerminalScrollbackTest {
     }
 
     @Test
-    fun `enabling command gutter guides does not resize terminal geometry`() {
+    fun `toggling command gutter markers does not resize terminal geometry`() {
         val connector = RecordingConnector()
         val shellIntegrationState = TerminalShellIntegrationState()
         shellIntegrationState.recordPromptStart(1)
@@ -477,11 +477,12 @@ class SwingTerminalScrollbackTest {
         assertEquals(3, connector.lastColumns.get())
         assertEquals(3, connector.lastRows.get())
         assertEquals(3, component.visibleGridSize().height)
+        assertEquals(3, component.visibleGridSize().width)
         session.close()
     }
 
     @Test
-    fun `alternate screen chrome resizes terminal grid to symmetric side padding`() {
+    fun `alternate screen chrome resizes terminal grid to explicit alternate padding`() {
         val connector = RecordingConnector()
         val reader = ActiveBufferFrameReader()
         val terminal = TerminalBuffers.create(width = 3, height = 3, maxHistory = 0)
@@ -498,6 +499,7 @@ class SwingTerminalScrollbackTest {
         val settings =
             SwingSettings(
                 padding = Insets(0, 40, 8, 8),
+                alternateScreenPadding = Insets(0, 8, 8, 8),
                 shellIntegrationDecorationGutterWidth = 32,
             )
         val component = SwingTerminal(settingsProvider = SwingSettingsProvider { settings })
@@ -524,7 +526,7 @@ class SwingTerminalScrollbackTest {
             assertTrue(alternateVisibleSize.width > primaryColumns)
             assertEquals(alternateVisibleSize.width, terminal.width)
             assertEquals(alternateVisibleSize.width, connector.lastColumns.get())
-            assertEquals(8, settings.padding.bottom)
+            assertEquals(Insets(0, 8, 8, 8), settings.alternateScreenPadding)
         } finally {
             session.close()
         }

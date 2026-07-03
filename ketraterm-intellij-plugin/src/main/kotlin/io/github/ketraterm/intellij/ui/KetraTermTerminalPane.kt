@@ -72,14 +72,14 @@ internal class KetraTermTerminalPane private constructor(
         fun create(tab: TerminalWorkspaceTab): KetraTermTerminalPane {
             val scrollbar = JBScrollBar(Adjustable.VERTICAL)
             val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
-
             val terminal =
                 SwingTerminal(
                     settingsProvider = { KetraTermIntellijSettings.current() },
                     hostServices =
                         SwingHostServices(
-                            viewportListener = scrollbarAdapter,
                             clipboardHandler = IntellijTerminalClipboardHandler,
+                            viewportListener = scrollbarAdapter,
+                            scrollbarOverlayEnabled = false,
                             uiDispatcher = TerminalUiDispatcher { runnable ->
                                 ApplicationManager.getApplication().invokeLater(runnable)
                             },
@@ -88,8 +88,6 @@ internal class KetraTermTerminalPane private constructor(
             scrollbarAdapter.attach(terminal)
             terminal.bind(tab.session)
 
-            configureScrollbar(scrollbar)
-
             val component =
                 JPanel(BorderLayout()).apply {
                     border = null
@@ -97,18 +95,10 @@ internal class KetraTermTerminalPane private constructor(
                     terminal.border = null
                     add(terminal, BorderLayout.CENTER)
                     add(scrollbar, BorderLayout.EAST)
-            }
+                }
 
             tab.session.notifyRenderDirty()
             return KetraTermTerminalPane(tab, terminal, component)
-        }
-
-        private fun configureScrollbar(scrollbar: JBScrollBar) {
-            scrollbar.unitIncrement = 1
-            scrollbar.blockIncrement = 8
-            scrollbar.isVisible = false
-            scrollbar.isFocusable = false
-            scrollbar.isOpaque = false
         }
     }
 }

@@ -1,5 +1,9 @@
 # KetraTerm Standalone App Changelog
 
+## [Unreleased]
+
+- Fixed first-run TUI wrapping corruption by drawing the scrollback scrollbar inside a reserved terminal gutter instead of letting scrollbar visibility change the available terminal width.
+
 ## [0.1.1] - 2026-07-02
 
 - Fixed AltGr character input and terminal grid corruption on AZERTY keyboards for Windows/Linux.

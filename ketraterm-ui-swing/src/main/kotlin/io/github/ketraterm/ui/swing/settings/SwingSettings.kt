@@ -67,16 +67,22 @@ import java.util.*
  * @property shellIntegrationPromptDotColor packed ARGB color for normal prompt dots.
  * @property shellIntegrationFailedPromptDotColor packed ARGB color for failed-command prompt dots.
  * @property shellIntegrationPromptDotDiameter prompt-dot diameter in pixels.
- * @property shellIntegrationDecorationGutterWidth maximum pixels used for shell-integration decorations in the left padding gutter.
+ * @property shellIntegrationDecorationGutterWidth pixels reserved between the
+ * primary-screen left margin and terminal grid when the bound session has
+ * shell-integration decorations.
  * @property shellIntegrationFailedCommandRailsVisible whether failed-command output draws a vertical gutter rail.
  * @property shellIntegrationFailedCommandRailColor packed ARGB color for failed-command rails.
  * @property shellIntegrationFailedCommandRailWidth failed-command rail width in pixels.
- * @property padding optional host-owned visual inset around the terminal grid
- * in pixels. The default keeps top padding at zero so smooth scrolling can
- * enter through the top edge, while retaining a compact right edge, the
- * shell-integration decoration gutter, and a small bottom visual spacer.
- * Alternate-screen rendering replaces the inactive prompt gutter with symmetric
- * side insets and resizes the terminal grid to the newly available columns.
+ * @property padding primary-screen visual inset around the terminal grid in
+ * pixels. Prompt-decoration and scrollbar gutters are component chrome layered
+ * outside this margin. The default keeps top padding at zero so smooth
+ * scrolling can enter through the top edge, leaves a small left margin before
+ * the prompt gutter, reserves a stable right gutter for the overlay scrollbar,
+ * and keeps a small bottom visual spacer.
+ * @property alternateScreenPadding alternate-screen visual inset around the
+ * terminal grid in pixels. The default keeps top padding at zero and uses small
+ * symmetric side insets because alternate-screen applications do not use the
+ * primary scrollback scrollbar or shell-integration prompt gutter.
  * @property pasteOnMiddleClick whether middle mouse button click triggers a clipboard paste.
  * @property pasteSanitizationPolicy paste payload transformation applied before
  * host-bound input emission.
@@ -118,7 +124,8 @@ data class SwingSettings
         val shellIntegrationFailedCommandRailsVisible: Boolean = true,
         val shellIntegrationFailedCommandRailColor: Int = DEFAULT_SHELL_INTEGRATION_FAILED_COMMAND_RAIL_COLOR,
         val shellIntegrationFailedCommandRailWidth: Int = 3,
-        val padding: Insets = Insets(0, 20, 8, 8),
+        val padding: Insets = Insets(0, 4, 4, 6),
+        val alternateScreenPadding: Insets = Insets(0, 2, 2, 2),
         val pasteOnMiddleClick: Boolean = true,
         val pasteSanitizationPolicy: PasteSanitizationPolicy = PasteSanitizationPolicy.RAW,
         val cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK,
@@ -157,6 +164,14 @@ data class SwingSettings
             }
             require(padding.top >= 0 && padding.left >= 0 && padding.bottom >= 0 && padding.right >= 0) {
                 "padding must be non-negative, was $padding"
+            }
+            require(
+                alternateScreenPadding.top >= 0 &&
+                    alternateScreenPadding.left >= 0 &&
+                    alternateScreenPadding.bottom >= 0 &&
+                    alternateScreenPadding.right >= 0,
+            ) {
+                "alternateScreenPadding must be non-negative, was $alternateScreenPadding"
             }
         }
 
