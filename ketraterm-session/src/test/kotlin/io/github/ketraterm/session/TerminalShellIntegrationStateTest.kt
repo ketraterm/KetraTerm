@@ -63,6 +63,34 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `running command query follows shell integration command lifecycle`() {
+        val state = TerminalShellIntegrationState()
+
+        assertFalse(state.hasRunningCommand())
+
+        state.recordPromptStart(10)
+        state.recordPromptEnd(10)
+        assertFalse(state.hasRunningCommand())
+
+        state.recordCommandStart(11, includeLine = true)
+        assertTrue(state.hasRunningCommand())
+
+        state.recordCommandFinished(12, exitCode = 0)
+        assertFalse(state.hasRunningCommand())
+    }
+
+    @Test
+    fun `new prompt clears running command query for abandoned command`() {
+        val state = TerminalShellIntegrationState()
+
+        state.recordCommandStart(10, includeLine = true)
+        assertTrue(state.hasRunningCommand())
+
+        state.recordPromptStart(20)
+        assertFalse(state.hasRunningCommand())
+    }
+
+    @Test
     fun `prompt command lifecycle projects prompt starts and failed output into viewport`() {
         val state = TerminalShellIntegrationState()
         val promptStarts = BooleanArray(5)

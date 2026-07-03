@@ -45,7 +45,7 @@ internal class WindowFactory(
     fun createWindow(): Window {
         val frame =
             JFrame(Chrome.APP_TITLE).apply {
-                defaultCloseOperation = WindowConstants.DISPOSE_ON_CLOSE
+                defaultCloseOperation = WindowConstants.DO_NOTHING_ON_CLOSE
                 minimumSize = Dimension(720, 420)
                 iconImages =
                     listOf(
@@ -100,8 +100,14 @@ internal class WindowFactory(
 
         frame.addWindowListener(
             object : WindowAdapter() {
+                override fun windowClosing(event: WindowEvent) {
+                    if (tabManager.closeAllTabs()) {
+                        frame.dispose()
+                    }
+                }
+
                 override fun windowClosed(event: WindowEvent) {
-                    tabManager.closeAllTabs()
+                    tabManager.closeAllTabsWithoutConfirmation()
                 }
             },
         )

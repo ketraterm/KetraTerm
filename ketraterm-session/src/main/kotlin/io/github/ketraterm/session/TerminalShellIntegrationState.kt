@@ -201,6 +201,24 @@ class TerminalShellIntegrationState(
         }
 
     /**
+     * Returns true while shell integration reports a command between
+     * command-start and command-finished markers.
+     *
+     * Idle prompts, sessions that have not emitted shell integration markers,
+     * finished commands, and commands abandoned by a newer prompt all return
+     * false. The query is allocation-free and safe for host close-policy checks.
+     *
+     * @return true when an active foreground command is known to be running.
+     */
+    fun hasRunningCommand(): Boolean =
+        synchronized(lock) {
+            val index = activeCommandIndex
+            index != NO_INDEX &&
+                commandStartLineIds[index] != NO_LINE_ID &&
+                lifecycles[index] == TerminalShellIntegrationCommandLifecycle.RUNNING
+        }
+
+    /**
      * Records the start of a shell prompt.
      *
      * @param lineId stable render line identity where the prompt begins.

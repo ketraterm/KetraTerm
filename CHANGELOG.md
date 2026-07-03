@@ -2,6 +2,7 @@
 
 ## [0.1.2] - 2026-07-03
 
+- Added terminal process close confirmation and enhance command lifecycle tracking.
 - Added render-cache-bounded IDE hyperlink overlays so host-discovered links can be highlighted and activated without scanning during paint, hover, parser, or core hot paths.
 - Improved hyperlink rendering with a cleaner solid underline and immediate preservation of discovered link highlights while scrolling through cached rows.
 - Added a `scrollOnOutput` configuration policy and UI settings toggle to lock viewport scroll position or snap to bottom when new process output arrives.
