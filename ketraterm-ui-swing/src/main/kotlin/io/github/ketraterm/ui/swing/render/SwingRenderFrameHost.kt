@@ -48,7 +48,10 @@ internal interface SwingRenderFrameHost {
      */
     fun syncTerminalGridToActiveChrome(): Boolean
 
-    fun clampViewport(historySize: Int): Boolean
+    fun clampViewport(
+        historySize: Int,
+        discardedCount: Long,
+    ): Boolean
 
     fun requestedViewportOffset(): Int
 

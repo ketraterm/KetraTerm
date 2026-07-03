@@ -129,6 +129,9 @@ class TerminalWorkspaceConfigManager(
             val persistentCommandHistoryEnabled =
                 behavior["persistent_command_history_enabled"]?.toBooleanStrictOrNull()
                     ?: default.persistentCommandHistoryEnabled
+            val scrollOnOutput =
+                behavior["scroll_on_output"]?.toBooleanStrictOrNull()
+                    ?: default.scrollOnOutput
             val scrollbackLines =
                 parseIntSetting(
                     raw = window["scrollback_lines"],
@@ -203,6 +206,7 @@ class TerminalWorkspaceConfigManager(
                 clipboardMaxDecodedBytes = clipboardMaxDecodedBytes,
                 titleLocalPermission = titleLocalPermission,
                 titleRemotePermission = titleRemotePermission,
+                scrollOnOutput = scrollOnOutput,
             )
         } catch (e: Exception) {
             try {
@@ -298,6 +302,8 @@ class TerminalWorkspaceConfigManager(
         shell_suggestions_enabled = ${config.shellSuggestionsEnabled}
         # Persist bounded command metadata (never raw terminal output) across application restarts
         persistent_command_history_enabled = ${config.persistentCommandHistoryEnabled}
+        # Automatically scroll to bottom when new process output arrives
+        scroll_on_output = ${config.scrollOnOutput}
 
         [security]
         # OSC 52 clipboard write permission for local sessions (allow, prompt, allowlist, deny)

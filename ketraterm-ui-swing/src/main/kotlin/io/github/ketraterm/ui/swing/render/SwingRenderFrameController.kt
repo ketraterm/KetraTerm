@@ -71,7 +71,9 @@ internal class SwingRenderFrameController(
         if (host.syncTerminalGridToActiveChrome()) {
             host.refreshRenderCacheFromSession(boundSession)
         }
-        if (host.clampViewport(host.renderCache.historySize) || host.renderCache.scrollbackOffset != host.requestedViewportOffset()) {
+        if (host.clampViewport(host.renderCache.historySize, host.renderCache.discardedCount) ||
+            host.renderCache.scrollbackOffset != host.requestedViewportOffset()
+        ) {
             host.refreshRenderCacheFromSession(boundSession)
         }
         var shellIntegrationDecorationsChanged = host.refreshShellIntegrationDecorations(boundSession)

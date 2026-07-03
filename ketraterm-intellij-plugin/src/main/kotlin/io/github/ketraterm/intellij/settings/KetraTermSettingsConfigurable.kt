@@ -77,6 +77,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
     private val visualBellCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.visualBell"))
     private val pasteOnMiddleClickCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.pasteOnMiddleClick"))
     private val shellSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
+    private val scrollOnOutputCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.scrollOnOutput"))
 
     private val pasteSanitizationCombo = ComboBox(pasteSanitizationOptions())
     private val clipboardLocalWriteCombo = ComboBox(permissionOptions())
@@ -187,6 +188,9 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
                     row {
                         cell(shellSuggestionsCheckBox)
                     }
+                    row {
+                        cell(scrollOnOutputCheckBox)
+                    }
                 }
 
                 group(KetraTermBundle.message("settings.ketraterm.group.security")) {
@@ -255,6 +259,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
         visualBellCheckBox.isSelected = normalized.visualBell
         pasteOnMiddleClickCheckBox.isSelected = normalized.pasteOnMiddleClick
         shellSuggestionsCheckBox.isSelected = normalized.shellSuggestionsEnabled
+        scrollOnOutputCheckBox.isSelected = normalized.scrollOnOutput
         pasteSanitizationCombo.selectedItem = pasteSanitizationOptions().firstOrNull { it.id == normalized.pasteSanitization }
         clipboardLocalWriteCombo.selectedItem = visiblePermissionOption(normalized.clipboardLocalWrite, "prompt")
         clipboardRemoteWriteCombo.selectedItem = visiblePermissionOption(normalized.clipboardRemoteWrite, "deny")
@@ -292,6 +297,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
             clipboardMaxDecodedBytes = spinnerValue(clipboardMaxDecodedBytesSpinner),
             titleLocalPermission = if (titleLocalPermissionCheckBox.isSelected) "allow" else "deny",
             titleRemotePermission = if (titleRemotePermissionCheckBox.isSelected) "allow" else "deny",
+            scrollOnOutput = scrollOnOutputCheckBox.isSelected,
         )
 
     private fun selectedThemeId(): String =

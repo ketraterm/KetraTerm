@@ -191,6 +191,7 @@ class KetraTermIntellijSettings :
         @JvmField val clipboardMaxDecodedBytes: Int = TerminalConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES,
         @JvmField val titleLocalPermission: String = TerminalConfig.DEFAULT_TITLE_LOCAL_PERMISSION.name.lowercase(Locale.ROOT),
         @JvmField val titleRemotePermission: String = TerminalConfig.DEFAULT_TITLE_REMOTE_PERMISSION.name.lowercase(Locale.ROOT),
+        @JvmField val scrollOnOutput: Boolean = true,
     )
 
     companion object {
@@ -400,6 +401,7 @@ internal object KetraTermIntellijSettingsMapper {
             shellRequestResizeWindow = false,
             shellRequestWindowManipulation = false,
             shellSuggestionsEnabled = normalized.shellSuggestionsEnabled,
+            scrollOnOutput = normalized.scrollOnOutput,
         )
     }
 

@@ -171,6 +171,12 @@ internal class KetraTermSettings(
             updateConfig(config.copy(shellSuggestionsEnabled = value))
         }
 
+    var scrollOnOutput: Boolean
+        get() = config.scrollOnOutput
+        set(value) {
+            updateConfig(config.copy(scrollOnOutput = value))
+        }
+
     var clipboardLocalWrite: TerminalClipboardPermission
         get() = config.clipboardLocalWrite
         set(value) {
@@ -229,6 +235,7 @@ internal class KetraTermSettings(
             shellRequestResizeWindow = config.shellRequestResizeWindow,
             shellRequestWindowManipulation = config.shellRequestWindowManipulation,
             shellSuggestionsEnabled = config.shellSuggestionsEnabled,
+            scrollOnOutput = config.scrollOnOutput,
         )
     }
 

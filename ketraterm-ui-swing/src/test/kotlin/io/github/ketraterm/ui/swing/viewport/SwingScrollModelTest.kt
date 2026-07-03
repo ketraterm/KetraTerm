@@ -86,4 +86,45 @@ class SwingScrollModelTest {
         assertEquals(4, model.requestedRows(renderRows = 3))
         assertEquals(-12.0, model.contentYOffset(cellHeight = 16))
     }
+
+    @Test
+    fun `scrollOnOutput = true snaps to bottom when history grows`() {
+        val model = SwingScrollModel()
+        model.scrollTo(2.0, historySize = 5)
+
+        model.clamp(historySize = 6, discardedCount = 0L, scrollOnOutput = true)
+        assertEquals(0.0, model.preciseScrollbackOffset)
+        assertEquals(0, model.offset)
+    }
+
+    @Test
+    fun `scrollOnOutput = false locks content when history grows`() {
+        val model = SwingScrollModel()
+        model.scrollTo(2.0, historySize = 5)
+        model.clamp(historySize = 5, discardedCount = 0L, scrollOnOutput = false)
+
+        model.clamp(historySize = 6, discardedCount = 0L, scrollOnOutput = false)
+        assertEquals(3.0, model.preciseScrollbackOffset)
+        assertEquals(3, model.offset)
+    }
+
+    @Test
+    fun `scrollOnOutput = false locks content when history reaches capacity and discards lines`() {
+        val model = SwingScrollModel()
+        model.scrollTo(2.0, historySize = 10)
+        model.clamp(historySize = 10, discardedCount = 0L, scrollOnOutput = false)
+
+        model.clamp(historySize = 10, discardedCount = 1L, scrollOnOutput = false)
+        assertEquals(3.0, model.preciseScrollbackOffset)
+        assertEquals(3, model.offset)
+    }
+
+    @Test
+    fun `scrollOnOutput = false does not snap if already at bottom`() {
+        val model = SwingScrollModel()
+        model.clamp(historySize = 5, discardedCount = 0L, scrollOnOutput = false)
+
+        model.clamp(historySize = 6, discardedCount = 0L, scrollOnOutput = false)
+        assertEquals(0.0, model.preciseScrollbackOffset)
+    }
 }

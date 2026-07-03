@@ -431,7 +431,10 @@ class SwingTerminal
                     override fun syncTerminalGridToActiveChrome(): Boolean =
                         this@SwingTerminal.resizeSessionToVisibleGridOnEdt(publishWhenUnchanged = false)
 
-                    override fun clampViewport(historySize: Int): Boolean = viewportController.clamp(historySize)
+                    override fun clampViewport(
+                        historySize: Int,
+                        discardedCount: Long,
+                    ): Boolean = viewportController.clamp(historySize, discardedCount, settings.scrollOnOutput)
 
                     override fun requestedViewportOffset(): Int = viewportController.requestedOffset
 
@@ -1282,8 +1285,8 @@ class SwingTerminal
          * @return `true` if selection was successfully copied to clipboard, `false` otherwise.
          */
         fun copySelectionToClipboard(): Boolean {
-            if (session == null) return false
-            val selectedText = selectionController.getSelectedText(renderCache) ?: return false
+            val boundSession = session ?: return false
+            val selectedText = selectionController.getSelectedText(boundSession, renderCache) ?: return false
             hostServices.clipboardHandler.copyText(selectedText)
             return true
         }
@@ -1571,6 +1574,7 @@ class SwingTerminal
             val visualMetricsChanged =
                 viewportController.updateVisualMetrics(
                     historySize = renderCache.historySize,
+                    discardedCount = renderCache.discardedCount,
                     cellHeight = metrics.cellHeight,
                     visualOverflowPixels = 0,
                 )

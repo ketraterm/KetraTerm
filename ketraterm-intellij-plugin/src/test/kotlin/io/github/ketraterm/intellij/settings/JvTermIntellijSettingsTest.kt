@@ -90,6 +90,21 @@ class KetraTermIntellijSettingsTest {
     }
 
     @Test
+    fun `scroll on output setting maps to swing settings`() {
+        val enabled =
+            KetraTermIntellijSettingsMapper.toSwingSettings(
+                KetraTermIntellijSettings.State(themeId = "nord"),
+            )
+        val disabled =
+            KetraTermIntellijSettingsMapper.toSwingSettings(
+                KetraTermIntellijSettings.State(themeId = "nord", scrollOnOutput = false),
+            )
+
+        assertTrue(enabled.scrollOnOutput)
+        assertFalse(disabled.scrollOnOutput)
+    }
+
+    @Test
     fun `normalizes unknown theme ids to IntelliJ native theme`() {
         assertEquals(
             KetraTermIntellijSettings.DEFAULT_THEME_ID,
