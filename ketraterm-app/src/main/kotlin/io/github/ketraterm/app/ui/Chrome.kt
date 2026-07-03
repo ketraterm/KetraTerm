@@ -16,7 +16,6 @@
 package io.github.ketraterm.app.ui
 
 import java.awt.Color
-import java.awt.Dimension
 import javax.swing.UIManager
 import kotlin.math.pow
 
@@ -38,10 +37,6 @@ private data class ChromeColors(
     val accent: Color,
     val border: Color,
     val divider: Color,
-    val scrollbarTrack: Color,
-    val scrollbarThumb: Color,
-    val scrollbarThumbHover: Color,
-    val scrollbarThumbPressed: Color,
 ) {
     companion object {
         fun fallback(): ChromeColors =
@@ -63,10 +58,6 @@ private data class ChromeColors(
                 accent = Color(0x4D, 0xA3, 0xFF),
                 border = Color(0x2B, 0x2D, 0x30),
                 divider = Color(0xFF, 0xFF, 0xFF, 60),
-                scrollbarTrack = Color(0x18, 0x18, 0x18),
-                scrollbarThumb = Color(0x55, 0x55, 0x55),
-                scrollbarThumbHover = Color(0x70, 0x70, 0x70),
-                scrollbarThumbPressed = Color(0x90, 0x90, 0x90),
             )
     }
 }
@@ -75,7 +66,7 @@ private data class ChromeColors(
  * Palette-derived visual tokens for the standalone Swing host.
  *
  * The reusable terminal component owns terminal rendering. This host object
- * owns only standalone chrome colors such as tab states, menus, and scrollbars.
+ * owns only standalone chrome colors such as tab states and menus.
  */
 internal object Chrome {
     const val APP_TITLE = "KetraTerm"
@@ -148,25 +139,6 @@ internal object Chrome {
     val divider: Color
         get() = colors.divider
 
-    /** Scrollbar track color. */
-    val scrollbarTrack: Color
-        get() = colors.scrollbarTrack
-
-    /** Scrollbar thumb color. */
-    val scrollbarThumb: Color
-        get() = colors.scrollbarThumb
-
-    /** Scrollbar thumb hover color. */
-    val scrollbarThumbHover: Color
-        get() = colors.scrollbarThumbHover
-
-    /** Scrollbar thumb pressed color. */
-    val scrollbarThumbPressed: Color
-        get() = colors.scrollbarThumbPressed
-
-    /** Preferred scrollbar width. */
-    val scrollbarSize: Dimension = Dimension(10, 1)
-
     private var colors = ChromeColors.fallback()
 
     /**
@@ -202,10 +174,6 @@ internal object Chrome {
                 accent = Color(palette.selectionBackground, true),
                 border = border,
                 divider = withAlpha(border, if (isDark) 150 else 190),
-                scrollbarTrack = bg,
-                scrollbarThumb = blendColors(bg, fg, 0.25f),
-                scrollbarThumbHover = blendColors(bg, fg, 0.35f),
-                scrollbarThumbPressed = blendColors(bg, fg, 0.45f),
             )
 
         applySwingDefaults()

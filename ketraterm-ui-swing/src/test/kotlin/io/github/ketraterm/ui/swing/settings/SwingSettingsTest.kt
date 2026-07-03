@@ -141,7 +141,8 @@ class SwingSettingsTest {
         assertEquals(true, settings.shellIntegrationFailedCommandRailsVisible)
         assertEquals(0xFFE74856.toInt(), settings.shellIntegrationFailedCommandRailColor)
         assertEquals(3, settings.shellIntegrationFailedCommandRailWidth)
-        assertEquals(Insets(0, 20, 8, 0), settings.padding)
+        assertEquals(Insets(0, 20, 8, 10), settings.padding)
+        assertEquals(Insets(0, 8, 8, 8), settings.alternateScreenPadding)
         assertEquals(4, settings.padding.left - settings.shellIntegrationDecorationGutterWidth)
         assertEquals(0, settings.padding.top)
         assertEquals(8, settings.padding.bottom)
@@ -168,19 +169,24 @@ class SwingSettingsTest {
 
     @Test
     fun settingsAcceptCustomPadding() {
-        val settings = SwingSettings(padding = Insets(4, 8, 4, 8))
+        val settings =
+            SwingSettings(
+                padding = Insets(4, 8, 4, 8),
+                alternateScreenPadding = Insets(1, 2, 3, 4),
+            )
         assertEquals(Insets(4, 8, 4, 8), settings.padding)
+        assertEquals(Insets(1, 2, 3, 4), settings.alternateScreenPadding)
     }
 
     @Test
-    fun alternateScreenChromeUsesSymmetricSideInsetsFromBottomSpacer() {
+    fun alternateScreenChromeUsesExplicitAlternatePadding() {
         val settings = SwingSettings()
 
         assertEquals(20, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(0, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(10, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(8, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(8, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(20, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(30, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(16, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(8, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(16, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
@@ -189,9 +195,29 @@ class SwingSettingsTest {
     }
 
     @Test
+    fun alternateScreenChromeDoesNotInheritPrimaryScrollbarGutter() {
+        val settings =
+            SwingSettings(
+                padding = Insets(0, 40, 8, 14),
+                alternateScreenPadding = Insets(0, 3, 4, 5),
+            )
+
+        assertEquals(40, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(14, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(3, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(5, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(54, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(8, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(4, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+    }
+
+    @Test
     fun settingsRejectNegativePaddingEdges() {
         assertFailsWith<IllegalArgumentException> {
             SwingSettings(padding = Insets(0, -1, 0, 0))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            SwingSettings(alternateScreenPadding = Insets(0, 0, 0, -1))
         }
     }
 
