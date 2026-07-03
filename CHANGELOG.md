@@ -1,6 +1,6 @@
 # KetraTerm Standalone App Changelog
 
-## [Unreleased]
+## [0.1.2] - 2026-07-03
 
 - Added render-cache-bounded IDE hyperlink overlays so host-discovered links can be highlighted and activated without scanning during paint, hover, parser, or core hot paths.
 - Improved hyperlink rendering with a cleaner solid underline and immediate preservation of discovered link highlights while scrolling through cached rows.
