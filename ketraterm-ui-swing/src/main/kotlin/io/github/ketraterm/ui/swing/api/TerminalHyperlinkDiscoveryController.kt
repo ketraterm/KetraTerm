@@ -72,8 +72,9 @@ internal class TerminalHyperlinkDiscoveryController(
     fun scheduleForFrame() {
         if (disposed) return
         analysisSequence++
+        val cache = host.renderCache
         if (host.hyperlinkDetector === SwingHyperlinkDetector.NONE) {
-            publishOverlay(currentFrameKey(host.renderCache), candidate = null)
+            publishOverlay(currentFrameKey(cache), candidate = null)
             debounceTimer.stop()
             return
         }
@@ -115,6 +116,11 @@ internal class TerminalHyperlinkDiscoveryController(
             val accumulator = TerminalHyperlinkDetectionAccumulator()
             try {
                 detector.detect(snapshot.request, accumulator)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return@execute
+            } catch (error: VirtualMachineError) {
+                throw error
             } catch (_: Exception) {
                 return@execute
             }

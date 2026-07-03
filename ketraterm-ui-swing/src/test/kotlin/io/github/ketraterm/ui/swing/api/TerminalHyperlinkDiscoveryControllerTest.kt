@@ -19,8 +19,54 @@ import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import javax.swing.SwingUtilities
 
 class TerminalHyperlinkDiscoveryControllerTest {
+    @Test
+    fun `scheduled analysis publishes discovered url overlay after debounce`() {
+        val cache = TerminalRenderCache(24, 1)
+        writeText(cache, row = 0, text = "https://example.com")
+        val opened = AtomicBoolean(false)
+        val repaintObserved = CountDownLatch(1)
+        val host =
+            TestDiscoveryHost(
+                renderCache = cache,
+                hyperlinkDetector =
+                    SwingHyperlinkDetector { request, sink ->
+                        assertEquals("https://example.com\n", request.lineText(0))
+                        sink.addHyperlink(
+                            lineIndex = 0,
+                            startOffset = 0,
+                            endOffset = "https://example.com".length,
+                            action =
+                                SwingHyperlinkAction {
+                                    opened.set(true)
+                                    true
+                                },
+                        )
+                    },
+                repaintObserved = repaintObserved,
+            )
+        val controller = TerminalHyperlinkDiscoveryController(host)
+
+        SwingUtilities.invokeAndWait {
+            controller.scheduleForFrame()
+        }
+
+        assertTrue(repaintObserved.await(3, TimeUnit.SECONDS))
+
+        val ids = controller.hyperlinkIdsFor(cache)
+        assertEquals(-1, ids[0])
+        assertEquals(-1, ids["https://example.com".lastIndex])
+        assertEquals(0, ids["https://example.com".length])
+        assertTrue(controller.isDiscoveredHyperlinkResolvable(-1, cache))
+        assertTrue(controller.openDiscoveredHyperlink(-1, cache))
+        assertTrue(opened.get())
+    }
+
     @Test
     fun `snapshot joins soft-wrapped rows into one logical filter line`() {
         val cache = TerminalRenderCache(5, 2)
@@ -188,6 +234,25 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val index = cache.rowOffset(row) + column
         cache.flags[index] = flags
         cache.codeWords[index] = codePoint
+    }
+
+    private class TestDiscoveryHost(
+        override val renderCache: TerminalRenderCache,
+        override val hyperlinkDetector: SwingHyperlinkDetector,
+        private val repaintObserved: CountDownLatch = CountDownLatch(0),
+    ) : TerminalHyperlinkDiscoveryHost {
+        override fun dispatch(action: Runnable) {
+            SwingUtilities.invokeLater(action)
+        }
+
+        override fun repaintHyperlinkSpan(
+            startRow: Int,
+            startColumn: Int,
+            endRow: Int,
+            endColumn: Int,
+        ) {
+            repaintObserved.countDown()
+        }
     }
 
     private class CombiningClusterFrame : TerminalRenderFrame {

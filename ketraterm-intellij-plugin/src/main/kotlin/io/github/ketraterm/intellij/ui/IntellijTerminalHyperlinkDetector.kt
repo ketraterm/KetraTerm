@@ -96,7 +96,15 @@ internal class IntellijTerminalHyperlinkDetector(
         filters += UrlFilter(project)
 
         val scope = GlobalSearchScope.allScope(project)
-        for (provider in ConsoleFilterProvider.FILTER_PROVIDERS.getExtensionList(project)) {
+        val providers =
+            try {
+                ConsoleFilterProvider.FILTER_PROVIDERS.getExtensionList(ApplicationManager.getApplication())
+            } catch (exception: ProcessCanceledException) {
+                throw exception
+            } catch (_: IllegalArgumentException) {
+                emptyList()
+            }
+        for (provider in providers) {
             val providerFilters =
                 try {
                     if (provider is ConsoleFilterProviderEx) {
