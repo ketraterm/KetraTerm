@@ -148,8 +148,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 ## Session, Transport, Rendering, and Host Integration Gaps
 
 - `DONE(host)`: custom host-provided font resolver API (`TerminalFontResolver`) and IntelliJ-native fallback integration.
-- `TODO(host)`: OS-native font linking/cascading (DirectWrite/CoreText/FontConfig) in the standalone application, script/run-level shaping, and native font handle cache eviction.
-- `TODO(host)`: richer font measurement policy for script/run-level shaping, fallback run metrics, and backend painter integrations beyond the current Java2D/Swing path.
+- `TODO(host)`: OS-native font linking/cascading (DirectWrite/CoreText/FontConfig) in the standalone application and native font handle cache eviction.
+- `TODO(host)`: richer font measurement policy for native shaping backends, fallback run metrics, and backend painter integrations beyond the current Java2D/Swing script-run shaping path.
 - `DONE(host)`: custom line spacing/height metrics in the renderer.
 - `DONE(host/ui)`: scrollback controls, selection behavior while scrolled, scroll-on-output policy, and resize offset retention.
 - `TODO(host/ui)`: live shell suggestion triggers, command-line replacement semantics, path/current-directory providers, and IntelliJ-native popup styling remain host-owned follow-up work. The reusable Swing terminal popup surface, keyboard/mouse selection, acceptance callback, standalone history provider, and standalone/IntelliJ enablement settings exist.
