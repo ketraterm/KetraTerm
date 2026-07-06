@@ -17,16 +17,24 @@ package io.github.ketraterm.intellij.ui
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollBar
+import com.intellij.ui.components.JBTextField
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBarComponentFactory
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
+import javax.swing.JButton
+import javax.swing.JCheckBox
+import javax.swing.JLabel
 import javax.swing.JPanel
+import javax.swing.JTextField
 
 /**
  * IntelliJ-hosted pane that binds one workspace tab to one reusable terminal component.
@@ -39,7 +47,7 @@ internal class KetraTermTerminalPane private constructor(
     val tab: TerminalWorkspaceTab,
     val terminal: SwingTerminal,
     val component: JPanel,
-    private val searchController: KetraTermTerminalSearchController,
+    private val searchBar: SwingTerminalSearchBar,
 ) {
     private var shortcutController: KetraTermTerminalShortcutController? = null
 
@@ -56,6 +64,7 @@ internal class KetraTermTerminalPane private constructor(
     fun reloadSettings() {
         terminal.reloadSettings()
         component.background = terminal.background
+        searchBar.refreshColors()
         tab.session.setHostPolicy(KetraTermIntellijSettings.getInstance().createHostPolicy(tab.profile.command))
     }
 
@@ -63,14 +72,14 @@ internal class KetraTermTerminalPane private constructor(
      * Opens the IDE-hosted search UI for this terminal pane.
      */
     fun openSearch() {
-        searchController.open()
+        searchBar.open()
     }
 
     /**
      * Unbinds the pane from its session before the containing IDE tab is disposed.
      */
     fun close() {
-        searchController.close()
+        searchBar.close()
         shortcutController?.dispose()
         shortcutController = null
         terminal.dispose()
@@ -116,12 +125,23 @@ internal class KetraTermTerminalPane private constructor(
                     add(scrollbar, BorderLayout.EAST)
                 }
 
-            val searchController = KetraTermTerminalSearchController(terminal, component)
+            val searchBar = SwingTerminalSearchBar(terminal, IntellijSearchBarComponentFactory)
+            component.add(searchBar.component, BorderLayout.NORTH)
 
             tab.session.notifyRenderDirty()
-            return KetraTermTerminalPane(tab, terminal, component, searchController).also { pane ->
+            return KetraTermTerminalPane(tab, terminal, component, searchBar).also { pane ->
                 pane.shortcutController = KetraTermTerminalShortcutController(pane)
             }
+        }
+
+        private object IntellijSearchBarComponentFactory : SwingTerminalSearchBarComponentFactory {
+            override fun textField(columns: Int): JTextField = JBTextField(columns)
+
+            override fun label(text: String): JLabel = JBLabel(text)
+
+            override fun button(text: String): JButton = JButton(text)
+
+            override fun checkBox(text: String): JCheckBox = JCheckBox(text)
         }
     }
 }

@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.ui.swing.api
+package io.github.ketraterm.ui.swing.host
 
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
-import java.util.*
+import java.util.EnumMap
+import java.util.Locale
 import javax.swing.KeyStroke
 
 /**
  * Host-owned terminal pane actions that can be bound by applications embedding
- * [SwingTerminal].
+ * `SwingTerminal`.
  *
  * The reusable terminal component does not install shortcuts for these actions.
  * Hosts use this vocabulary to keep shortcut policy outside rendering/input
@@ -35,7 +36,7 @@ enum class SwingTerminalHostAction {
     /** Paste host clipboard text into the terminal session. */
     PASTE_CLIPBOARD,
 
-    /** Open the terminal search UI. */
+    /** Open the host-owned terminal search UI. */
     OPEN_SEARCH,
 
     /** Scroll one visible terminal page away from the live viewport. */
@@ -88,7 +89,8 @@ class SwingTerminalHostShortcutMap private constructor(
      *
      * @param keyCode Swing virtual key code.
      * @param modifiersEx extended Swing modifier mask.
-     * @return matching action, or `null` when the key event is not a host terminal shortcut.
+     * @return matching action, or `null` when the key event is not a host
+     * terminal shortcut.
      */
     fun actionFor(
         keyCode: Int,

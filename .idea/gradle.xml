@@ -23,6 +23,7 @@
             <option value="$PROJECT_DIR$/ketraterm-testkit" />
             <option value="$PROJECT_DIR$/ketraterm-transport-api" />
             <option value="$PROJECT_DIR$/ketraterm-ui-swing" />
+            <option value="$PROJECT_DIR$/ketraterm-ui-swing-host" />
             <option value="$PROJECT_DIR$/ketraterm-workspace" />
           </set>
         </option>
@@ -48,6 +49,7 @@
                   <project path="$PROJECT_DIR$/ketraterm-testkit" />
                   <project path="$PROJECT_DIR$/ketraterm-transport-api" />
                   <project path="$PROJECT_DIR$/ketraterm-ui-swing" />
+                  <project path="$PROJECT_DIR$/ketraterm-ui-swing-host" />
                   <project path="$PROJECT_DIR$/ketraterm-workspace" />
                 </projects>
               </build>
@@ -74,6 +76,7 @@
             <option value="$PROJECT_DIR$/ketraterm-testkit" />
             <option value="$PROJECT_DIR$/ketraterm-transport-api" />
             <option value="$PROJECT_DIR$/ketraterm-ui-swing" />
+            <option value="$PROJECT_DIR$/ketraterm-ui-swing-host" />
             <option value="$PROJECT_DIR$/ketraterm-workspace" />
           </set>
         </option>

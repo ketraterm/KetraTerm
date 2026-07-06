@@ -16,8 +16,8 @@
 package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.config.KetraTermSettings
-import io.github.ketraterm.ui.swing.api.SwingTerminalHostAction
-import io.github.ketraterm.ui.swing.api.SwingTerminalHostShortcutMap
+import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
+import io.github.ketraterm.ui.swing.host.SwingTerminalHostShortcutMap
 import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -96,10 +96,10 @@ internal object TerminalPaneActionRegistry {
      */
     fun isEnabled(
         action: SwingTerminalHostAction,
-        pane: TerminalPane,
+        target: TerminalPaneActionTarget,
     ): Boolean =
         when (action) {
-            SwingTerminalHostAction.COPY_SELECTION -> pane.terminal.currentSelection() != null
+            SwingTerminalHostAction.COPY_SELECTION -> target.hasSelection()
             SwingTerminalHostAction.PASTE_CLIPBOARD,
             SwingTerminalHostAction.OPEN_SEARCH,
             SwingTerminalHostAction.SCROLL_PAGE_UP,
@@ -116,34 +116,57 @@ internal object TerminalPaneActionRegistry {
      */
     fun perform(
         action: SwingTerminalHostAction,
-        pane: TerminalPane,
+        target: TerminalPaneActionTarget,
     ): Boolean =
         when (action) {
-            SwingTerminalHostAction.COPY_SELECTION -> pane.terminal.copySelectionToClipboard()
-            SwingTerminalHostAction.PASTE_CLIPBOARD -> pane.terminal.pasteClipboardText()
+            SwingTerminalHostAction.COPY_SELECTION -> target.copySelectionToClipboard()
+            SwingTerminalHostAction.PASTE_CLIPBOARD -> target.pasteClipboardText()
             SwingTerminalHostAction.OPEN_SEARCH -> {
-                pane.openSearch()
+                target.openSearch()
                 true
             }
             SwingTerminalHostAction.SCROLL_PAGE_UP -> {
-                pane.terminal.scrollViewportBy(
-                    pane.terminal
-                        .visibleGridSize()
-                        .height
-                        .coerceAtLeast(1)
-                        .toDouble(),
-                )
+                target.scrollPageUp()
                 true
             }
             SwingTerminalHostAction.SCROLL_PAGE_DOWN -> {
-                pane.terminal.scrollViewportBy(
-                    -pane.terminal
-                        .visibleGridSize()
-                        .height
-                        .coerceAtLeast(1)
-                        .toDouble(),
-                )
+                target.scrollPageDown()
                 true
             }
         }
+}
+
+/**
+ * Minimal standalone terminal-pane action target.
+ */
+internal interface TerminalPaneActionTarget {
+    /**
+     * Returns whether terminal text is currently selected.
+     */
+    fun hasSelection(): Boolean
+
+    /**
+     * Copies the current terminal selection to the host clipboard.
+     */
+    fun copySelectionToClipboard(): Boolean
+
+    /**
+     * Pastes host clipboard text into the terminal.
+     */
+    fun pasteClipboardText(): Boolean
+
+    /**
+     * Opens host-owned search chrome.
+     */
+    fun openSearch()
+
+    /**
+     * Scrolls one terminal page away from the live viewport.
+     */
+    fun scrollPageUp()
+
+    /**
+     * Scrolls one terminal page toward the live viewport.
+     */
+    fun scrollPageDown()
 }

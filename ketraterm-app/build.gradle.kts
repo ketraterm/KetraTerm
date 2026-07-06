@@ -27,6 +27,7 @@ dependencies {
     implementation("com.formdev:flatlaf:3.7.1")
     implementation("com.formdev:flatlaf-extras:3.7.1")
     implementation(project(":ketraterm-ui-swing"))
+    implementation(project(":ketraterm-ui-swing-host"))
     implementation(project(":ketraterm-workspace"))
 
     runtimeOnly("org.slf4j:slf4j-nop:2.0.18")

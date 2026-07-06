@@ -29,15 +29,16 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import javax.swing.SwingUtilities
 
 class TerminalSearchControllerTest {
     @Test
     fun `search scans retained scrollback and requests active result viewport`() {
-        val reader = SearchFrameReader()
+        val reader = SearchFrameReader(historyLines = listOf("needle"), liveLines = listOf(""))
         val session = testSession(reader)
-        val host = RecordingSearchHost(session)
+        val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
         val controller = TerminalSearchController(host)
 
         SwingUtilities.invokeAndWait {
@@ -56,9 +57,9 @@ class TerminalSearchControllerTest {
 
     @Test
     fun `reset clears query result state and viewport highlights`() {
-        val reader = SearchFrameReader()
+        val reader = SearchFrameReader(historyLines = listOf("needle"), liveLines = listOf(""))
         val session = testSession(reader)
-        val host = RecordingSearchHost(session)
+        val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
         val controller = TerminalSearchController(host)
 
         SwingUtilities.invokeAndWait {
@@ -75,17 +76,94 @@ class TerminalSearchControllerTest {
         session.close()
     }
 
+    @Test
+    fun `next and previous cycle through active search results`() {
+        val reader = SearchFrameReader(liveLines = listOf("aaa"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
+        val controller = TerminalSearchController(host)
+
+        SwingUtilities.invokeAndWait {
+            host.renderCache.updateFrom(session)
+            controller.search("a")
+
+            assertEquals(3, controller.state().resultCount)
+            assertEquals(0, controller.state().activeResultIndex)
+
+            assertTrue(controller.findNext())
+            assertEquals(1, controller.state().activeResultIndex)
+            assertTrue(controller.findNext())
+            assertEquals(2, controller.state().activeResultIndex)
+            assertTrue(controller.findNext())
+            assertEquals(0, controller.state().activeResultIndex)
+            assertTrue(controller.findPrevious())
+            assertEquals(2, controller.state().activeResultIndex)
+        }
+
+        session.close()
+    }
+
+    @Test
+    fun `case sensitivity toggle refreshes matches`() {
+        val reader = SearchFrameReader(liveLines = listOf("Needle needle NEEDLE"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
+        val controller = TerminalSearchController(host)
+
+        SwingUtilities.invokeAndWait {
+            host.renderCache.updateFrom(session)
+            controller.search("Needle")
+
+            assertEquals(3, controller.state().resultCount)
+
+            controller.setIgnoreCase(false)
+            assertEquals(1, controller.state().resultCount)
+            assertEquals(0, controller.state().activeResultIndex)
+
+            controller.setIgnoreCase(true)
+            assertEquals(3, controller.state().resultCount)
+        }
+
+        session.close()
+    }
+
+    @Test
+    fun `clear removes query results and viewport highlights`() {
+        val reader = SearchFrameReader(liveLines = listOf("needle"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
+        val controller = TerminalSearchController(host)
+
+        SwingUtilities.invokeAndWait {
+            host.renderCache.updateFrom(session)
+            controller.search("needle")
+            assertTrue(controller.viewportHighlights.segmentCount > 0)
+
+            controller.clear()
+
+            val state = controller.state()
+            assertEquals("", state.query)
+            assertEquals(0, state.resultCount)
+            assertEquals(-1, state.activeResultIndex)
+            assertEquals(0, controller.viewportHighlights.segmentCount)
+        }
+
+        session.close()
+    }
+
     private class RecordingSearchHost(
         override val session: TerminalSession,
+        columns: Int,
+        rows: Int,
     ) : TerminalSearchHost {
-        override val renderCache = TerminalRenderCache(12, 1)
-        override val searchCache = TerminalRenderCache(12, 1)
+        override val renderCache = TerminalRenderCache(columns, rows)
+        override val searchCache = TerminalRenderCache(columns, rows)
         var scrollRequestCount: Int = 0
             private set
         var repaintCount: Int = 0
             private set
 
-        override fun visibleGridRows(): Int = 1
+        override fun visibleGridRows(): Int = renderCache.rows
 
         override fun scrollViewportTo(
             offsetRows: Int,
@@ -102,9 +180,15 @@ class TerminalSearchControllerTest {
         }
     }
 
-    private class SearchFrameReader : TerminalRenderFrameReader {
+    private class SearchFrameReader(
+        private val historyLines: List<String> = emptyList(),
+        private val liveLines: List<String>,
+    ) : TerminalRenderFrameReader {
+        val columns: Int = (historyLines + liveLines).maxOfOrNull { it.length }?.coerceAtLeast(1) ?: 1
+        val visibleRows: Int = liveLines.size.coerceAtLeast(1)
+
         override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-            readRenderFrame(scrollbackOffset = 0, viewportRows = 1, consumer = consumer)
+            readRenderFrame(scrollbackOffset = 0, viewportRows = visibleRows, consumer = consumer)
         }
 
         override fun readRenderFrame(
@@ -119,16 +203,26 @@ class TerminalSearchControllerTest {
             viewportRows: Int,
             consumer: TerminalRenderFrameConsumer,
         ) {
-            consumer.accept(SearchFrame(scrollbackOffset = scrollbackOffset.coerceIn(0, 5), rows = viewportRows.coerceAtLeast(1)))
+            consumer.accept(
+                SearchFrame(
+                    historyLines = historyLines,
+                    liveLines = liveLines,
+                    columns = columns,
+                    scrollbackOffset = scrollbackOffset.coerceIn(0, historyLines.size),
+                    rows = viewportRows.coerceAtLeast(1),
+                ),
+            )
         }
     }
 
     private class SearchFrame(
+        private val historyLines: List<String>,
+        private val liveLines: List<String>,
+        override val columns: Int,
         override val scrollbackOffset: Int,
         override val rows: Int,
     ) : TerminalRenderFrame {
-        override val columns: Int = 12
-        override val historySize: Int = 5
+        override val historySize: Int = historyLines.size
         override val frameGeneration: Long = 1
         override val structureGeneration: Long = 1
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
@@ -162,7 +256,7 @@ class TerminalSearchControllerTest {
             clusterDataSink: TerminalRenderClusterDataSink?,
         ) {
             val absoluteRow = historySize - scrollbackOffset + row
-            val text = if (absoluteRow == 0) "needle" else ""
+            val text = lineAt(absoluteRow)
             var column = 0
             while (column < columns) {
                 attrWords[attrOffset + column] = TerminalRenderAttrs.DEFAULT
@@ -178,13 +272,20 @@ class TerminalSearchControllerTest {
                 column++
             }
         }
+
+        private fun lineAt(absoluteRow: Int): String =
+            if (absoluteRow < historySize) {
+                historyLines.getOrElse(absoluteRow) { "" }
+            } else {
+                liveLines.getOrElse(absoluteRow - historySize) { "" }
+            }
     }
 
-    private fun testSession(renderReader: TerminalRenderFrameReader): TerminalSession {
-        val terminal = TerminalBuffers.create(width = 12, height = 1, maxHistory = 5)
+    private fun testSession(renderReader: SearchFrameReader): TerminalSession {
+        val terminal = TerminalBuffers.create(width = renderReader.columns, height = renderReader.visibleRows, maxHistory = 5)
         return TerminalSession(
             terminal = terminal,
-            publisher = TerminalRenderPublisher(12, 1),
+            publisher = TerminalRenderPublisher(renderReader.columns, renderReader.visibleRows),
             renderReader = renderReader,
             responseReader = terminal,
             connector = NoOpConnector,

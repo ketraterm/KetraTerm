@@ -20,8 +20,8 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CustomShortcutSet
 import com.intellij.openapi.project.DumbAwareAction
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
-import io.github.ketraterm.ui.swing.api.SwingTerminalHostAction
-import io.github.ketraterm.ui.swing.api.SwingTerminalHostShortcutMap
+import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
+import io.github.ketraterm.ui.swing.host.SwingTerminalHostShortcutMap
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities

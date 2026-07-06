@@ -46,6 +46,7 @@ private val ketratermVersion = version.toString()
 
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
+    implementation("io.github.ketraterm:ketraterm-ui-swing-host:$ketratermVersion")
     implementation("io.github.ketraterm:ketraterm-ui-swing:$ketratermVersion")
     implementation("io.github.ketraterm:ketraterm-workspace:$ketratermVersion") {
         exclude(group = "org.jetbrains.pty4j", module = "pty4j")

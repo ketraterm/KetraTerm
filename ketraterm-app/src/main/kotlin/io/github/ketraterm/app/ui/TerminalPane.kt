@@ -18,6 +18,7 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.BorderLayout
@@ -34,8 +35,8 @@ internal class TerminalPane private constructor(
     val terminal: SwingTerminal,
     val component: JPanel,
     private val settings: KetraTermSettings,
-    private val searchController: TerminalPaneSearchController,
-) {
+    private val searchBar: SwingTerminalSearchBar,
+) : TerminalPaneActionTarget {
     private var shortcutController: TerminalPaneShortcutController? = null
 
     fun requestFocus() {
@@ -45,15 +46,42 @@ internal class TerminalPane private constructor(
     fun reloadSettings() {
         terminal.reloadSettings()
         component.background = terminal.background
+        searchBar.refreshColors()
         tab.session.setHostPolicy(settings.createHostPolicy(tab.profile.command))
     }
 
-    fun openSearch() {
-        searchController.open()
+    override fun hasSelection(): Boolean = terminal.currentSelection() != null
+
+    override fun copySelectionToClipboard(): Boolean = terminal.copySelectionToClipboard()
+
+    override fun pasteClipboardText(): Boolean = terminal.pasteClipboardText()
+
+    override fun openSearch() {
+        searchBar.open()
+    }
+
+    override fun scrollPageUp() {
+        terminal.scrollViewportBy(
+            terminal
+                .visibleGridSize()
+                .height
+                .coerceAtLeast(1)
+                .toDouble(),
+        )
+    }
+
+    override fun scrollPageDown() {
+        terminal.scrollViewportBy(
+            -terminal
+                .visibleGridSize()
+                .height
+                .coerceAtLeast(1)
+                .toDouble(),
+        )
     }
 
     fun close() {
-        searchController.close()
+        searchBar.close()
         shortcutController?.dispose()
         shortcutController = null
         terminal.dispose()
@@ -78,14 +106,15 @@ internal class TerminalPane private constructor(
             terminal.bind(tab.session)
 
             val component = terminalPanel(terminal)
-            val searchController = TerminalPaneSearchController(terminal, component)
+            val searchBar = SwingTerminalSearchBar(terminal)
+            component.add(searchBar.component, BorderLayout.NORTH)
             val pane =
                 TerminalPane(
                     tab = tab,
                     terminal = terminal,
                     component = component,
                     settings = settings,
-                    searchController = searchController,
+                    searchBar = searchBar,
                 )
             pane.shortcutController = TerminalPaneShortcutController(pane, settings)
 
