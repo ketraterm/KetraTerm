@@ -20,6 +20,7 @@ import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import java.awt.event.KeyEvent
 import javax.swing.SwingUtilities
 
 /**
@@ -51,6 +52,32 @@ fun interface TerminalUiDispatcher {
 }
 
 /**
+ * Host-owned keyboard action hook for [SwingTerminal].
+ *
+ * The reusable terminal asks this hook before encoding key presses for the
+ * shell. Returning `true` means the host handled the key as application policy
+ * and the terminal must not send it to the session. Returning `false` passes
+ * the key through to terminal input handling.
+ */
+fun interface SwingTerminalHostKeyHandler {
+    /**
+     * Handles a key press before terminal input encoding.
+     *
+     * @param event Swing key event owned by the EDT.
+     * @return `true` when the host handled and consumed the key.
+     */
+    fun handleKeyPressed(event: KeyEvent): Boolean
+
+    companion object {
+        /**
+         * Handler that never claims keys.
+         */
+        @JvmField
+        val NONE: SwingTerminalHostKeyHandler = SwingTerminalHostKeyHandler { false }
+    }
+}
+
+/**
  * Host-provided non-render services for [SwingTerminal].
  *
  * These services are intentionally kept out of row painters. Rendering consumes
@@ -73,6 +100,8 @@ fun interface TerminalUiDispatcher {
  * command-line suggestion snapshots.
  * @property shellSuggestionHandler host callback invoked after the user accepts
  * a shell suggestion from the reusable popup.
+ * @property hostKeyHandler host-owned keyboard action policy evaluated before
+ * terminal input encoding.
  * @property fontResolver custom host font resolver policy.
  */
 data class SwingHostServices
@@ -86,5 +115,6 @@ data class SwingHostServices
         val scrollbarOverlayEnabled: Boolean = true,
         val shellSuggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
         val shellSuggestionHandler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
+        val hostKeyHandler: SwingTerminalHostKeyHandler = SwingTerminalHostKeyHandler.NONE,
         val fontResolver: TerminalFontResolver? = null,
     )

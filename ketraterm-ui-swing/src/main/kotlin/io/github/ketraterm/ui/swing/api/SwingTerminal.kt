@@ -326,6 +326,8 @@ class SwingTerminal
                         renderFrameController.repaintCursorState()
                     }
 
+                    override fun handleHostKeyPressed(event: KeyEvent): Boolean = hostServices.hostKeyHandler.handleKeyPressed(event)
+
                     override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean =
                         shellSuggestionController.handleKeyPressed(event)
                 },

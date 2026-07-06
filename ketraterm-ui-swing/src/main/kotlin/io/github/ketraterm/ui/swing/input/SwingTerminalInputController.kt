@@ -31,6 +31,11 @@ internal class SwingTerminalInputController(
     val keyListener =
         object : KeyAdapter() {
             override fun keyPressed(event: KeyEvent) {
+                if (host.handleHostKeyPressed(event)) {
+                    event.consume()
+                    return
+                }
+
                 host.updateHyperlinkActivationHover(event.isControlDown)
                 host.resetCursorBlink(forceRepaint = true)
 

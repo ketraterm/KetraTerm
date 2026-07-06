@@ -19,6 +19,7 @@ import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostShortcutMap
 import java.awt.event.ActionEvent
+import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.AbstractAction
@@ -80,6 +81,20 @@ internal class TerminalPaneShortcutController(
         override fun actionPerformed(event: ActionEvent) {
             actionRegistry.perform(actionId, pane)
         }
+    }
+
+    /**
+     * Handles a key press before terminal input encoding.
+     *
+     * @param event Swing key event from the terminal component.
+     * @return `true` when the key was a host shortcut and must not be sent to
+     * the shell.
+     */
+    fun handleKeyPressed(event: KeyEvent): Boolean {
+        val action = shortcutMap.actionFor(event.keyCode, event.modifiersEx) ?: return false
+        if (!actionRegistry.isEnabled(action, pane)) return false
+        actionRegistry.perform(action, pane)
+        return true
     }
 }
 

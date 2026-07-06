@@ -202,7 +202,7 @@ class SwingTerminalSearchBar
             component.isVisible = true
             setQueryText(terminal.currentSearchState().query)
             refreshCounter()
-            component.revalidate()
+            revalidateHost()
             queryField.requestFocusInWindow()
             queryField.selectAll()
         }
@@ -219,7 +219,7 @@ class SwingTerminalSearchBar
             setQueryText("")
             terminal.clearSearch()
             refreshCounter()
-            component.revalidate()
+            revalidateHost()
             terminal.requestFocusInWindow()
         }
 
@@ -282,6 +282,17 @@ class SwingTerminalSearchBar
                 } else {
                     "${state.activeResultIndex + 1}/${state.resultCount}"
                 }
+        }
+
+        private fun revalidateHost() {
+            val parent = component.parent
+            if (parent == null) {
+                component.revalidate()
+                component.repaint()
+                return
+            }
+            parent.revalidate()
+            parent.repaint()
         }
 
         private fun configureButton(

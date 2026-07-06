@@ -98,6 +98,7 @@ internal class KetraTermTerminalPane private constructor(
         ): KetraTermTerminalPane {
             val scrollbar = JBScrollBar(Adjustable.VERTICAL)
             val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
+            val shortcutControllerRef = arrayOfNulls<KetraTermTerminalShortcutController>(1)
             val terminal =
                 SwingTerminal(
                     settingsProvider = { KetraTermIntellijSettings.current() },
@@ -111,6 +112,7 @@ internal class KetraTermTerminalPane private constructor(
                                 ApplicationManager.getApplication().invokeLater(runnable)
                             },
                             fontResolver = IntellijTerminalFontResolver,
+                            hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
                         ),
                 )
             scrollbarAdapter.attach(terminal)
@@ -131,6 +133,7 @@ internal class KetraTermTerminalPane private constructor(
             tab.session.notifyRenderDirty()
             return KetraTermTerminalPane(tab, terminal, component, searchBar).also { pane ->
                 pane.shortcutController = KetraTermTerminalShortcutController(pane)
+                shortcutControllerRef[0] = pane.shortcutController
             }
         }
 

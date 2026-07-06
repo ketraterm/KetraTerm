@@ -94,12 +94,14 @@ internal class TerminalPane private constructor(
             suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
             onContextMenu: (TerminalPane, Int, Int) -> Unit,
         ): TerminalPane {
+            val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
             val terminal =
                 SwingTerminal(
                     settingsProvider = { settings.current() },
                     hostServices =
                         SwingHostServices(
                             shellSuggestionProvider = suggestionProvider,
+                            hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
                         ),
                 )
 
@@ -117,6 +119,7 @@ internal class TerminalPane private constructor(
                     searchBar = searchBar,
                 )
             pane.shortcutController = TerminalPaneShortcutController(pane, settings)
+            shortcutControllerRef[0] = pane.shortcutController
 
             terminal.addMouseListener(
                 object : java.awt.event.MouseAdapter() {

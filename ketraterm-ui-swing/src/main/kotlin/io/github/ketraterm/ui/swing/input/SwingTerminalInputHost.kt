@@ -31,5 +31,7 @@ internal interface SwingTerminalInputHost {
 
     fun repaintCursorState()
 
+    fun handleHostKeyPressed(event: java.awt.event.KeyEvent): Boolean
+
     fun handleShellSuggestionKeyPressed(event: java.awt.event.KeyEvent): Boolean
 }

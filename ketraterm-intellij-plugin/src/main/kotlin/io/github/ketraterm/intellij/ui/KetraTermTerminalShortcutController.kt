@@ -22,6 +22,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostShortcutMap
+import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
@@ -72,6 +73,20 @@ internal class KetraTermTerminalShortcutController(
             action.registerCustomShortcutSet(CustomShortcutSet(shortcut.keyStroke()), pane.terminal)
             actions += action
         }
+    }
+
+    /**
+     * Handles a key press before terminal input encoding.
+     *
+     * @param event Swing key event from the terminal component.
+     * @return `true` when the key was a host shortcut and must not be sent to
+     * the shell.
+     */
+    fun handleKeyPressed(event: KeyEvent): Boolean {
+        val action = shortcutMap.actionFor(event.keyCode, event.modifiersEx) ?: return false
+        if (!isTerminalActionEnabled(action)) return false
+        performTerminalAction(action)
+        return true
     }
 
     private inner class TerminalPaneAction(

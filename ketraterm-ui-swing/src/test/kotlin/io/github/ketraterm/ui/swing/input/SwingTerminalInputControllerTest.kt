@@ -44,6 +44,28 @@ class SwingTerminalInputControllerTest {
     }
 
     @Nested
+    inner class HostShortcuts {
+        @Test
+        fun `host handled key press is consumed before terminal input handling`() {
+            val host = RecordingInputHost(hostKeyHandled = true)
+            val controller = SwingTerminalInputController(host)
+            val event =
+                keyPressed(
+                    keyCode = KeyEvent.VK_F,
+                    modifiers = InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK,
+                )
+
+            controller.keyListener.keyPressed(event)
+
+            assertEquals(1, host.hostKeyPressCount)
+            assertEquals(0, host.shellSuggestionKeyPressCount)
+            assertTrue(host.hyperlinkHoverUpdates.isEmpty())
+            assertTrue(host.cursorBlinkResets.isEmpty())
+            assertTrue(event.isConsumed)
+        }
+    }
+
+    @Nested
     inner class ShellSuggestionShortcuts {
         @Test
         fun `visible suggestion popup handles navigation before terminal input`() {
@@ -99,6 +121,7 @@ class SwingTerminalInputControllerTest {
         )
 
     private class RecordingInputHost(
+        private val hostKeyHandled: Boolean = false,
         private val shellSuggestionKeyHandled: Boolean = false,
     ) : SwingTerminalInputHost {
         override val session: TerminalSession? = null
@@ -106,6 +129,7 @@ class SwingTerminalInputControllerTest {
         val cursorBlinkResets = ArrayList<Boolean>()
         var focused = false
         var cursorRepaints = 0
+        var hostKeyPressCount = 0
         var shellSuggestionKeyPressCount = 0
 
         override fun updateHyperlinkActivationHover(active: Boolean) {
@@ -122,6 +146,11 @@ class SwingTerminalInputControllerTest {
 
         override fun repaintCursorState() {
             cursorRepaints++
+        }
+
+        override fun handleHostKeyPressed(event: KeyEvent): Boolean {
+            hostKeyPressCount++
+            return hostKeyHandled
         }
 
         override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean {
