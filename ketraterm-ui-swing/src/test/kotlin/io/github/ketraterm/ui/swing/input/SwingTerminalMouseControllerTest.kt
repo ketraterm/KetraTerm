@@ -38,27 +38,13 @@ class SwingTerminalMouseControllerTest {
     @Nested
     inner class PressRouting {
         @Test
-        fun `middle mouse press pastes when enabled and consumes event`() {
-            val host = RecordingMouseHost(settings = SwingSettings(pasteOnMiddleClick = true))
+        fun `middle mouse press falls through to selection routing`() {
+            val host = RecordingMouseHost()
             val controller = SwingTerminalMouseController(host)
             val event = mousePressed(button = MouseEvent.BUTTON2, modifiers = InputEvent.BUTTON2_DOWN_MASK)
 
             controller.mouseListener.mousePressed(event)
 
-            assertEquals(1, host.pasteCount)
-            assertEquals(0, host.selectionPressCount)
-            assertTrue(event.isConsumed)
-        }
-
-        @Test
-        fun `middle mouse press falls through to selection when paste is disabled`() {
-            val host = RecordingMouseHost(settings = SwingSettings(pasteOnMiddleClick = false))
-            val controller = SwingTerminalMouseController(host)
-            val event = mousePressed(button = MouseEvent.BUTTON2, modifiers = InputEvent.BUTTON2_DOWN_MASK)
-
-            controller.mouseListener.mousePressed(event)
-
-            assertEquals(0, host.pasteCount)
             assertEquals(1, host.selectionPressCount)
             assertFalse(event.isConsumed)
         }
@@ -395,7 +381,6 @@ class SwingTerminalMouseControllerTest {
         override val renderCache = TerminalRenderCache(80, 24)
 
         var scrollCount = 0
-        var pasteCount = 0
         var requestFocusInWindowCount = 0
         var hyperlinkPressCount = 0
         var hyperlinkMoveCount = 0
@@ -435,11 +420,6 @@ class SwingTerminalMouseControllerTest {
 
         override fun finishViewportScroll() {
             finishWheelAnimationCount++
-        }
-
-        override fun pasteClipboardText(): Boolean {
-            pasteCount++
-            return true
         }
 
         override fun requestFocusInWindow(): Boolean {

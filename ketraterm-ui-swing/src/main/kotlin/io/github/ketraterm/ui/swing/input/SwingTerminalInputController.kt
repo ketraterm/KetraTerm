@@ -15,14 +15,13 @@
  */
 package io.github.ketraterm.ui.swing.input
 
-import io.github.ketraterm.ui.swing.settings.TerminalClipboardAction
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 
 /**
- * Swing keyboard/focus routing for terminal input and UI shortcuts.
+ * Swing keyboard/focus routing for terminal input.
  */
 internal class SwingTerminalInputController(
     private val host: SwingTerminalInputHost,
@@ -37,9 +36,6 @@ internal class SwingTerminalInputController(
 
                 if (!event.isAltGraphDown) {
                     if (host.handleShellSuggestionKeyPressed(event)) return
-                    if (handleViewportScrollShortcut(event)) return
-                    if (handleSearchShortcut(event)) return
-                    if (handleClipboardShortcut(event)) return
                 }
 
                 val keyEvent = keyMapper.keyPressed(event) ?: return
@@ -72,40 +68,4 @@ internal class SwingTerminalInputController(
                 host.repaintCursorState()
             }
         }
-
-    private fun handleClipboardShortcut(event: KeyEvent): Boolean {
-        val handled =
-            when (host.settings.clipboardShortcuts.actionFor(event.keyCode, event.modifiersEx)) {
-                TerminalClipboardAction.COPY -> host.copySelectionToClipboard()
-                TerminalClipboardAction.PASTE -> host.pasteClipboardText()
-                TerminalClipboardAction.NONE -> false
-            }
-
-        if (!handled) return false
-        event.consume()
-        return true
-    }
-
-    private fun handleViewportScrollShortcut(event: KeyEvent): Boolean {
-        if (!event.isShiftDown || event.isControlDown || event.isAltDown || event.isMetaDown) return false
-        val rows = host.visibleGridRows().coerceAtLeast(1)
-        val deltaRows =
-            when (event.keyCode) {
-                KeyEvent.VK_PAGE_UP -> rows
-                KeyEvent.VK_PAGE_DOWN -> -rows
-                else -> return false
-            }
-        host.scrollViewportByRows(deltaRows)
-        event.consume()
-        return true
-    }
-
-    private fun handleSearchShortcut(event: KeyEvent): Boolean {
-        if (event.keyCode != KeyEvent.VK_F) return false
-        if (!event.isShiftDown) return false
-        if (!event.isControlDown && !event.isMetaDown) return false
-        host.openSearch()
-        event.consume()
-        return true
-    }
 }

@@ -40,6 +40,8 @@ internal class KetraTermTerminalPane private constructor(
     val terminal: SwingTerminal,
     val component: JPanel,
 ) {
+    private var shortcutController: KetraTermTerminalShortcutController? = null
+
     /**
      * Requests keyboard focus for the terminal component.
      */
@@ -60,6 +62,8 @@ internal class KetraTermTerminalPane private constructor(
      * Unbinds the pane from its session before the containing IDE tab is disposed.
      */
     fun close() {
+        shortcutController?.dispose()
+        shortcutController = null
         terminal.dispose()
     }
 
@@ -104,7 +108,9 @@ internal class KetraTermTerminalPane private constructor(
                 }
 
             tab.session.notifyRenderDirty()
-            return KetraTermTerminalPane(tab, terminal, component)
+            return KetraTermTerminalPane(tab, terminal, component).also { pane ->
+                pane.shortcutController = KetraTermTerminalShortcutController(pane)
+            }
         }
     }
 }

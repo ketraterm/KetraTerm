@@ -35,6 +35,8 @@ internal class TerminalPane private constructor(
     val component: JPanel,
     private val settings: KetraTermSettings,
 ) {
+    private var shortcutController: TerminalPaneShortcutController? = null
+
     fun requestFocus() {
         terminal.requestFocusInWindow()
     }
@@ -46,6 +48,8 @@ internal class TerminalPane private constructor(
     }
 
     fun close() {
+        shortcutController?.dispose()
+        shortcutController = null
         terminal.dispose()
     }
 
@@ -74,6 +78,7 @@ internal class TerminalPane private constructor(
                     component = terminalPanel(terminal),
                     settings = settings,
                 )
+            pane.shortcutController = TerminalPaneShortcutController(pane, settings)
 
             terminal.addMouseListener(
                 object : java.awt.event.MouseAdapter() {

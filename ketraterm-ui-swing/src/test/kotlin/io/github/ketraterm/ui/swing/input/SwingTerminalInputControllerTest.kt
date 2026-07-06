@@ -16,8 +16,6 @@
 package io.github.ketraterm.ui.swing.input
 
 import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.ui.swing.settings.SwingSettings
-import io.github.ketraterm.ui.swing.settings.TerminalClipboardShortcuts
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -46,57 +44,6 @@ class SwingTerminalInputControllerTest {
     }
 
     @Nested
-    inner class SearchShortcuts {
-        @Test
-        fun `ctrl shift f opens search and consumes event`() {
-            val host = RecordingInputHost()
-            val controller = SwingTerminalInputController(host)
-            val event =
-                keyPressed(
-                    keyCode = KeyEvent.VK_F,
-                    modifiers = InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK,
-                )
-
-            controller.keyListener.keyPressed(event)
-
-            assertEquals(1, host.openSearchCount)
-            assertTrue(event.isConsumed)
-            assertEquals(listOf(true), host.cursorBlinkResets)
-        }
-
-        @Test
-        fun `meta shift f opens search for platform menu shortcut hosts`() {
-            val host = RecordingInputHost()
-            val controller = SwingTerminalInputController(host)
-            val event =
-                keyPressed(
-                    keyCode = KeyEvent.VK_F,
-                    modifiers = InputEvent.META_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK,
-                )
-
-            controller.keyListener.keyPressed(event)
-
-            assertEquals(1, host.openSearchCount)
-            assertTrue(event.isConsumed)
-        }
-
-        @Test
-        fun `ctrl f without shift does not open search`() {
-            val host = RecordingInputHost()
-            val controller = SwingTerminalInputController(host)
-
-            controller.keyListener.keyPressed(
-                keyPressed(
-                    keyCode = KeyEvent.VK_F,
-                    modifiers = InputEvent.CTRL_DOWN_MASK,
-                ),
-            )
-
-            assertEquals(0, host.openSearchCount)
-        }
-    }
-
-    @Nested
     inner class ShellSuggestionShortcuts {
         @Test
         fun `visible suggestion popup handles navigation before terminal input`() {
@@ -108,86 +55,6 @@ class SwingTerminalInputControllerTest {
 
             assertEquals(1, host.shellSuggestionKeyPressCount)
             assertTrue(event.isConsumed)
-            assertTrue(host.viewportScrollDeltas.isEmpty())
-        }
-    }
-
-    @Nested
-    inner class ClipboardShortcuts {
-        @Test
-        fun `configured copy shortcut is handled before terminal key encoding`() {
-            val host =
-                RecordingInputHost(
-                    settings = SwingSettings(clipboardShortcuts = TerminalClipboardShortcuts.windows()),
-                )
-            val controller = SwingTerminalInputController(host)
-            val event = keyPressed(keyCode = KeyEvent.VK_C, modifiers = InputEvent.CTRL_DOWN_MASK)
-
-            controller.keyListener.keyPressed(event)
-
-            assertEquals(1, host.copyCount)
-            assertEquals(0, host.pasteCount)
-            assertTrue(event.isConsumed)
-        }
-
-        @Test
-        fun `configured paste shortcut is handled before terminal key encoding`() {
-            val host =
-                RecordingInputHost(
-                    settings = SwingSettings(clipboardShortcuts = TerminalClipboardShortcuts.windows()),
-                )
-            val controller = SwingTerminalInputController(host)
-            val event = keyPressed(keyCode = KeyEvent.VK_V, modifiers = InputEvent.CTRL_DOWN_MASK)
-
-            controller.keyListener.keyPressed(event)
-
-            assertEquals(0, host.copyCount)
-            assertEquals(1, host.pasteCount)
-            assertTrue(event.isConsumed)
-        }
-
-        @Test
-        fun `failed clipboard copy does not claim shortcut as handled`() {
-            val host =
-                RecordingInputHost(
-                    settings = SwingSettings(clipboardShortcuts = TerminalClipboardShortcuts.windows()),
-                    copyResult = false,
-                )
-            val controller = SwingTerminalInputController(host)
-            val event = keyPressed(keyCode = KeyEvent.VK_C, modifiers = InputEvent.CTRL_DOWN_MASK)
-
-            controller.keyListener.keyPressed(event)
-
-            assertEquals(1, host.copyCount)
-            assertEquals(0, host.pasteCount)
-        }
-    }
-
-    @Nested
-    inner class ViewportShortcuts {
-        @Test
-        fun `shift page keys use whole-page row destinations`() {
-            val host = RecordingInputHost()
-            val controller = SwingTerminalInputController(host)
-            val pageUp = keyPressed(KeyEvent.VK_PAGE_UP, InputEvent.SHIFT_DOWN_MASK)
-            val pageDown = keyPressed(KeyEvent.VK_PAGE_DOWN, InputEvent.SHIFT_DOWN_MASK)
-
-            controller.keyListener.keyPressed(pageUp)
-            controller.keyListener.keyPressed(pageDown)
-
-            assertEquals(listOf(24, -24), host.viewportScrollDeltas)
-            assertTrue(pageUp.isConsumed)
-            assertTrue(pageDown.isConsumed)
-        }
-
-        @Test
-        fun `unmodified page key remains terminal input`() {
-            val host = RecordingInputHost()
-            val controller = SwingTerminalInputController(host)
-
-            controller.keyListener.keyPressed(keyPressed(KeyEvent.VK_PAGE_UP, 0))
-
-            assertTrue(host.viewportScrollDeltas.isEmpty())
         }
     }
 
@@ -232,27 +99,14 @@ class SwingTerminalInputControllerTest {
         )
 
     private class RecordingInputHost(
-        override val settings: SwingSettings = SwingSettings(),
-        private val copyResult: Boolean = true,
-        private val pasteResult: Boolean = true,
         private val shellSuggestionKeyHandled: Boolean = false,
     ) : SwingTerminalInputHost {
         override val session: TerminalSession? = null
         val hyperlinkHoverUpdates = ArrayList<Boolean>()
         val cursorBlinkResets = ArrayList<Boolean>()
-        val viewportScrollDeltas = ArrayList<Int>()
         var focused = false
         var cursorRepaints = 0
-        var openSearchCount = 0
-        var copyCount = 0
-        var pasteCount = 0
         var shellSuggestionKeyPressCount = 0
-
-        override fun visibleGridRows(): Int = 24
-
-        override fun scrollViewportByRows(deltaRows: Int) {
-            viewportScrollDeltas += deltaRows
-        }
 
         override fun updateHyperlinkActivationHover(active: Boolean) {
             hyperlinkHoverUpdates += active
@@ -270,24 +124,10 @@ class SwingTerminalInputControllerTest {
             cursorRepaints++
         }
 
-        override fun openSearch() {
-            openSearchCount++
-        }
-
         override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean {
             shellSuggestionKeyPressCount++
             if (shellSuggestionKeyHandled) event.consume()
             return shellSuggestionKeyHandled
-        }
-
-        override fun copySelectionToClipboard(): Boolean {
-            copyCount++
-            return copyResult
-        }
-
-        override fun pasteClipboardText(): Boolean {
-            pasteCount++
-            return pasteResult
         }
     }
 }

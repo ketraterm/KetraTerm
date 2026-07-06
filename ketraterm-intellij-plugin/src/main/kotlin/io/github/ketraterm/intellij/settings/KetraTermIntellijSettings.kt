@@ -56,6 +56,13 @@ class KetraTermIntellijSettings :
     fun current(): SwingSettings = KetraTermIntellijSettingsMapper.toSwingSettings(state)
 
     /**
+     * Returns whether the IDE host should bind middle-click paste for terminal panes.
+     *
+     * @return `true` when middle mouse button paste is enabled.
+     */
+    fun pasteOnMiddleClick(): Boolean = KetraTermIntellijSettingsNormalizer.normalize(state).pasteOnMiddleClick
+
+    /**
      * Replaces persisted IDE terminal settings with a normalized state.
      *
      * @param nextState new settings state produced by the IntelliJ settings UI.
@@ -393,7 +400,6 @@ internal object KetraTermIntellijSettingsMapper {
             cursorBlinkMillis = normalized.cursorBlinkMillis,
             useSystemFallbackFonts = normalized.useSystemFallbackFonts,
             visualBellEnabled = normalized.visualBell,
-            pasteOnMiddleClick = normalized.pasteOnMiddleClick,
             pasteSanitizationPolicy = parsePasteSanitization(normalized.pasteSanitization),
             cursorShape = parseCursorShape(normalized.cursorShape),
             scrollbackLines = normalized.scrollbackLines,

@@ -16,18 +16,12 @@
 package io.github.ketraterm.ui.swing.input
 
 import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.ui.swing.settings.SwingSettings
 
 /**
  * Narrow adapter for Swing keyboard/focus terminal input routing.
  */
 internal interface SwingTerminalInputHost {
     val session: TerminalSession?
-    val settings: SwingSettings
-
-    fun visibleGridRows(): Int
-
-    fun scrollViewportByRows(deltaRows: Int)
 
     fun updateHyperlinkActivationHover(active: Boolean)
 
@@ -37,11 +31,5 @@ internal interface SwingTerminalInputHost {
 
     fun repaintCursorState()
 
-    fun openSearch()
-
     fun handleShellSuggestionKeyPressed(event: java.awt.event.KeyEvent): Boolean
-
-    fun copySelectionToClipboard(): Boolean
-
-    fun pasteClipboardText(): Boolean
 }

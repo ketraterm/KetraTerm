@@ -313,13 +313,6 @@ class SwingTerminal
             SwingTerminalInputController(
                 object : SwingTerminalInputHost {
                     override val session: TerminalSession? get() = this@SwingTerminal.session
-                    override val settings: SwingSettings get() = this@SwingTerminal.settings
-
-                    override fun visibleGridRows(): Int = this@SwingTerminal.visibleGridRows()
-
-                    override fun scrollViewportByRows(deltaRows: Int) {
-                        rowScroller.scrollByRows(deltaRows)
-                    }
 
                     override fun updateHyperlinkActivationHover(active: Boolean) {
                         hyperlinkController.updateHyperlinkActivationHover(active)
@@ -337,16 +330,8 @@ class SwingTerminal
                         renderFrameController.repaintCursorState()
                     }
 
-                    override fun openSearch() {
-                        searchController.open()
-                    }
-
                     override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean =
                         shellSuggestionController.handleKeyPressed(event)
-
-                    override fun copySelectionToClipboard(): Boolean = this@SwingTerminal.copySelectionToClipboard()
-
-                    override fun pasteClipboardText(): Boolean = this@SwingTerminal.pasteClipboardText()
                 },
             )
         private val mouseController =
@@ -386,8 +371,6 @@ class SwingTerminal
                     override fun finishViewportScroll() {
                         rowScroller.finish()
                     }
-
-                    override fun pasteClipboardText(): Boolean = this@SwingTerminal.pasteClipboardText()
 
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
 
@@ -1157,6 +1140,20 @@ class SwingTerminal
          * @return current terminal search state.
          */
         fun currentSearchState(): TerminalSearchState = searchController.state()
+
+        /**
+         * Opens the terminal search UI.
+         *
+         * Hosts should bind their own application shortcuts or actions to this
+         * method when search should be keyboard-accessible.
+         */
+        fun openSearch() {
+            runOnEdt(
+                Runnable {
+                    searchController.open()
+                },
+            )
+        }
 
         /**
          * Shows host-provided shell suggestions near a terminal-grid cell.
