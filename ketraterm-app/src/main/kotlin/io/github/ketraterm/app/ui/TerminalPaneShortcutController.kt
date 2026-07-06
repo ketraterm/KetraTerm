@@ -16,12 +16,13 @@
 package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.config.KetraTermSettings
-import java.awt.Toolkit
-import java.awt.event.InputEvent
-import java.awt.event.KeyEvent
+import io.github.ketraterm.ui.swing.api.SwingTerminalHostAction
+import io.github.ketraterm.ui.swing.api.SwingTerminalHostShortcutMap
+import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import java.util.*
+import javax.swing.AbstractAction
+import javax.swing.JComponent
 import javax.swing.SwingUtilities
 
 /**
@@ -35,6 +36,8 @@ import javax.swing.SwingUtilities
 internal class TerminalPaneShortcutController(
     private val pane: TerminalPane,
     private val settings: KetraTermSettings,
+    private val actionRegistry: TerminalPaneActionRegistry = TerminalPaneActionRegistry,
+    private val shortcutMap: SwingTerminalHostShortcutMap = SwingTerminalHostShortcutMap.platformDefault(),
 ) {
     private val mouseListener =
         object : MouseAdapter() {
@@ -48,6 +51,7 @@ internal class TerminalPaneShortcutController(
         }
 
     init {
+        installKeyBindings()
         pane.terminal.addMouseListener(mouseListener)
     }
 
@@ -58,140 +62,88 @@ internal class TerminalPaneShortcutController(
         pane.terminal.removeMouseListener(mouseListener)
     }
 
-    companion object {
-        private val clipboardShortcuts = StandaloneClipboardShortcuts.platformDefault()
-        private val menuShortcutMask: Int by lazy(LazyThreadSafetyMode.PUBLICATION) {
-            Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+    private fun installKeyBindings() {
+        val inputMap = pane.terminal.getInputMap(JComponent.WHEN_FOCUSED)
+        val actionMap = pane.terminal.actionMap
+        shortcutMap.forEachShortcut { actionId, shortcut ->
+            val bindingKey = "ketraterm.${actionId.name}"
+            inputMap.put(shortcut.keyStroke(), bindingKey)
+            actionMap.put(bindingKey, TerminalPaneSwingAction(actionId))
         }
+    }
 
-        /**
-         * Handles a standalone terminal shortcut for [pane].
-         *
-         * @param event key event seen before the reusable terminal component.
-         * @param pane active terminal pane.
-         * @return `true` when the host command consumed the event.
-         */
-        fun handleKeyPressed(
-            event: KeyEvent,
-            pane: TerminalPane,
-        ): Boolean {
-            if (event.isConsumed || event.isAltGraphDown) return false
-            val action = clipboardShortcuts.actionFor(event.keyCode, event.modifiersEx)
-            val handled =
-                when (action) {
-                    StandaloneClipboardAction.COPY -> pane.terminal.copySelectionToClipboard()
-                    StandaloneClipboardAction.PASTE -> pane.terminal.pasteClipboardText()
-                    StandaloneClipboardAction.NONE -> handleNonClipboardShortcut(event, pane)
-                }
-            if (!handled) return false
-            event.consume()
-            return true
-        }
+    private inner class TerminalPaneSwingAction(
+        private val actionId: SwingTerminalHostAction,
+    ) : AbstractAction() {
+        override fun isEnabled(): Boolean = actionRegistry.isEnabled(actionId, pane)
 
-        private fun handleNonClipboardShortcut(
-            event: KeyEvent,
-            pane: TerminalPane,
-        ): Boolean {
-            if (handleViewportShortcut(event, pane)) return true
-            if (handleSearchShortcut(event, pane)) return true
-            return false
-        }
-
-        private fun handleViewportShortcut(
-            event: KeyEvent,
-            pane: TerminalPane,
-        ): Boolean {
-            if (!event.isShiftDown || event.isControlDown || event.isAltDown || event.isMetaDown) return false
-            val rows =
-                pane.terminal
-                    .visibleGridSize()
-                    .height
-                    .coerceAtLeast(1)
-            val deltaRows =
-                when (event.keyCode) {
-                    KeyEvent.VK_PAGE_UP -> rows
-                    KeyEvent.VK_PAGE_DOWN -> -rows
-                    else -> return false
-                }
-            pane.terminal.scrollViewportBy(deltaRows.toDouble())
-            return true
-        }
-
-        private fun handleSearchShortcut(
-            event: KeyEvent,
-            pane: TerminalPane,
-        ): Boolean {
-            if (event.keyCode != KeyEvent.VK_F || !event.isShiftDown) return false
-            val modifiers = event.modifiersEx
-            val isMenuShortcut = (modifiers and menuShortcutMask) == menuShortcutMask
-            if (!isMenuShortcut) return false
-            pane.terminal.openSearch()
-            return true
+        override fun actionPerformed(event: ActionEvent) {
+            actionRegistry.perform(actionId, pane)
         }
     }
 }
 
-internal data class StandaloneClipboardShortcuts(
-    private val copyKey: Int,
-    private val copyModifiers: Int,
-    private val pasteKey: Int,
-    private val pasteModifiers: Int,
-) {
-    fun actionFor(
-        keyCode: Int,
-        modifiersEx: Int,
-    ): StandaloneClipboardAction {
-        val normalizedModifiers = modifiersEx and RELEVANT_MODIFIERS
-        return when {
-            keyCode == copyKey && normalizedModifiers == copyModifiers -> StandaloneClipboardAction.COPY
-            keyCode == pasteKey && normalizedModifiers == pasteModifiers -> StandaloneClipboardAction.PASTE
-            else -> StandaloneClipboardAction.NONE
+/**
+ * Standalone terminal-pane action execution.
+ */
+internal object TerminalPaneActionRegistry {
+    /**
+     * Returns whether [action] can currently be executed for [pane].
+     *
+     * @param action terminal host action.
+     * @param pane active terminal pane.
+     * @return `true` when the action should claim its shortcut.
+     */
+    fun isEnabled(
+        action: SwingTerminalHostAction,
+        pane: TerminalPane,
+    ): Boolean =
+        when (action) {
+            SwingTerminalHostAction.COPY_SELECTION -> pane.terminal.currentSelection() != null
+            SwingTerminalHostAction.PASTE_CLIPBOARD,
+            SwingTerminalHostAction.OPEN_SEARCH,
+            SwingTerminalHostAction.SCROLL_PAGE_UP,
+            SwingTerminalHostAction.SCROLL_PAGE_DOWN,
+            -> true
         }
-    }
 
-    companion object {
-        fun platformDefault(): StandaloneClipboardShortcuts = platformDefault(System.getProperty("os.name").orEmpty())
-
-        fun platformDefault(osName: String): StandaloneClipboardShortcuts {
-            val normalized = osName.lowercase(Locale.ROOT)
-            return when {
-                normalized.contains("mac") || normalized.contains("darwin") ->
-                    StandaloneClipboardShortcuts(
-                        copyKey = KeyEvent.VK_C,
-                        copyModifiers = InputEvent.META_DOWN_MASK,
-                        pasteKey = KeyEvent.VK_V,
-                        pasteModifiers = InputEvent.META_DOWN_MASK,
-                    )
-                normalized.contains("win") ->
-                    StandaloneClipboardShortcuts(
-                        copyKey = KeyEvent.VK_C,
-                        copyModifiers = InputEvent.CTRL_DOWN_MASK,
-                        pasteKey = KeyEvent.VK_V,
-                        pasteModifiers = InputEvent.CTRL_DOWN_MASK,
-                    )
-                else -> {
-                    val modifiers = InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK
-                    StandaloneClipboardShortcuts(
-                        copyKey = KeyEvent.VK_C,
-                        copyModifiers = modifiers,
-                        pasteKey = KeyEvent.VK_V,
-                        pasteModifiers = modifiers,
-                    )
-                }
+    /**
+     * Executes [action] for [pane].
+     *
+     * @param action terminal host action.
+     * @param pane target terminal pane.
+     * @return `true` when the action performed useful work.
+     */
+    fun perform(
+        action: SwingTerminalHostAction,
+        pane: TerminalPane,
+    ): Boolean =
+        when (action) {
+            SwingTerminalHostAction.COPY_SELECTION -> pane.terminal.copySelectionToClipboard()
+            SwingTerminalHostAction.PASTE_CLIPBOARD -> pane.terminal.pasteClipboardText()
+            SwingTerminalHostAction.OPEN_SEARCH -> {
+                pane.terminal.openSearch()
+                true
+            }
+            SwingTerminalHostAction.SCROLL_PAGE_UP -> {
+                pane.terminal.scrollViewportBy(
+                    pane.terminal
+                        .visibleGridSize()
+                        .height
+                        .coerceAtLeast(1)
+                        .toDouble(),
+                )
+                true
+            }
+            SwingTerminalHostAction.SCROLL_PAGE_DOWN -> {
+                pane.terminal.scrollViewportBy(
+                    -pane.terminal
+                        .visibleGridSize()
+                        .height
+                        .coerceAtLeast(1)
+                        .toDouble(),
+                )
+                true
             }
         }
-
-        private const val RELEVANT_MODIFIERS =
-            InputEvent.SHIFT_DOWN_MASK or
-                InputEvent.CTRL_DOWN_MASK or
-                InputEvent.META_DOWN_MASK or
-                InputEvent.ALT_DOWN_MASK or
-                InputEvent.ALT_GRAPH_DOWN_MASK
-    }
-}
-
-internal enum class StandaloneClipboardAction {
-    NONE,
-    COPY,
-    PASTE,
 }

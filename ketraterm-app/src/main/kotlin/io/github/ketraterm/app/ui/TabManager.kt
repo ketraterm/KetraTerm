@@ -67,15 +67,6 @@ internal class TabManager(
     private val keyEventDispatcher =
         KeyEventDispatcher { event ->
             if (event.id == KeyEvent.KEY_PRESSED) {
-                val activePane = selectedPane
-                if (
-                    activePane != null &&
-                    focusOwnerIsInside(activePane.component) &&
-                    TerminalPaneShortcutController.handleKeyPressed(event, activePane)
-                ) {
-                    return@KeyEventDispatcher true
-                }
-
                 val keyCode = event.keyCode
                 val modifiers = event.modifiersEx
                 val menuShortcutMask = Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
@@ -597,11 +588,6 @@ internal class TabManager(
                 JOptionPane.ERROR_MESSAGE,
             )
         }
-    }
-
-    private fun focusOwnerIsInside(component: Component): Boolean {
-        val focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner ?: return false
-        return focusOwner === component || SwingUtilities.isDescendingFrom(focusOwner, component)
     }
 
     private fun createStyledSplitPane(
