@@ -29,14 +29,13 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.awt.Insets
 import javax.swing.SwingUtilities
 
 class SwingTerminalSearchTest {
     @Test
-    fun `openSearch opens search overlay without sending terminal input`() {
+    fun `clearSearch clears query and result highlights`() {
         val reader = SearchFrameReader()
         val session = testSession(reader)
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
@@ -44,10 +43,15 @@ class SwingTerminalSearchTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 1)
             component.bind(session)
-            component.openSearch()
+            component.search("needle")
+            component.clearSearch()
+
+            val state = component.currentSearchState()
+            assertEquals("", state.query)
+            assertEquals(0, state.resultCount)
+            assertEquals(-1, state.activeResultIndex)
         }
 
-        assertTrue(component.currentSearchState().visible)
         session.close()
     }
 

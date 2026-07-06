@@ -97,13 +97,9 @@ class TerminalSearchControllerTest {
             return true
         }
 
-        override fun revalidate() = Unit
-
         override fun repaint() {
             repaintCount++
         }
-
-        override fun requestFocusInWindow(): Boolean = true
     }
 
     private class SearchFrameReader : TerminalRenderFrameReader {

@@ -103,7 +103,7 @@ internal class KetraTermTerminalShortcutController(
             SwingTerminalHostAction.COPY_SELECTION -> pane.terminal.copySelectionToClipboard()
             SwingTerminalHostAction.PASTE_CLIPBOARD -> pane.terminal.pasteClipboardText()
             SwingTerminalHostAction.OPEN_SEARCH -> {
-                pane.terminal.openSearch()
+                pane.openSearch()
                 true
             }
             SwingTerminalHostAction.SCROLL_PAGE_UP -> {

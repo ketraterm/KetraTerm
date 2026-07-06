@@ -34,6 +34,7 @@ internal class TerminalPane private constructor(
     val terminal: SwingTerminal,
     val component: JPanel,
     private val settings: KetraTermSettings,
+    private val searchController: TerminalPaneSearchController,
 ) {
     private var shortcutController: TerminalPaneShortcutController? = null
 
@@ -47,7 +48,12 @@ internal class TerminalPane private constructor(
         tab.session.setHostPolicy(settings.createHostPolicy(tab.profile.command))
     }
 
+    fun openSearch() {
+        searchController.open()
+    }
+
     fun close() {
+        searchController.close()
         shortcutController?.dispose()
         shortcutController = null
         terminal.dispose()
@@ -71,12 +77,15 @@ internal class TerminalPane private constructor(
 
             terminal.bind(tab.session)
 
+            val component = terminalPanel(terminal)
+            val searchController = TerminalPaneSearchController(terminal, component)
             val pane =
                 TerminalPane(
                     tab = tab,
                     terminal = terminal,
-                    component = terminalPanel(terminal),
+                    component = component,
                     settings = settings,
+                    searchController = searchController,
                 )
             pane.shortcutController = TerminalPaneShortcutController(pane, settings)
 

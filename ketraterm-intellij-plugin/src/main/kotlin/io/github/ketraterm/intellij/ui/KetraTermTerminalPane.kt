@@ -39,6 +39,7 @@ internal class KetraTermTerminalPane private constructor(
     val tab: TerminalWorkspaceTab,
     val terminal: SwingTerminal,
     val component: JPanel,
+    private val searchController: KetraTermTerminalSearchController,
 ) {
     private var shortcutController: KetraTermTerminalShortcutController? = null
 
@@ -59,9 +60,17 @@ internal class KetraTermTerminalPane private constructor(
     }
 
     /**
+     * Opens the IDE-hosted search UI for this terminal pane.
+     */
+    fun openSearch() {
+        searchController.open()
+    }
+
+    /**
      * Unbinds the pane from its session before the containing IDE tab is disposed.
      */
     fun close() {
+        searchController.close()
         shortcutController?.dispose()
         shortcutController = null
         terminal.dispose()
@@ -107,8 +116,10 @@ internal class KetraTermTerminalPane private constructor(
                     add(scrollbar, BorderLayout.EAST)
                 }
 
+            val searchController = KetraTermTerminalSearchController(terminal, component)
+
             tab.session.notifyRenderDirty()
-            return KetraTermTerminalPane(tab, terminal, component).also { pane ->
+            return KetraTermTerminalPane(tab, terminal, component, searchController).also { pane ->
                 pane.shortcutController = KetraTermTerminalShortcutController(pane)
             }
         }
