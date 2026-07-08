@@ -103,10 +103,10 @@ internal class TerminalPaneShortcutController(
  */
 internal object TerminalPaneActionRegistry {
     /**
-     * Returns whether [action] can currently be executed for [pane].
+     * Returns whether [action] can currently be executed for [target].
      *
      * @param action terminal host action.
-     * @param pane active terminal pane.
+     * @param target active terminal pane.
      * @return `true` when the action should claim its shortcut.
      */
     fun isEnabled(
@@ -123,10 +123,10 @@ internal object TerminalPaneActionRegistry {
         }
 
     /**
-     * Executes [action] for [pane].
+     * Executes [action] for [target].
      *
      * @param action terminal host action.
-     * @param pane target terminal pane.
+     * @param target target terminal pane.
      * @return `true` when the action performed useful work.
      */
     fun perform(

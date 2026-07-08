@@ -18,31 +18,80 @@ package io.github.ketraterm.ui.swing.host
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import java.awt.BorderLayout
 import java.awt.Color
+import java.awt.Cursor
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
 import java.awt.RenderingHints
+import java.awt.event.FocusEvent
+import java.awt.event.FocusListener
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import javax.swing.BorderFactory
+import javax.swing.ButtonModel
 import javax.swing.JButton
-import javax.swing.JCheckBox
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.JTextField
+import javax.swing.JToggleButton
 import javax.swing.KeyStroke
 import javax.swing.SwingUtilities
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
+private val PANEL_BACKGROUND = Color(0xEE202124.toInt(), true)
+private val PANEL_BORDER = Color(0x663C4043, true)
+private val FOREGROUND = Color(0xFFE8EAED.toInt(), true)
+private val COUNTER_FOREGROUND = Color(0xFF9AA0A6.toInt(), true)
+private val TEXT_FIELD_BACKGROUND = Color(0x26FFFFFF, true)
+private val TEXT_FIELD_BORDER = Color(0x13FFFFFF, true)
+private val TEXT_FIELD_FOCUS_BORDER = Color(0x664285F4, true)
+private val BUTTON_HOVER_BACKGROUND = Color(0x1AFFFFFF, true)
+private val BUTTON_PRESSED_BACKGROUND = Color(0x33FFFFFF, true)
+private val BUTTON_SELECTED_BACKGROUND = Color(0x404285F4, true)
+
+private class SearchTextField(
+    columns: Int,
+) : JTextField(columns) {
+    init {
+        isOpaque = false
+        caretColor = FOREGROUND
+        foreground = FOREGROUND
+        border = BorderFactory.createEmptyBorder(4, 8, 4, 8)
+        addFocusListener(
+            object : FocusListener {
+                override fun focusGained(event: FocusEvent) = repaint()
+
+                override fun focusLost(event: FocusEvent) = repaint()
+            },
+        )
+    }
+
+    override fun paintComponent(graphics: Graphics) {
+        val g = graphics.create() as Graphics2D
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            g.color = TEXT_FIELD_BACKGROUND
+            g.fillRoundRect(1, 1, width - 2, height - 2, 8, 8)
+            g.color = if (isFocusOwner) TEXT_FIELD_FOCUS_BORDER else TEXT_FIELD_BORDER
+            g.drawRoundRect(1, 1, width - 2, height - 2, 8, 8)
+        } finally {
+            g.dispose()
+        }
+        super.paintComponent(graphics)
+    }
+}
+
 /**
- * Factory for Swing controls used by [SwingTerminalSearchBar].
+ * Factory for text controls used by [SwingTerminalSearchBar].
  *
- * Hosts can provide IDE-specific component subclasses while reusing the shared
- * host search behavior.
+ * Hosts can provide IDE-specific text component subclasses while reusing the
+ * shared host search behavior and interaction styling.
  */
 interface SwingTerminalSearchBarComponentFactory {
     /**
@@ -61,22 +110,6 @@ interface SwingTerminalSearchBarComponentFactory {
      */
     fun label(text: String): JLabel
 
-    /**
-     * Creates a command button.
-     *
-     * @param text button text.
-     * @return button component.
-     */
-    fun button(text: String): JButton
-
-    /**
-     * Creates a binary option toggle.
-     *
-     * @param text toggle text.
-     * @return check box component.
-     */
-    fun checkBox(text: String): JCheckBox
-
     companion object {
         /**
          * Default plain-Swing control factory.
@@ -84,13 +117,9 @@ interface SwingTerminalSearchBarComponentFactory {
         @JvmField
         val DEFAULT: SwingTerminalSearchBarComponentFactory =
             object : SwingTerminalSearchBarComponentFactory {
-                override fun textField(columns: Int): JTextField = JTextField(columns)
+                override fun textField(columns: Int): JTextField = SearchTextField(columns)
 
                 override fun label(text: String): JLabel = JLabel(text)
-
-                override fun button(text: String): JButton = JButton(text)
-
-                override fun checkBox(text: String): JCheckBox = JCheckBox(text)
             }
     }
 }
@@ -115,10 +144,10 @@ class SwingTerminalSearchBar
         private var suppressDocumentEvents = false
         private val queryField = componentFactory.textField(28)
         private val counterLabel = componentFactory.label("0/0")
-        private val previousButton = componentFactory.button("\u25B2")
-        private val nextButton = componentFactory.button("\u25BC")
-        private val caseSensitiveToggle = componentFactory.checkBox("Aa")
-        private val closeButton = componentFactory.button("\u2715")
+        private val previousButton = FlatButton("\u25B2", horizontalMargin = 4)
+        private val nextButton = FlatButton("\u25BC", horizontalMargin = 4)
+        private val caseSensitiveToggle = FlatToggleButton("Aa")
+        private val closeButton = FlatButton("\u2715", horizontalMargin = 6)
         private val searchPanel = SearchPanel()
 
         /**
@@ -135,15 +164,10 @@ class SwingTerminalSearchBar
         init {
             queryField.toolTipText = "Search terminal output"
             counterLabel.toolTipText = "Active match and total matches"
-            configureCommandButton(previousButton, "Previous match", horizontalMargin = 4)
-            configureCommandButton(nextButton, "Next match", horizontalMargin = 4)
-            configureCommandButton(closeButton, "Close search", horizontalMargin = 6)
+            previousButton.toolTipText = "Previous match"
+            nextButton.toolTipText = "Next match"
+            closeButton.toolTipText = "Close search"
             caseSensitiveToggle.toolTipText = "Match case"
-            caseSensitiveToggle.isFocusable = false
-            caseSensitiveToggle.isOpaque = false
-            caseSensitiveToggle.isContentAreaFilled = false
-            caseSensitiveToggle.isBorderPainted = false
-            caseSensitiveToggle.margin = Insets(4, 6, 4, 6)
 
             queryField.document.addDocumentListener(
                 object : DocumentListener {
@@ -253,11 +277,10 @@ class SwingTerminalSearchBar
             queryField.caretColor = FOREGROUND
             queryField.border = BorderFactory.createEmptyBorder(4, 8, 4, 8)
             counterLabel.foreground = COUNTER_FOREGROUND
-            styleCommandColors(previousButton)
-            styleCommandColors(nextButton)
-            styleCommandColors(closeButton)
+            previousButton.foreground = FOREGROUND
+            nextButton.foreground = FOREGROUND
+            closeButton.foreground = FOREGROUND
             caseSensitiveToggle.foreground = FOREGROUND
-            caseSensitiveToggle.background = PANEL_BACKGROUND
         }
 
         private fun queryChanged() {
@@ -297,27 +320,6 @@ class SwingTerminalSearchBar
             parent.repaint()
         }
 
-        private fun configureCommandButton(
-            button: JButton,
-            tooltip: String,
-            horizontalMargin: Int,
-        ) {
-            button.toolTipText = tooltip
-            button.margin = Insets(4, horizontalMargin, 4, horizontalMargin)
-            button.isFocusable = false
-            button.isOpaque = false
-            button.isContentAreaFilled = false
-            button.isBorderPainted = false
-        }
-
-        private fun styleCommandColors(button: JButton) {
-            button.foreground = FOREGROUND
-            button.background = PANEL_BACKGROUND
-            button.isOpaque = false
-            button.isContentAreaFilled = false
-            button.isBorderPainted = false
-        }
-
         private fun constraints(
             gridX: Int,
             weightX: Double = 0.0,
@@ -332,6 +334,61 @@ class SwingTerminalSearchBar
                 this.insets = Insets(0, if (gridX == 0) 0 else leftInset, 0, 0)
                 this.anchor = GridBagConstraints.CENTER
             }
+
+        private open class FlatButton(
+            text: String,
+            horizontalMargin: Int = 8,
+        ) : JButton(text) {
+            init {
+                isContentAreaFilled = false
+                isBorderPainted = false
+                isFocusPainted = false
+                isOpaque = false
+                isFocusable = false
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                margin = Insets(4, horizontalMargin, 4, horizontalMargin)
+                foreground = FOREGROUND
+                addMouseListener(RepaintOnHoverListener)
+            }
+
+            override fun paintComponent(graphics: Graphics) {
+                val g = graphics.create() as Graphics2D
+                try {
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                    paintFlatButtonBackground(g, width, height, model)
+                } finally {
+                    g.dispose()
+                }
+                super.paintComponent(graphics)
+            }
+        }
+
+        private class FlatToggleButton(
+            text: String,
+        ) : JToggleButton(text) {
+            init {
+                isContentAreaFilled = false
+                isBorderPainted = false
+                isFocusPainted = false
+                isOpaque = false
+                isFocusable = false
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                margin = Insets(4, 6, 4, 6)
+                foreground = FOREGROUND
+                addMouseListener(RepaintOnHoverListener)
+            }
+
+            override fun paintComponent(graphics: Graphics) {
+                val g = graphics.create() as Graphics2D
+                try {
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                    paintFlatButtonBackground(g, width, height, model, isSelected)
+                } finally {
+                    g.dispose()
+                }
+                super.paintComponent(graphics)
+            }
+        }
 
         private class SearchPanel : JPanel(GridBagLayout()) {
             init {
@@ -355,9 +412,27 @@ class SwingTerminalSearchBar
         }
 
         private companion object {
-            private val PANEL_BACKGROUND = Color(0xEE202124.toInt(), true)
-            private val PANEL_BORDER = Color(0x663C4043, true)
-            private val FOREGROUND = Color(0xFFE8EAED.toInt(), true)
-            private val COUNTER_FOREGROUND = Color(0xFF9AA0A6.toInt(), true)
+            private val RepaintOnHoverListener =
+                object : MouseAdapter() {
+                    override fun mouseEntered(event: MouseEvent) = event.component.repaint()
+
+                    override fun mouseExited(event: MouseEvent) = event.component.repaint()
+                }
+
+            private fun paintFlatButtonBackground(
+                graphics: Graphics2D,
+                width: Int,
+                height: Int,
+                model: ButtonModel,
+                isSelected: Boolean = false,
+            ) {
+                when {
+                    isSelected -> graphics.color = BUTTON_SELECTED_BACKGROUND
+                    model.isPressed -> graphics.color = BUTTON_PRESSED_BACKGROUND
+                    model.isRollover -> graphics.color = BUTTON_HOVER_BACKGROUND
+                    else -> return
+                }
+                graphics.fillRoundRect(0, 0, width, height, 6, 6)
+            }
         }
     }

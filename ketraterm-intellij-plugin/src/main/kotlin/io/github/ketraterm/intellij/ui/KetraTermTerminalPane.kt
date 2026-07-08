@@ -31,8 +31,6 @@ import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBarComponentFactory
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
-import javax.swing.JButton
-import javax.swing.JCheckBox
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.JTextField
@@ -141,10 +139,6 @@ internal class KetraTermTerminalPane private constructor(
             override fun textField(columns: Int): JTextField = JBTextField(columns)
 
             override fun label(text: String): JLabel = JBLabel(text)
-
-            override fun button(text: String): JButton = JButton(text)
-
-            override fun checkBox(text: String): JCheckBox = JCheckBox(text)
         }
     }
 }
