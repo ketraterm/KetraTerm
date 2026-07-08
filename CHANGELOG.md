@@ -5,9 +5,7 @@
 - Moved search chrome and shortcut policy into host-owned action wiring.
 - Added shared Swing host utilities for floating search UI and default host shortcuts.
 - Added host key handling so shortcuts can be handled or passed through to the PTY.
-- Added host-owned terminal context menus with mouse-reporting-aware right-click routing.
-- Added shared context-menu actions for copy, paste, select all, search, link handling, and clear-screen requests.
-- Changed clear screen to send Ctrl+L to the foreground process instead of mutating terminal state behind the PTY.
+- Added host-owned context menus that respect terminal mouse reporting, with Shift-right-click as a menu override.
 - Expanded search and shortcut coverage.
 
 ## [0.1.2] - 2026-07-03

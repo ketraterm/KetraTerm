@@ -17,8 +17,7 @@ package io.github.ketraterm.ui.swing.host
 
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
-import java.util.EnumMap
-import java.util.Locale
+import java.util.*
 import javax.swing.KeyStroke
 
 /**
@@ -38,6 +37,12 @@ enum class SwingTerminalHostAction {
 
     /** Open the host-owned terminal search UI. */
     OPEN_SEARCH,
+
+    /** Select all retained terminal text. */
+    SELECT_ALL,
+
+    /** Request a foreground-program screen clear/redraw. */
+    CLEAR_SCREEN,
 
     /** Scroll one visible terminal page away from the live viewport. */
     SCROLL_PAGE_UP,

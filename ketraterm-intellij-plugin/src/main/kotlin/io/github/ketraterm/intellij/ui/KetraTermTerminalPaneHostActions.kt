@@ -18,49 +18,42 @@ package io.github.ketraterm.intellij.ui
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 
 /**
- * IDE-owned pane actions exposed to the terminal context menu.
+ * IDE-owned actions that affect a terminal pane's surrounding tool-window UI.
  *
- * The pane owns Swing assembly; the project service owns tab lifecycle and
- * launch policy. This adapter keeps those responsibilities separated.
+ * The reusable terminal component exposes only terminal operations. IntelliJ
+ * pane/tab lifecycle commands stay in the plugin and are invoked through this
+ * narrow callback set.
  */
 internal class KetraTermTerminalPaneHostActions(
-    private val canOpenTerminalHereAction: (TerminalWorkspaceTab) -> Boolean,
-    private val openTerminalHereAction: (TerminalWorkspaceTab) -> Boolean,
-    private val openNewTabAction: () -> Boolean,
-    private val closePaneAction: (TerminalWorkspaceTab) -> Unit,
+    private val openNewTabAction: () -> Boolean = { false },
+    private val canOpenTerminalHereAction: (TerminalWorkspaceTab) -> Boolean = { false },
+    private val openTerminalHereAction: (TerminalWorkspaceTab) -> Boolean = { false },
+    private val closePaneAction: (TerminalWorkspaceTab) -> Unit = {},
 ) {
     /**
-     * Returns whether a local working directory is available for [tab].
-     */
-    fun canOpenTerminalHere(tab: TerminalWorkspaceTab): Boolean = canOpenTerminalHereAction(tab)
-
-    /**
-     * Opens a new IDE terminal tab using [tab]'s current local working directory.
-     */
-    fun openTerminalHere(tab: TerminalWorkspaceTab): Boolean = openTerminalHereAction(tab)
-
-    /**
-     * Opens a new IDE terminal tab with the default launch profile.
+     * Opens a new default KetraTerm tab in the containing tool window.
      */
     fun openNewTab(): Boolean = openNewTabAction()
 
     /**
-     * Closes [tab] using the IDE content lifecycle.
+     * Returns whether a local OSC 7 working directory can be used for [tab].
      */
-    fun closePane(tab: TerminalWorkspaceTab) {
-        closePaneAction(tab)
-    }
+    fun canOpenTerminalHere(tab: TerminalWorkspaceTab): Boolean = canOpenTerminalHereAction(tab)
+
+    /**
+     * Opens a new KetraTerm tab rooted at [tab]'s current local directory.
+     */
+    fun openTerminalHere(tab: TerminalWorkspaceTab): Boolean = openTerminalHereAction(tab)
+
+    /**
+     * Closes [tab]'s containing pane.
+     */
+    fun closePane(tab: TerminalWorkspaceTab) = closePaneAction(tab)
 
     companion object {
         /**
-         * Adapter with no project-level actions.
+         * Empty action set used by tests or panes not attached to a tool window.
          */
-        val NONE =
-            KetraTermTerminalPaneHostActions(
-                canOpenTerminalHereAction = { false },
-                openTerminalHereAction = { false },
-                openNewTabAction = { false },
-                closePaneAction = {},
-            )
+        val NONE = KetraTermTerminalPaneHostActions()
     }
 }

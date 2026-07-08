@@ -22,12 +22,12 @@ import java.nio.file.Path
 import java.util.*
 
 /**
- * Resolves local OSC 7 working-directory URIs for IDE launch actions.
+ * Resolves local OSC 7 `file:` URIs for IntelliJ terminal launch actions.
  */
 internal object IntellijWorkingDirectoryResolver {
     /**
-     * Resolves [uriValue] to a local directory path, or `null` when the URI is
-     * absent, remote, malformed, or no longer points to a directory.
+     * Returns a local existing directory for [uriValue], or `null` when the URI
+     * is absent, remote, malformed, or not a directory.
      */
     fun resolve(uriValue: String?): Path? {
         if (uriValue == null) return null

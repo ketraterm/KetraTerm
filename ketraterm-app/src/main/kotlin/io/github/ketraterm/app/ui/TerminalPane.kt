@@ -18,6 +18,7 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuHandler
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
@@ -57,6 +58,10 @@ internal class TerminalPane private constructor(
 
     override fun pasteClipboardText(): Boolean = terminal.pasteClipboardText()
 
+    override fun selectAll(): Boolean = terminal.selectAll()
+
+    override fun clearScreen(): Boolean = terminal.clearScreen()
+
     override fun openSearch() {
         searchBar.open()
     }
@@ -93,7 +98,7 @@ internal class TerminalPane private constructor(
             tab: TerminalWorkspaceTab,
             settings: KetraTermSettings,
             suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
-            onContextMenu: (TerminalPane, SwingTerminalContextMenuRequest) -> Boolean,
+            onContextMenu: (TerminalPane, SwingTerminalContextMenuRequest) -> Unit,
         ): TerminalPane {
             val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
             val paneRef = arrayOfNulls<TerminalPane>(1)
@@ -104,9 +109,12 @@ internal class TerminalPane private constructor(
                         SwingHostServices(
                             shellSuggestionProvider = suggestionProvider,
                             hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
-                            contextMenuHandler = { request ->
-                                paneRef[0]?.let { onContextMenu(it, request) } == true
-                            },
+                            contextMenuHandler =
+                                SwingTerminalContextMenuHandler { request ->
+                                    val pane = paneRef[0] ?: return@SwingTerminalContextMenuHandler false
+                                    onContextMenu(pane, request)
+                                    true
+                                },
                         ),
                 )
 
