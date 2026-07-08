@@ -39,6 +39,17 @@ val pluginDescription =
     <p>It provides project-aware terminal tabs, quick shell-profile launch actions, IDE color-scheme integration, configurable typography and cursor behavior, scrollback, paste handling, visual bell support, and guarded clipboard/title controls.</p>
     <p>KetraTerm focuses on contemporary terminal workflows: responsive rendering, Unicode-aware text, modern color and notification sequences, and security-conscious handling of terminal-initiated IDE actions.</p>
     """.trimIndent()
+val pluginChangeNotes =
+    providers.fileContents(layout.projectDirectory.file("CHANGELOG.md")).asText.map { changelog ->
+        changelog
+            .lineSequence()
+            .dropWhile { line -> !line.startsWith("## ") }
+            .drop(1)
+            .takeWhile { line -> !line.startsWith("## ") }
+            .joinToString("\n")
+            .trim()
+            .ifBlank { "See CHANGELOG.md for release notes." }
+    }
 
 version = pluginVersionProvider.get()
 
@@ -46,6 +57,7 @@ private val ketratermVersion = version.toString()
 
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
+    implementation("io.github.ketraterm:ketraterm-ui-swing-host:$ketratermVersion")
     implementation("io.github.ketraterm:ketraterm-ui-swing:$ketratermVersion")
     implementation("io.github.ketraterm:ketraterm-workspace:$ketratermVersion") {
         exclude(group = "org.jetbrains.pty4j", module = "pty4j")
@@ -72,6 +84,7 @@ intellijPlatform {
         name.set("KetraTerm")
         version.set(project.version.toString())
         description.set(pluginDescription)
+        changeNotes.set(pluginChangeNotes)
 
         ideaVersion {
             sinceBuild.set(pluginSinceBuild)

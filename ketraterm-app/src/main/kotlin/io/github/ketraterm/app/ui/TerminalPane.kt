@@ -18,9 +18,10 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
-import java.awt.BorderLayout
 import javax.swing.JPanel
 
 /**
@@ -34,7 +35,10 @@ internal class TerminalPane private constructor(
     val terminal: SwingTerminal,
     val component: JPanel,
     private val settings: KetraTermSettings,
-) {
+    private val searchBar: SwingTerminalSearchBar,
+) : TerminalPaneActionTarget {
+    private var shortcutController: TerminalPaneShortcutController? = null
+
     fun requestFocus() {
         terminal.requestFocusInWindow()
     }
@@ -42,10 +46,44 @@ internal class TerminalPane private constructor(
     fun reloadSettings() {
         terminal.reloadSettings()
         component.background = terminal.background
+        searchBar.refreshColors()
         tab.session.setHostPolicy(settings.createHostPolicy(tab.profile.command))
     }
 
+    override fun hasSelection(): Boolean = terminal.currentSelection() != null
+
+    override fun copySelectionToClipboard(): Boolean = terminal.copySelectionToClipboard()
+
+    override fun pasteClipboardText(): Boolean = terminal.pasteClipboardText()
+
+    override fun openSearch() {
+        searchBar.open()
+    }
+
+    override fun scrollPageUp() {
+        terminal.scrollViewportBy(
+            terminal
+                .visibleGridSize()
+                .height
+                .coerceAtLeast(1)
+                .toDouble(),
+        )
+    }
+
+    override fun scrollPageDown() {
+        terminal.scrollViewportBy(
+            -terminal
+                .visibleGridSize()
+                .height
+                .coerceAtLeast(1)
+                .toDouble(),
+        )
+    }
+
     fun close() {
+        searchBar.close()
+        shortcutController?.dispose()
+        shortcutController = null
         terminal.dispose()
     }
 
@@ -56,24 +94,31 @@ internal class TerminalPane private constructor(
             suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
             onContextMenu: (TerminalPane, Int, Int) -> Unit,
         ): TerminalPane {
+            val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
             val terminal =
                 SwingTerminal(
                     settingsProvider = { settings.current() },
                     hostServices =
                         SwingHostServices(
                             shellSuggestionProvider = suggestionProvider,
+                            hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
                         ),
                 )
 
             terminal.bind(tab.session)
 
+            val searchBar = SwingTerminalSearchBar(terminal)
+            val component = terminalPanel(terminal, searchBar)
             val pane =
                 TerminalPane(
                     tab = tab,
                     terminal = terminal,
-                    component = terminalPanel(terminal),
+                    component = component,
                     settings = settings,
+                    searchBar = searchBar,
                 )
+            pane.shortcutController = TerminalPaneShortcutController(pane, settings)
+            shortcutControllerRef[0] = pane.shortcutController
 
             terminal.addMouseListener(
                 object : java.awt.event.MouseAdapter() {
@@ -95,12 +140,14 @@ internal class TerminalPane private constructor(
             return pane
         }
 
-        private fun terminalPanel(terminal: SwingTerminal): JPanel =
-            JPanel(BorderLayout()).apply {
+        private fun terminalPanel(
+            terminal: SwingTerminal,
+            searchBar: SwingTerminalSearchBar,
+        ): JPanel =
+            SwingTerminalOverlayPane(terminal, searchBar.component).apply {
                 background = terminal.background
                 border = null
                 terminal.border = null
-                add(terminal, BorderLayout.CENTER)
             }
     }
 }

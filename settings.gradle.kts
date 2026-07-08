@@ -17,6 +17,7 @@ include(
     ":ketraterm-workspace",
     ":ketraterm-app",
     ":ketraterm-ui-swing",
+    ":ketraterm-ui-swing-host",
     ":ketraterm-benchmarks",
     ":ketraterm-render-cache",
 )

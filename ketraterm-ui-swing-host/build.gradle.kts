@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.ui.swing.search
 
-/**
- * Public snapshot of terminal search results.
- *
- * @property query current literal search query.
- * @property resultCount number of matches in the current buffer snapshot.
- * @property activeResultIndex zero-based active match, or `-1` when no match is
- * active.
- */
-data class TerminalSearchState(
-    val query: String,
-    val resultCount: Int,
-    val activeResultIndex: Int,
-)
+plugins {
+    `java-library`
+    kotlin("jvm")
+}
+
+dependencies {
+    api(project(":ketraterm-ui-swing"))
+
+    testImplementation(kotlin("test"))
+}
+
+tasks.test {
+    useJUnitPlatform()
+}

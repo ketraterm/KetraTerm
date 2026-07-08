@@ -289,11 +289,7 @@ class SwingTerminal
                         boundSession: TerminalSession,
                     ): Boolean = this@SwingTerminal.scrollViewportToOnEdt(offsetRows, historySize, boundSession)
 
-                    override fun revalidate() = this@SwingTerminal.revalidate()
-
                     override fun repaint() = this@SwingTerminal.repaint()
-
-                    override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
                 },
             )
         private val shellSuggestionController =
@@ -313,13 +309,6 @@ class SwingTerminal
             SwingTerminalInputController(
                 object : SwingTerminalInputHost {
                     override val session: TerminalSession? get() = this@SwingTerminal.session
-                    override val settings: SwingSettings get() = this@SwingTerminal.settings
-
-                    override fun visibleGridRows(): Int = this@SwingTerminal.visibleGridRows()
-
-                    override fun scrollViewportByRows(deltaRows: Int) {
-                        rowScroller.scrollByRows(deltaRows)
-                    }
 
                     override fun updateHyperlinkActivationHover(active: Boolean) {
                         hyperlinkController.updateHyperlinkActivationHover(active)
@@ -337,16 +326,10 @@ class SwingTerminal
                         renderFrameController.repaintCursorState()
                     }
 
-                    override fun openSearch() {
-                        searchController.open()
-                    }
+                    override fun handleHostKeyPressed(event: KeyEvent): Boolean = hostServices.hostKeyHandler.handleKeyPressed(event)
 
                     override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean =
                         shellSuggestionController.handleKeyPressed(event)
-
-                    override fun copySelectionToClipboard(): Boolean = this@SwingTerminal.copySelectionToClipboard()
-
-                    override fun pasteClipboardText(): Boolean = this@SwingTerminal.pasteClipboardText()
                 },
             )
         private val mouseController =
@@ -386,8 +369,6 @@ class SwingTerminal
                     override fun finishViewportScroll() {
                         rowScroller.finish()
                     }
-
-                    override fun pasteClipboardText(): Boolean = this@SwingTerminal.pasteClipboardText()
 
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
 
@@ -576,8 +557,6 @@ class SwingTerminal
             addMouseMotionListener(terminalMouseMotionListener)
             addMouseWheelListener(mouseController.wheelListener)
             addComponentListener(resizeListener)
-            add(searchController.overlay)
-            searchController.overlay.isVisible = false
             add(shellSuggestionController.popup)
             shellSuggestionController.popup.isVisible = false
             preferredSize = preferredGridSize(settings.columns, settings.rows)
@@ -923,25 +902,7 @@ class SwingTerminal
 
         override fun doLayout() {
             super.doLayout()
-            layoutSearchOverlay()
             layoutShellSuggestionPopup()
-        }
-
-        private fun layoutSearchOverlay() {
-            val searchOverlay = searchController.overlay
-            val preferred = searchOverlay.preferredSize
-            val activeBuffer = renderCache.activeBuffer
-            val paddingLeft = SwingTerminalChrome.left(settings, activeBuffer)
-            val paddingRight = SwingTerminalChrome.right(settings, activeBuffer)
-            val paddingTop = SwingTerminalChrome.top(settings, activeBuffer)
-            val availableWidth = width - paddingLeft - paddingRight
-            val overlayWidth = minOf(availableWidth, preferred.width).coerceAtLeast(0)
-            if (overlayWidth == 0) {
-                searchOverlay.setBounds(0, 0, 0, 0)
-                return
-            }
-            val x = maxOf(paddingLeft, width - paddingRight - overlayWidth)
-            searchOverlay.setBounds(x, paddingTop, overlayWidth, preferred.height)
         }
 
         private fun layoutShellSuggestionPopup() {
@@ -1139,7 +1100,8 @@ class SwingTerminal
          * Applies a literal terminal-buffer search query.
          *
          * The search covers retained scrollback plus the live grid snapshot exposed
-         * through the bound session's render-frame reader.
+         * through the bound session's render-frame reader. Hosts own any visible
+         * search UI and call this method when their query changes.
          *
          * @param query literal text to find.
          */
@@ -1152,7 +1114,54 @@ class SwingTerminal
         }
 
         /**
-         * Returns the current search UI and result snapshot.
+         * Clears the current terminal-buffer search query and highlights.
+         */
+        fun clearSearch() {
+            runOnEdt(
+                Runnable {
+                    searchController.clear()
+                },
+            )
+        }
+
+        /**
+         * Selects the next search result when a search query is active.
+         */
+        fun selectNextSearchResult() {
+            runOnEdt(
+                Runnable {
+                    searchController.findNext()
+                },
+            )
+        }
+
+        /**
+         * Selects the previous search result when a search query is active.
+         */
+        fun selectPreviousSearchResult() {
+            runOnEdt(
+                Runnable {
+                    searchController.findPrevious()
+                },
+            )
+        }
+
+        /**
+         * Configures whether terminal-buffer search is case-sensitive.
+         *
+         * @param caseSensitive `true` to match case exactly, `false` for
+         * case-insensitive search.
+         */
+        fun setSearchCaseSensitive(caseSensitive: Boolean) {
+            runOnEdt(
+                Runnable {
+                    searchController.setIgnoreCase(!caseSensitive)
+                },
+            )
+        }
+
+        /**
+         * Returns the current search result snapshot.
          *
          * @return current terminal search state.
          */

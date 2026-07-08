@@ -46,7 +46,6 @@ import java.util.*
  * zero disables cursor blinking and keeps the cursor visible.
  * @property textAntialiasing text antialiasing hint used during painting.
  * @property fractionalMetrics fractional font metrics hint used during painting.
- * @property clipboardShortcuts platform clipboard key bindings.
  * @property hyperlinkActivationForeground packed ARGB foreground used for the
  * linked span currently under Ctrl-hover.
  * @property selectionBackground packed ARGB overlay used for visible terminal
@@ -83,7 +82,6 @@ import java.util.*
  * terminal grid in pixels. The default keeps top padding at zero and uses small
  * symmetric side insets because alternate-screen applications do not use the
  * primary scrollback scrollbar or shell-integration prompt gutter.
- * @property pasteOnMiddleClick whether middle mouse button click triggers a clipboard paste.
  * @property pasteSanitizationPolicy paste payload transformation applied before
  * host-bound input emission.
  * @property cursorShape default cursor shape configured for the session.
@@ -107,7 +105,6 @@ data class SwingSettings
         val cursorBlinkMillis: Int = 600,
         val textAntialiasing: Any = RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB,
         val fractionalMetrics: Any = RenderingHints.VALUE_FRACTIONALMETRICS_OFF,
-        val clipboardShortcuts: TerminalClipboardShortcuts = TerminalClipboardShortcuts.platformDefault(),
         val hyperlinkActivationForeground: Int = DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND,
         val selectionBackground: Int = DEFAULT_SELECTION_BACKGROUND,
         val searchMatchBackground: Int = DEFAULT_SEARCH_MATCH_BACKGROUND,
@@ -126,7 +123,6 @@ data class SwingSettings
         val shellIntegrationFailedCommandRailWidth: Int = 3,
         val padding: Insets = Insets(0, 4, 4, 6),
         val alternateScreenPadding: Insets = Insets(0, 2, 2, 2),
-        val pasteOnMiddleClick: Boolean = true,
         val pasteSanitizationPolicy: PasteSanitizationPolicy = PasteSanitizationPolicy.RAW,
         val cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK,
         val scrollbackLines: Int = 1000,

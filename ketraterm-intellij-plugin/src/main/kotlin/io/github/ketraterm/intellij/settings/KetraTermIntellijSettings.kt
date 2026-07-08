@@ -56,6 +56,24 @@ class KetraTermIntellijSettings :
     fun current(): SwingSettings = KetraTermIntellijSettingsMapper.toSwingSettings(state)
 
     /**
+     * Returns whether the IDE host should bind middle-click paste for terminal panes.
+     *
+     * @return `true` when middle mouse button paste is enabled.
+     */
+    fun pasteOnMiddleClick(): Boolean = KetraTermIntellijSettingsNormalizer.normalize(state).pasteOnMiddleClick
+
+    /**
+     * Returns whether terminal panes should override IDE shortcuts.
+     *
+     * When enabled, focused terminal panes may claim IDE-style shortcuts such
+     * as Find for host UI. When disabled, those key events are left for
+     * terminal input encoding and can be sent to the PTY.
+     *
+     * @return `true` when terminal panes may override IDE shortcuts.
+     */
+    fun overrideIdeShortcuts(): Boolean = KetraTermIntellijSettingsNormalizer.normalize(state).overrideIdeShortcuts
+
+    /**
      * Replaces persisted IDE terminal settings with a normalized state.
      *
      * @param nextState new settings state produced by the IntelliJ settings UI.
@@ -155,6 +173,8 @@ class KetraTermIntellijSettings :
      * @property cursorShape default cursor shape id.
      * @property visualBell whether BEL events show a visual terminal indicator.
      * @property pasteOnMiddleClick whether the middle click pastes clipboard text.
+     * @property overrideIdeShortcuts whether focused terminal panes may claim
+     * IDE-style shortcuts such as Find for host UI.
      * @property scrollbackLines maximum retained scrollback rows.
      * @property lineHeight font metric line-height multiplier.
      * @property shellPath command or executable path used for new local shells.
@@ -177,6 +197,7 @@ class KetraTermIntellijSettings :
         @JvmField val cursorShape: String = TerminalConfig.DEFAULT_CURSOR_SHAPE,
         @JvmField val visualBell: Boolean = TerminalConfig.DEFAULT_VISUAL_BELL,
         @JvmField val pasteOnMiddleClick: Boolean = TerminalConfig.DEFAULT_PASTE_ON_MIDDLE_CLICK,
+        @JvmField val overrideIdeShortcuts: Boolean = true,
         @JvmField val scrollbackLines: Int = TerminalConfig.DEFAULT_SCROLLBACK_LINES,
         @JvmField val lineHeight: Float = TerminalConfig.DEFAULT_LINE_HEIGHT,
         @JvmField val shellPath: String = TerminalConfig.DEFAULT_SHELL_PATH,
@@ -393,7 +414,6 @@ internal object KetraTermIntellijSettingsMapper {
             cursorBlinkMillis = normalized.cursorBlinkMillis,
             useSystemFallbackFonts = normalized.useSystemFallbackFonts,
             visualBellEnabled = normalized.visualBell,
-            pasteOnMiddleClick = normalized.pasteOnMiddleClick,
             pasteSanitizationPolicy = parsePasteSanitization(normalized.pasteSanitization),
             cursorShape = parseCursorShape(normalized.cursorShape),
             scrollbackLines = normalized.scrollbackLines,

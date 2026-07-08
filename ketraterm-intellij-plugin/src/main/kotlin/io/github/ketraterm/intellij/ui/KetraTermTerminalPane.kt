@@ -23,6 +23,9 @@ import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher
+import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
+import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
@@ -39,7 +42,10 @@ internal class KetraTermTerminalPane private constructor(
     val tab: TerminalWorkspaceTab,
     val terminal: SwingTerminal,
     val component: JPanel,
+    private val searchBar: SwingTerminalSearchBar,
 ) {
+    private var shortcutController: KetraTermTerminalShortcutController? = null
+
     /**
      * Requests keyboard focus for the terminal component.
      */
@@ -53,13 +59,64 @@ internal class KetraTermTerminalPane private constructor(
     fun reloadSettings() {
         terminal.reloadSettings()
         component.background = terminal.background
+        searchBar.refreshColors()
         tab.session.setHostPolicy(KetraTermIntellijSettings.getInstance().createHostPolicy(tab.profile.command))
     }
+
+    /**
+     * Opens the IDE-hosted search UI for this terminal pane.
+     */
+    fun openSearch() {
+        searchBar.open()
+    }
+
+    /**
+     * Returns whether [action] can currently run for this pane.
+     *
+     * @param action host-owned terminal pane action.
+     * @return `true` when the action should be enabled.
+     */
+    fun isTerminalActionEnabled(action: SwingTerminalHostAction): Boolean =
+        when (action) {
+            SwingTerminalHostAction.COPY_SELECTION -> terminal.currentSelection() != null
+            SwingTerminalHostAction.OPEN_SEARCH -> KetraTermIntellijSettings.getInstance().overrideIdeShortcuts()
+            SwingTerminalHostAction.PASTE_CLIPBOARD,
+            SwingTerminalHostAction.SCROLL_PAGE_UP,
+            SwingTerminalHostAction.SCROLL_PAGE_DOWN,
+            -> true
+        }
+
+    /**
+     * Performs [action] against this pane.
+     *
+     * @param action host-owned terminal pane action.
+     * @return `true` when the action was handled by this pane.
+     */
+    fun performTerminalAction(action: SwingTerminalHostAction): Boolean =
+        when (action) {
+            SwingTerminalHostAction.COPY_SELECTION -> terminal.copySelectionToClipboard()
+            SwingTerminalHostAction.PASTE_CLIPBOARD -> terminal.pasteClipboardText()
+            SwingTerminalHostAction.OPEN_SEARCH -> {
+                openSearch()
+                true
+            }
+            SwingTerminalHostAction.SCROLL_PAGE_UP -> {
+                terminal.scrollViewportBy(terminal.visibleGridSize().height.coerceAtLeast(1).toDouble())
+                true
+            }
+            SwingTerminalHostAction.SCROLL_PAGE_DOWN -> {
+                terminal.scrollViewportBy(-terminal.visibleGridSize().height.coerceAtLeast(1).toDouble())
+                true
+            }
+        }
 
     /**
      * Unbinds the pane from its session before the containing IDE tab is disposed.
      */
     fun close() {
+        searchBar.close()
+        shortcutController?.dispose()
+        shortcutController = null
         terminal.dispose()
     }
 
@@ -76,6 +133,7 @@ internal class KetraTermTerminalPane private constructor(
         ): KetraTermTerminalPane {
             val scrollbar = JBScrollBar(Adjustable.VERTICAL)
             val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
+            val shortcutControllerRef = arrayOfNulls<KetraTermTerminalShortcutController>(1)
             val terminal =
                 SwingTerminal(
                     settingsProvider = { KetraTermIntellijSettings.current() },
@@ -89,22 +147,29 @@ internal class KetraTermTerminalPane private constructor(
                                 ApplicationManager.getApplication().invokeLater(runnable)
                             },
                             fontResolver = IntellijTerminalFontResolver,
+                            hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
                         ),
                 )
             scrollbarAdapter.attach(terminal)
             terminal.bind(tab.session)
 
+            val searchBar = SwingTerminalSearchBar(terminal)
+            val terminalArea = SwingTerminalOverlayPane(terminal, searchBar.component)
             val component =
                 JPanel(BorderLayout()).apply {
                     border = null
                     background = terminal.background
                     terminal.border = null
-                    add(terminal, BorderLayout.CENTER)
+                    add(terminalArea, BorderLayout.CENTER)
                     add(scrollbar, BorderLayout.EAST)
                 }
 
             tab.session.notifyRenderDirty()
-            return KetraTermTerminalPane(tab, terminal, component)
+            return KetraTermTerminalPane(tab, terminal, component, searchBar).also { pane ->
+                pane.shortcutController = KetraTermTerminalShortcutController(pane)
+                shortcutControllerRef[0] = pane.shortcutController
+            }
         }
+
     }
 }

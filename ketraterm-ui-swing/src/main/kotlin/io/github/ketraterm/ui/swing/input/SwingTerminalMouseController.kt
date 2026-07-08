@@ -41,13 +41,6 @@ internal class SwingTerminalMouseController(
                 if (host.handlePromptMarkerMousePressed(event)) return
                 if (handleMouseTracking(event, TerminalMouseEventType.PRESS)) return
                 if (host.handleHyperlinkMousePressed(event)) return
-                if (SwingUtilities.isMiddleMouseButton(event)) {
-                    if (host.settings.pasteOnMiddleClick) {
-                        host.pasteClipboardText()
-                        event.consume()
-                        return
-                    }
-                }
                 host.handleSelectionMousePressed(event)
             }
 
@@ -112,7 +105,7 @@ internal class SwingTerminalMouseController(
         }
     }
 
-    private fun isMouseTrackingIntercepted(event: MouseEvent): Boolean {
+    fun isMouseTrackingIntercepted(event: MouseEvent): Boolean {
         if (event.isShiftDown) return false
         return host.mouseTrackingMode() != MouseTrackingMode.OFF
     }

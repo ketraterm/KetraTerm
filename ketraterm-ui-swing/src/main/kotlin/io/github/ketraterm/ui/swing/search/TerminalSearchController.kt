@@ -19,12 +19,13 @@ import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalSession
 
 /**
- * EDT-owned terminal search workflow controller.
+ * EDT-owned terminal search controller.
  *
- * The controller owns search UI state, literal match scanning, active-result
- * navigation, and viewport highlight projection. It does not paint and does not
- * allocate from the frame paint loop; painting consumes [viewportHighlights],
- * which is rebuilt only when search state or viewport mapping changes.
+ * The controller owns literal match scanning, active-result navigation, and
+ * viewport highlight projection. It does not own visible search chrome, does
+ * not paint, and does not allocate from the frame paint loop; painting consumes
+ * [viewportHighlights], which is rebuilt only when search state or viewport
+ * mapping changes.
  *
  * @param host Swing terminal hooks needed to refresh caches and move viewport.
  */
@@ -37,69 +38,34 @@ internal class TerminalSearchController(
 
     private val model = TerminalSearchModel()
 
-    val overlay: TerminalSearchOverlay =
-        TerminalSearchOverlay(
-            object : SearchOverlayListener {
-                override fun onQueryChanged(query: String) {
-                    applyQuery(query)
-                }
-
-                override fun onFindNext() {
-                    findNext()
-                }
-
-                override fun onFindPrevious() {
-                    findPrevious()
-                }
-
-                override fun onCloseSearch() {
-                    close()
-                }
-
-                override fun onCaseSensitivityChanged(ignoreCase: Boolean) {
-                    this@TerminalSearchController.ignoreCase = ignoreCase
-                }
-            },
-        )
-
     val viewportHighlights = TerminalSearchViewportHighlights()
 
     fun reset(viewportRows: Int) {
         query = ""
         highlights = null
         viewportHighlights.reset(viewportRows)
-        overlay.setQueryText("")
-        overlay.updateResultCounter(0, NO_ACTIVE_RESULT)
-    }
-
-    fun open() {
-        overlay.isVisible = true
-        overlay.setQueryText(query)
-        host.revalidate()
-        overlay.focusQuery()
-        if (query.isNotEmpty()) {
-            refreshForFrame()
-        }
-        host.repaint()
-    }
-
-    fun close() {
-        overlay.isVisible = false
-        highlights = null
-        viewportHighlights.reset(host.renderCache.rows)
-        host.revalidate()
-        host.requestFocusInWindow()
-        host.repaint()
     }
 
     fun search(query: String) {
-        overlay.setQueryText(query)
         applyQuery(query)
     }
 
+    fun clear() {
+        applyQuery("")
+    }
+
+    fun setIgnoreCase(ignoreCase: Boolean) {
+        if (this.ignoreCase == ignoreCase) return
+        this.ignoreCase = ignoreCase
+        if (query.isNotEmpty()) applyQuery(query)
+    }
+
+    fun findNext(): Boolean = activateRelativeResult(1)
+
+    fun findPrevious(): Boolean = activateRelativeResult(-1)
+
     fun state(): TerminalSearchState =
         TerminalSearchState(
-            visible = overlay.isVisible,
             query = query,
             resultCount = highlights?.resultCount ?: 0,
             activeResultIndex = highlights?.activeResultIndex ?: NO_ACTIVE_RESULT,
@@ -119,7 +85,6 @@ internal class TerminalSearchController(
             nextHighlights.activate(oldActive)
         }
         highlights = nextHighlights
-        overlay.updateResultCounter(nextHighlights.resultCount, nextHighlights.activeResultIndex)
         updateViewportHighlights()
     }
 
@@ -137,7 +102,6 @@ internal class TerminalSearchController(
         if (nextQuery.isEmpty()) {
             highlights = null
             viewportHighlights.reset(host.renderCache.rows)
-            overlay.updateResultCounter(0, NO_ACTIVE_RESULT)
             host.repaint()
             return
         }
@@ -145,18 +109,10 @@ internal class TerminalSearchController(
         val boundSession = host.session ?: return
         refreshSearchCache(boundSession)
         highlights = model.search(host.searchCache, nextQuery, ignoreCase = ignoreCase)
-        overlay.updateResultCounter(
-            resultCount = highlights?.resultCount ?: 0,
-            activeResultIndex = highlights?.activeResultIndex ?: NO_ACTIVE_RESULT,
-        )
         scrollToActiveResult()
         updateViewportHighlights()
         host.repaint()
     }
-
-    private fun findNext(): Boolean = activateRelativeResult(1)
-
-    private fun findPrevious(): Boolean = activateRelativeResult(-1)
 
     private fun activateRelativeResult(delta: Int): Boolean {
         val currentHighlights = highlights ?: return false
@@ -169,7 +125,6 @@ internal class TerminalSearchController(
             }
         val next = (current + delta + currentHighlights.resultCount) % currentHighlights.resultCount
         currentHighlights.activate(next)
-        overlay.updateResultCounter(currentHighlights.resultCount, currentHighlights.activeResultIndex)
         scrollToActiveResult()
         updateViewportHighlights()
         host.repaint()
@@ -220,9 +175,5 @@ internal interface TerminalSearchHost {
         boundSession: TerminalSession,
     ): Boolean
 
-    fun revalidate()
-
     fun repaint()
-
-    fun requestFocusInWindow(): Boolean
 }
