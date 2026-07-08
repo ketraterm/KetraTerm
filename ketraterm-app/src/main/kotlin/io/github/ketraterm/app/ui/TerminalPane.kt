@@ -18,6 +18,7 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
@@ -92,9 +93,10 @@ internal class TerminalPane private constructor(
             tab: TerminalWorkspaceTab,
             settings: KetraTermSettings,
             suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
-            onContextMenu: (TerminalPane, Int, Int) -> Unit,
+            onContextMenu: (TerminalPane, SwingTerminalContextMenuRequest) -> Boolean,
         ): TerminalPane {
             val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
+            val paneRef = arrayOfNulls<TerminalPane>(1)
             val terminal =
                 SwingTerminal(
                     settingsProvider = { settings.current() },
@@ -102,6 +104,9 @@ internal class TerminalPane private constructor(
                         SwingHostServices(
                             shellSuggestionProvider = suggestionProvider,
                             hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
+                            contextMenuHandler = { request ->
+                                paneRef[0]?.let { onContextMenu(it, request) } == true
+                            },
                         ),
                 )
 
@@ -119,22 +124,7 @@ internal class TerminalPane private constructor(
                 )
             pane.shortcutController = TerminalPaneShortcutController(pane, settings)
             shortcutControllerRef[0] = pane.shortcutController
-
-            terminal.addMouseListener(
-                object : java.awt.event.MouseAdapter() {
-                    override fun mousePressed(e: java.awt.event.MouseEvent) {
-                        if (e.isPopupTrigger) {
-                            onContextMenu(pane, e.x, e.y)
-                        }
-                    }
-
-                    override fun mouseReleased(e: java.awt.event.MouseEvent) {
-                        if (e.isPopupTrigger) {
-                            onContextMenu(pane, e.x, e.y)
-                        }
-                    }
-                },
-            )
+            paneRef[0] = pane
 
             tab.session.notifyRenderDirty()
             return pane

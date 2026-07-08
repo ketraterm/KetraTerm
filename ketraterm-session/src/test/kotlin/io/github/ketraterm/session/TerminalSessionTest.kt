@@ -17,14 +17,7 @@ package io.github.ketraterm.session
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
-import io.github.ketraterm.host.HostEventSink
-import io.github.ketraterm.host.HostPolicy
-import io.github.ketraterm.host.TerminalClipboardAuditEvent
-import io.github.ketraterm.host.TerminalClipboardOrigin
-import io.github.ketraterm.host.TerminalClipboardPermission
-import io.github.ketraterm.host.TerminalClipboardPolicy
-import io.github.ketraterm.host.TerminalClipboardPromptEvent
-import io.github.ketraterm.host.TerminalClipboardWriteEvent
+import io.github.ketraterm.host.*
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
@@ -243,6 +236,24 @@ class TerminalSessionTest {
         assertEquals(20, session.terminal.width)
         assertEquals(5, session.terminal.height)
         assertEquals(listOf(10 to 3, 20 to 5), connector.resizeCalls)
+        session.close()
+    }
+
+    @Test
+    fun `clearScreen clears visible screen and homes cursor through session lock`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector, columns = 10, rows = 3)
+
+        connector.feedFromHost("\u001B[2;4Habc".ascii())
+
+        assertEquals("   abc", session.terminal.getLineAsString(1))
+
+        session.clearScreen()
+
+        assertEquals("", session.terminal.getLineAsString(0))
+        assertEquals("", session.terminal.getLineAsString(1))
+        assertEquals(0, session.terminal.cursorRow)
+        assertEquals(0, session.terminal.cursorCol)
         session.close()
     }
 

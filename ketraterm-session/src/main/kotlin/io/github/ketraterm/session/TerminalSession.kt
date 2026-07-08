@@ -17,12 +17,7 @@ package io.github.ketraterm.session
 
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalHostResponseReader
-import io.github.ketraterm.host.HostCommandAdapter
-import io.github.ketraterm.host.HostEventSink
-import io.github.ketraterm.host.HostPolicy
-import io.github.ketraterm.host.TerminalClipboardAuditEvent
-import io.github.ketraterm.host.TerminalClipboardPromptEvent
-import io.github.ketraterm.host.TerminalClipboardWriteEvent
+import io.github.ketraterm.host.*
 import io.github.ketraterm.input.TerminalInputEncoders
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalFocusEvent
@@ -245,6 +240,22 @@ class TerminalSession(
         connector.resize(columns, rows)
         notifyRenderDirty()
         return result
+    }
+
+    /**
+     * Clears the visible terminal screen and homes the cursor under the session
+     * mutation lock.
+     *
+     * Scrollback history is preserved, matching the core [TerminalBuffer.clearScreen]
+     * contract and the behavior of the shell `clear` command. Closed sessions
+     * ignore the request.
+     */
+    fun clearScreen() {
+        if (isSessionClosed()) return
+        synchronized(mutationLock) {
+            terminal.clearScreen()
+        }
+        notifyRenderDirty()
     }
 
     /**

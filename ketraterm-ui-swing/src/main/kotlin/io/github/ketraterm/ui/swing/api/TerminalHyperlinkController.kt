@@ -83,12 +83,14 @@ internal class TerminalHyperlinkController(
 
     fun handleMousePressed(event: MouseEvent): Boolean {
         if (!SwingUtilities.isLeftMouseButton(event) || !event.isControlDown) return false
-        val hyperlinkId = hyperlinkIdAt(event, host.renderCache)
+        val hyperlinkId = hyperlinkIdAt(event)
         if (hyperlinkId == NO_HYPERLINK_ID) return false
         if (!host.openHyperlink(hyperlinkId)) return false
         event.consume()
         return true
     }
+
+    fun hyperlinkIdAt(event: MouseEvent): Int = resolvableHyperlinkIdAt(event)
 
     fun updateHyperlinkActivationHover(active: Boolean) {
         if (hoveredHyperlinkId == NO_HYPERLINK_ID || hyperlinkActivationHover == active) return

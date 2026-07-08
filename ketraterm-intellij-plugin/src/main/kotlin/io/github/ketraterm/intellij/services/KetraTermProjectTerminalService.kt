@@ -31,6 +31,7 @@ import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.ui.KetraTermTerminalPane
+import io.github.ketraterm.intellij.ui.KetraTermTerminalPaneHostActions
 import io.github.ketraterm.intellij.ui.KetraTermTerminalStartupView
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.ui.swing.settings.SwingSettings
@@ -296,7 +297,18 @@ class KetraTermProjectTerminalService(
         pendingTab: PendingTerminalTab,
         workspaceTab: TerminalWorkspaceTab,
     ) {
-        val pane = KetraTermTerminalPane.create(project, workspaceTab)
+        val pane =
+            KetraTermTerminalPane.create(
+                project = project,
+                tab = workspaceTab,
+                hostActions =
+                    KetraTermTerminalPaneHostActions(
+                        canOpenTerminalHereAction = ::canOpenTerminalHere,
+                        openTerminalHereAction = ::openTerminalHere,
+                        openNewTabAction = ::openDefaultTabFromContextMenu,
+                        closePaneAction = ::closePaneFromContextMenu,
+                    ),
+            )
         replaceContent(pendingTab.container, pane.component)
         pendingTab.content.displayName = workspaceTab.title
         pendingTab.content.preferredFocusableComponent = pane.terminal
@@ -305,6 +317,27 @@ class KetraTermProjectTerminalService(
         contentsByTabId[workspaceTab.id] = pendingTab.content
         panesByTabId[workspaceTab.id] = pane
         pane.requestFocus()
+    }
+
+    private fun canOpenTerminalHere(tab: TerminalWorkspaceTab): Boolean =
+        IntellijWorkingDirectoryResolver.resolve(tab.currentWorkingDirectoryUri) != null && lastToolWindow != null
+
+    private fun openTerminalHere(tab: TerminalWorkspaceTab): Boolean {
+        val toolWindow = lastToolWindow ?: return false
+        val workingDirectory = IntellijWorkingDirectoryResolver.resolve(tab.currentWorkingDirectoryUri) ?: return false
+        openTab(toolWindow, tab.profile.copy(workingDirectory = workingDirectory), KetraTermIntellijSettings.current())
+        return true
+    }
+
+    private fun openDefaultTabFromContextMenu(): Boolean {
+        val toolWindow = lastToolWindow ?: return false
+        openDefaultTab(toolWindow)
+        return true
+    }
+
+    private fun closePaneFromContextMenu(tab: TerminalWorkspaceTab) {
+        val content = contentsByTabId[tab.id] ?: return
+        content.manager?.removeContent(content, true)
     }
 
     private fun showStartupFailure(
@@ -321,7 +354,7 @@ class KetraTermProjectTerminalService(
 
     private fun replaceContent(
         container: JPanel,
-        component: java.awt.Component,
+        component: Component,
     ) {
         container.removeAll()
         container.add(component, BorderLayout.CENTER)

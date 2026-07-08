@@ -382,6 +382,15 @@ class SwingTerminal
                         this@SwingTerminal.updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
                     }
 
+                    override fun handleContextMenuMouseEvent(
+                        event: MouseEvent,
+                        forcedByShift: Boolean,
+                    ): Boolean =
+                        this@SwingTerminal.handleContextMenuMouseEvent(
+                            event = event,
+                            forcedByShift = forcedByShift,
+                        )
+
                     override fun handleHyperlinkMousePressed(event: MouseEvent): Boolean = hyperlinkController.handleMousePressed(event)
 
                     override fun handleHyperlinkMouseMoved(event: MouseEvent) {
@@ -1097,6 +1106,45 @@ class SwingTerminal
         }
 
         /**
+         * Selects all retained terminal text.
+         *
+         * The selection spans available scrollback and the live render grid. It
+         * cannot include rows already discarded by the configured scrollback
+         * capacity.
+         *
+         * @return `true` when a bound session and non-empty render cache allowed
+         * a selection to be created.
+         */
+        fun selectAll(): Boolean {
+            if (!SwingUtilities.isEventDispatchThread()) return false
+            if (session == null || renderCache.columns <= 0 || renderCache.rows <= 0) return false
+            val firstAbsoluteRow = renderCache.discardedCount
+            val lastAbsoluteRow = renderCache.discardedCount + renderCache.historySize + renderCache.rows - 1L
+            selectionController.selectAbsoluteRows(firstAbsoluteRow, lastAbsoluteRow, renderCache.columns)
+            repaint()
+            return true
+        }
+
+        /**
+         * Clears the visible terminal screen and homes the cursor.
+         *
+         * Retained scrollback history is preserved. Selection and search
+         * highlights are cleared because their coordinates refer to content
+         * that may no longer exist after the session mutation.
+         *
+         * @return `true` when a bound session accepted the clear request.
+         */
+        fun clearScreen(): Boolean {
+            if (!SwingUtilities.isEventDispatchThread()) return false
+            val boundSession = session ?: return false
+            selectionController.clearSelection()
+            searchController.clear()
+            boundSession.clearScreen()
+            repaint()
+            return true
+        }
+
+        /**
          * Applies a literal terminal-buffer search query.
          *
          * The search covers retained scrollback plus the live grid snapshot exposed
@@ -1391,6 +1439,21 @@ class SwingTerminal
             return true
         }
 
+        private fun handleContextMenuMouseEvent(
+            event: MouseEvent,
+            forcedByShift: Boolean,
+        ): Boolean {
+            val request =
+                SwingTerminalContextMenuRequest(
+                    terminal = this,
+                    x = event.x,
+                    y = event.y,
+                    forcedByShift = forcedByShift,
+                    hyperlink = contextHyperlinkAt(event),
+                )
+            return hostServices.contextMenuHandler.handleContextMenu(request)
+        }
+
         private fun isHyperlinkResolvable(hyperlinkId: Int): Boolean {
             if (hyperlinkId == NO_HYPERLINK_ID) return false
             if (hyperlinkId > 0) return session?.hyperlinkUri(hyperlinkId) != null
@@ -1404,6 +1467,23 @@ class SwingTerminal
                 return hostServices.hyperlinkHandler.openHyperlink(uri)
             }
             return hyperlinkDiscoveryController.openDiscoveredHyperlink(hyperlinkId, renderCache)
+        }
+
+        private fun contextHyperlinkAt(event: MouseEvent): SwingTerminalContextHyperlink? {
+            val hyperlinkId = hyperlinkController.hyperlinkIdAt(event)
+            if (hyperlinkId == NO_HYPERLINK_ID) return null
+            val uri = if (hyperlinkId > 0) session?.hyperlinkUri(hyperlinkId) else null
+            return SwingTerminalContextHyperlink(
+                uri = uri,
+                openAction = { openHyperlink(hyperlinkId) },
+                copyUriAction = {
+                    if (uri == null) {
+                        false
+                    } else {
+                        copyTextToClipboard(uri)
+                    }
+                },
+            )
         }
 
         private fun cellAt(
