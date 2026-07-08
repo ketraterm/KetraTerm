@@ -227,6 +227,46 @@ class SwingTerminalSelectionTest {
     }
 
     @Test
+    fun `copySelectionToClipboard ignores selected empty cells after row content`() {
+        val clipboard = RecordingClipboard()
+        val frame =
+            TestRenderFrame(
+                arrayOf(
+                    arrayOf(
+                        TestCell(codeWord = 'h'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+                        TestCell(codeWord = 'i'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+                        TestCell(),
+                        TestCell(),
+                        TestCell(),
+                    ),
+                ),
+            )
+        val session = testSession(frame = frame)
+        val component =
+            SwingTerminal(
+                settingsProvider = {
+                    SwingSettings(padding = Insets(0, 0, 0, 0))
+                },
+                hostServices =
+                    SwingHostServices(
+                        clipboardHandler = clipboard,
+                    ),
+            )
+
+        SwingUtilities.invokeAndWait {
+            component.setSize(300, 80)
+            component.bind(session)
+            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
+            component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
+            assertTrue(component.copySelectionToClipboard())
+        }
+
+        assertEquals("hi", clipboard.copied.get())
+        session.close()
+    }
+
+    @Test
     fun `pasteClipboardText reads clipboard and sends paste event through session`() {
         val clipboard = RecordingClipboard(readValue = "pasted text")
         val input = RecordingInputEncoder()
