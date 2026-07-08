@@ -25,6 +25,7 @@ import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher
+import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBarComponentFactory
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
@@ -118,17 +119,16 @@ internal class KetraTermTerminalPane private constructor(
             scrollbarAdapter.attach(terminal)
             terminal.bind(tab.session)
 
+            val searchBar = SwingTerminalSearchBar(terminal, IntellijSearchBarComponentFactory)
+            val terminalArea = SwingTerminalOverlayPane(terminal, searchBar.component)
             val component =
                 JPanel(BorderLayout()).apply {
                     border = null
                     background = terminal.background
                     terminal.border = null
-                    add(terminal, BorderLayout.CENTER)
+                    add(terminalArea, BorderLayout.CENTER)
                     add(scrollbar, BorderLayout.EAST)
                 }
-
-            val searchBar = SwingTerminalSearchBar(terminal, IntellijSearchBarComponentFactory)
-            component.add(searchBar.component, BorderLayout.NORTH)
 
             tab.session.notifyRenderDirty()
             return KetraTermTerminalPane(tab, terminal, component, searchBar).also { pane ->

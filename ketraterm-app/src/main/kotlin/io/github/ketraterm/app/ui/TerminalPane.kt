@@ -18,10 +18,10 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
-import java.awt.BorderLayout
 import javax.swing.JPanel
 
 /**
@@ -107,9 +107,8 @@ internal class TerminalPane private constructor(
 
             terminal.bind(tab.session)
 
-            val component = terminalPanel(terminal)
             val searchBar = SwingTerminalSearchBar(terminal)
-            component.add(searchBar.component, BorderLayout.NORTH)
+            val component = terminalPanel(terminal, searchBar)
             val pane =
                 TerminalPane(
                     tab = tab,
@@ -141,12 +140,14 @@ internal class TerminalPane private constructor(
             return pane
         }
 
-        private fun terminalPanel(terminal: SwingTerminal): JPanel =
-            JPanel(BorderLayout()).apply {
+        private fun terminalPanel(
+            terminal: SwingTerminal,
+            searchBar: SwingTerminalSearchBar,
+        ): JPanel =
+            SwingTerminalOverlayPane(terminal, searchBar.component).apply {
                 background = terminal.background
                 border = null
                 terminal.border = null
-                add(terminal, BorderLayout.CENTER)
             }
     }
 }

@@ -16,10 +16,14 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import java.awt.BorderLayout
 import java.awt.Color
-import java.awt.Dimension
-import java.awt.FlowLayout
+import java.awt.Graphics
+import java.awt.Graphics2D
+import java.awt.GridBagConstraints
+import java.awt.GridBagLayout
 import java.awt.Insets
+import java.awt.RenderingHints
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import javax.swing.BorderFactory
@@ -111,37 +115,35 @@ class SwingTerminalSearchBar
         private var suppressDocumentEvents = false
         private val queryField = componentFactory.textField(28)
         private val counterLabel = componentFactory.label("0/0")
-        private val previousButton = componentFactory.button("<")
-        private val nextButton = componentFactory.button(">")
+        private val previousButton = componentFactory.button("\u25B2")
+        private val nextButton = componentFactory.button("\u25BC")
         private val caseSensitiveToggle = componentFactory.checkBox("Aa")
-        private val closeButton = componentFactory.button("x")
+        private val closeButton = componentFactory.button("\u2715")
+        private val searchPanel = SearchPanel()
 
         /**
-         * Swing component that hosts should add to their pane chrome.
+         * Swing component that hosts should mount as floating pane chrome.
          */
         val component: JComponent =
-            JPanel(FlowLayout(FlowLayout.RIGHT, HORIZONTAL_GAP, VERTICAL_GAP)).apply {
+            JPanel(BorderLayout()).apply {
                 isVisible = false
-                isOpaque = true
-                border = BorderFactory.createEmptyBorder(3, 8, 3, 8)
-                add(queryField)
-                add(counterLabel)
-                add(previousButton)
-                add(nextButton)
-                add(caseSensitiveToggle)
-                add(closeButton)
+                isOpaque = false
+                border = BorderFactory.createEmptyBorder(6, 12, 6, 12)
+                add(searchPanel, BorderLayout.EAST)
             }
 
         init {
             queryField.toolTipText = "Search terminal output"
             counterLabel.toolTipText = "Active match and total matches"
-            configureButton(previousButton, "Previous match")
-            configureButton(nextButton, "Next match")
-            configureButton(closeButton, "Close search")
+            configureCommandButton(previousButton, "Previous match", horizontalMargin = 4)
+            configureCommandButton(nextButton, "Next match", horizontalMargin = 4)
+            configureCommandButton(closeButton, "Close search", horizontalMargin = 6)
             caseSensitiveToggle.toolTipText = "Match case"
-            caseSensitiveToggle.margin = Insets(2, 6, 2, 6)
             caseSensitiveToggle.isFocusable = false
             caseSensitiveToggle.isOpaque = false
+            caseSensitiveToggle.isContentAreaFilled = false
+            caseSensitiveToggle.isBorderPainted = false
+            caseSensitiveToggle.margin = Insets(4, 6, 4, 6)
 
             queryField.document.addDocumentListener(
                 object : DocumentListener {
@@ -186,6 +188,14 @@ class SwingTerminalSearchBar
                 refreshCounter()
             }
             closeButton.addActionListener { close() }
+
+            var gridX = 0
+            searchPanel.add(queryField, constraints(gridX++, weightX = 1.0, fill = GridBagConstraints.HORIZONTAL))
+            searchPanel.add(counterLabel, constraints(gridX++))
+            searchPanel.add(previousButton, constraints(gridX++))
+            searchPanel.add(nextButton, constraints(gridX++, leftInset = 1))
+            searchPanel.add(caseSensitiveToggle, constraints(gridX++))
+            searchPanel.add(closeButton, constraints(gridX))
 
             refreshColors()
         }
@@ -234,28 +244,20 @@ class SwingTerminalSearchBar
          * Refreshes host colors from the terminal component.
          */
         fun refreshColors() {
-            val terminalBackground = terminal.background ?: Color.BLACK
-            val terminalForeground = terminal.foreground ?: Color.WHITE
-            val barBackground = blend(terminalBackground, terminalForeground, 0.08f)
-            val fieldBackground = blend(terminalBackground, terminalForeground, 0.14f)
-            val borderColor = blend(terminalBackground, terminalForeground, 0.22f)
-
-            component.background = barBackground
-            component.foreground = terminalForeground
-            queryField.background = fieldBackground
-            queryField.foreground = terminalForeground
-            queryField.caretColor = terminalForeground
-            queryField.border =
-                BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(borderColor),
-                    BorderFactory.createEmptyBorder(3, 8, 3, 8),
-                )
-            counterLabel.foreground = blend(terminalForeground, terminalBackground, 0.28f)
-            styleCommandColors(previousButton, terminalForeground, barBackground)
-            styleCommandColors(nextButton, terminalForeground, barBackground)
-            styleCommandColors(closeButton, terminalForeground, barBackground)
-            caseSensitiveToggle.foreground = terminalForeground
-            caseSensitiveToggle.background = barBackground
+            component.background = Color(0, 0, 0, 0)
+            component.foreground = FOREGROUND
+            searchPanel.background = PANEL_BACKGROUND
+            searchPanel.foreground = FOREGROUND
+            queryField.isOpaque = false
+            queryField.foreground = FOREGROUND
+            queryField.caretColor = FOREGROUND
+            queryField.border = BorderFactory.createEmptyBorder(4, 8, 4, 8)
+            counterLabel.foreground = COUNTER_FOREGROUND
+            styleCommandColors(previousButton)
+            styleCommandColors(nextButton)
+            styleCommandColors(closeButton)
+            caseSensitiveToggle.foreground = FOREGROUND
+            caseSensitiveToggle.background = PANEL_BACKGROUND
         }
 
         private fun queryChanged() {
@@ -295,46 +297,67 @@ class SwingTerminalSearchBar
             parent.repaint()
         }
 
-        private fun configureButton(
+        private fun configureCommandButton(
             button: JButton,
             tooltip: String,
+            horizontalMargin: Int,
         ) {
             button.toolTipText = tooltip
-            button.margin = Insets(2, 7, 2, 7)
+            button.margin = Insets(4, horizontalMargin, 4, horizontalMargin)
             button.isFocusable = false
-            button.minimumSize = Dimension(28, 24)
-            button.preferredSize = Dimension(28, 24)
-        }
-
-        private fun styleCommandColors(
-            button: JButton,
-            foreground: Color,
-            background: Color,
-        ) {
-            button.foreground = foreground
-            button.background = background
             button.isOpaque = false
             button.isContentAreaFilled = false
-            button.isBorderPainted = true
-            button.border = BorderFactory.createLineBorder(blend(background, foreground, 0.25f))
+            button.isBorderPainted = false
+        }
+
+        private fun styleCommandColors(button: JButton) {
+            button.foreground = FOREGROUND
+            button.background = PANEL_BACKGROUND
+            button.isOpaque = false
+            button.isContentAreaFilled = false
+            button.isBorderPainted = false
+        }
+
+        private fun constraints(
+            gridX: Int,
+            weightX: Double = 0.0,
+            fill: Int = GridBagConstraints.NONE,
+            leftInset: Int = 6,
+        ): GridBagConstraints =
+            GridBagConstraints().apply {
+                this.gridx = gridX
+                this.gridy = 0
+                this.weightx = weightX
+                this.fill = fill
+                this.insets = Insets(0, if (gridX == 0) 0 else leftInset, 0, 0)
+                this.anchor = GridBagConstraints.CENTER
+            }
+
+        private class SearchPanel : JPanel(GridBagLayout()) {
+            init {
+                isOpaque = false
+                border = BorderFactory.createEmptyBorder(6, 12, 6, 12)
+            }
+
+            override fun paintComponent(graphics: Graphics) {
+                val g = graphics.create() as Graphics2D
+                try {
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                    g.color = PANEL_BACKGROUND
+                    g.fillRoundRect(1, 1, width - 2, height - 2, 12, 12)
+                    g.color = PANEL_BORDER
+                    g.drawRoundRect(1, 1, width - 2, height - 2, 12, 12)
+                } finally {
+                    g.dispose()
+                }
+                super.paintComponent(graphics)
+            }
         }
 
         private companion object {
-            private const val HORIZONTAL_GAP = 6
-            private const val VERTICAL_GAP = 4
-
-            private fun blend(
-                first: Color,
-                second: Color,
-                secondWeight: Float,
-            ): Color {
-                val clampedWeight = secondWeight.coerceIn(0.0f, 1.0f)
-                val firstWeight = 1.0f - clampedWeight
-                return Color(
-                    (first.red * firstWeight + second.red * clampedWeight).toInt().coerceIn(0, 255),
-                    (first.green * firstWeight + second.green * clampedWeight).toInt().coerceIn(0, 255),
-                    (first.blue * firstWeight + second.blue * clampedWeight).toInt().coerceIn(0, 255),
-                )
-            }
+            private val PANEL_BACKGROUND = Color(0xEE202124.toInt(), true)
+            private val PANEL_BORDER = Color(0x663C4043, true)
+            private val FOREGROUND = Color(0xFFE8EAED.toInt(), true)
+            private val COUNTER_FOREGROUND = Color(0xFF9AA0A6.toInt(), true)
         }
     }
