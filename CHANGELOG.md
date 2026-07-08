@@ -1,4 +1,11 @@
-# KetraTerm Standalone App Changelog
+# KetraTerm Changelog
+
+## [0.1.3] - 2026-07-08
+
+- Moved search chrome and shortcut policy into host-owned action wiring.
+- Added shared Swing host utilities for floating search UI and default host shortcuts.
+- Added host key handling so shortcuts can be handled or passed through to the PTY.
+- Expanded search and shortcut coverage.
 
 ## [0.1.2] - 2026-07-03
 

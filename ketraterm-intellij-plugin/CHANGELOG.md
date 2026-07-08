@@ -1,5 +1,12 @@
 # KetraTerm IntelliJ Plugin Changelog
 
+## [0.1.3] - 2026-07-08
+
+- Improved focused-terminal shortcuts for copy, paste, search, and page scrolling.
+- Added an "Override IDE shortcuts in focused terminal" setting for Ctrl+F search behavior.
+- Added a compact floating search bar with result navigation and match-case control.
+- Improved macOS shortcut behavior with standard Cmd+C, Cmd+V, and Cmd+F bindings.
+
 ## [0.1.2] - 2026-07-03
 
 - Added terminal process close confirmation dialog.
