@@ -91,7 +91,9 @@ private class SearchTextField(
  * Factory for text controls used by [SwingTerminalSearchBar].
  *
  * Hosts can provide IDE-specific text component subclasses while reusing the
- * shared host search behavior and interaction styling.
+ * shared host search behavior. Command buttons and toggles are intentionally
+ * owned by the search bar so hover, pressed, and selected states stay
+ * consistent across Swing hosts.
  */
 interface SwingTerminalSearchBarComponentFactory {
     /**
@@ -112,7 +114,7 @@ interface SwingTerminalSearchBarComponentFactory {
 
     companion object {
         /**
-         * Default plain-Swing control factory.
+         * Default plain-Swing text control factory.
          */
         @JvmField
         val DEFAULT: SwingTerminalSearchBarComponentFactory =
