@@ -56,11 +56,11 @@
                 class="io.github.ketraterm.intellij.ui.KetraTermOpenSearchAction"
                 text="Find in Terminal"
                 description="Open search for the focused KetraTerm terminal">
-            <keyboard-shortcut keymap="$default" first-keystroke="control shift F"/>
-            <keyboard-shortcut keymap="Mac OS X" first-keystroke="control shift F" remove="true"/>
-            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control shift F" remove="true"/>
-            <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta shift F"/>
-            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta shift F"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="control F"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="control F" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control F" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta F"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta F"/>
         </action>
 
         <action id="KetraTerm.Terminal.ScrollPageUp"

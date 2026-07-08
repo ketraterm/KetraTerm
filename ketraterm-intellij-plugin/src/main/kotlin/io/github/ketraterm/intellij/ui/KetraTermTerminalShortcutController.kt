@@ -67,6 +67,9 @@ internal class KetraTermTerminalShortcutController(
      */
     fun handleKeyPressed(event: KeyEvent): Boolean {
         val action = activeKeymapActionFor(event.keyCode, event.modifiersEx) ?: return false
+        if (action == SwingTerminalHostAction.OPEN_SEARCH && !KetraTermIntellijSettings.getInstance().overrideIdeShortcuts()) {
+            return false
+        }
         if (!pane.isTerminalActionEnabled(action)) return false
         pane.performTerminalAction(action)
         return true

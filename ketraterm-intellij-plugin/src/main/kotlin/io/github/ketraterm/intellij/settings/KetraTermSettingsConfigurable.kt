@@ -76,6 +76,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
     private val systemFallbackFontsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.systemFallbackFonts"))
     private val visualBellCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.visualBell"))
     private val pasteOnMiddleClickCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.pasteOnMiddleClick"))
+    private val overrideIdeShortcutsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.overrideIdeShortcuts"))
     private val shellSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
     private val scrollOnOutputCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.scrollOnOutput"))
 
@@ -186,6 +187,9 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
                         cell(pasteOnMiddleClickCheckBox)
                     }
                     row {
+                        cell(overrideIdeShortcutsCheckBox)
+                    }
+                    row {
                         cell(shellSuggestionsCheckBox)
                     }
                     row {
@@ -258,6 +262,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
         systemFallbackFontsCheckBox.isSelected = normalized.useSystemFallbackFonts
         visualBellCheckBox.isSelected = normalized.visualBell
         pasteOnMiddleClickCheckBox.isSelected = normalized.pasteOnMiddleClick
+        overrideIdeShortcutsCheckBox.isSelected = normalized.overrideIdeShortcuts
         shellSuggestionsCheckBox.isSelected = normalized.shellSuggestionsEnabled
         scrollOnOutputCheckBox.isSelected = normalized.scrollOnOutput
         pasteSanitizationCombo.selectedItem = pasteSanitizationOptions().firstOrNull { it.id == normalized.pasteSanitization }
@@ -283,6 +288,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
             cursorShape = selectedCursorShapeId(),
             visualBell = visualBellCheckBox.isSelected,
             pasteOnMiddleClick = pasteOnMiddleClickCheckBox.isSelected,
+            overrideIdeShortcuts = overrideIdeShortcutsCheckBox.isSelected,
             shellSuggestionsEnabled = shellSuggestionsCheckBox.isSelected,
             scrollbackLines = spinnerValue(scrollbackSpinner),
             lineHeight = spinnerDoubleValue(lineHeightSpinner).toFloat(),

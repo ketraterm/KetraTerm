@@ -84,8 +84,8 @@ internal class KetraTermTerminalPane private constructor(
     fun isTerminalActionEnabled(action: SwingTerminalHostAction): Boolean =
         when (action) {
             SwingTerminalHostAction.COPY_SELECTION -> terminal.currentSelection() != null
+            SwingTerminalHostAction.OPEN_SEARCH -> KetraTermIntellijSettings.getInstance().overrideIdeShortcuts()
             SwingTerminalHostAction.PASTE_CLIPBOARD,
-            SwingTerminalHostAction.OPEN_SEARCH,
             SwingTerminalHostAction.SCROLL_PAGE_UP,
             SwingTerminalHostAction.SCROLL_PAGE_DOWN,
             -> true
