@@ -20,6 +20,8 @@ import io.github.ketraterm.app.history.CommandHistoryStore
 import io.github.ketraterm.app.history.CommandHistorySuggestionProvider
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
+import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
+import io.github.ketraterm.ui.swing.host.SwingTerminalContextMenuItems
 import io.github.ketraterm.workspace.*
 import java.awt.*
 import java.awt.event.InputEvent
@@ -204,8 +206,8 @@ internal class TabManager(
                 tab = workspaceTab,
                 settings = settings,
                 suggestionProvider = historySuggestionProvider(workspaceTab.profile.id),
-            ) { p, x, y ->
-                showPaneContextMenu(p, p.terminal, x, y)
+            ) { p, request ->
+                showPaneContextMenu(p, request)
             }
         panes += pane
 
@@ -376,8 +378,8 @@ internal class TabManager(
                 tab = workspaceTab,
                 settings = settings,
                 suggestionProvider = historySuggestionProvider(workspaceTab.profile.id),
-            ) { p, x, y ->
-                showPaneContextMenu(p, p.terminal, x, y)
+            ) { p, request ->
+                showPaneContextMenu(p, request)
             }
 
         panes += newPane
@@ -484,30 +486,17 @@ internal class TabManager(
 
     fun showPaneContextMenu(
         pane: TerminalPane,
-        component: Component,
-        x: Int,
-        y: Int,
-    ) {
+        request: SwingTerminalContextMenuRequest,
+    ): Boolean {
         val menu = JPopupMenu()
 
-        val copyItem =
-            JMenuItem("Copy").apply {
-                isEnabled = pane.terminal.currentSelection() != null
-                addActionListener {
-                    pane.terminal.copySelectionToClipboard()
-                }
-            }
-        val pasteItem =
-            JMenuItem("Paste").apply {
-                addActionListener {
-                    pane.terminal.pasteClipboardText()
-                }
-            }
+        SwingTerminalContextMenuItems.addTerminalActions(
+            menu = menu,
+            request = request,
+            openSearch = pane::openSearch,
+        )
 
-        menu.add(copyItem)
-        menu.add(pasteItem)
-
-        val commandRecordId = pane.terminal.commandRecordAt(x, y)
+        val commandRecordId = pane.terminal.commandRecordAt(request.x, request.y)
         if (commandRecordId != 0) {
             menu.addSeparator()
             menu.add(
@@ -568,7 +557,8 @@ internal class TabManager(
         menu.addSeparator()
         menu.add(closeItem)
 
-        menu.show(component, x, y)
+        menu.show(request.terminal, request.x, request.y)
+        return true
     }
 
     private fun exportCommandOutput(

@@ -17,19 +17,9 @@ package io.github.ketraterm.session
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
-import io.github.ketraterm.host.HostEventSink
-import io.github.ketraterm.host.HostPolicy
-import io.github.ketraterm.host.TerminalClipboardAuditEvent
-import io.github.ketraterm.host.TerminalClipboardOrigin
-import io.github.ketraterm.host.TerminalClipboardPermission
-import io.github.ketraterm.host.TerminalClipboardPolicy
-import io.github.ketraterm.host.TerminalClipboardPromptEvent
-import io.github.ketraterm.host.TerminalClipboardWriteEvent
+import io.github.ketraterm.host.*
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.event.TerminalFocusEvent
-import io.github.ketraterm.input.event.TerminalKeyEvent
-import io.github.ketraterm.input.event.TerminalMouseEvent
-import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.input.event.*
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
@@ -139,6 +129,17 @@ class TerminalSessionTest {
         session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
 
         assertEquals("a", connector.writtenBytes.asciiText())
+        session.close()
+    }
+
+    @Test
+    fun `ctrl L input writes form feed clear screen request`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector)
+
+        session.encodeKey(TerminalKeyEvent.codepoint('L'.code, TerminalModifiers.CTRL))
+
+        assertArrayEquals(byteArrayOf(0x0C), connector.writtenBytes)
         session.close()
     }
 

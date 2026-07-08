@@ -38,6 +38,7 @@ internal class SwingTerminalMouseController(
         object : MouseAdapter() {
             override fun mousePressed(event: MouseEvent) {
                 host.requestFocusInWindow()
+                if (handleContextMenu(event)) return
                 if (host.handlePromptMarkerMousePressed(event)) return
                 if (handleMouseTracking(event, TerminalMouseEventType.PRESS)) return
                 if (host.handleHyperlinkMousePressed(event)) return
@@ -45,6 +46,7 @@ internal class SwingTerminalMouseController(
             }
 
             override fun mouseReleased(event: MouseEvent) {
+                if (handleContextMenu(event)) return
                 if (handleMouseTracking(event, TerminalMouseEventType.RELEASE)) return
                 host.handleSelectionMouseReleased(event)
             }
@@ -108,6 +110,15 @@ internal class SwingTerminalMouseController(
     fun isMouseTrackingIntercepted(event: MouseEvent): Boolean {
         if (event.isShiftDown) return false
         return host.mouseTrackingMode() != MouseTrackingMode.OFF
+    }
+
+    private fun handleContextMenu(event: MouseEvent): Boolean {
+        if (!event.isPopupTrigger) return false
+        if (!event.isShiftDown && host.mouseTrackingMode() != MouseTrackingMode.OFF) return false
+        val handled = host.handleContextMenuMouseEvent(event, forcedByShift = event.isShiftDown)
+        if (!handled) return false
+        event.consume()
+        return true
     }
 
     private fun handleMouseTracking(

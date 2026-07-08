@@ -5,6 +5,7 @@
 - Improved focused-terminal shortcuts for copy, paste, search, and page scrolling.
 - Added an "Override IDE shortcuts in focused terminal" setting for Ctrl+F search behavior.
 - Added a compact floating search bar with result navigation and match-case control.
+- Added an IDE-styled terminal context menu with find, tab, clipboard, selection, clear-screen, and open-here actions..
 - Improved macOS shortcut behavior with standard Cmd+C, Cmd+V, and Cmd+F bindings.
 
 ## [0.1.2] - 2026-07-03

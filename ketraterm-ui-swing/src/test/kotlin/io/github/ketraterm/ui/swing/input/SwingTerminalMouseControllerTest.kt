@@ -73,6 +73,47 @@ class SwingTerminalMouseControllerTest {
             assertEquals(1, host.mouseReports.size)
             assertTrue(event.isConsumed)
         }
+
+        @Test
+        fun `popup trigger opens context menu when mouse tracking is off`() {
+            val host = RecordingMouseHost()
+            val controller = SwingTerminalMouseController(host)
+            val event = popupPressed(modifiers = InputEvent.BUTTON3_DOWN_MASK)
+
+            controller.mouseListener.mousePressed(event)
+
+            assertEquals(1, host.contextMenuCount)
+            assertEquals(0, host.mouseReports.size)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `plain popup trigger is sent to PTY when mouse tracking is active`() {
+            val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL)
+            val controller = SwingTerminalMouseController(host)
+            val event = popupPressed(modifiers = InputEvent.BUTTON3_DOWN_MASK)
+
+            controller.mouseListener.mousePressed(event)
+
+            assertEquals(0, host.contextMenuCount)
+            assertEquals(1, host.mouseReports.size)
+            assertEquals(io.github.ketraterm.input.event.TerminalMouseButton.RIGHT, host.mouseReports.single().button)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `shift popup trigger opens context menu even when mouse tracking is active`() {
+            val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL)
+            val controller = SwingTerminalMouseController(host)
+            val event = popupPressed(modifiers = InputEvent.BUTTON3_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK)
+
+            controller.mouseListener.mousePressed(event)
+
+            assertEquals(1, host.contextMenuCount)
+            assertTrue(host.lastContextMenuForcedByShift)
+            assertEquals(0, host.mouseReports.size)
+            assertTrue(event.isConsumed)
+        }
     }
 
     @Nested
@@ -291,6 +332,19 @@ class SwingTerminalMouseControllerTest {
             button,
         )
 
+    private fun popupPressed(modifiers: Int): MouseEvent =
+        MouseEvent(
+            source,
+            MouseEvent.MOUSE_PRESSED,
+            System.currentTimeMillis(),
+            modifiers,
+            20,
+            30,
+            1,
+            true,
+            MouseEvent.BUTTON3,
+        )
+
     private fun mouseReleased(): MouseEvent =
         MouseEvent(
             source,
@@ -391,6 +445,8 @@ class SwingTerminalMouseControllerTest {
         var selectionDragCount = 0
         var lastScrollDelta = 0.0
         var finishWheelAnimationCount = 0
+        var contextMenuCount = 0
+        var lastContextMenuForcedByShift = false
         val mouseReports = ArrayList<TerminalMouseEvent>()
 
         override fun mouseTrackingMode(): MouseTrackingMode = mouseTrackingMode
@@ -424,6 +480,15 @@ class SwingTerminalMouseControllerTest {
 
         override fun requestFocusInWindow(): Boolean {
             requestFocusInWindowCount++
+            return true
+        }
+
+        override fun handleContextMenuMouseEvent(
+            event: MouseEvent,
+            forcedByShift: Boolean,
+        ): Boolean {
+            contextMenuCount++
+            lastContextMenuForcedByShift = forcedByShift
             return true
         }
 

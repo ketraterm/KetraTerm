@@ -15,20 +15,21 @@
  */
 package io.github.ketraterm.intellij.ui
 
+import com.intellij.icons.AllIcons
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBScrollBar
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
-import io.github.ketraterm.ui.swing.api.SwingHostServices
-import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
-import io.github.ketraterm.ui.swing.api.SwingTerminal
-import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher
+import io.github.ketraterm.ui.swing.api.*
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
+import javax.swing.Icon
 import javax.swing.JPanel
 
 /**
@@ -43,6 +44,7 @@ internal class KetraTermTerminalPane private constructor(
     val terminal: SwingTerminal,
     val component: JPanel,
     private val searchBar: SwingTerminalSearchBar,
+    private val hostActions: KetraTermTerminalPaneHostActions,
 ) {
     private var shortcutController: KetraTermTerminalShortcutController? = null
 
@@ -111,6 +113,70 @@ internal class KetraTermTerminalPane private constructor(
         }
 
     /**
+     * Shows the IDE-owned terminal context menu for a right-click request that
+     * the reusable Swing terminal has decided belongs to terminal chrome.
+     */
+    fun showContextMenu(request: SwingTerminalContextMenuRequest): Boolean {
+        val group = DefaultActionGroup()
+        request.hyperlink?.let { link ->
+            group.add(ContextMenuAction("Open Link") { link.open() })
+            if (link.uri != null) {
+                group.add(ContextMenuAction("Copy Link") { link.copyUri() })
+            }
+            group.add(Separator.getInstance())
+        }
+
+        group.add(terminalAction("Find", KetraTermTerminalActionIds.OPEN_SEARCH, enabled = true) { openSearch() })
+        group.add(ContextMenuAction("New Tab", AllIcons.General.Add) { hostActions.openNewTab() })
+        group.add(ContextMenuAction("Close Tab") { hostActions.closePane(tab) })
+        group.add(Separator.getInstance())
+        group.add(
+            terminalAction(
+                text = "Copy",
+                registeredActionId = KetraTermTerminalActionIds.COPY_SELECTION,
+                enabled = request.hasSelection(),
+            ) {
+                request.copySelection()
+            },
+        )
+        group.add(
+            terminalAction(
+                text = "Paste",
+                registeredActionId = KetraTermTerminalActionIds.PASTE_CLIPBOARD,
+                enabled = true,
+            ) {
+                request.pasteClipboard()
+            },
+        )
+        group.add(ContextMenuAction("Select All") { request.selectAll() })
+        group.add(ContextMenuAction("Clear Screen") { request.clearScreen() })
+        group.add(Separator.getInstance())
+        group.add(
+            ContextMenuAction(
+                text = "Open Terminal Here",
+                enabled = hostActions.canOpenTerminalHere(tab),
+            ) {
+                hostActions.openTerminalHere(tab)
+            },
+        )
+
+        val popup = ActionManager.getInstance().createActionPopupMenu(CONTEXT_MENU_PLACE, group)
+        popup.component.show(request.terminal, request.x, request.y)
+        return true
+    }
+
+    private fun terminalAction(
+        text: String,
+        registeredActionId: String,
+        enabled: Boolean,
+        perform: () -> Unit,
+    ): AnAction {
+        val action = ContextMenuAction(text = text, enabled = enabled, perform = perform)
+        ActionManager.getInstance().getAction(registeredActionId)?.let(action::copyShortcutFrom)
+        return action
+    }
+
+    /**
      * Unbinds the pane from its session before the containing IDE tab is disposed.
      */
     fun close() {
@@ -130,10 +196,12 @@ internal class KetraTermTerminalPane private constructor(
         fun create(
             project: Project,
             tab: TerminalWorkspaceTab,
+            hostActions: KetraTermTerminalPaneHostActions = KetraTermTerminalPaneHostActions.NONE,
         ): KetraTermTerminalPane {
             val scrollbar = JBScrollBar(Adjustable.VERTICAL)
             val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
             val shortcutControllerRef = arrayOfNulls<KetraTermTerminalShortcutController>(1)
+            val paneRef = arrayOfNulls<KetraTermTerminalPane>(1)
             val terminal =
                 SwingTerminal(
                     settingsProvider = { KetraTermIntellijSettings.current() },
@@ -148,6 +216,9 @@ internal class KetraTermTerminalPane private constructor(
                             },
                             fontResolver = IntellijTerminalFontResolver,
                             hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
+                            contextMenuHandler = { request ->
+                                paneRef[0]?.showContextMenu(request) == true
+                            },
                         ),
                 )
             scrollbarAdapter.attach(terminal)
@@ -165,11 +236,30 @@ internal class KetraTermTerminalPane private constructor(
                 }
 
             tab.session.notifyRenderDirty()
-            return KetraTermTerminalPane(tab, terminal, component, searchBar).also { pane ->
+            return KetraTermTerminalPane(tab, terminal, component, searchBar, hostActions).also { pane ->
                 pane.shortcutController = KetraTermTerminalShortcutController(pane)
                 shortcutControllerRef[0] = pane.shortcutController
+                paneRef[0] = pane
             }
         }
 
+        private const val CONTEXT_MENU_PLACE = "KetraTerm.TerminalContextMenu"
     }
+}
+
+private class ContextMenuAction(
+    text: String,
+    icon: Icon? = null,
+    private val enabled: Boolean = true,
+    private val perform: () -> Unit,
+) : DumbAwareAction(text, null, icon) {
+    override fun actionPerformed(event: AnActionEvent) {
+        if (enabled) perform()
+    }
+
+    override fun update(event: AnActionEvent) {
+        event.presentation.isEnabled = enabled
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 }

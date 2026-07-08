@@ -16,6 +16,8 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.input.api.TerminalInputEncoder
+import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.MouseTrackingMode
@@ -381,6 +383,15 @@ class SwingTerminal
                     override fun handlePromptMarkerMouseExited() {
                         this@SwingTerminal.updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
                     }
+
+                    override fun handleContextMenuMouseEvent(
+                        event: MouseEvent,
+                        forcedByShift: Boolean,
+                    ): Boolean =
+                        this@SwingTerminal.handleContextMenuMouseEvent(
+                            event = event,
+                            forcedByShift = forcedByShift,
+                        )
 
                     override fun handleHyperlinkMousePressed(event: MouseEvent): Boolean = hyperlinkController.handleMousePressed(event)
 
@@ -1097,6 +1108,45 @@ class SwingTerminal
         }
 
         /**
+         * Selects all retained terminal text.
+         *
+         * The selection spans available scrollback and the live render grid. It
+         * cannot include rows already discarded by the configured scrollback
+         * capacity.
+         *
+         * @return `true` when a bound session and non-empty render cache allowed
+         * a selection to be created.
+         */
+        fun selectAll(): Boolean {
+            if (!SwingUtilities.isEventDispatchThread()) return false
+            if (session == null || renderCache.columns <= 0 || renderCache.rows <= 0) return false
+            val firstAbsoluteRow = renderCache.discardedCount
+            val lastAbsoluteRow = renderCache.discardedCount + renderCache.historySize + renderCache.rows - 1L
+            selectionController.selectAbsoluteRows(firstAbsoluteRow, lastAbsoluteRow, renderCache.columns)
+            repaint()
+            return true
+        }
+
+        /**
+         * Requests a foreground-program screen clear/redraw.
+         *
+         * This sends Ctrl+L through the terminal input encoder. It deliberately
+         * does not mutate the render buffer directly, because clearing the
+         * emulator display behind the PTY would desynchronize shells and TUIs
+         * from their cursor and prompt model.
+         *
+         * @return `true` when a bound session accepted the input request.
+         */
+        fun clearScreen(): Boolean {
+            if (!SwingUtilities.isEventDispatchThread()) return false
+            val boundSession = session ?: return false
+            selectionController.clearSelection()
+            searchController.clear()
+            boundSession.encodeKey(CLEAR_SCREEN_KEY_EVENT)
+            return true
+        }
+
+        /**
          * Applies a literal terminal-buffer search query.
          *
          * The search covers retained scrollback plus the live grid snapshot exposed
@@ -1391,6 +1441,21 @@ class SwingTerminal
             return true
         }
 
+        private fun handleContextMenuMouseEvent(
+            event: MouseEvent,
+            forcedByShift: Boolean,
+        ): Boolean {
+            val request =
+                SwingTerminalContextMenuRequest(
+                    terminal = this,
+                    x = event.x,
+                    y = event.y,
+                    forcedByShift = forcedByShift,
+                    hyperlink = contextHyperlinkAt(event),
+                )
+            return hostServices.contextMenuHandler.handleContextMenu(request)
+        }
+
         private fun isHyperlinkResolvable(hyperlinkId: Int): Boolean {
             if (hyperlinkId == NO_HYPERLINK_ID) return false
             if (hyperlinkId > 0) return session?.hyperlinkUri(hyperlinkId) != null
@@ -1404,6 +1469,23 @@ class SwingTerminal
                 return hostServices.hyperlinkHandler.openHyperlink(uri)
             }
             return hyperlinkDiscoveryController.openDiscoveredHyperlink(hyperlinkId, renderCache)
+        }
+
+        private fun contextHyperlinkAt(event: MouseEvent): SwingTerminalContextHyperlink? {
+            val hyperlinkId = hyperlinkController.hyperlinkIdAt(event)
+            if (hyperlinkId == NO_HYPERLINK_ID) return null
+            val uri = if (hyperlinkId > 0) session?.hyperlinkUri(hyperlinkId) else null
+            return SwingTerminalContextHyperlink(
+                uri = uri,
+                openAction = { openHyperlink(hyperlinkId) },
+                copyUriAction = {
+                    if (uri == null) {
+                        false
+                    } else {
+                        copyTextToClipboard(uri)
+                    }
+                },
+            )
         }
 
         private fun cellAt(
@@ -1702,6 +1784,7 @@ class SwingTerminal
 
             private val HAND_CURSOR: Cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             private val DEFAULT_CURSOR: Cursor = Cursor.getDefaultCursor()
+            private val CLEAR_SCREEN_KEY_EVENT = TerminalKeyEvent.codepoint('L'.code, TerminalModifiers.CTRL)
 
             private fun cursorTimerDelay(settings: SwingSettings): Int = maxOf(MIN_TIMER_DELAY_MILLIS, settings.cursorBlinkMillis)
 

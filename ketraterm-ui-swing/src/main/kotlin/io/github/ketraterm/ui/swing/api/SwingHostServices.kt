@@ -102,6 +102,9 @@ fun interface SwingTerminalHostKeyHandler {
  * a shell suggestion from the reusable popup.
  * @property hostKeyHandler host-owned keyboard action policy evaluated before
  * terminal input encoding.
+ * @property contextMenuHandler host-owned right-click popup policy. The
+ * reusable terminal invokes it only when terminal UI owns the right-click
+ * gesture; application mouse reporting takes precedence unless Shift is held.
  * @property fontResolver custom host font resolver policy.
  */
 data class SwingHostServices
@@ -116,5 +119,6 @@ data class SwingHostServices
         val shellSuggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
         val shellSuggestionHandler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
         val hostKeyHandler: SwingTerminalHostKeyHandler = SwingTerminalHostKeyHandler.NONE,
+        val contextMenuHandler: SwingTerminalContextMenuHandler = SwingTerminalContextMenuHandler.NONE,
         val fontResolver: TerminalFontResolver? = null,
     )
