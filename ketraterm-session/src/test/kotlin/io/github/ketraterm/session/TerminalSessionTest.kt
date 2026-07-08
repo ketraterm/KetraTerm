@@ -19,10 +19,7 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.event.TerminalFocusEvent
-import io.github.ketraterm.input.event.TerminalKeyEvent
-import io.github.ketraterm.input.event.TerminalMouseEvent
-import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.input.event.*
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
@@ -136,6 +133,17 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `ctrl L input writes form feed clear screen request`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector)
+
+        session.encodeKey(TerminalKeyEvent.codepoint('L'.code, TerminalModifiers.CTRL))
+
+        assertArrayEquals(byteArrayOf(0x0C), connector.writtenBytes)
+        session.close()
+    }
+
+    @Test
     fun `local close emits local lifecycle event once`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)
@@ -236,24 +244,6 @@ class TerminalSessionTest {
         assertEquals(20, session.terminal.width)
         assertEquals(5, session.terminal.height)
         assertEquals(listOf(10 to 3, 20 to 5), connector.resizeCalls)
-        session.close()
-    }
-
-    @Test
-    fun `clearScreen clears visible screen and homes cursor through session lock`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 10, rows = 3)
-
-        connector.feedFromHost("\u001B[2;4Habc".ascii())
-
-        assertEquals("   abc", session.terminal.getLineAsString(1))
-
-        session.clearScreen()
-
-        assertEquals("", session.terminal.getLineAsString(0))
-        assertEquals("", session.terminal.getLineAsString(1))
-        assertEquals(0, session.terminal.cursorRow)
-        assertEquals(0, session.terminal.cursorCol)
         session.close()
     }
 

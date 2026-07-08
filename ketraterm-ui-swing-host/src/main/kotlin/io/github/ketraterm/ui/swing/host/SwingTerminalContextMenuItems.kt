@@ -78,7 +78,7 @@ object SwingTerminalContextMenuItems {
             },
         )
         menu.add(
-            JMenuItem("Clear").apply {
+            JMenuItem("Clear Screen").apply {
                 addActionListener { request.clearScreen() }
             },
         )

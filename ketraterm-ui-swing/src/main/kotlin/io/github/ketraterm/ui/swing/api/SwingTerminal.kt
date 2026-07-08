@@ -16,6 +16,8 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.input.api.TerminalInputEncoder
+import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.MouseTrackingMode
@@ -1126,21 +1128,21 @@ class SwingTerminal
         }
 
         /**
-         * Clears the visible terminal screen and homes the cursor.
+         * Requests a foreground-program screen clear/redraw.
          *
-         * Retained scrollback history is preserved. Selection and search
-         * highlights are cleared because their coordinates refer to content
-         * that may no longer exist after the session mutation.
+         * This sends Ctrl+L through the terminal input encoder. It deliberately
+         * does not mutate the render buffer directly, because clearing the
+         * emulator display behind the PTY would desynchronize shells and TUIs
+         * from their cursor and prompt model.
          *
-         * @return `true` when a bound session accepted the clear request.
+         * @return `true` when a bound session accepted the input request.
          */
         fun clearScreen(): Boolean {
             if (!SwingUtilities.isEventDispatchThread()) return false
             val boundSession = session ?: return false
             selectionController.clearSelection()
             searchController.clear()
-            boundSession.clearScreen()
-            repaint()
+            boundSession.encodeKey(CLEAR_SCREEN_KEY_EVENT)
             return true
         }
 
@@ -1782,6 +1784,7 @@ class SwingTerminal
 
             private val HAND_CURSOR: Cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             private val DEFAULT_CURSOR: Cursor = Cursor.getDefaultCursor()
+            private val CLEAR_SCREEN_KEY_EVENT = TerminalKeyEvent.codepoint('L'.code, TerminalModifiers.CTRL)
 
             private fun cursorTimerDelay(settings: SwingSettings): Int = maxOf(MIN_TIMER_DELAY_MILLIS, settings.cursorBlinkMillis)
 

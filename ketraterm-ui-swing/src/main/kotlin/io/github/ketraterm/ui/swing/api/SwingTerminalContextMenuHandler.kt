@@ -90,9 +90,12 @@ class SwingTerminalContextMenuRequest internal constructor(
     fun selectAll(): Boolean = terminal.selectAll()
 
     /**
-     * Clears the visible terminal screen while preserving retained scrollback.
+     * Requests a foreground-program screen clear/redraw.
      *
-     * @return `true` when a bound session accepted the clear request.
+     * This sends Ctrl+L/form-feed to the terminal session instead of mutating
+     * the emulator display behind the PTY.
+     *
+     * @return `true` when a bound session accepted the input request.
      */
     fun clearScreen(): Boolean = terminal.clearScreen()
 }

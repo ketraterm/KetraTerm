@@ -149,7 +149,7 @@ internal class KetraTermTerminalPane private constructor(
             },
         )
         group.add(ContextMenuAction("Select All") { request.selectAll() })
-        group.add(ContextMenuAction("Clear") { request.clearScreen() })
+        group.add(ContextMenuAction("Clear Screen") { request.clearScreen() })
         group.add(Separator.getInstance())
         group.add(
             ContextMenuAction(

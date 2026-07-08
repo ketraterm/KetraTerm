@@ -243,22 +243,6 @@ class TerminalSession(
     }
 
     /**
-     * Clears the visible terminal screen and homes the cursor under the session
-     * mutation lock.
-     *
-     * Scrollback history is preserved, matching the core [TerminalBuffer.clearScreen]
-     * contract and the behavior of the shell `clear` command. Closed sessions
-     * ignore the request.
-     */
-    fun clearScreen() {
-        if (isSessionClosed()) return
-        synchronized(mutationLock) {
-            terminal.clearScreen()
-        }
-        notifyRenderDirty()
-    }
-
-    /**
      * Applies the host's East Asian Ambiguous width policy for future writes.
      *
      * Existing stored content keeps its current cell shape; changing this
