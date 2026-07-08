@@ -25,6 +25,7 @@ import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher
+import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBarComponentFactory
@@ -73,6 +74,46 @@ internal class KetraTermTerminalPane private constructor(
     fun openSearch() {
         searchBar.open()
     }
+
+    /**
+     * Returns whether [action] can currently run for this pane.
+     *
+     * @param action host-owned terminal pane action.
+     * @return `true` when the action should be enabled.
+     */
+    fun isTerminalActionEnabled(action: SwingTerminalHostAction): Boolean =
+        when (action) {
+            SwingTerminalHostAction.COPY_SELECTION -> terminal.currentSelection() != null
+            SwingTerminalHostAction.PASTE_CLIPBOARD,
+            SwingTerminalHostAction.OPEN_SEARCH,
+            SwingTerminalHostAction.SCROLL_PAGE_UP,
+            SwingTerminalHostAction.SCROLL_PAGE_DOWN,
+            -> true
+        }
+
+    /**
+     * Performs [action] against this pane.
+     *
+     * @param action host-owned terminal pane action.
+     * @return `true` when the action was handled by this pane.
+     */
+    fun performTerminalAction(action: SwingTerminalHostAction): Boolean =
+        when (action) {
+            SwingTerminalHostAction.COPY_SELECTION -> terminal.copySelectionToClipboard()
+            SwingTerminalHostAction.PASTE_CLIPBOARD -> terminal.pasteClipboardText()
+            SwingTerminalHostAction.OPEN_SEARCH -> {
+                openSearch()
+                true
+            }
+            SwingTerminalHostAction.SCROLL_PAGE_UP -> {
+                terminal.scrollViewportBy(terminal.visibleGridSize().height.coerceAtLeast(1).toDouble())
+                true
+            }
+            SwingTerminalHostAction.SCROLL_PAGE_DOWN -> {
+                terminal.scrollViewportBy(-terminal.visibleGridSize().height.coerceAtLeast(1).toDouble())
+                true
+            }
+        }
 
     /**
      * Unbinds the pane from its session before the containing IDE tab is disposed.

@@ -29,4 +29,53 @@
                     icon="/icons/ketraterm-toolwindow.svg"/>
     </extensions>
 
+    <actions>
+        <action id="KetraTerm.Terminal.CopySelection"
+                class="io.github.ketraterm.intellij.ui.KetraTermCopySelectionAction"
+                text="Copy Terminal Selection"
+                description="Copy the current KetraTerm terminal selection to the clipboard">
+            <keyboard-shortcut keymap="$default" first-keystroke="control C"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="control C" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control C" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta C"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta C"/>
+        </action>
+
+        <action id="KetraTerm.Terminal.PasteClipboard"
+                class="io.github.ketraterm.intellij.ui.KetraTermPasteClipboardAction"
+                text="Paste into Terminal"
+                description="Paste clipboard text into the focused KetraTerm terminal">
+            <keyboard-shortcut keymap="$default" first-keystroke="control V"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="control V" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control V" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta V"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta V"/>
+        </action>
+
+        <action id="KetraTerm.Terminal.OpenSearch"
+                class="io.github.ketraterm.intellij.ui.KetraTermOpenSearchAction"
+                text="Find in Terminal"
+                description="Open search for the focused KetraTerm terminal">
+            <keyboard-shortcut keymap="$default" first-keystroke="control shift F"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="control shift F" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control shift F" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta shift F"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta shift F"/>
+        </action>
+
+        <action id="KetraTerm.Terminal.ScrollPageUp"
+                class="io.github.ketraterm.intellij.ui.KetraTermScrollPageUpAction"
+                text="Scroll Terminal Page Up"
+                description="Scroll the focused KetraTerm terminal one page up">
+            <keyboard-shortcut keymap="$default" first-keystroke="shift PAGE_UP"/>
+        </action>
+
+        <action id="KetraTerm.Terminal.ScrollPageDown"
+                class="io.github.ketraterm.intellij.ui.KetraTermScrollPageDownAction"
+                text="Scroll Terminal Page Down"
+                description="Scroll the focused KetraTerm terminal one page down">
+            <keyboard-shortcut keymap="$default" first-keystroke="shift PAGE_DOWN"/>
+        </action>
+    </actions>
+
 </idea-plugin>

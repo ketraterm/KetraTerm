@@ -36,8 +36,10 @@ import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.workspace.*
 import java.awt.BorderLayout
+import java.awt.Component
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JPanel
+import javax.swing.SwingUtilities
 
 /**
  * Project-level owner for IntelliJ-hosted KetraTerm tabs and sessions.
@@ -72,6 +74,26 @@ class KetraTermProjectTerminalService(
      * Returns true when this project already has an open terminal tab.
      */
     fun hasOpenTabs(): Boolean = contentsByTabId.isNotEmpty() || pendingTabsById.isNotEmpty()
+
+    /**
+     * Finds the terminal pane that owns [component].
+     *
+     * Registered IntelliJ actions use this to scope global keymap shortcuts to
+     * the focused KetraTerm terminal pane without installing per-pane action
+     * instances.
+     *
+     * @param component focused Swing component from the action event context.
+     * @return owning terminal pane, or `null` when focus is outside KetraTerm.
+     */
+    internal fun paneForComponent(component: Component?): KetraTermTerminalPane? {
+        if (component == null || disposed) return null
+        for (pane in panesByTabId.values) {
+            if (component === pane.component || SwingUtilities.isDescendingFrom(component, pane.component)) {
+                return pane
+            }
+        }
+        return null
+    }
 
     /**
      * Opens the initial terminal tab if no terminal content exists yet.
