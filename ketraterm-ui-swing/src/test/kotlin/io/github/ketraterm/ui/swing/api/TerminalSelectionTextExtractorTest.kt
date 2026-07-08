@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import io.github.ketraterm.render.api.TerminalRenderCellFlags
+import io.github.ketraterm.ui.swing.render.TestCell
 import io.github.ketraterm.ui.swing.render.TestRenderFrame
 import io.github.ketraterm.ui.swing.render.renderCache
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -29,6 +31,67 @@ class TerminalSelectionTextExtractorTest {
         val selection = CellSelection(anchorColumn = 0, anchorRow = 0, caretColumn = 8, caretRow = 0)
 
         assertEquals("ab  cd", extractor.selectedText(cache, selection))
+    }
+
+    @Test
+    fun `selected text ignores empty cells after row content`() {
+        val cache =
+            renderCache(
+                TestRenderFrame(
+                    arrayOf(
+                        arrayOf(
+                            TestCell(codeWord = 'a'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+                            TestCell(codeWord = 'b'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+                            TestCell(),
+                            TestCell(),
+                            TestCell(),
+                        ),
+                    ),
+                ),
+            )
+        val selection = CellSelection(anchorColumn = 0, anchorRow = 0, caretColumn = 5, caretRow = 0)
+
+        assertEquals("ab", extractor.selectedText(cache, selection))
+    }
+
+    @Test
+    fun `selected text returns empty when only empty cells are selected`() {
+        val cache =
+            renderCache(
+                TestRenderFrame(
+                    arrayOf(
+                        arrayOf(
+                            TestCell(codeWord = 'a'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+                            TestCell(),
+                            TestCell(),
+                            TestCell(),
+                        ),
+                    ),
+                ),
+            )
+        val selection = CellSelection(anchorColumn = 1, anchorRow = 0, caretColumn = 4, caretRow = 0)
+
+        assertEquals("", extractor.selectedText(cache, selection))
+    }
+
+    @Test
+    fun `selected text preserves empty positioning cells before later content`() {
+        val cache =
+            renderCache(
+                TestRenderFrame(
+                    arrayOf(
+                        arrayOf(
+                            TestCell(codeWord = 'a'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+                            TestCell(),
+                            TestCell(),
+                            TestCell(codeWord = 'b'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+                        ),
+                    ),
+                ),
+            )
+        val selection = CellSelection(anchorColumn = 0, anchorRow = 0, caretColumn = 4, caretRow = 0)
+
+        assertEquals("a  b", extractor.selectedText(cache, selection))
     }
 
     @Test
