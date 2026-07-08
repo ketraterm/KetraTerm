@@ -16,6 +16,7 @@
 package io.github.ketraterm.intellij.ui
 
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.application.ApplicationManager
@@ -152,6 +153,8 @@ internal class KetraTermTerminalPane private constructor(
                     override fun actionPerformed(event: com.intellij.openapi.actionSystem.AnActionEvent) {
                         hyperlink.open()
                     }
+
+                    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
                 },
             )
             group.add(
@@ -163,6 +166,8 @@ internal class KetraTermTerminalPane private constructor(
                     override fun update(event: com.intellij.openapi.actionSystem.AnActionEvent) {
                         event.presentation.isEnabled = hyperlink.uri != null
                     }
+
+                    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
                 },
             )
             group.add(Separator.getInstance())
@@ -182,10 +187,12 @@ internal class KetraTermTerminalPane private constructor(
         group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.SCROLL_PAGE_UP)
         group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.SCROLL_PAGE_DOWN)
 
-        actionManager
-            .createActionPopupMenu(KetraTermTerminalActionIds.CONTEXT_MENU_PLACE, group)
-            .component
-            .show(request.terminal, request.x, request.y)
+        val popup =
+            actionManager
+                .createActionPopupMenu(KetraTermTerminalActionIds.CONTEXT_MENU_PLACE, group)
+                .component
+        KetraTermTerminalPopupContext.install(popup, this)
+        popup.show(request.terminal, request.x, request.y)
         return true
     }
 

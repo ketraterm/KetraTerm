@@ -22,6 +22,10 @@ import com.intellij.openapi.project.ProjectManager
 import io.github.ketraterm.intellij.services.KetraTermProjectTerminalService
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import java.awt.KeyboardFocusManager
+import javax.swing.JPopupMenu
+import javax.swing.SwingUtilities
+import javax.swing.event.PopupMenuEvent
+import javax.swing.event.PopupMenuListener
 
 internal object KetraTermTerminalActionIds {
     const val CONTEXT_MENU_PLACE = "KetraTerm.TerminalContextMenu"
@@ -176,6 +180,9 @@ internal abstract class KetraTermPaneLifecycleAction : DumbAwareAction() {
 }
 
 private fun terminalPane(event: AnActionEvent): KetraTermTerminalPane? {
+    if (event.isTerminalContextMenu()) {
+        KetraTermTerminalPopupContext.currentPane()?.let { return it }
+    }
     val focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner
     event.project
         ?.let { KetraTermProjectTerminalService.getInstance(it).paneForComponent(focusOwner) }
@@ -187,3 +194,37 @@ private fun terminalPane(event: AnActionEvent): KetraTermTerminalPane? {
 }
 
 private fun AnActionEvent.isTerminalContextMenu(): Boolean = place == KetraTermTerminalActionIds.CONTEXT_MENU_PLACE
+
+internal object KetraTermTerminalPopupContext {
+    private var pane: KetraTermTerminalPane? = null
+
+    fun currentPane(): KetraTermTerminalPane? = pane
+
+    fun install(
+        popup: JPopupMenu,
+        pane: KetraTermTerminalPane,
+    ) {
+        this.pane = pane
+        popup.addPopupMenuListener(
+            object : PopupMenuListener {
+                override fun popupMenuWillBecomeVisible(event: PopupMenuEvent) = Unit
+
+                override fun popupMenuWillBecomeInvisible(event: PopupMenuEvent) {
+                    SwingUtilities.invokeLater { clear(pane) }
+                    popup.removePopupMenuListener(this)
+                }
+
+                override fun popupMenuCanceled(event: PopupMenuEvent) {
+                    SwingUtilities.invokeLater { clear(pane) }
+                    popup.removePopupMenuListener(this)
+                }
+            },
+        )
+    }
+
+    private fun clear(expectedPane: KetraTermTerminalPane) {
+        if (pane === expectedPane) {
+            pane = null
+        }
+    }
+}
