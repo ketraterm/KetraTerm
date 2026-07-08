@@ -17,9 +17,7 @@ package io.github.ketraterm.intellij.ui
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
-import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollBar
-import com.intellij.ui.components.JBTextField
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
@@ -28,13 +26,10 @@ import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
-import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBarComponentFactory
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
-import javax.swing.JLabel
 import javax.swing.JPanel
-import javax.swing.JTextField
 
 /**
  * IntelliJ-hosted pane that binds one workspace tab to one reusable terminal component.
@@ -158,7 +153,7 @@ internal class KetraTermTerminalPane private constructor(
             scrollbarAdapter.attach(terminal)
             terminal.bind(tab.session)
 
-            val searchBar = SwingTerminalSearchBar(terminal, IntellijSearchBarComponentFactory)
+            val searchBar = SwingTerminalSearchBar(terminal)
             val terminalArea = SwingTerminalOverlayPane(terminal, searchBar.component)
             val component =
                 JPanel(BorderLayout()).apply {
@@ -176,10 +171,5 @@ internal class KetraTermTerminalPane private constructor(
             }
         }
 
-        private object IntellijSearchBarComponentFactory : SwingTerminalSearchBarComponentFactory {
-            override fun textField(columns: Int): JTextField = JBTextField(columns)
-
-            override fun label(text: String): JLabel = JBLabel(text)
-        }
     }
 }

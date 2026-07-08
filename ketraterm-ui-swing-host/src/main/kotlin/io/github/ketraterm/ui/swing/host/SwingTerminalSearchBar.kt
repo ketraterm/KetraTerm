@@ -16,9 +16,12 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import java.awt.BasicStroke
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Cursor
+import java.awt.Dimension
+import java.awt.Font
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.GridBagConstraints
@@ -40,20 +43,25 @@ import javax.swing.JPanel
 import javax.swing.JTextField
 import javax.swing.JToggleButton
 import javax.swing.KeyStroke
+import javax.swing.SwingConstants
 import javax.swing.SwingUtilities
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
-private val PANEL_BACKGROUND = Color(0xEE202124.toInt(), true)
-private val PANEL_BORDER = Color(0x663C4043, true)
+private val PANEL_SHADOW = Color(0x70000000, true)
+private val PANEL_BACKGROUND = Color(0xF01F2227.toInt(), true)
+private val PANEL_BORDER = Color(0x55414852, true)
 private val FOREGROUND = Color(0xFFE8EAED.toInt(), true)
-private val COUNTER_FOREGROUND = Color(0xFF9AA0A6.toInt(), true)
-private val TEXT_FIELD_BACKGROUND = Color(0x26FFFFFF, true)
-private val TEXT_FIELD_BORDER = Color(0x13FFFFFF, true)
-private val TEXT_FIELD_FOCUS_BORDER = Color(0x664285F4, true)
-private val BUTTON_HOVER_BACKGROUND = Color(0x1AFFFFFF, true)
-private val BUTTON_PRESSED_BACKGROUND = Color(0x33FFFFFF, true)
-private val BUTTON_SELECTED_BACKGROUND = Color(0x404285F4, true)
+private val COUNTER_FOREGROUND = Color(0xFFA4ABB6.toInt(), true)
+private val TEXT_FIELD_BACKGROUND = Color(0xFF25282E.toInt(), true)
+private val TEXT_FIELD_BORDER = Color(0x4A4B5563, true)
+private val TEXT_FIELD_FOCUS_BORDER = Color(0xFF3574F0.toInt(), true)
+private val TEXT_FIELD_PLACEHOLDER = Color(0xFF8B929D.toInt(), true)
+private val SEARCH_ICON_FOREGROUND = Color(0xFFB6BBC4.toInt(), true)
+private val BUTTON_HOVER_BACKGROUND = Color(0x18FFFFFF, true)
+private val BUTTON_PRESSED_BACKGROUND = Color(0x2CFFFFFF, true)
+private val BUTTON_SELECTED_BACKGROUND = Color(0x553574F0, true)
+private val BUTTON_SELECTED_FOREGROUND = Color(0xFFFFFFFF.toInt(), true)
 
 private class SearchTextField(
     columns: Int,
@@ -62,7 +70,8 @@ private class SearchTextField(
         isOpaque = false
         caretColor = FOREGROUND
         foreground = FOREGROUND
-        border = BorderFactory.createEmptyBorder(4, 8, 4, 8)
+        border = BorderFactory.createEmptyBorder(4, 34, 4, 48)
+        margin = Insets(0, 0, 0, 0)
         addFocusListener(
             object : FocusListener {
                 override fun focusGained(event: FocusEvent) = repaint()
@@ -71,6 +80,13 @@ private class SearchTextField(
             },
         )
     }
+
+    override fun getPreferredSize(): Dimension {
+        val size = super.getPreferredSize()
+        return Dimension(size.width, SEARCH_FIELD_HEIGHT)
+    }
+
+    override fun getMinimumSize(): Dimension = Dimension(160, SEARCH_FIELD_HEIGHT)
 
     override fun paintComponent(graphics: Graphics) {
         val g = graphics.create() as Graphics2D
@@ -84,6 +100,44 @@ private class SearchTextField(
             g.dispose()
         }
         super.paintComponent(graphics)
+        paintSearchAffordances(graphics)
+    }
+
+    private fun paintSearchAffordances(graphics: Graphics) {
+        val g = graphics.create() as Graphics2D
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            paintSearchIcon(g, 13, height / 2)
+            if (text.isEmpty() && !isFocusOwner) {
+                g.color = TEXT_FIELD_PLACEHOLDER
+                g.font = font
+                val metrics = g.fontMetrics
+                val y = ((height - metrics.height) / 2) + metrics.ascent
+                g.drawString("Search", 34, y)
+            }
+        } finally {
+            g.dispose()
+        }
+    }
+
+    private fun paintSearchIcon(
+        graphics: Graphics2D,
+        x: Int,
+        centerY: Int,
+    ) {
+        val oldStroke = graphics.stroke
+        try {
+            graphics.color = SEARCH_ICON_FOREGROUND
+            graphics.stroke = BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+            graphics.drawOval(x, centerY - 7, 11, 11)
+            graphics.drawLine(x + 9, centerY + 3, x + 15, centerY + 9)
+        } finally {
+            graphics.stroke = oldStroke
+        }
+    }
+
+    private companion object {
+        private const val SEARCH_FIELD_HEIGHT = 30
     }
 }
 
@@ -144,12 +198,13 @@ class SwingTerminalSearchBar
         componentFactory: SwingTerminalSearchBarComponentFactory = SwingTerminalSearchBarComponentFactory.DEFAULT,
     ) {
         private var suppressDocumentEvents = false
-        private val queryField = componentFactory.textField(28)
+        private val queryField = componentFactory.textField(24)
         private val counterLabel = componentFactory.label("0/0")
-        private val previousButton = FlatButton("\u25B2", horizontalMargin = 4)
-        private val nextButton = FlatButton("\u25BC", horizontalMargin = 4)
+        private val previousButton = IconButton(ButtonIcon.PREVIOUS)
+        private val nextButton = IconButton(ButtonIcon.NEXT)
         private val caseSensitiveToggle = FlatToggleButton("Aa")
-        private val closeButton = FlatButton("\u2715", horizontalMargin = 6)
+        private val searchInputPanel = SearchInputPanel(queryField, caseSensitiveToggle)
+        private val closeButton = IconButton(ButtonIcon.CLOSE)
         private val searchPanel = SearchPanel()
 
         /**
@@ -170,6 +225,9 @@ class SwingTerminalSearchBar
             nextButton.toolTipText = "Next match"
             closeButton.toolTipText = "Close search"
             caseSensitiveToggle.toolTipText = "Match case"
+            counterLabel.horizontalAlignment = SwingConstants.CENTER
+            counterLabel.preferredSize = Dimension(COUNTER_LABEL_WIDTH, COMMAND_BUTTON_HEIGHT)
+            counterLabel.minimumSize = counterLabel.preferredSize
 
             queryField.document.addDocumentListener(
                 object : DocumentListener {
@@ -216,11 +274,10 @@ class SwingTerminalSearchBar
             closeButton.addActionListener { close() }
 
             var gridX = 0
-            searchPanel.add(queryField, constraints(gridX++, weightX = 1.0, fill = GridBagConstraints.HORIZONTAL))
+            searchPanel.add(searchInputPanel, constraints(gridX++, weightX = 1.0, fill = GridBagConstraints.HORIZONTAL))
             searchPanel.add(counterLabel, constraints(gridX++))
             searchPanel.add(previousButton, constraints(gridX++))
             searchPanel.add(nextButton, constraints(gridX++, leftInset = 1))
-            searchPanel.add(caseSensitiveToggle, constraints(gridX++))
             searchPanel.add(closeButton, constraints(gridX))
 
             refreshColors()
@@ -277,7 +334,7 @@ class SwingTerminalSearchBar
             queryField.isOpaque = false
             queryField.foreground = FOREGROUND
             queryField.caretColor = FOREGROUND
-            queryField.border = BorderFactory.createEmptyBorder(4, 8, 4, 8)
+            queryField.border = BorderFactory.createEmptyBorder(4, 34, 4, 48)
             counterLabel.foreground = COUNTER_FOREGROUND
             previousButton.foreground = FOREGROUND
             nextButton.foreground = FOREGROUND
@@ -337,31 +394,70 @@ class SwingTerminalSearchBar
                 this.anchor = GridBagConstraints.CENTER
             }
 
-        private open class FlatButton(
-            text: String,
-            horizontalMargin: Int = 8,
-        ) : JButton(text) {
+        private class SearchInputPanel(
+            private val queryField: JTextField,
+            private val caseSensitiveToggle: JToggleButton,
+        ) : JPanel(null) {
+            init {
+                isOpaque = false
+                add(queryField)
+                add(caseSensitiveToggle)
+                setComponentZOrder(caseSensitiveToggle, 0)
+                setComponentZOrder(queryField, 1)
+            }
+
+            override fun getPreferredSize(): Dimension = queryField.preferredSize
+
+            override fun getMinimumSize(): Dimension = queryField.minimumSize
+
+            override fun getMaximumSize(): Dimension = queryField.maximumSize
+
+            override fun doLayout() {
+                queryField.setBounds(0, 0, width, height)
+                val buttonSize = caseSensitiveToggle.preferredSize
+                val buttonX = width - buttonSize.width - 5
+                val buttonY = (height - buttonSize.height) / 2
+                caseSensitiveToggle.setBounds(buttonX, buttonY, buttonSize.width, buttonSize.height)
+            }
+        }
+
+        private enum class ButtonIcon {
+            PREVIOUS,
+            NEXT,
+            CLOSE,
+        }
+
+        private class IconButton(
+            private val icon: ButtonIcon,
+        ) : JButton() {
             init {
                 isContentAreaFilled = false
                 isBorderPainted = false
                 isFocusPainted = false
                 isOpaque = false
                 isFocusable = false
+                isRolloverEnabled = true
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-                margin = Insets(4, horizontalMargin, 4, horizontalMargin)
+                margin = Insets(0, 0, 0, 0)
                 foreground = FOREGROUND
                 addMouseListener(RepaintOnHoverListener)
             }
+
+            override fun getPreferredSize(): Dimension = Dimension(ICON_BUTTON_WIDTH, COMMAND_BUTTON_HEIGHT)
+
+            override fun getMinimumSize(): Dimension = preferredSize
+
+            override fun getMaximumSize(): Dimension = preferredSize
 
             override fun paintComponent(graphics: Graphics) {
                 val g = graphics.create() as Graphics2D
                 try {
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
                     paintFlatButtonBackground(g, width, height, model)
+                    paintIcon(g, icon, width, height, foreground)
                 } finally {
                     g.dispose()
                 }
-                super.paintComponent(graphics)
             }
         }
 
@@ -374,17 +470,26 @@ class SwingTerminalSearchBar
                 isFocusPainted = false
                 isOpaque = false
                 isFocusable = false
+                isRolloverEnabled = true
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-                margin = Insets(4, 6, 4, 6)
+                margin = Insets(0, 0, 0, 0)
                 foreground = FOREGROUND
+                font = font.deriveFont(Font.BOLD)
                 addMouseListener(RepaintOnHoverListener)
             }
+
+            override fun getPreferredSize(): Dimension = Dimension(TOGGLE_BUTTON_WIDTH, COMMAND_BUTTON_HEIGHT)
+
+            override fun getMinimumSize(): Dimension = preferredSize
+
+            override fun getMaximumSize(): Dimension = preferredSize
 
             override fun paintComponent(graphics: Graphics) {
                 val g = graphics.create() as Graphics2D
                 try {
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
                     paintFlatButtonBackground(g, width, height, model, isSelected)
+                    foreground = if (isSelected) BUTTON_SELECTED_FOREGROUND else FOREGROUND
                 } finally {
                     g.dispose()
                 }
@@ -395,13 +500,15 @@ class SwingTerminalSearchBar
         private class SearchPanel : JPanel(GridBagLayout()) {
             init {
                 isOpaque = false
-                border = BorderFactory.createEmptyBorder(6, 12, 6, 12)
+                border = BorderFactory.createEmptyBorder(6, 10, 6, 10)
             }
 
             override fun paintComponent(graphics: Graphics) {
                 val g = graphics.create() as Graphics2D
                 try {
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                    g.color = PANEL_SHADOW
+                    g.fillRoundRect(2, 3, width - 4, height - 4, 14, 14)
                     g.color = PANEL_BACKGROUND
                     g.fillRoundRect(1, 1, width - 2, height - 2, 12, 12)
                     g.color = PANEL_BORDER
@@ -414,6 +521,11 @@ class SwingTerminalSearchBar
         }
 
         private companion object {
+            private const val COMMAND_BUTTON_HEIGHT = 28
+            private const val ICON_BUTTON_WIDTH = 30
+            private const val TOGGLE_BUTTON_WIDTH = 38
+            private const val COUNTER_LABEL_WIDTH = 46
+
             private val RepaintOnHoverListener =
                 object : MouseAdapter() {
                     override fun mouseEntered(event: MouseEvent) = event.component.repaint()
@@ -435,6 +547,40 @@ class SwingTerminalSearchBar
                     else -> return
                 }
                 graphics.fillRoundRect(0, 0, width, height, 6, 6)
+            }
+
+            private fun paintIcon(
+                graphics: Graphics2D,
+                icon: ButtonIcon,
+                width: Int,
+                height: Int,
+                color: Color,
+            ) {
+                val oldStroke = graphics.stroke
+                try {
+                    graphics.color = color
+                    graphics.stroke = BasicStroke(1.7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                    val centerX = width / 2
+                    val centerY = height / 2
+                    when (icon) {
+                        ButtonIcon.PREVIOUS -> {
+                            graphics.drawLine(centerX, centerY + 6, centerX, centerY - 5)
+                            graphics.drawLine(centerX, centerY - 5, centerX - 4, centerY - 1)
+                            graphics.drawLine(centerX, centerY - 5, centerX + 4, centerY - 1)
+                        }
+                        ButtonIcon.NEXT -> {
+                            graphics.drawLine(centerX, centerY - 6, centerX, centerY + 5)
+                            graphics.drawLine(centerX, centerY + 5, centerX - 4, centerY + 1)
+                            graphics.drawLine(centerX, centerY + 5, centerX + 4, centerY + 1)
+                        }
+                        ButtonIcon.CLOSE -> {
+                            graphics.drawLine(centerX - 4, centerY - 4, centerX + 4, centerY + 4)
+                            graphics.drawLine(centerX + 4, centerY - 4, centerX - 4, centerY + 4)
+                        }
+                    }
+                } finally {
+                    graphics.stroke = oldStroke
+                }
             }
         }
     }

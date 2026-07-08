@@ -39,4 +39,16 @@ class SwingTerminalSearchBarTest {
             assertEquals("", terminal.currentSearchState().query)
         }
     }
+
+    @Test
+    fun preferredWidthStaysCompactAcrossLookAndFeels() {
+        val terminal = SwingTerminal()
+        val searchBar = SwingTerminalSearchBar(terminal)
+
+        SwingUtilities.invokeAndWait {
+            val width = searchBar.component.preferredSize.width
+
+            assertTrue(width in 420..620, "search bar preferred width was $width")
+        }
+    }
 }
