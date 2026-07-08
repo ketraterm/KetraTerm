@@ -117,6 +117,8 @@ internal object TerminalPaneActionRegistry {
             SwingTerminalHostAction.COPY_SELECTION -> target.hasSelection()
             SwingTerminalHostAction.PASTE_CLIPBOARD,
             SwingTerminalHostAction.OPEN_SEARCH,
+            SwingTerminalHostAction.SELECT_ALL,
+            SwingTerminalHostAction.CLEAR_SCREEN,
             SwingTerminalHostAction.SCROLL_PAGE_UP,
             SwingTerminalHostAction.SCROLL_PAGE_DOWN,
             -> true
@@ -136,6 +138,8 @@ internal object TerminalPaneActionRegistry {
         when (action) {
             SwingTerminalHostAction.COPY_SELECTION -> target.copySelectionToClipboard()
             SwingTerminalHostAction.PASTE_CLIPBOARD -> target.pasteClipboardText()
+            SwingTerminalHostAction.SELECT_ALL -> target.selectAll()
+            SwingTerminalHostAction.CLEAR_SCREEN -> target.clearScreen()
             SwingTerminalHostAction.OPEN_SEARCH -> {
                 target.openSearch()
                 true
@@ -169,6 +173,16 @@ internal interface TerminalPaneActionTarget {
      * Pastes host clipboard text into the terminal.
      */
     fun pasteClipboardText(): Boolean
+
+    /**
+     * Selects all retained terminal text.
+     */
+    fun selectAll(): Boolean
+
+    /**
+     * Requests a foreground-program screen clear/redraw.
+     */
+    fun clearScreen(): Boolean
 
     /**
      * Opens host-owned search chrome.

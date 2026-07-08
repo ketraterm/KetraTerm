@@ -25,7 +25,7 @@ package io.github.ketraterm.ui.swing.api
  */
 fun interface SwingTerminalContextMenuHandler {
     /**
-     * Shows or handles a terminal context menu request.
+     * Shows or handles a terminal context-menu request.
      *
      * Implementations run on the Swing Event Dispatch Thread.
      *

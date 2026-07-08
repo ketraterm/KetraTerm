@@ -15,8 +15,10 @@
  */
 package io.github.ketraterm.intellij.ui
 
-import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
@@ -29,7 +31,6 @@ import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
-import javax.swing.Icon
 import javax.swing.JPanel
 
 /**
@@ -78,10 +79,15 @@ internal class KetraTermTerminalPane private constructor(
      * @param action host-owned terminal pane action.
      * @return `true` when the action should be enabled.
      */
-    fun isTerminalActionEnabled(action: SwingTerminalHostAction): Boolean =
+    fun isTerminalActionEnabled(
+        action: SwingTerminalHostAction,
+        fromContextMenu: Boolean = false,
+    ): Boolean =
         when (action) {
             SwingTerminalHostAction.COPY_SELECTION -> terminal.currentSelection() != null
-            SwingTerminalHostAction.OPEN_SEARCH -> KetraTermIntellijSettings.getInstance().overrideIdeShortcuts()
+            SwingTerminalHostAction.OPEN_SEARCH -> fromContextMenu || KetraTermIntellijSettings.getInstance().overrideIdeShortcuts()
+            SwingTerminalHostAction.SELECT_ALL,
+            SwingTerminalHostAction.CLEAR_SCREEN,
             SwingTerminalHostAction.PASTE_CLIPBOARD,
             SwingTerminalHostAction.SCROLL_PAGE_UP,
             SwingTerminalHostAction.SCROLL_PAGE_DOWN,
@@ -98,6 +104,8 @@ internal class KetraTermTerminalPane private constructor(
         when (action) {
             SwingTerminalHostAction.COPY_SELECTION -> terminal.copySelectionToClipboard()
             SwingTerminalHostAction.PASTE_CLIPBOARD -> terminal.pasteClipboardText()
+            SwingTerminalHostAction.SELECT_ALL -> terminal.selectAll()
+            SwingTerminalHostAction.CLEAR_SCREEN -> terminal.clearScreen()
             SwingTerminalHostAction.OPEN_SEARCH -> {
                 openSearch()
                 true
@@ -113,67 +121,79 @@ internal class KetraTermTerminalPane private constructor(
         }
 
     /**
-     * Shows the IDE-owned terminal context menu for a right-click request that
-     * the reusable Swing terminal has decided belongs to terminal chrome.
+     * Opens a new default terminal tab in this pane's tool window.
+     */
+    fun openNewTab(): Boolean = hostActions.openNewTab()
+
+    /**
+     * Returns whether "Open Terminal Here" can run for this pane.
+     */
+    fun canOpenTerminalHere(): Boolean = hostActions.canOpenTerminalHere(tab)
+
+    /**
+     * Opens a new terminal rooted at this pane's current local OSC 7 directory.
+     */
+    fun openTerminalHere(): Boolean = hostActions.openTerminalHere(tab)
+
+    /**
+     * Closes this pane through the owning IntelliJ content manager.
+     */
+    fun closePane() = hostActions.closePane(tab)
+
+    /**
+     * Shows the IntelliJ-native context menu for this terminal pane.
      */
     fun showContextMenu(request: SwingTerminalContextMenuRequest): Boolean {
+        val actionManager = ActionManager.getInstance()
         val group = DefaultActionGroup()
-        request.hyperlink?.let { link ->
-            group.add(ContextMenuAction("Open Link") { link.open() })
-            if (link.uri != null) {
-                group.add(ContextMenuAction("Copy Link") { link.copyUri() })
-            }
+        val hyperlink = request.hyperlink
+        if (hyperlink != null) {
+            group.add(
+                object : DumbAwareAction("Open Link") {
+                    override fun actionPerformed(event: com.intellij.openapi.actionSystem.AnActionEvent) {
+                        hyperlink.open()
+                    }
+
+                    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+                },
+            )
+            group.add(
+                object : DumbAwareAction("Copy Link") {
+                    override fun actionPerformed(event: com.intellij.openapi.actionSystem.AnActionEvent) {
+                        hyperlink.copyUri()
+                    }
+
+                    override fun update(event: com.intellij.openapi.actionSystem.AnActionEvent) {
+                        event.presentation.isEnabled = hyperlink.uri != null
+                    }
+
+                    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+                },
+            )
             group.add(Separator.getInstance())
         }
 
-        group.add(terminalAction("Find", KetraTermTerminalActionIds.OPEN_SEARCH, enabled = true) { openSearch() })
-        group.add(ContextMenuAction("New Tab", AllIcons.General.Add) { hostActions.openNewTab() })
-        group.add(ContextMenuAction("Close Tab") { hostActions.closePane(tab) })
+        group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.OPEN_SEARCH)
+        group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.NEW_TAB)
+        group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.CLOSE_TAB)
         group.add(Separator.getInstance())
-        group.add(
-            terminalAction(
-                text = "Copy",
-                registeredActionId = KetraTermTerminalActionIds.COPY_SELECTION,
-                enabled = request.hasSelection(),
-            ) {
-                request.copySelection()
-            },
-        )
-        group.add(
-            terminalAction(
-                text = "Paste",
-                registeredActionId = KetraTermTerminalActionIds.PASTE_CLIPBOARD,
-                enabled = true,
-            ) {
-                request.pasteClipboard()
-            },
-        )
-        group.add(ContextMenuAction("Select All") { request.selectAll() })
-        group.add(ContextMenuAction("Clear Screen") { request.clearScreen() })
+        group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.COPY_SELECTION)
+        group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.PASTE_CLIPBOARD)
+        group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.SELECT_ALL)
         group.add(Separator.getInstance())
-        group.add(
-            ContextMenuAction(
-                text = "Open Terminal Here",
-                enabled = hostActions.canOpenTerminalHere(tab),
-            ) {
-                hostActions.openTerminalHere(tab)
-            },
-        )
+        group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.CLEAR_SCREEN)
+        group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.OPEN_TERMINAL_HERE)
+        group.add(Separator.getInstance())
+        group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.SCROLL_PAGE_UP)
+        group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.SCROLL_PAGE_DOWN)
 
-        val popup = ActionManager.getInstance().createActionPopupMenu(CONTEXT_MENU_PLACE, group)
-        popup.component.show(request.terminal, request.x, request.y)
+        val popup =
+            actionManager
+                .createActionPopupMenu(KetraTermTerminalActionIds.CONTEXT_MENU_PLACE, group)
+                .component
+        KetraTermTerminalPopupContext.install(popup, this)
+        popup.show(request.terminal, request.x, request.y)
         return true
-    }
-
-    private fun terminalAction(
-        text: String,
-        registeredActionId: String,
-        enabled: Boolean,
-        perform: () -> Unit,
-    ): AnAction {
-        val action = ContextMenuAction(text = text, enabled = enabled, perform = perform)
-        ActionManager.getInstance().getAction(registeredActionId)?.let(action::copyShortcutFrom)
-        return action
     }
 
     /**
@@ -216,9 +236,10 @@ internal class KetraTermTerminalPane private constructor(
                             },
                             fontResolver = IntellijTerminalFontResolver,
                             hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
-                            contextMenuHandler = { request ->
-                                paneRef[0]?.showContextMenu(request) == true
-                            },
+                            contextMenuHandler =
+                                SwingTerminalContextMenuHandler { request ->
+                                    paneRef[0]?.showContextMenu(request) == true
+                                },
                         ),
                 )
             scrollbarAdapter.attach(terminal)
@@ -242,24 +263,12 @@ internal class KetraTermTerminalPane private constructor(
                 paneRef[0] = pane
             }
         }
-
-        private const val CONTEXT_MENU_PLACE = "KetraTerm.TerminalContextMenu"
     }
 }
 
-private class ContextMenuAction(
-    text: String,
-    icon: Icon? = null,
-    private val enabled: Boolean = true,
-    private val perform: () -> Unit,
-) : DumbAwareAction(text, null, icon) {
-    override fun actionPerformed(event: AnActionEvent) {
-        if (enabled) perform()
-    }
-
-    override fun update(event: AnActionEvent) {
-        event.presentation.isEnabled = enabled
-    }
-
-    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+private fun DefaultActionGroup.addRegisteredAction(
+    actionManager: ActionManager,
+    actionId: String,
+) {
+    add(actionManager.getAction(actionId) ?: return)
 }

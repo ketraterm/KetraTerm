@@ -1128,25 +1128,6 @@ class SwingTerminal
         }
 
         /**
-         * Requests a foreground-program screen clear/redraw.
-         *
-         * This sends Ctrl+L through the terminal input encoder. It deliberately
-         * does not mutate the render buffer directly, because clearing the
-         * emulator display behind the PTY would desynchronize shells and TUIs
-         * from their cursor and prompt model.
-         *
-         * @return `true` when a bound session accepted the input request.
-         */
-        fun clearScreen(): Boolean {
-            if (!SwingUtilities.isEventDispatchThread()) return false
-            val boundSession = session ?: return false
-            selectionController.clearSelection()
-            searchController.clear()
-            boundSession.encodeKey(CLEAR_SCREEN_KEY_EVENT)
-            return true
-        }
-
-        /**
          * Applies a literal terminal-buffer search query.
          *
          * The search covers retained scrollback plus the live grid snapshot exposed
@@ -1441,6 +1422,25 @@ class SwingTerminal
             return true
         }
 
+        /**
+         * Requests a foreground-program screen clear/redraw.
+         *
+         * This sends Ctrl+L through the terminal input encoder. It deliberately
+         * does not mutate the render buffer directly, because clearing the
+         * emulator display behind the PTY would desynchronize shells and TUIs
+         * from their cursor and prompt model.
+         *
+         * @return `true` when a bound session accepted the input request.
+         */
+        fun clearScreen(): Boolean {
+            if (!SwingUtilities.isEventDispatchThread()) return false
+            val boundSession = session ?: return false
+            selectionController.clearSelection()
+            searchController.clear()
+            boundSession.encodeKey(CLEAR_SCREEN_KEY_EVENT)
+            return true
+        }
+
         private fun handleContextMenuMouseEvent(
             event: MouseEvent,
             forcedByShift: Boolean,
@@ -1454,21 +1454,6 @@ class SwingTerminal
                     hyperlink = contextHyperlinkAt(event),
                 )
             return hostServices.contextMenuHandler.handleContextMenu(request)
-        }
-
-        private fun isHyperlinkResolvable(hyperlinkId: Int): Boolean {
-            if (hyperlinkId == NO_HYPERLINK_ID) return false
-            if (hyperlinkId > 0) return session?.hyperlinkUri(hyperlinkId) != null
-            return hyperlinkDiscoveryController.isDiscoveredHyperlinkResolvable(hyperlinkId, renderCache)
-        }
-
-        private fun openHyperlink(hyperlinkId: Int): Boolean {
-            if (hyperlinkId == NO_HYPERLINK_ID) return false
-            if (hyperlinkId > 0) {
-                val uri = session?.hyperlinkUri(hyperlinkId) ?: return false
-                return hostServices.hyperlinkHandler.openHyperlink(uri)
-            }
-            return hyperlinkDiscoveryController.openDiscoveredHyperlink(hyperlinkId, renderCache)
         }
 
         private fun contextHyperlinkAt(event: MouseEvent): SwingTerminalContextHyperlink? {
@@ -1486,6 +1471,21 @@ class SwingTerminal
                     }
                 },
             )
+        }
+
+        private fun isHyperlinkResolvable(hyperlinkId: Int): Boolean {
+            if (hyperlinkId == NO_HYPERLINK_ID) return false
+            if (hyperlinkId > 0) return session?.hyperlinkUri(hyperlinkId) != null
+            return hyperlinkDiscoveryController.isDiscoveredHyperlinkResolvable(hyperlinkId, renderCache)
+        }
+
+        private fun openHyperlink(hyperlinkId: Int): Boolean {
+            if (hyperlinkId == NO_HYPERLINK_ID) return false
+            if (hyperlinkId > 0) {
+                val uri = session?.hyperlinkUri(hyperlinkId) ?: return false
+                return hostServices.hyperlinkHandler.openHyperlink(uri)
+            }
+            return hyperlinkDiscoveryController.openDiscoveredHyperlink(hyperlinkId, renderCache)
         }
 
         private fun cellAt(

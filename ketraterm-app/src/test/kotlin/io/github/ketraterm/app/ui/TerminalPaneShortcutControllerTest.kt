@@ -40,6 +40,10 @@ class TerminalPaneShortcutControllerTest {
             private set
         var pasteCount: Int = 0
             private set
+        var selectAllCount: Int = 0
+            private set
+        var clearScreenCount: Int = 0
+            private set
 
         override fun hasSelection(): Boolean = false
 
@@ -50,6 +54,16 @@ class TerminalPaneShortcutControllerTest {
 
         override fun pasteClipboardText(): Boolean {
             pasteCount++
+            return true
+        }
+
+        override fun selectAll(): Boolean {
+            selectAllCount++
+            return true
+        }
+
+        override fun clearScreen(): Boolean {
+            clearScreenCount++
             return true
         }
 

@@ -139,7 +139,7 @@ class TerminalSessionTest {
 
         session.encodeKey(TerminalKeyEvent.codepoint('L'.code, TerminalModifiers.CTRL))
 
-        assertArrayEquals(byteArrayOf(0x0C), connector.writtenBytes)
+        assertArrayEquals(byteArrayOf(0x0c), connector.writtenBytes)
         session.close()
     }
 

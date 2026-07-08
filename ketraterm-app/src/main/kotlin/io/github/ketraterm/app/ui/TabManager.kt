@@ -21,7 +21,6 @@ import io.github.ketraterm.app.history.CommandHistorySuggestionProvider
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
-import io.github.ketraterm.ui.swing.host.SwingTerminalContextMenuItems
 import io.github.ketraterm.workspace.*
 import java.awt.*
 import java.awt.event.InputEvent
@@ -487,14 +486,52 @@ internal class TabManager(
     fun showPaneContextMenu(
         pane: TerminalPane,
         request: SwingTerminalContextMenuRequest,
-    ): Boolean {
+    ) {
         val menu = JPopupMenu()
 
-        SwingTerminalContextMenuItems.addTerminalActions(
-            menu = menu,
-            request = request,
-            openSearch = pane::openSearch,
-        )
+        val hyperlink = request.hyperlink
+        if (hyperlink != null) {
+            menu.add(
+                JMenuItem("Open Link").apply {
+                    addActionListener { hyperlink.open() }
+                },
+            )
+            menu.add(
+                JMenuItem("Copy Link").apply {
+                    isEnabled = hyperlink.uri != null
+                    addActionListener { hyperlink.copyUri() }
+                },
+            )
+            menu.addSeparator()
+        }
+
+        val copyItem =
+            JMenuItem("Copy").apply {
+                isEnabled = request.hasSelection()
+                addActionListener { request.copySelection() }
+            }
+        val pasteItem =
+            JMenuItem("Paste").apply {
+                addActionListener { request.pasteClipboard() }
+            }
+        val selectAllItem =
+            JMenuItem("Select All").apply {
+                addActionListener { request.selectAll() }
+            }
+        val searchItem =
+            JMenuItem("Search").apply {
+                addActionListener { pane.openSearch() }
+            }
+        val clearItem =
+            JMenuItem("Clear").apply {
+                addActionListener { request.clearScreen() }
+            }
+
+        menu.add(copyItem)
+        menu.add(pasteItem)
+        menu.add(selectAllItem)
+        menu.add(searchItem)
+        menu.add(clearItem)
 
         val commandRecordId = pane.terminal.commandRecordAt(request.x, request.y)
         if (commandRecordId != 0) {
@@ -558,7 +595,6 @@ internal class TabManager(
         menu.add(closeItem)
 
         menu.show(request.terminal, request.x, request.y)
-        return true
     }
 
     private fun exportCommandOutput(
