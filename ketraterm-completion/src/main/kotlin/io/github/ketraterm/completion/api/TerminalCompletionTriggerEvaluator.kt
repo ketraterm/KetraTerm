@@ -15,8 +15,7 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
-import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
+import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
@@ -37,6 +36,7 @@ object TerminalCompletionTriggerEvaluator {
      * @param cursorOffset UTF-16 cursor position.
      * @param minimumNonWhitespaceCharacters minimum characters required for default typing.
      * @param commandSpecs command specs used for context-aware live triggers.
+     * @param shellCapabilities resolved shell lexical and replacement policy.
      * @return `true` if suggestions should be requested.
      */
     @JvmOverloads
@@ -45,9 +45,12 @@ object TerminalCompletionTriggerEvaluator {
         cursorOffset: Int,
         minimumNonWhitespaceCharacters: Int,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+        shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
     ): Boolean {
-        if (isLiveTrigger(commandLine, cursorOffset, commandSpecs)) return true
-        return nonWhitespaceCount(commandLine) >= minimumNonWhitespaceCharacters
+        val lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset, shellCapabilities.syntax)
+        if (lineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) return false
+        if (isLiveTrigger(commandLine, cursorOffset, commandSpecs, lineContext)) return true
+        return nonWhitespaceCount(lineContext.commandPrefix(commandLine)) >= minimumNonWhitespaceCharacters
     }
 
     /**
@@ -58,6 +61,7 @@ object TerminalCompletionTriggerEvaluator {
      * @param commandLine visible command text.
      * @param cursorOffset UTF-16 cursor position.
      * @param commandSpecs command specs used for context-aware space triggers.
+     * @param shellCapabilities resolved shell lexical and replacement policy.
      * @return `true` if cursor is immediately after a live trigger token.
      */
     @JvmOverloads
@@ -65,8 +69,22 @@ object TerminalCompletionTriggerEvaluator {
         commandLine: String,
         cursorOffset: Int,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+        shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
+    ): Boolean {
+        val lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset, shellCapabilities.syntax)
+        if (lineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) return false
+        return isLiveTrigger(commandLine, cursorOffset, commandSpecs, lineContext)
+    }
+
+    private fun isLiveTrigger(
+        commandLine: String,
+        cursorOffset: Int,
+        commandSpecs: List<TerminalCommandSpec>,
+        lineContext: TerminalCommandLineContext,
     ): Boolean {
         if (cursorOffset <= 0) return false
+
+        if (lineContext.precededByOperator && lineContext.commandPrefix(commandLine).isBlank()) return true
 
         val lastChar = commandLine.getOrNull(cursorOffset - 1) ?: return false
 
@@ -82,7 +100,9 @@ object TerminalCompletionTriggerEvaluator {
         // 4. Context-aware finished-word space trigger
         if (lastChar == ' ') {
             val prevChar = commandLine.getOrNull(cursorOffset - 2)
-            if (prevChar != null && prevChar != ' ') return isContextualSpaceTrigger(commandLine, cursorOffset, commandSpecs)
+            if (prevChar != null && prevChar != ' ') {
+                return isContextualSpaceTrigger(commandLine, lineContext, commandSpecs)
+            }
         }
 
         return false
@@ -90,16 +110,17 @@ object TerminalCompletionTriggerEvaluator {
 
     private fun isContextualSpaceTrigger(
         commandLine: String,
-        cursorOffset: Int,
+        lineContext: TerminalCommandLineContext,
         commandSpecs: List<TerminalCommandSpec>,
     ): Boolean {
         val context =
             TerminalCompletionContextResolver.resolve(
                 commandLine = commandLine,
-                cursorOffset = cursorOffset,
+                lineContext = lineContext,
                 commandSpecs = commandSpecs,
             )
         return when (context.activePosition) {
+            TerminalCompletionActivePosition.OPERATOR -> false
             TerminalCompletionActivePosition.COMMAND -> false
             TerminalCompletionActivePosition.SUBCOMMAND -> context.subcommandCandidateSource != null
             TerminalCompletionActivePosition.OPTION_NAME -> false

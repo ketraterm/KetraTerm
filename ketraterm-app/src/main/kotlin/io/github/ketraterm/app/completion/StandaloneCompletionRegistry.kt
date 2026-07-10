@@ -64,12 +64,14 @@ internal class StandaloneCompletionRegistry(
      *
      * @param sessionId stable workspace tab/session id.
      * @param profileId stable standalone profile id for this session.
+     * @param shellCapabilities shell lexical and replacement rules selected from the profile.
      * @param workingDirectoryUriProvider supplier for the latest current-working-directory URI.
      * @return standalone Swing suggestion provider for the session.
      */
     fun createProvider(
         sessionId: String,
         profileId: String? = null,
+        shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
         workingDirectoryUriProvider: () -> String? = { null },
     ): StandaloneCompletionSuggestionProvider {
         require(sessionId.isNotBlank()) { "sessionId must not be blank" }
@@ -105,6 +107,7 @@ internal class StandaloneCompletionRegistry(
                 StandaloneCompletionSuggestionContext(
                     profileId = profileId,
                     workingDirectoryUri = workingDirectoryUriProvider(),
+                    shellCapabilities = shellCapabilities,
                 )
             },
         )

@@ -18,34 +18,40 @@ package io.github.ketraterm.completion.spec
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalCompletionSource
-import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
-import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
-import io.github.ketraterm.completion.commandline.TerminalCompletionContext
-import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
+import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalOptionSpec
 
 internal class SpecCompletionSource(
     specs: List<TerminalCommandSpec>,
-) : TerminalCompletionSource {
+) : ContextAwareCompletionSource {
     private val specs = specs.toList()
 
     init {
         require(specs.none { it.name.isBlank() }) { "specs must not contain blank command names" }
     }
 
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
+    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
+        complete(
+            request,
+            TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset, request.shellCapabilities.syntax),
+        )
+
+    override fun complete(
+        request: TerminalCompletionRequest,
+        commandLineContext: TerminalCommandLineContext,
+    ): List<TerminalCompletionCandidate> {
         if (specs.isEmpty()) return emptyList()
         val context =
             TerminalCompletionContextResolver.resolve(
                 commandLine = request.commandLine,
-                cursorOffset = request.cursorOffset,
+                lineContext = commandLineContext,
                 commandSpecs = specs,
             )
         val candidates =
             when (context.activePosition) {
+                TerminalCompletionActivePosition.OPERATOR -> emptyList()
                 TerminalCompletionActivePosition.COMMAND -> completeCommands(context.commandLineContext)
                 TerminalCompletionActivePosition.OPTION_NAME -> completeOptions(context)
                 TerminalCompletionActivePosition.OPTION_VALUE -> completeOptionValues(context)

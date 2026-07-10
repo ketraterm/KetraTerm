@@ -19,7 +19,10 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionEngine
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
+import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
+import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
+import io.github.ketraterm.completion.commandline.complete
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.ranking.TerminalCompletionRankingContext
@@ -34,18 +37,24 @@ internal class MergedCompletionEngine(
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
         if (sources.isEmpty()) return emptyList()
 
-        val rankingContext =
-            TerminalCompletionRankingContext(
-                TerminalCompletionContextResolver.resolve(
-                    commandLine = request.commandLine,
-                    cursorOffset = request.cursorOffset,
-                    commandSpecs = commandSpecs,
-                ),
+        val commandLineContext =
+            TerminalCommandLineTokenizer.parse(
+                request.commandLine,
+                request.cursorOffset,
+                request.shellCapabilities.syntax,
             )
+        val completionContext =
+            TerminalCompletionContextResolver.resolve(
+                commandLine = request.commandLine,
+                lineContext = commandLineContext,
+                commandSpecs = commandSpecs,
+            )
+        if (completionContext.activePosition == TerminalCompletionActivePosition.OPERATOR) return emptyList()
+        val rankingContext = TerminalCompletionRankingContext(completionContext)
         val deduplicated = LinkedHashMap<CandidateKey, RankedCandidate>()
         for (sourceIndex in sources.indices) {
             val entry = sources[sourceIndex]
-            val candidates = entry.source.complete(request)
+            val candidates = entry.source.complete(request, commandLineContext)
             for (candidateIndex in candidates.indices) {
                 val candidate = candidates[candidateIndex]
                 val ranked =

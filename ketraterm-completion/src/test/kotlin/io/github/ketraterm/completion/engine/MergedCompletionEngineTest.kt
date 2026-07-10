@@ -375,6 +375,31 @@ class MergedCompletionEngineTest {
         assertTrue(engine.complete(request(maxCandidates = 8)).isEmpty())
     }
 
+    @Test
+    fun `operator region suppresses every source before source evaluation`() {
+        var sourceCalls = 0
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                TerminalCompletionSource {
+                    sourceCalls++
+                    listOf(candidate("unexpected"))
+                },
+            )
+        val commandLine = "git status && cd"
+
+        val candidates =
+            engine.complete(
+                TerminalCompletionRequest(
+                    commandLine = commandLine,
+                    cursorOffset = commandLine.indexOf("&&") + 1,
+                    shellCapabilities = TerminalShellCapabilities.POSIX,
+                ),
+            )
+
+        assertTrue(candidates.isEmpty())
+        assertEquals(0, sourceCalls)
+    }
+
     private fun entry(
         source: TerminalCompletionSource,
         priority: Int,

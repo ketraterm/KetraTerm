@@ -18,6 +18,10 @@ package io.github.ketraterm.completion.ranking
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSource
+import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
+import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
+import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
+import io.github.ketraterm.completion.commandline.complete
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
 import io.github.ketraterm.completion.model.TerminalCompletionTokenPosition
@@ -37,15 +41,24 @@ import io.github.ketraterm.completion.model.TerminalCompletionTokenPosition
 internal class FeedbackAwareCompletionSource(
     private val delegate: TerminalCompletionSource,
     private val feedbackStatsProvider: () -> List<TerminalCompletionFeedbackStats>,
-) : TerminalCompletionSource {
+) : ContextAwareCompletionSource {
     /**
      * Returns delegated candidates with source-specific feedback adjustments.
      *
      * @param request completion context.
      * @return delegated candidates sorted by adjusted score.
      */
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
-        val candidates = delegate.complete(request)
+    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
+        complete(
+            request,
+            TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset, request.shellCapabilities.syntax),
+        )
+
+    override fun complete(
+        request: TerminalCompletionRequest,
+        commandLineContext: TerminalCommandLineContext,
+    ): List<TerminalCompletionCandidate> {
+        val candidates = delegate.complete(request, commandLineContext)
         if (candidates.isEmpty()) return candidates
         val feedbackStats = feedbackStatsProvider()
         if (feedbackStats.isEmpty()) return candidates

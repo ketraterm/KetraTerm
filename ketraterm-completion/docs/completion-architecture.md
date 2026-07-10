@@ -47,6 +47,13 @@ expected path kind, expected dynamic value domain, repeatable subcommand source,
 static value candidates, context-aware live trigger state, replacement offsets,
 or active quote state from raw command text.
 
+`TerminalShellCapabilities` is the single host-to-engine dialect contract. It
+contains `TerminalShellSyntax` for segment lexing and
+`TerminalShellQuotingPolicy` for replacement text. The shared engine never
+infers either capability from command text or a profile id: hosts select the
+tested `POSIX` or `POWERSHELL` capability set from authoritative profile
+metadata, and use `PLAIN` for every shell without an implemented contract.
+
 ## Internal Implementation
 
 These packages are implementation detail and must not be imported by app,
@@ -84,6 +91,17 @@ Completion treats trailing space as a semantic boundary. With the cursor inside
 complete a new empty argument at the cursor while full-command MRU and stats
 sources may still match the normalized visible command prefix.
 
+For supported POSIX and PowerShell syntax, the tokenizer uses one bounded
+single-pass lexical scan per merged-engine request to select the cursor's
+command segment. Operators inside quotes or escaped by the dialect do not split
+segments. A cursor at the start of an operator belongs to the left segment; a
+cursor inside a multi-character operator is an `OPERATOR` region and returns no
+candidates; a cursor after the operator belongs to a new right segment.
+Unclosed quotes and incomplete command lines remain tokenizable and resolve to
+their closest logical segment. Whole-command MRU and exact-stats candidates are
+suppressed in segments following an operator because their full-line replacement
+range cannot safely express a segment-local completion.
+
 Path completion is intentionally conservative. In command position it only
 returns candidates for explicitly path-like prefixes. In argument position it
 returns bare current-directory entries only when the resolved
@@ -95,10 +113,11 @@ file-or-directory candidates. Dot-prefixed entries are hidden for an empty path
 prefix and appear once the user types `.`. When the active path token begins
 with a quote, path candidates replace the whole token with a matching quoted
 replacement instead of dropping the quote. Unquoted path replacements are
-escaped according to `TerminalCompletionRequest.shellQuotingPolicy`, preserving
-existing backslash-escaped style where the user has already chosen it. `AUTO`
-uses `profileId` to select PowerShell escaping for PowerShell profiles and POSIX
-escaping otherwise.
+escaped according to `TerminalCompletionRequest.shellCapabilities.quoting`.
+POSIX uses backslash escaping, PowerShell uses single-quoted literals where
+escaping is necessary, and `PLAIN` omits replacements that would require
+dialect-specific escaping. Existing single- and double-quote styles are
+preserved when that style can safely represent the candidate.
 
 Live trigger policy is command-context aware. Hyphen, path separator, and
 environment-variable triggers remain immediate. A trailing space is immediate
@@ -135,6 +154,12 @@ Both hosts should map their data into the shared request/candidate/source
 contracts and let the shared engine merge, deduplicate, and rank candidates.
 `ketraterm-completion` must stay pure: it should not shell out to Git, read IDE
 indexes, watch files, or block on host I/O.
+
+The standalone host currently maps PowerShell to `POWERSHELL`, its tested
+POSIX-profile categories to `POSIX`, and Command Prompt, Fish, Nushell, and
+unknown profiles to `PLAIN`. Native shell completion callbacks and dialect
+adapters remain host-owned future work; they must supply authoritative
+replacement ranges and never be called from the shared completion hot path.
 
 ## Ranking Policy
 

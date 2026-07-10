@@ -16,6 +16,7 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionTriggerEvaluator
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
@@ -47,6 +48,7 @@ import javax.swing.Timer
  * @param commandSpecs immutable command specs shared with the suggestion
  * provider so custom command contexts use the same live-trigger policy as
  * candidate generation and ranking.
+ * @param shellCapabilities resolved shell lexical and replacement policy.
  */
 internal class StandaloneCompletionTriggerController(
     private val activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
@@ -58,6 +60,7 @@ internal class StandaloneCompletionTriggerController(
     private val debounceMillis: Int = DEFAULT_DEBOUNCE_MILLIS,
     private val minimumNonWhitespaceCharacters: Int = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    private val shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
 ) {
     private val commandSpecs = commandSpecs.toList()
     private var lastRequestedSnapshotKey: SnapshotKey? = null
@@ -135,6 +138,7 @@ internal class StandaloneCompletionTriggerController(
                 cursorOffset = snapshot.cursorOffset,
                 minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
                 commandSpecs = commandSpecs,
+                shellCapabilities = shellCapabilities,
             )
         if (!shouldTrigger) {
             lastRequestedSnapshotKey = null

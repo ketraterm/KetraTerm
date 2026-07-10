@@ -27,6 +27,7 @@ internal class TerminalCompletionRankingContext(
 ) {
     fun priorityAdjustment(candidate: TerminalCompletionCandidate): Int =
         when (context.activePosition) {
+            TerminalCompletionActivePosition.OPERATOR -> 0
             TerminalCompletionActivePosition.COMMAND -> commandPositionAdjustment(candidate)
             TerminalCompletionActivePosition.SUBCOMMAND -> subcommandPositionAdjustment(candidate)
             TerminalCompletionActivePosition.OPTION_NAME -> optionNamePositionAdjustment(candidate)

@@ -17,6 +17,7 @@ package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.completion.StandaloneCompletionTriggerController
 import io.github.ketraterm.app.config.KetraTermSettings
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
@@ -72,6 +73,7 @@ internal class TerminalPane private constructor(
             suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
             suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
             commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+            shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
             onContextMenu: (TerminalPane, Int, Int) -> Unit,
         ): TerminalPane {
             val scrollbar = JScrollBar(Adjustable.VERTICAL)
@@ -85,6 +87,7 @@ internal class TerminalPane private constructor(
                     rankingContextKey = { tab.currentWorkingDirectoryUri },
                     suggestionsEnabled = { settings.shellSuggestionsEnabled },
                     commandSpecs = commandSpecs,
+                    shellCapabilities = shellCapabilities,
                 )
 
             val defaultHandler = SwingShellSuggestionHandler.createDefault(tab.session)

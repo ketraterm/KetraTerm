@@ -18,7 +18,7 @@ package io.github.ketraterm.completion.ranking
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSource
-import io.github.ketraterm.completion.commandline.TerminalCommandLineClassifier
+import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.commandLineAfterCandidate
 import io.github.ketraterm.completion.model.TerminalCommandLineShape
@@ -46,7 +46,7 @@ internal class ShapeAwareCompletionSource(
     private val delegate: TerminalCompletionSource,
     private val shapeStatsProvider: () -> List<TerminalCommandShapeStats>,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-) : TerminalCompletionSource {
+) : ContextAwareCompletionSource {
     private val commandSpecs = commandSpecs.toList()
 
     /**
@@ -55,8 +55,17 @@ internal class ShapeAwareCompletionSource(
      * @param request completion context.
      * @return delegated candidates sorted by adjusted score.
      */
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
-        val candidates = delegate.complete(request)
+    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
+        complete(
+            request,
+            TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset, request.shellCapabilities.syntax),
+        )
+
+    override fun complete(
+        request: TerminalCompletionRequest,
+        commandLineContext: TerminalCommandLineContext,
+    ): List<TerminalCompletionCandidate> {
+        val candidates = delegate.complete(request, commandLineContext)
         if (candidates.isEmpty()) return candidates
         val shapeStats = shapeStatsProvider()
         if (shapeStats.isEmpty()) return candidates

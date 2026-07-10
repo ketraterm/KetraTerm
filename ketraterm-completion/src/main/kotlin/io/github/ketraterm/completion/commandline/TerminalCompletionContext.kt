@@ -15,12 +15,14 @@
  */
 package io.github.ketraterm.completion.commandline
 
+import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalOptionSpec
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 internal enum class TerminalCompletionActivePosition {
+    OPERATOR,
     COMMAND,
     SUBCOMMAND,
     OPTION_NAME,
@@ -52,8 +54,34 @@ internal object TerminalCompletionContextResolver {
         commandLine: String,
         cursorOffset: Int,
         commandSpecs: List<TerminalCommandSpec>,
+        shellSyntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
+    ): TerminalCompletionContext =
+        resolve(
+            commandLine = commandLine,
+            lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset, shellSyntax),
+            commandSpecs = commandSpecs,
+        )
+
+    fun resolve(
+        commandLine: String,
+        lineContext: TerminalCommandLineContext,
+        commandSpecs: List<TerminalCommandSpec>,
     ): TerminalCompletionContext {
-        val lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset)
+        if (lineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) {
+            return TerminalCompletionContext(
+                commandLineContext = lineContext,
+                commandTokenIndex = 0,
+                command = null,
+                commandPath = emptyList(),
+                activePosition = TerminalCompletionActivePosition.OPERATOR,
+                activeOption = null,
+                expectedPathKind = TerminalPathArgumentKind.NONE,
+                expectedValueDomain = TerminalCompletionValueDomain.NONE,
+                subcommandCandidateSource = null,
+                staticValueCandidates = emptyList(),
+                activeTokenQuote = NO_QUOTE,
+            )
+        }
         val commandTokenIndex = lineContext.tokens.firstCommandTokenIndex()
         val isCommandPosition = lineContext.activeTokenIndex <= commandTokenIndex
         val activeTokenQuote = activeTokenQuote(commandLine, lineContext.replacementStartOffset)

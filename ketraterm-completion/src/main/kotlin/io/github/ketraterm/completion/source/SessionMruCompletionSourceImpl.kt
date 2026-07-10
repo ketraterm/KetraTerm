@@ -19,12 +19,8 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalSessionMruCompletionSource
-import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
-import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
-import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
-import io.github.ketraterm.completion.internal.isRelativeCdCommand
-import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
-import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncrement
+import io.github.ketraterm.completion.commandline.*
+import io.github.ketraterm.completion.internal.*
 
 /**
  * Bounded in-memory MRU source for successful commands observed in one live
@@ -42,7 +38,8 @@ import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncreme
  */
 internal class SessionMruCompletionSourceImpl(
     private val capacity: Int = DEFAULT_CAPACITY,
-) : TerminalSessionMruCompletionSource {
+) : TerminalSessionMruCompletionSource,
+    ContextAwareCompletionSource {
     init {
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
     }
@@ -107,8 +104,20 @@ internal class SessionMruCompletionSourceImpl(
         }
     }
 
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
-        val prefix = request.commandLine.substring(0, request.cursorOffset).trimStart()
+    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
+        complete(
+            request,
+            TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset, request.shellCapabilities.syntax),
+        )
+
+    override fun complete(
+        request: TerminalCompletionRequest,
+        commandLineContext: TerminalCommandLineContext,
+    ): List<TerminalCompletionCandidate> {
+        val context = commandLineContext
+        if (context.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) return emptyList()
+        if (context.precededByOperator) return emptyList()
+        val prefix = context.commandPrefix(request.commandLine)
         val normalizedPrefix = normalizeTerminalCommandLine(prefix)
         val candidates =
             synchronized(lock) {
@@ -127,7 +136,7 @@ internal class SessionMruCompletionSourceImpl(
                                 continue
                             }
                         }
-                        result += entry.toCandidate(request)
+                        result += entry.toCandidate(request, context.commandStartOffset, context.commandEndOffset)
                     }
                 }
                 result
@@ -138,11 +147,15 @@ internal class SessionMruCompletionSourceImpl(
             .take(request.maxCandidates)
     }
 
-    private fun Entry.toCandidate(request: TerminalCompletionRequest): TerminalCompletionCandidate =
+    private fun Entry.toCandidate(
+        request: TerminalCompletionRequest,
+        replacementStartOffset: Int,
+        replacementEndOffset: Int,
+    ): TerminalCompletionCandidate =
         TerminalCompletionCandidate(
             replacementText = commandLine,
-            replacementStartOffset = 0,
-            replacementEndOffset = request.commandLine.length,
+            replacementStartOffset = replacementStartOffset,
+            replacementEndOffset = replacementEndOffset,
             displayText = commandLine,
             source = SOURCE_MRU,
             kind = TerminalCompletionCandidateKind.HISTORY,

@@ -18,6 +18,7 @@ package io.github.ketraterm.completion.ranking
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
 import io.github.ketraterm.completion.internal.isRelativeCdCommand
@@ -35,10 +36,28 @@ internal object ExactCommandStatsCandidateBuilder {
     fun complete(
         request: TerminalCompletionRequest,
         snapshot: List<TerminalCommandCompletionStats>,
+    ): List<TerminalCompletionCandidate> =
+        complete(
+            request = request,
+            snapshot = snapshot,
+            commandLineContext =
+                TerminalCommandLineTokenizer.parse(
+                    request.commandLine,
+                    request.cursorOffset,
+                    request.shellCapabilities.syntax,
+                ),
+        )
+
+    fun complete(
+        request: TerminalCompletionRequest,
+        snapshot: List<TerminalCommandCompletionStats>,
+        commandLineContext: TerminalCommandLineContext,
     ): List<TerminalCompletionCandidate> {
         if (snapshot.isEmpty()) return emptyList()
-
-        val prefix = request.commandLine.substring(0, request.cursorOffset).trimStart()
+        val context = commandLineContext
+        if (context.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) return emptyList()
+        if (context.precededByOperator) return emptyList()
+        val prefix = context.commandPrefix(request.commandLine)
         val normalizedPrefix = normalizeTerminalCommandLine(prefix)
         val candidates = ArrayList<TerminalCompletionCandidate>(minOf(snapshot.size, request.maxCandidates))
         for (entry in snapshot) {
@@ -55,18 +74,22 @@ internal object ExactCommandStatsCandidateBuilder {
                     continue
                 }
             }
-            candidates += entry.toCandidate(request)
+            candidates += entry.toCandidate(request, context.commandStartOffset, context.commandEndOffset)
         }
         return candidates
             .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
             .take(request.maxCandidates)
     }
 
-    private fun TerminalCommandCompletionStats.toCandidate(request: TerminalCompletionRequest): TerminalCompletionCandidate =
+    private fun TerminalCommandCompletionStats.toCandidate(
+        request: TerminalCompletionRequest,
+        replacementStartOffset: Int,
+        replacementEndOffset: Int,
+    ): TerminalCompletionCandidate =
         TerminalCompletionCandidate(
             replacementText = commandLine,
-            replacementStartOffset = 0,
-            replacementEndOffset = request.commandLine.length,
+            replacementStartOffset = replacementStartOffset,
+            replacementEndOffset = replacementEndOffset,
             displayText = commandLine,
             source = SOURCE_STATS,
             kind = TerminalCompletionCandidateKind.HISTORY,

@@ -18,6 +18,7 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -167,6 +168,22 @@ class TerminalCommandStatsCompletionSourceTest {
         source.recordCommandResult("git status", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 100)
 
         assertTrue(source.complete(request("git status")).isEmpty())
+    }
+
+    @Test
+    fun `does not replace a chained command segment with whole-line history`() {
+        val source = TerminalCompletionSources.commandStats()
+        source.recordCommandResult("git status", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 100)
+
+        val candidates =
+            source.complete(
+                request(
+                    "echo ready && git s",
+                    shellCapabilities = TerminalShellCapabilities.POSIX,
+                ),
+            )
+
+        assertTrue(candidates.isEmpty())
     }
 
     @Test
@@ -443,12 +460,14 @@ class TerminalCommandStatsCompletionSourceTest {
         commandLine: String,
         profileId: String? = null,
         workingDirectoryUri: String? = null,
+        shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
     ): TerminalCompletionRequest =
         TerminalCompletionRequest(
             commandLine = commandLine,
             cursorOffset = commandLine.length,
             profileId = profileId,
             workingDirectoryUri = workingDirectoryUri,
+            shellCapabilities = shellCapabilities,
         )
 
     private fun stats(

@@ -15,6 +15,9 @@
  */
 package io.github.ketraterm.completion.api
 
+import io.github.ketraterm.completion.api.TerminalShellCapabilities.Companion.PLAIN
+import io.github.ketraterm.completion.api.TerminalShellCapabilities.Companion.POSIX
+import io.github.ketraterm.completion.api.TerminalShellCapabilities.Companion.POWERSHELL
 import io.github.ketraterm.completion.internal.isTerminalCompletionUtf16Boundary
 
 /**
@@ -22,8 +25,11 @@ import io.github.ketraterm.completion.internal.isTerminalCompletionUtf16Boundary
  * sources.
  */
 enum class TerminalShellQuotingPolicy {
-    /** Infer a safe policy from request metadata, falling back to POSIX style. */
-    AUTO,
+    /**
+     * Preserve only replacements that are safe without dialect-specific
+     * escaping. Unsafe unquoted values are omitted instead of guessed.
+     */
+    CONSERVATIVE,
 
     /** POSIX shell escaping using backslash escapes and POSIX quote rules. */
     POSIX,
@@ -31,6 +37,70 @@ enum class TerminalShellQuotingPolicy {
     /** PowerShell escaping using single-quoted literals by default. */
     POWERSHELL,
 }
+
+/**
+ * Shell lexical policy used to identify command separators and escapes while
+ * resolving the command segment that contains the completion cursor.
+ *
+ * This policy is explicit because quoting policy alone does not determine
+ * operator semantics. Hosts should derive it from authoritative shell profile
+ * metadata rather than terminal text or process output.
+ */
+enum class TerminalShellSyntax {
+    /**
+     * Conservative whitespace-and-quote tokenization with no command operator
+     * segmentation. Use for unknown shells and dialects without an implemented
+     * lexical contract.
+     */
+    PLAIN,
+
+    /** POSIX shell operators and backslash escaping. */
+    POSIX,
+
+    /** PowerShell pipeline operators and backtick escaping. */
+    POWERSHELL,
+}
+
+/**
+ * Immutable shell capabilities resolved by the host from authoritative profile
+ * metadata before a completion request is created.
+ *
+ * The shared completion engine never infers shell behavior from command text or
+ * profile ids. Hosts should use [PLAIN] for shells without a tested lexical and
+ * replacement contract, [POSIX] for the supported POSIX subset, and
+ * [POWERSHELL] for PowerShell.
+ *
+ * @property syntax lexical rules used to resolve the cursor's command segment.
+ * @property quoting replacement escaping policy used by candidate sources.
+ */
+data class TerminalShellCapabilities
+    @JvmOverloads
+    constructor(
+        val syntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
+        val quoting: TerminalShellQuotingPolicy = TerminalShellQuotingPolicy.CONSERVATIVE,
+    ) {
+        companion object {
+            /** Conservative capabilities for unknown or unsupported shells. */
+            @JvmField
+            val PLAIN: TerminalShellCapabilities = TerminalShellCapabilities()
+
+            /** Capabilities for the supported POSIX shell subset. */
+            @JvmField
+            val POSIX: TerminalShellCapabilities =
+                TerminalShellCapabilities(
+                    syntax = TerminalShellSyntax.POSIX,
+                    quoting = TerminalShellQuotingPolicy.POSIX,
+                )
+
+            /** Capabilities for PowerShell lexical and quoting rules. */
+            @JvmField
+            val POWERSHELL: TerminalShellCapabilities =
+                TerminalShellCapabilities(
+                    syntax = TerminalShellSyntax.POWERSHELL,
+                    quoting = TerminalShellQuotingPolicy.POWERSHELL,
+                )
+        }
+    }
 
 /**
  * Immutable command-line context used to request completion candidates.
@@ -43,9 +113,9 @@ enum class TerminalShellQuotingPolicy {
  * @property cursorOffset UTF-16 cursor offset within [commandLine]. The offset
  * must be a scalar boundary and must not split a surrogate pair.
  * @property workingDirectoryUri optional current working directory URI.
- * @property profileId optional host profile id, such as `pwsh`, `bash`, or `zsh`.
+ * @property profileId optional host profile id used by host-owned ranking data.
  * @property maxCandidates maximum number of candidates to return.
- * @property shellQuotingPolicy shell escaping policy for replacement text.
+ * @property shellCapabilities resolved shell lexical and replacement policy.
  */
 data class TerminalCompletionRequest
     @JvmOverloads
@@ -55,7 +125,7 @@ data class TerminalCompletionRequest
         val workingDirectoryUri: String? = null,
         val profileId: String? = null,
         val maxCandidates: Int = DEFAULT_MAX_CANDIDATES,
-        val shellQuotingPolicy: TerminalShellQuotingPolicy = TerminalShellQuotingPolicy.AUTO,
+        val shellCapabilities: TerminalShellCapabilities = PLAIN,
     ) {
         init {
             require(cursorOffset in 0..commandLine.length) {

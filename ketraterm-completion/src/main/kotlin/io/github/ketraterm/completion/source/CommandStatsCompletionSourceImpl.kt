@@ -18,6 +18,9 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
+import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
+import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.ranking.ExactCommandStatsCandidateBuilder
@@ -39,7 +42,8 @@ import io.github.ketraterm.completion.stats.CompletionFeedbackStatsIndex
 internal class CommandStatsCompletionSourceImpl(
     capacity: Int = DEFAULT_CAPACITY,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-) : TerminalCommandStatsCompletionSource {
+) : TerminalCommandStatsCompletionSource,
+    ContextAwareCompletionSource {
     init {
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
     }
@@ -192,8 +196,17 @@ internal class CommandStatsCompletionSourceImpl(
     }
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
+        complete(
+            request,
+            TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset, request.shellCapabilities.syntax),
+        )
+
+    override fun complete(
+        request: TerminalCompletionRequest,
+        commandLineContext: TerminalCommandLineContext,
+    ): List<TerminalCompletionCandidate> =
         synchronized(lock) {
-            ExactCommandStatsCandidateBuilder.complete(request, commandStats.rawRows())
+            ExactCommandStatsCandidateBuilder.complete(request, commandStats.rawRows(), commandLineContext)
         }
 
     private companion object {

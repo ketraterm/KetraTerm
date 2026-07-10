@@ -71,4 +71,27 @@ class TerminalCompletionTriggerEvaluatorTest {
         assertFalse(TerminalCompletionTriggerEvaluator.isLiveTrigger("  ", 2))
         assertFalse(TerminalCompletionTriggerEvaluator.isLiveTrigger("git  ", 5))
     }
+
+    @Test
+    fun `operator boundaries trigger an empty next POSIX command but suppress an incomplete operator`() {
+        val capabilities = TerminalShellCapabilities.POSIX
+        val afterOperator = "git status && "
+        val insideOperator = "git status && cd"
+
+        assertTrue(
+            TerminalCompletionTriggerEvaluator.isLiveTrigger(
+                afterOperator,
+                afterOperator.length,
+                shellCapabilities = capabilities,
+            ),
+        )
+        assertFalse(
+            TerminalCompletionTriggerEvaluator.shouldTrigger(
+                insideOperator,
+                insideOperator.indexOf("&&") + 1,
+                minimumNonWhitespaceCharacters = 0,
+                shellCapabilities = capabilities,
+            ),
+        )
+    }
 }

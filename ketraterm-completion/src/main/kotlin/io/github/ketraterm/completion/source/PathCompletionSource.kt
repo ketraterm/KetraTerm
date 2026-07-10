@@ -16,8 +16,7 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
-import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
+import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -36,18 +35,29 @@ import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 internal class PathCompletionSource(
     private val fileSystemProvider: TerminalFileSystemProvider,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-) : TerminalCompletionSource {
+) : ContextAwareCompletionSource {
     private val commandSpecs = commandSpecs.toList()
 
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
+    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
+        complete(
+            request,
+            TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset, request.shellCapabilities.syntax),
+        )
+
+    override fun complete(
+        request: TerminalCompletionRequest,
+        commandLineContext: TerminalCommandLineContext,
+    ): List<TerminalCompletionCandidate> {
         val workingDir = request.workingDirectoryUri ?: return emptyList()
         val context =
             TerminalCompletionContextResolver.resolve(
                 commandLine = request.commandLine,
-                cursorOffset = request.cursorOffset,
+                lineContext = commandLineContext,
                 commandSpecs = commandSpecs,
             )
         val prefix = context.activePrefix
+
+        if (context.activePosition == TerminalCompletionActivePosition.OPERATOR) return emptyList()
 
         // Don't autocomplete paths if the active prefix looks like an option flag
         if (context.activePosition == TerminalCompletionActivePosition.OPTION_NAME) return emptyList()
@@ -104,10 +114,9 @@ internal class PathCompletionSource(
                     replacementText(
                         request = request,
                         activeTokenQuote = context.activeTokenQuote,
-                        activeTokenText = request.commandLine.substring(context.replacementStartOffset, context.replacementEndOffset),
                         rawReplacement = rawReplacement,
                         pathSeparator = pathSeparator,
-                    )
+                    ) ?: continue
 
                 candidates +=
                     TerminalCompletionCandidate(
@@ -129,37 +138,38 @@ internal class PathCompletionSource(
     private fun replacementText(
         request: TerminalCompletionRequest,
         activeTokenQuote: Char,
-        activeTokenText: String,
         rawReplacement: String,
         pathSeparator: Char,
-    ): String {
+    ): String? {
         val normalizedReplacement = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement
+        val policy = request.shellCapabilities.quoting
         return when (activeTokenQuote) {
-            SINGLE_QUOTE -> quoteSingle(normalizedReplacement, request.resolvedQuotingPolicy())
-            DOUBLE_QUOTE -> quoteDouble(normalizedReplacement, request.resolvedQuotingPolicy())
-            else -> unquotedReplacement(normalizedReplacement, activeTokenText, request.resolvedQuotingPolicy())
+            SINGLE_QUOTE -> quoteSingle(normalizedReplacement, policy)
+            DOUBLE_QUOTE -> quoteDouble(normalizedReplacement, policy)
+            else -> unquotedReplacement(normalizedReplacement, policy)
         }
     }
 
     private fun unquotedReplacement(
         value: String,
-        activeTokenText: String,
         policy: TerminalShellQuotingPolicy,
-    ): String {
-        if (!needsEscaping(value)) return value
-        if (activeTokenText.contains(BACKSLASH) || policy == TerminalShellQuotingPolicy.POSIX) {
-            return escapePosixUnquoted(value)
+    ): String? {
+        if (!needsEscaping(value, policy)) return value
+        return when (policy) {
+            TerminalShellQuotingPolicy.CONSERVATIVE -> null
+            TerminalShellQuotingPolicy.POSIX -> escapePosixUnquoted(value)
+            TerminalShellQuotingPolicy.POWERSHELL -> quoteSingle(value, policy)
         }
-        return quoteSingle(value, policy)
     }
 
     private fun quoteSingle(
         value: String,
         policy: TerminalShellQuotingPolicy,
-    ): String =
+    ): String? =
         when (policy) {
+            TerminalShellQuotingPolicy.CONSERVATIVE ->
+                if (value.contains(SINGLE_QUOTE)) null else "'$value'"
             TerminalShellQuotingPolicy.POWERSHELL -> "'${value.replace("'", "''")}'"
-            TerminalShellQuotingPolicy.AUTO,
             TerminalShellQuotingPolicy.POSIX,
             -> "'${value.replace("'", "'\\''")}'"
         }
@@ -167,8 +177,10 @@ internal class PathCompletionSource(
     private fun quoteDouble(
         value: String,
         policy: TerminalShellQuotingPolicy,
-    ): String =
+    ): String? =
         when (policy) {
+            TerminalShellQuotingPolicy.CONSERVATIVE ->
+                if (value.any { it == DOUBLE_QUOTE || it == DOLLAR || it == BACKTICK }) null else "\"$value\""
             TerminalShellQuotingPolicy.POWERSHELL ->
                 buildString(value.length + 2) {
                     append(DOUBLE_QUOTE)
@@ -178,7 +190,6 @@ internal class PathCompletionSource(
                     }
                     append(DOUBLE_QUOTE)
                 }
-            TerminalShellQuotingPolicy.AUTO,
             TerminalShellQuotingPolicy.POSIX,
             ->
                 buildString(value.length + 2) {
@@ -199,29 +210,15 @@ internal class PathCompletionSource(
             }
         }
 
-    private fun TerminalCompletionRequest.resolvedQuotingPolicy(): TerminalShellQuotingPolicy =
-        when (shellQuotingPolicy) {
-            TerminalShellQuotingPolicy.AUTO ->
-                if (profileId.isPowerShellProfile()) {
-                    TerminalShellQuotingPolicy.POWERSHELL
-                } else {
-                    TerminalShellQuotingPolicy.POSIX
-                }
-            TerminalShellQuotingPolicy.POSIX -> TerminalShellQuotingPolicy.POSIX
-            TerminalShellQuotingPolicy.POWERSHELL -> TerminalShellQuotingPolicy.POWERSHELL
-        }
-
-    private fun String?.isPowerShellProfile(): Boolean {
-        val profile = this?.lowercase() ?: return false
-        return profile == "pwsh" || profile == "powershell" || profile.contains("powershell")
-    }
-
-    private fun needsEscaping(value: String): Boolean =
-        value.any {
-            it.isShellWhitespace() ||
-                it == SINGLE_QUOTE ||
-                it == DOUBLE_QUOTE ||
-                it == DOLLAR
+    private fun needsEscaping(
+        value: String,
+        policy: TerminalShellQuotingPolicy,
+    ): Boolean =
+        when (policy) {
+            TerminalShellQuotingPolicy.POSIX -> value.any { it.needsPosixUnquotedEscape() }
+            TerminalShellQuotingPolicy.POWERSHELL -> value.any { it.needsPowerShellUnquotedEscape() }
+            TerminalShellQuotingPolicy.CONSERVATIVE ->
+                value.any { it.needsPosixUnquotedEscape() || it.needsPowerShellUnquotedEscape() }
         }
 
     private fun Char.needsPosixUnquotedEscape(): Boolean =
@@ -235,6 +232,27 @@ internal class PathCompletionSource(
             this == AMPERSAND ||
             this == LEFT_PAREN ||
             this == RIGHT_PAREN
+
+    private fun Char.needsPowerShellUnquotedEscape(): Boolean =
+        isShellWhitespace() ||
+            this == BACKTICK ||
+            this == DOLLAR ||
+            this == SINGLE_QUOTE ||
+            this == DOUBLE_QUOTE ||
+            this == LEFT_PAREN ||
+            this == RIGHT_PAREN ||
+            this == LEFT_BRACE ||
+            this == RIGHT_BRACE ||
+            this == LEFT_BRACKET ||
+            this == RIGHT_BRACKET ||
+            this == LESS_THAN ||
+            this == GREATER_THAN ||
+            this == PIPE ||
+            this == AMPERSAND ||
+            this == SEMICOLON ||
+            this == COMMA ||
+            this == AT ||
+            this == HASH
 
     private fun Char.isShellWhitespace(): Boolean = this == ' ' || this == '\t' || this == '\r' || this == '\n'
 
@@ -275,6 +293,16 @@ internal class PathCompletionSource(
         private const val AMPERSAND = '&'
         private const val LEFT_PAREN = '('
         private const val RIGHT_PAREN = ')'
+        private const val LEFT_BRACE = '{'
+        private const val RIGHT_BRACE = '}'
+        private const val LEFT_BRACKET = '['
+        private const val RIGHT_BRACKET = ']'
+        private const val LESS_THAN = '<'
+        private const val GREATER_THAN = '>'
+        private const val PIPE = '|'
+        private const val COMMA = ','
+        private const val AT = '@'
+        private const val HASH = '#'
     }
 
     private fun TerminalPathArgumentKind.accepts(entry: TerminalFileEntry): Boolean =

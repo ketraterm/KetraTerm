@@ -17,6 +17,7 @@ package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.completion.StandaloneCompletionFeedbackRecorder
 import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
+import io.github.ketraterm.app.completion.completionShellCapabilities
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.history.CommandPersistencePrivacyPolicy
@@ -225,8 +226,10 @@ internal class TabManager(
                         sessionId = workspaceTab.id,
                         profileId = workspaceTab.profile.id,
                         workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
+                        shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
                     ),
                 commandSpecs = completionRegistry.commandSpecs,
+                shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
                 suggestionFeedbackHandler =
                     completionFeedbackRecorder.createHandler(
                         profileId = workspaceTab.profile.id,
@@ -383,8 +386,10 @@ internal class TabManager(
                         sessionId = workspaceTab.id,
                         profileId = workspaceTab.profile.id,
                         workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
+                        shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
                     ),
                 commandSpecs = completionRegistry.commandSpecs,
+                shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
                 suggestionFeedbackHandler =
                     completionFeedbackRecorder.createHandler(
                         profileId = workspaceTab.profile.id,

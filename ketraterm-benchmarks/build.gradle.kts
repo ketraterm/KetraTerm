@@ -24,6 +24,7 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":ketraterm-completion"))
     implementation(project(":ketraterm-core"))
     implementation(project(":ketraterm-host"))
     implementation(project(":ketraterm-parser"))

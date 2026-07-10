@@ -18,6 +18,7 @@ package io.github.ketraterm.app.completion
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionEngine
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
@@ -57,6 +58,7 @@ internal class StandaloneCompletionSuggestionProvider(
                     cursorOffset = request.cursorOffset,
                     workingDirectoryUri = context.workingDirectoryUri,
                     profileId = context.profileId,
+                    shellCapabilities = context.shellCapabilities,
                 )
             } catch (_: IllegalArgumentException) {
                 return emptyList()
@@ -86,10 +88,12 @@ internal class StandaloneCompletionSuggestionProvider(
  * @property profileId stable standalone profile id, or `null` when unknown.
  * @property workingDirectoryUri latest OSC 7 current-working-directory URI, or
  * `null` before one has been reported.
+ * @property shellCapabilities resolved shell lexical and replacement policy.
  */
 internal data class StandaloneCompletionSuggestionContext(
     val profileId: String? = null,
     val workingDirectoryUri: String? = null,
+    val shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
 ) {
     companion object {
         /**

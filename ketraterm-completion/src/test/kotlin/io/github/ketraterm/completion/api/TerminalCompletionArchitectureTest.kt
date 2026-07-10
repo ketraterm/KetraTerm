@@ -272,6 +272,8 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalFileEntry",
                 "TerminalFileSystemProvider",
                 "TerminalShellQuotingPolicy",
+                "TerminalShellSyntax",
+                "TerminalShellCapabilities",
                 "canonicalizeDirectoryUri",
             )
         private val PUBLIC_COMPLETION_SOURCE_FACTORIES =

@@ -201,7 +201,7 @@ class PathCompletionSourceTest {
             request(
                 commandLine = "cd Idea",
                 workingDirectoryUri = "file:///project",
-                shellQuotingPolicy = TerminalShellQuotingPolicy.POWERSHELL,
+                shellCapabilities = TerminalShellCapabilities.POWERSHELL,
             )
         val candidates = source.complete(request)
 
@@ -214,7 +214,7 @@ class PathCompletionSourceTest {
             request(
                 commandLine = "cd 'O",
                 workingDirectoryUri = "file:///project",
-                shellQuotingPolicy = TerminalShellQuotingPolicy.POWERSHELL,
+                shellCapabilities = TerminalShellCapabilities.POWERSHELL,
             )
         val candidates = source.complete(request)
 
@@ -223,7 +223,7 @@ class PathCompletionSourceTest {
 
     @Test
     fun `completes nested relative path with Windows backslashes`() {
-        val request = request("cat src\\\\m", "file:///project")
+        val request = request("cat src\\m", "file:///project", shellCapabilities = TerminalShellCapabilities.POWERSHELL)
         val candidates = source.complete(request)
 
         assertEquals(1, candidates.size)
@@ -273,16 +273,28 @@ class PathCompletionSourceTest {
         assertTrue(source.complete(invalidRequest).isEmpty())
     }
 
+    @Test
+    fun `conservative shell omits unquoted path replacements that require escaping`() {
+        val request =
+            request(
+                commandLine = "cd Idea",
+                workingDirectoryUri = "file:///project",
+                shellCapabilities = TerminalShellCapabilities.PLAIN,
+            )
+
+        assertTrue(source.complete(request).isEmpty())
+    }
+
     private fun request(
         commandLine: String,
         workingDirectoryUri: String?,
-        shellQuotingPolicy: TerminalShellQuotingPolicy = TerminalShellQuotingPolicy.AUTO,
+        shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.POSIX,
     ): TerminalCompletionRequest =
         TerminalCompletionRequest(
             commandLine = commandLine,
             cursorOffset = commandLine.length,
             workingDirectoryUri = workingDirectoryUri,
-            shellQuotingPolicy = shellQuotingPolicy,
+            shellCapabilities = shellCapabilities,
         )
 
     private class FakeFileSystemProvider : TerminalFileSystemProvider {
