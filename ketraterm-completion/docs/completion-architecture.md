@@ -91,6 +91,16 @@ Completion treats trailing space as a semantic boundary. With the cursor inside
 complete a new empty argument at the cursor while full-command MRU and stats
 sources may still match the normalized visible command prefix.
 
+Session MRU also maintains a separate bounded, in-memory observed-token index
+for executables that have no static `TerminalCommandSpec`. Successful commands
+such as `abc de -g`, `abc de -f`, and `abc as` can therefore offer `de` and
+`as` after `abc `, and `-g`/`-f` after `abc de `. These are `ARGUMENT`
+candidates labeled as observed session usage, not inferred subcommands or a
+claimed command grammar. The index learns only the first non-option token after
+an unknown executable and option names; it never learns later positional values
+or option values. It is cleared with the session MRU and is never part of
+persisted command statistics.
+
 For supported POSIX and PowerShell syntax, the tokenizer uses one bounded
 single-pass lexical scan per merged-engine request to select the cursor's
 command segment. Operators inside quotes or escaped by the dialect do not split

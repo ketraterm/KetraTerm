@@ -75,7 +75,11 @@ internal class StandaloneCompletionRegistry(
         workingDirectoryUriProvider: () -> String? = { null },
     ): StandaloneCompletionSuggestionProvider {
         require(sessionId.isNotBlank()) { "sessionId must not be blank" }
-        val mruSource = TerminalCompletionSources.sessionMru(sessionMruCapacity)
+        val mruSource =
+            TerminalCompletionSources.sessionMru(
+                capacity = sessionMruCapacity,
+                commandSpecs = commandSpecs,
+            )
         synchronized(lock) {
             sessionMruSources[sessionId] = mruSource
         }

@@ -17,11 +17,7 @@ package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.completion.api.TerminalCompletionSources
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
-import io.github.ketraterm.completion.model.TerminalCommandLineShape
-import io.github.ketraterm.completion.model.TerminalCommandShapeStats
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import java.nio.file.Files
 import kotlin.test.Test
@@ -246,7 +242,10 @@ class StandaloneCompletionRegistryTest {
 
         val suggestions = provider.suggestions(request("git s"))
 
-        assertEquals(listOf("git switch main", "git status"), suggestions.map { it.replacementText })
+        assertEquals(
+            listOf("git switch main", "git status"),
+            suggestions.filter { it.source == "mru" }.map { it.replacementText },
+        )
     }
 
     @Test
@@ -276,7 +275,7 @@ class StandaloneCompletionRegistryTest {
 
         val suggestions = provider.suggestions(request("git s"))
 
-        assertEquals("git status", suggestions.first().replacementText)
+        assertEquals("git status", suggestions.first { it.source == "mru" }.replacementText)
     }
 
     @Test

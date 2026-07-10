@@ -50,6 +50,67 @@ class TerminalSessionMruCompletionSourceTest {
     }
 
     @Test
+    fun `learns observed unknown-command tokens without claiming subcommand semantics`() {
+        val source = TerminalCompletionSources.sessionMru()
+        source.recordSuccessfulCommand("abc de -g")
+        source.recordSuccessfulCommand("abc de -f")
+        source.recordSuccessfulCommand("abc as")
+
+        val firstTokens = observedCandidates(source, request("abc "))
+        val options = observedCandidates(source, request("abc de "))
+
+        assertEquals(listOf("de", "as"), firstTokens.map { it.replacementText })
+        assertTrue(firstTokens.all { it.kind == TerminalCompletionCandidateKind.ARGUMENT })
+        assertTrue(firstTokens.all { it.detail == "observed in this session" })
+        assertEquals(listOf("-f", "-g"), options.map { it.replacementText }.sorted())
+    }
+
+    @Test
+    fun `does not learn unknown positional or option values as observed tokens`() {
+        val source = TerminalCompletionSources.sessionMru()
+        source.recordSuccessfulCommand("abc de private-value")
+        source.recordSuccessfulCommand("abc --config private-value")
+
+        assertTrue(observedCandidates(source, request("abc de ")).isEmpty())
+        assertTrue(observedCandidates(source, request("abc --config ")).isEmpty())
+    }
+
+    @Test
+    fun `does not compete with static command specifications`() {
+        val source = TerminalCompletionSources.sessionMru()
+        source.recordSuccessfulCommand("git status")
+
+        assertTrue(observedCandidates(source, request("git ")).isEmpty())
+    }
+
+    @Test
+    fun `observed tokens prefer matching profile and working directory`() {
+        val source = TerminalCompletionSources.sessionMru()
+        source.recordSuccessfulCommand("abc dev", profileId = "bash", workingDirectoryUri = "file:///repo")
+        source.recordSuccessfulCommand("abc deploy", profileId = "pwsh", workingDirectoryUri = "file:///other")
+
+        val candidates =
+            observedCandidates(
+                source,
+                request("abc d", profileId = "bash", workingDirectoryUri = "file:///repo"),
+            )
+
+        assertEquals(listOf("dev", "deploy"), candidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `observed token capacity evicts the least recent transition`() {
+        val source = TerminalCompletionSources.sessionMru(capacity = 2)
+        source.recordSuccessfulCommand("abc de")
+        source.recordSuccessfulCommand("abc as")
+        source.recordSuccessfulCommand("abc be")
+
+        val candidates = observedCandidates(source, request("abc "))
+
+        assertEquals(listOf("be", "as"), candidates.map { it.replacementText })
+    }
+
+    @Test
     fun `does not suggest the exact already typed command`() {
         val source = TerminalCompletionSources.sessionMru()
         source.recordSuccessfulCommand("git status")
@@ -133,11 +194,11 @@ class TerminalSessionMruCompletionSourceTest {
     @Test
     fun `clear removes retained commands`() {
         val source = TerminalCompletionSources.sessionMru()
-        source.recordSuccessfulCommand("git status")
+        source.recordSuccessfulCommand("abc de -g")
 
         source.clear()
 
-        assertTrue(source.complete(request("git")).isEmpty())
+        assertTrue(source.complete(request("abc ")).isEmpty())
     }
 
     @Test
@@ -207,4 +268,9 @@ class TerminalSessionMruCompletionSourceTest {
             maxCandidates = 8,
             shellCapabilities = shellCapabilities,
         )
+
+    private fun observedCandidates(
+        source: io.github.ketraterm.completion.api.TerminalSessionMruCompletionSource,
+        request: TerminalCompletionRequest,
+    ) = source.complete(request).filter { it.source == "observed" }
 }

@@ -21,10 +21,16 @@ import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalSessionMruCompletionSource
 import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.internal.*
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.spec.CommandSpecResolver
 
 /**
  * Bounded in-memory MRU source for successful commands observed in one live
- * terminal session.
+ * terminal session. Alongside exact command lines, it retains a bounded
+ * session-local observed-token index for unknown executable families. The
+ * index does not claim shell semantics: a learned first token is presented as
+ * an argument, not as a subcommand.
  *
  * This source never reads persistent history and never performs I/O. Hosts feed
  * it from trusted command lifecycle events, typically successful OSC 133 command
@@ -34,10 +40,14 @@ import io.github.ketraterm.completion.internal.*
  *
  * All public methods are thread-safe.
  *
- * @param capacity maximum number of distinct normalized commands retained.
+ * @param capacity maximum number of distinct normalized commands and observed
+ * token transitions retained independently.
+ * @param commandSpecs static command specs excluded from observed-token
+ * learning because their specs define authoritative completion semantics.
  */
 internal class SessionMruCompletionSourceImpl(
     private val capacity: Int = DEFAULT_CAPACITY,
+    commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
 ) : TerminalSessionMruCompletionSource,
     ContextAwareCompletionSource {
     init {
@@ -46,6 +56,8 @@ internal class SessionMruCompletionSourceImpl(
 
     private val lock = Any()
     private val entries = ArrayList<Entry>(capacity)
+    private val observedTokens = ArrayList<ObservedTokenEntry>(capacity)
+    private val commandSpecs = commandSpecs.toList()
     private var nextSequence = 1L
 
     /**
@@ -92,6 +104,7 @@ internal class SessionMruCompletionSourceImpl(
                         lastUsedSequence = sequence,
                     )
             }
+            recordObservedTokensLocked(command, profileId, workingDirectoryUri)
         }
     }
 
@@ -101,6 +114,7 @@ internal class SessionMruCompletionSourceImpl(
     override fun clear() {
         synchronized(lock) {
             entries.clear()
+            observedTokens.clear()
         }
     }
 
@@ -121,7 +135,7 @@ internal class SessionMruCompletionSourceImpl(
         val normalizedPrefix = normalizeTerminalCommandLine(prefix)
         val candidates =
             synchronized(lock) {
-                if (entries.isEmpty()) return@synchronized emptyList()
+                if (entries.isEmpty() && observedTokens.isEmpty()) return@synchronized emptyList()
                 val result = ArrayList<TerminalCompletionCandidate>()
                 for (i in entries.indices) {
                     val entry = entries[i]
@@ -139,6 +153,7 @@ internal class SessionMruCompletionSourceImpl(
                         result += entry.toCandidate(request, context.commandStartOffset, context.commandEndOffset)
                     }
                 }
+                appendObservedTokenCandidatesLocked(request, context, result)
                 result
             }
         if (candidates.isEmpty()) return emptyList()
@@ -161,6 +176,160 @@ internal class SessionMruCompletionSourceImpl(
             kind = TerminalCompletionCandidateKind.HISTORY,
             score = score(request),
         )
+
+    private fun appendObservedTokenCandidatesLocked(
+        request: TerminalCompletionRequest,
+        context: TerminalCommandLineContext,
+        result: MutableList<TerminalCompletionCandidate>,
+    ) {
+        val observedContext = observedContextFor(context) ?: return
+        val normalizedPrefix = normalizeTerminalCommandToken(context.activePrefix)
+        for (entry in observedTokens) {
+            if (entry.context != observedContext || !entry.normalizedToken.startsWith(normalizedPrefix)) continue
+            if (entry.normalizedToken == normalizedPrefix) continue
+            result += entry.toCandidate(request, context.replacementStartOffset, context.replacementEndOffset)
+        }
+    }
+
+    private fun observedContextFor(context: TerminalCommandLineContext): String? {
+        if (context.activeTokenIndex <= 0) return null
+        val builder = StringBuilder()
+        var index = 0
+        while (index < context.activeTokenIndex) {
+            val token = normalizeTerminalCommandToken(context.tokens[index].text)
+            if (token.isBlank()) return null
+            if (index > 0) builder.append(CONTEXT_SEPARATOR)
+            builder.append(token)
+            index++
+        }
+        return builder.toString()
+    }
+
+    private fun recordObservedTokensLocked(
+        commandLine: String,
+        profileId: String?,
+        workingDirectoryUri: String?,
+    ) {
+        val tokens = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length).tokens
+        var executableIndex = tokens.firstCommandTokenIndex()
+        if (executableIndex >= tokens.size) return
+        val executable = normalizeTerminalCommandToken(tokens[executableIndex].text)
+        if (executable.isBlank() || CommandSpecResolver.findSpec(commandSpecs, executable) != null) return
+
+        val context = StringBuilder(executable)
+        executableIndex++
+        var observedFirstArgument = false
+        var encounteredOption = false
+        while (executableIndex < tokens.size) {
+            val token = normalizeTerminalCommandToken(tokens[executableIndex].text)
+            when {
+                token.isBlank() -> Unit
+                token.isCommandOperator() || token == TERMINAL_COMMAND_OPTION_TERMINATOR -> return
+                token.isTerminalOptionToken() -> {
+                    token.observedOptionToken()?.let {
+                        recordObservedTokenLocked(
+                            context = context.toString(),
+                            token = it,
+                            profileId = profileId,
+                            workingDirectoryUri = workingDirectoryUri,
+                        )
+                    }
+                    appendContextToken(context, token)
+                    encounteredOption = true
+                }
+                !observedFirstArgument && !encounteredOption -> {
+                    recordObservedTokenLocked(
+                        context = context.toString(),
+                        token = token,
+                        profileId = profileId,
+                        workingDirectoryUri = workingDirectoryUri,
+                    )
+                    appendContextToken(context, token)
+                    observedFirstArgument = true
+                }
+                else -> return
+            }
+            executableIndex++
+        }
+    }
+
+    private fun recordObservedTokenLocked(
+        context: String,
+        token: String,
+        profileId: String?,
+        workingDirectoryUri: String?,
+    ) {
+        if (token.isBlank()) return
+        val sequence = nextSequenceLocked()
+        val index = observedTokenIndexLocked(context, token, profileId, workingDirectoryUri)
+        if (index >= 0) {
+            val entry = observedTokens[index]
+            observedTokens[index] =
+                entry.copy(
+                    token = token,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    useCount = saturatedCompletionCounterIncrement(entry.useCount),
+                    lastUsedSequence = sequence,
+                )
+        } else {
+            if (observedTokens.size == capacity) removeOldestObservedTokenLocked()
+            observedTokens +=
+                ObservedTokenEntry(
+                    context = context,
+                    token = token,
+                    normalizedToken = token,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    useCount = 1,
+                    lastUsedSequence = sequence,
+                )
+        }
+    }
+
+    private fun appendContextToken(
+        context: StringBuilder,
+        token: String,
+    ) {
+        context.append(CONTEXT_SEPARATOR)
+        context.append(token)
+    }
+
+    private fun observedTokenIndexLocked(
+        context: String,
+        token: String,
+        profileId: String?,
+        workingDirectoryUri: String?,
+    ): Int {
+        var index = 0
+        while (index < observedTokens.size) {
+            val entry = observedTokens[index]
+            if (entry.context == context &&
+                entry.normalizedToken == token &&
+                entry.profileId == profileId &&
+                entry.workingDirectoryUri == workingDirectoryUri
+            ) {
+                return index
+            }
+            index++
+        }
+        return -1
+    }
+
+    private fun removeOldestObservedTokenLocked() {
+        var oldestIndex = 0
+        var oldestSequence = observedTokens[0].lastUsedSequence
+        var index = 1
+        while (index < observedTokens.size) {
+            val sequence = observedTokens[index].lastUsedSequence
+            if (sequence < oldestSequence) {
+                oldestSequence = sequence
+                oldestIndex = index
+            }
+            index++
+        }
+        observedTokens.removeAt(oldestIndex)
+    }
 
     private fun Entry.score(request: TerminalCompletionRequest): Int {
         var score = MRU_BASE_SCORE
@@ -212,14 +381,66 @@ internal class SessionMruCompletionSourceImpl(
         val lastUsedSequence: Long,
     )
 
+    private fun ObservedTokenEntry.toCandidate(
+        request: TerminalCompletionRequest,
+        replacementStartOffset: Int,
+        replacementEndOffset: Int,
+    ): TerminalCompletionCandidate =
+        TerminalCompletionCandidate(
+            replacementText = token,
+            replacementStartOffset = replacementStartOffset,
+            replacementEndOffset = replacementEndOffset,
+            displayText = token,
+            detail = OBSERVED_TOKEN_DETAIL,
+            source = SOURCE_OBSERVED,
+            kind = TerminalCompletionCandidateKind.ARGUMENT,
+            score = score(request),
+        )
+
+    private fun ObservedTokenEntry.score(request: TerminalCompletionRequest): Int {
+        var score = OBSERVED_TOKEN_BASE_SCORE
+        score += minOf(useCount, MAX_USE_COUNT_SCORE_UNITS) * USE_COUNT_SCORE
+        score += minOf(lastUsedSequence, MAX_RECENCY_SCORE).toInt()
+        if (profileId != null && profileId == request.profileId) score += PROFILE_MATCH_SCORE
+        if (workingDirectoryUri != null && workingDirectoryUri == request.workingDirectoryUri) {
+            score += WORKING_DIRECTORY_MATCH_SCORE
+        }
+        return score
+    }
+
+    private data class ObservedTokenEntry(
+        val context: String,
+        val token: String,
+        val normalizedToken: String,
+        val profileId: String?,
+        val workingDirectoryUri: String?,
+        val useCount: Int,
+        val lastUsedSequence: Long,
+    )
+
+    private fun String.observedOptionToken(): String? =
+        when {
+            startsWith("--") -> substringBefore("=")
+            length == SHORT_OPTION_LENGTH -> this
+            else -> null
+        }
+
+    private fun String.isCommandOperator(): Boolean = this in COMMAND_OPERATORS
+
     private companion object {
         private const val DEFAULT_CAPACITY = 128
         private const val SOURCE_MRU = "mru"
+        private const val SOURCE_OBSERVED = "observed"
+        private const val OBSERVED_TOKEN_DETAIL = "observed in this session"
         private const val MRU_BASE_SCORE = 700
+        private const val OBSERVED_TOKEN_BASE_SCORE = 760
         private const val USE_COUNT_SCORE = 30
         private const val MAX_USE_COUNT_SCORE_UNITS = 20
         private const val MAX_RECENCY_SCORE = 100L
         private const val PROFILE_MATCH_SCORE = 60
         private const val WORKING_DIRECTORY_MATCH_SCORE = 90
+        private const val CONTEXT_SEPARATOR = '\u0000'
+        private const val SHORT_OPTION_LENGTH = 2
+        private val COMMAND_OPERATORS = setOf("&&", "||", "|", "|&", ";", "&")
     }
 }

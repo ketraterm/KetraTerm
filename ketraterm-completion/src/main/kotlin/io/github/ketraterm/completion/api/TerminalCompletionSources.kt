@@ -65,12 +65,23 @@ object TerminalCompletionSources {
      * Creates a bounded in-memory source for commands observed in the current
      * terminal session.
      *
-     * @param capacity maximum number of distinct normalized commands retained.
+     * @param capacity maximum number of distinct normalized commands and
+     * session-local observed-token transitions retained.
+     * @param commandSpecs static command specs whose known command families are
+     * excluded from observed-token learning because specs are authoritative for
+     * those commands.
      * @return mutable session MRU completion source.
      */
     @JvmStatic
     @JvmOverloads
-    fun sessionMru(capacity: Int = 128): TerminalSessionMruCompletionSource = SessionMruCompletionSourceImpl(capacity)
+    fun sessionMru(
+        capacity: Int = 128,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    ): TerminalSessionMruCompletionSource =
+        SessionMruCompletionSourceImpl(
+            capacity = capacity,
+            commandSpecs = commandSpecs,
+        )
 
     /**
      * Creates a bounded in-memory source for aggregated command statistics.
