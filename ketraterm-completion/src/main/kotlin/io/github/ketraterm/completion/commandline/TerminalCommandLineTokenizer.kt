@@ -55,28 +55,18 @@ internal object TerminalCommandLineTokenizer {
         cursorOffset: Int,
         shellSyntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
     ): TerminalCommandLineContext {
-        val tokens = ArrayList<TerminalCommandLineToken>(INITIAL_TOKEN_CAPACITY)
-        val tokenBuilder = StringBuilder()
         var index = 0
-        var tokenStart = NO_OFFSET
         var quote = NO_QUOTE
-        var activePrefix: String? = null
         var segmentStart = 0
         var segmentEnd = commandLine.length
         var precededByOperator = false
 
+        // Locate the active segment without materializing tokens from discarded segments.
         while (index < commandLine.length) {
-            if (tokenStart != NO_OFFSET && cursorOffset == index) {
-                activePrefix = tokenBuilder.toString()
-            }
-
             val ch = commandLine[index]
             if (quote == NO_QUOTE) {
                 val operatorLength = ShellLexicalRules.operatorLength(commandLine, index, shellSyntax)
                 if (operatorLength > 0) {
-                    addToken(tokens, tokenBuilder, tokenStart, index)
-                    tokenStart = NO_OFFSET
-                    quote = NO_QUOTE
                     val operatorEnd = index + operatorLength
                     when {
                         cursorOffset <= index -> {
@@ -86,8 +76,6 @@ internal object TerminalCommandLineTokenizer {
                         cursorOffset < operatorEnd ->
                             return operatorContext(index, operatorEnd, cursorOffset, precededByOperator)
                         else -> {
-                            tokens.clear()
-                            activePrefix = null
                             segmentStart = operatorEnd
                             precededByOperator = true
                             index = operatorEnd
@@ -95,16 +83,7 @@ internal object TerminalCommandLineTokenizer {
                         }
                     }
                 }
-
-                if (ch.isShellWhitespace()) {
-                    addToken(tokens, tokenBuilder, tokenStart, index)
-                    tokenStart = NO_OFFSET
-                    index++
-                    continue
-                }
             }
-
-            if (tokenStart == NO_OFFSET) tokenStart = index
 
             when {
                 quote == NO_QUOTE && (ch == SINGLE_QUOTE || ch == DOUBLE_QUOTE) -> {
@@ -112,8 +91,6 @@ internal object TerminalCommandLineTokenizer {
                     index++
                 }
                 quote == ch && ShellLexicalRules.isDoubledQuote(commandLine, index, quote, shellSyntax) -> {
-                    if (cursorOffset == index + 1) activePrefix = tokenBuilder.toString() + quote
-                    tokenBuilder.append(quote)
                     index += 2
                 }
                 quote == ch -> {
@@ -121,26 +98,94 @@ internal object TerminalCommandLineTokenizer {
                     index++
                 }
                 ShellLexicalRules.isEscapePair(commandLine, index, quote, shellSyntax) -> {
-                    if (cursorOffset == index + 1) activePrefix = tokenBuilder.toString() + ch
-                    tokenBuilder.append(commandLine[index + 1])
                     index += 2
                 }
                 else -> {
-                    tokenBuilder.append(ch)
                     index++
                 }
             }
         }
 
-        if (tokenStart != NO_OFFSET && cursorOffset == commandLine.length) activePrefix = tokenBuilder.toString()
-        addToken(tokens, tokenBuilder, tokenStart, segmentEnd)
+        return tokenizeSegment(
+            commandLine = commandLine,
+            cursorOffset = cursorOffset,
+            segmentStart = segmentStart,
+            segmentEnd = segmentEnd,
+            precededByOperator = precededByOperator,
+            shellSyntax = shellSyntax,
+        )
+    }
 
+    private fun tokenizeSegment(
+        commandLine: String,
+        cursorOffset: Int,
+        segmentStart: Int,
+        segmentEnd: Int,
+        precededByOperator: Boolean,
+        shellSyntax: TerminalShellSyntax,
+    ): TerminalCommandLineContext {
+        var tokens: MutableList<TerminalCommandLineToken>? = null
+        var tokenBuilder: StringBuilder? = null
+        var index = segmentStart
+        var tokenStart = NO_OFFSET
+        var quote = NO_QUOTE
+        var activePrefix: String? = null
+
+        while (index < segmentEnd) {
+            if (tokenStart != NO_OFFSET && cursorOffset == index) {
+                activePrefix = tokenBuilder!!.toString()
+            }
+
+            val ch = commandLine[index]
+            if (quote == NO_QUOTE && ch.isShellWhitespace()) {
+                tokens = addToken(tokens, tokenBuilder, tokenStart, index)
+                tokenStart = NO_OFFSET
+                tokenBuilder = null
+                index++
+                continue
+            }
+
+            if (tokenStart == NO_OFFSET) {
+                tokenStart = index
+                tokenBuilder = StringBuilder()
+            }
+
+            when {
+                quote == NO_QUOTE && (ch == SINGLE_QUOTE || ch == DOUBLE_QUOTE) -> {
+                    quote = ch
+                    index++
+                }
+                quote == ch && ShellLexicalRules.isDoubledQuote(commandLine, index, quote, shellSyntax) -> {
+                    if (cursorOffset == index + 1) activePrefix = tokenBuilder!!.toString() + quote
+                    tokenBuilder!!.append(quote)
+                    index += 2
+                }
+                quote == ch -> {
+                    quote = NO_QUOTE
+                    index++
+                }
+                ShellLexicalRules.isEscapePair(commandLine, index, quote, shellSyntax) -> {
+                    if (cursorOffset == index + 1) activePrefix = tokenBuilder!!.toString() + ch
+                    tokenBuilder!!.append(commandLine[index + 1])
+                    index += 2
+                }
+                else -> {
+                    tokenBuilder!!.append(ch)
+                    index++
+                }
+            }
+        }
+
+        if (tokenStart != NO_OFFSET && cursorOffset == segmentEnd) activePrefix = tokenBuilder!!.toString()
+        tokens = addToken(tokens, tokenBuilder, tokenStart, segmentEnd)
+
+        val tokenList = tokens ?: emptyList()
         var tokenIndex = 0
-        while (tokenIndex < tokens.size) {
-            val token = tokens[tokenIndex]
+        while (tokenIndex < tokenList.size) {
+            val token = tokenList[tokenIndex]
             if (cursorOffset in token.startOffset..token.endOffset) {
                 return TerminalCommandLineContext(
-                    tokens = tokens,
+                    tokens = tokenList,
                     activeTokenIndex = tokenIndex,
                     activePrefix = if (cursorOffset >= token.endOffset) token.text else activePrefix.orEmpty(),
                     replacementStartOffset = token.startOffset,
@@ -157,7 +202,7 @@ internal object TerminalCommandLineTokenizer {
         }
 
         return TerminalCommandLineContext(
-            tokens = tokens,
+            tokens = tokenList,
             activeTokenIndex = tokenIndex,
             activePrefix = "",
             replacementStartOffset = cursorOffset,
@@ -190,14 +235,15 @@ internal object TerminalCommandLineTokenizer {
         )
 
     private fun addToken(
-        tokens: MutableList<TerminalCommandLineToken>,
-        builder: StringBuilder,
+        tokens: MutableList<TerminalCommandLineToken>?,
+        builder: StringBuilder?,
         startOffset: Int,
         endOffset: Int,
-    ) {
-        if (startOffset == NO_OFFSET) return
-        tokens += TerminalCommandLineToken(builder.toString(), startOffset, endOffset)
-        builder.setLength(0)
+    ): MutableList<TerminalCommandLineToken>? {
+        if (startOffset == NO_OFFSET) return tokens
+        val result = tokens ?: ArrayList(INITIAL_TOKEN_CAPACITY)
+        result += TerminalCommandLineToken(builder!!.toString(), startOffset, endOffset)
+        return result
     }
 
     private fun Char.isShellWhitespace(): Boolean = this == ' ' || this == '\t' || this == '\r' || this == '\n'
