@@ -113,6 +113,7 @@ internal class SpecCompletionSource(
         val candidates = ArrayList<TerminalCompletionCandidate>()
         var orderIndex = 0
         for (option in options) {
+            if (option.exclusiveGroupIds.any(context.usedOptionExclusiveGroupIds::contains)) continue
             for (name in option.names) {
                 if (matchesCompletablePrefix(name, context.activePrefix)) {
                     candidates +=

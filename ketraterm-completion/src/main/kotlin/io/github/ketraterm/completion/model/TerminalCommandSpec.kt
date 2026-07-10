@@ -32,6 +32,8 @@ package io.github.ketraterm.completion.model
  * positional arguments after this command or subcommand.
  * @property positionalArgumentValueDomain dynamic host-owned value domain
  * accepted by bare positional arguments after this command or subcommand.
+ * @property positionalArgumentHiddenPathPolicy hidden-entry policy used when
+ * [positionalArgumentPathKind] accepts a path.
  * @property repeatableSubcommands whether multiple child subcommand tokens may
  * appear as sibling positional command values. This models task-style CLIs such
  * as Gradle, where `gradle clean build` is a sequence of tasks rather than
@@ -47,6 +49,7 @@ data class TerminalCommandSpec
         val options: List<TerminalOptionSpec> = emptyList(),
         val positionalArgumentPathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
         val positionalArgumentValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
+        val positionalArgumentHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
         val repeatableSubcommands: Boolean = false,
     ) {
         init {
@@ -68,6 +71,11 @@ data class TerminalCommandSpec
  * output modes. Dynamic host-owned domains belong in host providers instead.
  * @property valueDomain dynamic host-owned value domain accepted by the option's
  * separate value token when [requiresValue] is true.
+ * @property valueHiddenPathPolicy hidden-entry policy used when
+ * [valuePathKind] accepts a path.
+ * @property exclusiveGroupIds identifiers of mutually exclusive option groups.
+ * Options that share any identifier cannot be suggested together once one has
+ * already been entered before the completion cursor.
  */
 data class TerminalOptionSpec
     @JvmOverloads
@@ -78,11 +86,14 @@ data class TerminalOptionSpec
         val valuePathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
         val valueCandidates: List<String> = emptyList(),
         val valueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
+        val valueHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
+        val exclusiveGroupIds: List<String> = emptyList(),
     ) {
         init {
             require(names.isNotEmpty()) { "names must not be empty" }
             require(names.none(String::isBlank)) { "names must not contain blank values" }
             require(valueCandidates.none(String::isBlank)) { "valueCandidates must not contain blank values" }
+            require(exclusiveGroupIds.none(String::isBlank)) { "exclusiveGroupIds must not contain blank values" }
         }
     }
 
@@ -102,6 +113,20 @@ enum class TerminalPathArgumentKind {
 
     /** The argument should reference a regular file. */
     FILE,
+}
+
+/**
+ * Policy for hidden filesystem entries exposed by one path-taking argument.
+ */
+enum class TerminalHiddenPathPolicy {
+    /** Hide dot-prefixed entries for an empty prefix, but show them after `.` is typed. */
+    DEFAULT,
+
+    /** Include dot-prefixed entries even when the user has not typed a prefix. */
+    INCLUDE,
+
+    /** Never return dot-prefixed entries for this argument. */
+    EXCLUDE,
 }
 
 /**

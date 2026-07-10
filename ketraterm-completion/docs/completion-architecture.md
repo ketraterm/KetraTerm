@@ -116,7 +116,10 @@ returns bare current-directory entries only when the resolved
 `pushd`, and PowerShell `Set-Location` aliases receive directory-only
 candidates, while commands such as `git add` and `kubectl apply` may request
 file-or-directory candidates. Dot-prefixed entries are hidden for an empty path
-prefix and appear once the user types `.`. When the active path token begins
+prefix and appear once the user types `.` by default. Command positional and
+option path metadata may instead set `TerminalHiddenPathPolicy.INCLUDE` to
+always expose hidden entries, or `EXCLUDE` to keep them hidden even after a dot
+prefix. When the active path token begins
 with a quote, path candidates replace the whole token with a matching quoted
 replacement instead of dropping the quote. Unquoted path replacements are
 escaped according to `TerminalCompletionRequest.shellCapabilities.quoting`.
@@ -147,6 +150,12 @@ set `TerminalCommandSpec.repeatableSubcommands`. Gradle is the built-in example:
 after `./gradlew clean bu`, the context remains attached to the root Gradle
 task set and the spec source can suggest `build` while omitting already-used
 tasks such as `clean`.
+
+`TerminalOptionSpec.exclusiveGroupIds` models mutually exclusive option sets
+without coupling one option to another option name. Once a completed option
+before the cursor claims a group, spec completion suppresses every option that
+claims that group. Aliases resolve to the same option and therefore claim the
+same groups.
 
 ## Host Dynamic Providers
 

@@ -16,10 +16,7 @@
 package io.github.ketraterm.completion.commandline
 
 import io.github.ketraterm.completion.api.TerminalShellSyntax
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
-import io.github.ketraterm.completion.model.TerminalOptionSpec
-import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+import io.github.ketraterm.completion.model.*
 
 internal enum class TerminalCompletionActivePosition {
     OPERATOR,
@@ -37,8 +34,10 @@ internal data class TerminalCompletionContext(
     val commandPath: List<TerminalCommandSpec>,
     val activePosition: TerminalCompletionActivePosition,
     val activeOption: TerminalOptionSpec?,
+    val usedOptionExclusiveGroupIds: Set<String>,
     val optionsTerminated: Boolean,
     val expectedPathKind: TerminalPathArgumentKind,
+    val expectedHiddenPathPolicy: TerminalHiddenPathPolicy,
     val expectedValueDomain: TerminalCompletionValueDomain,
     val subcommandCandidateSource: TerminalCommandSpec?,
     val staticValueCandidates: List<String>,
@@ -76,8 +75,10 @@ internal object TerminalCompletionContextResolver {
                 commandPath = emptyList(),
                 activePosition = TerminalCompletionActivePosition.OPERATOR,
                 activeOption = null,
+                usedOptionExclusiveGroupIds = emptySet(),
                 optionsTerminated = false,
                 expectedPathKind = TerminalPathArgumentKind.NONE,
+                expectedHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
                 expectedValueDomain = TerminalCompletionValueDomain.NONE,
                 subcommandCandidateSource = null,
                 staticValueCandidates = emptyList(),
@@ -95,8 +96,10 @@ internal object TerminalCompletionContextResolver {
                 commandPath = emptyList(),
                 activePosition = TerminalCompletionActivePosition.COMMAND,
                 activeOption = null,
+                usedOptionExclusiveGroupIds = emptySet(),
                 optionsTerminated = false,
                 expectedPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                expectedHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
                 expectedValueDomain = TerminalCompletionValueDomain.NONE,
                 subcommandCandidateSource = null,
                 staticValueCandidates = emptyList(),
@@ -121,8 +124,10 @@ internal object TerminalCompletionContextResolver {
                         TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
                     },
                 activeOption = null,
+                usedOptionExclusiveGroupIds = emptySet(),
                 optionsTerminated = false,
                 expectedPathKind = TerminalPathArgumentKind.NONE,
+                expectedHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
                 expectedValueDomain = TerminalCompletionValueDomain.NONE,
                 subcommandCandidateSource = null,
                 staticValueCandidates = emptyList(),
@@ -131,13 +136,15 @@ internal object TerminalCompletionContextResolver {
         }
 
         val optionsTerminated = lineContext.hasPassedOptionTerminator(commandTokenIndex)
-        val commandPath = resolveCommandPath(lineContext, commandTokenIndex, root)
+        val resolvedCommandPath = resolveCommandPath(lineContext, commandTokenIndex, root)
+        val commandPath = resolvedCommandPath.commandPath
         val activeOption =
             if (optionsTerminated) {
                 null
             } else {
                 optionBeforeActiveValue(lineContext, commandTokenIndex, commandPath)
             }
+        val usedOptionExclusiveGroupIds = resolvedCommandPath.usedOptionExclusiveGroupIds
         val subcommandCandidateSource = if (optionsTerminated) null else subcommandCandidateSource(commandPath)
         val activePosition =
             when {
@@ -161,6 +168,12 @@ internal object TerminalCompletionContextResolver {
             } else {
                 commandPath.last().positionalArgumentValueDomain
             }
+        val expectedHiddenPathPolicy =
+            if (activeOption != null && activeOption.valuePathKind != TerminalPathArgumentKind.NONE) {
+                activeOption.valueHiddenPathPolicy
+            } else {
+                commandPath.last().positionalArgumentHiddenPathPolicy
+            }
 
         return TerminalCompletionContext(
             commandLineContext = lineContext,
@@ -169,8 +182,10 @@ internal object TerminalCompletionContextResolver {
             commandPath = commandPath,
             activePosition = activePosition,
             activeOption = activeOption,
+            usedOptionExclusiveGroupIds = usedOptionExclusiveGroupIds,
             optionsTerminated = optionsTerminated,
             expectedPathKind = expectedPathKind,
+            expectedHiddenPathPolicy = expectedHiddenPathPolicy,
             expectedValueDomain = expectedValueDomain,
             subcommandCandidateSource = subcommandCandidateSource,
             staticValueCandidates = activeOption?.valueCandidates ?: emptyList(),
@@ -190,8 +205,9 @@ internal object TerminalCompletionContextResolver {
         context: TerminalCommandLineContext,
         commandTokenIndex: Int,
         root: TerminalCommandSpec,
-    ): List<TerminalCommandSpec> {
+    ): ResolvedCommandPath {
         val commands = ArrayList<TerminalCommandSpec>()
+        var usedExclusiveGroupIds: LinkedHashSet<String>? = null
         commands += root
         var current = root
         var index = commandTokenIndex + 1
@@ -200,7 +216,15 @@ internal object TerminalCompletionContextResolver {
             if (token == TERMINAL_COMMAND_OPTION_TERMINATOR) break
             if (token.isTerminalOptionToken()) {
                 val option = findOption(commands, token)
-                if (option?.requiresValue == true) index++
+                if (option != null) {
+                    if (option.exclusiveGroupIds.isNotEmpty()) {
+                        if (usedExclusiveGroupIds == null) {
+                            usedExclusiveGroupIds = LinkedHashSet(option.exclusiveGroupIds.size)
+                        }
+                        usedExclusiveGroupIds.addAll(option.exclusiveGroupIds)
+                    }
+                    if (option.requiresValue) index++
+                }
                 index++
                 continue
             }
@@ -210,7 +234,10 @@ internal object TerminalCompletionContextResolver {
             commands += current
             index++
         }
-        return commands
+        return ResolvedCommandPath(
+            commandPath = commands,
+            usedOptionExclusiveGroupIds = usedExclusiveGroupIds ?: emptySet(),
+        )
     }
 
     private fun findNextSubcommand(
@@ -269,6 +296,11 @@ internal object TerminalCompletionContextResolver {
     private const val NO_QUOTE = '\u0000'
     private const val SINGLE_QUOTE = '\''
     private const val DOUBLE_QUOTE = '"'
+
+    private data class ResolvedCommandPath(
+        val commandPath: List<TerminalCommandSpec>,
+        val usedOptionExclusiveGroupIds: Set<String>,
+    )
 }
 
 private fun TerminalCommandLineContext.hasPassedOptionTerminator(commandTokenIndex: Int): Boolean {

@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalHiddenPathPolicy
 import io.github.ketraterm.completion.model.TerminalOptionSpec
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import kotlin.test.Test
@@ -86,6 +87,51 @@ class PathCompletionSourceTest {
 
         val dotPrefixCandidates = source.complete(request("cat .", "file:///project"))
         assertEquals(listOf(".hidden/"), dotPrefixCandidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `path metadata can include hidden entries for an empty prefix`() {
+        val source =
+            PathCompletionSource(
+                fileSystemProvider = mockProvider,
+                commandSpecs =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "tool",
+                            positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                            positionalArgumentHiddenPathPolicy = TerminalHiddenPathPolicy.INCLUDE,
+                        ),
+                    ),
+            )
+
+        val candidates = source.complete(request("tool ", "file:///project"))
+
+        assertTrue(candidates.any { it.replacementText == ".hidden/" })
+    }
+
+    @Test
+    fun `option path metadata can exclude hidden entries after a dot prefix`() {
+        val source =
+            PathCompletionSource(
+                fileSystemProvider = mockProvider,
+                commandSpecs =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "tool",
+                            options =
+                                listOf(
+                                    TerminalOptionSpec(
+                                        names = listOf("--config"),
+                                        requiresValue = true,
+                                        valuePathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                                        valueHiddenPathPolicy = TerminalHiddenPathPolicy.EXCLUDE,
+                                    ),
+                                ),
+                        ),
+                    ),
+            )
+
+        assertTrue(source.complete(request("tool --config .", "file:///project")).isEmpty())
     }
 
     @Test

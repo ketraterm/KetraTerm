@@ -20,6 +20,7 @@ import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.TerminalHiddenPathPolicy
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 /**
@@ -106,7 +107,7 @@ internal class PathCompletionSource(
 
         for (entry in entries) {
             if (!context.expectedPathKind.accepts(entry)) continue
-            if (filePrefix.isEmpty() && entry.name.startsWith(".")) continue
+            if (!context.expectedHiddenPathPolicy.accepts(entry.name, filePrefix)) continue
             if (matchesPrefix(entry.name, filePrefix)) {
                 val rawSuffix = if (entry.isDirectory) "$pathSeparator" else ""
                 val rawReplacement = directoryPortion + entry.name + rawSuffix
@@ -313,4 +314,15 @@ internal class PathCompletionSource(
             TerminalPathArgumentKind.DIRECTORY -> entry.isDirectory
             TerminalPathArgumentKind.FILE -> !entry.isDirectory
         }
+
+    private fun TerminalHiddenPathPolicy.accepts(
+        entryName: String,
+        prefix: String,
+    ): Boolean =
+        !entryName.startsWith('.') ||
+            when (this) {
+                TerminalHiddenPathPolicy.DEFAULT -> prefix.isNotEmpty()
+                TerminalHiddenPathPolicy.INCLUDE -> true
+                TerminalHiddenPathPolicy.EXCLUDE -> false
+            }
 }

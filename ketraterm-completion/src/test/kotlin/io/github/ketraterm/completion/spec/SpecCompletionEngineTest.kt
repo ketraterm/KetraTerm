@@ -96,6 +96,30 @@ class SpecCompletionEngineTest {
     }
 
     @Test
+    fun `mutually exclusive options are not suggested after a conflicting option`() {
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                TerminalCompletionSources.fromSpecs(
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "tool",
+                            options =
+                                listOf(
+                                    TerminalOptionSpec(listOf("--quiet", "-q"), exclusiveGroupIds = listOf("verbosity")),
+                                    TerminalOptionSpec(listOf("--verbose", "-v"), exclusiveGroupIds = listOf("verbosity")),
+                                    TerminalOptionSpec(listOf("--color")),
+                                ),
+                        ),
+                    ),
+                ),
+            )
+
+        val candidates = engine.complete(request("tool -q -"))
+
+        assertEquals(listOf("--color"), candidates.map { it.replacementText })
+    }
+
+    @Test
     fun `option value candidates complete value token`() {
         val candidates = engine().complete(request("gradle --console r"))
 

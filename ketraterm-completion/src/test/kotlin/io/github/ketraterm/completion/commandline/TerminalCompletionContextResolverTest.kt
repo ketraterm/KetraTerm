@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.completion.commandline
 
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
-import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+import io.github.ketraterm.completion.model.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -85,6 +82,50 @@ class TerminalCompletionContextResolverTest {
         assertEquals(TerminalCompletionActivePosition.OPTION_VALUE, context.activePosition)
         assertEquals(TerminalCompletionValueDomain.KUBERNETES_NAMESPACE, context.expectedValueDomain)
         assertEquals("def", context.activePrefix)
+    }
+
+    @Test
+    fun `used option conflict groups are exposed through context`() {
+        val context =
+            TerminalCompletionContextResolver.resolve(
+                commandLine = "tool --quiet ",
+                cursorOffset = "tool --quiet ".length,
+                commandSpecs =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "tool",
+                            options = listOf(TerminalOptionSpec(listOf("--quiet"), exclusiveGroupIds = listOf("verbosity"))),
+                        ),
+                    ),
+            )
+
+        assertEquals(setOf("verbosity"), context.usedOptionExclusiveGroupIds)
+    }
+
+    @Test
+    fun `option path hidden policy is exposed through context`() {
+        val context =
+            TerminalCompletionContextResolver.resolve(
+                commandLine = "tool --config ",
+                cursorOffset = "tool --config ".length,
+                commandSpecs =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "tool",
+                            options =
+                                listOf(
+                                    TerminalOptionSpec(
+                                        names = listOf("--config"),
+                                        requiresValue = true,
+                                        valuePathKind = TerminalPathArgumentKind.FILE,
+                                        valueHiddenPathPolicy = TerminalHiddenPathPolicy.EXCLUDE,
+                                    ),
+                                ),
+                        ),
+                    ),
+            )
+
+        assertEquals(TerminalHiddenPathPolicy.EXCLUDE, context.expectedHiddenPathPolicy)
     }
 
     @Test
