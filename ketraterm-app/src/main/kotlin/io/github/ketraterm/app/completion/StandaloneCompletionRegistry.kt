@@ -43,7 +43,8 @@ internal class StandaloneCompletionRegistry(
         require(sessionMruCapacity > 0) { "sessionMruCapacity must be > 0, was $sessionMruCapacity" }
     }
 
-    private val commandSpecs = specs.toList()
+    /** Immutable command specs shared by standalone completion integration. */
+    val commandSpecs = specs.toList()
     private val lock = Any()
     private val shapeStatsProvider = persistentStatsSource?.let { source -> { source.shapeSnapshot() } }
     private val specSource =

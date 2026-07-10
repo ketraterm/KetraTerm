@@ -17,15 +17,13 @@ package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.completion.StandaloneCompletionTriggerController
 import io.github.ketraterm.app.config.KetraTermSettings
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.ketraterm.ui.swing.api.SwingTerminal
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
-import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
-import io.github.ketraterm.ui.swing.suggestion.replacementFor
+import io.github.ketraterm.ui.swing.suggestion.*
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
@@ -73,6 +71,7 @@ internal class TerminalPane private constructor(
             settings: KetraTermSettings,
             suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
             suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+            commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
             onContextMenu: (TerminalPane, Int, Int) -> Unit,
         ): TerminalPane {
             val scrollbar = JScrollBar(Adjustable.VERTICAL)
@@ -85,6 +84,7 @@ internal class TerminalPane private constructor(
                     hideSuggestions = { terminalRef.hideShellSuggestions() },
                     rankingContextKey = { tab.currentWorkingDirectoryUri },
                     suggestionsEnabled = { settings.shellSuggestionsEnabled },
+                    commandSpecs = commandSpecs,
                 )
 
             val defaultHandler = SwingShellSuggestionHandler.createDefault(tab.session)

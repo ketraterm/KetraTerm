@@ -226,6 +226,7 @@ internal class TabManager(
                         profileId = workspaceTab.profile.id,
                         workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
                     ),
+                commandSpecs = completionRegistry.commandSpecs,
                 suggestionFeedbackHandler =
                     completionFeedbackRecorder.createHandler(
                         profileId = workspaceTab.profile.id,
@@ -383,6 +384,7 @@ internal class TabManager(
                         profileId = workspaceTab.profile.id,
                         workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
                     ),
+                commandSpecs = completionRegistry.commandSpecs,
                 suggestionFeedbackHandler =
                     completionFeedbackRecorder.createHandler(
                         profileId = workspaceTab.profile.id,

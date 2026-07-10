@@ -16,6 +16,8 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionTriggerEvaluator
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import javax.swing.SwingUtilities
 import javax.swing.Timer
@@ -42,6 +44,9 @@ import javax.swing.Timer
  * output changes.
  * @param minimumNonWhitespaceCharacters minimum typed non-whitespace command
  * characters required before the popup is allowed to open.
+ * @param commandSpecs immutable command specs shared with the suggestion
+ * provider so custom command contexts use the same live-trigger policy as
+ * candidate generation and ranking.
  */
 internal class StandaloneCompletionTriggerController(
     private val activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
@@ -52,7 +57,9 @@ internal class StandaloneCompletionTriggerController(
     private val scheduler: StandaloneCompletionTriggerScheduler = SwingStandaloneCompletionTriggerScheduler(),
     private val debounceMillis: Int = DEFAULT_DEBOUNCE_MILLIS,
     private val minimumNonWhitespaceCharacters: Int = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
+    commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
 ) {
+    private val commandSpecs = commandSpecs.toList()
     private var lastRequestedSnapshotKey: SnapshotKey? = null
 
     init {
@@ -127,6 +134,7 @@ internal class StandaloneCompletionTriggerController(
                 commandLine = snapshot.commandText,
                 cursorOffset = snapshot.cursorOffset,
                 minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
+                commandSpecs = commandSpecs,
             )
         if (!shouldTrigger) {
             lastRequestedSnapshotKey = null

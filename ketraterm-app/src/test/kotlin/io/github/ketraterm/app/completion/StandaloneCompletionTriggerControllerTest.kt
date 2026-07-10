@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.app.completion
 
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -254,6 +256,35 @@ class StandaloneCompletionTriggerControllerTest {
                 scheduler = FakeScheduler(),
                 debounceMillis = 50,
                 minimumNonWhitespaceCharacters = 3,
+            )
+
+        controller.refreshNow()
+
+        assertEquals(listOf(activeSnapshot), requested)
+        assertEquals(0, hidden.count)
+    }
+
+    @Test
+    fun `refresh uses supplied command specs for contextual space triggers`() {
+        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+        val hidden = Counter()
+        val activeSnapshot = snapshot("go ")
+        val controller =
+            StandaloneCompletionTriggerController(
+                activeCommandLine = { activeSnapshot },
+                requestSuggestions = { requested += it },
+                hideSuggestions = hidden::increment,
+                suggestionsEnabled = { true },
+                scheduler = FakeScheduler(),
+                debounceMillis = 50,
+                minimumNonWhitespaceCharacters = 99,
+                commandSpecs =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "go",
+                            positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+                        ),
+                    ),
             )
 
         controller.refreshNow()
