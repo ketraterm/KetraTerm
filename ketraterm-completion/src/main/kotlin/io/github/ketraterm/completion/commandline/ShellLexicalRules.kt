@@ -57,7 +57,11 @@ internal object ShellLexicalRules {
             TerminalShellSyntax.POSIX ->
                 ch == BACKSLASH &&
                     (
-                        quote != DOUBLE_QUOTE || next == DOLLAR || next == BACKTICK || next == DOUBLE_QUOTE || next == BACKSLASH ||
+                        quote != DOUBLE_QUOTE ||
+                            next == DOLLAR ||
+                            next == BACKTICK ||
+                            next == DOUBLE_QUOTE ||
+                            next == BACKSLASH ||
                             next == NEWLINE
                     )
         }

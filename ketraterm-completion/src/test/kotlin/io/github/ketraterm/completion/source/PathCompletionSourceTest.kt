@@ -196,6 +196,61 @@ class PathCompletionSourceTest {
     }
 
     @Test
+    fun `attached option path value replaces only the text after the separator`() {
+        val source =
+            PathCompletionSource(
+                fileSystemProvider = mockProvider,
+                commandSpecs =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "tool",
+                            options =
+                                listOf(
+                                    TerminalOptionSpec(
+                                        names = listOf("--cwd"),
+                                        requiresValue = true,
+                                        valuePathKind = TerminalPathArgumentKind.DIRECTORY,
+                                    ),
+                                ),
+                        ),
+                    ),
+            )
+        val commandLine = "tool --cwd=I"
+
+        val candidates = source.complete(request(commandLine, "file:///project"))
+
+        assertEquals(listOf("Idea\\ Projects/"), candidates.map { it.replacementText })
+        assertEquals(commandLine.indexOf('=') + 1, candidates.single().replacementStartOffset)
+        assertEquals(commandLine.length, candidates.single().replacementEndOffset)
+    }
+
+    @Test
+    fun `attached quoted option path value preserves the quote style`() {
+        val source =
+            PathCompletionSource(
+                fileSystemProvider = mockProvider,
+                commandSpecs =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "tool",
+                            options =
+                                listOf(
+                                    TerminalOptionSpec(
+                                        names = listOf("--cwd"),
+                                        requiresValue = true,
+                                        valuePathKind = TerminalPathArgumentKind.DIRECTORY,
+                                    ),
+                                ),
+                        ),
+                    ),
+            )
+
+        val candidates = source.complete(request("tool --cwd=\"Idea Pro", "file:///project"))
+
+        assertEquals("\"Idea Projects/\"", candidates.single().replacementText)
+    }
+
+    @Test
     fun `completes nested relative path with forward slashes`() {
         val request = request("cat src/m", "file:///project")
         val candidates = source.complete(request)

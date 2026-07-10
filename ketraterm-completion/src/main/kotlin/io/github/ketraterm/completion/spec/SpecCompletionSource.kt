@@ -142,10 +142,29 @@ internal class SpecCompletionSource(
                     displayText = value,
                     detail = context.activeOption?.description.orEmpty(),
                     kind = TerminalCompletionCandidateKind.ARGUMENT,
-                    context = context.commandLineContext,
+                    context = context,
                     score = score(value, context.activePrefix, OPTION_VALUE_BASE_SCORE, orderIndex),
                 )
             }.toList()
+
+    private fun candidate(
+        replacementText: String,
+        displayText: String,
+        detail: String,
+        kind: TerminalCompletionCandidateKind,
+        context: TerminalCompletionContext,
+        score: Int,
+    ): TerminalCompletionCandidate =
+        TerminalCompletionCandidate(
+            replacementText = replacementText,
+            replacementStartOffset = context.replacementStartOffset,
+            replacementEndOffset = context.replacementEndOffset,
+            displayText = displayText,
+            detail = detail,
+            source = SOURCE_SPEC,
+            kind = kind,
+            score = score,
+        )
 
     private fun candidate(
         replacementText: String,

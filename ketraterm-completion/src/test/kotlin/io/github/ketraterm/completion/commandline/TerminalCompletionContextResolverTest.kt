@@ -76,6 +76,18 @@ class TerminalCompletionContextResolverTest {
     }
 
     @Test
+    fun `attached option value exposes value-only prefix and replacement range`() {
+        val commandLine = "aws --output=ta"
+        val context = resolve(commandLine)
+
+        assertEquals(TerminalCompletionActivePosition.OPTION_VALUE, context.activePosition)
+        assertEquals("ta", context.activePrefix)
+        assertEquals(commandLine.indexOf('=') + 1, context.replacementStartOffset)
+        assertEquals(commandLine.length, context.replacementEndOffset)
+        assertEquals(listOf("json", "text", "table", "yaml", "yaml-stream"), context.staticValueCandidates)
+    }
+
+    @Test
     fun `dynamic option value domain is exposed through context`() {
         val context = resolve("kubectl --namespace def")
 

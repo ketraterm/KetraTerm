@@ -145,6 +145,13 @@ Kubernetes namespaces, IDE run configurations, project files, or indexed symbols
 must still come from host-owned providers; the shared module only models and
 ranks those values.
 
+Options that require a value support both separate and attached forms. For
+example, `aws --output text` and `aws --output=text` resolve to the same option
+value context. Attached completion replaces only the text after `=`, preserving
+the option name and separator. This applies to static values, path values, and
+host-provided dynamic domains; a quoted attached path value preserves its quote
+style through the normal path replacement policy.
+
 Task-style CLIs that accept several sibling command values on one line should
 set `TerminalCommandSpec.repeatableSubcommands`. Gradle is the built-in example:
 after `./gradlew clean bu`, the context remains attached to the root Gradle

@@ -36,6 +36,12 @@ class TerminalCompletionTriggerEvaluatorTest {
     }
 
     @Test
+    fun `isLiveTrigger matches attached option values with known completions`() {
+        assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("aws --output=", 13))
+        assertFalse(TerminalCompletionTriggerEvaluator.isLiveTrigger("git --help=", 11))
+    }
+
+    @Test
     fun `isLiveTrigger matches path separators`() {
         assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("/", 1))
         assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("\\", 1))

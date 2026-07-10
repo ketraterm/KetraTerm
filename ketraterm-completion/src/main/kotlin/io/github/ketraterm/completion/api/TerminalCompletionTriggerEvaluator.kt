@@ -93,13 +93,18 @@ object TerminalCompletionTriggerEvaluator {
         // 1. Hyphen option trigger (e.g. '-')
         if (lastChar == '-') return true
 
-        // 2. Path separator trigger (e.g. '/' or '\')
+        // 2. Attached option value trigger (e.g. '--output=')
+        if (lastChar == '=') {
+            return hasContextualValueCompletions(commandLine, lineContext, commandSpecs)
+        }
+
+        // 3. Path separator trigger (e.g. '/' or '\')
         if (lastChar == '/' || lastChar == '\\') return true
 
-        // 3. Environment variable trigger (e.g. '$')
+        // 4. Environment variable trigger (e.g. '$')
         if (lastChar == '$') return true
 
-        // 4. Context-aware finished-word space trigger
+        // 5. Context-aware finished-word space trigger
         if (lastChar == ' ') {
             val prevChar = commandLine.getOrNull(cursorOffset - 2)
             if (prevChar != null && prevChar != ' ') {
@@ -134,6 +139,25 @@ object TerminalCompletionTriggerEvaluator {
                 context.expectedPathKind != TerminalPathArgumentKind.NONE ||
                     context.expectedValueDomain != TerminalCompletionValueDomain.NONE
         }
+    }
+
+    private fun hasContextualValueCompletions(
+        commandLine: String,
+        lineContext: TerminalCommandLineContext,
+        commandSpecs: List<TerminalCommandSpec>,
+    ): Boolean {
+        val context =
+            TerminalCompletionContextResolver.resolve(
+                commandLine = commandLine,
+                lineContext = lineContext,
+                commandSpecs = commandSpecs,
+            )
+        return context.activePosition == TerminalCompletionActivePosition.OPTION_VALUE &&
+            (
+                context.staticValueCandidates.isNotEmpty() ||
+                    context.expectedPathKind != TerminalPathArgumentKind.NONE ||
+                    context.expectedValueDomain != TerminalCompletionValueDomain.NONE
+            )
     }
 
     private fun nonWhitespaceCount(text: String): Int {

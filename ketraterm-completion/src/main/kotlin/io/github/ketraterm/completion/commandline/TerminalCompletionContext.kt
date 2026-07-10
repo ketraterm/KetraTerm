@@ -27,6 +27,13 @@ internal enum class TerminalCompletionActivePosition {
     POSITIONAL_ARGUMENT,
 }
 
+internal data class AttachedOptionValue(
+    val option: TerminalOptionSpec,
+    val prefix: String,
+    val replacementStartOffset: Int,
+    val quote: Char,
+)
+
 internal data class TerminalCompletionContext(
     val commandLineContext: TerminalCommandLineContext,
     val commandTokenIndex: Int,
@@ -42,9 +49,10 @@ internal data class TerminalCompletionContext(
     val subcommandCandidateSource: TerminalCommandSpec?,
     val staticValueCandidates: List<String>,
     val activeTokenQuote: Char,
+    private val attachedOptionValue: AttachedOptionValue?,
 ) {
-    val activePrefix: String get() = commandLineContext.activePrefix
-    val replacementStartOffset: Int get() = commandLineContext.replacementStartOffset
+    val activePrefix: String get() = attachedOptionValue?.prefix ?: commandLineContext.activePrefix
+    val replacementStartOffset: Int get() = attachedOptionValue?.replacementStartOffset ?: commandLineContext.replacementStartOffset
     val replacementEndOffset: Int get() = commandLineContext.replacementEndOffset
     val currentCommand: TerminalCommandSpec? get() = commandPath.lastOrNull()
 }
@@ -83,6 +91,7 @@ internal object TerminalCompletionContextResolver {
                 subcommandCandidateSource = null,
                 staticValueCandidates = emptyList(),
                 activeTokenQuote = NO_QUOTE,
+                attachedOptionValue = null,
             )
         }
         val commandTokenIndex = lineContext.tokens.firstCommandTokenIndex()
@@ -104,6 +113,7 @@ internal object TerminalCompletionContextResolver {
                 subcommandCandidateSource = null,
                 staticValueCandidates = emptyList(),
                 activeTokenQuote = activeTokenQuote,
+                attachedOptionValue = null,
             )
         }
 
@@ -132,18 +142,26 @@ internal object TerminalCompletionContextResolver {
                 subcommandCandidateSource = null,
                 staticValueCandidates = emptyList(),
                 activeTokenQuote = activeTokenQuote,
+                attachedOptionValue = null,
             )
         }
 
         val optionsTerminated = lineContext.hasPassedOptionTerminator(commandTokenIndex)
         val resolvedCommandPath = resolveCommandPath(lineContext, commandTokenIndex, root)
         val commandPath = resolvedCommandPath.commandPath
-        val activeOption =
+        val attachedOptionValue =
             if (optionsTerminated) {
                 null
             } else {
-                optionBeforeActiveValue(lineContext, commandTokenIndex, commandPath)
+                attachedOptionValue(commandLine, lineContext, commandPath)
             }
+        val activeOption =
+            attachedOptionValue?.option
+                ?: if (optionsTerminated) {
+                    null
+                } else {
+                    optionBeforeActiveValue(lineContext, commandTokenIndex, commandPath)
+                }
         val usedOptionExclusiveGroupIds = resolvedCommandPath.usedOptionExclusiveGroupIds
         val subcommandCandidateSource = if (optionsTerminated) null else subcommandCandidateSource(commandPath)
         val activePosition =
@@ -189,7 +207,8 @@ internal object TerminalCompletionContextResolver {
             expectedValueDomain = expectedValueDomain,
             subcommandCandidateSource = subcommandCandidateSource,
             staticValueCandidates = activeOption?.valueCandidates ?: emptyList(),
-            activeTokenQuote = activeTokenQuote,
+            activeTokenQuote = attachedOptionValue?.quote ?: activeTokenQuote,
+            attachedOptionValue = attachedOptionValue,
         )
     }
 
@@ -223,7 +242,7 @@ internal object TerminalCompletionContextResolver {
                         }
                         usedExclusiveGroupIds.addAll(option.exclusiveGroupIds)
                     }
-                    if (option.requiresValue) index++
+                    if (option.requiresValue && !token.hasAttachedOptionValue()) index++
                 }
                 index++
                 continue
@@ -261,14 +280,38 @@ internal object TerminalCompletionContextResolver {
         val optionToken = context.tokens.getOrNull(optionIndex) ?: return null
         if (!optionToken.text.isTerminalOptionToken()) return null
         val option = findOption(commands, optionToken.text) ?: return null
-        return if (option.requiresValue) option else null
+        return if (option.requiresValue && !optionToken.text.hasAttachedOptionValue()) option else null
+    }
+
+    private fun attachedOptionValue(
+        commandLine: String,
+        context: TerminalCommandLineContext,
+        commands: List<TerminalCommandSpec>,
+    ): AttachedOptionValue? {
+        val activeToken = context.tokens.getOrNull(context.activeTokenIndex) ?: return null
+        val separatorOffset = commandLine.indexOf(OPTION_VALUE_SEPARATOR, activeToken.startOffset)
+        if (separatorOffset !in activeToken.startOffset until activeToken.endOffset || context.cursorOffset <= separatorOffset) {
+            return null
+        }
+        val option = findOption(commands, commandLine.substring(activeToken.startOffset, separatorOffset)) ?: return null
+        if (!option.requiresValue) return null
+        val prefixSeparatorIndex = context.activePrefix.indexOf(OPTION_VALUE_SEPARATOR)
+        if (prefixSeparatorIndex < 0) return null
+        val quote = commandLine.getOrNull(separatorOffset + 1)
+        return AttachedOptionValue(
+            option = option,
+            prefix = context.activePrefix.substring(prefixSeparatorIndex + 1),
+            replacementStartOffset = separatorOffset + 1,
+            quote = if (quote == SINGLE_QUOTE || quote == DOUBLE_QUOTE) quote else NO_QUOTE,
+        )
     }
 
     private fun findOption(
         commands: List<TerminalCommandSpec>,
         token: String,
     ): TerminalOptionSpec? {
-        val normalized = normalizeTerminalCommandToken(token)
+        val separatorIndex = token.indexOf(OPTION_VALUE_SEPARATOR)
+        val normalized = normalizeTerminalCommandToken(if (separatorIndex < 0) token else token.substring(0, separatorIndex))
         return commands.asReversed().firstNotNullOfOrNull { command ->
             command.options.firstOrNull { option ->
                 option.names.any { name -> normalizeTerminalCommandToken(name) == normalized }
@@ -296,6 +339,7 @@ internal object TerminalCompletionContextResolver {
     private const val NO_QUOTE = '\u0000'
     private const val SINGLE_QUOTE = '\''
     private const val DOUBLE_QUOTE = '"'
+    private const val OPTION_VALUE_SEPARATOR = '='
 
     private data class ResolvedCommandPath(
         val commandPath: List<TerminalCommandSpec>,
@@ -315,3 +359,5 @@ private fun TerminalCommandLineContext.hasPassedOptionTerminator(commandTokenInd
 }
 
 private fun String.isOptionNamePrefix(): Boolean = startsWith("-") && this != ""
+
+private fun String.hasAttachedOptionValue(): Boolean = indexOf('=') > 1

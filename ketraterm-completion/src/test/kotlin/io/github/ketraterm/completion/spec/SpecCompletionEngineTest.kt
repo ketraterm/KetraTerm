@@ -130,6 +130,16 @@ class SpecCompletionEngineTest {
     }
 
     @Test
+    fun `option value candidates complete attached value token`() {
+        val commandLine = "gradle --console=ri"
+        val candidates = engine().complete(request(commandLine))
+
+        assertEquals(listOf("rich"), candidates.map { it.replacementText })
+        assertEquals(commandLine.indexOf('=') + 1, candidates.single().replacementStartOffset)
+        assertEquals(commandLine.length, candidates.single().replacementEndOffset)
+    }
+
+    @Test
     fun `default specs expose static option value domains`() {
         val engine =
             TerminalCompletionEngines.fromSources(
