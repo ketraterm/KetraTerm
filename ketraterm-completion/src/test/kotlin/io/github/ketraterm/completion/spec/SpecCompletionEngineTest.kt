@@ -77,11 +77,22 @@ class SpecCompletionEngineTest {
     }
 
     @Test
-    fun `option prefix returns command options`() {
-        val candidates = engine().complete(request("git --"))
+    fun `option prefix returns matching command options before the terminator`() {
+        val candidates = engine().complete(request("git --v"))
 
-        assertEquals(listOf("--help", "--version"), candidates.map { it.replacementText })
+        assertEquals(listOf("--version"), candidates.map { it.replacementText })
         assertTrue(candidates.all { it.kind == TerminalCompletionCandidateKind.OPTION })
+    }
+
+    @Test
+    fun `option terminator stops option completion`() {
+        assertTrue(engine().complete(request("git --")).isEmpty())
+        assertTrue(engine().complete(request("git -- --v")).isEmpty())
+    }
+
+    @Test
+    fun `option terminator prevents option values from completing`() {
+        assertTrue(engine().complete(request("gradle -- --console r")).isEmpty())
     }
 
     @Test

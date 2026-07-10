@@ -37,6 +37,7 @@ internal data class TerminalCompletionContext(
     val commandPath: List<TerminalCommandSpec>,
     val activePosition: TerminalCompletionActivePosition,
     val activeOption: TerminalOptionSpec?,
+    val optionsTerminated: Boolean,
     val expectedPathKind: TerminalPathArgumentKind,
     val expectedValueDomain: TerminalCompletionValueDomain,
     val subcommandCandidateSource: TerminalCommandSpec?,
@@ -75,6 +76,7 @@ internal object TerminalCompletionContextResolver {
                 commandPath = emptyList(),
                 activePosition = TerminalCompletionActivePosition.OPERATOR,
                 activeOption = null,
+                optionsTerminated = false,
                 expectedPathKind = TerminalPathArgumentKind.NONE,
                 expectedValueDomain = TerminalCompletionValueDomain.NONE,
                 subcommandCandidateSource = null,
@@ -93,6 +95,7 @@ internal object TerminalCompletionContextResolver {
                 commandPath = emptyList(),
                 activePosition = TerminalCompletionActivePosition.COMMAND,
                 activeOption = null,
+                optionsTerminated = false,
                 expectedPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                 expectedValueDomain = TerminalCompletionValueDomain.NONE,
                 subcommandCandidateSource = null,
@@ -118,6 +121,7 @@ internal object TerminalCompletionContextResolver {
                         TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
                     },
                 activeOption = null,
+                optionsTerminated = false,
                 expectedPathKind = TerminalPathArgumentKind.NONE,
                 expectedValueDomain = TerminalCompletionValueDomain.NONE,
                 subcommandCandidateSource = null,
@@ -126,11 +130,18 @@ internal object TerminalCompletionContextResolver {
             )
         }
 
+        val optionsTerminated = lineContext.hasPassedOptionTerminator(commandTokenIndex)
         val commandPath = resolveCommandPath(lineContext, commandTokenIndex, root)
-        val activeOption = optionBeforeActiveValue(lineContext, commandTokenIndex, commandPath)
-        val subcommandCandidateSource = subcommandCandidateSource(commandPath)
+        val activeOption =
+            if (optionsTerminated) {
+                null
+            } else {
+                optionBeforeActiveValue(lineContext, commandTokenIndex, commandPath)
+            }
+        val subcommandCandidateSource = if (optionsTerminated) null else subcommandCandidateSource(commandPath)
         val activePosition =
             when {
+                optionsTerminated -> TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
                 activeOption != null -> TerminalCompletionActivePosition.OPTION_VALUE
                 lineContext.activePrefix.isOptionNamePrefix() -> TerminalCompletionActivePosition.OPTION_NAME
                 commandPath.last().positionalArgumentPathKind != TerminalPathArgumentKind.NONE ->
@@ -158,6 +169,7 @@ internal object TerminalCompletionContextResolver {
             commandPath = commandPath,
             activePosition = activePosition,
             activeOption = activeOption,
+            optionsTerminated = optionsTerminated,
             expectedPathKind = expectedPathKind,
             expectedValueDomain = expectedValueDomain,
             subcommandCandidateSource = subcommandCandidateSource,
@@ -185,6 +197,7 @@ internal object TerminalCompletionContextResolver {
         var index = commandTokenIndex + 1
         while (index < context.activeTokenIndex) {
             val token = context.tokens[index].text
+            if (token == TERMINAL_COMMAND_OPTION_TERMINATOR) break
             if (token.isTerminalOptionToken()) {
                 val option = findOption(commands, token)
                 if (option?.requiresValue == true) index++
@@ -256,6 +269,17 @@ internal object TerminalCompletionContextResolver {
     private const val NO_QUOTE = '\u0000'
     private const val SINGLE_QUOTE = '\''
     private const val DOUBLE_QUOTE = '"'
+}
+
+private fun TerminalCommandLineContext.hasPassedOptionTerminator(commandTokenIndex: Int): Boolean {
+    var index = commandTokenIndex + 1
+    while (index < tokens.size) {
+        val token = tokens[index]
+        if (token.startOffset >= cursorOffset) break
+        if (token.endOffset <= cursorOffset && token.text == TERMINAL_COMMAND_OPTION_TERMINATOR) return true
+        index++
+    }
+    return false
 }
 
 private fun String.isOptionNamePrefix(): Boolean = startsWith("-") && this != ""

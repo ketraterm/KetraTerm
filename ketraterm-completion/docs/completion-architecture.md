@@ -102,6 +102,12 @@ their closest logical segment. Whole-command MRU and exact-stats candidates are
 suppressed in segments following an operator because their full-line replacement
 range cannot safely express a segment-local completion.
 
+The exact shell option terminator `--` is a command-context boundary once the
+cursor has passed the complete token. Tokens after it remain positional: they do
+not resolve as options, option values, or subcommands, and static spec option
+completion stops. An incomplete prefix such as `--v` remains an option prefix
+until the complete terminator token is entered.
+
 Path completion is intentionally conservative. In command position it only
 returns candidates for explicitly path-like prefixes. In argument position it
 returns bare current-directory entries only when the resolved

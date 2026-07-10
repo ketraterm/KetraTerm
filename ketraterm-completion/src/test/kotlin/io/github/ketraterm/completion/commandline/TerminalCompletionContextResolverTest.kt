@@ -42,6 +42,25 @@ class TerminalCompletionContextResolverTest {
     }
 
     @Test
+    fun `option terminator makes the active token positional`() {
+        val context = resolve("git -- --help")
+
+        assertEquals(TerminalCompletionActivePosition.POSITIONAL_ARGUMENT, context.activePosition)
+        assertEquals(true, context.optionsTerminated)
+        assertEquals(null, context.activeOption)
+        assertEquals("--help", context.activePrefix)
+    }
+
+    @Test
+    fun `option terminator prevents later tokens from resolving as subcommands`() {
+        val context = resolve("git -- status")
+
+        assertEquals(listOf("git"), context.commandPath.map { it.name })
+        assertEquals(TerminalCompletionActivePosition.POSITIONAL_ARGUMENT, context.activePosition)
+        assertEquals(null, context.subcommandCandidateSource)
+    }
+
+    @Test
     fun `git directory option value resolves option value path context`() {
         val context = resolve("git -C ")
 
