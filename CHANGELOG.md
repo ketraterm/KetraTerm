@@ -1,5 +1,9 @@
 # KetraTerm Changelog
 
+## [Unreleased]
+
+- Fixed multiline paste framing across local PTY sessions: bracketed paste preserves the payload, while unbracketed paste uses CR line boundaries so PowerShell and other interactive shells do not receive duplicate or reordered continuation input.
+
 ## [0.1.3] - 2026-07-08
 
 - Moved search chrome and shortcut policy into host-owned action wiring.
