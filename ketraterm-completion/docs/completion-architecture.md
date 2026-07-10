@@ -164,6 +164,12 @@ before the cursor claims a group, spec completion suppresses every option that
 claims that group. Aliases resolve to the same option and therefore claim the
 same groups.
 
+`TerminalArgumentSpec` models ordered positional arguments. It supports static
+value candidates, path and dynamic-domain metadata, optional arguments, and a
+variadic final argument that applies to every remaining positional token.
+`TerminalCommandSpec.positionalArguments` takes precedence when present; the
+scalar positional fields remain the fallback for compact specs.
+
 ## Host Dynamic Providers
 
 Standalone and IntelliJ completion providers are expected to differ internally.

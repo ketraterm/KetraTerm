@@ -28,6 +28,8 @@ package io.github.ketraterm.completion.model
  * @property aliases additional tokens that resolve to this command.
  * @property subcommands nested subcommands available after this command.
  * @property options options available at this command level.
+ * @property positionalArguments ordered positional argument declarations. When
+ * nonempty, they take precedence over the scalar positional metadata.
  * @property positionalArgumentPathKind file-system path kind accepted by bare
  * positional arguments after this command or subcommand.
  * @property positionalArgumentValueDomain dynamic host-owned value domain
@@ -47,6 +49,7 @@ data class TerminalCommandSpec
         val aliases: List<String> = emptyList(),
         val subcommands: List<TerminalCommandSpec> = emptyList(),
         val options: List<TerminalOptionSpec> = emptyList(),
+        val positionalArguments: List<TerminalArgumentSpec> = emptyList(),
         val positionalArgumentPathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
         val positionalArgumentValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
         val positionalArgumentHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
@@ -55,6 +58,36 @@ data class TerminalCommandSpec
         init {
             require(name.isNotBlank()) { "name must not be blank" }
             require(aliases.none(String::isBlank)) { "aliases must not contain blank values" }
+        }
+    }
+
+/**
+ * Declarative metadata for one ordered positional command argument.
+ *
+ * @property name concise display label for the argument.
+ * @property description short explanation shown with static value candidates.
+ * @property isOptional whether callers may omit this argument.
+ * @property isVariadic whether this declaration applies to every remaining
+ * positional argument after its ordinal position.
+ * @property pathKind filesystem path category accepted by this argument.
+ * @property valueCandidates bounded static values accepted by this argument.
+ * @property valueDomain dynamic host-owned value domain accepted by this argument.
+ * @property hiddenPathPolicy hidden-entry policy used when [pathKind] accepts a path.
+ */
+data class TerminalArgumentSpec
+    @JvmOverloads
+    constructor(
+        val name: String = "",
+        val description: String = "",
+        val isOptional: Boolean = false,
+        val isVariadic: Boolean = false,
+        val pathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
+        val valueCandidates: List<String> = emptyList(),
+        val valueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
+        val hiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
+    ) {
+        init {
+            require(valueCandidates.none(String::isBlank)) { "valueCandidates must not contain blank values" }
         }
     }
 

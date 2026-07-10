@@ -41,6 +41,7 @@ internal data class TerminalCompletionContext(
     val commandPath: List<TerminalCommandSpec>,
     val activePosition: TerminalCompletionActivePosition,
     val activeOption: TerminalOptionSpec?,
+    val activePositionalArgument: TerminalArgumentSpec?,
     val usedOptionExclusiveGroupIds: Set<String>,
     val optionsTerminated: Boolean,
     val expectedPathKind: TerminalPathArgumentKind,
@@ -83,6 +84,7 @@ internal object TerminalCompletionContextResolver {
                 commandPath = emptyList(),
                 activePosition = TerminalCompletionActivePosition.OPERATOR,
                 activeOption = null,
+                activePositionalArgument = null,
                 usedOptionExclusiveGroupIds = emptySet(),
                 optionsTerminated = false,
                 expectedPathKind = TerminalPathArgumentKind.NONE,
@@ -105,6 +107,7 @@ internal object TerminalCompletionContextResolver {
                 commandPath = emptyList(),
                 activePosition = TerminalCompletionActivePosition.COMMAND,
                 activeOption = null,
+                activePositionalArgument = null,
                 usedOptionExclusiveGroupIds = emptySet(),
                 optionsTerminated = false,
                 expectedPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
@@ -134,6 +137,7 @@ internal object TerminalCompletionContextResolver {
                         TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
                     },
                 activeOption = null,
+                activePositionalArgument = null,
                 usedOptionExclusiveGroupIds = emptySet(),
                 optionsTerminated = false,
                 expectedPathKind = TerminalPathArgumentKind.NONE,
@@ -162,6 +166,12 @@ internal object TerminalCompletionContextResolver {
                 } else {
                     optionBeforeActiveValue(lineContext, commandTokenIndex, commandPath)
                 }
+        val activePositionalArgument =
+            if (activeOption == null) {
+                commandPath.last().positionalArgumentAt(resolvedCommandPath.positionalArgumentCountBeforeActive)
+            } else {
+                null
+            }
         val usedOptionExclusiveGroupIds = resolvedCommandPath.usedOptionExclusiveGroupIds
         val subcommandCandidateSource = if (optionsTerminated) null else subcommandCandidateSource(commandPath)
         val activePosition =
@@ -169,7 +179,8 @@ internal object TerminalCompletionContextResolver {
                 optionsTerminated -> TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
                 activeOption != null -> TerminalCompletionActivePosition.OPTION_VALUE
                 lineContext.activePrefix.isOptionNamePrefix() -> TerminalCompletionActivePosition.OPTION_NAME
-                commandPath.last().positionalArgumentPathKind != TerminalPathArgumentKind.NONE ->
+                activePositionalArgument?.pathKind?.let { it != TerminalPathArgumentKind.NONE } == true ||
+                    commandPath.last().positionalArgumentPathKind != TerminalPathArgumentKind.NONE ->
                     TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
                 subcommandCandidateSource != null -> TerminalCompletionActivePosition.SUBCOMMAND
                 else -> TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
@@ -177,18 +188,24 @@ internal object TerminalCompletionContextResolver {
         val expectedPathKind =
             if (activeOption != null && activeOption.valuePathKind != TerminalPathArgumentKind.NONE) {
                 activeOption.valuePathKind
+            } else if (activePositionalArgument != null) {
+                activePositionalArgument.pathKind
             } else {
                 commandPath.last().positionalArgumentPathKind
             }
         val expectedValueDomain =
             if (activeOption != null && activeOption.valueDomain != TerminalCompletionValueDomain.NONE) {
                 activeOption.valueDomain
+            } else if (activePositionalArgument != null) {
+                activePositionalArgument.valueDomain
             } else {
                 commandPath.last().positionalArgumentValueDomain
             }
         val expectedHiddenPathPolicy =
             if (activeOption != null && activeOption.valuePathKind != TerminalPathArgumentKind.NONE) {
                 activeOption.valueHiddenPathPolicy
+            } else if (activePositionalArgument != null) {
+                activePositionalArgument.hiddenPathPolicy
             } else {
                 commandPath.last().positionalArgumentHiddenPathPolicy
             }
@@ -200,13 +217,14 @@ internal object TerminalCompletionContextResolver {
             commandPath = commandPath,
             activePosition = activePosition,
             activeOption = activeOption,
+            activePositionalArgument = activePositionalArgument,
             usedOptionExclusiveGroupIds = usedOptionExclusiveGroupIds,
             optionsTerminated = optionsTerminated,
             expectedPathKind = expectedPathKind,
             expectedHiddenPathPolicy = expectedHiddenPathPolicy,
             expectedValueDomain = expectedValueDomain,
             subcommandCandidateSource = subcommandCandidateSource,
-            staticValueCandidates = activeOption?.valueCandidates ?: emptyList(),
+            staticValueCandidates = activeOption?.valueCandidates ?: activePositionalArgument?.valueCandidates ?: emptyList(),
             activeTokenQuote = attachedOptionValue?.quote ?: activeTokenQuote,
             attachedOptionValue = attachedOptionValue,
         )
@@ -227,13 +245,20 @@ internal object TerminalCompletionContextResolver {
     ): ResolvedCommandPath {
         val commands = ArrayList<TerminalCommandSpec>()
         var usedExclusiveGroupIds: LinkedHashSet<String>? = null
+        var positionalArgumentCount = 0
+        var optionsTerminated = false
+        var subcommandResolutionOpen = true
         commands += root
         var current = root
         var index = commandTokenIndex + 1
         while (index < context.activeTokenIndex) {
             val token = context.tokens[index].text
-            if (token == TERMINAL_COMMAND_OPTION_TERMINATOR) break
-            if (token.isTerminalOptionToken()) {
+            if (token == TERMINAL_COMMAND_OPTION_TERMINATOR) {
+                optionsTerminated = true
+                index++
+                continue
+            }
+            if (!optionsTerminated && token.isTerminalOptionToken()) {
                 val option = findOption(commands, token)
                 if (option != null) {
                     if (option.exclusiveGroupIds.isNotEmpty()) {
@@ -248,14 +273,25 @@ internal object TerminalCompletionContextResolver {
                 continue
             }
 
-            val next = findNextSubcommand(commands, current, normalizeTerminalCommandToken(token)) ?: break
-            current = next
-            commands += current
+            val next =
+                if (optionsTerminated || !subcommandResolutionOpen) {
+                    null
+                } else {
+                    findNextSubcommand(commands, current, normalizeTerminalCommandToken(token))
+                }
+            if (next != null) {
+                current = next
+                commands += current
+            } else {
+                positionalArgumentCount++
+                subcommandResolutionOpen = false
+            }
             index++
         }
         return ResolvedCommandPath(
             commandPath = commands,
             usedOptionExclusiveGroupIds = usedExclusiveGroupIds ?: emptySet(),
+            positionalArgumentCountBeforeActive = positionalArgumentCount,
         )
     }
 
@@ -344,7 +380,15 @@ internal object TerminalCompletionContextResolver {
     private data class ResolvedCommandPath(
         val commandPath: List<TerminalCommandSpec>,
         val usedOptionExclusiveGroupIds: Set<String>,
+        val positionalArgumentCountBeforeActive: Int,
     )
+}
+
+private fun TerminalCommandSpec.positionalArgumentAt(position: Int): TerminalArgumentSpec? {
+    if (positionalArguments.isEmpty() || position < 0) return null
+    if (position < positionalArguments.size) return positionalArguments[position]
+    val last = positionalArguments.last()
+    return if (last.isVariadic) last else null
 }
 
 private fun TerminalCommandLineContext.hasPassedOptionTerminator(commandTokenIndex: Int): Boolean {

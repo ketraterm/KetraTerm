@@ -136,7 +136,8 @@ object TerminalCompletionTriggerEvaluator {
                     context.expectedPathKind != TerminalPathArgumentKind.NONE ||
                     context.expectedValueDomain != TerminalCompletionValueDomain.NONE
             TerminalCompletionActivePosition.POSITIONAL_ARGUMENT ->
-                context.expectedPathKind != TerminalPathArgumentKind.NONE ||
+                context.staticValueCandidates.isNotEmpty() ||
+                    context.expectedPathKind != TerminalPathArgumentKind.NONE ||
                     context.expectedValueDomain != TerminalCompletionValueDomain.NONE
         }
     }

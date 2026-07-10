@@ -56,7 +56,7 @@ internal class SpecCompletionSource(
                 TerminalCompletionActivePosition.OPTION_NAME -> completeOptions(context)
                 TerminalCompletionActivePosition.OPTION_VALUE -> completeOptionValues(context)
                 TerminalCompletionActivePosition.SUBCOMMAND -> completeSubcommands(context)
-                TerminalCompletionActivePosition.POSITIONAL_ARGUMENT -> emptyList()
+                TerminalCompletionActivePosition.POSITIONAL_ARGUMENT -> completePositionalValues(context)
             }
         return candidates
             .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
@@ -141,6 +141,21 @@ internal class SpecCompletionSource(
                     replacementText = value,
                     displayText = value,
                     detail = context.activeOption?.description.orEmpty(),
+                    kind = TerminalCompletionCandidateKind.ARGUMENT,
+                    context = context,
+                    score = score(value, context.activePrefix, OPTION_VALUE_BASE_SCORE, orderIndex),
+                )
+            }.toList()
+
+    private fun completePositionalValues(context: TerminalCompletionContext): List<TerminalCompletionCandidate> =
+        context.staticValueCandidates
+            .asSequence()
+            .filter { matchesCompletablePrefix(it, context.activePrefix) }
+            .mapIndexed { orderIndex, value ->
+                candidate(
+                    replacementText = value,
+                    displayText = value,
+                    detail = context.activePositionalArgument?.description.orEmpty(),
                     kind = TerminalCompletionCandidateKind.ARGUMENT,
                     context = context,
                     score = score(value, context.activePrefix, OPTION_VALUE_BASE_SCORE, orderIndex),

@@ -16,10 +16,7 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalHiddenPathPolicy
-import io.github.ketraterm.completion.model.TerminalOptionSpec
-import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+import io.github.ketraterm.completion.model.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -248,6 +245,31 @@ class PathCompletionSourceTest {
         val candidates = source.complete(request("tool --cwd=\"Idea Pro", "file:///project"))
 
         assertEquals("\"Idea Projects/\"", candidates.single().replacementText)
+    }
+
+    @Test
+    fun `variadic positional path argument uses the final declaration repeatedly`() {
+        val source =
+            PathCompletionSource(
+                fileSystemProvider = mockProvider,
+                commandSpecs =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "tool",
+                            positionalArguments =
+                                listOf(
+                                    TerminalArgumentSpec(name = "first"),
+                                    TerminalArgumentSpec(
+                                        name = "file",
+                                        isVariadic = true,
+                                        pathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                                    ),
+                                ),
+                        ),
+                    ),
+            )
+
+        assertTrue(source.complete(request("tool target src ", "file:///project")).isNotEmpty())
     }
 
     @Test

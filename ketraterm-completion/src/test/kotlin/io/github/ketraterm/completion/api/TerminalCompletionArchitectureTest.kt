@@ -246,6 +246,7 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCommandCompletionStatsSnapshotCodec",
                 "TerminalCommandLineShape",
                 "TerminalCommandShapeStats",
+                "TerminalArgumentSpec",
                 "TerminalCommandSpec",
                 "TerminalCommandSpecs",
                 "TerminalCompletionFeedbackContext",

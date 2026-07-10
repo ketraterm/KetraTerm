@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.spec
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.TerminalArgumentSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalOptionSpec
@@ -137,6 +138,28 @@ class SpecCompletionEngineTest {
         assertEquals(listOf("rich"), candidates.map { it.replacementText })
         assertEquals(commandLine.indexOf('=') + 1, candidates.single().replacementStartOffset)
         assertEquals(commandLine.length, candidates.single().replacementEndOffset)
+    }
+
+    @Test
+    fun `ordered positional argument candidates advance by ordinal`() {
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                TerminalCompletionSources.fromSpecs(
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "tool",
+                            positionalArguments =
+                                listOf(
+                                    TerminalArgumentSpec(name = "target", valueCandidates = listOf("alpha", "beta")),
+                                    TerminalArgumentSpec(name = "profile", valueCandidates = listOf("dev", "prod")),
+                                ),
+                        ),
+                    ),
+                ),
+            )
+
+        assertEquals(listOf("alpha"), engine.complete(request("tool a")).map { it.replacementText })
+        assertEquals(listOf("dev"), engine.complete(request("tool alpha d")).map { it.replacementText })
     }
 
     @Test

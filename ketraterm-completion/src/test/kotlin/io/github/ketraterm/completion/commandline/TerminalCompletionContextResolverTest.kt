@@ -150,6 +150,28 @@ class TerminalCompletionContextResolverTest {
     }
 
     @Test
+    fun `ordered positional arguments advance through optional and variadic declarations`() {
+        val spec =
+            TerminalCommandSpec(
+                name = "tool",
+                positionalArguments =
+                    listOf(
+                        TerminalArgumentSpec(name = "target", valueCandidates = listOf("alpha")),
+                        TerminalArgumentSpec(name = "profile", isOptional = true, valueCandidates = listOf("dev")),
+                        TerminalArgumentSpec(name = "file", isVariadic = true, pathKind = TerminalPathArgumentKind.FILE),
+                    ),
+            )
+
+        val optionalContext = resolve("tool alpha ", listOf(spec))
+        assertEquals("profile", optionalContext.activePositionalArgument?.name)
+        assertEquals(listOf("dev"), optionalContext.staticValueCandidates)
+
+        val variadicContext = resolve("tool alpha dev first ", listOf(spec))
+        assertEquals("file", variadicContext.activePositionalArgument?.name)
+        assertEquals(TerminalPathArgumentKind.FILE, variadicContext.expectedPathKind)
+    }
+
+    @Test
     fun `repeatable subcommands keep suggesting siblings after an existing sibling`() {
         val context = resolve("./gradlew clean bu")
 
@@ -183,11 +205,14 @@ class TerminalCompletionContextResolverTest {
         assertEquals("./s", context.activePrefix)
     }
 
-    private fun resolve(commandLine: String): TerminalCompletionContext =
+    private fun resolve(
+        commandLine: String,
+        commandSpecs: List<TerminalCommandSpec> = specs,
+    ): TerminalCompletionContext =
         TerminalCompletionContextResolver.resolve(
             commandLine = commandLine,
             cursorOffset = commandLine.length,
-            commandSpecs = specs,
+            commandSpecs = commandSpecs,
         )
 
     private companion object {
