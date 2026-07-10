@@ -18,6 +18,7 @@ package io.github.ketraterm.input.impl
 import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.input.impl.keyboard.CsiWriter
+import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.PasteSanitizationPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.host.TerminalHostOutput
@@ -31,32 +32,66 @@ internal class PasteEncoder(
         event: TerminalPasteEvent,
         modeBits: Long,
     ) {
-        if (TerminalInputState.isBracketedPasteEnabled(modeBits)) {
+        val bracketedPaste = TerminalInputState.isBracketedPasteEnabled(modeBits)
+        if (bracketedPaste) {
             output.writeBytes(
                 TerminalSequences.BRACKETED_PASTE_START,
                 0,
                 TerminalSequences.BRACKETED_PASTE_START.size,
             )
-            writePasteText(event.text)
+            writePasteText(event.text, bracketedPaste = true)
             output.writeBytes(
                 TerminalSequences.BRACKETED_PASTE_END,
                 0,
                 TerminalSequences.BRACKETED_PASTE_END.size,
             )
         } else {
-            writePasteText(event.text)
+            writePasteText(event.text, bracketedPaste = false)
         }
     }
 
-    private fun writePasteText(text: String) {
+    private fun writePasteText(
+        text: String,
+        bracketedPaste: Boolean,
+    ) {
         when (policy.pasteSanitizationPolicy) {
-            PasteSanitizationPolicy.RAW -> output.writeUtf8(text)
-            PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF -> writeStrippedC0(text)
-            PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS -> writeNormalizedLineEndings(text)
+            PasteSanitizationPolicy.RAW -> writeRaw(text, bracketedPaste)
+            PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF -> writeStrippedC0(text, bracketedPaste)
+            PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS ->
+                if (bracketedPaste) {
+                    output.writeUtf8(text)
+                } else {
+                    val lineEndingPolicy =
+                        if (policy.pasteLineEndingPolicy == PasteLineEndingPolicy.PRESERVE) {
+                            PasteLineEndingPolicy.LINE_FEED
+                        } else {
+                            policy.pasteLineEndingPolicy
+                        }
+                    writeCanonicalLineEndings(text, stripC0 = false, lineEndingPolicy)
+                }
         }
     }
 
-    private fun writeStrippedC0(text: String) {
+    private fun writeRaw(
+        text: String,
+        bracketedPaste: Boolean,
+    ) {
+        if (bracketedPaste || policy.pasteLineEndingPolicy == PasteLineEndingPolicy.PRESERVE) {
+            output.writeUtf8(text)
+        } else {
+            writeCanonicalLineEndings(text, stripC0 = false, policy.pasteLineEndingPolicy)
+        }
+    }
+
+    private fun writeStrippedC0(
+        text: String,
+        bracketedPaste: Boolean,
+    ) {
+        if (!bracketedPaste && policy.pasteLineEndingPolicy != PasteLineEndingPolicy.PRESERVE) {
+            writeCanonicalLineEndings(text, stripC0 = true, policy.pasteLineEndingPolicy)
+            return
+        }
+
         var offset = 0
         while (offset < text.length) {
             val codepoint = text.codePointAt(offset)
@@ -73,19 +108,37 @@ internal class PasteEncoder(
             codepoint == CR ||
             codepoint == LF
 
-    private fun writeNormalizedLineEndings(text: String) {
+    private fun writeCanonicalLineEndings(
+        text: String,
+        stripC0: Boolean,
+        lineEndingPolicy: PasteLineEndingPolicy,
+    ) {
         var offset = 0
         while (offset < text.length) {
             val codepoint = text.codePointAt(offset)
-            if (codepoint == CR) {
-                writeUtf8Codepoint(LF)
+            if (codepoint == CR || codepoint == LF) {
+                writeCanonicalLineEnding(lineEndingPolicy)
                 offset += Character.charCount(codepoint)
-                if (offset < text.length && text.codePointAt(offset) == LF) {
+                if (codepoint == CR && offset < text.length && text.codePointAt(offset) == LF) {
                     offset += Character.charCount(LF)
                 }
             } else {
-                writeUtf8Codepoint(codepoint)
+                if (!stripC0 || isAllowedAfterC0Strip(codepoint)) {
+                    writeUtf8Codepoint(codepoint)
+                }
                 offset += Character.charCount(codepoint)
+            }
+        }
+    }
+
+    private fun writeCanonicalLineEnding(lineEndingPolicy: PasteLineEndingPolicy) {
+        when (lineEndingPolicy) {
+            PasteLineEndingPolicy.PRESERVE -> error("preserve mode does not canonicalize line endings")
+            PasteLineEndingPolicy.LINE_FEED -> writeUtf8Codepoint(LF)
+            PasteLineEndingPolicy.CARRIAGE_RETURN -> writeUtf8Codepoint(CR)
+            PasteLineEndingPolicy.CARRIAGE_RETURN_AND_LINE_FEED -> {
+                writeUtf8Codepoint(CR)
+                writeUtf8Codepoint(LF)
             }
         }
     }
