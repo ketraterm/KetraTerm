@@ -191,14 +191,20 @@ Not guaranteed yet:
 ## Paste And Focus Contract
 
 Paste encoding preserves payload bytes by default after UTF-8 conversion from
-the provided Kotlin string. Bracketed paste mode wraps the payload with
-`CSI 200~` and `CSI 201~` when enabled in the per-event mode snapshot.
+the provided Kotlin string. Bracketed paste mode wraps the original payload with
+`CSI 200~` and `CSI 201~` when enabled in the per-event mode snapshot; it never
+rewrites line endings. Unbracketed pastes may canonicalize line endings through
+the host-owned input policy.
 
 Paste policy may:
 
 - preserve text exactly as provided
 - strip C0 controls except TAB, CR, and LF
 - normalize CRLF and lone CR line endings to LF
+
+The separate unbracketed line-ending policy may preserve input or canonicalize
+all newline forms to LF, CR, or CRLF. Local PTY hosts select CR so each pasted
+line boundary has the same host-input semantics as the Enter key.
 
 Focus encoding emits `CSI I` and `CSI O` only when focus reporting is enabled
 in the per-event mode snapshot.

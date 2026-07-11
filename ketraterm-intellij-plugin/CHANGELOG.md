@@ -1,5 +1,9 @@
 # KetraTerm IntelliJ Plugin Changelog
 
+## [Unreleased]
+
+- Fixed multiline paste.
+
 ## [0.1.3] - 2026-07-08
 
 - Improved focused-terminal shortcuts for copy, paste, search, and page scrolling.

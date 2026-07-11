@@ -17,6 +17,7 @@ package io.github.ketraterm.input.impl
 
 import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.PasteSanitizationPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.host.TerminalHostOutput
@@ -44,6 +45,31 @@ class PasteEncoderTest {
             expected = esc("[200~") + "a\r\nb\nc\rd".encodeToByteArray() + esc("[201~"),
             event = TerminalPasteEvent("a\r\nb\nc\rd"),
             modeBits = TerminalModeBits.BRACKETED_PASTE,
+        )
+    }
+
+    @Test
+    fun `unbracketed paste canonicalizes all line endings to CRLF when configured`() {
+        assertBytes(
+            expected = "a\r\nb\r\nc\r\nd".encodeToByteArray(),
+            event = TerminalPasteEvent("a\r\nb\nc\rd"),
+            policy =
+                TerminalInputPolicy(
+                    pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN_AND_LINE_FEED,
+                ),
+        )
+    }
+
+    @Test
+    fun `bracketed paste preserves original line endings despite canonicalization policy`() {
+        assertBytes(
+            expected = esc("[200~") + "a\r\nb\nc\rd".encodeToByteArray() + esc("[201~"),
+            event = TerminalPasteEvent("a\r\nb\nc\rd"),
+            modeBits = TerminalModeBits.BRACKETED_PASTE,
+            policy =
+                TerminalInputPolicy(
+                    pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN_AND_LINE_FEED,
+                ),
         )
     }
 
@@ -106,6 +132,19 @@ class PasteEncoderTest {
             policy =
                 TerminalInputPolicy(
                     pasteSanitizationPolicy = PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS,
+                ),
+        )
+    }
+
+    @Test
+    fun `host line ending policy governs normalized unbracketed paste`() {
+        assertBytes(
+            expected = "a\rb\rc\rd".encodeToByteArray(),
+            event = TerminalPasteEvent("a\r\nb\rc\nd"),
+            policy =
+                TerminalInputPolicy(
+                    pasteSanitizationPolicy = PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS,
+                    pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN,
                 ),
         )
     }
