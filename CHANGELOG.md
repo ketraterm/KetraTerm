@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 - Fixed multiline paste framing across local PTY sessions: bracketed paste preserves the payload, while unbracketed paste uses CR line boundaries so PowerShell and other interactive shells do not receive duplicate or reordered continuation input.
+- Made selection copy history-stable by resolving absolute row ranges under the session mutation lock, preventing stale-cache copies of unrelated scrollback text.
+- Fixed selection extraction to preserve soft-wrapped lines and omit trailing empty terminal cells without leaving stale clipboard contents.
 
 ## [0.1.3] - 2026-07-08
 

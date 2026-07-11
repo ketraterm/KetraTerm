@@ -362,6 +362,25 @@ class TerminalSelectionControllerTest {
                         ),
                     )
                 }
+
+                override fun readRenderFrameForAbsoluteRange(
+                    startAbsoluteRow: Long,
+                    endAbsoluteRow: Long,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    val start = startAbsoluteRow.toInt().coerceIn(0, lines.lastIndex)
+                    val end = endAbsoluteRow.toInt().coerceIn(start, lines.lastIndex)
+                    val scrollbackOffset = (5 - start).coerceAtLeast(0)
+                    val frameTop = 5 - scrollbackOffset
+                    consumer.accept(
+                        MultiLineFakeFrame(
+                            historySize = 5,
+                            scrollbackOffset = scrollbackOffset,
+                            rows = end - frameTop + 1,
+                            frameLines = lines.subList(frameTop, end + 1),
+                        ),
+                    )
+                }
             }
 
         val liveCache = TerminalRenderCache(columns = 10, rows = 5)
@@ -373,8 +392,126 @@ class TerminalSelectionControllerTest {
 
         controller.selectAbsoluteRows(2L, 7L, 10)
 
-        val text = controller.getSelectedText(reader, liveCache)
+        val text = controller.getSelectedText(reader)
         val expected = "hist2\nhist3\nhist4\nscreen0\nscreen1\nscreen2"
         assertEquals(expected, text)
+    }
+
+    @Test
+    fun `getSelectedText keeps absolute rows stable when output advances beyond live cache`() {
+        val staleLiveCache = TerminalRenderCache(columns = 8, rows = 3)
+        staleLiveCache.accept(AbsoluteLinesFrame(lines = listOf("old5", "old6", "old7"), historySize = 5))
+        val currentLines = (0..8).map { "row$it" }
+        val reader = AbsoluteLinesReader(lines = currentLines, historySize = 6, screenRows = 3)
+        val controller = TerminalSelectionController(FakeSelectionHost(staleLiveCache))
+        controller.selectAbsoluteRows(startAbsoluteRow = 2L, endAbsoluteRow = 7L, columns = 8)
+
+        val text = controller.getSelectedText(reader)
+
+        assertEquals("row2\nrow3\nrow4\nrow5\nrow6\nrow7", text)
+        assertEquals(2L, reader.requestedStartAbsoluteRow)
+        assertEquals(7L, reader.requestedEndAbsoluteRow)
+    }
+
+    @Test
+    fun `getSelectedText does not substitute retained rows for a fully discarded selection`() {
+        val cache = TerminalRenderCache(columns = 8, rows = 3)
+        cache.accept(AbsoluteLinesFrame(lines = listOf("row5", "row6", "row7"), historySize = 5))
+        val reader = AbsoluteLinesReader(lines = (2..9).map { "row$it" }, historySize = 5, screenRows = 3, discardedCount = 2L)
+        val controller = TerminalSelectionController(FakeSelectionHost(cache))
+        controller.selectAbsoluteRows(startAbsoluteRow = 0L, endAbsoluteRow = 1L, columns = 8)
+
+        assertNull(controller.getSelectedText(reader))
+    }
+
+    private class AbsoluteLinesReader(
+        private val lines: List<String>,
+        private val historySize: Int,
+        private val screenRows: Int,
+        private val discardedCount: Long = 0L,
+    ) : TerminalRenderFrameReader {
+        var requestedStartAbsoluteRow: Long = -1L
+            private set
+        var requestedEndAbsoluteRow: Long = -1L
+            private set
+
+        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+            val liveStart = historySize
+            consumer.accept(
+                AbsoluteLinesFrame(
+                    lines = lines.subList(liveStart, liveStart + screenRows),
+                    historySize = historySize,
+                    discardedCount = discardedCount,
+                ),
+            )
+        }
+
+        override fun readRenderFrameForAbsoluteRange(
+            startAbsoluteRow: Long,
+            endAbsoluteRow: Long,
+            consumer: TerminalRenderFrameConsumer,
+        ) {
+            requestedStartAbsoluteRow = startAbsoluteRow
+            requestedEndAbsoluteRow = endAbsoluteRow
+            val retainedFirst = discardedCount
+            val retainedLast = discardedCount + lines.lastIndex
+            val resolvedStart = startAbsoluteRow.coerceIn(retainedFirst, retainedLast)
+            val resolvedEnd = endAbsoluteRow.coerceIn(resolvedStart, retainedLast)
+            val liveTop = discardedCount + historySize
+            val frameTop = minOf(resolvedStart, liveTop)
+            val firstIndex = (frameTop - discardedCount).toInt()
+            val lastIndex = (resolvedEnd - discardedCount).toInt()
+            consumer.accept(
+                AbsoluteLinesFrame(
+                    lines = lines.subList(firstIndex, lastIndex + 1),
+                    historySize = historySize,
+                    scrollbackOffset = (liveTop - frameTop).toInt(),
+                    discardedCount = discardedCount,
+                ),
+            )
+        }
+    }
+
+    private class AbsoluteLinesFrame(
+        private val lines: List<String>,
+        override val historySize: Int,
+        override val scrollbackOffset: Int = 0,
+        override val discardedCount: Long = 0L,
+    ) : TerminalRenderFrame {
+        override val columns: Int = 8
+        override val rows: Int = lines.size
+        override val frameGeneration: Long = 1L
+        override val structureGeneration: Long = 1L
+        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
+        override val cursor = TerminalRenderCursor(0, 0, false, false, TerminalRenderCursorShape.BLOCK, 1L)
+
+        override fun lineGeneration(row: Int): Long = row.toLong() + 1L
+
+        override fun lineWrapped(row: Int): Boolean = false
+
+        override fun copyLine(
+            row: Int,
+            codeWords: IntArray,
+            codeOffset: Int,
+            attrWords: LongArray,
+            attrOffset: Int,
+            flags: IntArray,
+            flagOffset: Int,
+            extraAttrWords: LongArray?,
+            extraAttrOffset: Int,
+            hyperlinkIds: IntArray?,
+            hyperlinkOffset: Int,
+            clusterSink: TerminalRenderClusterSink?,
+            clusterDataSink: TerminalRenderClusterDataSink?,
+        ) {
+            val text = lines[row]
+            var column = 0
+            while (column < minOf(columns, text.length)) {
+                codeWords[codeOffset + column] = text[column].code
+                attrWords[attrOffset + column] = TerminalRenderAttrs.DEFAULT
+                flags[flagOffset + column] = TerminalRenderCellFlags.CODEPOINT
+                column++
+            }
+        }
     }
 }

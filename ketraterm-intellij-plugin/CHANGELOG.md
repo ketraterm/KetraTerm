@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 - Fixed multiline paste.
+- Fixed terminal selection copying that could intermittently copy the wrong text or leave the previous clipboard contents unchanged.
+- Improved copying of scrollback selections, wrapped lines, and trailing empty cells.
 
 ## [0.1.3] - 2026-07-08
 

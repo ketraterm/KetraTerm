@@ -34,10 +34,14 @@ internal class TerminalSelectionTextExtractor {
         val result = StringBuilder()
         var row = selection.startRow.coerceAtLeast(0)
         val lastRow = selection.endRow.coerceAtMost(cache.rows - 1)
+        var hasPreviousSelectedRow = false
         while (row <= lastRow) {
             val range = selection.packedColumnRange(row, cache.columns, cache)
             if (range != CellSelection.NO_RANGE) {
-                if (result.isNotEmpty() && (!joinSoftWrappedRows || row == 0 || !cache.lineWrapped[row - 1])) {
+                if (
+                    hasPreviousSelectedRow &&
+                    (!joinSoftWrappedRows || selection.isBlock || row == 0 || !cache.lineWrapped[row - 1])
+                ) {
                     result.append('\n')
                 }
                 appendTrimmedRow(
@@ -47,6 +51,7 @@ internal class TerminalSelectionTextExtractor {
                     startColumn = CellSelection.rangeStart(range),
                     endColumn = CellSelection.rangeEnd(range),
                 )
+                hasPreviousSelectedRow = true
             }
             row++
         }
