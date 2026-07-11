@@ -214,10 +214,7 @@ internal class TerminalSelectionController(
         }
     }
 
-    fun getSelectedText(
-        reader: io.github.ketraterm.render.api.TerminalRenderFrameReader,
-        liveCache: TerminalRenderCache,
-    ): String? {
+    fun getSelectedText(reader: io.github.ketraterm.render.api.TerminalRenderFrameReader): String? {
         val anchorAbsRow = selectionAnchorAbsoluteRow ?: return null
         val caretAbsRow = selectionCaretAbsoluteRow ?: return null
 
@@ -230,23 +227,22 @@ internal class TerminalSelectionController(
         val endAbsRow = if (isForward) caretAbsRow else anchorAbsRow
         val endCol = if (isForward) selectionCaretColumn else selectionAnchorColumn
 
-        val liveTopAbsRow = liveCache.discardedCount + liveCache.historySize
-        val clampedStart = maxOf(startAbsRow, liveCache.discardedCount)
-        val clampedEnd = maxOf(clampedStart, minOf(endAbsRow, liveTopAbsRow + liveCache.rows - 1))
-
-        if (clampedEnd < clampedStart) return null
-
-        val requestedOffset = (liveTopAbsRow - clampedStart).toInt().coerceIn(0, liveCache.historySize)
-        val requestedRows = (clampedEnd - clampedStart + 1).toInt()
-
         var text: String? = null
-        reader.readRenderFrame(requestedOffset, requestedRows) { frame ->
+        reader.readRenderFrameForAbsoluteRange(startAbsRow, endAbsRow) { frame ->
+            val frameTopAbsRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
+            val frameLastAbsRow = frameTopAbsRow + frame.rows - 1L
+            val clampedStart = maxOf(startAbsRow, frame.discardedCount)
+            val clampedEnd = minOf(endAbsRow, frameLastAbsRow)
+            if (clampedStart > clampedEnd) return@readRenderFrameForAbsoluteRange
+
             val tempCache = TerminalRenderCache(frame.columns, frame.rows)
             tempCache.accept(frame)
 
-            val frameTopAbsRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
-            val startRowInFrame = (clampedStart - frameTopAbsRow).toInt().coerceIn(0, frame.rows - 1)
-            val endRowInFrame = (clampedEnd - frameTopAbsRow).toInt().coerceIn(0, frame.rows - 1)
+            val startRowInFrame = (clampedStart - frameTopAbsRow).toInt()
+            val endRowInFrame = (clampedEnd - frameTopAbsRow).toInt()
+            if (startRowInFrame !in 0 until frame.rows || endRowInFrame !in 0 until frame.rows) {
+                return@readRenderFrameForAbsoluteRange
+            }
 
             val relativeSelection =
                 if (isForward) {
@@ -266,10 +262,13 @@ internal class TerminalSelectionController(
                         isBlock = selectionIsBlock,
                     )
                 }
-            val extracted = selectionTextExtractor.selectedText(tempCache, relativeSelection)
-            if (extracted.isNotEmpty()) {
-                text = extracted
-            }
+            val extracted =
+                selectionTextExtractor.selectedText(
+                    cache = tempCache,
+                    selection = relativeSelection,
+                    joinSoftWrappedRows = !selectionIsBlock,
+                )
+            text = extracted
         }
         return text
     }
@@ -336,7 +335,6 @@ internal class TerminalSelectionController(
             return
         }
 
-        val cache = host.renderCache
         val delta = selectionAutoscrollDelta(lastSelectionDragY)
         if (delta == 0) {
             selectionAutoscrollTimer.stop()

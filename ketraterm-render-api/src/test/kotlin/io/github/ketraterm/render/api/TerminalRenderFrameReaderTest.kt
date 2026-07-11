@@ -66,9 +66,45 @@ class TerminalRenderFrameReaderTest {
         assertEquals(7, requestedOffset)
     }
 
+    @Test
+    fun `default absolute range read resolves relative viewport from frame metadata`() {
+        val liveFrame = RecordingFrame(columns = 80, rows = 3, historySize = 5)
+        val selectedFrame = RecordingFrame(columns = 80, rows = 6, historySize = 5, scrollbackOffset = 3)
+        var requestedOffset = -1
+        var requestedRows = -1
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                    consumer.accept(liveFrame)
+                }
+
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    viewportRows: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    requestedOffset = scrollbackOffset
+                    requestedRows = viewportRows
+                    consumer.accept(selectedFrame)
+                }
+            }
+
+        var observed: TerminalRenderFrame? = null
+        reader.readRenderFrameForAbsoluteRange(startAbsoluteRow = 2L, endAbsoluteRow = 7L) {
+            observed = it
+        }
+
+        assertEquals(3, requestedOffset)
+        assertEquals(6, requestedRows)
+        assertSame(selectedFrame, observed)
+    }
+
     private class RecordingFrame(
         override val columns: Int,
         override val rows: Int,
+        override val historySize: Int = 0,
+        override val scrollbackOffset: Int = 0,
+        override val discardedCount: Long = 0L,
     ) : TerminalRenderFrame {
         override val frameGeneration: Long = 0L
         override val structureGeneration: Long = 0L

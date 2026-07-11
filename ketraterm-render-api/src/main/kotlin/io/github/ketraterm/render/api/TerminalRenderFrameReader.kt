@@ -18,8 +18,8 @@ package io.github.ketraterm.render.api
 /**
  * Provides a short-lived render frame view.
  *
- * The frame passed to [consumer] is valid only during the callback.
- * Implementations may hold a terminal mutation lock while invoking [consumer].
+ * The frame passed to the consumer is valid only during the callback.
+ * Implementations may hold a terminal mutation lock while invoking the consumer.
  * Consumers must copy anything they need before returning.
  */
 interface TerminalRenderFrameReader {
@@ -76,5 +76,51 @@ interface TerminalRenderFrameReader {
         consumer: TerminalRenderFrameConsumer,
     ) {
         readRenderFrame(scrollbackOffset, consumer)
+    }
+
+    /**
+     * Invokes [consumer] with a frame containing the retained intersection of
+     * the requested absolute row range.
+     *
+     * Absolute rows start at zero for the first terminal line and continue
+     * increasing when old history is discarded. Implementations that serialize
+     * terminal mutation should resolve the range and expose the frame in one
+     * critical section so concurrent output cannot shift the requested rows.
+     * The returned frame may start before [startAbsoluteRow] when the requested
+     * range begins inside the live grid, because scrollback viewports are
+     * anchored at the live grid's first row. Callers must intersect their range
+     * with the retained bounds reported by the returned frame.
+     *
+     * The default implementation snapshots current frame metadata and then
+     * issues a relative viewport read. Stateful callers must serialize this
+     * entire method against mutation, or readers may override it when they can
+     * resolve and expose the range atomically themselves.
+     *
+     * @param startAbsoluteRow inclusive first requested absolute row.
+     * @param endAbsoluteRow inclusive last requested absolute row.
+     * @param consumer receiver that copies any render data it needs.
+     */
+    fun readRenderFrameForAbsoluteRange(
+        startAbsoluteRow: Long,
+        endAbsoluteRow: Long,
+        consumer: TerminalRenderFrameConsumer,
+    ) {
+        require(startAbsoluteRow >= 0L) { "startAbsoluteRow must be >= 0, was $startAbsoluteRow" }
+        require(endAbsoluteRow >= startAbsoluteRow) {
+            "endAbsoluteRow must be >= startAbsoluteRow, was start=$startAbsoluteRow end=$endAbsoluteRow"
+        }
+
+        var scrollbackOffset = 0
+        var viewportRows = 1
+        readRenderFrame { frame ->
+            val liveTopAbsoluteRow = frame.discardedCount + frame.historySize
+            val retainedLastAbsoluteRow = liveTopAbsoluteRow + frame.rows - 1L
+            val resolvedStart = startAbsoluteRow.coerceIn(frame.discardedCount, retainedLastAbsoluteRow)
+            val resolvedEnd = endAbsoluteRow.coerceIn(resolvedStart, retainedLastAbsoluteRow)
+            scrollbackOffset = (liveTopAbsoluteRow - resolvedStart).coerceAtLeast(0L).toInt()
+            val frameTopAbsoluteRow = liveTopAbsoluteRow - scrollbackOffset
+            viewportRows = (resolvedEnd - frameTopAbsoluteRow + 1L).toInt()
+        }
+        readRenderFrame(scrollbackOffset, viewportRows, consumer)
     }
 }

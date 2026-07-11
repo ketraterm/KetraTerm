@@ -1390,7 +1390,7 @@ class SwingTerminal
          */
         fun copySelectionToClipboard(): Boolean {
             val boundSession = session ?: return false
-            val selectedText = selectionController.getSelectedText(boundSession, renderCache) ?: return false
+            val selectedText = selectionController.getSelectedText(boundSession) ?: return false
             hostServices.clipboardHandler.copyText(selectedText)
             return true
         }

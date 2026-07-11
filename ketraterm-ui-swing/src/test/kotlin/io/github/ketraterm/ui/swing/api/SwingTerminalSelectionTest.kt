@@ -267,6 +267,31 @@ class SwingTerminalSelectionTest {
     }
 
     @Test
+    fun `copySelectionToClipboard replaces stale clipboard content for an empty-cell selection`() {
+        val clipboard = RecordingClipboard()
+        clipboard.copyText("stale")
+        val frame = TestRenderFrame(arrayOf(Array(5) { TestCell() }))
+        val session = testSession(frame = frame)
+        val component =
+            SwingTerminal(
+                settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
+                hostServices = SwingHostServices(clipboardHandler = clipboard),
+            )
+
+        SwingUtilities.invokeAndWait {
+            component.setSize(300, 80)
+            component.bind(session)
+            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
+            component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
+            assertTrue(component.copySelectionToClipboard())
+        }
+
+        assertEquals("", clipboard.copied.get())
+        session.close()
+    }
+
+    @Test
     fun `pasteClipboardText reads clipboard and sends paste event through session`() {
         val clipboard = RecordingClipboard(readValue = "pasted text")
         val input = RecordingInputEncoder()
@@ -512,23 +537,6 @@ class SwingTerminalSelectionTest {
             x,
             y,
             clickCount,
-            false,
-            MouseEvent.BUTTON2,
-        )
-
-    private fun mouseReleasedMiddle(
-        component: SwingTerminal,
-        x: Int,
-        y: Int,
-    ): MouseEvent =
-        MouseEvent(
-            component,
-            MouseEvent.MOUSE_RELEASED,
-            System.currentTimeMillis(),
-            InputEvent.BUTTON2_DOWN_MASK,
-            x,
-            y,
-            1,
             false,
             MouseEvent.BUTTON2,
         )

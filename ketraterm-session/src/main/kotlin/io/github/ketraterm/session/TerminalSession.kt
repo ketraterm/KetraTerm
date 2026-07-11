@@ -573,6 +573,27 @@ class TerminalSession(
     }
 
     /**
+     * Reads an absolute terminal row range while holding the mutation lock.
+     *
+     * Resolving absolute rows and copying their frame are one atomic operation,
+     * so incoming output cannot shift a selection onto unrelated scrollback
+     * rows between coordinate conversion and frame access.
+     *
+     * @param startAbsoluteRow inclusive first requested absolute row.
+     * @param endAbsoluteRow inclusive last requested absolute row.
+     * @param consumer the frame consumer to invoke.
+     */
+    override fun readRenderFrameForAbsoluteRange(
+        startAbsoluteRow: Long,
+        endAbsoluteRow: Long,
+        consumer: TerminalRenderFrameConsumer,
+    ) {
+        synchronized(mutationLock) {
+            renderReader.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow, consumer)
+        }
+    }
+
+    /**
      * Records remote closure and closes the parser exactly once.
      */
     override fun onClosed(exitCode: Int?) {

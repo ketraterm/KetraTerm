@@ -95,6 +95,47 @@ class TerminalSelectionTextExtractorTest {
     }
 
     @Test
+    fun `selected text joins soft wrapped rows for linear copy`() {
+        val frame =
+            object : TestRenderFrame(arrayOf(textCells("ab"), textCells("cd"))) {
+                override fun lineWrapped(row: Int): Boolean = row == 0
+            }
+        val cache = renderCache(frame)
+        val selection = CellSelection(anchorColumn = 0, anchorRow = 0, caretColumn = 2, caretRow = 1)
+
+        assertEquals("abcd", extractor.selectedText(cache, selection, joinSoftWrappedRows = true))
+    }
+
+    @Test
+    fun `selected text preserves row breaks for block copy across soft wraps`() {
+        val frame =
+            object : TestRenderFrame(arrayOf(textCells("ab"), textCells("cd"))) {
+                override fun lineWrapped(row: Int): Boolean = row == 0
+            }
+        val cache = renderCache(frame)
+        val selection = CellSelection(anchorColumn = 0, anchorRow = 0, caretColumn = 2, caretRow = 1, isBlock = true)
+
+        assertEquals("ab\ncd", extractor.selectedText(cache, selection, joinSoftWrappedRows = true))
+    }
+
+    @Test
+    fun `selected text preserves leading and repeated empty hard rows`() {
+        val cache =
+            renderCache(
+                TestRenderFrame(
+                    arrayOf(
+                        Array(2) { TestCell() },
+                        Array(2) { TestCell() },
+                        textCells("ab"),
+                    ),
+                ),
+            )
+        val selection = CellSelection(anchorColumn = 0, anchorRow = 0, caretColumn = 2, caretRow = 2)
+
+        assertEquals("\n\nab", extractor.selectedText(cache, selection, joinSoftWrappedRows = true))
+    }
+
+    @Test
     fun `word selection groups letters digits and underscore`() {
         val cache = renderCache(TestRenderFrame.text("foo_bar-99"))
         val selection = extractor.wordSelectionAt(cache, row = 0, column = 2)
@@ -117,4 +158,9 @@ class TerminalSelectionTextExtractorTest {
 
         assertEquals(CellSelection(0, 0, 32, 0), selection)
     }
+
+    private fun textCells(text: String): Array<TestCell> =
+        Array(text.length) { index ->
+            TestCell(codeWord = text[index].code, flags = TerminalRenderCellFlags.CODEPOINT)
+        }
 }
