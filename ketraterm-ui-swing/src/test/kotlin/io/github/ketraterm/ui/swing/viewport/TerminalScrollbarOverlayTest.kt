@@ -98,6 +98,7 @@ class TerminalScrollbarOverlayTest {
         overlay.handleReleased(
             y = 0,
             settings = settings,
+            activeBuffer = TerminalRenderBufferKind.PRIMARY,
             componentHeight = 108,
             state = viewportState(scrollbackOffset = requestedOffset.toDouble()),
         ) { offset, adjusting ->

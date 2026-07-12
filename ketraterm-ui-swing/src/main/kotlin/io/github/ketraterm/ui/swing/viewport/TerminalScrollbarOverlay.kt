@@ -81,32 +81,34 @@ internal class TerminalScrollbarOverlay {
             } else {
                 thumb.height / 2
             }
-        scrollTo(offsetAtThumbTop(y - dragThumbOffsetY, settings, componentHeight, state), true)
+        scrollTo(offsetAtThumbTop(y - dragThumbOffsetY, settings, activeBuffer, componentHeight, state), true)
         return true
     }
 
     fun handleDragged(
         y: Int,
         settings: SwingSettings,
+        activeBuffer: TerminalRenderBufferKind,
         componentHeight: Int,
         state: TerminalViewportState,
         scrollTo: (Int, Boolean) -> Unit,
     ): Boolean {
         if (!dragging) return false
-        scrollTo(offsetAtThumbTop(y - dragThumbOffsetY, settings, componentHeight, state), true)
+        scrollTo(offsetAtThumbTop(y - dragThumbOffsetY, settings, activeBuffer, componentHeight, state), true)
         return true
     }
 
     fun handleReleased(
         y: Int,
         settings: SwingSettings,
+        activeBuffer: TerminalRenderBufferKind,
         componentHeight: Int,
         state: TerminalViewportState,
         scrollTo: (Int, Boolean) -> Unit,
     ): Boolean {
         if (!dragging) return false
         dragging = false
-        scrollTo(offsetAtThumbTop(y - dragThumbOffsetY, settings, componentHeight, state), false)
+        scrollTo(offsetAtThumbTop(y - dragThumbOffsetY, settings, activeBuffer, componentHeight, state), false)
         return true
     }
 
@@ -179,14 +181,15 @@ internal class TerminalScrollbarOverlay {
     private fun offsetAtThumbTop(
         thumbTop: Int,
         settings: SwingSettings,
+        activeBuffer: TerminalRenderBufferKind,
         componentHeight: Int,
         state: TerminalViewportState,
     ): Int {
         if (state.historySize <= 0 || state.visualScrollRangePixels <= 0) return 0
-        val trackTop = SwingTerminalChrome.top(settings, TerminalRenderBufferKind.PRIMARY)
-        val trackHeight = componentHeight - trackTop - SwingTerminalChrome.bottom(settings, TerminalRenderBufferKind.PRIMARY)
+        val trackTop = SwingTerminalChrome.top(settings, activeBuffer)
+        val trackHeight = componentHeight - trackTop - SwingTerminalChrome.bottom(settings, activeBuffer)
         if (trackHeight <= 0) return 0
-        val thumbHeight = thumbBounds(settings, TerminalRenderBufferKind.PRIMARY, 1, componentHeight, state)?.height ?: return 0
+        val thumbHeight = thumbBounds(settings, activeBuffer, 1, componentHeight, state)?.height ?: return 0
         val travel = trackHeight - thumbHeight
         if (travel <= 0) return 0
 

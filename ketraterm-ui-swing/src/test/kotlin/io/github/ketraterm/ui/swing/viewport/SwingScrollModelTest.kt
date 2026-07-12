@@ -127,4 +127,22 @@ class SwingScrollModelTest {
         model.clamp(historySize = 6, discardedCount = 0L, scrollOnOutput = false)
         assertEquals(0.0, model.preciseScrollbackOffset)
     }
+
+    @Test
+    fun `alternate buffer transition clears an active fractional primary viewport and returns live`() {
+        val model = SwingScrollModel()
+        model.scrollTo(4.5, historySize = 10)
+        model.clamp(historySize = 10, discardedCount = 7L, scrollOnOutput = false)
+
+        model.clamp(historySize = 0, discardedCount = 0L, scrollOnOutput = false)
+
+        assertEquals(0.0, model.preciseScrollbackOffset)
+        assertEquals(0, model.offset)
+        assertEquals(0, model.requestedOffset)
+        assertFalse(model.needsOverscan)
+
+        model.clamp(historySize = 10, discardedCount = 7L, scrollOnOutput = false)
+
+        assertEquals(0.0, model.preciseScrollbackOffset)
+    }
 }

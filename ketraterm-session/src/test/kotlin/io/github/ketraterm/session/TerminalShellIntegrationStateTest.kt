@@ -868,6 +868,26 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `viewport projection drops evicted decorations after repeated line identity movement`() {
+        val state = TerminalShellIntegrationState(capacity = 2)
+
+        state.recordCommandStart(10, includeLine = true)
+        state.recordCommandFinished(11, exitCode = 1)
+        state.recordCommandStart(20, includeLine = true)
+        state.recordCommandFinished(21, exitCode = 0)
+        state.recordCommandStart(30, includeLine = true)
+        state.recordCommandFinished(31, exitCode = 1)
+
+        val projection = state.project(longArrayOf(31, 10, 20, 21, 30))
+
+        assertEquals(TerminalShellIntegrationCommandRecord.NONE, projection.commandRecordIds[1])
+        assertEquals(TerminalShellIntegrationCommandLifecycle.NONE, projection.commandLifecycleStates[1])
+        assertNotEquals(TerminalShellIntegrationCommandRecord.NONE, projection.commandRecordIds[0])
+        assertNotEquals(TerminalShellIntegrationCommandRecord.NONE, projection.commandRecordIds[2])
+        assertNotEquals(TerminalShellIntegrationCommandRecord.NONE, projection.commandRecordIds[4])
+    }
+
+    @Test
     fun `evicting active prompt prevents command start from attaching to removed record`() {
         val state = TerminalShellIntegrationState(capacity = 1)
 
