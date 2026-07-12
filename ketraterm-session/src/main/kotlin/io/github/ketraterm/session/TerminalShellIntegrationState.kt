@@ -57,6 +57,31 @@ object TerminalShellIntegrationCommandOutputRange {
 }
 
 /**
+ * Primitive column layout for command-block range copies.
+ *
+ * A command block starts at its prompt anchor when one is available and ends
+ * at the final output line before the next prompt. It therefore contains the
+ * visible prompt/input and command result without capturing the following
+ * prompt.
+ */
+object TerminalShellIntegrationCommandBlockRange {
+    /**
+     * Required number of `Long` slots for one copied command-block range.
+     */
+    const val REQUIRED_LONGS: Int = 2
+
+    /**
+     * Destination index containing the inclusive block-start line id.
+     */
+    const val START_LINE_ID_INDEX: Int = 0
+
+    /**
+     * Destination index containing the inclusive block-end line id.
+     */
+    const val END_LINE_ID_INDEX: Int = 1
+}
+
+/**
  * Primitive lifecycle vocabulary for session-owned shell command records.
  *
  * These values are intentionally `Int` constants rather than enum instances so
@@ -527,13 +552,64 @@ class TerminalShellIntegrationState(
 
             val start = commandStartLineIds[index]
             val end = commandEndLineIds[index]
-            if (start == NO_LINE_ID || end == NO_LINE_ID) return false
-            if (!hasFlag(index, FLAG_COMMAND_START_INCLUSIVE) && start == end) return false
+            if (start == NO_LINE_ID || end == NO_LINE_ID || start > end) return false
+            val lastOutputLine = lastCommandOutputLineBeforePromptLocked(start, end)
+            if (lastOutputLine < start) return false
+            if (!hasFlag(index, FLAG_COMMAND_START_INCLUSIVE) && lastOutputLine == start) return false
 
             destination[destinationOffset + TerminalShellIntegrationCommandOutputRange.START_LINE_ID_INDEX] = start
-            destination[destinationOffset + TerminalShellIntegrationCommandOutputRange.END_LINE_ID_INDEX] = end
+            destination[destinationOffset + TerminalShellIntegrationCommandOutputRange.END_LINE_ID_INDEX] = lastOutputLine
             destination[destinationOffset + TerminalShellIntegrationCommandOutputRange.START_INCLUSIVE_INDEX] =
                 if (hasFlag(index, FLAG_COMMAND_START_INCLUSIVE)) 1L else 0L
+            return true
+        }
+    }
+
+    /**
+     * Copies the selectable prompt/input-and-output line range for [recordId].
+     *
+     * The destination layout is defined by
+     * [TerminalShellIntegrationCommandBlockRange]. A completed command with a
+     * prompt selects from that prompt's visible anchor through its output. A
+     * silent command selects its prompt/input only. The next prompt is always
+     * excluded. Unfinished, prompt-only, orphan-silent, unknown, and evicted
+     * records return `false` and leave the destination unchanged.
+     *
+     * @param recordId retained command record id.
+     * @param destination destination `Long` columns.
+     * @param destinationOffset first destination slot.
+     * @return true when a complete command block was copied.
+     */
+    fun copyCommandBlockRange(
+        recordId: Int,
+        destination: LongArray,
+        destinationOffset: Int = 0,
+    ): Boolean {
+        require(destinationOffset >= 0) { "destinationOffset must be >= 0, was $destinationOffset" }
+        require(destinationOffset + TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS <= destination.size) {
+            "destination is too small for offset=$destinationOffset size=${destination.size}"
+        }
+        if (recordId == TerminalShellIntegrationCommandRecord.NONE) return false
+
+        synchronized(lock) {
+            val index = indexForRecordIdLocked(recordId)
+            if (index == NO_INDEX || !isCommandRecordLocked(index)) return false
+
+            val commandStart = commandStartLineIds[index]
+            val commandEnd = commandEndLineIds[index]
+            if (commandStart == NO_LINE_ID || commandEnd == NO_LINE_ID) return false
+
+            val blockStart = promptStartLineIds[index].takeIf { it != NO_LINE_ID } ?: commandStart
+            val blockEnd =
+                if (commandStart <= commandEnd) {
+                    lastCommandBlockLineBeforeNextPromptLocked(index, commandStart, commandEnd)
+                } else {
+                    commandEnd
+                }
+            if (blockEnd < blockStart) return false
+
+            destination[destinationOffset + TerminalShellIntegrationCommandBlockRange.START_LINE_ID_INDEX] = blockStart
+            destination[destinationOffset + TerminalShellIntegrationCommandBlockRange.END_LINE_ID_INDEX] = blockEnd
             return true
         }
     }
@@ -1096,15 +1172,52 @@ class TerminalShellIntegrationState(
         start: Long,
         end: Long,
     ): Boolean {
-        val first = minOf(start, end)
-        val last = maxOf(start, end)
-        if (lineId < first || lineId > last) return false
+        if (start > end) return false
+        val lastOutputLine = lastCommandOutputLineBeforePromptLocked(start, end)
+        if (lineId < start || lineId > lastOutputLine) return false
+        return hasFlag(index, FLAG_COMMAND_START_INCLUSIVE) || lineId != start
+    }
+
+    /**
+     * Returns the last line that can belong to output for a completed command.
+     *
+     * The next prompt is an authoritative output boundary. In particular, a
+     * shell can emit `D` on the same physical line that it will immediately use
+     * for the next `A` prompt. That line must never be treated as prior-command
+     * output by either decorations or copy/selection operations.
+     */
+    private fun lastCommandOutputLineBeforePromptLocked(
+        start: Long,
+        end: Long,
+    ): Long {
+        var lastOutputLine = end
         var i = 0
         while (i < count) {
-            if (promptStartLineIds[i] == lineId) return false
+            val promptStart = promptStartLineIds[i]
+            if (promptStart >= start && promptStart <= lastOutputLine) {
+                lastOutputLine = promptStart - 1L
+            }
             i++
         }
-        return hasFlag(index, FLAG_COMMAND_START_INCLUSIVE) || lineId != start
+        return lastOutputLine
+    }
+
+    /** Returns the final command-block line before a newer prompt begins. */
+    private fun lastCommandBlockLineBeforeNextPromptLocked(
+        commandIndex: Int,
+        start: Long,
+        end: Long,
+    ): Long {
+        var lastBlockLine = end
+        var i = 0
+        while (i < count) {
+            val promptStart = promptStartLineIds[i]
+            if (i != commandIndex && promptStart >= start && promptStart <= lastBlockLine) {
+                lastBlockLine = promptStart - 1L
+            }
+            i++
+        }
+        return lastBlockLine
     }
 
     private fun hasFlag(

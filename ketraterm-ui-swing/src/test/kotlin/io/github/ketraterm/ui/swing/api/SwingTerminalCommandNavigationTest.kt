@@ -228,6 +228,40 @@ class SwingTerminalCommandNavigationTest {
     }
 
     @Test
+    fun `clicking a silent command prompt marker selects its prompt without the following prompt`() {
+        val reader = CommandFrameReader()
+        val session = commandSession(reader, firstCommandHasOutput = false)
+        val padding = Insets(8, 12, 8, 8)
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = padding) })
+
+        SwingUtilities.invokeAndWait {
+            component.size = component.preferredGridSize(12, 2)
+            component.bind(session)
+            component.scrollToScrollbackOffset(HISTORY_SIZE)
+            val click =
+                MouseEvent(
+                    component,
+                    MouseEvent.MOUSE_PRESSED,
+                    1L,
+                    0,
+                    padding.left,
+                    component.height - padding.bottom - 2,
+                    1,
+                    false,
+                    MouseEvent.BUTTON1,
+                )
+
+            component.dispatchEvent(click)
+
+            assertEquals(true, click.isConsumed)
+            assertEquals(5, component.viewportState().renderOffset)
+            assertEquals(CellSelection(0, 0, 12, 0), component.currentSelection())
+        }
+
+        session.close()
+    }
+
+    @Test
     fun `select command output ignores evicted command record`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader, capacity = 1)
@@ -262,7 +296,7 @@ class SwingTerminalCommandNavigationTest {
     }
 
     @Test
-    fun `clicking prompt marker gutter selects its command output`() {
+    fun `clicking prompt marker gutter selects its command block`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val padding = Insets(8, 12, 8, 8)
@@ -354,6 +388,7 @@ class SwingTerminalCommandNavigationTest {
     private fun commandSession(
         renderReader: TerminalRenderFrameReader,
         capacity: Int = 8,
+        firstCommandHasOutput: Boolean = true,
     ): TerminalSession {
         val terminal = TerminalBuffers.create(width = 12, height = 2, maxHistory = HISTORY_SIZE)
         val session =
@@ -371,8 +406,14 @@ class SwingTerminalCommandNavigationTest {
         val state = session.shellIntegrationState
         state.recordPromptStart(lineIdForAbsoluteRow(1))
         state.recordPromptEnd(lineIdForAbsoluteRow(1))
-        state.recordCommandStart(lineIdForAbsoluteRow(2), includeLine = false)
-        state.recordCommandFinished(lineIdForAbsoluteRow(3), exitCode = 0)
+        if (firstCommandHasOutput) {
+            state.recordCommandStart(lineIdForAbsoluteRow(2), includeLine = false)
+            state.recordCommandFinished(lineIdForAbsoluteRow(3), exitCode = 0)
+        } else {
+            state.recordCommandStart(lineIdForAbsoluteRow(1), includeLine = false)
+            state.recordCommandFinished(lineIdForAbsoluteRow(2), exitCode = 0)
+            state.recordPromptStart(lineIdForAbsoluteRow(2))
+        }
         state.recordPromptStart(lineIdForAbsoluteRow(4))
         state.recordPromptStart(lineIdForAbsoluteRow(5))
         state.recordPromptEnd(lineIdForAbsoluteRow(5))

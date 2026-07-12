@@ -518,7 +518,7 @@ class SwingTerminal
             if (row == NO_PROMPT_MARKER_ROW) return false
             val recordId = shellIntegrationDecorations.commandRecordIdAt(row)
             if (recordId == TerminalShellIntegrationCommandRecord.NONE) return false
-            if (!commandInteractionController.selectCommandOutput(recordId)) return false
+            commandInteractionController.selectCommandBlock(recordId)
             event.consume()
             return true
         }
