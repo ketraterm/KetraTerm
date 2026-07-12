@@ -6,6 +6,7 @@
 - Made selection copy history-stable by resolving absolute row ranges under the session mutation lock, preventing stale-cache copies of unrelated scrollback text.
 - Fixed selection extraction to preserve soft-wrapped lines and omit trailing empty terminal cells without leaving stale clipboard contents.
 - Fixed scrollback admission for top-anchored scroll regions and alternate-screen transitions so TUIs using region-aware scrolling no longer get stuck at live rows and can scroll historical output correctly.
+- Fixed prompt gutter selection in the terminal UI: it now selects the full command block (prompt + output) without leaking into the next prompt row.
 
 ## [0.1.3] - 2026-07-08
 
