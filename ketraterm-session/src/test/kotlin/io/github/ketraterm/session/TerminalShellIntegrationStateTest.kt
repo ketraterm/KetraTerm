@@ -195,6 +195,39 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `copy command output range excludes next prompt line using the same output boundary as failed rails`() {
+        val state = TerminalShellIntegrationState()
+        val range = LongArray(TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS)
+
+        state.recordPromptStart(10)
+        state.recordPromptEnd(10)
+        state.recordCommandStart(10, includeLine = false)
+        state.recordCommandFinished(11, exitCode = 1)
+        state.recordPromptStart(11)
+
+        val commandRecordId = state.commandRecordIdAtLine(10)
+
+        assertFalse(state.copyCommandOutputRange(commandRecordId, range))
+    }
+
+    @Test
+    fun `copy command block range preserves a silent command prompt while excluding the next prompt`() {
+        val state = TerminalShellIntegrationState()
+        val range = LongArray(TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS)
+
+        state.recordPromptStart(10)
+        state.recordPromptEnd(10)
+        state.recordCommandStart(10, includeLine = false)
+        state.recordCommandFinished(11, exitCode = 0)
+        state.recordPromptStart(11)
+
+        val commandRecordId = state.commandRecordIdAtLine(10)
+
+        assertTrue(state.copyCommandBlockRange(commandRecordId, range))
+        assertContentEquals(longArrayOf(10, 10), range)
+    }
+
+    @Test
     fun `zero null and missing command starts do not create failed command ranges`() {
         val state = TerminalShellIntegrationState()
 
