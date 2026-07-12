@@ -1344,6 +1344,7 @@ class SwingTerminal
                 scrollbarOverlay.handleDragged(
                     y = event.y,
                     settings = settings,
+                    activeBuffer = renderCache.activeBuffer,
                     componentHeight = height,
                     state = viewportController.viewportStateSnapshot(),
                 ) { scrollbackOffset, valueIsAdjusting ->
@@ -1372,6 +1373,7 @@ class SwingTerminal
                 scrollbarOverlay.handleReleased(
                     y = event.y,
                     settings = settings,
+                    activeBuffer = renderCache.activeBuffer,
                     componentHeight = height,
                     state = viewportController.viewportStateSnapshot(),
                 ) { scrollbackOffset, valueIsAdjusting ->

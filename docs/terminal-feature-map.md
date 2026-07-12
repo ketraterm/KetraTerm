@@ -106,7 +106,7 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 
 - **PTY Process Integration**: Spawns default platform shells using Pty4J with Windows ConPTY support and prompt resizing.
 - **Custom Line Height**: Dynamic line spacing/height scaling (from 0.5x to 3.0x) supported in settings and rendered in the Swing UI.
-- **Scrollback & Selection Policies**: Auto-follow (`scrollOnOutput`) configuration, resize viewport offset-retention, and clipboard copy operations spanning the full scrollback history.
+- **Scrollback & Selection Policies**: Auto-follow (`scrollOnOutput`) configuration, resize viewport offset-retention, clipboard copy operations spanning the full scrollback history, and history admission for top-anchored scroll regions used by inline TUIs such as Codex CLI.
 - **High-Performance Painting**: Decoupled, multi-threaded rendering using triple-buffering to achieve 60+ FPS paint cycles with zero tearing under heavy stdout throughput.
 - **Font Fallbacks & Resolver API**: Scan and fall back to native system fonts for color emojis and complex visual shapes. Embedding environments can supply a `TerminalFontResolver` (such as the IntelliJ plugin's optimized `ComplementaryFontsRegistry` integration) to perform native fallback searches and bypass slow AWT system font iterations.
 - **Script-Run Text Shaping**: Complex Swing text rendering splits terminal rows into direction-, style-, attribute-, and Unicode-script-compatible runs before feeding the whole logical run to Java2D `TextLayout`, preserving contextual shaping for Arabic joining, Indic reordering, and connected scripts without moving ASCII rendering off the fast path.

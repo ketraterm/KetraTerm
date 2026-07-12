@@ -87,6 +87,77 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `Codex inline history sequence retains rows scrolled from a top anchored region`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 3, height = 4, maxHistory = 8))
+            f.acceptAscii("\u001B[1;1HAAA\u001B[2;1HBBB\u001B[3;1HCCC\u001B[4;1HDDD")
+
+            f.acceptAscii("\u001B[1;3r\u001B[3;1H\r\nNEW\u001B[r")
+
+            assertAll(
+                { assertEquals(1, f.terminal.historySize) },
+                { assertEquals("AAA\nBBB\nCCC\nNEW\nDDD", f.terminal.getAllAsString()) },
+                { assertEquals("BBB", f.terminal.getLineAsString(0)) },
+                { assertEquals("CCC", f.terminal.getLineAsString(1)) },
+                { assertEquals("NEW", f.terminal.getLineAsString(2)) },
+                { assertEquals("DDD", f.terminal.getLineAsString(3)) },
+            )
+        }
+
+        @Test
+        fun `top anchored structural scroll commands and line edits preserve lower rows without history`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 3, height = 4, maxHistory = 8))
+
+            fun seed() {
+                f.acceptAscii("\u001B[1;1HAAA\u001B[2;1HBBB\u001B[3;1HCCC\u001B[4;1HDDD\u001B[1;3r")
+            }
+
+            seed()
+            f.acceptAscii("\u001B[1;1H\u001B[1T")
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("", f.terminal.getLineAsString(0)) },
+                { assertEquals("AAA", f.terminal.getLineAsString(1)) },
+                { assertEquals("BBB", f.terminal.getLineAsString(2)) },
+                { assertEquals("DDD", f.terminal.getLineAsString(3)) },
+            )
+
+            seed()
+            f.acceptAscii("\u001B[1;1H\u001BM")
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("", f.terminal.getLineAsString(0)) },
+                { assertEquals("AAA", f.terminal.getLineAsString(1)) },
+                { assertEquals("BBB", f.terminal.getLineAsString(2)) },
+                { assertEquals("DDD", f.terminal.getLineAsString(3)) },
+            )
+
+            seed()
+            f.acceptAscii("\u001B[2;1H\u001B[1L\u001B[1M")
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("AAA", f.terminal.getLineAsString(0)) },
+                { assertEquals("BBB", f.terminal.getLineAsString(1)) },
+                { assertEquals("", f.terminal.getLineAsString(2)) },
+                { assertEquals("DDD", f.terminal.getLineAsString(3)) },
+            )
+        }
+
+        @Test
+        fun `ED 3 clears retained history while preserving the visible viewport`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 3, height = 2, maxHistory = 8))
+            f.acceptAscii("\u001B[1;1HAAA\u001B[2;1HBBB\u001B[2;1H\r\n")
+
+            assertEquals(1, f.terminal.historySize)
+
+            f.acceptAscii("\u001B[3J")
+
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("BBB", f.terminal.getLineAsString(0)) },
+            )
+        }
+
+        @Test
         fun `combining mark in later host chunk extends previous core cell`() {
             val f = Fixture(terminal = TerminalBuffers.create(width = 6, height = 2))
 

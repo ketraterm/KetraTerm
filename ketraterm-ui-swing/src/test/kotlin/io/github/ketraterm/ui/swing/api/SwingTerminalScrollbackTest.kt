@@ -532,6 +532,50 @@ class SwingTerminalScrollbackTest {
         }
     }
 
+    @Test
+    fun `alternate buffer transition clears an active primary scrollback viewport`() {
+        val reader = ActiveBufferFrameReader().apply { historySize = 5 }
+        val terminal = TerminalBuffers.create(width = 3, height = 3, maxHistory = 5)
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                publisher = TerminalRenderPublisher(3, 3),
+                renderReader = reader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+            )
+        val component = scrollTestTerminal()
+
+        try {
+            SwingUtilities.invokeAndWait {
+                component.setSize(30, 100)
+                component.bind(session)
+            }
+            component.scrollToScrollbackOffset(3)
+            awaitViewportOffset(component, expectedOffset = 3.0)
+
+            reader.activeBuffer = TerminalRenderBufferKind.ALTERNATE
+            reader.historySize = 0
+            session.onDirty?.invoke()
+            drainEdt()
+
+            assertEquals(0.0, component.viewportState().scrollbackOffset)
+            assertEquals(0, component.viewportState().renderOffset)
+
+            reader.activeBuffer = TerminalRenderBufferKind.PRIMARY
+            reader.historySize = 5
+            session.onDirty?.invoke()
+            drainEdt()
+
+            assertEquals(0.0, component.viewportState().scrollbackOffset)
+            assertEquals(0, component.viewportState().renderOffset)
+        } finally {
+            session.close()
+        }
+    }
+
     private class CountingRepaintManager(
         private val target: JComponent,
     ) : RepaintManager() {
@@ -825,15 +869,18 @@ class SwingTerminalScrollbackTest {
         @Volatile
         var activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
 
+        @Volatile
+        var historySize: Int = 0
+
         override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-            consumer.accept(ActiveBufferFrame(activeBuffer))
+            consumer.accept(ActiveBufferFrame(activeBuffer, historySize, scrollbackOffset = 0))
         }
 
         override fun readRenderFrame(
             scrollbackOffset: Int,
             consumer: TerminalRenderFrameConsumer,
         ) {
-            consumer.accept(ActiveBufferFrame(activeBuffer))
+            consumer.accept(ActiveBufferFrame(activeBuffer, historySize, scrollbackOffset.coerceIn(0, historySize)))
         }
 
         override fun readRenderFrame(
@@ -841,17 +888,17 @@ class SwingTerminalScrollbackTest {
             viewportRows: Int,
             consumer: TerminalRenderFrameConsumer,
         ) {
-            consumer.accept(ActiveBufferFrame(activeBuffer))
+            consumer.accept(ActiveBufferFrame(activeBuffer, historySize, scrollbackOffset.coerceIn(0, historySize)))
         }
     }
 
     private class ActiveBufferFrame(
         override val activeBuffer: TerminalRenderBufferKind,
+        override val historySize: Int,
+        override val scrollbackOffset: Int,
     ) : TerminalRenderFrame {
         override val columns: Int = 3
         override val rows: Int = 3
-        override val historySize: Int = 0
-        override val scrollbackOffset: Int = 0
         override val frameGeneration: Long = 1
         override val structureGeneration: Long = 1
         override val cursor: TerminalRenderCursor =

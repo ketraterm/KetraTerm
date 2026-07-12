@@ -94,9 +94,19 @@ internal class MutationEngine(
         val n = count.coerceIn(0, bottom - top + 1)
         if (n == 0) return
 
-        if (state.isFullViewportScroll) {
+        if (top == 0) {
             repeat(n) {
                 val line = state.ring.push()
+                if (bottom < state.dimensions.height - 1) {
+                    // Pushing admits the top row to history but initially puts
+                    // the recycled blank at the viewport bottom. Move that
+                    // line to the bottom of the top-anchored scroll region so
+                    // rows below the region retain their viewport positions.
+                    state.ring.rotateDown(
+                        state.resolveRingIndex(bottom),
+                        state.resolveRingIndex(state.dimensions.height - 1),
+                    )
+                }
                 state.clearLineAsNew(line, blankAttr, blankExtendedAttr)
                 state.markLineChanged(line)
             }
