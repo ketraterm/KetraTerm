@@ -558,6 +558,12 @@ class KeyboardEncoderTest {
         assertBytes(esc("[97u"), TerminalKeyEvent.codepoint('a'.code), bitsReportAll)
         // Shift + printable -> CSI-u with modifier parameter 2
         assertBytes(esc("[97;2u"), TerminalKeyEvent.codepoint('a'.code, TerminalModifiers.SHIFT), bitsReportAll)
+        // Kitty key codes retain the unshifted key identity, independently of produced text.
+        assertBytes(
+            esc("[97;2u"),
+            TerminalKeyEvent.codepoint('A'.code, TerminalModifiers.SHIFT, unshiftedCodepoint = 'a'.code),
+            bitsReportAll,
+        )
         // Ctrl + printable -> CSI-u
         assertBytes(esc("[97;5u"), TerminalKeyEvent.codepoint('a'.code, TerminalModifiers.CTRL), bitsReportAll)
     }
@@ -566,38 +572,71 @@ class KeyboardEncoderTest {
     fun `Kitty keyboard encodes Enter Tab Escape Backspace`() {
         val bitsDisambiguate = kittyKeyboardBits(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES)
         val bitsReportAll = kittyKeyboardBits(KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES)
-        val bitsOther = kittyKeyboardBits(KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES) // neither 1 nor 8
 
-        // 1. Under DISAMBIGUATE_ESCAPE_CODES (unmodified -> CSI-u):
-        assertBytes(esc("[13u"), TerminalKeyEvent.key(TerminalKey.ENTER), bitsDisambiguate)
-        assertBytes(esc("[9u"), TerminalKeyEvent.key(TerminalKey.TAB), bitsDisambiguate)
+        // DISAMBIGUATE_ESCAPE_CODES keeps reset-safe control keys in legacy form.
+        assertBytes(bytes(0x0d), TerminalKeyEvent.key(TerminalKey.ENTER), bitsDisambiguate)
+        assertBytes(
+            bytes(0x0d, 0x0a),
+            TerminalKeyEvent.key(TerminalKey.ENTER),
+            bitsDisambiguate or TerminalModeBits.NEW_LINE_MODE,
+        )
+        assertBytes(
+            expected = bytes(0x0d),
+            event = TerminalKeyEvent.key(TerminalKey.ENTER),
+            modeBits = bitsDisambiguate or TerminalModeBits.NEW_LINE_MODE,
+            policy = TerminalInputPolicy(enterNewLineModePolicy = EnterNewLineModePolicy.SEND_CR),
+        )
+        assertBytes(bytes(0x0d), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CTRL), bitsDisambiguate)
+        assertBytes(bytes(0x0d), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.SHIFT), bitsDisambiguate)
+        assertBytes(bytes(0x1b, 0x0d), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.ALT), bitsDisambiguate)
+        assertBytes(
+            bytes(0x1b, 0x0d),
+            TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CTRL or TerminalModifiers.ALT),
+            bitsDisambiguate,
+        )
+
+        assertBytes(bytes(0x09), TerminalKeyEvent.key(TerminalKey.TAB), bitsDisambiguate)
+        assertBytes(bytes(0x09), TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.CTRL), bitsDisambiguate)
+        assertBytes(esc("[Z"), TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.SHIFT), bitsDisambiguate)
+        assertBytes(bytes(0x1b, 0x09), TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.ALT), bitsDisambiguate)
+        assertBytes(
+            bytes(0x1b, 0x1b, 0x5b, 0x5a),
+            TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.SHIFT or TerminalModifiers.ALT),
+            bitsDisambiguate,
+        )
+
         assertBytes(esc("[27u"), TerminalKeyEvent.key(TerminalKey.ESCAPE), bitsDisambiguate)
-        assertBytes(esc("[127u"), TerminalKeyEvent.key(TerminalKey.BACKSPACE), bitsDisambiguate)
+        assertBytes(bytes(0x7f), TerminalKeyEvent.key(TerminalKey.BACKSPACE), bitsDisambiguate)
+        assertBytes(bytes(0x7f), TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.SHIFT), bitsDisambiguate)
+        assertBytes(bytes(0x08), TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL), bitsDisambiguate)
+        assertBytes(
+            bytes(0x1b, 0x08),
+            TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL or TerminalModifiers.ALT),
+            bitsDisambiguate,
+        )
+        assertBytes(
+            expected = bytes(0x08),
+            event = TerminalKeyEvent.key(TerminalKey.BACKSPACE),
+            modeBits = bitsDisambiguate,
+            policy = TerminalInputPolicy(backspacePolicy = BackspacePolicy.BACKSPACE),
+        )
+        assertBytes(
+            expected = bytes(0x7f),
+            event = TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL),
+            modeBits = bitsDisambiguate,
+            policy = TerminalInputPolicy(backspacePolicy = BackspacePolicy.BACKSPACE),
+        )
+        assertBytes(esc("[13;9u"), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.META), bitsDisambiguate)
 
-        // 2. Under REPORT_ALL_KEYS_AS_ESCAPE_CODES (unmodified -> CSI-u):
+        // REPORT_ALL_KEYS_AS_ESCAPE_CODES makes every key event a canonical CSI-u sequence.
         assertBytes(esc("[13u"), TerminalKeyEvent.key(TerminalKey.ENTER), bitsReportAll)
         assertBytes(esc("[9u"), TerminalKeyEvent.key(TerminalKey.TAB), bitsReportAll)
         assertBytes(esc("[27u"), TerminalKeyEvent.key(TerminalKey.ESCAPE), bitsReportAll)
         assertBytes(esc("[127u"), TerminalKeyEvent.key(TerminalKey.BACKSPACE), bitsReportAll)
-
-        // 3. With modifiers (always CSI-u):
-        assertBytes(esc("[13;2u"), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.SHIFT), bitsOther)
-        assertBytes(esc("[9;5u"), TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.CTRL), bitsOther)
-        assertBytes(esc("[27;3u"), TerminalKeyEvent.key(TerminalKey.ESCAPE, TerminalModifiers.ALT), bitsOther)
-        assertBytes(esc("[127;5u"), TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL), bitsOther)
-
-        // 4. Unmodified without disambiguation/report-all (fallback to legacy):
-        assertBytes(bytes(0x0d), TerminalKeyEvent.key(TerminalKey.ENTER), bitsOther)
-        assertBytes(bytes(0x0d, 0x0a), TerminalKeyEvent.key(TerminalKey.ENTER), bitsOther or TerminalModeBits.NEW_LINE_MODE)
-        assertBytes(
-            expected = bytes(0x0d),
-            event = TerminalKeyEvent.key(TerminalKey.ENTER),
-            modeBits = bitsOther or TerminalModeBits.NEW_LINE_MODE,
-            policy = TerminalInputPolicy(enterNewLineModePolicy = EnterNewLineModePolicy.SEND_CR),
-        )
-        assertBytes(bytes(0x09), TerminalKeyEvent.key(TerminalKey.TAB), bitsOther)
-        assertBytes(bytes(0x1b), TerminalKeyEvent.key(TerminalKey.ESCAPE), bitsOther)
-        assertBytes(bytes(0x7f), TerminalKeyEvent.key(TerminalKey.BACKSPACE), bitsOther)
+        assertBytes(esc("[13;5u"), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CTRL), bitsReportAll)
+        assertBytes(esc("[9;2u"), TerminalKeyEvent.key(TerminalKey.TAB, TerminalModifiers.SHIFT), bitsReportAll)
+        assertBytes(esc("[27;3u"), TerminalKeyEvent.key(TerminalKey.ESCAPE, TerminalModifiers.ALT), bitsReportAll)
+        assertBytes(esc("[127;5u"), TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL), bitsReportAll)
     }
 
     @Test

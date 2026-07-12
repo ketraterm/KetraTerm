@@ -136,7 +136,9 @@ These are not badges of compatibility for this project. They expand attack surfa
 ### Deferred Kitty Keyboard Protocol Scope
 - `DONE(protocol/core/pty)`: terminal capability identity contract centralizes `$TERM`, `COLORTERM`, DA/DA2, XTGETTCAP terminal-name/color claims, and the implemented Kitty keyboard flag mask.
 - `DONE(protocol/core/input)`: advertised Kitty keyboard progressive mask is restricted to implemented flags: disambiguate escape codes (`1`) and report-all-keys-as-escape-codes (`8`). Unsupported progressive bits are masked out of input-facing core mode state.
+- `DONE(input)`: `TerminalKeyEvent` can carry an optional unshifted printable-key scalar, and Kitty CSI-u encoding uses it instead of produced text when present.
 - `TODO(parser/core/policy)`: `CSI ? u` Kitty keyboard capability query response remains disabled until a response shape and fingerprinting policy are implemented.
+- `TODO(host)`: the portable Swing adapter cannot truthfully recover a current-layout unshifted key scalar from every AWT event. A host input adapter with reliable layout/IME metadata must supply it before non-US-layout Kitty key identity is fully supported.
 - separate left/right modifier reporting if host event vocabulary grows it.
 - key repeat/release reporting.
 - alternate-key fields and associated text fields.

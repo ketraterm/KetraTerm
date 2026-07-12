@@ -85,25 +85,24 @@ internal class KittyKeyboardEncoder(
             // 2. Core Functional Keys (Enter, Tab, Escape, Backspace)
             when (key) {
                 TerminalKey.ENTER -> {
-                    if (isDisambiguate || isReportAll || modifiers != TerminalModifiers.NONE) {
+                    if (isReportAll || TerminalModifiers.hasMeta(modifiers) || (!isDisambiguate && modifiers != TerminalModifiers.NONE)) {
                         CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.ENTER, modifiers)
+                    } else if (isDisambiguate) {
+                        writeDisambiguatedEnter(modifiers, modeBits)
                     } else {
-                        if (
-                            TerminalInputState.isNewLineMode(modeBits) &&
-                            policy.enterNewLineModePolicy == EnterNewLineModePolicy.SEND_CR_LF
-                        ) {
-                            output.writeByte(ControlCode.CR)
-                            output.writeByte(ControlCode.LF)
-                        } else {
-                            output.writeByte(ControlCode.CR)
-                        }
+                        writeLegacyEnter(modeBits)
                     }
                     return
                 }
 
                 TerminalKey.TAB -> {
-                    if (isDisambiguate || isReportAll || (modifiers != TerminalModifiers.NONE && modifiers != TerminalModifiers.SHIFT)) {
+                    if (isReportAll ||
+                        TerminalModifiers.hasMeta(modifiers) ||
+                        (!isDisambiguate && modifiers != TerminalModifiers.NONE && modifiers != TerminalModifiers.SHIFT)
+                    ) {
                         CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.TAB, modifiers)
+                    } else if (isDisambiguate) {
+                        writeDisambiguatedTab(modifiers)
                     } else {
                         if (modifiers == TerminalModifiers.SHIFT) {
                             output.writeBytes(TerminalSequences.BACK_TAB, 0, TerminalSequences.BACK_TAB.size)
@@ -124,15 +123,12 @@ internal class KittyKeyboardEncoder(
                 }
 
                 TerminalKey.BACKSPACE -> {
-                    if (isDisambiguate || isReportAll || modifiers != TerminalModifiers.NONE) {
+                    if (isReportAll || TerminalModifiers.hasMeta(modifiers) || (!isDisambiguate && modifiers != TerminalModifiers.NONE)) {
                         CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.BACKSPACE, modifiers)
+                    } else if (isDisambiguate) {
+                        writeDisambiguatedBackspace(modifiers)
                     } else {
-                        val baseByte =
-                            when (policy.backspacePolicy) {
-                                BackspacePolicy.DELETE -> ControlCode.DEL
-                                BackspacePolicy.BACKSPACE -> BS
-                            }
-                        output.writeByte(baseByte)
+                        output.writeByte(configuredBackspaceByte())
                     }
                     return
                 }
@@ -159,8 +155,10 @@ internal class KittyKeyboardEncoder(
         } else {
             // Printable Codepoints
             val codepoint = event.codepoint
+            val kittyCodepoint =
+                if (event.unshiftedCodepoint != TerminalKeyEvent.NO_CODEPOINT) event.unshiftedCodepoint else codepoint
             if (isReportAll || (modifiers != TerminalModifiers.NONE && modifiers != TerminalModifiers.SHIFT)) {
-                CsiWriter.writeCsiU(scratch, output, codepoint, modifiers)
+                CsiWriter.writeCsiU(scratch, output, kittyCodepoint, modifiers)
             } else {
                 if (shouldSuppressForMeta(modifiers)) {
                     return
@@ -172,6 +170,76 @@ internal class KittyKeyboardEncoder(
             }
         }
     }
+
+    /**
+     * Writes the reset-safe legacy Enter representation required while Kitty
+     * disambiguate-escape-codes mode is active. Alt retains the conventional
+     * escape prefix; Shift and Control do not alter the return bytes.
+     */
+    private fun writeDisambiguatedEnter(
+        modifiers: Int,
+        modeBits: Long,
+    ) {
+        if (TerminalModifiers.hasAlt(modifiers)) {
+            output.writeByte(ControlCode.ESC)
+        }
+        writeLegacyEnter(modeBits)
+    }
+
+    /**
+     * Writes Enter according to the host's newline-mode policy.
+     */
+    private fun writeLegacyEnter(modeBits: Long) {
+        output.writeByte(ControlCode.CR)
+        if (
+            TerminalInputState.isNewLineMode(modeBits) &&
+            policy.enterNewLineModePolicy == EnterNewLineModePolicy.SEND_CR_LF
+        ) {
+            output.writeByte(ControlCode.LF)
+        }
+    }
+
+    /**
+     * Writes the reset-safe legacy Tab representation required while Kitty
+     * disambiguate-escape-codes mode is active.
+     */
+    private fun writeDisambiguatedTab(modifiers: Int) {
+        if (TerminalModifiers.hasAlt(modifiers)) {
+            output.writeByte(ControlCode.ESC)
+        }
+        if (TerminalModifiers.hasShift(modifiers)) {
+            output.writeBytes(TerminalSequences.BACK_TAB, 0, TerminalSequences.BACK_TAB.size)
+        } else {
+            output.writeByte(ControlCode.HT)
+        }
+    }
+
+    /**
+     * Writes the reset-safe legacy Backspace representation required while Kitty
+     * disambiguate-escape-codes mode is active.
+     */
+    private fun writeDisambiguatedBackspace(modifiers: Int) {
+        if (TerminalModifiers.hasAlt(modifiers)) {
+            output.writeByte(ControlCode.ESC)
+        }
+        output.writeByte(backspaceByte(modifiers))
+    }
+
+    /**
+     * Selects the configured Backspace byte, swapping it for Control+Backspace.
+     */
+    private fun backspaceByte(modifiers: Int): Int {
+        val baseByte = configuredBackspaceByte()
+        return if (TerminalModifiers.hasCtrl(modifiers)) invertBackspaceByte(baseByte) else baseByte
+    }
+
+    private fun configuredBackspaceByte(): Int =
+        when (policy.backspacePolicy) {
+            BackspacePolicy.DELETE -> ControlCode.DEL
+            BackspacePolicy.BACKSPACE -> BS
+        }
+
+    private fun invertBackspaceByte(baseByte: Int): Int = if (baseByte == ControlCode.DEL) BS else ControlCode.DEL
 
     /**
      * Determines if a key event with a Meta modifier should be suppressed based on the Meta Key Policy.

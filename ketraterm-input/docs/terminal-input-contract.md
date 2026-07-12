@@ -54,6 +54,11 @@ Keyboard events contain exactly one of:
 - a `TerminalKey` for non-printable physical keys
 - a printable Unicode scalar codepoint
 
+Printable events may additionally carry the unshifted scalar that identifies
+the physical text-producing key. Input sources must leave that value unknown
+when they cannot provide it truthfully; it is distinct from the produced text
+and is required by Kitty-compatible CSI-u encoding.
+
 Guaranteed behavior:
 
 - invalid modifier bitmasks are rejected
@@ -146,11 +151,16 @@ Supported modified-key protocol:
   `CSI 27 ; modifier ; codepoint ~`, for mode 1, mode 2, and mode 3
 - xterm `formatOtherKeys=1` / CSI-u format,
   `CSI codepoint ; modifier u`, when enabled by core input-mode state
+- partial Kitty keyboard handling for progressive flags `1` and `8`. Flag `1`
+  preserves legacy Enter, Tab, and Backspace bytes; Kitty CSI-u output uses a
+  supplied unshifted key scalar when the input source provides one.
 
 Not guaranteed yet:
 
 - modifyCursorKeys, modifyFunctionKeys, or modifyKeypadKeys resource variants
-- Kitty Keyboard Protocol
+- complete Kitty Keyboard Protocol support, including event types, alternate
+  key values, associated text, modifier-only events, and the full functional
+  key vocabulary
 
 ## Mouse Contract
 

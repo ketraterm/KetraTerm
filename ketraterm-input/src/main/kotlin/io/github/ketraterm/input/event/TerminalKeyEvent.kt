@@ -26,11 +26,16 @@ import io.github.ketraterm.input.event.TerminalKeyEvent.Companion.NO_CODEPOINT
  * @property key non-printable key, or null when this is printable input.
  * @property codepoint Unicode scalar value for printable input, or
  * [NO_CODEPOINT] when this is a non-printable key.
+ * @property unshiftedCodepoint unshifted Unicode scalar identifying the physical
+ * text-producing key for Kitty-compatible protocols, or [NO_CODEPOINT] when
+ * the input source cannot provide that identity. This may differ from
+ * [codepoint], such as `a` for a Shift+A event that produces `A`.
  * @property modifiers active keyboard modifiers using [TerminalModifiers] bits.
  */
 data class TerminalKeyEvent(
     val key: TerminalKey? = null,
     val codepoint: Int = NO_CODEPOINT,
+    val unshiftedCodepoint: Int = NO_CODEPOINT,
     val modifiers: Int = TerminalModifiers.NONE,
 ) {
     init {
@@ -45,12 +50,18 @@ data class TerminalKeyEvent(
             "TerminalKeyEvent must contain exactly one of key or codepoint"
         }
 
+        require(!hasKey || unshiftedCodepoint == NO_CODEPOINT) {
+            "unshiftedCodepoint is valid only for printable input"
+        }
+
         if (hasCodepoint) {
-            require(codepoint in 0..0x10ffff && codepoint !in 0xd800..0xdfff) {
+            require(isPrintableUnicodeScalar(codepoint)) {
                 "invalid Unicode scalar: $codepoint"
             }
-            require(codepoint !in 0x00..0x1f && codepoint != 0x7f) {
-                "control codepoints must use TerminalKey events"
+            if (unshiftedCodepoint != NO_CODEPOINT) {
+                require(isPrintableUnicodeScalar(unshiftedCodepoint)) {
+                    "invalid unshifted Unicode scalar: $unshiftedCodepoint"
+                }
             }
         }
     }
@@ -83,15 +94,26 @@ data class TerminalKeyEvent(
          *
          * @param codepoint Unicode scalar value to encode.
          * @param modifiers active keyboard modifiers.
+         * @param unshiftedCodepoint unshifted Unicode scalar identifying the
+         * physical text-producing key for Kitty-compatible protocols. Defaults
+         * to [NO_CODEPOINT] when the input source cannot provide that identity.
          * @return a new [TerminalKeyEvent] instance.
          */
         fun codepoint(
             codepoint: Int,
             modifiers: Int = TerminalModifiers.NONE,
+            unshiftedCodepoint: Int = NO_CODEPOINT,
         ): TerminalKeyEvent =
             TerminalKeyEvent(
                 codepoint = codepoint,
+                unshiftedCodepoint = unshiftedCodepoint,
                 modifiers = modifiers,
             )
+
+        private fun isPrintableUnicodeScalar(codepoint: Int): Boolean =
+            codepoint in 0..0x10ffff &&
+                codepoint !in 0xd800..0xdfff &&
+                codepoint !in 0x00..0x1f &&
+                codepoint != 0x7f
     }
 }
