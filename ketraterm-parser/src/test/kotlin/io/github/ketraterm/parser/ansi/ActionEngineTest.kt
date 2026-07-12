@@ -403,6 +403,10 @@ class ActionEngineTest {
             sinkCalls += "requestDeviceAttributes:$kind:$parameter"
         }
 
+        override fun requestKittyKeyboardFlags() {
+            sinkCalls += "requestKittyKeyboardFlags"
+        }
+
         override fun requestWindowReport(mode: Int) {
             sinkCalls += "requestWindowReport:$mode"
         }

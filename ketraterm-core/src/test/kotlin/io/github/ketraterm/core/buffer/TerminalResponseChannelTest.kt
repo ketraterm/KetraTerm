@@ -19,6 +19,7 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalResponseChannel
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
+import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -112,6 +113,20 @@ class TerminalResponseChannelTest {
                 "${TerminalCapabilityIdentity.SECONDARY_DA_OPTIONS}c",
             drain(buffer),
         )
+    }
+
+    @Test
+    fun `Kitty keyboard query reports only active masked progressive flags`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+
+        buffer.setKittyKeyboardFlags(
+            KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
+                KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES or
+                KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES,
+        )
+        buffer.requestKittyKeyboardFlags()
+
+        assertEquals("\u001B[?9u", drain(buffer))
     }
 
     @Test

@@ -596,6 +596,24 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `Kitty keyboard query reports active flags through the parser host core pipeline`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B[=9u\u001B[?u")
+
+            assertEquals("\u001B[?9u", f.drainResponses())
+        }
+
+        @Test
+        fun `terminal response policy suppresses Kitty keyboard query responses`() {
+            val f = Fixture(hostPolicy = HostPolicy(terminalResponsePolicy = HostControlPolicy.DENY))
+
+            f.acceptAscii("\u001B[?u")
+
+            assertEquals("", f.drainResponses())
+        }
+
+        @Test
         fun `unsupported Kitty keyboard controls leave core mode snapshot unchanged`() {
             val f = Fixture()
 

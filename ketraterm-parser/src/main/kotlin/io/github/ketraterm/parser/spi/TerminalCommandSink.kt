@@ -502,6 +502,12 @@ interface TerminalCommandSink {
     )
 
     /**
+     * Requests the active Kitty keyboard progressive-enhancement flag report
+     * for parameterless `CSI ? u`.
+     */
+    fun requestKittyKeyboardFlags()
+
+    /**
      * Safe xterm window report request.
      *
      * Supported modes are owned by the sink/core. Window manipulation requests

@@ -171,6 +171,8 @@ internal class NoOpCommandSink : TerminalCommandSink {
         parameter: Int,
     ) {}
 
+    override fun requestKittyKeyboardFlags() {}
+
     override fun requestWindowReport(mode: Int) {}
 
     override fun resizeWindow(

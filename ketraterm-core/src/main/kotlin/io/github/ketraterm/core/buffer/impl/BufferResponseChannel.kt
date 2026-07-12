@@ -67,6 +67,13 @@ internal class BufferResponseChannel(
         }
     }
 
+    override fun requestKittyKeyboardFlags() {
+        enqueueCsiPrefix()
+        state.hostResponses.enqueueByte('?'.code)
+        state.hostResponses.enqueuePositiveDecimal(state.modes.kittyKeyboardFlags)
+        state.hostResponses.enqueueByte('u'.code)
+    }
+
     override fun setWindowSizePixels(
         width: Int,
         height: Int,

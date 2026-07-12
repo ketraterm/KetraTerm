@@ -83,8 +83,9 @@ object TerminalCapabilityIdentity {
     const val KITTY_KEYBOARD_SUPPORTED_FLAGS: Int = KittyKeyboardProgressiveFlag.SUPPORTED_MASK
 
     /**
-     * `CSI ? u` Kitty keyboard capability query responses are intentionally not
-     * emitted until a response shape and identity policy are implemented.
+     * `CSI ? u` Kitty keyboard capability queries return only the active,
+     * supported progressive-enhancement flags through the terminal response
+     * policy channel.
      */
-    const val KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED: Boolean = false
+    const val KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED: Boolean = true
 }

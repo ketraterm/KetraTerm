@@ -25,6 +25,10 @@ import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import java.net.URI
 import java.net.URISyntaxException
 import java.util.Base64
+import kotlin.collections.ArrayDeque
+import kotlin.collections.HashMap
+import kotlin.collections.LinkedHashMap
+import kotlin.collections.set
 
 /**
  * Production bridge from parser semantic commands to the terminal core.
@@ -524,6 +528,11 @@ class HostCommandAdapter(
     ) {
         if (!hostPolicy.terminalResponsePolicy.isAllowed) return
         terminal.requestDeviceAttributes(kind, parameter)
+    }
+
+    override fun requestKittyKeyboardFlags() {
+        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+        terminal.requestKittyKeyboardFlags()
     }
 
     override fun requestWindowReport(mode: Int) {

@@ -277,6 +277,10 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "requestDeviceAttributes:$kind:$parameter"
     }
 
+    override fun requestKittyKeyboardFlags() {
+        events += "requestKittyKeyboardFlags"
+    }
+
     override fun requestWindowReport(mode: Int) {
         events += "requestWindowReport:$mode"
     }

@@ -62,6 +62,13 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
     )
 
     /**
+     * Enqueues the active Kitty keyboard progressive-enhancement flags as a
+     * parameterless `CSI ? u` query response. Core reports only flags retained
+     * by its supported-mode mask.
+     */
+    fun requestKittyKeyboardFlags()
+
+    /**
      * Updates the recorded window size in pixels.
      *
      * @param width Width in pixels.

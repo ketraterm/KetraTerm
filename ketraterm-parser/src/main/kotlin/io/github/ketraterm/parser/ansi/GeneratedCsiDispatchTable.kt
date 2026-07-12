@@ -71,6 +71,7 @@ internal object GeneratedCsiDispatchTable {
             16232L, // CSI ? h  DECSET
             16236L, // CSI ? l  DECRST
             16238L, // CSI ? n  DEC DSR
+            16245L, // CSI ? u  Kitty keyboard query flags
             281474978807921L, // CSI SP q  DECSCUSR
             281474978873456L, // CSI ! p  DECSTR
             281474978938993L, // CSI " q  DECSCA
@@ -120,6 +121,7 @@ internal object GeneratedCsiDispatchTable {
             CsiCommand.SM_DEC,
             CsiCommand.RM_DEC,
             CsiCommand.DSR_DEC,
+            CsiCommand.KITTY_KEYBOARD_QUERY,
             CsiCommand.DECSCUSR,
             CsiCommand.DECSTR,
             CsiCommand.DECSCA,

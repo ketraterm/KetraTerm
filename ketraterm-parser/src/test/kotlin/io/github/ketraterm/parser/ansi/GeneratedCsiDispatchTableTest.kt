@@ -87,7 +87,7 @@ class GeneratedCsiDispatchTableTest {
             assertEquals(CsiCommand.KITTY_KEYBOARD_FLAGS, lookup('u', privateMarker = '='.code))
             assertEquals(CsiCommand.KITTY_KEYBOARD_PUSH, lookup('u', privateMarker = '>'.code))
             assertEquals(CsiCommand.KITTY_KEYBOARD_POP, lookup('u', privateMarker = '<'.code))
-            assertEquals(CsiCommand.UNKNOWN, lookup('u', privateMarker = '?'.code))
+            assertEquals(CsiCommand.KITTY_KEYBOARD_QUERY, lookup('u', privateMarker = '?'.code))
         }
 
         @Test

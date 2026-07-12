@@ -158,6 +158,9 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.KITTY_KEYBOARD_FLAGS -> dispatchKittyKeyboardFlags(sink, state)
             CsiCommand.KITTY_KEYBOARD_PUSH -> dispatchKittyKeyboardPush(sink, state)
             CsiCommand.KITTY_KEYBOARD_POP -> dispatchKittyKeyboardPop(sink, state)
+            CsiCommand.KITTY_KEYBOARD_QUERY -> {
+                if (state.paramCount == 0) sink.requestKittyKeyboardFlags()
+            }
             CsiCommand.DECSTBM ->
                 sink.setScrollRegion(
                     top = scrollRegionTopParam(state, 0),

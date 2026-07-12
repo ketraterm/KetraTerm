@@ -47,7 +47,7 @@ class TerminalCapabilityIdentityTest {
                     TerminalCapabilityIdentity.KITTY_KEYBOARD_SUPPORTED_FLAGS,
                 )
             },
-            { assertFalse(TerminalCapabilityIdentity.KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED) },
+            { assertTrue(TerminalCapabilityIdentity.KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED) },
         )
     }
 }
