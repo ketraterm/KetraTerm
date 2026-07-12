@@ -101,7 +101,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(core)`: rectangular area operations if parser support is added (copy, erase, fill, selective erase).
 - `TODO(core)`: left/right margin interactions need continued property testing across all edit/erase/scroll operations.
 - `TODO(core)`: full DEC protection behavior across all rectangular operations.
-- `TODO(core)`: scrollback policy under alternate-screen and private-mode combinations beyond current tested cases.
+- `TODO(core)`: scrollback policy under alternate-screen and private-mode combinations beyond tested full-viewport and top-anchored primary-screen regions.
 - `TODO(core)`: soft-wrap metadata compatibility with copy/paste/export.
 
 ### Unicode Width

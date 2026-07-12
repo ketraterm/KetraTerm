@@ -87,6 +87,23 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `Codex inline history sequence retains rows scrolled from a top anchored region`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 3, height = 4, maxHistory = 8))
+            f.acceptAscii("\u001B[1;1HAAA\u001B[2;1HBBB\u001B[3;1HCCC\u001B[4;1HDDD")
+
+            f.acceptAscii("\u001B[1;3r\u001B[3;1H\r\nNEW\u001B[r")
+
+            assertAll(
+                { assertEquals(1, f.terminal.historySize) },
+                { assertEquals("AAA\nBBB\nCCC\nNEW\nDDD", f.terminal.getAllAsString()) },
+                { assertEquals("BBB", f.terminal.getLineAsString(0)) },
+                { assertEquals("CCC", f.terminal.getLineAsString(1)) },
+                { assertEquals("NEW", f.terminal.getLineAsString(2)) },
+                { assertEquals("DDD", f.terminal.getLineAsString(3)) },
+            )
+        }
+
+        @Test
         fun `combining mark in later host chunk extends previous core cell`() {
             val f = Fixture(terminal = TerminalBuffers.create(width = 6, height = 2))
 

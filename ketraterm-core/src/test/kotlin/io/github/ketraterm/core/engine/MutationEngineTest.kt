@@ -1463,6 +1463,58 @@ class MutationEngineTest {
     @DisplayName("scroll region awareness")
     inner class ScrollRegionTests {
         @Test
+        fun `top anchored scroll region admits rows to history and preserves rows below region`() {
+            val state = createState(width = 3, height = 4, history = 4)
+            val writer = MutationEngine(state)
+            setScrollRegion(state, top = 0, bottom = 2)
+            seedLine(state, 0, "AAA")
+            seedLine(state, 1, "BBB")
+            seedLine(state, 2, "CCC")
+            seedLine(state, 3, "DDD")
+            state.cursor.row = 2
+
+            writer.newLine()
+
+            assertAll(
+                { assertEquals(1, state.historySize) },
+                { assertEquals("AAA", state.ring[0].toTextTrimmed()) },
+                { assertEquals("BBB", lineAt(state, 0).toTextTrimmed()) },
+                { assertEquals("CCC", lineAt(state, 1).toTextTrimmed()) },
+                { assertEquals("", lineAt(state, 2).toTextTrimmed()) },
+                { assertEquals("DDD", lineAt(state, 3).toTextTrimmed()) },
+                { assertEquals(2, state.cursor.row) },
+            )
+        }
+
+        @Test
+        fun `top anchored scroll region remains bounded while repeatedly preserving rows below region`() {
+            val state = createState(width = 1, height = 4, history = 2)
+            val writer = MutationEngine(state)
+            setScrollRegion(state, top = 0, bottom = 2)
+            seedLine(state, 0, "A")
+            seedLine(state, 1, "B")
+            seedLine(state, 2, "C")
+            seedLine(state, 3, "D")
+
+            writer.scrollUp()
+            seedLine(state, 2, "E")
+            writer.scrollUp()
+            seedLine(state, 2, "F")
+            writer.scrollUp()
+
+            assertAll(
+                { assertEquals(2, state.historySize) },
+                { assertEquals(1L, state.ring.discardedCount) },
+                { assertEquals("B", state.ring[0].toTextTrimmed()) },
+                { assertEquals("C", state.ring[1].toTextTrimmed()) },
+                { assertEquals("E", lineAt(state, 0).toTextTrimmed()) },
+                { assertEquals("F", lineAt(state, 1).toTextTrimmed()) },
+                { assertEquals("", lineAt(state, 2).toTextTrimmed()) },
+                { assertEquals("D", lineAt(state, 3).toTextTrimmed()) },
+            )
+        }
+
+        @Test
         fun `newLine inside region scrolls region, not full viewport`() {
             val state = createState(width = 3, height = 4, history = 4)
             val writer = MutationEngine(state)
@@ -1476,6 +1528,7 @@ class MutationEngineTest {
             writer.newLine()
 
             assertAll(
+                { assertEquals(0, state.historySize) },
                 { assertLineCodepoints(state, 1, intArrayOf('C'.code, 'C'.code, 'C'.code)) },
                 { assertLineCodepoints(state, 2, intArrayOf(0, 0, 0)) },
                 { assertEquals(2, state.cursor.row) },
