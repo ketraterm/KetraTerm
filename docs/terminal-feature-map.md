@@ -16,6 +16,7 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   - Selective display erasing (`DECSED` / `CSI Ps ? J`).
   - Character erasing (`ECH` / `CSI Ps X`).
 - **Selective Erase Protection**: Protected cell marking (`DECSCA` / `CSI Ps " q`) stamps protection onto characters to shield them from normal line and display erasures.
+- **DEC Rectangular Areas**: VT400/VT420 rectangular erase (`DECERA` / `CSI Pt;Pl;Pb;Pr $ z`), selective erase (`DECSERA` / `CSI Pt;Pl;Pb;Pr $ {`), fill (`DECFRA` / `CSI Pch;Pt;Pl;Pb;Pr $ x`), and overlap-safe copy (`DECCRA` / `CSI Pts;Pls;Pbs;Prs;Pps;Ptd;Pld;Ppd $ v`). Rectangles respect origin and active margins; copy accepts only the active single page (`0` omitted or `1`).
 - **Buffer Switching**: Instantly switches between Primary and Alternate screen buffers (modes `47`, `1047`, `1048`, `1049`). Alternate screen isolates cursor save slots, margins, and automatically homes and clears the screen on entry (for `1047`/`1049`).
 - **Column Toggles**: Dynamic 80/132 column switching (`DECCOLM` / `CSI Ps space $ |`) with automatic viewport resizes, screen clearing, and margin/tab-stop resets.
 - **Grid Editing**: Line Insert (`IL` / `CSI Ps L`), Line Delete (`DL` / `CSI Ps M`), Character Insert (`ICH` / `CSI Ps @`), and Character Delete (`DCH` / `CSI Ps P`) constrained within horizontal and vertical margins.

@@ -184,6 +184,20 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "fillRectangle:$codepoint:$top:$left:$bottom:$right"
     }
 
+    override fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    ) {
+        events +=
+            "copyRectangle:$sourceTop:$sourceLeft:$sourceBottom:$sourceRight:$sourcePage:$destinationTop:$destinationLeft:$destinationPage"
+    }
+
     override fun insertLines(n: Int) {
         events += "insertLines:$n"
     }

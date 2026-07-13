@@ -573,6 +573,15 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `DECCRA preserves source and destination parameters`() {
+            val f = TerminalParserFixture()
+
+            f.acceptAscii("\u001B[2;3;4;5;1;6;7;1\$v")
+
+            assertEquals(listOf("copyRectangle:2:3:4:5:1:6:7:1"), f.sink.events)
+        }
+
+        @Test
         fun `DEC private CSI mode dispatch survives chunk boundaries`() {
             val f = TerminalParserFixture()
 

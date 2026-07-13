@@ -152,6 +152,17 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
                     bottom = rectangleParam(state, 3),
                     right = rectangleParam(state, 4),
                 )
+            CsiCommand.DECCRA ->
+                sink.copyRectangle(
+                    sourceTop = rectangleParam(state, 0),
+                    sourceLeft = rectangleParam(state, 1),
+                    sourceBottom = rectangleParam(state, 2),
+                    sourceRight = rectangleParam(state, 3),
+                    sourcePage = rectangleParam(state, 4),
+                    destinationTop = rectangleParam(state, 5),
+                    destinationLeft = rectangleParam(state, 6),
+                    destinationPage = rectangleParam(state, 7),
+                )
             CsiCommand.IL -> sink.insertLines(countParam(state, 0))
             CsiCommand.DL -> sink.deleteLines(countParam(state, 0))
             CsiCommand.ICH -> sink.insertCharacters(countParam(state, 0))

@@ -154,6 +154,26 @@ internal class BufferWriter(
         right: Int,
     ) = mutationEngine.fillRectangle(codepoint, top, left, bottom, right)
 
+    override fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    ) = mutationEngine.copyRectangle(
+        sourceTop,
+        sourceLeft,
+        sourceBottom,
+        sourceRight,
+        sourcePage,
+        destinationTop,
+        destinationLeft,
+        destinationPage,
+    )
+
     override fun eraseEntireScreen() = mutationEngine.clearViewport()
 
     override fun eraseScreenAndHistory() = mutationEngine.eraseScreenAndHistory()

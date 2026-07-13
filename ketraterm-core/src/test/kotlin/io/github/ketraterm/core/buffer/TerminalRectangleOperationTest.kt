@@ -87,4 +87,59 @@ class TerminalRectangleOperationTest {
             { assertEquals(TerminalConstants.EMPTY, buffer.getCodepointAt(4, 3)) },
         )
     }
+
+    @Test
+    fun `DECCRA snapshots overlapping source before mutating destination`() {
+        val buffer = TerminalBuffers.create(width = 6, height = 2)
+        "ABCDEF".forEach { buffer.writeCodepoint(it.code) }
+
+        buffer.copyRectangle(
+            sourceTop = 1,
+            sourceLeft = 1,
+            sourceBottom = 1,
+            sourceRight = 4,
+            sourcePage = 1,
+            destinationTop = 1,
+            destinationLeft = 2,
+            destinationPage = 1,
+        )
+
+        assertEquals("AABCDF", buffer.getLineAsString(0))
+    }
+
+    @Test
+    fun `DECCRA preserves a copied wide span after source is erased`() {
+        val buffer = TerminalBuffers.create(width = 6, height = 2)
+        buffer.writeCodepoint(0x1F642)
+
+        buffer.copyRectangle(
+            sourceTop = 1,
+            sourceLeft = 1,
+            sourceBottom = 1,
+            sourceRight = 2,
+            sourcePage = 0,
+            destinationTop = 1,
+            destinationLeft = 4,
+            destinationPage = 0,
+        )
+        buffer.eraseRectangle(top = 1, left = 1, bottom = 1, right = 2, selective = false)
+
+        assertAll(
+            { assertEquals(TerminalConstants.EMPTY, buffer.getCodepointAt(0, 0)) },
+            { assertEquals(TerminalConstants.EMPTY, buffer.getCodepointAt(1, 0)) },
+            { assertEquals(0x1F642, buffer.getCodepointAt(3, 0)) },
+            { assertEquals(TerminalConstants.WIDE_CHAR_SPACER, buffer.getCodepointAt(4, 0)) },
+        )
+    }
+
+    @Test
+    fun `DECCRA rejects unavailable source and destination pages`() {
+        val buffer = TerminalBuffers.create(width = 4, height = 2)
+        buffer.writeCodepoint('A'.code)
+
+        buffer.copyRectangle(1, 1, 1, 1, 2, 1, 2, 1)
+        buffer.copyRectangle(1, 1, 1, 1, 1, 1, 2, 2)
+
+        assertEquals("A", buffer.getLineAsString(0))
+    }
 }

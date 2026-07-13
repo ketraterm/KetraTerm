@@ -287,6 +287,35 @@ interface TerminalWriter {
         right: Int,
     )
 
+    /**
+     * Copies a VT420 rectangular area (DECCRA) without moving the cursor.
+     *
+     * Coordinates are DEC one-based values. The source rectangle is inclusive; destination
+     * coordinates identify its new upper-left cell. This single-page terminal accepts omitted
+     * page parameters (`0`) and page `1`; every other page value is ignored. Source data is
+     * snapshotted before destination cells are mutated, so overlapping copies have memmove
+     * semantics and preserve grapheme-cluster ownership.
+     *
+     * @param sourceTop One-based source top row, or `0` when omitted.
+     * @param sourceLeft One-based source left column, or `0` when omitted.
+     * @param sourceBottom One-based source bottom row, or `0` when omitted.
+     * @param sourceRight One-based source right column, or `0` when omitted.
+     * @param sourcePage Source page (`0` omitted or `1` for the active page).
+     * @param destinationTop One-based destination top row, or `0` when omitted.
+     * @param destinationLeft One-based destination left column, or `0` when omitted.
+     * @param destinationPage Destination page (`0` omitted or `1` for the active page).
+     */
+    fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    )
+
     /** Erases the entire visible screen without moving the cursor (ED 2, `CSI 2 J`). */
     fun eraseEntireScreen()
 

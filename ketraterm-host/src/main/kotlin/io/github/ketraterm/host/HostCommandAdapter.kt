@@ -344,6 +344,28 @@ class HostCommandAdapter(
         terminal.fillRectangle(codepoint, top, left, bottom, right)
     }
 
+    override fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    ) {
+        terminal.copyRectangle(
+            sourceTop,
+            sourceLeft,
+            sourceBottom,
+            sourceRight,
+            sourcePage,
+            destinationTop,
+            destinationLeft,
+            destinationPage,
+        )
+    }
+
     override fun insertLines(n: Int) {
         terminal.insertLines(n)
     }

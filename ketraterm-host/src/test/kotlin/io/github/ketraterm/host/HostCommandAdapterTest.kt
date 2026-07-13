@@ -1162,6 +1162,17 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `DECCRA byte stream performs overlap safe active page copy`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 6, height = 2))
+
+            f.acceptAscii("ABCDEF")
+            f.acceptAscii("\u001B[1;1;1;4;1;1;2;1\$v")
+            f.end()
+
+            assertEquals("AABCDF", f.terminal.getLineAsString(0))
+        }
+
+        @Test
         fun `OSC titles and hyperlinks are retained as adapter metadata`() {
             val f = Fixture()
 

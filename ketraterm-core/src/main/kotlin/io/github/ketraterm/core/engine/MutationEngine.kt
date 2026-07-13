@@ -54,6 +54,14 @@ internal class MutationEngine(
     private val blankExtendedAttr: Long get() = state.pen.blankExtendedAttr
     private var clusterScratch = IntArray(16)
 
+    // Reused by DECCRA. Rectangular copies are unusual but must not allocate per command.
+    private var rectangleCodepoints = IntArray(0)
+    private var rectangleAttrs = LongArray(0)
+    private var rectangleExtendedAttrs = LongArray(0)
+    private var rectangleClusterOffsets = IntArray(0)
+    private var rectangleClusterLengths = IntArray(0)
+    private var rectangleClusterData = IntArray(0)
+
     /**
      * Wraps mutations that conceptually break phantom-column state.
      *
@@ -1090,6 +1098,159 @@ internal class MutationEngine(
                 state.markLineChanged(line)
             }
         }
+    }
+
+    /**
+     * Applies VT420 DECCRA using a source snapshot, giving overlapping copies memmove semantics.
+     *
+     * VT420 page numbers are normalized to this emulator's single active page: omitted page zero
+     * and page one are accepted; all other pages are unsupported and therefore have no effect.
+     */
+    fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    ) = structuralMutation {
+        if (sourcePage !in 0..1 || destinationPage !in 0..1) return@structuralMutation
+
+        withRectangle(sourceTop, sourceLeft, sourceBottom, sourceRight) { topRow, leftCol, bottomRow, rightCol ->
+            val originRows = state.modes.isOriginMode
+            val originColumns = originRows && state.modes.isLeftRightMarginMode
+            val rowBase = if (originRows) state.scrollTop else 0
+            val rowLimit = if (originRows) state.scrollBottom else height - 1
+            val colBase = if (originColumns) leftMargin else 0
+            val colLimit = if (originColumns) rightMargin else width - 1
+            val destinationRow = rowBase + if (destinationTop <= 0) 0 else destinationTop - 1
+            val destinationCol = colBase + if (destinationLeft <= 0) 0 else destinationLeft - 1
+            if (destinationRow !in rowBase..rowLimit || destinationCol !in colBase..colLimit) return@withRectangle
+
+            val sourceRows = bottomRow - topRow + 1
+            val sourceColumns = rightCol - leftCol + 1
+            val copyRows = minOf(sourceRows, rowLimit - destinationRow + 1)
+            val copyColumns = minOf(sourceColumns, colLimit - destinationCol + 1)
+            if (copyRows <= 0 || copyColumns <= 0) return@withRectangle
+
+            snapshotRectangle(topRow, leftCol, copyRows, copyColumns)
+
+            // Clear all target occupants before writing so a copied leader and spacer cannot
+            // annihilate one another while a wide span is being reconstructed.
+            for (rowOffset in 0 until copyRows) {
+                val row = destinationRow + rowOffset
+                for (colOffset in 0 until copyColumns) {
+                    annihilateAt(row, destinationCol + colOffset)
+                }
+            }
+
+            for (rowOffset in 0 until copyRows) {
+                val line = getLine(destinationRow + rowOffset)
+                val rowStart = rowOffset * copyColumns
+                for (colOffset in 0 until copyColumns) {
+                    val index = rowStart + colOffset
+                    val raw = rectangleCodepoints[index]
+                    val attr = rectangleAttrs[index]
+                    val extendedAttr = rectangleExtendedAttrs[index]
+                    val clusterLength = rectangleClusterLengths[index]
+                    if (clusterLength != 0) {
+                        ensureClusterScratchCapacity(clusterLength)
+                        rectangleClusterData.copyInto(
+                            clusterScratch,
+                            destinationOffset = 0,
+                            startIndex = rectangleClusterOffsets[index],
+                            endIndex = rectangleClusterOffsets[index] + clusterLength,
+                        )
+                        line.setCluster(
+                            destinationCol + colOffset,
+                            clusterScratch,
+                            clusterLength,
+                            attr,
+                            extendedAttr,
+                        )
+                    } else {
+                        line.setCell(destinationCol + colOffset, raw, attr, extendedAttr)
+                    }
+                }
+                state.markLineChanged(line)
+            }
+        }
+    }
+
+    /** Snapshots source cells and cluster payloads before DECCRA mutates an overlapping target. */
+    private fun snapshotRectangle(
+        topRow: Int,
+        leftCol: Int,
+        rows: Int,
+        columns: Int,
+    ) {
+        val cellCount = rows * columns
+        ensureRectangleCellCapacity(cellCount)
+        var clusterDataSize = 0
+        for (rowOffset in 0 until rows) {
+            val line = getLine(topRow + rowOffset)
+            val rowStart = rowOffset * columns
+            for (colOffset in 0 until columns) {
+                val index = rowStart + colOffset
+                val sourceCol = leftCol + colOffset
+                val raw = line.rawCodepoint(sourceCol)
+                rectangleCodepoints[index] = raw
+                rectangleAttrs[index] = line.getPackedAttr(sourceCol)
+                rectangleExtendedAttrs[index] = line.getPackedExtendedAttr(sourceCol)
+                if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
+                    val clusterLength = line.store.length(raw)
+                    ensureRectangleClusterDataCapacity(clusterDataSize + clusterLength)
+                    line.store.readInto(raw, rectangleClusterData, clusterDataSize)
+                    rectangleClusterOffsets[index] = clusterDataSize
+                    rectangleClusterLengths[index] = clusterLength
+                    clusterDataSize += clusterLength
+                } else {
+                    rectangleClusterOffsets[index] = 0
+                    rectangleClusterLengths[index] = 0
+                }
+            }
+
+            val first = rowStart
+            val last = rowStart + columns - 1
+            if (rectangleCodepoints[first] == TerminalConstants.WIDE_CHAR_SPACER) {
+                setSnapshotBlank(first)
+            }
+            if (
+                rectangleCodepoints[last] != TerminalConstants.WIDE_CHAR_SPACER &&
+                leftCol + columns < width &&
+                line.rawCodepoint(leftCol + columns) == TerminalConstants.WIDE_CHAR_SPACER
+            ) {
+                setSnapshotBlank(last)
+            }
+        }
+    }
+
+    private fun setSnapshotBlank(index: Int) {
+        rectangleCodepoints[index] = TerminalConstants.EMPTY
+        rectangleAttrs[index] = blankAttr
+        rectangleExtendedAttrs[index] = blankExtendedAttr
+        rectangleClusterOffsets[index] = 0
+        rectangleClusterLengths[index] = 0
+    }
+
+    private fun ensureRectangleCellCapacity(required: Int) {
+        if (rectangleCodepoints.size >= required) return
+        var nextSize = rectangleCodepoints.size.coerceAtLeast(16)
+        while (nextSize < required) nextSize *= 2
+        rectangleCodepoints = IntArray(nextSize)
+        rectangleAttrs = LongArray(nextSize)
+        rectangleExtendedAttrs = LongArray(nextSize)
+        rectangleClusterOffsets = IntArray(nextSize)
+        rectangleClusterLengths = IntArray(nextSize)
+    }
+
+    private fun ensureRectangleClusterDataCapacity(required: Int) {
+        if (rectangleClusterData.size >= required) return
+        var nextSize = rectangleClusterData.size.coerceAtLeast(16)
+        while (nextSize < required) nextSize *= 2
+        rectangleClusterData = IntArray(nextSize)
     }
 
     private inline fun withRectangle(

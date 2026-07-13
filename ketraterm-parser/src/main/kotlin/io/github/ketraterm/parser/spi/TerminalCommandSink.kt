@@ -329,6 +329,23 @@ interface TerminalCommandSink {
     )
 
     /**
+     * Copies a VT400 rectangular area (DECCRA).
+     *
+     * Coordinates retain DEC's one-based inclusive representation so the core can apply active
+     * origin-mode policy. Page numbers use DEC's one-based numbering; `0` denotes omission.
+     */
+    fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    )
+
+    /**
      * Inserts [n] blank lines at the cursor row (IL).
      *
      * @param n Number of lines to insert.

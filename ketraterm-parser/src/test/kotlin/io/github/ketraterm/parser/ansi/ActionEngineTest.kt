@@ -310,6 +310,20 @@ class ActionEngineTest {
             sinkCalls += "fillRectangle:$codepoint:$top:$left:$bottom:$right"
         }
 
+        override fun copyRectangle(
+            sourceTop: Int,
+            sourceLeft: Int,
+            sourceBottom: Int,
+            sourceRight: Int,
+            sourcePage: Int,
+            destinationTop: Int,
+            destinationLeft: Int,
+            destinationPage: Int,
+        ) {
+            sinkCalls +=
+                "copyRectangle:$sourceTop:$sourceLeft:$sourceBottom:$sourceRight:$sourcePage:$destinationTop:$destinationLeft:$destinationPage"
+        }
+
         override fun insertLines(n: Int) {
             sinkCalls += "insertLines:$n"
         }

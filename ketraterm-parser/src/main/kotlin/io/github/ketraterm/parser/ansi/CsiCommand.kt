@@ -76,4 +76,5 @@ internal object CsiCommand {
     const val DECFRA: Int = 48
     const val DECERA: Int = 49
     const val DECSERA: Int = 50
+    const val DECCRA: Int = 51
 }
