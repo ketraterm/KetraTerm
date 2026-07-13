@@ -76,6 +76,7 @@ internal class KittyKeyboardEncoder(
         val isReportAll = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES) != 0
         val isReportAssociatedText = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_ASSOCIATED_TEXT) != 0
         val eventType = if (isReportEventTypes) event.type.ordinal + 1 else NO_EVENT_TYPE
+        val hasPressEncodingSemantics = !isReportEventTypes || event.type == TerminalKeyEventType.PRESS
 
         if (
             event.codepoint == TerminalKeyEvent.TEXT_ONLY_CODEPOINT &&
@@ -107,7 +108,7 @@ internal class KittyKeyboardEncoder(
             when (key) {
                 TerminalKey.ENTER -> {
                     if (isReportAll ||
-                        event.type != TerminalKeyEventType.PRESS ||
+                        !hasPressEncodingSemantics ||
                         TerminalModifiers.hasMeta(modifiers) ||
                         (!isDisambiguate && modifiers != TerminalModifiers.NONE)
                     ) {
@@ -129,7 +130,7 @@ internal class KittyKeyboardEncoder(
 
                 TerminalKey.TAB -> {
                     if (isReportAll ||
-                        event.type != TerminalKeyEventType.PRESS ||
+                        !hasPressEncodingSemantics ||
                         TerminalModifiers.hasMeta(modifiers) ||
                         (!isDisambiguate && modifiers != TerminalModifiers.NONE && modifiers != TerminalModifiers.SHIFT)
                     ) {
@@ -154,7 +155,7 @@ internal class KittyKeyboardEncoder(
                 }
 
                 TerminalKey.ESCAPE -> {
-                    if (isDisambiguate || isReportAll || event.type != TerminalKeyEventType.PRESS || modifiers != TerminalModifiers.NONE) {
+                    if (isDisambiguate || isReportAll || !hasPressEncodingSemantics || modifiers != TerminalModifiers.NONE) {
                         CsiWriter.writeCsiU(
                             scratch,
                             output,
@@ -171,7 +172,7 @@ internal class KittyKeyboardEncoder(
 
                 TerminalKey.BACKSPACE -> {
                     if (isReportAll ||
-                        event.type != TerminalKeyEventType.PRESS ||
+                        !hasPressEncodingSemantics ||
                         TerminalModifiers.hasMeta(modifiers) ||
                         (!isDisambiguate && modifiers != TerminalModifiers.NONE)
                     ) {
@@ -194,7 +195,7 @@ internal class KittyKeyboardEncoder(
             }
 
             // 3. CSI Letter Keys (Arrows, Home, End, F1-F4)
-            val csiLetter = KeyMappingTable.CSI_LETTERS[keyOrdinal]
+            val csiLetter = KeyMappingTable.KITTY_CSI_LETTERS[keyOrdinal]
             if (csiLetter >= 0) {
                 if (modifiers != TerminalModifiers.NONE || eventType != NO_EVENT_TYPE) {
                     CsiWriter.writeCsiModifierLetter(scratch, output, 1, modifiers, csiLetter, eventType, kittyModifiers = true)

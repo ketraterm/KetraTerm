@@ -23,6 +23,32 @@ import org.junit.jupiter.api.Test
 
 class TerminalModesTest {
     @Test
+    fun `DECBKM selection is atomic explicit and cleared by resets`() {
+        val modes = TerminalModes()
+
+        var snapshot = modes.getModeSnapshot()
+        assertFalse(snapshot.isBackarrowKeyModeExplicit)
+        assertFalse(snapshot.isBackarrowKeySendsBackspace)
+
+        modes.setBackarrowKeyMode(true)
+        snapshot = modes.getModeSnapshot()
+        assertTrue(snapshot.isBackarrowKeyModeExplicit)
+        assertTrue(snapshot.isBackarrowKeySendsBackspace)
+
+        modes.setBackarrowKeyMode(false)
+        snapshot = modes.getModeSnapshot()
+        assertTrue(snapshot.isBackarrowKeyModeExplicit)
+        assertFalse(snapshot.isBackarrowKeySendsBackspace)
+
+        modes.softReset()
+        assertFalse(modes.getModeSnapshot().isBackarrowKeyModeExplicit)
+
+        modes.setBackarrowKeyMode(true)
+        modes.reset()
+        assertFalse(modes.getModeSnapshot().isBackarrowKeyModeExplicit)
+    }
+
+    @Test
     fun `defaults reflect current shared terminal state contract`() {
         val modes = TerminalModes()
 

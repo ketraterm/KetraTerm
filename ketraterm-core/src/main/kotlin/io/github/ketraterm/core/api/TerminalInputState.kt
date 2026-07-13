@@ -49,6 +49,26 @@ interface TerminalInputState {
         fun isApplicationKeypad(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.APPLICATION_KEYPAD)
 
         /**
+         * Returns whether DECBKM has explicitly overridden the input profile's
+         * initial Backspace policy in [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return `true` after DECSET or DECRST 67, until a terminal reset.
+         */
+        @JvmStatic
+        fun isBackarrowKeyModeExplicit(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.BACKARROW_KEY_MODE_EXPLICIT)
+
+        /**
+         * Returns the explicit DECBKM wire selection from [bits].
+         *
+         * @param bits The packed mode bits snapshot.
+         * @return `true` for BS and `false` for DEL.
+         */
+        @JvmStatic
+        fun isBackarrowKeySendsBackspace(bits: Long): Boolean =
+            TerminalModeBits.hasFlag(bits, TerminalModeBits.BACKARROW_KEY_SENDS_BACKSPACE)
+
+        /**
          * Returns true when new-line mode is enabled in [bits].
          *
          * @param bits The packed mode bits snapshot.

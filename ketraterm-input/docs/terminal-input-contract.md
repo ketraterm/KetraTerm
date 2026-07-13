@@ -138,12 +138,16 @@ keyboard mode.
 
 Guaranteed behavior:
 
+- repeat events use normal press encoding unless Kitty event-type reporting is
+  active; release events are suppressed when the active protocol cannot
+  represent releases
 - Ctrl mappings are explicit and never silently drop unsupported modifiers
 - Alt can prefix applicable legacy encodings with ESC under policy
 - Meta handling for legacy printable/control encodings follows policy
 - special keys with xterm CSI modifier encodings may encode Meta as modifier
   parameter 9
-- Backspace byte selection follows `BackspacePolicy`
+- Backspace byte selection follows `BackspacePolicy` until the host explicitly
+  selects DECBKM; DECSET 67 sends BS and DECRST 67 sends DEL until reset
 - Enter follows newline mode for unmodified or policy-accepted events unless
   the active input policy forces CR-only Return for cooked PTY hosts
 - application cursor and application keypad modes are read from the per-event
@@ -203,6 +207,7 @@ Tracking suppression is guaranteed:
 Supported mouse encodings:
 
 - SGR mouse
+- SGR-Pixels mouse (`?1016`) when the host supplies one-based pixel coordinates
 - default legacy `ESC [ M`
 - UTF-8 extended mouse (`?1005`)
 - URXVT mouse (`?1015`)
@@ -218,7 +223,6 @@ Guaranteed behavior:
 
 Not guaranteed yet:
 
-- SGR-Pixels mouse mode (`?1016`)
 - xterm highlight mouse tracking (`?1001`)
 - UI pointer capture, drag threshold, or double/triple-click interpretation
 
@@ -315,8 +319,6 @@ Likely to evolve before 1.0:
 
 - broader modified-key protocol support
 - optional Kitty keyboard protocol as a separate encoder path
-- SGR-Pixels mouse event vocabulary if renderer/UI host supplies pixel
-  coordinates
 - paste policy surface if host host needs stricter security defaults
 - a future `:ketraterm-core-api` split for input-facing mode reads
 

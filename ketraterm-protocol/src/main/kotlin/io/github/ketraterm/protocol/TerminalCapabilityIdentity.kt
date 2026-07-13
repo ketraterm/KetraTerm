@@ -37,20 +37,25 @@ object TerminalCapabilityIdentity {
      */
     const val COLOR_TERM_TRUECOLOR: String = "truecolor"
 
-    /**
-     * Primary DA terminal class. `1` is VT100.
-     */
-    const val PRIMARY_DA_TERMINAL_CLASS: Int = 1
+    /** Primary DA terminal class. `64` identifies VT420-level DEC controls. */
+    const val PRIMARY_DA_TERMINAL_CLASS: Int = 64
+
+    /** Primary DA allowlisted option: 132-column mode. */
+    const val PRIMARY_DA_132_COLUMNS: Int = 1
+
+    /** Primary DA allowlisted option: selective erase. */
+    const val PRIMARY_DA_SELECTIVE_ERASE: Int = 6
+
+    /** Primary DA allowlisted option: ANSI color. */
+    const val PRIMARY_DA_ANSI_COLOR: Int = 22
+
+    /** Primary DA allowlisted option: rectangular editing. */
+    const val PRIMARY_DA_RECTANGULAR_EDITING: Int = 28
 
     /**
-     * Primary DA option for advanced video support.
+     * Secondary DA terminal id. `41` is the VT420 equipment class.
      */
-    const val PRIMARY_DA_ADVANCED_VIDEO: Int = 2
-
-    /**
-     * Secondary DA terminal id. Zero is a generic/versionless identity.
-     */
-    const val SECONDARY_DA_TERMINAL_ID: Int = 0
+    const val SECONDARY_DA_TERMINAL_ID: Int = 41
 
     /**
      * Secondary DA firmware/version field. Zero avoids product version leakage.

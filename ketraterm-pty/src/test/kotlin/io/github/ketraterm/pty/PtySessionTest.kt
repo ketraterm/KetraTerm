@@ -34,16 +34,8 @@ class PtySessionTest {
     @Test
     fun `default environment advertises the shared terminal capability identity`() {
         val environment = PtyOptions.defaultEnvironment()
-        val systemEnvironment = System.getenv()
-
-        assertEquals(
-            systemEnvironment["TERM"] ?: TerminalCapabilityIdentity.TERM_NAME,
-            environment.getValue("TERM"),
-        )
-        assertEquals(
-            systemEnvironment["COLORTERM"] ?: TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR,
-            environment.getValue("COLORTERM"),
-        )
+        assertEquals(TerminalCapabilityIdentity.TERM_NAME, environment.getValue("TERM"))
+        assertEquals(TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR, environment.getValue("COLORTERM"))
     }
 
     @Test

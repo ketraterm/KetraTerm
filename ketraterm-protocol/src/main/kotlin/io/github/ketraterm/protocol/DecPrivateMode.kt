@@ -45,6 +45,9 @@ object DecPrivateMode {
     /** Application keypad mode (DECKPAM). */
     const val APPLICATION_KEYPAD: Int = 66
 
+    /** Backarrow key mode (DECBKM): Backspace sends BS when set and DEL when reset. */
+    const val BACKARROW_KEY: Int = 67
+
     /** Left/right margin mode (DECSLRM). */
     const val LEFT_RIGHT_MARGIN: Int = 69
 

@@ -68,7 +68,7 @@ internal class KeyboardEncoder(
     ) {
         val kittyFlags = TerminalInputState.kittyKeyboardFlags(modeBits)
         if (
-            event.type != TerminalKeyEventType.PRESS &&
+            event.type == TerminalKeyEventType.RELEASE &&
             (kittyFlags and io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES) == 0
         ) {
             return

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Fixed held Backspace and Delete keys so every OS key-repeat event reaches the shell.
+- Improved legacy shell and TUI compatibility for Backspace mode, Ctrl-number shortcuts, modified base keys, and extended function keys.
+- Aligned PTY and device-attribute identity with KetraTerm's implemented VT420-level capabilities.
 - Added VT420 rectangular-area checksums (`DECRQCRA`) across the parser, core, and host pipeline. Responses are policy-gated, bounded to the active page, and preserve DEC origin/margin semantics.
 
 ## [0.2.0] - 2026-07-13

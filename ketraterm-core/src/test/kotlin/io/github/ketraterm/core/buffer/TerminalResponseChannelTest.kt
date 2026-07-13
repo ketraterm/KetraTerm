@@ -95,7 +95,7 @@ class TerminalResponseChannelTest {
         buffer.requestDeviceAttributes(TerminalResponseChannel.DEVICE_ATTRIBUTES_SECONDARY, parameter = 0)
         buffer.requestDeviceAttributes(TerminalResponseChannel.DEVICE_ATTRIBUTES_TERTIARY, parameter = 0)
 
-        assertEquals("\u001B[?1;2c\u001B[>0;0;0c", drain(buffer))
+        assertEquals("\u001B[?64;1;6;22;28c\u001B[>41;0;0c", drain(buffer))
     }
 
     @Test
@@ -107,7 +107,10 @@ class TerminalResponseChannelTest {
 
         assertEquals(
             "\u001B[?${TerminalCapabilityIdentity.PRIMARY_DA_TERMINAL_CLASS};" +
-                "${TerminalCapabilityIdentity.PRIMARY_DA_ADVANCED_VIDEO}c" +
+                "${TerminalCapabilityIdentity.PRIMARY_DA_132_COLUMNS};" +
+                "${TerminalCapabilityIdentity.PRIMARY_DA_SELECTIVE_ERASE};" +
+                "${TerminalCapabilityIdentity.PRIMARY_DA_ANSI_COLOR};" +
+                "${TerminalCapabilityIdentity.PRIMARY_DA_RECTANGULAR_EDITING}c" +
                 "\u001B[>${TerminalCapabilityIdentity.SECONDARY_DA_TERMINAL_ID};" +
                 "${TerminalCapabilityIdentity.SECONDARY_DA_VERSION};" +
                 "${TerminalCapabilityIdentity.SECONDARY_DA_OPTIONS}c",

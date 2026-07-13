@@ -132,6 +132,17 @@ internal class LegacyKeyboardEncoder(
         modifiers: Int,
         modeBits: Long,
     ) {
+        if (key.ordinal in TerminalKey.F13.ordinal..TerminalKey.F24.ordinal) {
+            val baseKey = TERMINAL_KEYS[TerminalKey.F1.ordinal + key.ordinal - TerminalKey.F13.ordinal]
+            encodeMappedKey(baseKey, modifiers or TerminalModifiers.SHIFT, modeBits)
+            return
+        }
+        if (key.ordinal in TerminalKey.F25.ordinal..TerminalKey.F35.ordinal) {
+            val baseKey = TERMINAL_KEYS[TerminalKey.F1.ordinal + key.ordinal - TerminalKey.F25.ordinal]
+            encodeMappedKey(baseKey, modifiers or TerminalModifiers.CTRL, modeBits)
+            return
+        }
+
         val keyOrdinal = key.ordinal
 
         // 0. Static Sequences (Unmodified)
@@ -157,13 +168,13 @@ internal class LegacyKeyboardEncoder(
                 key == TerminalKey.HOME ||
                 key == TerminalKey.END
         if (isCursorKey) {
-            val csiLetter = KeyMappingTable.CSI_LETTERS[keyOrdinal]
+            val csiLetter = KeyMappingTable.LEGACY_CSI_LETTERS[keyOrdinal]
             CsiWriter.writeCsiModifierLetter(scratch, output, 1, modifiers, csiLetter)
             return
         }
 
         // 2. Function F1-F4
-        val csiLetter = KeyMappingTable.CSI_LETTERS[keyOrdinal]
+        val csiLetter = KeyMappingTable.LEGACY_CSI_LETTERS[keyOrdinal]
         if (csiLetter >= 0) {
             CsiWriter.writeCsiModifierLetter(scratch, output, 1, modifiers, csiLetter)
             return
@@ -194,30 +205,16 @@ internal class LegacyKeyboardEncoder(
             return
         }
 
-        val unsupportedModifier =
-            TerminalModifiers.hasShift(modifiers) ||
-                (
-                    TerminalModifiers.hasCtrl(modifiers) &&
-                        (
-                            TerminalModifiers.hasShift(modifiers) ||
-                                TerminalModifiers.hasAlt(modifiers) ||
-                                TerminalModifiers.hasMeta(modifiers)
-                        )
-                )
-
-        if (unsupportedModifier) {
-            when (policy.unsupportedModifiedKeyPolicy) {
-                UnsupportedModifiedKeyPolicy.SUPPRESS -> return
-                UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED -> {}
-            }
-        }
-
         if (!writeModifierPrefixOrSuppress(modifiers)) return
 
         val baseByte =
-            when (policy.backspacePolicy) {
-                BackspacePolicy.DELETE -> ControlCode.DEL
-                BackspacePolicy.BACKSPACE -> BS
+            if (TerminalInputState.isBackarrowKeyModeExplicit(modeBits)) {
+                if (TerminalInputState.isBackarrowKeySendsBackspace(modeBits)) BS else ControlCode.DEL
+            } else {
+                when (policy.backspacePolicy) {
+                    BackspacePolicy.DELETE -> ControlCode.DEL
+                    BackspacePolicy.BACKSPACE -> BS
+                }
             }
 
         if (TerminalModifiers.hasCtrl(modifiers)) {
@@ -234,15 +231,6 @@ internal class LegacyKeyboardEncoder(
         if (shouldEncodeModifyOtherSpecial(ENTER_CODEPOINT, modifiers, modeBits)) {
             encodeModifyOtherKey(ENTER_CODEPOINT, modifiers, modeBits)
             return
-        }
-
-        val unsupportedModifier = TerminalModifiers.hasShift(modifiers) || TerminalModifiers.hasCtrl(modifiers)
-
-        if (unsupportedModifier) {
-            when (policy.unsupportedModifiedKeyPolicy) {
-                UnsupportedModifiedKeyPolicy.SUPPRESS -> return
-                UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED -> {}
-            }
         }
 
         if (!writeModifierPrefixOrSuppress(modifiers)) return
@@ -264,12 +252,6 @@ internal class LegacyKeyboardEncoder(
     ) {
         if (shouldEncodeModifyOtherSpecial(ESCAPE_CODEPOINT, modifiers, modeBits)) {
             encodeModifyOtherKey(ESCAPE_CODEPOINT, modifiers, modeBits)
-            return
-        }
-
-        val unsupportedModifier = TerminalModifiers.hasShift(modifiers) || TerminalModifiers.hasCtrl(modifiers)
-
-        if (unsupportedModifier && policy.unsupportedModifiedKeyPolicy == UnsupportedModifiedKeyPolicy.SUPPRESS) {
             return
         }
 
@@ -308,13 +290,6 @@ internal class LegacyKeyboardEncoder(
         val keyOrdinal = key.ordinal
 
         if (modifiers != TerminalModifiers.NONE) {
-            val unsupportedModifier = TerminalModifiers.hasShift(modifiers) || TerminalModifiers.hasCtrl(modifiers)
-            if (unsupportedModifier) {
-                when (policy.unsupportedModifiedKeyPolicy) {
-                    UnsupportedModifiedKeyPolicy.SUPPRESS -> return
-                    UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED -> {}
-                }
-            }
             if (!writeModifierPrefixOrSuppress(modifiers)) return
         }
 
@@ -463,6 +438,13 @@ internal class LegacyKeyboardEncoder(
         return when (lower) {
             in 'a'.code..'z'.code -> lower - 'a'.code + 1
             '@'.code, ' '.code -> 0x00
+            '2'.code -> 0x00
+            '3'.code -> 0x1b
+            '4'.code -> 0x1c
+            '5'.code -> 0x1d
+            '6'.code -> 0x1e
+            '7'.code -> 0x1f
+            '8'.code -> 0x7f
             '['.code -> 0x1b
             '\\'.code -> 0x1c
             ']'.code -> 0x1d
@@ -480,5 +462,6 @@ internal class LegacyKeyboardEncoder(
         private const val ENTER_CODEPOINT: Int = 0x0d
         private const val MODIFY_OTHER_KEYS_PREFIX: Int = 27
         private const val TAB_CODEPOINT: Int = 0x09
+        private val TERMINAL_KEYS = TerminalKey.entries
     }
 }

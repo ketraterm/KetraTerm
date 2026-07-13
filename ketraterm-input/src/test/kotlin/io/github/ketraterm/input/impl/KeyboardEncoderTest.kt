@@ -87,6 +87,13 @@ class KeyboardEncoderTest {
         assertBytes(bytes(0x1e), TerminalKeyEvent.codepoint('^'.code, TerminalModifiers.CTRL))
         assertBytes(bytes(0x1f), TerminalKeyEvent.codepoint('_'.code, TerminalModifiers.CTRL))
         assertBytes(bytes(0x7f), TerminalKeyEvent.codepoint('?'.code, TerminalModifiers.CTRL))
+        assertBytes(bytes(0x00), TerminalKeyEvent.codepoint('2'.code, TerminalModifiers.CTRL))
+        assertBytes(bytes(0x1b), TerminalKeyEvent.codepoint('3'.code, TerminalModifiers.CTRL))
+        assertBytes(bytes(0x1c), TerminalKeyEvent.codepoint('4'.code, TerminalModifiers.CTRL))
+        assertBytes(bytes(0x1d), TerminalKeyEvent.codepoint('5'.code, TerminalModifiers.CTRL))
+        assertBytes(bytes(0x1e), TerminalKeyEvent.codepoint('6'.code, TerminalModifiers.CTRL))
+        assertBytes(bytes(0x1f), TerminalKeyEvent.codepoint('7'.code, TerminalModifiers.CTRL))
+        assertBytes(bytes(0x7f), TerminalKeyEvent.codepoint('8'.code, TerminalModifiers.CTRL))
         assertBytes(
             bytes(0x1b, 0x01),
             TerminalKeyEvent.codepoint('a'.code, TerminalModifiers.CTRL or TerminalModifiers.ALT),
@@ -233,7 +240,7 @@ class KeyboardEncoderTest {
             policy = TerminalInputPolicy(enterNewLineModePolicy = EnterNewLineModePolicy.SEND_CR),
         )
         assertBytes(bytes(0x1b, 0x0d), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.ALT))
-        assertBytes(bytes(), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CTRL))
+        assertBytes(bytes(0x0d), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CTRL))
         assertBytes(
             expected = bytes(0x0d),
             event = TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.CTRL),
@@ -290,7 +297,7 @@ class KeyboardEncoderTest {
     fun `encodes Escape by modifier policy`() {
         assertBytes(bytes(0x1b), TerminalKeyEvent.key(TerminalKey.ESCAPE))
         assertBytes(bytes(0x1b, 0x1b), TerminalKeyEvent.key(TerminalKey.ESCAPE, TerminalModifiers.ALT))
-        assertBytes(bytes(), TerminalKeyEvent.key(TerminalKey.ESCAPE, TerminalModifiers.SHIFT))
+        assertBytes(bytes(0x1b), TerminalKeyEvent.key(TerminalKey.ESCAPE, TerminalModifiers.SHIFT))
         assertBytes(
             expected = bytes(0x1b),
             event = TerminalKeyEvent.key(TerminalKey.ESCAPE, TerminalModifiers.SHIFT),
@@ -441,8 +448,34 @@ class KeyboardEncoderTest {
         assertBytes(esc("[23~"), TerminalKeyEvent.key(TerminalKey.F11))
         assertBytes(esc("[24~"), TerminalKeyEvent.key(TerminalKey.F12))
         assertBytes(esc("[1;5P"), TerminalKeyEvent.key(TerminalKey.F1, TerminalModifiers.CTRL))
+        assertBytes(esc("[1;5R"), TerminalKeyEvent.key(TerminalKey.F3, TerminalModifiers.CTRL))
         assertBytes(esc("[15;5~"), TerminalKeyEvent.key(TerminalKey.F5, TerminalModifiers.CTRL))
         assertBytes(esc("[24;9~"), TerminalKeyEvent.key(TerminalKey.F12, TerminalModifiers.META))
+    }
+
+    @Test
+    fun `explicit DECBKM overrides the profile Backspace default`() {
+        val explicit = TerminalModeBits.BACKARROW_KEY_MODE_EXPLICIT
+        val sendsBackspace = explicit or TerminalModeBits.BACKARROW_KEY_SENDS_BACKSPACE
+
+        assertBytes(bytes(0x08), TerminalKeyEvent.key(TerminalKey.BACKSPACE), sendsBackspace)
+        assertBytes(
+            expected = bytes(0x7f),
+            event = TerminalKeyEvent.key(TerminalKey.BACKSPACE),
+            modeBits = explicit,
+            policy = TerminalInputPolicy(backspacePolicy = BackspacePolicy.BACKSPACE),
+        )
+        assertBytes(bytes(0x7f), TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL), sendsBackspace)
+        assertBytes(bytes(0x08), TerminalKeyEvent.key(TerminalKey.BACKSPACE, TerminalModifiers.CTRL), explicit)
+    }
+
+    @Test
+    fun `encodes extended function keys as xterm Shift and Ctrl function keys`() {
+        assertBytes(esc("[1;2P"), TerminalKeyEvent.key(TerminalKey.F13))
+        assertBytes(esc("[24;2~"), TerminalKeyEvent.key(TerminalKey.F24))
+        assertBytes(esc("[1;5P"), TerminalKeyEvent.key(TerminalKey.F25))
+        assertBytes(esc("[23;5~"), TerminalKeyEvent.key(TerminalKey.F35))
+        assertBytes(esc("[1;6P"), TerminalKeyEvent.key(TerminalKey.F13, TerminalModifiers.CTRL))
     }
 
     @Test
@@ -510,9 +543,10 @@ class KeyboardEncoderTest {
     }
 
     @Test
-    fun `applies keypad modifier policy without silent modifier loss`() {
+    fun `preserves legacy keypad output when Shift and Ctrl are not representable`() {
         assertBytes(bytes(0x1b, 0x31), TerminalKeyEvent.key(TerminalKey.NUMPAD_1, TerminalModifiers.ALT))
-        assertBytes(bytes(), TerminalKeyEvent.key(TerminalKey.NUMPAD_1, TerminalModifiers.CTRL))
+        assertBytes(ascii("1"), TerminalKeyEvent.key(TerminalKey.NUMPAD_1, TerminalModifiers.CTRL))
+        assertBytes(ascii("1"), TerminalKeyEvent.key(TerminalKey.NUMPAD_1, TerminalModifiers.SHIFT))
         assertBytes(
             expected = ascii("1"),
             event = TerminalKeyEvent.key(TerminalKey.NUMPAD_1, TerminalModifiers.CTRL),
@@ -729,15 +763,43 @@ class KeyboardEncoderTest {
     }
 
     @Test
-    fun `key lifecycle events are suppressed without Kitty event reporting`() {
+    fun `repeat events retain press encoding while releases are suppressed without Kitty event reporting`() {
         assertBytes(
             bytes(),
             TerminalKeyEvent.key(TerminalKey.UP, type = TerminalKeyEventType.RELEASE),
         )
         assertBytes(
-            bytes(),
+            bytes(0x7f),
+            TerminalKeyEvent.key(TerminalKey.BACKSPACE, type = TerminalKeyEventType.REPEAT),
+        )
+        assertBytes(
+            esc("[3~"),
+            TerminalKeyEvent.key(TerminalKey.DELETE, type = TerminalKeyEventType.REPEAT),
+        )
+        assertBytes(
+            esc("[A"),
             TerminalKeyEvent.key(TerminalKey.UP, type = TerminalKeyEventType.REPEAT),
             kittyKeyboardBits(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES),
+        )
+        assertBytes(
+            bytes(0x7f),
+            TerminalKeyEvent.key(TerminalKey.BACKSPACE, type = TerminalKeyEventType.REPEAT),
+            kittyKeyboardBits(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES),
+        )
+        assertBytes(
+            esc("[3~"),
+            TerminalKeyEvent.key(TerminalKey.DELETE, type = TerminalKeyEventType.REPEAT),
+            kittyKeyboardBits(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES),
+        )
+        assertBytes(
+            esc("[127u"),
+            TerminalKeyEvent.key(TerminalKey.BACKSPACE, type = TerminalKeyEventType.REPEAT),
+            kittyKeyboardBits(KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES),
+        )
+        assertBytes(
+            bytes(),
+            TerminalKeyEvent.key(TerminalKey.DELETE, type = TerminalKeyEventType.RELEASE),
+            kittyKeyboardBits(KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES),
         )
     }
 

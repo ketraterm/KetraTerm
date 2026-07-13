@@ -26,6 +26,8 @@ package io.github.ketraterm.core.api
  * @property isAutoWrap `true` when DECAWM auto-wrap mode is active.
  * @property isApplicationCursorKeys `true` when application cursor keys mode (DECCKM) is active.
  * @property isApplicationKeypad `true` when application keypad mode (DECNKM) is active.
+ * @property isBackarrowKeyModeExplicit `true` after the host explicitly selected DECBKM.
+ * @property isBackarrowKeySendsBackspace the explicit DECBKM byte selection: BS when true, DEL when false.
  * @property isOriginMode `true` when origin mode (DECOM) is active.
  * @property isNewLineMode `true` when new-line mode (LNM) is active.
  * @property isLeftRightMarginMode `true` when left/right margins (DECLRMM) are active.
@@ -49,6 +51,8 @@ data class TerminalModeSnapshot(
     val isAutoWrap: Boolean,
     val isApplicationCursorKeys: Boolean,
     val isApplicationKeypad: Boolean,
+    val isBackarrowKeyModeExplicit: Boolean,
+    val isBackarrowKeySendsBackspace: Boolean,
     val isOriginMode: Boolean,
     val isNewLineMode: Boolean,
     val isLeftRightMarginMode: Boolean,
