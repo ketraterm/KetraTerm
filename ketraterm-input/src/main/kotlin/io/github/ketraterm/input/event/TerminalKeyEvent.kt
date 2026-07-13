@@ -26,12 +26,28 @@ import io.github.ketraterm.input.event.TerminalKeyEvent.Companion.NO_CODEPOINT
  * @property key non-printable key, or null when this is printable input.
  * @property codepoint Unicode scalar value for printable input, or
  * [NO_CODEPOINT] when this is a non-printable key.
+ * @property unshiftedCodepoint unshifted Unicode scalar identifying the physical
+ * text-producing key for Kitty-compatible protocols, or [NO_CODEPOINT] when
+ * the input source cannot provide that identity. This may differ from
+ * [codepoint], such as `a` for a Shift+A event that produces `A`.
+ * @property shiftedCodepoint shifted current-layout key scalar for Kitty
+ * alternate-key reporting, or [NO_CODEPOINT] when unknown.
+ * @property baseLayoutCodepoint standard PC-101 base-layout key scalar for
+ * Kitty alternate-key reporting, or [NO_CODEPOINT] when unknown.
+ * @property associatedText host-owned text produced by this key for Kitty
+ * associated-text reporting, or null when unknown or inapplicable.
  * @property modifiers active keyboard modifiers using [TerminalModifiers] bits.
+ * @property type physical lifecycle phase as reported by the host adapter.
  */
 data class TerminalKeyEvent(
     val key: TerminalKey? = null,
     val codepoint: Int = NO_CODEPOINT,
+    val unshiftedCodepoint: Int = NO_CODEPOINT,
+    val shiftedCodepoint: Int = NO_CODEPOINT,
+    val baseLayoutCodepoint: Int = NO_CODEPOINT,
+    val associatedText: String? = null,
     val modifiers: Int = TerminalModifiers.NONE,
+    val type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
 ) {
     init {
         require(TerminalModifiers.isValid(modifiers)) {
@@ -40,18 +56,54 @@ data class TerminalKeyEvent(
 
         val hasKey = key != null
         val hasCodepoint = codepoint != NO_CODEPOINT
+        val isTextOnly = codepoint == TEXT_ONLY_CODEPOINT
 
         require(hasKey xor hasCodepoint) {
             "TerminalKeyEvent must contain exactly one of key or codepoint"
         }
 
+        require(
+            !hasKey ||
+                (
+                    unshiftedCodepoint == NO_CODEPOINT &&
+                        shiftedCodepoint == NO_CODEPOINT &&
+                        baseLayoutCodepoint == NO_CODEPOINT &&
+                        associatedText == null
+                ),
+        ) {
+            "Kitty key scalar metadata is valid only for printable input"
+        }
+
         if (hasCodepoint) {
-            require(codepoint in 0..0x10ffff && codepoint !in 0xd800..0xdfff) {
-                "invalid Unicode scalar: $codepoint"
+            if (isTextOnly) {
+                require(associatedText != null) { "text-only input requires associatedText" }
+                require(unshiftedCodepoint == NO_CODEPOINT && shiftedCodepoint == NO_CODEPOINT && baseLayoutCodepoint == NO_CODEPOINT) {
+                    "text-only input cannot carry Kitty key scalar metadata"
+                }
+            } else {
+                require(isPrintableUnicodeScalar(codepoint)) {
+                    "invalid Unicode scalar: $codepoint"
+                }
             }
-            require(codepoint !in 0x00..0x1f && codepoint != 0x7f) {
-                "control codepoints must use TerminalKey events"
+            if (!isTextOnly && unshiftedCodepoint != NO_CODEPOINT) {
+                require(isPrintableUnicodeScalar(unshiftedCodepoint)) {
+                    "invalid unshifted Unicode scalar: $unshiftedCodepoint"
+                }
             }
+            if (!isTextOnly && shiftedCodepoint != NO_CODEPOINT) {
+                require(TerminalModifiers.hasShift(modifiers)) {
+                    "shiftedCodepoint requires the Shift modifier"
+                }
+                require(isPrintableUnicodeScalar(shiftedCodepoint)) {
+                    "invalid shifted Unicode scalar: $shiftedCodepoint"
+                }
+            }
+            if (!isTextOnly && baseLayoutCodepoint != NO_CODEPOINT) {
+                require(isPrintableUnicodeScalar(baseLayoutCodepoint)) {
+                    "invalid base-layout Unicode scalar: $baseLayoutCodepoint"
+                }
+            }
+            if (associatedText != null) requireAssociatedText(associatedText)
         }
     }
 
@@ -62,20 +114,26 @@ data class TerminalKeyEvent(
         /** Sentinel used when a key event does not carry a printable codepoint. */
         const val NO_CODEPOINT: Int = -1
 
+        /** Kitty key code used when text has no known physical key identity. */
+        const val TEXT_ONLY_CODEPOINT: Int = 0
+
         /**
          * Creates a non-printable key event.
          *
          * @param key non-printable terminal key.
          * @param modifiers active keyboard modifiers.
+         * @param type physical lifecycle phase reported by the host.
          * @return a new [TerminalKeyEvent] instance.
          */
         fun key(
             key: TerminalKey,
             modifiers: Int = TerminalModifiers.NONE,
+            type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
         ): TerminalKeyEvent =
             TerminalKeyEvent(
                 key = key,
                 modifiers = modifiers,
+                type = type,
             )
 
         /**
@@ -83,15 +141,73 @@ data class TerminalKeyEvent(
          *
          * @param codepoint Unicode scalar value to encode.
          * @param modifiers active keyboard modifiers.
+         * @param unshiftedCodepoint unshifted Unicode scalar identifying the
+         * physical text-producing key for Kitty-compatible protocols. Defaults
+         * to [NO_CODEPOINT] when the input source cannot provide that identity.
+         * @param shiftedCodepoint shifted current-layout key scalar for Kitty
+         * alternate-key reporting.
+         * @param baseLayoutCodepoint standard PC-101 base-layout key scalar for
+         * Kitty alternate-key reporting.
+         * @param associatedText text produced by this key for Kitty
+         * associated-text reporting.
+         * @param type physical lifecycle phase reported by the host.
          * @return a new [TerminalKeyEvent] instance.
          */
         fun codepoint(
             codepoint: Int,
             modifiers: Int = TerminalModifiers.NONE,
+            unshiftedCodepoint: Int = NO_CODEPOINT,
+            shiftedCodepoint: Int = NO_CODEPOINT,
+            baseLayoutCodepoint: Int = NO_CODEPOINT,
+            associatedText: String? = null,
+            type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
         ): TerminalKeyEvent =
             TerminalKeyEvent(
                 codepoint = codepoint,
+                unshiftedCodepoint = unshiftedCodepoint,
+                shiftedCodepoint = shiftedCodepoint,
+                baseLayoutCodepoint = baseLayoutCodepoint,
+                associatedText = associatedText,
                 modifiers = modifiers,
+                type = type,
             )
+
+        /**
+         * Creates a Kitty text-only event with no known physical key identity.
+         *
+         * @param associatedText text produced by the host or IME.
+         * @param modifiers active keyboard modifiers.
+         * @param type physical lifecycle phase reported by the host.
+         * @return a normalized text-only key event.
+         */
+        fun text(
+            associatedText: String,
+            modifiers: Int = TerminalModifiers.NONE,
+            type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
+        ): TerminalKeyEvent =
+            TerminalKeyEvent(
+                codepoint = TEXT_ONLY_CODEPOINT,
+                associatedText = associatedText,
+                modifiers = modifiers,
+                type = type,
+            )
+
+        private fun isPrintableUnicodeScalar(codepoint: Int): Boolean =
+            codepoint in 0..0x10ffff &&
+                codepoint !in 0xd800..0xdfff &&
+                codepoint !in 0x00..0x1f &&
+                codepoint != 0x7f
+
+        private fun requireAssociatedText(text: String) {
+            require(text.isNotEmpty()) { "associatedText must not be empty" }
+            var index = 0
+            while (index < text.length) {
+                val codepoint = text.codePointAt(index)
+                require(isPrintableUnicodeScalar(codepoint) && codepoint !in 0x80..0x9f) {
+                    "invalid associated text scalar: $codepoint"
+                }
+                index += Character.charCount(codepoint)
+            }
+        }
     }
 }

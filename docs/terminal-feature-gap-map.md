@@ -26,7 +26,7 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 
 ### Tier 2: Useful (Under consideration / partial gaps)
 - *No outstanding SAFE query-response, DECRQSS/XTGETTCAP, push/pop title stack, or host-adapter allow/deny policy-surface gaps (all implemented and verified).*
-- `FIXED(alpha-blocker)`: Kitty keyboard capability advertising now exposes only implemented progressive flags (`1` disambiguate escape codes and `8` report all keys as escape codes). Event types, alternate keys, and associated text remain protocol vocabulary only until the input event model can encode them.
+- `FIXED(alpha-blocker)`: Kitty keyboard capability advertising is per-session and admits only progressive flags backed by complete active-host metadata. The portable Swing profile, including IntelliJ-hosted Swing, exposes `1` (disambiguate escape codes) and `8` (report all keys as escape codes); richer flags stay unadvertised.
 
 ### Tier 3: Optional (Graphics & advanced features)
 - Sixel or modern graphics protocols (e.g. Kitty graphics protocol).
@@ -127,21 +127,24 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(host/profile)`: standalone/workspace local PTY profiles persist `paste_sanitization` (`raw`, `strip-c0`, or `normalize-line-endings`) and apply it to newly opened tabs and splits through `TerminalWorkspaceOpenOptions` and `PtyOptions.inputPolicy`.
 - `TODO(host/profile)`: expose paste policy defaults for SSH and IDE/workspace embedding profiles when those product surfaces are wired; input already provides the mechanism.
 - `TODO(input)`: broader modified-key encoding:
-  - xterm modifyOtherKeys subparameter mask support such as `CSI > 4 : 1 m`.
-  - query/disable controls for xterm key modifier options.
+  - xterm modifyOtherKeys subparameter mask support such as `CSI > 4 : 1 m`; this factors modifiers out of the source keysym and therefore remains deferred with rich layout-aware input metadata.
 - `TODO(parser/core/input)`: xterm modified-key policy surface for `modifyCursorKeys`, `modifyFunctionKeys`, and `modifyKeypadKeys`.
 - `TODO(input/policy)`: additional xterm-compatible key policies when a real ambiguity exists, such as Delete behavior and optional eight-bit Meta output.
 - `TODO(parser/core/input)`: xterm highlight mouse tracking (`?1001`) if full xterm mouse parity is required.
 
 ### Deferred Kitty Keyboard Protocol Scope
 - `DONE(protocol/core/pty)`: terminal capability identity contract centralizes `$TERM`, `COLORTERM`, DA/DA2, XTGETTCAP terminal-name/color claims, and the implemented Kitty keyboard flag mask.
-- `DONE(protocol/core/input)`: advertised Kitty keyboard progressive mask is restricted to implemented flags: disambiguate escape codes (`1`) and report-all-keys-as-escape-codes (`8`). Unsupported progressive bits are masked out of input-facing core mode state.
-- `TODO(parser/core/policy)`: `CSI ? u` Kitty keyboard capability query response remains disabled until a response shape and fingerprinting policy are implemented.
-- separate left/right modifier reporting if host event vocabulary grows it.
-- key repeat/release reporting.
-- alternate-key fields and associated text fields.
-- modifier-only key events.
-- complete functional-key numeric table beyond keys already represented by `TerminalKey`.
+- `DONE(protocol/core/host/session/input)`: Kitty capability handling distinguishes the full encoder mask from the conservative portable-host mask. The parser-to-core adapter applies a per-session host mask to replace/set/clear/push operations, so query responses reflect only capabilities the active host has explicitly declared.
+- `DONE(input)`: `TerminalKeyEvent` can carry an optional unshifted printable-key scalar, and Kitty CSI-u encoding uses it instead of produced text when present.
+- `DONE(parser/core/host/policy)`: parameterless `CSI ? u` reports only active Kitty keyboard progressive flags admitted by the session's host capability mask through the existing terminal-response policy.
+- `TODO(host, deferred)`: native rich-input adapters for layout-aware physical-key identity, IME text, and complete lifecycle metadata. This requires host-specific native integration; no portable Swing or IntelliJ-hosted Swing session may advertise flags `2`, `4`, or `16` until that work is implemented and verified.
+- `DONE(input)`: normalized keyboard events carry an explicit press/repeat/release lifecycle phase without host-toolkit dependencies or encoder hot-path allocation.
+- `DONE(input)`: the Kitty encoder formats the lifecycle phase in the `modifier:event-type` subfield and suppresses lifecycle events when flag `2` is inactive.
+- `DONE(ui)`: Swing preserves press/repeat/release for AWT-visible non-text physical keys through a fixed preallocated pressed-key table; unmatched releases are not invented or emitted.
+- `DONE(protocol/input/ui)`: the complete Kitty functional-key table is represented by normalized input vocabulary and allocation-free PUA lookup tables; Swing maps the subset exposed by AWT, while richer hosts can supply the remaining keys.
+- `DONE(input)`: normalized modifiers preserve Kitty's independent Super, Hyper, Meta, Caps Lock, and Num Lock bits while legacy CSI encodings retain their compatible four-modifier representation. Modifier-only key reports are gated by flag `8`.
+- `DONE(input)`: normalized printable events carry validated Kitty shifted and base-layout alternate key scalars; the encoder formats both fields, including the required empty shifted field when only a base-layout scalar exists.
+- `DONE(input)`: host-owned associated text is scalar-validated and encoded as Kitty colon-separated text codepoints without encoder-side allocation.
 
 ---
 

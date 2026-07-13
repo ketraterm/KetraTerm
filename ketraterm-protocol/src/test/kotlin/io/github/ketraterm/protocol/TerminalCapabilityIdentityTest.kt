@@ -43,11 +43,11 @@ class TerminalCapabilityIdentityTest {
             { assertTrue(TerminalCapabilityIdentity.TERMINFO_TRUECOLOR_SUPPORTED) },
             {
                 assertEquals(
-                    KittyKeyboardProgressiveFlag.SUPPORTED_MASK,
+                    KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
                     TerminalCapabilityIdentity.KITTY_KEYBOARD_SUPPORTED_FLAGS,
                 )
             },
-            { assertFalse(TerminalCapabilityIdentity.KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED) },
+            { assertTrue(TerminalCapabilityIdentity.KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED) },
         )
     }
 }

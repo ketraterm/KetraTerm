@@ -108,7 +108,8 @@ interface TerminalModeController {
     /**
      * Sets the modify-other-keys reporting level.
      *
-     * @param mode The modify-other-keys mode level (0, 1, or 2).
+     * @param mode The modify-other-keys mode level, where `-1` is xterm's
+     * explicit disabled state and `0` is the reset/default state.
      */
     fun setModifyOtherKeysMode(mode: Int)
 

@@ -110,12 +110,15 @@ interface TerminalInputState {
          * @return The active modify-other-keys mode level (typically 0, 1, or 2).
          */
         @JvmStatic
-        fun modifyOtherKeysMode(bits: Long): Int =
-            TerminalModeBits.packedValue(
-                bits,
-                TerminalModeBits.MODIFY_OTHER_KEYS_MASK,
-                TerminalModeBits.MODIFY_OTHER_KEYS_SHIFT,
-            )
+        fun modifyOtherKeysMode(bits: Long): Int {
+            val packed =
+                TerminalModeBits.packedValue(
+                    bits,
+                    TerminalModeBits.MODIFY_OTHER_KEYS_MASK,
+                    TerminalModeBits.MODIFY_OTHER_KEYS_SHIFT,
+                )
+            return if (packed == TerminalModeBits.MODIFY_OTHER_KEYS_EXPLICITLY_DISABLED) -1 else packed
+        }
 
         /**
          * Returns the packed format-other-keys mode value from [bits].

@@ -80,6 +80,8 @@ class GeneratedCsiDispatchTableTest {
         fun `xterm key option controls route by greater-than private marker`() {
             assertEquals(CsiCommand.XTFMTKEYS, lookup('f', privateMarker = '>'.code))
             assertEquals(CsiCommand.XTMODKEYS, lookup('m', privateMarker = '>'.code))
+            assertEquals(CsiCommand.XTDISMODKEYS, lookup('n', privateMarker = '>'.code))
+            assertEquals(CsiCommand.XTQMODKEYS, lookup('m', privateMarker = '?'.code))
         }
 
         @Test
@@ -87,7 +89,7 @@ class GeneratedCsiDispatchTableTest {
             assertEquals(CsiCommand.KITTY_KEYBOARD_FLAGS, lookup('u', privateMarker = '='.code))
             assertEquals(CsiCommand.KITTY_KEYBOARD_PUSH, lookup('u', privateMarker = '>'.code))
             assertEquals(CsiCommand.KITTY_KEYBOARD_POP, lookup('u', privateMarker = '<'.code))
-            assertEquals(CsiCommand.UNKNOWN, lookup('u', privateMarker = '?'.code))
+            assertEquals(CsiCommand.KITTY_KEYBOARD_QUERY, lookup('u', privateMarker = '?'.code))
         }
 
         @Test
@@ -119,7 +121,6 @@ class GeneratedCsiDispatchTableTest {
 
         @Test
         fun `unknown signatures return UNKNOWN`() {
-            assertEquals(CsiCommand.UNKNOWN, lookup('m', privateMarker = '?'.code))
             assertEquals(CsiCommand.UNKNOWN, lookup('A', privateMarker = '?'.code))
             assertEquals(CsiCommand.UNKNOWN, lookup('A', intermediates = '!'.code, intermediateCount = 1))
         }

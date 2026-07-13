@@ -38,14 +38,22 @@ object KittyKeyboardProgressiveFlag {
     /** Include associated text as codepoints. */
     const val REPORT_ASSOCIATED_TEXT: Int = 1 shl 4
 
-    /**
-     * Mask containing progressive-enhancement flags encoded by the current
-     * input implementation.
-     *
-     * Event types, alternate keys, and associated text remain protocol
-     * vocabulary only until the public input event model can carry that data.
-     */
-    const val SUPPORTED_MASK: Int =
+    /** Mask containing every progressive flag implemented by the input encoder. */
+    const val ENCODER_SUPPORTED_MASK: Int =
         DISAMBIGUATE_ESCAPE_CODES or
-            REPORT_ALL_KEYS_AS_ESCAPE_CODES
+            REPORT_EVENT_TYPES or
+            REPORT_ALTERNATE_KEYS or
+            REPORT_ALL_KEYS_AS_ESCAPE_CODES or
+            REPORT_ASSOCIATED_TEXT
+
+    /**
+     * Conservative progressive mask for hosts without complete physical-key,
+     * layout, and IME metadata.
+     *
+     * Rich hosts must explicitly supply a narrower or broader per-session mask
+     * through the integration boundary. This constant must not be used to
+     * claim that every encoder feature is available from every host toolkit.
+     */
+    const val DEFAULT_HOST_SUPPORTED_MASK: Int =
+        DISAMBIGUATE_ESCAPE_CODES or REPORT_ALL_KEYS_AS_ESCAPE_CODES
 }

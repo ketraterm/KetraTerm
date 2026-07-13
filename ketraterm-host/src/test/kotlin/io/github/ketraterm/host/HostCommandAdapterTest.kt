@@ -37,12 +37,14 @@ class HostCommandAdapterTest {
     private data class Fixture(
         val terminal: TerminalBuffer = TerminalBuffers.create(width = 10, height = 5),
         val hostPolicy: HostPolicy = HostPolicy(),
+        val kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
         val events: RecordingHostEventSink = RecordingHostEventSink(),
         val sink: HostCommandAdapter =
             HostCommandAdapter(
                 terminal = terminal,
                 hostEvents = events,
                 hostPolicy = hostPolicy,
+                kittyKeyboardSupportedFlags = kittyKeyboardSupportedFlags,
             ),
         val parser: TerminalOutputParser = TerminalParsers.create(sink),
     ) {
@@ -549,6 +551,29 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `xterm key modifier query and disable preserve the distinct disabled state`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B[>4;2m\u001B[?4m")
+            assertEquals("\u001B[>4;2m", f.drainResponses())
+
+            f.acceptAscii("\u001B[>4n\u001B[?4m")
+            assertAll(
+                { assertEquals(-1, f.terminal.getModeSnapshot().modifyOtherKeysMode) },
+                { assertEquals("\u001B[>4;-1m", f.drainResponses()) },
+            )
+        }
+
+        @Test
+        fun `terminal response policy suppresses xterm key modifier query responses`() {
+            val f = Fixture(hostPolicy = HostPolicy(terminalResponsePolicy = HostControlPolicy.DENY))
+
+            f.acceptAscii("\u001B[?4m")
+
+            assertEquals("", f.drainResponses())
+        }
+
+        @Test
         fun `unsupported xterm key option controls leave core mode snapshot unchanged`() {
             val f = Fixture()
 
@@ -592,7 +617,44 @@ class HostCommandAdapterTest {
 
             f.acceptAscii("\u001B[=1023u")
 
-            assertEquals(KittyKeyboardProgressiveFlag.SUPPORTED_MASK, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals(KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+        }
+
+        @Test
+        fun `rich host capability enables every encoder-supported Kitty flag through parser host core pipeline`() {
+            val f = Fixture(kittyKeyboardSupportedFlags = KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK)
+
+            f.acceptAscii("\u001B[=31u\u001B[?u")
+
+            assertEquals(KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals("\u001B[?31u", f.drainResponses())
+        }
+
+        @Test
+        fun `host capability mask constrains Kitty push state as well as replace set and clear`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B[=9u\u001B[>31u")
+
+            assertEquals(KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+        }
+
+        @Test
+        fun `Kitty keyboard query reports active flags through the parser host core pipeline`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B[=9u\u001B[?u")
+
+            assertEquals("\u001B[?9u", f.drainResponses())
+        }
+
+        @Test
+        fun `terminal response policy suppresses Kitty keyboard query responses`() {
+            val f = Fixture(hostPolicy = HostPolicy(terminalResponsePolicy = HostControlPolicy.DENY))
+
+            f.acceptAscii("\u001B[?u")
+
+            assertEquals("", f.drainResponses())
         }
 
         @Test

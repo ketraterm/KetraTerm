@@ -19,6 +19,7 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalResponseChannel
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
+import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -112,6 +113,31 @@ class TerminalResponseChannelTest {
                 "${TerminalCapabilityIdentity.SECONDARY_DA_OPTIONS}c",
             drain(buffer),
         )
+    }
+
+    @Test
+    fun `Kitty keyboard query reports every active encoder-supported progressive flag`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+
+        buffer.setKittyKeyboardFlags(
+            KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
+                KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES or
+                KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES,
+        )
+        buffer.requestKittyKeyboardFlags()
+
+        assertEquals("\u001B[?11u", drain(buffer))
+    }
+
+    @Test
+    fun `xterm modify-other-keys query reports only the allowlisted resource and preserves explicit disable`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+        buffer.setModifyOtherKeysMode(-1)
+
+        buffer.requestKeyModifierOption(4)
+        buffer.requestKeyModifierOption(1)
+
+        assertEquals("\u001B[>4;-1m", drain(buffer))
     }
 
     @Test

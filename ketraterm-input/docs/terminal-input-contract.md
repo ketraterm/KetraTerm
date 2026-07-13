@@ -53,12 +53,25 @@ Keyboard events contain exactly one of:
 
 - a `TerminalKey` for non-printable physical keys
 - a printable Unicode scalar codepoint
+- Kitty text-only key code `0` with non-empty associated text when an IME or
+  host text API has no physical-key identity
+
+Each event also carries a host-reported lifecycle phase: press, repeat, or
+release. Hosts must not infer repeat or release semantics they cannot observe.
+
+Printable events may additionally carry unshifted, shifted current-layout, and
+standard PC-101 base-layout scalars that identify the physical text-producing
+key, as well as associated host-owned text. Input sources must leave each value
+unknown when they cannot provide it truthfully; each is distinct from produced
+text and is used only by the relevant Kitty-compatible CSI-u progressive flag.
 
 Guaranteed behavior:
 
 - invalid modifier bitmasks are rejected
 - surrogate codepoints and values above `U+10FFFF` are rejected
 - C0 control codepoints and DEL are rejected as printable input
+- text-only events require scalar-valid associated text and cannot carry
+  physical-key scalar metadata
 - physical control-ish input such as Enter, Tab, Escape, and Backspace uses
   `TerminalKey`
 
@@ -146,11 +159,32 @@ Supported modified-key protocol:
   `CSI 27 ; modifier ; codepoint ~`, for mode 1, mode 2, and mode 3
 - xterm `formatOtherKeys=1` / CSI-u format,
   `CSI codepoint ; modifier u`, when enabled by core input-mode state
+- partial Kitty keyboard handling for progressive flags `1` and `8`. Flag `1`
+  preserves legacy Enter, Tab, and Backspace bytes; Kitty CSI-u output uses a
+  supplied unshifted key scalar when the input source provides one.
+- Kitty modifier encoding uses all eight protocol-defined bits. Legacy xterm
+  encodings retain their four-modifier representation; modifier-only key events
+  are emitted only when Kitty report-all-keys mode (`8`) is active.
+- Kitty event-type formatting (`modifier:event-type`) is implemented in the
+  encoder for rich host events, but flag `2` is not advertised until a host can
+  truthfully provide the complete required lifecycle metadata.
+- Kitty alternate-key formatting is implemented for host-supplied shifted and
+  base-layout scalars, but flag `4` is not advertised until a host can provide
+  those layout values truthfully.
+- Kitty associated-text formatting is implemented for validated host-owned
+  text and writes codepoints directly to the reusable CSI buffer. Flag `16`
+  remains unadvertised pending complete rich-host text/IME support.
+- The active host session admits a subset of encoder-supported Kitty flags.
+  Portable Swing sessions admit only flags `1` and `8`; a richer host must
+  explicitly declare the complete metadata it can provide before enabling
+  flags `2`, `4`, or `16`. Native rich-input adapters are deferred, so this
+  limitation also applies to IntelliJ-hosted Swing sessions.
 
 Not guaranteed yet:
 
 - modifyCursorKeys, modifyFunctionKeys, or modifyKeypadKeys resource variants
-- Kitty Keyboard Protocol
+- complete Kitty Keyboard Protocol support, including event types, alternate
+  key values, associated text, and complete host lifecycle/layout metadata
 
 ## Mouse Contract
 

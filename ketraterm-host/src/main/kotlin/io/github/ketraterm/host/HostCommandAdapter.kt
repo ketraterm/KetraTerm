@@ -25,6 +25,7 @@ import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import java.net.URI
 import java.net.URISyntaxException
 import java.util.Base64
+import kotlin.collections.ArrayDeque
 
 /**
  * Production bridge from parser semantic commands to the terminal core.
@@ -36,12 +37,25 @@ import java.util.Base64
  * @param terminal public core buffer API mutated by parser semantic commands.
  * @param hostEvents optional metadata callback sink for BEL and title changes.
  * @param hostPolicy safety limits for host-owned metadata.
+ * @param kittyKeyboardSupportedFlags progressive Kitty keyboard flags the
+ * active input host can provide truthfully. The value must be a subset of the
+ * input encoder's implemented protocol mask.
  */
 class HostCommandAdapter(
     private val terminal: TerminalBuffer,
     private val hostEvents: HostEventSink = HostEventSink.NONE,
     @Volatile private var hostPolicy: HostPolicy = HostPolicy(),
+    private val kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
 ) : TerminalCommandSink {
+    init {
+        require(
+            kittyKeyboardSupportedFlags >= 0 &&
+                kittyKeyboardSupportedFlags and KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK == kittyKeyboardSupportedFlags,
+        ) {
+            "invalid Kitty keyboard host capability mask: $kittyKeyboardSupportedFlags"
+        }
+    }
+
     /**
      * Updates the active host security policy dynamically.
      *
@@ -456,6 +470,17 @@ class HostCommandAdapter(
         terminal.setModifyOtherKeysMode(ModifyOtherKeysMode.DISABLED)
     }
 
+    override fun disableKeyModifierOption(resource: Int) {
+        if (resource == XtermKeyModifierResource.MODIFY_OTHER_KEYS) {
+            terminal.setModifyOtherKeysMode(-1)
+        }
+    }
+
+    override fun requestKeyModifierOption(resource: Int) {
+        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+        terminal.requestKeyModifierOption(resource)
+    }
+
     override fun setKeyFormatOption(
         resource: Int,
         value: Int,
@@ -499,11 +524,11 @@ class HostCommandAdapter(
                 KittyKeyboardFlagApplicationMode.CLEAR -> current and flags.inv()
                 else -> return
             }
-        terminal.setKittyKeyboardFlags(next)
+        terminal.setKittyKeyboardFlags(next and kittyKeyboardSupportedFlags)
     }
 
     override fun pushKittyKeyboardFlags(flags: Int) {
-        terminal.pushKittyKeyboardFlags(flags)
+        terminal.pushKittyKeyboardFlags(flags and kittyKeyboardSupportedFlags)
     }
 
     override fun popKittyKeyboardFlags(count: Int) {
@@ -524,6 +549,11 @@ class HostCommandAdapter(
     ) {
         if (!hostPolicy.terminalResponsePolicy.isAllowed) return
         terminal.requestDeviceAttributes(kind, parameter)
+    }
+
+    override fun requestKittyKeyboardFlags() {
+        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+        terminal.requestKittyKeyboardFlags()
     }
 
     override fun requestWindowReport(mode: Int) {

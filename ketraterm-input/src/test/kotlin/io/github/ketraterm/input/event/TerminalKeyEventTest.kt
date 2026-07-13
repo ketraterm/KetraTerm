@@ -31,6 +31,7 @@ class TerminalKeyEventTest {
             { assertEquals(TerminalKey.UP, event.key) },
             { assertEquals(TerminalKeyEvent.NO_CODEPOINT, event.codepoint) },
             { assertEquals(TerminalModifiers.SHIFT, event.modifiers) },
+            { assertEquals(TerminalKeyEventType.PRESS, event.type) },
         )
     }
 
@@ -45,8 +46,73 @@ class TerminalKeyEventTest {
         assertAll(
             { assertNull(event.key) },
             { assertEquals('a'.code, event.codepoint) },
+            { assertEquals(TerminalKeyEvent.NO_CODEPOINT, event.unshiftedCodepoint) },
             { assertEquals(TerminalModifiers.ALT, event.modifiers) },
         )
+    }
+
+    @Test
+    fun `creates printable event with a distinct unshifted key codepoint`() {
+        val event =
+            TerminalKeyEvent.codepoint(
+                codepoint = 'A'.code,
+                modifiers = TerminalModifiers.SHIFT,
+                unshiftedCodepoint = 'a'.code,
+            )
+
+        assertAll(
+            { assertEquals('A'.code, event.codepoint) },
+            { assertEquals('a'.code, event.unshiftedCodepoint) },
+            { assertEquals(TerminalModifiers.SHIFT, event.modifiers) },
+        )
+    }
+
+    @Test
+    fun `creates printable event with Kitty alternate key scalars`() {
+        val event =
+            TerminalKeyEvent.codepoint(
+                codepoint = '+'.code,
+                modifiers = TerminalModifiers.SHIFT or TerminalModifiers.CTRL,
+                unshiftedCodepoint = '='.code,
+                shiftedCodepoint = '+'.code,
+                baseLayoutCodepoint = '='.code,
+            )
+
+        assertAll(
+            { assertEquals('+'.code, event.shiftedCodepoint) },
+            { assertEquals('='.code, event.baseLayoutCodepoint) },
+        )
+    }
+
+    @Test
+    fun `rejects shifted alternate key without Shift`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalKeyEvent.codepoint('a'.code, shiftedCodepoint = 'A'.code)
+        }
+    }
+
+    @Test
+    fun `rejects control codepoints in associated text`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalKeyEvent.codepoint('a'.code, associatedText = "a\u001b")
+        }
+    }
+
+    @Test
+    fun `creates Kitty text-only input`() {
+        val event = TerminalKeyEvent.text("å")
+
+        assertAll(
+            { assertEquals(TerminalKeyEvent.TEXT_ONLY_CODEPOINT, event.codepoint) },
+            { assertEquals("å", event.associatedText) },
+        )
+    }
+
+    @Test
+    fun `preserves an explicit physical lifecycle phase`() {
+        val event = TerminalKeyEvent.key(TerminalKey.UP, type = TerminalKeyEventType.RELEASE)
+
+        assertEquals(TerminalKeyEventType.RELEASE, event.type)
     }
 
     @Test
@@ -77,6 +143,16 @@ class TerminalKeyEventTest {
     }
 
     @Test
+    fun `rejects unshifted codepoint on a non-printable key event`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalKeyEvent(
+                key = TerminalKey.ENTER,
+                unshiftedCodepoint = 'a'.code,
+            )
+        }
+    }
+
+    @Test
     fun `rejects surrogate codepoint`() {
         assertThrows(IllegalArgumentException::class.java) {
             TerminalKeyEvent.codepoint(0xd800)
@@ -101,6 +177,16 @@ class TerminalKeyEventTest {
     fun `rejects DEL codepoint`() {
         assertThrows(IllegalArgumentException::class.java) {
             TerminalKeyEvent.codepoint(0x007f)
+        }
+    }
+
+    @Test
+    fun `rejects invalid unshifted codepoint`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalKeyEvent.codepoint(
+                codepoint = 'a'.code,
+                unshiftedCodepoint = 0xd800,
+            )
         }
     }
 

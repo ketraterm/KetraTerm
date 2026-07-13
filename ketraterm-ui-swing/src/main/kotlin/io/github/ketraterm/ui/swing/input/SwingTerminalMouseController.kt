@@ -156,7 +156,7 @@ internal class SwingTerminalMouseController(
         if (event.isShiftDown) mods = mods or TerminalModifiers.SHIFT
         if (event.isAltDown) mods = mods or TerminalModifiers.ALT
         if (event.isControlDown) mods = mods or TerminalModifiers.CTRL
-        if (event.isMetaDown) mods = mods or TerminalModifiers.META
+        if (event.isMetaDown) mods = mods or TerminalModifiers.SUPER
 
         val paddingLeft =
             SwingTerminalChrome.left(

@@ -359,6 +359,14 @@ class ActionEngineTest {
             sinkCalls += "resetKeyModifierOptions"
         }
 
+        override fun disableKeyModifierOption(resource: Int) {
+            sinkCalls += "disableKeyModifierOption:$resource"
+        }
+
+        override fun requestKeyModifierOption(resource: Int) {
+            sinkCalls += "requestKeyModifierOption:$resource"
+        }
+
         override fun setKeyFormatOption(
             resource: Int,
             value: Int,
@@ -401,6 +409,10 @@ class ActionEngineTest {
             parameter: Int,
         ) {
             sinkCalls += "requestDeviceAttributes:$kind:$parameter"
+        }
+
+        override fun requestKittyKeyboardFlags() {
+            sinkCalls += "requestKittyKeyboardFlags"
         }
 
         override fun requestWindowReport(mode: Int) {

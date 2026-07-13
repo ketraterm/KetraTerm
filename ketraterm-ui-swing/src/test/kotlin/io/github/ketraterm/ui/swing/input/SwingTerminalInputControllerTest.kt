@@ -86,11 +86,13 @@ class SwingTerminalInputControllerTest {
         fun `key press and release publish control activation state`() {
             val host = RecordingInputHost()
             val controller = SwingTerminalInputController(host)
+            val releaseEvent = keyReleased(keyCode = KeyEvent.VK_CONTROL, modifiers = 0)
 
             controller.keyListener.keyPressed(keyPressed(keyCode = KeyEvent.VK_CONTROL, modifiers = InputEvent.CTRL_DOWN_MASK))
-            controller.keyListener.keyReleased(keyReleased(keyCode = KeyEvent.VK_CONTROL, modifiers = 0))
+            controller.keyListener.keyReleased(releaseEvent)
 
             assertEquals(listOf(true, false), host.hyperlinkHoverUpdates)
+            assertTrue(releaseEvent.isConsumed)
         }
     }
 

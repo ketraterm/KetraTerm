@@ -78,13 +78,16 @@ object TerminalCapabilityIdentity {
     const val TERMINFO_TRUECOLOR_SUPPORTED: Boolean = true
 
     /**
-     * Kitty keyboard progressive flags currently understood by input encoding.
+     * Conservative Kitty keyboard progressive flags for the default host
+     * profile. Per-session host integration may advertise a different subset
+     * of encoder-supported flags when it can provide the required metadata.
      */
-    const val KITTY_KEYBOARD_SUPPORTED_FLAGS: Int = KittyKeyboardProgressiveFlag.SUPPORTED_MASK
+    const val KITTY_KEYBOARD_SUPPORTED_FLAGS: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK
 
     /**
-     * `CSI ? u` Kitty keyboard capability query responses are intentionally not
-     * emitted until a response shape and identity policy are implemented.
+     * `CSI ? u` Kitty keyboard capability queries return only the active,
+     * supported progressive-enhancement flags through the terminal response
+     * policy channel.
      */
-    const val KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED: Boolean = false
+    const val KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED: Boolean = true
 }

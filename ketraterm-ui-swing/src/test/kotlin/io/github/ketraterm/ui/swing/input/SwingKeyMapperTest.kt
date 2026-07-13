@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.input
 
 import io.github.ketraterm.input.event.TerminalKey
+import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.event.TerminalModifiers
 import java.awt.Canvas
 import java.awt.event.KeyEvent
@@ -74,6 +75,59 @@ class SwingKeyMapperTest {
 
         assertEquals(TerminalKey.UP, mapped?.key)
         assertEquals(TerminalModifiers.NONE, mapped?.modifiers)
+    }
+
+    @Test
+    fun mapsPhysicalKeyLifecycleWithoutInferringUnobservedReleases() {
+        val press = mapper.keyPressed(pressed(KeyEvent.VK_UP))
+        val repeat = mapper.keyPressed(pressed(KeyEvent.VK_UP))
+        val release = mapper.keyReleased(released(KeyEvent.VK_UP))
+
+        assertEquals(TerminalKeyEventType.PRESS, press?.type)
+        assertEquals(TerminalKeyEventType.REPEAT, repeat?.type)
+        assertEquals(TerminalKeyEventType.RELEASE, release?.type)
+        assertNull(mapper.keyReleased(released(KeyEvent.VK_UP)))
+    }
+
+    @Test
+    fun tracksLeftAndRightPhysicalModifierLifecycleIndependently() {
+        mapper.keyPressed(pressed(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_LEFT))
+        mapper.keyPressed(pressed(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_RIGHT))
+
+        val leftRelease = mapper.keyReleased(released(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_LEFT))
+        val rightRelease = mapper.keyReleased(released(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_RIGHT))
+
+        assertEquals(TerminalKey.LEFT_SHIFT, leftRelease?.key)
+        assertEquals(TerminalKey.RIGHT_SHIFT, rightRelease?.key)
+        assertEquals(TerminalKeyEventType.RELEASE, leftRelease?.type)
+        assertEquals(TerminalKeyEventType.RELEASE, rightRelease?.type)
+    }
+
+    @Test
+    fun mapsExtendedFunctionPressedKey() {
+        val mapped = mapper.keyPressed(pressed(KeyEvent.VK_F24))
+
+        assertEquals(TerminalKey.F24, mapped?.key)
+    }
+
+    @Test
+    fun mapsLockAndPhysicalModifierPressedKeys() {
+        assertEquals(TerminalKey.CAPS_LOCK, mapper.keyPressed(pressed(KeyEvent.VK_CAPS_LOCK))?.key)
+        assertEquals(
+            TerminalKey.RIGHT_SHIFT,
+            mapper.keyPressed(pressed(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_RIGHT))?.key,
+        )
+        assertEquals(
+            TerminalKey.LEFT_SUPER,
+            mapper.keyPressed(pressed(KeyEvent.VK_WINDOWS, keyLocation = KeyEvent.KEY_LOCATION_LEFT))?.key,
+        )
+    }
+
+    @Test
+    fun mapsNumpadNavigationFromKeyLocation() {
+        val mapped = mapper.keyPressed(pressed(KeyEvent.VK_END, keyLocation = KeyEvent.KEY_LOCATION_NUMPAD))
+
+        assertEquals(TerminalKey.NUMPAD_END, mapped?.key)
     }
 
     @Test
@@ -160,6 +214,7 @@ class SwingKeyMapperTest {
     private fun pressed(
         keyCode: Int,
         modifiers: Int = 0,
+        keyLocation: Int = KeyEvent.KEY_LOCATION_STANDARD,
     ): KeyEvent =
         KeyEvent(
             source,
@@ -168,5 +223,21 @@ class SwingKeyMapperTest {
             modifiers,
             keyCode,
             KeyEvent.CHAR_UNDEFINED,
+            keyLocation,
+        )
+
+    private fun released(
+        keyCode: Int,
+        modifiers: Int = 0,
+        keyLocation: Int = KeyEvent.KEY_LOCATION_STANDARD,
+    ): KeyEvent =
+        KeyEvent(
+            source,
+            KeyEvent.KEY_RELEASED,
+            System.currentTimeMillis(),
+            modifiers,
+            keyCode,
+            KeyEvent.CHAR_UNDEFINED,
+            keyLocation,
         )
 }

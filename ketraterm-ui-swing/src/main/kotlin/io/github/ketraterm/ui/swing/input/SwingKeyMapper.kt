@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.input
 
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.event.TerminalModifiers
 import java.awt.event.KeyEvent
 
@@ -25,6 +26,8 @@ import java.awt.event.KeyEvent
  *
  * Printable text is emitted from `KEY_TYPED` events. Navigation, function, and
  * control/meta modified printable keys are emitted from `KEY_PRESSED` events.
+ * For the physical-key subset that AWT exposes, repeated `KEY_PRESSED` events
+ * and matching `KEY_RELEASED` events preserve the host-observed lifecycle.
  * Numeric keypad keys are emitted from `KEY_PRESSED` so application-keypad mode
  * can be applied by the input encoder; their follow-up `KEY_TYPED` event is
  * suppressed to avoid emitting the normal-mode character twice.
@@ -33,6 +36,7 @@ internal class SwingKeyMapper {
     private var pendingHighSurrogate: Char = NO_PENDING_SURROGATE
     private var pendingHighSurrogateModifiers: Int = TerminalModifiers.NONE
     private var suppressNextKeypadTyped: Boolean = false
+    private val pressedPhysicalKeys = BooleanArray((KeyEvent.KEY_LAST + 1) * KEY_LOCATION_COUNT)
 
     /**
      * Converts a `KEY_PRESSED` event to terminal input when the event should
@@ -44,10 +48,10 @@ internal class SwingKeyMapper {
      */
     fun keyPressed(event: KeyEvent): TerminalKeyEvent? {
         val modifiers = modifiers(event)
-        val key = terminalKey(event.keyCode)
+        val key = terminalKey(event)
         if (key != null) {
             suppressNextKeypadTyped = isPrintableKeypadKey(key)
-            return TerminalKeyEvent.key(key, modifiers)
+            return TerminalKeyEvent.key(key, modifiers, pressedType(event))
         }
 
         suppressNextKeypadTyped = false
@@ -57,6 +61,22 @@ internal class SwingKeyMapper {
 
         val codepoint = controlShortcutCodepoint(event) ?: return null
         return TerminalKeyEvent.codepoint(codepoint, modifiers)
+    }
+
+    /**
+     * Converts a `KEY_RELEASED` event for a previously reported physical key.
+     *
+     * Printable and IME-produced input remains `KEY_TYPED`-driven because AWT
+     * does not expose a trustworthy physical identity for every such event.
+     *
+     * @param event Swing key event.
+     * @return matching release event, or `null` when no physical press was
+     * reported to the terminal.
+     */
+    fun keyReleased(event: KeyEvent): TerminalKeyEvent? {
+        val key = terminalKey(event) ?: return null
+        if (!releasePhysicalKey(event)) return null
+        return TerminalKeyEvent.key(key, modifiers(event), TerminalKeyEventType.RELEASE)
     }
 
     /**
@@ -118,7 +138,7 @@ internal class SwingKeyMapper {
     private fun modifiers(event: KeyEvent): Int {
         var modifiers = TerminalModifiers.NONE
         if (event.isShiftDown) modifiers = modifiers or TerminalModifiers.SHIFT
-        if (event.isMetaDown) modifiers = modifiers or TerminalModifiers.META
+        if (event.isMetaDown) modifiers = modifiers or TerminalModifiers.SUPER
 
         if (event.isAltGraphDown) {
             // AltGr is active. On Windows/Linux, this sets isControlDown and isAltDown.
@@ -130,7 +150,17 @@ internal class SwingKeyMapper {
         return modifiers
     }
 
-    private fun terminalKey(keyCode: Int): TerminalKey? =
+    private fun terminalKey(event: KeyEvent): TerminalKey? {
+        if (event.keyLocation == KeyEvent.KEY_LOCATION_NUMPAD) {
+            keypadNavigationKey(event.keyCode)?.let { return it }
+        }
+        return terminalKey(event.keyCode, event.keyLocation)
+    }
+
+    private fun terminalKey(
+        keyCode: Int,
+        keyLocation: Int,
+    ): TerminalKey? =
         when (keyCode) {
             KeyEvent.VK_UP -> TerminalKey.UP
             KeyEvent.VK_DOWN -> TerminalKey.DOWN
@@ -158,6 +188,17 @@ internal class SwingKeyMapper {
             KeyEvent.VK_F10 -> TerminalKey.F10
             KeyEvent.VK_F11 -> TerminalKey.F11
             KeyEvent.VK_F12 -> TerminalKey.F12
+            KeyEvent.VK_CAPS_LOCK -> TerminalKey.CAPS_LOCK
+            KeyEvent.VK_SCROLL_LOCK -> TerminalKey.SCROLL_LOCK
+            KeyEvent.VK_NUM_LOCK -> TerminalKey.NUM_LOCK
+            KeyEvent.VK_PRINTSCREEN -> TerminalKey.PRINT_SCREEN
+            KeyEvent.VK_PAUSE -> TerminalKey.PAUSE
+            KeyEvent.VK_CONTEXT_MENU -> TerminalKey.MENU
+            KeyEvent.VK_SHIFT -> modifierKey(keyLocation, TerminalKey.LEFT_SHIFT, TerminalKey.RIGHT_SHIFT)
+            KeyEvent.VK_CONTROL -> modifierKey(keyLocation, TerminalKey.LEFT_CONTROL, TerminalKey.RIGHT_CONTROL)
+            KeyEvent.VK_ALT -> modifierKey(keyLocation, TerminalKey.LEFT_ALT, TerminalKey.RIGHT_ALT)
+            KeyEvent.VK_META -> modifierKey(keyLocation, TerminalKey.LEFT_META, TerminalKey.RIGHT_META)
+            KeyEvent.VK_WINDOWS -> modifierKey(keyLocation, TerminalKey.LEFT_SUPER, TerminalKey.RIGHT_SUPER)
             KeyEvent.VK_NUMPAD0 -> TerminalKey.NUMPAD_0
             KeyEvent.VK_NUMPAD1 -> TerminalKey.NUMPAD_1
             KeyEvent.VK_NUMPAD2 -> TerminalKey.NUMPAD_2
@@ -173,7 +214,35 @@ internal class SwingKeyMapper {
             KeyEvent.VK_MULTIPLY -> TerminalKey.NUMPAD_MULTIPLY
             KeyEvent.VK_SUBTRACT -> TerminalKey.NUMPAD_SUBTRACT
             KeyEvent.VK_ADD -> TerminalKey.NUMPAD_ADD
+            else -> extendedFunctionKey(keyCode)
+        }
+
+    private fun keypadNavigationKey(keyCode: Int): TerminalKey? =
+        when (keyCode) {
+            KeyEvent.VK_LEFT -> TerminalKey.NUMPAD_LEFT
+            KeyEvent.VK_RIGHT -> TerminalKey.NUMPAD_RIGHT
+            KeyEvent.VK_UP -> TerminalKey.NUMPAD_UP
+            KeyEvent.VK_DOWN -> TerminalKey.NUMPAD_DOWN
+            KeyEvent.VK_PAGE_UP -> TerminalKey.NUMPAD_PAGE_UP
+            KeyEvent.VK_PAGE_DOWN -> TerminalKey.NUMPAD_PAGE_DOWN
+            KeyEvent.VK_HOME -> TerminalKey.NUMPAD_HOME
+            KeyEvent.VK_END -> TerminalKey.NUMPAD_END
+            KeyEvent.VK_INSERT -> TerminalKey.NUMPAD_INSERT
+            KeyEvent.VK_DELETE -> TerminalKey.NUMPAD_DELETE
             else -> null
+        }
+
+    private fun modifierKey(
+        keyLocation: Int,
+        left: TerminalKey,
+        right: TerminalKey,
+    ): TerminalKey = if (keyLocation == KeyEvent.KEY_LOCATION_RIGHT) right else left
+
+    private fun extendedFunctionKey(keyCode: Int): TerminalKey? =
+        if (keyCode in KeyEvent.VK_F13..KeyEvent.VK_F24) {
+            TerminalKey.entries[TerminalKey.F13.ordinal + keyCode - KeyEvent.VK_F13]
+        } else {
+            null
         }
 
     private fun isPrintableKeypadKey(key: TerminalKey): Boolean =
@@ -225,7 +294,35 @@ internal class SwingKeyMapper {
         }
     }
 
+    private fun pressedType(event: KeyEvent): TerminalKeyEventType {
+        val index = physicalKeyIndex(event)
+        if (index == NO_PHYSICAL_KEY_INDEX) return TerminalKeyEventType.PRESS
+        if (pressedPhysicalKeys[index]) return TerminalKeyEventType.REPEAT
+
+        pressedPhysicalKeys[index] = true
+        return TerminalKeyEventType.PRESS
+    }
+
+    private fun releasePhysicalKey(event: KeyEvent): Boolean {
+        val index = physicalKeyIndex(event)
+        if (index == NO_PHYSICAL_KEY_INDEX || !pressedPhysicalKeys[index]) return false
+
+        pressedPhysicalKeys[index] = false
+        return true
+    }
+
+    private fun physicalKeyIndex(event: KeyEvent): Int {
+        val keyCode = event.keyCode
+        val keyLocation = event.keyLocation
+        if (keyCode !in 0..KeyEvent.KEY_LAST || keyLocation !in 0 until KEY_LOCATION_COUNT) {
+            return NO_PHYSICAL_KEY_INDEX
+        }
+        return keyCode * KEY_LOCATION_COUNT + keyLocation
+    }
+
     private companion object {
         private const val NO_PENDING_SURROGATE: Char = '\u0000'
+        private const val KEY_LOCATION_COUNT: Int = KeyEvent.KEY_LOCATION_NUMPAD + 1
+        private const val NO_PHYSICAL_KEY_INDEX: Int = -1
     }
 }

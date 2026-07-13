@@ -21,6 +21,7 @@ import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.CellColorKind
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.core.state.TerminalState
+import io.github.ketraterm.protocol.keyboard.XtermKeyModifierResource
 
 internal class BufferResponseChannel(
     private val state: TerminalState,
@@ -65,6 +66,26 @@ internal class BufferResponseChannel(
                 // DA3 can expose a stable terminal unit id. Keep it silent by identity policy.
             }
         }
+    }
+
+    override fun requestKittyKeyboardFlags() {
+        enqueueCsiPrefix()
+        state.hostResponses.enqueueByte('?'.code)
+        state.hostResponses.enqueuePositiveDecimal(state.modes.kittyKeyboardFlags)
+        state.hostResponses.enqueueByte('u'.code)
+    }
+
+    override fun requestKeyModifierOption(resource: Int) {
+        if (resource != XtermKeyModifierResource.MODIFY_OTHER_KEYS) return
+
+        enqueueCsiPrefix()
+        state.hostResponses.enqueueByte('>'.code)
+        state.hostResponses.enqueuePositiveDecimal(resource)
+        state.hostResponses.enqueueByte(';'.code)
+        val mode = state.modes.modifyOtherKeysMode
+        if (mode < 0) state.hostResponses.enqueueByte('-'.code)
+        state.hostResponses.enqueuePositiveDecimal(if (mode < 0) -mode else mode)
+        state.hostResponses.enqueueByte('m'.code)
     }
 
     override fun setWindowSizePixels(

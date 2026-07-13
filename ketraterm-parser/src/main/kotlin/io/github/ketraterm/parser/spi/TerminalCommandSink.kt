@@ -414,6 +414,23 @@ interface TerminalCommandSink {
     fun resetKeyModifierOptions()
 
     /**
+     * Disables one xterm key modifier option, `CSI > Ps n`.
+     *
+     * This is distinct from reset: xterm represents disable as resource value
+     * `-1`, which must remain observable to a later query.
+     *
+     * @param resource The resource/modifier identifier to disable.
+     */
+    fun disableKeyModifierOption(resource: Int)
+
+    /**
+     * Requests one xterm key modifier option, `CSI ? Pp m`.
+     *
+     * @param resource The resource/modifier identifier to report.
+     */
+    fun requestKeyModifierOption(resource: Int)
+
+    /**
      * Xterm key format option set, `CSI > Pp ; Pv f`.
      *
      * @param resource The resource/format identifier.
@@ -500,6 +517,12 @@ interface TerminalCommandSink {
         kind: Int,
         parameter: Int,
     )
+
+    /**
+     * Requests the active Kitty keyboard progressive-enhancement flag report
+     * for parameterless `CSI ? u`.
+     */
+    fun requestKittyKeyboardFlags()
 
     /**
      * Safe xterm window report request.

@@ -233,6 +233,14 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "resetKeyModifierOptions"
     }
 
+    override fun disableKeyModifierOption(resource: Int) {
+        events += "disableKeyModifierOption:$resource"
+    }
+
+    override fun requestKeyModifierOption(resource: Int) {
+        events += "requestKeyModifierOption:$resource"
+    }
+
     override fun setKeyFormatOption(
         resource: Int,
         value: Int,
@@ -275,6 +283,10 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         parameter: Int,
     ) {
         events += "requestDeviceAttributes:$kind:$parameter"
+    }
+
+    override fun requestKittyKeyboardFlags() {
+        events += "requestKittyKeyboardFlags"
     }
 
     override fun requestWindowReport(mode: Int) {
