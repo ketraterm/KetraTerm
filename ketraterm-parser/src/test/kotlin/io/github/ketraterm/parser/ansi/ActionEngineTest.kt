@@ -324,6 +324,50 @@ class ActionEngineTest {
                 "copyRectangle:$sourceTop:$sourceLeft:$sourceBottom:$sourceRight:$sourcePage:$destinationTop:$destinationLeft:$destinationPage"
         }
 
+        override fun requestRectangleChecksum(
+            requestId: Int,
+            page: Int,
+            top: Int,
+            left: Int,
+            bottom: Int,
+            right: Int,
+        ) {
+            sinkCalls += "requestRectangleChecksum:$requestId:$page:$top:$left:$bottom:$right"
+        }
+
+        override fun setAttributeChangeExtent(extent: Int) {
+            sinkCalls += "setAttributeChangeExtent:$extent"
+        }
+
+        override fun changeRectangleAttributes(
+            top: Int,
+            left: Int,
+            bottom: Int,
+            right: Int,
+            setMask: Int,
+            clearMask: Int,
+        ) {
+            sinkCalls += "changeRectangleAttributes:$top:$left:$bottom:$right:$setMask:$clearMask"
+        }
+
+        override fun reverseRectangleAttributes(
+            top: Int,
+            left: Int,
+            bottom: Int,
+            right: Int,
+            reverseMask: Int,
+        ) {
+            sinkCalls += "reverseRectangleAttributes:$top:$left:$bottom:$right:$reverseMask"
+        }
+
+        override fun insertColumns(count: Int) {
+            sinkCalls += "insertColumns:$count"
+        }
+
+        override fun deleteColumns(count: Int) {
+            sinkCalls += "deleteColumns:$count"
+        }
+
         override fun insertLines(n: Int) {
             sinkCalls += "insertLines:$n"
         }

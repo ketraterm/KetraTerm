@@ -53,9 +53,11 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ### CSI Protocols
 - `TODO(parser/core)`: broader DEC-specific status reports beyond the safe DSR/CPR/DA baseline.
-- `TODO(parser/core)`: `DECSACE` selective-attribute change extent is deferred with the rectangular attribute commands (`DECCARA` / `DECRARA`); it has no effect until those operations exist.
 - `TODO(parser)`: full tab-stop and margin variants beyond the current common set.
-- `DONE(parser/core/host)`: rectangular erase (`DECERA`), selective erase (`DECSERA`), fill (`DECFRA`), and copy (`DECCRA`) preserve wide/cluster span integrity, selective protection, active margin/origin coordinates, and overlap-safe snapshot semantics. `DECCRA` intentionally supports only the active single page (`0` omitted or `1`).
+- `DONE(parser/core/host)`: rectangular erase (`DECERA`), selective erase (`DECSERA`), fill (`DECFRA`), copy (`DECCRA`), and checksum response (`DECRQCRA`) preserve active margin/origin coordinates; mutation operations preserve wide/cluster span integrity and `DECCRA` uses overlap-safe snapshot semantics. Copy/checksum intentionally support only the active single page (`0` omitted or `1`); checksum responses are terminal-response-policy gated and use the VT420 default 16-bit algorithm.
+- `TODO(policy)`: xterm `XTCHECKSUM` extensions (`CSI Ps # y`) are not implemented. The stable DECRQCRA path deliberately uses the base VT420 behavior: erased/spacer cells omitted, base glyph values masked to eight bits, and supported legacy video attributes included; no color, combining-sequence, or alternate xterm extension semantics are claimed.
+- `DONE(parser/core/host)`: DECSACE, DECCARA, and DECRARA implement VT420's stream-versus-exact-rectangle extent, ordered visual SGR subset, blank materialization policy, and atomic wide/cluster attribute updates without changing glyph payloads, protection, hyperlinks, or the current pen.
+- `DONE(parser/core/host)`: DECIC and DECDC insert/delete columns across the active vertical scroll region, honor horizontal margins, preserve cursor position and active-buffer isolation, and repair wide/cluster span boundaries before each row shift.
 - `TODO(parser)`: insert/delete/erase variants with selective protection and rectangular bounds.
 - `TODO(parser)`: scroll variants and xterm extensions not yet routed:
   - left/right-margin-aware variants need broader host tests.
@@ -92,9 +94,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(core/host)`: richer event API for hyperlink metadata, palette changes, terminal notifications, and any future host-observable state that should not be read from render frames.
 
 ### Grid Operations
-- `TODO(core)`: rectangular area operations if parser support is added (copy, erase, fill, selective erase).
 - `TODO(core)`: left/right margin interactions need continued property testing across all edit/erase/scroll operations.
-- `TODO(core)`: full DEC protection behavior across all rectangular operations.
 - `TODO(core)`: scrollback policy under alternate-screen and private-mode combinations beyond tested full-viewport and top-anchored primary-screen regions.
 - `TODO(core)`: soft-wrap metadata compatibility with copy/paste/export.
 

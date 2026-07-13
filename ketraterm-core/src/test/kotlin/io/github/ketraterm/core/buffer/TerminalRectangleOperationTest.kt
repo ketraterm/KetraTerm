@@ -17,6 +17,7 @@ package io.github.ketraterm.core.buffer
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.model.TerminalConstants
+import io.github.ketraterm.protocol.DecRectangleAttribute
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
@@ -141,5 +142,122 @@ class TerminalRectangleOperationTest {
         buffer.copyRectangle(1, 1, 1, 1, 1, 1, 2, 2)
 
         assertEquals("A", buffer.getLineAsString(0))
+    }
+
+    @Test
+    fun `DECCARA rectangle extent materializes blanks and preserves protection`() {
+        val buffer = TerminalBuffers.create(width = 4, height = 2)
+        buffer.setSelectiveEraseProtection(true)
+        buffer.writeCodepoint('A'.code)
+
+        buffer.setAttributeChangeExtent(2)
+        buffer.changeRectangleAttributes(
+            top = 1,
+            left = 1,
+            bottom = 1,
+            right = 3,
+            setMask = DecRectangleAttribute.BOLD or DecRectangleAttribute.UNDERLINE,
+            clearMask = 0,
+        )
+
+        assertAll(
+            { assertEquals('A'.code, buffer.getCodepointAt(0, 0)) },
+            { assertEquals(' '.code, buffer.getCodepointAt(1, 0)) },
+            { assertEquals(' '.code, buffer.getCodepointAt(2, 0)) },
+            { assertTrue(buffer.getAttrAt(0, 0)?.bold == true) },
+            { assertTrue(buffer.getAttrAt(1, 0)?.underlineStyle?.sgrCode == 1) },
+            { assertTrue(buffer.getAttrAt(0, 0)?.selectiveEraseProtected == true) },
+        )
+    }
+
+    @Test
+    fun `DECSACE stream extent wraps and skips undrawn cells`() {
+        val buffer = TerminalBuffers.create(width = 4, height = 2)
+        buffer.writeCodepoint('A'.code)
+        buffer.writeCodepoint('B'.code)
+        buffer.positionCursor(col = 1, row = 1)
+        buffer.writeCodepoint('X'.code)
+
+        buffer.changeRectangleAttributes(
+            top = 1,
+            left = 2,
+            bottom = 2,
+            right = 3,
+            setMask = DecRectangleAttribute.BLINK,
+            clearMask = 0,
+        )
+
+        assertAll(
+            { assertTrue(buffer.getAttrAt(1, 0)?.blink == true) },
+            { assertTrue(buffer.getAttrAt(1, 1)?.blink == true) },
+            { assertEquals(TerminalConstants.EMPTY, buffer.getCodepointAt(2, 0)) },
+            { assertEquals(TerminalConstants.EMPTY, buffer.getCodepointAt(0, 1)) },
+        )
+    }
+
+    @Test
+    fun `DECRARA toggles a complete wide span when its spacer is selected`() {
+        val buffer = TerminalBuffers.create(width = 5, height = 2)
+        buffer.positionCursor(col = 1, row = 0)
+        buffer.writeCodepoint(0x1F642)
+        buffer.setAttributeChangeExtent(2)
+
+        buffer.reverseRectangleAttributes(
+            top = 1,
+            left = 3,
+            bottom = 1,
+            right = 3,
+            reverseMask = DecRectangleAttribute.BOLD or DecRectangleAttribute.INVERSE,
+        )
+
+        assertAll(
+            { assertTrue(buffer.getAttrAt(1, 0)?.bold == true) },
+            { assertTrue(buffer.getAttrAt(1, 0)?.inverse == true) },
+            { assertTrue(buffer.getAttrAt(2, 0)?.bold == true) },
+            { assertTrue(buffer.getAttrAt(2, 0)?.inverse == true) },
+        )
+    }
+
+    @Test
+    fun `DECCARA preserves grapheme payload while updating its attributes`() {
+        val buffer = TerminalBuffers.create(width = 5, height = 2)
+        buffer.writeCluster(intArrayOf('A'.code, 0x0301), 2)
+        buffer.setAttributeChangeExtent(2)
+
+        buffer.changeRectangleAttributes(
+            top = 1,
+            left = 1,
+            bottom = 1,
+            right = 1,
+            setMask = DecRectangleAttribute.INVERSE,
+            clearMask = 0,
+        )
+
+        val cluster = IntArray(2)
+        val line = buffer.getLine(0)
+        assertAll(
+            { assertTrue(line.isCluster(0)) },
+            { assertEquals(2, line.readCluster(0, cluster)) },
+            { assertArrayEquals(intArrayOf('A'.code, 0x0301), cluster) },
+            { assertTrue(buffer.getAttrAt(0, 0)?.inverse == true) },
+        )
+    }
+
+    @Test
+    fun `unsupported DECSACE value leaves the previous extent unchanged`() {
+        val buffer = TerminalBuffers.create(width = 3, height = 2)
+        buffer.setAttributeChangeExtent(2)
+        buffer.setAttributeChangeExtent(99)
+
+        buffer.changeRectangleAttributes(
+            top = 1,
+            left = 1,
+            bottom = 1,
+            right = 1,
+            setMask = DecRectangleAttribute.BOLD,
+            clearMask = 0,
+        )
+
+        assertEquals(' '.code, buffer.getCodepointAt(0, 0))
     }
 }

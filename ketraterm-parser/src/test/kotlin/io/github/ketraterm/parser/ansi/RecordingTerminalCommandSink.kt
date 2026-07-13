@@ -198,6 +198,50 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
             "copyRectangle:$sourceTop:$sourceLeft:$sourceBottom:$sourceRight:$sourcePage:$destinationTop:$destinationLeft:$destinationPage"
     }
 
+    override fun requestRectangleChecksum(
+        requestId: Int,
+        page: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) {
+        events += "requestRectangleChecksum:$requestId:$page:$top:$left:$bottom:$right"
+    }
+
+    override fun setAttributeChangeExtent(extent: Int) {
+        events += "setAttributeChangeExtent:$extent"
+    }
+
+    override fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    ) {
+        events += "changeRectangleAttributes:$top:$left:$bottom:$right:$setMask:$clearMask"
+    }
+
+    override fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    ) {
+        events += "reverseRectangleAttributes:$top:$left:$bottom:$right:$reverseMask"
+    }
+
+    override fun insertColumns(count: Int) {
+        events += "insertColumns:$count"
+    }
+
+    override fun deleteColumns(count: Int) {
+        events += "deleteColumns:$count"
+    }
+
     override fun insertLines(n: Int) {
         events += "insertLines:$n"
     }

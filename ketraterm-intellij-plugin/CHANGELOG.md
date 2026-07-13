@@ -1,5 +1,9 @@
 # KetraTerm IntelliJ Plugin Changelog
 
+## [Unreleased]
+
+- Improved compatibility with full-screen terminal applications that verify rectangular screen regions.
+
 ## [0.2.0] - 2026-07-13
 
 - Fixed multiline paste.

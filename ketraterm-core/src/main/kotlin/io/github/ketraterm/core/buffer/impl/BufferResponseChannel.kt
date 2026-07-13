@@ -19,6 +19,7 @@ import io.github.ketraterm.core.api.TerminalResponseChannel
 import io.github.ketraterm.core.codec.AttributeCodec
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.CellColorKind
+import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.protocol.keyboard.XtermKeyModifierResource
@@ -88,6 +89,32 @@ internal class BufferResponseChannel(
         state.hostResponses.enqueueByte('m'.code)
     }
 
+    override fun requestRectangleChecksum(
+        requestId: Int,
+        page: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) {
+        if (requestId < 0 || page !in 0..1) return
+
+        withRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
+            var checksum = 0
+            for (row in topRow..bottomRow) {
+                val line = state.ring[state.resolveRingIndex(row)]
+                for (col in leftCol..rightCol) {
+                    val raw = line.rawCodepoint(col)
+                    if (raw == TerminalConstants.EMPTY || raw == TerminalConstants.WIDE_CHAR_SPACER) continue
+
+                    checksum -= line.getCodepoint(col) and 0xff
+                    checksum -= checksumVideoAttributes(line.getPackedAttr(col), line.getPackedExtendedAttr(col))
+                }
+            }
+            enqueueRectangleChecksumResponse(requestId, checksum and CHECKSUM_MASK)
+        }
+    }
+
     override fun setWindowSizePixels(
         width: Int,
         height: Int,
@@ -134,6 +161,68 @@ internal class BufferResponseChannel(
         enqueueCsiPrefix()
         state.hostResponses.enqueueByte('0'.code)
         state.hostResponses.enqueueByte('n'.code)
+    }
+
+    /** Emits `DCS Pi ! ~ xxxx ST` with an uppercase four-digit checksum. */
+    private fun enqueueRectangleChecksumResponse(
+        requestId: Int,
+        checksum: Int,
+    ) {
+        state.hostResponses.enqueueByte(io.github.ketraterm.protocol.ControlCode.ESC)
+        state.hostResponses.enqueueByte('P'.code)
+        state.hostResponses.enqueuePositiveDecimal(requestId)
+        state.hostResponses.enqueueByte('!'.code)
+        state.hostResponses.enqueueByte('~'.code)
+        state.hostResponses.enqueueByte(UPPERCASE_HEX_CHARS[(checksum ushr 12) and 0x0f].code)
+        state.hostResponses.enqueueByte(UPPERCASE_HEX_CHARS[(checksum ushr 8) and 0x0f].code)
+        state.hostResponses.enqueueByte(UPPERCASE_HEX_CHARS[(checksum ushr 4) and 0x0f].code)
+        state.hostResponses.enqueueByte(UPPERCASE_HEX_CHARS[checksum and 0x0f].code)
+        enqueueStSuffix()
+    }
+
+    /** Returns the VT420 checksum contribution of supported legacy video attributes. */
+    private fun checksumVideoAttributes(
+        primary: Long,
+        extended: Long,
+    ): Int {
+        var value = 0
+        if (AttributeCodec.isProtected(primary)) value = value or CHECKSUM_PROTECTED
+        if (AttributeCodec.isConceal(extended)) value = value or CHECKSUM_INVISIBLE
+        if (AttributeCodec.underlineStyle(extended) != UnderlineStyle.NONE) value = value or CHECKSUM_UNDERLINE
+        if (AttributeCodec.isInverse(primary)) value = value or CHECKSUM_REVERSE
+        if (AttributeCodec.isBlink(primary)) value = value or CHECKSUM_BLINK
+        if (AttributeCodec.isBold(primary)) value = value or CHECKSUM_BOLD
+        return value
+    }
+
+    /** Resolves DEC rectangle coordinates according to the core's active origin/margin policy. */
+    private inline fun withRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        block: (topRow: Int, leftCol: Int, bottomRow: Int, rightCol: Int) -> Unit,
+    ) {
+        val originRows = state.modes.isOriginMode
+        val originColumns = originRows && state.modes.isLeftRightMarginMode
+        val rowBase = if (originRows) state.scrollTop else 0
+        val rowLimit = if (originRows) state.scrollBottom else state.dimensions.height - 1
+        val colBase = if (originColumns) state.effectiveLeftMargin else 0
+        val colLimit = if (originColumns) state.effectiveRightMargin else state.dimensions.width - 1
+
+        val requestedTop = rowBase + if (top <= 0) 0 else top - 1
+        val requestedLeft = colBase + if (left <= 0) 0 else left - 1
+        val requestedBottom = rowBase + if (bottom <= 0) rowLimit - rowBase else bottom - 1
+        val requestedRight = colBase + if (right <= 0) colLimit - colBase else right - 1
+        if (requestedTop > requestedBottom || requestedLeft > requestedRight) return
+
+        val topRow = requestedTop.coerceIn(rowBase, rowLimit)
+        val leftCol = requestedLeft.coerceIn(colBase, colLimit)
+        val bottomRow = requestedBottom.coerceIn(rowBase, rowLimit)
+        val rightCol = requestedRight.coerceIn(colBase, colLimit)
+        if (topRow > bottomRow || leftCol > rightCol) return
+
+        block(topRow, leftCol, bottomRow, rightCol)
     }
 
     private fun enqueuePrimaryDeviceAttributes() {
@@ -557,6 +646,14 @@ internal class BufferResponseChannel(
     }
 
     companion object {
+        private const val CHECKSUM_MASK = 0xffff
+        private const val CHECKSUM_PROTECTED = 0x04
+        private const val CHECKSUM_INVISIBLE = 0x08
+        private const val CHECKSUM_UNDERLINE = 0x10
+        private const val CHECKSUM_REVERSE = 0x20
+        private const val CHECKSUM_BLINK = 0x40
+        private const val CHECKSUM_BOLD = 0x80
         private const val HEX_CHARS = "0123456789abcdef"
+        private const val UPPERCASE_HEX_CHARS = "0123456789ABCDEF"
     }
 }

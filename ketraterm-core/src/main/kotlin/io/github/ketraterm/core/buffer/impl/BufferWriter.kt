@@ -174,6 +174,29 @@ internal class BufferWriter(
         destinationPage,
     )
 
+    override fun setAttributeChangeExtent(extent: Int) = mutationEngine.setAttributeChangeExtent(extent)
+
+    override fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    ) = mutationEngine.changeRectangleAttributes(top, left, bottom, right, setMask, clearMask)
+
+    override fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    ) = mutationEngine.reverseRectangleAttributes(top, left, bottom, right, reverseMask)
+
+    override fun insertColumns(count: Int) = mutationEngine.insertColumns(count)
+
+    override fun deleteColumns(count: Int) = mutationEngine.deleteColumns(count)
+
     override fun eraseEntireScreen() = mutationEngine.clearViewport()
 
     override fun eraseScreenAndHistory() = mutationEngine.eraseScreenAndHistory()

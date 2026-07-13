@@ -42,6 +42,9 @@ internal class TerminalState(
     val pen = Pen()
     val dimensions = GridDimensions(initialWidth, initialHeight)
     val hostResponses = HostResponseQueue()
+
+    /** `false` for DECSACE stream extent (the terminal default), `true` for exact rectangle. */
+    var isAttributeChangeExtentRectangle: Boolean = false
     var themePalette =
         io.github.ketraterm.render.api
             .TerminalColorPalette()

@@ -19,6 +19,7 @@ import io.github.ketraterm.core.model.CellAttributes
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.CellColorKind
 import io.github.ketraterm.core.model.UnderlineStyle
+import io.github.ketraterm.protocol.DecRectangleAttribute
 
 /**
  * Encodes terminal cell attributes into two compact Long words.
@@ -239,6 +240,60 @@ internal object AttributeCodec {
 
     fun sgrResetExtended(v: Long): Long = hyperlinkId(v).toLong() shl HYPERLINK_ID_SHIFT
 
+    /** Applies DECCARA's supported visual-attribute changes while preserving unrelated bits. */
+    fun changeRectangularPrimaryAttributes(
+        value: Long,
+        setMask: Int,
+        clearMask: Int,
+    ): Long {
+        var result = value
+        result = setOrClearBit(result, BOLD_BIT, setMask, clearMask, DecRectangleAttribute.BOLD)
+        result = setOrClearBit(result, BLINK_BIT, setMask, clearMask, DecRectangleAttribute.BLINK)
+        result = setOrClearBit(result, INVERSE_BIT, setMask, clearMask, DecRectangleAttribute.INVERSE)
+        return result
+    }
+
+    /** Applies DECCARA's underline change while preserving color, concealment, and hyperlink data. */
+    fun changeRectangularExtendedAttributes(
+        value: Long,
+        setMask: Int,
+        clearMask: Int,
+    ): Long =
+        when {
+            setMask and DecRectangleAttribute.UNDERLINE != 0 ->
+                (value and (UNDERLINE_STYLE_MASK shl UNDERLINE_STYLE_SHIFT).inv()) or
+                    (UnderlineStyle.SINGLE.sgrCode.toLong() shl UNDERLINE_STYLE_SHIFT)
+            clearMask and DecRectangleAttribute.UNDERLINE != 0 ->
+                value and (UNDERLINE_STYLE_MASK shl UNDERLINE_STYLE_SHIFT).inv()
+            else -> value
+        }
+
+    /** Applies DECRARA's supported visual-attribute reversals while preserving unrelated bits. */
+    fun reverseRectangularPrimaryAttributes(
+        value: Long,
+        reverseMask: Int,
+    ): Long {
+        var result = value
+        if (reverseMask and DecRectangleAttribute.BOLD != 0) result = result xor (1L shl BOLD_BIT)
+        if (reverseMask and DecRectangleAttribute.BLINK != 0) result = result xor (1L shl BLINK_BIT)
+        if (reverseMask and DecRectangleAttribute.INVERSE != 0) result = result xor (1L shl INVERSE_BIT)
+        return result
+    }
+
+    /** Reverses DECRARA underline state: any underline becomes off, otherwise single underline. */
+    fun reverseRectangularExtendedAttributes(
+        value: Long,
+        reverseMask: Int,
+    ): Long {
+        if (reverseMask and DecRectangleAttribute.UNDERLINE == 0) return value
+        val withoutUnderline = value and (UNDERLINE_STYLE_MASK shl UNDERLINE_STYLE_SHIFT).inv()
+        return if (underlineStyle(value) == UnderlineStyle.NONE) {
+            withoutUnderline or (UnderlineStyle.SINGLE.sgrCode.toLong() shl UNDERLINE_STYLE_SHIFT)
+        } else {
+            withoutUnderline
+        }
+    }
+
     fun unpack(
         primary: Long,
         extended: Long = DEFAULT_EXTENDED_ATTR,
@@ -265,6 +320,19 @@ internal object AttributeCodec {
             COLOR_KIND_DEFAULT shl COLOR_KIND_SHIFT
         } else {
             (COLOR_KIND_INDEXED shl COLOR_KIND_SHIFT) or (code - 1)
+        }
+
+    private fun setOrClearBit(
+        value: Long,
+        bit: Int,
+        setMask: Int,
+        clearMask: Int,
+        attributeMask: Int,
+    ): Long =
+        when {
+            setMask and attributeMask != 0 -> value or (1L shl bit)
+            clearMask and attributeMask != 0 -> value and (1L shl bit).inv()
+            else -> value
         }
 
     private fun colorFromCode(code: Int): CellColor = if (code == 0) CellColor.DEFAULT else CellColor.indexed(code - 1)

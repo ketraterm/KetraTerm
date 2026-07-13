@@ -77,10 +77,16 @@ internal object GeneratedCsiDispatchTable {
             281474978807921L, // CSI SP q  DECSCUSR
             281474978873456L, // CSI ! p  DECSTR
             281474978938993L, // CSI " q  DECSCA
+            281474979070066L, // CSI Pt;Pl;Pb;Pr;Ps... $ r  DECCARA
+            281474979070068L, // CSI Pt;Pl;Pb;Pr;Ps... $ t  DECRARA
             281474979070070L, // CSI Pts;Pls;Pbs;Prs;Pps;Ptd;Pld;Ppd $ v  DECCRA
             281474979070072L, // CSI Pch;Pt;Pl;Pb;Pr $ x  DECFRA
             281474979070074L, // CSI Pt;Pl;Pb;Pr $ z  DECERA
             281474979070075L, // CSI Pt;Pl;Pb;Pr $ {  DECSERA
+            281474979266685L, // CSI Pn ' }  DECIC
+            281474979266686L, // CSI Pn ' ~  DECDC
+            281474979463288L, // CSI Ps * x  DECSACE
+            281474979463289L, // CSI Pi;Pg;Pt;Pl;Pb;Pr * y  DECRQCRA
         )
 
     private val COMMANDS: IntArray =
@@ -133,10 +139,16 @@ internal object GeneratedCsiDispatchTable {
             CsiCommand.DECSCUSR,
             CsiCommand.DECSTR,
             CsiCommand.DECSCA,
+            CsiCommand.DECCARA,
+            CsiCommand.DECRARA,
             CsiCommand.DECCRA,
             CsiCommand.DECFRA,
             CsiCommand.DECERA,
             CsiCommand.DECSERA,
+            CsiCommand.DECIC,
+            CsiCommand.DECDC,
+            CsiCommand.DECSACE,
+            CsiCommand.DECRQCRA,
         )
 
     init {

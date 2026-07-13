@@ -582,6 +582,49 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `DECRQCRA preserves request id page and rectangle across a structural chunk boundary`() {
+            val f = TerminalParserFixture()
+
+            f.acceptAscii("\u001B[17;1;2;3")
+            f.acceptAscii(";4;5*y")
+
+            assertEquals(listOf("requestRectangleChecksum:17:1:2:3:4:5"), f.sink.events)
+        }
+
+        @Test
+        fun `DEC rectangular attribute commands collapse ordered SGR parameters`() {
+            val change = TerminalParserFixture()
+            val reverse = TerminalParserFixture()
+            val extent = TerminalParserFixture()
+
+            change.acceptAscii("\u001B[2;3;4;5;0;1;24\$r")
+            reverse.acceptAscii("\u001B[2;3;4;5;0;4;5\$t")
+            extent.acceptAscii("\u001B[2*")
+            extent.acceptAscii("x")
+
+            assertAll(
+                { assertEquals(listOf("changeRectangleAttributes:2:3:4:5:1:14"), change.sink.events) },
+                { assertEquals(listOf("reverseRectangleAttributes:2:3:4:5:9"), reverse.sink.events) },
+                { assertEquals(listOf("setAttributeChangeExtent:2"), extent.sink.events) },
+            )
+        }
+
+        @Test
+        fun `DEC column edits dispatch default and explicit counts across intermediate boundaries`() {
+            val insert = TerminalParserFixture()
+            val delete = TerminalParserFixture()
+
+            insert.acceptAscii("\u001B[3'}")
+            delete.acceptAscii("\u001B['")
+            delete.acceptAscii("~")
+
+            assertAll(
+                { assertEquals(listOf("insertColumns:3"), insert.sink.events) },
+                { assertEquals(listOf("deleteColumns:1"), delete.sink.events) },
+            )
+        }
+
+        @Test
         fun `DEC private CSI mode dispatch survives chunk boundaries`() {
             val f = TerminalParserFixture()
 

@@ -366,6 +366,51 @@ class HostCommandAdapter(
         )
     }
 
+    override fun requestRectangleChecksum(
+        requestId: Int,
+        page: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) {
+        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+        terminal.requestRectangleChecksum(requestId, page, top, left, bottom, right)
+    }
+
+    override fun setAttributeChangeExtent(extent: Int) {
+        terminal.setAttributeChangeExtent(extent)
+    }
+
+    override fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    ) {
+        terminal.changeRectangleAttributes(top, left, bottom, right, setMask, clearMask)
+    }
+
+    override fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    ) {
+        terminal.reverseRectangleAttributes(top, left, bottom, right, reverseMask)
+    }
+
+    override fun insertColumns(count: Int) {
+        terminal.insertColumns(count)
+    }
+
+    override fun deleteColumns(count: Int) {
+        terminal.deleteColumns(count)
+    }
+
     override fun insertLines(n: Int) {
         terminal.insertLines(n)
     }

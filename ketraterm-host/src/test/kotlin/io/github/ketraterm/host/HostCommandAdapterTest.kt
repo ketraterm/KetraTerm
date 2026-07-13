@@ -1173,6 +1173,69 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `DECRQCRA byte stream returns a bounded active page checksum`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 3, height = 1))
+
+            f.acceptAscii("A\u001B[17;1;1;1;1;1*y")
+            f.end()
+
+            assertEquals("\u001BP17!~FFBF\u001B\\", f.drainResponses())
+        }
+
+        @Test
+        fun `DECSACE DECCARA and DECRARA update attributes through byte stream`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 4, height = 2))
+
+            f.acceptAscii("A")
+            f.acceptAscii("\u001B[2*x\u001B[1;1;1;2;1;4\$r")
+            f.acceptAscii("\u001B[1;1;1;2;1;4\$t")
+            f.end()
+
+            assertAll(
+                { assertEquals('A'.code, f.terminal.getCodepointAt(0, 0)) },
+                { assertEquals(' '.code, f.terminal.getCodepointAt(1, 0)) },
+                { assertEquals(false, f.terminal.getAttrAt(0, 0)?.bold) },
+                {
+                    assertEquals(
+                        0,
+                        f.terminal
+                            .getAttrAt(0, 0)
+                            ?.underlineStyle
+                            ?.sgrCode,
+                    )
+                },
+                { assertEquals(false, f.terminal.getAttrAt(1, 0)?.bold) },
+                {
+                    assertEquals(
+                        0,
+                        f.terminal
+                            .getAttrAt(1, 0)
+                            ?.underlineStyle
+                            ?.sgrCode,
+                    )
+                },
+            )
+        }
+
+        @Test
+        fun `DECIC and DECDC bytes shift every row in the active scroll region`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 6, height = 3))
+
+            f.acceptAscii("\u001B[1;1HABCDEF\u001B[2;1HABCDEF\u001B[3;1HABCDEF")
+            f.acceptAscii("\u001B[2;3r\u001B[2;2H\u001B[2'}")
+            f.acceptAscii("\u001B[1'~")
+            f.end()
+
+            assertAll(
+                { assertEquals("ABCDEF", f.terminal.getLineAsString(0)) },
+                { assertEquals("A BCD", f.terminal.getLineAsString(1)) },
+                { assertEquals("A BCD", f.terminal.getLineAsString(2)) },
+                { assertEquals(1, f.terminal.cursorCol) },
+                { assertEquals(1, f.terminal.cursorRow) },
+            )
+        }
+
+        @Test
         fun `OSC titles and hyperlinks are retained as adapter metadata`() {
             val f = Fixture()
 
@@ -1680,6 +1743,16 @@ class HostCommandAdapterTest {
 
             f.acceptAscii("\u001BP\$qm\u001B\\")
             f.acceptAscii("\u001BP+q436f\u001B\\")
+            f.end()
+
+            assertEquals("", f.drainResponses())
+        }
+
+        @Test
+        fun `terminal response policy can deny DECRQCRA responses`() {
+            val f = Fixture(hostPolicy = HostPolicy(terminalResponsePolicy = HostControlPolicy.DENY))
+
+            f.acceptAscii("A\u001B[1;1;1;1;1;1*y")
             f.end()
 
             assertEquals("", f.drainResponses())
