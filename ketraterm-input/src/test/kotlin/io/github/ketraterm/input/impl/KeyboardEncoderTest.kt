@@ -593,6 +593,17 @@ class KeyboardEncoderTest {
             ),
             bitsAlternate,
         )
+
+        val bitsAssociatedText =
+            kittyKeyboardBits(
+                KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES or
+                    KittyKeyboardProgressiveFlag.REPORT_ASSOCIATED_TEXT,
+            )
+        assertBytes(
+            esc("[65;2;65:769u"),
+            TerminalKeyEvent.codepoint('A'.code, TerminalModifiers.SHIFT, associatedText = "A\u0301"),
+            bitsAssociatedText,
+        )
     }
 
     @Test

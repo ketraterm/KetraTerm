@@ -34,6 +34,8 @@ import io.github.ketraterm.input.event.TerminalKeyEvent.Companion.NO_CODEPOINT
  * alternate-key reporting, or [NO_CODEPOINT] when unknown.
  * @property baseLayoutCodepoint standard PC-101 base-layout key scalar for
  * Kitty alternate-key reporting, or [NO_CODEPOINT] when unknown.
+ * @property associatedText host-owned text produced by this key for Kitty
+ * associated-text reporting, or null when unknown or inapplicable.
  * @property modifiers active keyboard modifiers using [TerminalModifiers] bits.
  * @property type physical lifecycle phase as reported by the host adapter.
  */
@@ -43,6 +45,7 @@ data class TerminalKeyEvent(
     val unshiftedCodepoint: Int = NO_CODEPOINT,
     val shiftedCodepoint: Int = NO_CODEPOINT,
     val baseLayoutCodepoint: Int = NO_CODEPOINT,
+    val associatedText: String? = null,
     val modifiers: Int = TerminalModifiers.NONE,
     val type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
 ) {
@@ -60,7 +63,12 @@ data class TerminalKeyEvent(
 
         require(
             !hasKey ||
-                (unshiftedCodepoint == NO_CODEPOINT && shiftedCodepoint == NO_CODEPOINT && baseLayoutCodepoint == NO_CODEPOINT),
+                (
+                    unshiftedCodepoint == NO_CODEPOINT &&
+                        shiftedCodepoint == NO_CODEPOINT &&
+                        baseLayoutCodepoint == NO_CODEPOINT &&
+                        associatedText == null
+                ),
         ) {
             "Kitty key scalar metadata is valid only for printable input"
         }
@@ -87,6 +95,7 @@ data class TerminalKeyEvent(
                     "invalid base-layout Unicode scalar: $baseLayoutCodepoint"
                 }
             }
+            if (associatedText != null) requireAssociatedText(associatedText)
         }
     }
 
@@ -128,6 +137,8 @@ data class TerminalKeyEvent(
          * alternate-key reporting.
          * @param baseLayoutCodepoint standard PC-101 base-layout key scalar for
          * Kitty alternate-key reporting.
+         * @param associatedText text produced by this key for Kitty
+         * associated-text reporting.
          * @param type physical lifecycle phase reported by the host.
          * @return a new [TerminalKeyEvent] instance.
          */
@@ -137,6 +148,7 @@ data class TerminalKeyEvent(
             unshiftedCodepoint: Int = NO_CODEPOINT,
             shiftedCodepoint: Int = NO_CODEPOINT,
             baseLayoutCodepoint: Int = NO_CODEPOINT,
+            associatedText: String? = null,
             type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
         ): TerminalKeyEvent =
             TerminalKeyEvent(
@@ -144,6 +156,7 @@ data class TerminalKeyEvent(
                 unshiftedCodepoint = unshiftedCodepoint,
                 shiftedCodepoint = shiftedCodepoint,
                 baseLayoutCodepoint = baseLayoutCodepoint,
+                associatedText = associatedText,
                 modifiers = modifiers,
                 type = type,
             )
@@ -153,5 +166,17 @@ data class TerminalKeyEvent(
                 codepoint !in 0xd800..0xdfff &&
                 codepoint !in 0x00..0x1f &&
                 codepoint != 0x7f
+
+        private fun requireAssociatedText(text: String) {
+            require(text.isNotEmpty()) { "associatedText must not be empty" }
+            var index = 0
+            while (index < text.length) {
+                val codepoint = text.codePointAt(index)
+                require(isPrintableUnicodeScalar(codepoint) && codepoint !in 0x80..0x9f) {
+                    "invalid associated text scalar: $codepoint"
+                }
+                index += Character.charCount(codepoint)
+            }
+        }
     }
 }

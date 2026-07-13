@@ -74,6 +74,7 @@ internal class KittyKeyboardEncoder(
         val isReportEventTypes = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES) != 0
         val isReportAlternateKeys = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_ALTERNATE_KEYS) != 0
         val isReportAll = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES) != 0
+        val isReportAssociatedText = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_ASSOCIATED_TEXT) != 0
         val eventType = if (isReportEventTypes) event.type.ordinal + 1 else NO_EVENT_TYPE
 
         if (
@@ -209,6 +210,7 @@ internal class KittyKeyboardEncoder(
                 if (event.unshiftedCodepoint != TerminalKeyEvent.NO_CODEPOINT) event.unshiftedCodepoint else codepoint
             val shiftedCodepoint = if (isReportAlternateKeys) event.shiftedCodepoint else TerminalKeyEvent.NO_CODEPOINT
             val baseLayoutCodepoint = if (isReportAlternateKeys) event.baseLayoutCodepoint else TerminalKeyEvent.NO_CODEPOINT
+            val associatedText = if (isReportAssociatedText && isReportAll) event.associatedText else null
             if (isReportAll || (modifiers != TerminalModifiers.NONE && modifiers != TerminalModifiers.SHIFT)) {
                 CsiWriter.writeCsiU(
                     scratch,
@@ -219,6 +221,7 @@ internal class KittyKeyboardEncoder(
                     kittyModifiers = true,
                     shiftedCodepoint = shiftedCodepoint,
                     baseLayoutCodepoint = baseLayoutCodepoint,
+                    associatedText = associatedText,
                 )
             } else {
                 if (shouldSuppressForMeta(modifiers)) {

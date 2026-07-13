@@ -146,7 +146,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(input)`: normalized printable events carry validated Kitty shifted and base-layout alternate key scalars; the encoder formats both fields, including the required empty shifted field when only a base-layout scalar exists.
 - `TODO(host)`: provide a rich key-event adapter that can reliably identify key press, operating-system repeat, and release for every key, including layout and IME-produced text, before flag `2` is advertised.
 - separate left/right modifier reporting if host event vocabulary grows it.
-- associated text fields.
+- `DONE(input)`: host-owned associated text is scalar-validated and encoded as Kitty colon-separated text codepoints without encoder-side allocation.
+- `TODO(host)`: support pure IME/text events using Kitty key code `0`, including complete text association and lifecycle metadata, before flag `16` is advertised.
 - modifier-only key events.
 - complete functional-key numeric table beyond keys already represented by `TerminalKey`.
 

@@ -92,6 +92,13 @@ class TerminalKeyEventTest {
     }
 
     @Test
+    fun `rejects control codepoints in associated text`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalKeyEvent.codepoint('a'.code, associatedText = "a\u001b")
+        }
+    }
+
+    @Test
     fun `preserves an explicit physical lifecycle phase`() {
         val event = TerminalKeyEvent.key(TerminalKey.UP, type = TerminalKeyEventType.RELEASE)
 

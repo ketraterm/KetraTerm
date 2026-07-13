@@ -166,6 +166,9 @@ Supported modified-key protocol:
 - Kitty alternate-key formatting is implemented for host-supplied shifted and
   base-layout scalars, but flag `4` is not advertised until a host can provide
   those layout values truthfully.
+- Kitty associated-text formatting is implemented for validated host-owned
+  text and writes codepoints directly to the reusable CSI buffer. Flag `16`
+  remains unadvertised pending complete rich-host text/IME support.
 
 Not guaranteed yet:
 

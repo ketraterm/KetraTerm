@@ -145,6 +145,7 @@ internal object CsiWriter {
         kittyModifiers: Boolean = false,
         shiftedCodepoint: Int = NO_CODEPOINT,
         baseLayoutCodepoint: Int = NO_CODEPOINT,
+        associatedText: String? = null,
     ) {
         scratch.clear()
         scratch.appendByte(ControlCode.ESC)
@@ -168,12 +169,30 @@ internal object CsiWriter {
             }
         }
 
+        if (associatedText != null) {
+            scratch.appendByte(';'.code)
+            appendAssociatedText(scratch, associatedText)
+        }
+
         scratch.appendByte('u'.code)
         scratch.writeTo(output)
     }
 
     private const val NO_EVENT_TYPE: Int = 0
     private const val NO_CODEPOINT: Int = -1
+
+    private fun appendAssociatedText(
+        scratch: InputScratchBuffer,
+        text: String,
+    ) {
+        var index = 0
+        while (index < text.length) {
+            if (index > 0) scratch.appendByte(':'.code)
+            val codepoint = text.codePointAt(index)
+            scratch.appendDecimal(codepoint)
+            index += Character.charCount(codepoint)
+        }
+    }
 
     private fun modifierParam(
         modifiers: Int,
