@@ -143,9 +143,10 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(input)`: the Kitty encoder formats the lifecycle phase in the `modifier:event-type` subfield and suppresses lifecycle events when flag `2` is inactive.
 - `DONE(protocol/input/ui)`: the complete Kitty functional-key table is represented by normalized input vocabulary and allocation-free PUA lookup tables; Swing maps the subset exposed by AWT, while richer hosts can supply the remaining keys.
 - `DONE(input)`: normalized modifiers preserve Kitty's independent Super, Hyper, Meta, Caps Lock, and Num Lock bits while legacy CSI encodings retain their compatible four-modifier representation. Modifier-only key reports are gated by flag `8`.
+- `DONE(input)`: normalized printable events carry validated Kitty shifted and base-layout alternate key scalars; the encoder formats both fields, including the required empty shifted field when only a base-layout scalar exists.
 - `TODO(host)`: provide a rich key-event adapter that can reliably identify key press, operating-system repeat, and release for every key, including layout and IME-produced text, before flag `2` is advertised.
 - separate left/right modifier reporting if host event vocabulary grows it.
-- alternate-key fields and associated text fields.
+- associated text fields.
 - modifier-only key events.
 - complete functional-key numeric table beyond keys already represented by `TerminalKey`.
 

@@ -567,6 +567,32 @@ class KeyboardEncoderTest {
         )
         // Ctrl + printable -> CSI-u
         assertBytes(esc("[97;5u"), TerminalKeyEvent.codepoint('a'.code, TerminalModifiers.CTRL), bitsReportAll)
+
+        val bitsAlternate =
+            kittyKeyboardBits(
+                KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES or
+                    KittyKeyboardProgressiveFlag.REPORT_ALTERNATE_KEYS,
+            )
+        assertBytes(
+            esc("[61:43:61;6u"),
+            TerminalKeyEvent.codepoint(
+                codepoint = '+'.code,
+                modifiers = TerminalModifiers.SHIFT or TerminalModifiers.CTRL,
+                unshiftedCodepoint = '='.code,
+                shiftedCodepoint = '+'.code,
+                baseLayoutCodepoint = '='.code,
+            ),
+            bitsAlternate,
+        )
+        assertBytes(
+            esc("[97::98u"),
+            TerminalKeyEvent.codepoint(
+                codepoint = 'a'.code,
+                unshiftedCodepoint = 'a'.code,
+                baseLayoutCodepoint = 'b'.code,
+            ),
+            bitsAlternate,
+        )
     }
 
     @Test

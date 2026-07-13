@@ -143,11 +143,21 @@ internal object CsiWriter {
         forceModifier: Boolean = false,
         eventType: Int = NO_EVENT_TYPE,
         kittyModifiers: Boolean = false,
+        shiftedCodepoint: Int = NO_CODEPOINT,
+        baseLayoutCodepoint: Int = NO_CODEPOINT,
     ) {
         scratch.clear()
         scratch.appendByte(ControlCode.ESC)
         scratch.appendByte('['.code)
         scratch.appendDecimal(code)
+        if (shiftedCodepoint != NO_CODEPOINT || baseLayoutCodepoint != NO_CODEPOINT) {
+            scratch.appendByte(':'.code)
+            if (shiftedCodepoint != NO_CODEPOINT) scratch.appendDecimal(shiftedCodepoint)
+            if (baseLayoutCodepoint != NO_CODEPOINT) {
+                scratch.appendByte(':'.code)
+                scratch.appendDecimal(baseLayoutCodepoint)
+            }
+        }
 
         if (modifiers != TerminalModifiers.NONE || forceModifier || eventType != NO_EVENT_TYPE) {
             scratch.appendByte(';'.code)
@@ -163,6 +173,7 @@ internal object CsiWriter {
     }
 
     private const val NO_EVENT_TYPE: Int = 0
+    private const val NO_CODEPOINT: Int = -1
 
     private fun modifierParam(
         modifiers: Int,

@@ -68,6 +68,30 @@ class TerminalKeyEventTest {
     }
 
     @Test
+    fun `creates printable event with Kitty alternate key scalars`() {
+        val event =
+            TerminalKeyEvent.codepoint(
+                codepoint = '+'.code,
+                modifiers = TerminalModifiers.SHIFT or TerminalModifiers.CTRL,
+                unshiftedCodepoint = '='.code,
+                shiftedCodepoint = '+'.code,
+                baseLayoutCodepoint = '='.code,
+            )
+
+        assertAll(
+            { assertEquals('+'.code, event.shiftedCodepoint) },
+            { assertEquals('='.code, event.baseLayoutCodepoint) },
+        )
+    }
+
+    @Test
+    fun `rejects shifted alternate key without Shift`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalKeyEvent.codepoint('a'.code, shiftedCodepoint = 'A'.code)
+        }
+    }
+
+    @Test
     fun `preserves an explicit physical lifecycle phase`() {
         val event = TerminalKeyEvent.key(TerminalKey.UP, type = TerminalKeyEventType.RELEASE)
 

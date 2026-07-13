@@ -163,6 +163,9 @@ Supported modified-key protocol:
 - Kitty event-type formatting (`modifier:event-type`) is implemented in the
   encoder for rich host events, but flag `2` is not advertised until a host can
   truthfully provide the complete required lifecycle metadata.
+- Kitty alternate-key formatting is implemented for host-supplied shifted and
+  base-layout scalars, but flag `4` is not advertised until a host can provide
+  those layout values truthfully.
 
 Not guaranteed yet:
 

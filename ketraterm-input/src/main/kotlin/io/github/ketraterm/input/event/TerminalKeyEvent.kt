@@ -30,6 +30,10 @@ import io.github.ketraterm.input.event.TerminalKeyEvent.Companion.NO_CODEPOINT
  * text-producing key for Kitty-compatible protocols, or [NO_CODEPOINT] when
  * the input source cannot provide that identity. This may differ from
  * [codepoint], such as `a` for a Shift+A event that produces `A`.
+ * @property shiftedCodepoint shifted current-layout key scalar for Kitty
+ * alternate-key reporting, or [NO_CODEPOINT] when unknown.
+ * @property baseLayoutCodepoint standard PC-101 base-layout key scalar for
+ * Kitty alternate-key reporting, or [NO_CODEPOINT] when unknown.
  * @property modifiers active keyboard modifiers using [TerminalModifiers] bits.
  * @property type physical lifecycle phase as reported by the host adapter.
  */
@@ -37,6 +41,8 @@ data class TerminalKeyEvent(
     val key: TerminalKey? = null,
     val codepoint: Int = NO_CODEPOINT,
     val unshiftedCodepoint: Int = NO_CODEPOINT,
+    val shiftedCodepoint: Int = NO_CODEPOINT,
+    val baseLayoutCodepoint: Int = NO_CODEPOINT,
     val modifiers: Int = TerminalModifiers.NONE,
     val type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
 ) {
@@ -52,8 +58,11 @@ data class TerminalKeyEvent(
             "TerminalKeyEvent must contain exactly one of key or codepoint"
         }
 
-        require(!hasKey || unshiftedCodepoint == NO_CODEPOINT) {
-            "unshiftedCodepoint is valid only for printable input"
+        require(
+            !hasKey ||
+                (unshiftedCodepoint == NO_CODEPOINT && shiftedCodepoint == NO_CODEPOINT && baseLayoutCodepoint == NO_CODEPOINT),
+        ) {
+            "Kitty key scalar metadata is valid only for printable input"
         }
 
         if (hasCodepoint) {
@@ -63,6 +72,19 @@ data class TerminalKeyEvent(
             if (unshiftedCodepoint != NO_CODEPOINT) {
                 require(isPrintableUnicodeScalar(unshiftedCodepoint)) {
                     "invalid unshifted Unicode scalar: $unshiftedCodepoint"
+                }
+            }
+            if (shiftedCodepoint != NO_CODEPOINT) {
+                require(TerminalModifiers.hasShift(modifiers)) {
+                    "shiftedCodepoint requires the Shift modifier"
+                }
+                require(isPrintableUnicodeScalar(shiftedCodepoint)) {
+                    "invalid shifted Unicode scalar: $shiftedCodepoint"
+                }
+            }
+            if (baseLayoutCodepoint != NO_CODEPOINT) {
+                require(isPrintableUnicodeScalar(baseLayoutCodepoint)) {
+                    "invalid base-layout Unicode scalar: $baseLayoutCodepoint"
                 }
             }
         }
@@ -102,6 +124,10 @@ data class TerminalKeyEvent(
          * @param unshiftedCodepoint unshifted Unicode scalar identifying the
          * physical text-producing key for Kitty-compatible protocols. Defaults
          * to [NO_CODEPOINT] when the input source cannot provide that identity.
+         * @param shiftedCodepoint shifted current-layout key scalar for Kitty
+         * alternate-key reporting.
+         * @param baseLayoutCodepoint standard PC-101 base-layout key scalar for
+         * Kitty alternate-key reporting.
          * @param type physical lifecycle phase reported by the host.
          * @return a new [TerminalKeyEvent] instance.
          */
@@ -109,11 +135,15 @@ data class TerminalKeyEvent(
             codepoint: Int,
             modifiers: Int = TerminalModifiers.NONE,
             unshiftedCodepoint: Int = NO_CODEPOINT,
+            shiftedCodepoint: Int = NO_CODEPOINT,
+            baseLayoutCodepoint: Int = NO_CODEPOINT,
             type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
         ): TerminalKeyEvent =
             TerminalKeyEvent(
                 codepoint = codepoint,
                 unshiftedCodepoint = unshiftedCodepoint,
+                shiftedCodepoint = shiftedCodepoint,
+                baseLayoutCodepoint = baseLayoutCodepoint,
                 modifiers = modifiers,
                 type = type,
             )
