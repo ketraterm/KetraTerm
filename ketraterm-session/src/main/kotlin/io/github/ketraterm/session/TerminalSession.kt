@@ -31,6 +31,7 @@ import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
+import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
@@ -695,6 +696,9 @@ class TerminalSession(
          * @param hostEvents metadata events target.
          * @param hostPolicy safety policy.
          * @param inputPolicy key-encoding policy.
+         * @param kittyKeyboardSupportedFlags progressive Kitty keyboard flags
+         * the active input host can provide truthfully. Defaults to the
+         * conservative portable-host profile.
          * @return standard production terminal session.
          */
         @JvmStatic
@@ -705,6 +709,7 @@ class TerminalSession(
             hostEvents: HostEventSink = HostEventSink.NONE,
             hostPolicy: HostPolicy = HostPolicy(),
             inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
+            kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
         ): TerminalSession {
             val outboundWriteLock = Any()
             val hostOutput = ConnectorTerminalHostOutput(connector, outboundWriteLock)
@@ -718,7 +723,7 @@ class TerminalSession(
                     renderReader = renderReader,
                     state = shellIntegrationState,
                 )
-            val sink = HostCommandAdapter(terminal, recordingHostEvents, hostPolicy)
+            val sink = HostCommandAdapter(terminal, recordingHostEvents, hostPolicy, kittyKeyboardSupportedFlags)
             val parser = TerminalParsers.create(sink)
             val inputEncoder = TerminalInputEncoders.create(terminal, hostOutput, inputPolicy)
 

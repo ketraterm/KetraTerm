@@ -65,11 +65,13 @@ internal object GeneratedCsiDispatchTable {
             15971L, // CSI > c  DA2
             15974L, // CSI > f  XTFMTKEYS
             15981L, // CSI > m  XTMODKEYS
+            15982L, // CSI > n  XTDISMODKEYS
             15989L, // CSI > u  Kitty keyboard push flags
             16202L, // CSI ? J  DECSED
             16203L, // CSI ? K  DECSEL
             16232L, // CSI ? h  DECSET
             16236L, // CSI ? l  DECRST
+            16237L, // CSI ? m  XTQMODKEYS
             16238L, // CSI ? n  DEC DSR
             16245L, // CSI ? u  Kitty keyboard query flags
             281474978807921L, // CSI SP q  DECSCUSR
@@ -115,11 +117,13 @@ internal object GeneratedCsiDispatchTable {
             CsiCommand.DA_SECONDARY,
             CsiCommand.XTFMTKEYS,
             CsiCommand.XTMODKEYS,
+            CsiCommand.XTDISMODKEYS,
             CsiCommand.KITTY_KEYBOARD_PUSH,
             CsiCommand.DECSED,
             CsiCommand.DECSEL,
             CsiCommand.SM_DEC,
             CsiCommand.RM_DEC,
+            CsiCommand.XTQMODKEYS,
             CsiCommand.DSR_DEC,
             CsiCommand.KITTY_KEYBOARD_QUERY,
             CsiCommand.DECSCUSR,

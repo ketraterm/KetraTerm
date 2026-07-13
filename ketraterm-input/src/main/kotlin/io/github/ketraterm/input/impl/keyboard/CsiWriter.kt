@@ -160,7 +160,8 @@ internal object CsiWriter {
             }
         }
 
-        if (modifiers != TerminalModifiers.NONE || forceModifier || eventType != NO_EVENT_TYPE) {
+        val hasModifierField = modifiers != TerminalModifiers.NONE || forceModifier || eventType != NO_EVENT_TYPE
+        if (hasModifierField) {
             scratch.appendByte(';'.code)
             scratch.appendDecimal(modifierParam(modifiers, kittyModifiers))
             if (eventType != NO_EVENT_TYPE) {
@@ -170,6 +171,7 @@ internal object CsiWriter {
         }
 
         if (associatedText != null) {
+            if (!hasModifierField) scratch.appendByte(';'.code)
             scratch.appendByte(';'.code)
             appendAssociatedText(scratch, associatedText)
         }

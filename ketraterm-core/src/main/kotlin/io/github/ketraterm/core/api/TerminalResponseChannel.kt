@@ -69,6 +69,15 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
     fun requestKittyKeyboardFlags()
 
     /**
+     * Enqueues an allowlisted xterm key-modifier option response.
+     *
+     * Unsupported resources produce no response.
+     *
+     * @param resource The queried xterm key-modifier resource identifier.
+     */
+    fun requestKeyModifierOption(resource: Int)
+
+    /**
      * Updates the recorded window size in pixels.
      *
      * @param width Width in pixels.

@@ -99,6 +99,16 @@ class TerminalKeyEventTest {
     }
 
     @Test
+    fun `creates Kitty text-only input`() {
+        val event = TerminalKeyEvent.text("å")
+
+        assertAll(
+            { assertEquals(TerminalKeyEvent.TEXT_ONLY_CODEPOINT, event.codepoint) },
+            { assertEquals("å", event.associatedText) },
+        )
+    }
+
+    @Test
     fun `preserves an explicit physical lifecycle phase`() {
         val event = TerminalKeyEvent.key(TerminalKey.UP, type = TerminalKeyEventType.RELEASE)
 

@@ -336,6 +336,30 @@ class ModeDispatchTest {
         }
 
         @Test
+        fun `CSI greater-than Pp n dispatches explicit key modifier option disable`() {
+            assertEquals(
+                listOf("disableKeyModifierOption:${XtermKeyModifierResource.MODIFY_OTHER_KEYS}"),
+                dispatchMode(
+                    'n'.code,
+                    XtermKeyModifierResource.MODIFY_OTHER_KEYS,
+                    privateMarker = '>'.code,
+                ).events,
+            )
+        }
+
+        @Test
+        fun `CSI question Pp m dispatches key modifier option query`() {
+            assertEquals(
+                listOf("requestKeyModifierOption:${XtermKeyModifierResource.MODIFY_OTHER_KEYS}"),
+                dispatchMode(
+                    'm'.code,
+                    XtermKeyModifierResource.MODIFY_OTHER_KEYS,
+                    privateMarker = '?'.code,
+                ).events,
+            )
+        }
+
+        @Test
         fun `colon subparameter modifier mask is ignored until explicitly supported`() {
             val state = ParserState(maxParams = 32)
             val sink = RecordingTerminalCommandSink()

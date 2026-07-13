@@ -116,7 +116,7 @@ class TerminalResponseChannelTest {
     }
 
     @Test
-    fun `Kitty keyboard query reports only active masked progressive flags`() {
+    fun `Kitty keyboard query reports every active encoder-supported progressive flag`() {
         val buffer = TerminalBuffers.create(width = 10, height = 5)
 
         buffer.setKittyKeyboardFlags(
@@ -126,7 +126,18 @@ class TerminalResponseChannelTest {
         )
         buffer.requestKittyKeyboardFlags()
 
-        assertEquals("\u001B[?9u", drain(buffer))
+        assertEquals("\u001B[?11u", drain(buffer))
+    }
+
+    @Test
+    fun `xterm modify-other-keys query reports only the allowlisted resource and preserves explicit disable`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+        buffer.setModifyOtherKeysMode(-1)
+
+        buffer.requestKeyModifierOption(4)
+        buffer.requestKeyModifierOption(1)
+
+        assertEquals("\u001B[>4;-1m", drain(buffer))
     }
 
     @Test

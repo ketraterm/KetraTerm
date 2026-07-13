@@ -78,6 +78,13 @@ internal class KittyKeyboardEncoder(
         val eventType = if (isReportEventTypes) event.type.ordinal + 1 else NO_EVENT_TYPE
 
         if (
+            event.codepoint == TerminalKeyEvent.TEXT_ONLY_CODEPOINT &&
+            (!isReportAll || !isReportAssociatedText)
+        ) {
+            return
+        }
+
+        if (
             event.type == TerminalKeyEventType.RELEASE &&
             !isReportAll &&
             (event.key == TerminalKey.ENTER || event.key == TerminalKey.TAB || event.key == TerminalKey.BACKSPACE)

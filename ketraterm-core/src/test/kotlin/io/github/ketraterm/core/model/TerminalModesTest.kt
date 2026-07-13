@@ -71,7 +71,7 @@ class TerminalModesTest {
         modes.mouseEncodingMode = MouseEncodingMode.SGR
         modes.modifyOtherKeysMode = 2
         modes.formatOtherKeysMode = 1
-        modes.kittyKeyboardFlags = KittyKeyboardProgressiveFlag.SUPPORTED_MASK
+        modes.kittyKeyboardFlags = KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK
         modes.isSynchronizedOutput = true
         modes.isBellIsUrgent = true
         modes.isPopOnBell = true
@@ -154,7 +154,7 @@ class TerminalModesTest {
 
         modes.kittyKeyboardFlags = Int.MAX_VALUE
 
-        assertEquals(KittyKeyboardProgressiveFlag.SUPPORTED_MASK, modes.kittyKeyboardFlags)
+        assertEquals(KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK, modes.kittyKeyboardFlags)
     }
 
     @Test
@@ -177,7 +177,7 @@ class TerminalModesTest {
         modes.mouseEncodingMode = MouseEncodingMode.URXVT
         modes.modifyOtherKeysMode = 2
         modes.formatOtherKeysMode = 1
-        modes.kittyKeyboardFlags = KittyKeyboardProgressiveFlag.SUPPORTED_MASK
+        modes.kittyKeyboardFlags = KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK
         modes.isSynchronizedOutput = true
         modes.isBellIsUrgent = true
         modes.isPopOnBell = true

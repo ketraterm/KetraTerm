@@ -50,6 +50,9 @@ internal class SwingTerminalInputController(
 
             override fun keyReleased(event: KeyEvent) {
                 host.updateHyperlinkActivationHover(event.isControlDown)
+                val keyEvent = keyMapper.keyReleased(event) ?: return
+                host.session?.encodeKey(keyEvent)
+                event.consume()
             }
 
             override fun keyTyped(event: KeyEvent) {

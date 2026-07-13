@@ -19,7 +19,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="KetraTerm: A premium, high-performance terminal emulator with full Unicode 17.0.0 text layout, Kitty Keyboard progressive modifier mappings, native shell integration, and audited security policies.">
+    <meta name="description" content="KetraTerm: A premium, high-performance terminal emulator with Unicode 17.0.0 text layout, portable Kitty Keyboard flags 1 and 8, native shell integration, and audited security policies.">
     <title>KetraTerm | High-Performance Cross-Platform Terminal Emulator</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -59,7 +59,7 @@
             <div class="badge-pill">Windows Native (ConPTY)</div>
             <div class="badge-pill">macOS & Linux</div>
             <div class="badge-pill">24-bit TrueColor RGB</div>
-            <div class="badge-pill">Kitty Keyboard Protocol</div>
+            <div class="badge-pill">Kitty Keyboard (flags 1/8)</div>
         </div>
 
         <!-- High-Fidelity Terminal Preview -->
@@ -83,7 +83,7 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="6" y1="8" x2="6.01" y2="8"></line><line x1="10" y1="8" x2="10.01" y2="8"></line><line x1="14" y1="8" x2="14.01" y2="8"></line><line x1="18" y1="8" x2="18.01" y2="8"></line><line x1="6" y1="12" x2="6.01" y2="12"></line><line x1="18" y1="12" x2="18.01" y2="12"></line><line x1="10" y1="12" x2="14" y2="12"></line><line x1="6" y1="16" x2="6.01" y2="16"></line><line x1="10" y1="16" x2="10.01" y2="16"></line><line x1="14" y1="16" x2="14.01" y2="16"></line><line x1="18" y1="16" x2="18.01" y2="16"></line></svg>
                 </div>
                 <h3 class="feature-title">Kitty Keyboard Protocol</h3>
-                <p class="feature-desc">Fidelity key encoding supporting progressive modifier flags. Disambiguates modifier combinations, reports release events, and manages push/pop mode stacks so applications like Helix and Neovim get true desktop-level hotkeys.</p>
+                <p class="feature-desc">Portable Kitty key encoding supports escape-code disambiguation and report-all-keys modes (flags 1 and 8), with replace/set/clear and push/pop state. Swing preserves lifecycle for visible non-text physical keys; native layout, IME, alternate-key, and associated-text reporting remain deferred and are not advertised.</p>
             </div>
 
             <!-- Feature 2: Deep Shell Integration -->
@@ -236,8 +236,8 @@
                     <td><span class="table-cross">✘</span></td>
                 </tr>
                 <tr>
-                    <td><strong>Kitty Keyboard Protocol</strong></td>
-                    <td><span class="table-check">✔</span> (Progressive flags)</td>
+                    <td><strong>Kitty Keyboard (flags 1/8)</strong></td>
+                    <td><span class="table-check">✔</span> (flags 1/8)</td>
                     <td><span class="table-check">✔</span></td>
                     <td><span class="table-cross">✘</span></td>
                     <td><span class="table-cross">✘</span></td>

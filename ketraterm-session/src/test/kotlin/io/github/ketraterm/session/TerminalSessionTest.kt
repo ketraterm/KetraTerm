@@ -21,6 +21,7 @@ import io.github.ketraterm.host.*
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.parser.api.TerminalOutputParser
+import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.testkit.MockConnector
@@ -43,6 +44,24 @@ class TerminalSessionTest {
         connector.feedFromHost("\u001B[5n".ascii())
 
         assertEquals("\u001B[0n", connector.writtenBytes.asciiText())
+        session.close()
+    }
+
+    @Test
+    fun `rich host Kitty capability reaches parser host core response pipeline`() {
+        val connector = MockConnector()
+        val terminal = TerminalBuffers.create(width = 10, height = 3)
+        val session =
+            TerminalSession.create(
+                terminal = terminal,
+                connector = connector,
+                kittyKeyboardSupportedFlags = KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK,
+            )
+        session.start(columns = 10, rows = 3)
+
+        connector.feedFromHost("\u001B[=31u\u001B[?u".ascii())
+
+        assertEquals("\u001B[?31u", connector.writtenBytes.asciiText())
         session.close()
     }
 

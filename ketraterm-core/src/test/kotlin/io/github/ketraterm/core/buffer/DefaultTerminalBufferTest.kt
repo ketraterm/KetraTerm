@@ -172,7 +172,7 @@ class DefaultTerminalBufferTest {
         buffer.setMouseTrackingMode(MouseTrackingMode.BUTTON_EVENT)
         buffer.setMouseEncodingMode(MouseEncodingMode.SGR)
         buffer.setModifyOtherKeysMode(2)
-        buffer.setKittyKeyboardFlags(KittyKeyboardProgressiveFlag.SUPPORTED_MASK)
+        buffer.setKittyKeyboardFlags(KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK)
         buffer.setSelectiveEraseProtection(true)
         buffer.setPenColors(
             foreground = CellColor.indexed(196),
@@ -254,7 +254,7 @@ class DefaultTerminalBufferTest {
         buffer.setMouseTrackingMode(MouseTrackingMode.BUTTON_EVENT)
         buffer.setMouseEncodingMode(MouseEncodingMode.SGR)
         buffer.setModifyOtherKeysMode(2)
-        buffer.setKittyKeyboardFlags(KittyKeyboardProgressiveFlag.SUPPORTED_MASK)
+        buffer.setKittyKeyboardFlags(KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK)
         buffer.setTreatAmbiguousAsWide(true)
         buffer.enterAltBuffer()
 

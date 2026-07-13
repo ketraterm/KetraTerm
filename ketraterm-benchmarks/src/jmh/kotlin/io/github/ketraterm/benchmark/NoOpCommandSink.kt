@@ -143,6 +143,10 @@ internal class NoOpCommandSink : TerminalCommandSink {
 
     override fun resetKeyModifierOptions() {}
 
+    override fun disableKeyModifierOption(resource: Int) {}
+
+    override fun requestKeyModifierOption(resource: Int) {}
+
     override fun setKeyFormatOption(
         resource: Int,
         value: Int,

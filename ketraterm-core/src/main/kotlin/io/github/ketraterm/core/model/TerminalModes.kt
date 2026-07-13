@@ -114,8 +114,9 @@ internal class TerminalModes : TerminalInputState {
     /**
      * Modify-other-keys level.
      *
-     * `0` means disabled. Values are clamped to the packed 3-bit range until a
-     * wider input contract needs more states.
+     * `-1` means explicitly disabled by XTDISMODKEYS; `0` means the xterm
+     * default/reset state. The all-ones packed value is reserved for `-1`,
+     * preserving the zero-initialized reset state.
      */
     var modifyOtherKeysMode: Int
         get() = TerminalInputState.modifyOtherKeysMode(currentBits)
@@ -123,7 +124,11 @@ internal class TerminalModes : TerminalInputState {
             setPacked(
                 TerminalModeBits.MODIFY_OTHER_KEYS_MASK,
                 TerminalModeBits.MODIFY_OTHER_KEYS_SHIFT,
-                value.coerceIn(0, 7),
+                if (value < 0) {
+                    TerminalModeBits.MODIFY_OTHER_KEYS_EXPLICITLY_DISABLED
+                } else {
+                    value.coerceIn(0, TerminalModeBits.MODIFY_OTHER_KEYS_EXPLICITLY_DISABLED - 1)
+                },
             )
 
     /**
@@ -145,8 +150,9 @@ internal class TerminalModes : TerminalInputState {
     /**
      * Active Kitty keyboard progressive-enhancement flags.
      *
-     * Unsupported bits are masked out until the input contract grows matching
-     * event vocabulary and encoder behavior.
+     * Bits outside the encoder's protocol implementation are masked here. The
+     * parser-to-core host adapter applies its per-session host capability mask
+     * before setting or pushing these flags.
      */
     var kittyKeyboardFlags: Int
         get() = TerminalInputState.kittyKeyboardFlags(currentBits)
@@ -154,7 +160,7 @@ internal class TerminalModes : TerminalInputState {
             setPacked(
                 TerminalModeBits.KITTY_KEYBOARD_FLAGS_MASK,
                 TerminalModeBits.KITTY_KEYBOARD_FLAGS_SHIFT,
-                value and io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag.SUPPORTED_MASK,
+                value and io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK,
             )
 
     /** Synchronized output mode (?2026). True = enabled, false = disabled. */

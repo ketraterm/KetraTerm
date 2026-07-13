@@ -604,6 +604,11 @@ class KeyboardEncoderTest {
             TerminalKeyEvent.codepoint('A'.code, TerminalModifiers.SHIFT, associatedText = "A\u0301"),
             bitsAssociatedText,
         )
+        assertBytes(
+            esc("[0;;229u"),
+            TerminalKeyEvent.text("å"),
+            bitsAssociatedText,
+        )
     }
 
     @Test

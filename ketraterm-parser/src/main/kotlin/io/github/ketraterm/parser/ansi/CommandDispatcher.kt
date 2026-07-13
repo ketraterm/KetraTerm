@@ -155,6 +155,8 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.WINDOW_OP -> dispatchWindowOperation(sink, state)
             CsiCommand.XTFMTKEYS -> dispatchKeyFormatOption(sink, state)
             CsiCommand.XTMODKEYS -> dispatchKeyModifierOption(sink, state)
+            CsiCommand.XTDISMODKEYS -> dispatchDisableKeyModifierOption(sink, state)
+            CsiCommand.XTQMODKEYS -> dispatchQueryKeyModifierOption(sink, state)
             CsiCommand.KITTY_KEYBOARD_FLAGS -> dispatchKittyKeyboardFlags(sink, state)
             CsiCommand.KITTY_KEYBOARD_PUSH -> dispatchKittyKeyboardPush(sink, state)
             CsiCommand.KITTY_KEYBOARD_POP -> dispatchKittyKeyboardPop(sink, state)
@@ -355,6 +357,24 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             resetOne = { resource -> sink.resetKeyFormatOption(resource) },
             set = { resource, value -> sink.setKeyFormatOption(resource, value) },
         )
+    }
+
+    private fun dispatchDisableKeyModifierOption(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        if (state.paramCount != 1 || isSubParameter(state, 0)) return
+        val resource = paramOrMissing(state, 0)
+        if (resource >= 0) sink.disableKeyModifierOption(resource)
+    }
+
+    private fun dispatchQueryKeyModifierOption(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        if (state.paramCount != 1 || isSubParameter(state, 0)) return
+        val resource = paramOrMissing(state, 0)
+        if (resource >= 0) sink.requestKeyModifierOption(resource)
     }
 
     private fun dispatchKittyKeyboardFlags(

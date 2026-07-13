@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.input
 
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.event.TerminalModifiers
 import java.awt.event.KeyEvent
 
@@ -25,6 +26,8 @@ import java.awt.event.KeyEvent
  *
  * Printable text is emitted from `KEY_TYPED` events. Navigation, function, and
  * control/meta modified printable keys are emitted from `KEY_PRESSED` events.
+ * For the physical-key subset that AWT exposes, repeated `KEY_PRESSED` events
+ * and matching `KEY_RELEASED` events preserve the host-observed lifecycle.
  * Numeric keypad keys are emitted from `KEY_PRESSED` so application-keypad mode
  * can be applied by the input encoder; their follow-up `KEY_TYPED` event is
  * suppressed to avoid emitting the normal-mode character twice.
@@ -33,6 +36,7 @@ internal class SwingKeyMapper {
     private var pendingHighSurrogate: Char = NO_PENDING_SURROGATE
     private var pendingHighSurrogateModifiers: Int = TerminalModifiers.NONE
     private var suppressNextKeypadTyped: Boolean = false
+    private val pressedPhysicalKeys = BooleanArray((KeyEvent.KEY_LAST + 1) * KEY_LOCATION_COUNT)
 
     /**
      * Converts a `KEY_PRESSED` event to terminal input when the event should
@@ -47,7 +51,7 @@ internal class SwingKeyMapper {
         val key = terminalKey(event)
         if (key != null) {
             suppressNextKeypadTyped = isPrintableKeypadKey(key)
-            return TerminalKeyEvent.key(key, modifiers)
+            return TerminalKeyEvent.key(key, modifiers, pressedType(event))
         }
 
         suppressNextKeypadTyped = false
@@ -57,6 +61,22 @@ internal class SwingKeyMapper {
 
         val codepoint = controlShortcutCodepoint(event) ?: return null
         return TerminalKeyEvent.codepoint(codepoint, modifiers)
+    }
+
+    /**
+     * Converts a `KEY_RELEASED` event for a previously reported physical key.
+     *
+     * Printable and IME-produced input remains `KEY_TYPED`-driven because AWT
+     * does not expose a trustworthy physical identity for every such event.
+     *
+     * @param event Swing key event.
+     * @return matching release event, or `null` when no physical press was
+     * reported to the terminal.
+     */
+    fun keyReleased(event: KeyEvent): TerminalKeyEvent? {
+        val key = terminalKey(event) ?: return null
+        if (!releasePhysicalKey(event)) return null
+        return TerminalKeyEvent.key(key, modifiers(event), TerminalKeyEventType.RELEASE)
     }
 
     /**
@@ -274,7 +294,35 @@ internal class SwingKeyMapper {
         }
     }
 
+    private fun pressedType(event: KeyEvent): TerminalKeyEventType {
+        val index = physicalKeyIndex(event)
+        if (index == NO_PHYSICAL_KEY_INDEX) return TerminalKeyEventType.PRESS
+        if (pressedPhysicalKeys[index]) return TerminalKeyEventType.REPEAT
+
+        pressedPhysicalKeys[index] = true
+        return TerminalKeyEventType.PRESS
+    }
+
+    private fun releasePhysicalKey(event: KeyEvent): Boolean {
+        val index = physicalKeyIndex(event)
+        if (index == NO_PHYSICAL_KEY_INDEX || !pressedPhysicalKeys[index]) return false
+
+        pressedPhysicalKeys[index] = false
+        return true
+    }
+
+    private fun physicalKeyIndex(event: KeyEvent): Int {
+        val keyCode = event.keyCode
+        val keyLocation = event.keyLocation
+        if (keyCode !in 0..KeyEvent.KEY_LAST || keyLocation !in 0 until KEY_LOCATION_COUNT) {
+            return NO_PHYSICAL_KEY_INDEX
+        }
+        return keyCode * KEY_LOCATION_COUNT + keyLocation
+    }
+
     private companion object {
         private const val NO_PENDING_SURROGATE: Char = '\u0000'
+        private const val KEY_LOCATION_COUNT: Int = KeyEvent.KEY_LOCATION_NUMPAD + 1
+        private const val NO_PHYSICAL_KEY_INDEX: Int = -1
     }
 }

@@ -53,20 +53,25 @@ Keyboard events contain exactly one of:
 
 - a `TerminalKey` for non-printable physical keys
 - a printable Unicode scalar codepoint
+- Kitty text-only key code `0` with non-empty associated text when an IME or
+  host text API has no physical-key identity
 
 Each event also carries a host-reported lifecycle phase: press, repeat, or
 release. Hosts must not infer repeat or release semantics they cannot observe.
 
-Printable events may additionally carry the unshifted scalar that identifies
-the physical text-producing key. Input sources must leave that value unknown
-when they cannot provide it truthfully; it is distinct from the produced text
-and is required by Kitty-compatible CSI-u encoding.
+Printable events may additionally carry unshifted, shifted current-layout, and
+standard PC-101 base-layout scalars that identify the physical text-producing
+key, as well as associated host-owned text. Input sources must leave each value
+unknown when they cannot provide it truthfully; each is distinct from produced
+text and is used only by the relevant Kitty-compatible CSI-u progressive flag.
 
 Guaranteed behavior:
 
 - invalid modifier bitmasks are rejected
 - surrogate codepoints and values above `U+10FFFF` are rejected
 - C0 control codepoints and DEL are rejected as printable input
+- text-only events require scalar-valid associated text and cannot carry
+  physical-key scalar metadata
 - physical control-ish input such as Enter, Tab, Escape, and Backspace uses
   `TerminalKey`
 
@@ -169,6 +174,11 @@ Supported modified-key protocol:
 - Kitty associated-text formatting is implemented for validated host-owned
   text and writes codepoints directly to the reusable CSI buffer. Flag `16`
   remains unadvertised pending complete rich-host text/IME support.
+- The active host session admits a subset of encoder-supported Kitty flags.
+  Portable Swing sessions admit only flags `1` and `8`; a richer host must
+  explicitly declare the complete metadata it can provide before enabling
+  flags `2`, `4`, or `16`. Native rich-input adapters are deferred, so this
+  limitation also applies to IntelliJ-hosted Swing sessions.
 
 Not guaranteed yet:
 

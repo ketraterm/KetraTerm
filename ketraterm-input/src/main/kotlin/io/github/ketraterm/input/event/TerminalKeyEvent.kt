@@ -56,6 +56,7 @@ data class TerminalKeyEvent(
 
         val hasKey = key != null
         val hasCodepoint = codepoint != NO_CODEPOINT
+        val isTextOnly = codepoint == TEXT_ONLY_CODEPOINT
 
         require(hasKey xor hasCodepoint) {
             "TerminalKeyEvent must contain exactly one of key or codepoint"
@@ -74,15 +75,22 @@ data class TerminalKeyEvent(
         }
 
         if (hasCodepoint) {
-            require(isPrintableUnicodeScalar(codepoint)) {
-                "invalid Unicode scalar: $codepoint"
+            if (isTextOnly) {
+                require(associatedText != null) { "text-only input requires associatedText" }
+                require(unshiftedCodepoint == NO_CODEPOINT && shiftedCodepoint == NO_CODEPOINT && baseLayoutCodepoint == NO_CODEPOINT) {
+                    "text-only input cannot carry Kitty key scalar metadata"
+                }
+            } else {
+                require(isPrintableUnicodeScalar(codepoint)) {
+                    "invalid Unicode scalar: $codepoint"
+                }
             }
-            if (unshiftedCodepoint != NO_CODEPOINT) {
+            if (!isTextOnly && unshiftedCodepoint != NO_CODEPOINT) {
                 require(isPrintableUnicodeScalar(unshiftedCodepoint)) {
                     "invalid unshifted Unicode scalar: $unshiftedCodepoint"
                 }
             }
-            if (shiftedCodepoint != NO_CODEPOINT) {
+            if (!isTextOnly && shiftedCodepoint != NO_CODEPOINT) {
                 require(TerminalModifiers.hasShift(modifiers)) {
                     "shiftedCodepoint requires the Shift modifier"
                 }
@@ -90,7 +98,7 @@ data class TerminalKeyEvent(
                     "invalid shifted Unicode scalar: $shiftedCodepoint"
                 }
             }
-            if (baseLayoutCodepoint != NO_CODEPOINT) {
+            if (!isTextOnly && baseLayoutCodepoint != NO_CODEPOINT) {
                 require(isPrintableUnicodeScalar(baseLayoutCodepoint)) {
                     "invalid base-layout Unicode scalar: $baseLayoutCodepoint"
                 }
@@ -105,6 +113,9 @@ data class TerminalKeyEvent(
     companion object {
         /** Sentinel used when a key event does not carry a printable codepoint. */
         const val NO_CODEPOINT: Int = -1
+
+        /** Kitty key code used when text has no known physical key identity. */
+        const val TEXT_ONLY_CODEPOINT: Int = 0
 
         /**
          * Creates a non-printable key event.
@@ -156,6 +167,26 @@ data class TerminalKeyEvent(
                 unshiftedCodepoint = unshiftedCodepoint,
                 shiftedCodepoint = shiftedCodepoint,
                 baseLayoutCodepoint = baseLayoutCodepoint,
+                associatedText = associatedText,
+                modifiers = modifiers,
+                type = type,
+            )
+
+        /**
+         * Creates a Kitty text-only event with no known physical key identity.
+         *
+         * @param associatedText text produced by the host or IME.
+         * @param modifiers active keyboard modifiers.
+         * @param type physical lifecycle phase reported by the host.
+         * @return a normalized text-only key event.
+         */
+        fun text(
+            associatedText: String,
+            modifiers: Int = TerminalModifiers.NONE,
+            type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
+        ): TerminalKeyEvent =
+            TerminalKeyEvent(
+                codepoint = TEXT_ONLY_CODEPOINT,
                 associatedText = associatedText,
                 modifiers = modifiers,
                 type = type,
