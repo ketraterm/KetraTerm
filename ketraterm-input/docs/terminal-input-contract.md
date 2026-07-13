@@ -157,6 +157,9 @@ Supported modified-key protocol:
 - partial Kitty keyboard handling for progressive flags `1` and `8`. Flag `1`
   preserves legacy Enter, Tab, and Backspace bytes; Kitty CSI-u output uses a
   supplied unshifted key scalar when the input source provides one.
+- Kitty modifier encoding uses all eight protocol-defined bits. Legacy xterm
+  encodings retain their four-modifier representation; modifier-only key events
+  are emitted only when Kitty report-all-keys mode (`8`) is active.
 - Kitty event-type formatting (`modifier:event-type`) is implemented in the
   encoder for rich host events, but flag `2` is not advertised until a host can
   truthfully provide the complete required lifecycle metadata.

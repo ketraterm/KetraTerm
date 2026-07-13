@@ -67,13 +67,14 @@ internal object CsiWriter {
         modifiers: Int,
         finalByte: Int,
         eventType: Int = NO_EVENT_TYPE,
+        kittyModifiers: Boolean = false,
     ) {
         scratch.clear()
         scratch.appendByte(ControlCode.ESC)
         scratch.appendByte('['.code)
         scratch.appendDecimal(prefixNumber)
         scratch.appendByte(';'.code)
-        scratch.appendDecimal(TerminalModifiers.toCsiModifierParam(modifiers))
+        scratch.appendDecimal(modifierParam(modifiers, kittyModifiers))
         if (eventType != NO_EVENT_TYPE) {
             scratch.appendByte(':'.code)
             scratch.appendDecimal(eventType)
@@ -100,6 +101,7 @@ internal object CsiWriter {
         number: Int,
         modifiers: Int,
         eventType: Int = NO_EVENT_TYPE,
+        kittyModifiers: Boolean = false,
     ) {
         scratch.clear()
         scratch.appendByte(ControlCode.ESC)
@@ -108,7 +110,7 @@ internal object CsiWriter {
 
         if (modifiers != TerminalModifiers.NONE || eventType != NO_EVENT_TYPE) {
             scratch.appendByte(';'.code)
-            scratch.appendDecimal(TerminalModifiers.toCsiModifierParam(modifiers))
+            scratch.appendDecimal(modifierParam(modifiers, kittyModifiers))
             if (eventType != NO_EVENT_TYPE) {
                 scratch.appendByte(':'.code)
                 scratch.appendDecimal(eventType)
@@ -140,6 +142,7 @@ internal object CsiWriter {
         modifiers: Int,
         forceModifier: Boolean = false,
         eventType: Int = NO_EVENT_TYPE,
+        kittyModifiers: Boolean = false,
     ) {
         scratch.clear()
         scratch.appendByte(ControlCode.ESC)
@@ -148,7 +151,7 @@ internal object CsiWriter {
 
         if (modifiers != TerminalModifiers.NONE || forceModifier || eventType != NO_EVENT_TYPE) {
             scratch.appendByte(';'.code)
-            scratch.appendDecimal(TerminalModifiers.toCsiModifierParam(modifiers))
+            scratch.appendDecimal(modifierParam(modifiers, kittyModifiers))
             if (eventType != NO_EVENT_TYPE) {
                 scratch.appendByte(':'.code)
                 scratch.appendDecimal(eventType)
@@ -160,6 +163,16 @@ internal object CsiWriter {
     }
 
     private const val NO_EVENT_TYPE: Int = 0
+
+    private fun modifierParam(
+        modifiers: Int,
+        kittyModifiers: Boolean,
+    ): Int =
+        if (kittyModifiers) {
+            TerminalModifiers.toKittyCsiModifierParam(modifiers)
+        } else {
+            TerminalModifiers.toCsiModifierParam(modifiers)
+        }
 
     /**
      * Writes a Single Shift Select (SS3) sequence of the format: `ESC O <finalByte>`.

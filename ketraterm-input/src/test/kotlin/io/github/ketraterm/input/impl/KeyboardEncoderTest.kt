@@ -627,7 +627,7 @@ class KeyboardEncoderTest {
             modeBits = bitsDisambiguate,
             policy = TerminalInputPolicy(backspacePolicy = BackspacePolicy.BACKSPACE),
         )
-        assertBytes(esc("[13;9u"), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.META), bitsDisambiguate)
+        assertBytes(esc("[13;33u"), TerminalKeyEvent.key(TerminalKey.ENTER, TerminalModifiers.META), bitsDisambiguate)
 
         // REPORT_ALL_KEYS_AS_ESCAPE_CODES makes every key event a canonical CSI-u sequence.
         assertBytes(esc("[13u"), TerminalKeyEvent.key(TerminalKey.ENTER), bitsReportAll)
@@ -803,6 +803,7 @@ class KeyboardEncoderTest {
     @Test
     fun `Kitty keyboard encodes extended functional key ranges`() {
         val bits = kittyKeyboardBits(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES)
+        val reportAllBits = kittyKeyboardBits(KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES)
 
         assertBytes(esc("[57358u"), TerminalKeyEvent.key(TerminalKey.CAPS_LOCK), bits)
         assertBytes(esc("[57363u"), TerminalKeyEvent.key(TerminalKey.MENU), bits)
@@ -810,12 +811,28 @@ class KeyboardEncoderTest {
         assertBytes(esc("[57426u"), TerminalKeyEvent.key(TerminalKey.NUMPAD_DELETE), bits)
         assertBytes(esc("[57428u"), TerminalKeyEvent.key(TerminalKey.MEDIA_PLAY), bits)
         assertBytes(esc("[57440u"), TerminalKeyEvent.key(TerminalKey.VOLUME_MUTE), bits)
-        assertBytes(esc("[57441u"), TerminalKeyEvent.key(TerminalKey.LEFT_SHIFT), bits)
-        assertBytes(esc("[57454u"), TerminalKeyEvent.key(TerminalKey.ISO_LEVEL5_SHIFT), bits)
+        assertBytes(bytes(), TerminalKeyEvent.key(TerminalKey.LEFT_SHIFT), bits)
+        assertBytes(bytes(), TerminalKeyEvent.key(TerminalKey.ISO_LEVEL5_SHIFT), bits)
         assertBytes(
             esc("[57448;5u"),
             TerminalKeyEvent.key(TerminalKey.RIGHT_CONTROL, TerminalModifiers.CTRL),
-            bits,
+            reportAllBits,
+        )
+        assertBytes(bytes(), TerminalKeyEvent.key(TerminalKey.LEFT_SHIFT, TerminalModifiers.SHIFT), bits)
+        assertBytes(
+            esc("[57444;9u"),
+            TerminalKeyEvent.key(TerminalKey.LEFT_SUPER, TerminalModifiers.SUPER),
+            reportAllBits,
+        )
+        assertBytes(
+            esc("[97;33u"),
+            TerminalKeyEvent.codepoint('a'.code, TerminalModifiers.META),
+            reportAllBits,
+        )
+        assertBytes(
+            esc("[57358;65u"),
+            TerminalKeyEvent.key(TerminalKey.CAPS_LOCK, TerminalModifiers.CAPS_LOCK),
+            reportAllBits,
         )
     }
 

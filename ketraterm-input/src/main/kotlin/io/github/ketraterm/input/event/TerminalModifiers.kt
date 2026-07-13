@@ -34,11 +34,23 @@ object TerminalModifiers {
     /** Control is active. */
     const val CTRL: Int = 1 shl 2
 
-    /** Meta or command is active. */
-    const val META: Int = 1 shl 3
+    /** Super is active, such as Windows or Command. */
+    const val SUPER: Int = 1 shl 3
+
+    /** Hyper is active. */
+    const val HYPER: Int = 1 shl 4
+
+    /** Meta is active. */
+    const val META: Int = 1 shl 5
+
+    /** Caps Lock is enabled. */
+    const val CAPS_LOCK: Int = 1 shl 6
+
+    /** Num Lock is enabled. */
+    const val NUM_LOCK: Int = 1 shl 7
 
     /** Mask containing every supported modifier bit. */
-    const val VALID_MASK: Int = SHIFT or ALT or CTRL or META
+    const val VALID_MASK: Int = SHIFT or ALT or CTRL or SUPER or HYPER or META or CAPS_LOCK or NUM_LOCK
 
     /**
      * Returns true when Shift is present in [modifiers].
@@ -72,6 +84,18 @@ object TerminalModifiers {
      */
     fun hasMeta(modifiers: Int): Boolean = (modifiers and META) != 0
 
+    /** Returns true when Super is present in [modifiers]. */
+    fun hasSuper(modifiers: Int): Boolean = (modifiers and SUPER) != 0
+
+    /** Returns true when Hyper is present in [modifiers]. */
+    fun hasHyper(modifiers: Int): Boolean = (modifiers and HYPER) != 0
+
+    /** Returns true when Caps Lock is present in [modifiers]. */
+    fun hasCapsLock(modifiers: Int): Boolean = (modifiers and CAPS_LOCK) != 0
+
+    /** Returns true when Num Lock is present in [modifiers]. */
+    fun hasNumLock(modifiers: Int): Boolean = (modifiers and NUM_LOCK) != 0
+
     /**
      * Returns true when [modifiers] contains only supported modifier bits.
      *
@@ -84,11 +108,28 @@ object TerminalModifiers {
      * Converts internal modifier bits to an xterm-style CSI modifier parameter.
      *
      * @param modifiers active modifier bitmask.
+     * Lock modifiers are not representable in xterm CSI parameters. Super,
+     * Hyper, and Meta are merged into xterm's legacy fourth modifier bit.
      * @return 1-based xterm CSI modifier parameter value.
      * @throws IllegalArgumentException when [modifiers] contains unsupported
      * bits.
      */
     fun toCsiModifierParam(modifiers: Int): Int {
+        require(isValid(modifiers)) { "invalid modifier bitmask: $modifiers" }
+        var legacyModifiers = modifiers and (SHIFT or ALT or CTRL)
+        if ((modifiers and (SUPER or HYPER or META)) != 0) {
+            legacyModifiers = legacyModifiers or SUPER
+        }
+        return 1 + legacyModifiers
+    }
+
+    /**
+     * Converts internal modifier bits to Kitty's CSI-u modifier parameter.
+     *
+     * @param modifiers active modifier bitmask.
+     * @return Kitty's one-based modifier parameter.
+     */
+    fun toKittyCsiModifierParam(modifiers: Int): Int {
         require(isValid(modifiers)) { "invalid modifier bitmask: $modifiers" }
         return 1 + modifiers
     }
