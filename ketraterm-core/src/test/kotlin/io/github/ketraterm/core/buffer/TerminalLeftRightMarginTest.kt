@@ -17,6 +17,7 @@ package io.github.ketraterm.core.buffer
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.codec.AttributeCodec
 import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.state.TerminalState
 import org.junit.jupiter.api.Assertions.*
@@ -41,6 +42,7 @@ class TerminalLeftRightMarginTest {
         val random = Random(0x1E_F7)
         buffer.setLeftRightMarginMode(true)
         buffer.setLeftRightMargins(3, 6)
+        buffer.setScrollRegion(1, 3)
         buffer.setAutoWrap(false)
 
         for (row in 0 until 3) {
@@ -51,14 +53,19 @@ class TerminalLeftRightMarginTest {
             line.setCell(7, 'r'.code + row, 0)
         }
 
-        repeat(300) { step ->
+        repeat(600) { step ->
             buffer.positionCursor(2 + random.nextInt(4), random.nextInt(3))
-            when (random.nextInt(5)) {
+            when (random.nextInt(10)) {
                 0 -> buffer.writeCodepoint('a'.code + random.nextInt(26))
                 1 -> buffer.writeCodepoint(0x1F600 + random.nextInt(5))
                 2 -> buffer.insertBlankCharacters(1 + random.nextInt(3))
                 3 -> buffer.deleteCharacters(1 + random.nextInt(3))
-                else -> buffer.eraseCharacters(1 + random.nextInt(3))
+                4 -> buffer.eraseCharacters(1 + random.nextInt(3))
+                5 -> buffer.selectiveEraseLineToEnd()
+                6 -> buffer.selectiveEraseLineToCursor()
+                7 -> buffer.selectiveEraseCurrentLine()
+                8 -> buffer.insertLines(1 + random.nextInt(2))
+                else -> buffer.deleteLines(1 + random.nextInt(2))
             }
 
             for (row in 0 until 3) {
@@ -844,6 +851,81 @@ class TerminalLeftRightMarginTest {
                 println("Row $r: $rowStr")
             }
             throw e
+        }
+    }
+
+    @Test
+    fun `partial region scroll property preserves rows outside region and models guard-column movement`() {
+        val buffer = TerminalBuffers.create(width = 8, height = 4)
+        val state = stateOf(buffer)
+        val random = Random(0x5C0A11)
+        val expectedLeft = IntArray(4) { 'L'.code + it }
+        val expectedRight = IntArray(4) { 'R'.code + it }
+
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 6)
+        buffer.setScrollRegion(2, 3)
+        for (row in 0 until 4) {
+            val line = state.activeBuffer.ring[state.resolveRingIndex(row)]
+            line.setCell(0, expectedLeft[row], 0)
+            line.setCell(7, expectedRight[row], 0)
+        }
+
+        repeat(400) { step ->
+            if (random.nextBoolean()) {
+                buffer.scrollUp()
+                expectedLeft[1] = expectedLeft[2]
+                expectedRight[1] = expectedRight[2]
+                expectedLeft[2] = TerminalConstants.EMPTY
+                expectedRight[2] = TerminalConstants.EMPTY
+            } else {
+                buffer.scrollDown()
+                expectedLeft[2] = expectedLeft[1]
+                expectedRight[2] = expectedRight[1]
+                expectedLeft[1] = TerminalConstants.EMPTY
+                expectedRight[1] = TerminalConstants.EMPTY
+            }
+
+            for (row in 0 until 4) {
+                assertAll(
+                    { assertEquals(expectedLeft[row], buffer.getCodepointAt(0, row), "step=$step row=$row left") },
+                    { assertEquals(expectedRight[row], buffer.getCodepointAt(7, row), "step=$step row=$row right") },
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `random selective erases preserve protected wide clusters within horizontal margins`() {
+        val buffer = TerminalBuffers.create(width = 8, height = 3)
+        val state = stateOf(buffer)
+        val random = Random(0x51EC7)
+
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 6)
+        buffer.setSelectiveEraseProtection(true)
+        for (row in 0 until 3) {
+            buffer.positionCursor(2, row)
+            buffer.writeCodepoint(0x1F600 + row)
+        }
+        buffer.setSelectiveEraseProtection(false)
+
+        repeat(400) { step ->
+            buffer.positionCursor(2 + random.nextInt(4), random.nextInt(3))
+            when (random.nextInt(3)) {
+                0 -> buffer.selectiveEraseLineToEnd()
+                1 -> buffer.selectiveEraseLineToCursor()
+                else -> buffer.selectiveEraseCurrentLine()
+            }
+
+            for (row in 0 until 3) {
+                val line = state.activeBuffer.ring[state.resolveRingIndex(row)]
+                assertAll(
+                    { assertEquals(0x1F600 + row, buffer.getCodepointAt(2, row), "step=$step row=$row leader") },
+                    { assertEquals(TerminalConstants.WIDE_CHAR_SPACER, buffer.getCodepointAt(3, row), "step=$step row=$row spacer") },
+                    { assertTrue(AttributeCodec.isProtected(line.getPackedAttr(2)), "step=$step row=$row protection") },
+                )
+            }
         }
     }
 }
