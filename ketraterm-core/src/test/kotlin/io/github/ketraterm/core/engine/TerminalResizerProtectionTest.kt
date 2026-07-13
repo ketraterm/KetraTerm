@@ -62,4 +62,29 @@ class TerminalResizerProtectionTest {
             { assertEquals(TerminalConstants.EMPTY, thirdVisible.getCodepoint(0)) },
         )
     }
+
+    @Test
+    fun `resize_reflow_preservesProtectionAcrossWideGlyphSpan`() {
+        val state = TerminalState(initialWidth = 5, initialHeight = 2, maxHistory = 2)
+        val writer = MutationEngine(state)
+        writer.printCodepoint('A'.code, 1)
+        state.pen.setSelectiveEraseProtection(true)
+        writer.printCodepoint(0x4F60, 2)
+        state.pen.setSelectiveEraseProtection(false)
+        writer.printCodepoint('B'.code, 1)
+
+        resizeState(state, newWidth = 2, newHeight = 3)
+
+        val wideLine =
+            (0 until state.ring.size)
+                .map(state.ring::get)
+                .first { it.getCodepoint(0) == 0x4F60 }
+
+        assertAll(
+            { assertEquals(0x4F60, wideLine.getCodepoint(0)) },
+            { assertEquals(TerminalConstants.WIDE_CHAR_SPACER, wideLine.getCodepoint(1)) },
+            { assertTrue(AttributeCodec.isProtected(wideLine.getPackedAttr(0))) },
+            { assertTrue(AttributeCodec.isProtected(wideLine.getPackedAttr(1))) },
+        )
+    }
 }

@@ -847,6 +847,89 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `alternate modes preserve primary protected wide content across resize and reset lifecycle`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 8, height = 3, maxHistory = 4))
+
+            f.acceptAscii("\u001B[?69h\u001B[3;6s\u001B[2;3r\u001B[1\"q\u001B[2;3H🙂")
+            f.acceptAscii("\u001B[?1048h\u001B[1;1H\u001B[?1048lR")
+
+            assertAll(
+                { assertEquals(0x1F642, f.terminal.getCodepointAt(2, 1)) },
+                { assertTrue(f.terminal.getAttrAt(2, 1)?.selectiveEraseProtected == true) },
+                { assertEquals('R'.code, f.terminal.getCodepointAt(4, 1)) },
+            )
+
+            f.acceptAscii("\u001B[?47hALT")
+            f.terminal.resize(newWidth = 6, newHeight = 3)
+            f.acceptAscii("\u001B[?47l")
+
+            assertAll(
+                { assertEquals(0x1F642, f.terminal.getCodepointAt(2, 1)) },
+                { assertTrue(f.terminal.getAttrAt(2, 1)?.selectiveEraseProtected == true) },
+                { assertEquals('R'.code, f.terminal.getCodepointAt(4, 1)) },
+            )
+
+            f.acceptAscii("\u001B[?47hS\u001B[?47l\u001B[?1047h")
+            assertEquals("", f.terminal.getLineAsString(0))
+            f.acceptAscii("\u001B[?1047l\u001B[?1049hZ")
+
+            f.terminal.reset()
+
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals(6, f.terminal.width) },
+                { assertEquals(3, f.terminal.height) },
+                { assertEquals("", f.terminal.getLineAsString(0)) },
+                { assertFalse(f.terminal.getModeSnapshot().isLeftRightMarginMode) },
+            )
+        }
+
+        @Test
+        fun `horizontal margins and alternate screen are invariant under byte chunking`() {
+            val stream = "\u001B[?69h\u001B[3;5sAB\u001B[?1049hZ\u001B[?1049lC".encodeToByteArray()
+
+            for (chunkSize in 1..stream.size) {
+                val f = Fixture(terminal = TerminalBuffers.create(width = 8, height = 3))
+                var offset = 0
+                while (offset < stream.size) {
+                    val length = minOf(chunkSize, stream.size - offset)
+                    f.parser.accept(stream, offset, length)
+                    offset += length
+                }
+                f.end()
+
+                assertAll(
+                    { assertEquals("  ABC", f.terminal.getLineAsString(0), "chunkSize=$chunkSize") },
+                    { assertEquals(4, f.terminal.cursorCol, "chunkSize=$chunkSize") },
+                    { assertEquals(0, f.terminal.cursorRow, "chunkSize=$chunkSize") },
+                )
+            }
+        }
+
+        @Test
+        fun `origin mode addresses the intersection of vertical and horizontal margins under every chunking`() {
+            val stream = "\u001B[?69h\u001B[3;6s\u001B[2;4r\u001B[?6h\u001B[1;1HX\u001B[?6l\u001B[1;1HY".encodeToByteArray()
+
+            for (chunkSize in 1..stream.size) {
+                val f = Fixture(terminal = TerminalBuffers.create(width = 8, height = 5))
+                var offset = 0
+                while (offset < stream.size) {
+                    val length = minOf(chunkSize, stream.size - offset)
+                    f.parser.accept(stream, offset, length)
+                    offset += length
+                }
+                f.end()
+
+                assertAll(
+                    { assertEquals('X'.code, f.terminal.getCodepointAt(2, 1), "chunkSize=$chunkSize") },
+                    { assertEquals('Y'.code, f.terminal.getCodepointAt(2, 0), "chunkSize=$chunkSize") },
+                    { assertEquals(3, f.terminal.cursorCol, "chunkSize=$chunkSize") },
+                    { assertEquals(0, f.terminal.cursorRow, "chunkSize=$chunkSize") },
+                )
+            }
+        }
+
+        @Test
         fun `DECSCUSR cursor style parsed from bytes updates core cursor shape and blinking`() {
             val f = Fixture()
 
@@ -1038,6 +1121,23 @@ class HostCommandAdapterTest {
             assertAll(
                 { assertEquals("A", f.terminal.getLineAsString(0)) },
                 { assertEquals("", f.terminal.getLineAsString(1)) },
+                { assertTrue(f.terminal.getAttrAt(0, 0)?.selectiveEraseProtected == true) },
+            )
+        }
+
+        @Test
+        fun `DECSEL preserves protected wide cluster and clears adjacent unprotected cell`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 6, height = 2))
+
+            f.acceptAscii("\u001B[1\"q\uD83D\uDE00")
+            f.acceptAscii("\u001B[2\"qB")
+            f.acceptAscii("\u001B[1;1H\u001B[?2K")
+            f.end()
+
+            assertAll(
+                { assertEquals(0x1F600, f.terminal.getCodepointAt(0, 0)) },
+                { assertEquals(-1, f.terminal.getCodepointAt(1, 0)) },
+                { assertEquals(0, f.terminal.getCodepointAt(2, 0)) },
                 { assertTrue(f.terminal.getAttrAt(0, 0)?.selectiveEraseProtected == true) },
             )
         }

@@ -42,6 +42,27 @@ class TerminalHistoryLifecycleTest {
     }
 
     @Test
+    fun `scrollback eviction releases clusters retained by the oldest history line`() {
+        val state = TerminalState(initialWidth = 4, initialHeight = 2, maxHistory = 1)
+        val mutation = MutationEngine(state)
+        val oldestVisibleLine = state.ring[0]
+        oldestVisibleLine.setCluster(0, intArrayOf('A'.code, 0x0301), 2, 0)
+        val originalHandle = oldestVisibleLine.rawCodepoint(0)
+
+        mutation.scrollUp()
+        mutation.scrollUp()
+
+        val newBottomLine = state.ring[state.ring.size - 1]
+        newBottomLine.setCluster(0, intArrayOf('B'.code, 0x0301), 2, 0)
+
+        assertEquals(
+            originalHandle,
+            newBottomLine.rawCodepoint(0),
+            "Evicting the oldest scrollback line must release its cluster slot for reuse",
+        )
+    }
+
+    @Test
     fun `reset_releasesAllPrimaryHistoryClusterSlots`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 2, maxHistory = 3)
         val state =
