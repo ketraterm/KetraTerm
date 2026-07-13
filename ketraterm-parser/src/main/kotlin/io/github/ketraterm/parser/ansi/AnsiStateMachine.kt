@@ -176,11 +176,12 @@ internal object AnsiStateMachine {
     }
 
     private fun buildCsi() {
-        // Non-ASCII bytes are invalid in CSI control functions.  Keep consuming through
-        // CSI_IGNORE until a structural terminator so no accumulated parameters dispatch.
-        set(AnsiState.CSI_ENTRY, ByteClass.UTF8_PAYLOAD, AnsiState.CSI_IGNORE, FsmAction.IGNORE)
-        set(AnsiState.CSI_PARAM, ByteClass.UTF8_PAYLOAD, AnsiState.CSI_IGNORE, FsmAction.IGNORE)
-        set(AnsiState.CSI_INTERMEDIATE, ByteClass.UTF8_PAYLOAD, AnsiState.CSI_IGNORE, FsmAction.IGNORE)
+        // Non-ASCII bytes are invalid in CSI control functions. Drop the incomplete sequence
+        // immediately so a later ASCII final is ordinary text, never a stale CSI dispatch.
+        set(AnsiState.CSI_ENTRY, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
+        set(AnsiState.CSI_PARAM, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
+        set(AnsiState.CSI_INTERMEDIATE, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
+        set(AnsiState.CSI_IGNORE, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
 
         // CSI_ENTRY
         set(AnsiState.CSI_ENTRY, ByteClass.PARAM_DIGIT, AnsiState.CSI_PARAM, FsmAction.PARAM_DIGIT)
@@ -268,9 +269,7 @@ internal object AnsiStateMachine {
         set(AnsiState.DCS_ENTRY, ByteClass.OSC_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
         set(AnsiState.DCS_ENTRY, ByteClass.SOS_PM_APC_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
         set(AnsiState.DCS_ENTRY, ByteClass.FINAL_BYTE, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
-        // A malformed UTF-8 byte before the DCS introducer has completed must not be replayed
-        // as a query once later ASCII completes it.  Swallow the remainder through ST/CAN/SUB.
-        set(AnsiState.DCS_ENTRY, ByteClass.UTF8_PAYLOAD, AnsiState.IGNORE_UNTIL_ST, FsmAction.STRING_END)
+        set(AnsiState.DCS_ENTRY, ByteClass.UTF8_PAYLOAD, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
 
         val s = AnsiState.DCS_PASSTHROUGH
         set(s, ByteClass.INTERMEDIATE, s, FsmAction.DCS_PUT_ASCII)
