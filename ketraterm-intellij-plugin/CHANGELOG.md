@@ -1,6 +1,6 @@
 # KetraTerm IntelliJ Plugin Changelog
 
-## [Unreleased]
+## [0.2.0] - 2026-07-13
 
 - Fixed multiline paste.
 - Fixed terminal selection copying that could intermittently copy the wrong text or leave the previous clipboard contents unchanged.
