@@ -82,7 +82,9 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(policy)`: any DCS that can exfiltrate host capabilities needs a response policy and terminal-to-host channel.
 
 ### Text and Unicode
-- `TODO(parser)`: malformed UTF-8 policy tests across all structural boundary bytes.
+- `DONE(parser)`: malformed UTF-8 recovery is exercised immediately before and inside ESC, CSI,
+  OSC (BEL/ST/CAN/SUB), DCS ST, and end-of-input, with every split boundary proving that malformed
+  bytes do not print or complete stale structural commands.
 - `TODO(parser)`: configurable replacement policy if needed by host applications.
 - `TODO(parser)`: broader ISO 2022 charset mapping.
 
