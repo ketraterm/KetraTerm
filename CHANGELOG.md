@@ -1,5 +1,9 @@
 # KetraTerm Changelog
 
+## [Unreleased]
+
+- Added VT420 rectangular-area checksums (`DECRQCRA`) across the parser, core, and host pipeline. Responses are policy-gated, bounded to the active page, and preserve DEC origin/margin semantics.
+
 ## [0.2.0] - 2026-07-13
 
 - Fixed multiline paste framing across local PTY sessions: bracketed paste preserves the payload, while unbracketed paste uses CR line boundaries so PowerShell and other interactive shells do not receive duplicate or reordered continuation input.
