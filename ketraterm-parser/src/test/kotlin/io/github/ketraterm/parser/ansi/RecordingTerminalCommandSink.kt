@@ -164,6 +164,26 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "eraseInLine:$mode:$selective"
     }
 
+    override fun eraseRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        selective: Boolean,
+    ) {
+        events += "eraseRectangle:$top:$left:$bottom:$right:$selective"
+    }
+
+    override fun fillRectangle(
+        codepoint: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) {
+        events += "fillRectangle:$codepoint:$top:$left:$bottom:$right"
+    }
+
     override fun insertLines(n: Int) {
         events += "insertLines:$n"
     }

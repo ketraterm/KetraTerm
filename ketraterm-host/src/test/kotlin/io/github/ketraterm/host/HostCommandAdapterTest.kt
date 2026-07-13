@@ -1143,6 +1143,25 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `DEC rectangular fill erase and selective erase flow from bytes into core`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 6, height = 3))
+
+            f.acceptAscii("\u001B[35;3;2;3;3\$x")
+            f.acceptAscii("\u001B[1\"q\u001B[1;2H🙂\u001B[0\"qB")
+            f.acceptAscii("\u001B[1;3;1;4\${")
+            f.acceptAscii("\u001B[2;2;2;3\$z")
+            f.end()
+
+            assertAll(
+                { assertEquals('#'.code, f.terminal.getCodepointAt(1, 2)) },
+                { assertEquals(0x1F642, f.terminal.getCodepointAt(1, 0)) },
+                { assertEquals(-1, f.terminal.getCodepointAt(2, 0)) },
+                { assertTrue(f.terminal.getAttrAt(1, 0)?.selectiveEraseProtected == true) },
+                { assertEquals(0, f.terminal.getCodepointAt(3, 1)) },
+            )
+        }
+
+        @Test
         fun `OSC titles and hyperlinks are retained as adapter metadata`() {
             val f = Fixture()
 

@@ -1038,6 +1038,90 @@ internal class MutationEngine(
         }
 
     /**
+     * Applies a VT400 rectangular erase operation without moving the cursor.
+     *
+     * The DEC coordinates are one-based and inclusive. Origin mode rebases them onto the active
+     * scroll region and, when horizontal margins are enabled, its active column region. Rectangles
+     * outside that domain are clipped to it. Any visual occupant intersecting the rectangle is
+     * handled atomically so a wide leader/spacer pair or grapheme cluster cannot be split.
+     */
+    fun eraseRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        selective: Boolean,
+    ) = structuralMutation {
+        withRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
+            for (row in topRow..bottomRow) {
+                if (selective) {
+                    selectiveEraseRange(row, leftCol, rightCol + 1)
+                } else {
+                    eraseRange(row, leftCol, rightCol + 1)
+                }
+            }
+        }
+    }
+
+    /**
+     * Applies a VT420 rectangular fill operation without moving the cursor.
+     *
+     * DECFRA addresses terminal cells rather than printable-stream columns, so the fill character
+     * is installed as one cell even if a host supplied an unusual wide scalar. Existing visual
+     * occupants are first annihilated as full spans to preserve grid integrity.
+     */
+    fun fillRectangle(
+        codepoint: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) = structuralMutation {
+        if (codepoint !in 0..0x10FFFF || codepoint in 0xD800..0xDFFF) return@structuralMutation
+
+        withRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
+            for (row in topRow..bottomRow) {
+                val line = getLine(row)
+                for (col in leftCol..rightCol) {
+                    annihilateAt(row, col)
+                    line.setCell(col, codepoint, state.pen.currentAttr, state.pen.currentExtendedAttr)
+                }
+                line.wrapped = false
+                state.markLineChanged(line)
+            }
+        }
+    }
+
+    private inline fun withRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        block: (topRow: Int, leftCol: Int, bottomRow: Int, rightCol: Int) -> Unit,
+    ) {
+        val originRows = state.modes.isOriginMode
+        val originColumns = originRows && state.modes.isLeftRightMarginMode
+        val rowBase = if (originRows) state.scrollTop else 0
+        val rowLimit = if (originRows) state.scrollBottom else height - 1
+        val colBase = if (originColumns) leftMargin else 0
+        val colLimit = if (originColumns) rightMargin else width - 1
+
+        val requestedTop = rowBase + if (top <= 0) 0 else top - 1
+        val requestedLeft = colBase + if (left <= 0) 0 else left - 1
+        val requestedBottom = rowBase + if (bottom <= 0) rowLimit - rowBase else bottom - 1
+        val requestedRight = colBase + if (right <= 0) colLimit - colBase else right - 1
+        if (requestedTop > requestedBottom || requestedLeft > requestedRight) return
+
+        val topRow = requestedTop.coerceIn(rowBase, rowLimit)
+        val leftCol = requestedLeft.coerceIn(colBase, colLimit)
+        val bottomRow = requestedBottom.coerceIn(rowBase, rowLimit)
+        val rightCol = requestedRight.coerceIn(colBase, colLimit)
+        if (topRow > bottomRow || leftCol > rightCol) return
+
+        block(topRow, leftCol, bottomRow, rightCol)
+    }
+
+    /**
      * Clears scrollback history while preserving the current visible viewport (ED 3).
      *
      * Visible rows are deep-copied into a fresh ring/store pair so dropped

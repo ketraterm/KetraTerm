@@ -289,6 +289,46 @@ interface TerminalCommandSink {
     )
 
     /**
+     * Erases a VT400 rectangular area (DECERA / DECSERA).
+     *
+     * Coordinates retain DEC's one-based inclusive representation so the core can apply its active
+     * origin-mode policy. A value of `0` denotes an omitted parameter and is resolved by the core.
+     *
+     * @param top One-based top row.
+     * @param left One-based left column.
+     * @param bottom One-based bottom row.
+     * @param right One-based right column.
+     * @param selective `true` for DECSERA, which preserves selectively protected cells.
+     */
+    fun eraseRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        selective: Boolean,
+    )
+
+    /**
+     * Fills a VT420 rectangular area (DECFRA) with [codepoint].
+     *
+     * Coordinates retain DEC's one-based inclusive representation so the core can apply its active
+     * origin-mode policy. A value of `0` denotes an omitted parameter and is resolved by the core.
+     *
+     * @param codepoint Decimal fill character.
+     * @param top One-based top row.
+     * @param left One-based left column.
+     * @param bottom One-based bottom row.
+     * @param right One-based right column.
+     */
+    fun fillRectangle(
+        codepoint: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    )
+
+    /**
      * Inserts [n] blank lines at the cursor row (IL).
      *
      * @param n Number of lines to insert.

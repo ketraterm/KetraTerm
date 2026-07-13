@@ -142,6 +142,16 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.EL -> sink.eraseInLine(modeParam(state, 0), selective = false)
             CsiCommand.DECSED -> sink.eraseInDisplay(modeParam(state, 0), selective = true)
             CsiCommand.DECSEL -> sink.eraseInLine(modeParam(state, 0), selective = true)
+            CsiCommand.DECERA -> dispatchRectangleErase(sink, state, selective = false)
+            CsiCommand.DECSERA -> dispatchRectangleErase(sink, state, selective = true)
+            CsiCommand.DECFRA ->
+                sink.fillRectangle(
+                    codepoint = modeParam(state, 0),
+                    top = rectangleParam(state, 1),
+                    left = rectangleParam(state, 2),
+                    bottom = rectangleParam(state, 3),
+                    right = rectangleParam(state, 4),
+                )
             CsiCommand.IL -> sink.insertLines(countParam(state, 0))
             CsiCommand.DL -> sink.deleteLines(countParam(state, 0))
             CsiCommand.ICH -> sink.insertCharacters(countParam(state, 0))
@@ -246,6 +256,28 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         state: ParserState,
         index: Int,
     ): Int = if (index < state.paramCount) state.params[index] else -1
+
+    private fun rectangleParam(
+        state: ParserState,
+        index: Int,
+    ): Int {
+        val value = paramOrMissing(state, index)
+        return if (value <= 0) 0 else value
+    }
+
+    private fun dispatchRectangleErase(
+        sink: TerminalCommandSink,
+        state: ParserState,
+        selective: Boolean,
+    ) {
+        sink.eraseRectangle(
+            top = rectangleParam(state, 0),
+            left = rectangleParam(state, 1),
+            bottom = rectangleParam(state, 2),
+            right = rectangleParam(state, 3),
+            selective = selective,
+        )
+    }
 
     private fun dispatchAnsiMode(
         sink: TerminalCommandSink,

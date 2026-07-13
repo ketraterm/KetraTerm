@@ -245,6 +245,48 @@ interface TerminalWriter {
     /** Selectively erases the entire visible screen without moving the cursor (DECSED 2). */
     fun selectiveEraseEntireScreen()
 
+    /**
+     * Erases a VT400 rectangular area (DECERA / DECSERA).
+     *
+     * Coordinates use DEC's one-based inclusive form. Zero values denote omitted parameters and
+     * resolve to the corresponding active-viewport edge. When origin mode is enabled, coordinates
+     * are relative to the active scrolling margins. Selective erasure preserves protected cells.
+     *
+     * @param top One-based top row, or `0` when omitted.
+     * @param left One-based left column, or `0` when omitted.
+     * @param bottom One-based bottom row, or `0` when omitted.
+     * @param right One-based right column, or `0` when omitted.
+     * @param selective `true` for DECSERA, `false` for DECERA.
+     */
+    fun eraseRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        selective: Boolean,
+    )
+
+    /**
+     * Fills a VT420 rectangular area (DECFRA) with a one-cell DEC character.
+     *
+     * Coordinates use DEC's one-based inclusive form. Zero values denote omitted parameters and
+     * resolve to the corresponding active-viewport edge. When origin mode is enabled, coordinates
+     * are relative to the active scrolling margins.
+     *
+     * @param codepoint Decimal fill character. Invalid scalar values are ignored.
+     * @param top One-based top row, or `0` when omitted.
+     * @param left One-based left column, or `0` when omitted.
+     * @param bottom One-based bottom row, or `0` when omitted.
+     * @param right One-based right column, or `0` when omitted.
+     */
+    fun fillRectangle(
+        codepoint: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    )
+
     /** Erases the entire visible screen without moving the cursor (ED 2, `CSI 2 J`). */
     fun eraseEntireScreen()
 

@@ -290,6 +290,26 @@ class ActionEngineTest {
             sinkCalls += "eraseInLine:$mode:$selective"
         }
 
+        override fun eraseRectangle(
+            top: Int,
+            left: Int,
+            bottom: Int,
+            right: Int,
+            selective: Boolean,
+        ) {
+            sinkCalls += "eraseRectangle:$top:$left:$bottom:$right:$selective"
+        }
+
+        override fun fillRectangle(
+            codepoint: Int,
+            top: Int,
+            left: Int,
+            bottom: Int,
+            right: Int,
+        ) {
+            sinkCalls += "fillRectangle:$codepoint:$top:$left:$bottom:$right"
+        }
+
         override fun insertLines(n: Int) {
             sinkCalls += "insertLines:$n"
         }

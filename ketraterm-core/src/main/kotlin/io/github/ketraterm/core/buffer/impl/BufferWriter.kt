@@ -138,6 +138,22 @@ internal class BufferWriter(
 
     override fun selectiveEraseEntireScreen() = mutationEngine.selectiveEraseEntireScreen()
 
+    override fun eraseRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        selective: Boolean,
+    ) = mutationEngine.eraseRectangle(top, left, bottom, right, selective)
+
+    override fun fillRectangle(
+        codepoint: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) = mutationEngine.fillRectangle(codepoint, top, left, bottom, right)
+
     override fun eraseEntireScreen() = mutationEngine.clearViewport()
 
     override fun eraseScreenAndHistory() = mutationEngine.eraseScreenAndHistory()

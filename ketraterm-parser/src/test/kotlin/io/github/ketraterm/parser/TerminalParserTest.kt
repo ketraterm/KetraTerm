@@ -556,6 +556,23 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `DEC rectangular erase and fill commands preserve one based parameters`() {
+            val normalErase = TerminalParserFixture()
+            val selectiveErase = TerminalParserFixture()
+            val fill = TerminalParserFixture()
+
+            normalErase.acceptAscii("\u001B[2;3;4;5\$z")
+            selectiveErase.acceptAscii("\u001B[2;3;4;5\${")
+            fill.acceptAscii("\u001B[35;2;3;4;5\$x")
+
+            assertAll(
+                { assertEquals(listOf("eraseRectangle:2:3:4:5:false"), normalErase.sink.events) },
+                { assertEquals(listOf("eraseRectangle:2:3:4:5:true"), selectiveErase.sink.events) },
+                { assertEquals(listOf("fillRectangle:35:2:3:4:5"), fill.sink.events) },
+            )
+        }
+
+        @Test
         fun `DEC private CSI mode dispatch survives chunk boundaries`() {
             val f = TerminalParserFixture()
 

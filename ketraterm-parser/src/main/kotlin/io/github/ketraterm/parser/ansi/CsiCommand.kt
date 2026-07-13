@@ -73,4 +73,7 @@ internal object CsiCommand {
     const val KITTY_KEYBOARD_QUERY: Int = 45
     const val XTQMODKEYS: Int = 46
     const val XTDISMODKEYS: Int = 47
+    const val DECFRA: Int = 48
+    const val DECERA: Int = 49
+    const val DECSERA: Int = 50
 }
