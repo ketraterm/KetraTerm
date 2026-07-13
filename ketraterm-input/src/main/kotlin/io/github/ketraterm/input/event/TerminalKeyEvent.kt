@@ -31,12 +31,14 @@ import io.github.ketraterm.input.event.TerminalKeyEvent.Companion.NO_CODEPOINT
  * the input source cannot provide that identity. This may differ from
  * [codepoint], such as `a` for a Shift+A event that produces `A`.
  * @property modifiers active keyboard modifiers using [TerminalModifiers] bits.
+ * @property type physical lifecycle phase as reported by the host adapter.
  */
 data class TerminalKeyEvent(
     val key: TerminalKey? = null,
     val codepoint: Int = NO_CODEPOINT,
     val unshiftedCodepoint: Int = NO_CODEPOINT,
     val modifiers: Int = TerminalModifiers.NONE,
+    val type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
 ) {
     init {
         require(TerminalModifiers.isValid(modifiers)) {
@@ -78,15 +80,18 @@ data class TerminalKeyEvent(
          *
          * @param key non-printable terminal key.
          * @param modifiers active keyboard modifiers.
+         * @param type physical lifecycle phase reported by the host.
          * @return a new [TerminalKeyEvent] instance.
          */
         fun key(
             key: TerminalKey,
             modifiers: Int = TerminalModifiers.NONE,
+            type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
         ): TerminalKeyEvent =
             TerminalKeyEvent(
                 key = key,
                 modifiers = modifiers,
+                type = type,
             )
 
         /**
@@ -97,17 +102,20 @@ data class TerminalKeyEvent(
          * @param unshiftedCodepoint unshifted Unicode scalar identifying the
          * physical text-producing key for Kitty-compatible protocols. Defaults
          * to [NO_CODEPOINT] when the input source cannot provide that identity.
+         * @param type physical lifecycle phase reported by the host.
          * @return a new [TerminalKeyEvent] instance.
          */
         fun codepoint(
             codepoint: Int,
             modifiers: Int = TerminalModifiers.NONE,
             unshiftedCodepoint: Int = NO_CODEPOINT,
+            type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
         ): TerminalKeyEvent =
             TerminalKeyEvent(
                 codepoint = codepoint,
                 unshiftedCodepoint = unshiftedCodepoint,
                 modifiers = modifiers,
+                type = type,
             )
 
         private fun isPrintableUnicodeScalar(codepoint: Int): Boolean =

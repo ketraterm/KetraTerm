@@ -31,6 +31,7 @@ class TerminalKeyEventTest {
             { assertEquals(TerminalKey.UP, event.key) },
             { assertEquals(TerminalKeyEvent.NO_CODEPOINT, event.codepoint) },
             { assertEquals(TerminalModifiers.SHIFT, event.modifiers) },
+            { assertEquals(TerminalKeyEventType.PRESS, event.type) },
         )
     }
 
@@ -64,6 +65,13 @@ class TerminalKeyEventTest {
             { assertEquals('a'.code, event.unshiftedCodepoint) },
             { assertEquals(TerminalModifiers.SHIFT, event.modifiers) },
         )
+    }
+
+    @Test
+    fun `preserves an explicit physical lifecycle phase`() {
+        val event = TerminalKeyEvent.key(TerminalKey.UP, type = TerminalKeyEventType.RELEASE)
+
+        assertEquals(TerminalKeyEventType.RELEASE, event.type)
     }
 
     @Test

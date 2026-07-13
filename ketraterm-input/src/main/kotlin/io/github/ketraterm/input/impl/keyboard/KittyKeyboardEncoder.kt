@@ -18,6 +18,7 @@ package io.github.ketraterm.input.impl.keyboard
 import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.input.impl.InputScratchBuffer
 import io.github.ketraterm.input.impl.TerminalSequences
@@ -70,7 +71,17 @@ internal class KittyKeyboardEncoder(
         val key = event.key
         val modifiers = event.modifiers
         val isDisambiguate = (kittyFlags and KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES) != 0
+        val isReportEventTypes = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES) != 0
         val isReportAll = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES) != 0
+        val eventType = if (isReportEventTypes) event.type.ordinal + 1 else NO_EVENT_TYPE
+
+        if (
+            event.type == TerminalKeyEventType.RELEASE &&
+            !isReportAll &&
+            (event.key == TerminalKey.ENTER || event.key == TerminalKey.TAB || event.key == TerminalKey.BACKSPACE)
+        ) {
+            return
+        }
 
         if (key != null) {
             val keyOrdinal = key.ordinal
@@ -78,15 +89,19 @@ internal class KittyKeyboardEncoder(
             // 1. Keypad Keys (mapped to Kitty PUA)
             val puaCode = KeyMappingTable.KITTY_PUA_CODES[keyOrdinal]
             if (puaCode >= 0) {
-                CsiWriter.writeCsiU(scratch, output, puaCode, modifiers)
+                CsiWriter.writeCsiU(scratch, output, puaCode, modifiers, eventType = eventType)
                 return
             }
 
             // 2. Core Functional Keys (Enter, Tab, Escape, Backspace)
             when (key) {
                 TerminalKey.ENTER -> {
-                    if (isReportAll || TerminalModifiers.hasMeta(modifiers) || (!isDisambiguate && modifiers != TerminalModifiers.NONE)) {
-                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.ENTER, modifiers)
+                    if (isReportAll ||
+                        event.type != TerminalKeyEventType.PRESS ||
+                        TerminalModifiers.hasMeta(modifiers) ||
+                        (!isDisambiguate && modifiers != TerminalModifiers.NONE)
+                    ) {
+                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.ENTER, modifiers, eventType = eventType)
                     } else if (isDisambiguate) {
                         writeDisambiguatedEnter(modifiers, modeBits)
                     } else {
@@ -97,10 +112,11 @@ internal class KittyKeyboardEncoder(
 
                 TerminalKey.TAB -> {
                     if (isReportAll ||
+                        event.type != TerminalKeyEventType.PRESS ||
                         TerminalModifiers.hasMeta(modifiers) ||
                         (!isDisambiguate && modifiers != TerminalModifiers.NONE && modifiers != TerminalModifiers.SHIFT)
                     ) {
-                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.TAB, modifiers)
+                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.TAB, modifiers, eventType = eventType)
                     } else if (isDisambiguate) {
                         writeDisambiguatedTab(modifiers)
                     } else {
@@ -114,8 +130,8 @@ internal class KittyKeyboardEncoder(
                 }
 
                 TerminalKey.ESCAPE -> {
-                    if (isDisambiguate || isReportAll || modifiers != TerminalModifiers.NONE) {
-                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.ESCAPE, modifiers)
+                    if (isDisambiguate || isReportAll || event.type != TerminalKeyEventType.PRESS || modifiers != TerminalModifiers.NONE) {
+                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.ESCAPE, modifiers, eventType = eventType)
                     } else {
                         output.writeByte(ControlCode.ESC)
                     }
@@ -123,8 +139,12 @@ internal class KittyKeyboardEncoder(
                 }
 
                 TerminalKey.BACKSPACE -> {
-                    if (isReportAll || TerminalModifiers.hasMeta(modifiers) || (!isDisambiguate && modifiers != TerminalModifiers.NONE)) {
-                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.BACKSPACE, modifiers)
+                    if (isReportAll ||
+                        event.type != TerminalKeyEventType.PRESS ||
+                        TerminalModifiers.hasMeta(modifiers) ||
+                        (!isDisambiguate && modifiers != TerminalModifiers.NONE)
+                    ) {
+                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.BACKSPACE, modifiers, eventType = eventType)
                     } else if (isDisambiguate) {
                         writeDisambiguatedBackspace(modifiers)
                     } else {
@@ -138,8 +158,8 @@ internal class KittyKeyboardEncoder(
             // 3. CSI Letter Keys (Arrows, Home, End, F1-F4)
             val csiLetter = KeyMappingTable.CSI_LETTERS[keyOrdinal]
             if (csiLetter >= 0) {
-                if (modifiers != TerminalModifiers.NONE) {
-                    CsiWriter.writeCsiModifierLetter(scratch, output, 1, modifiers, csiLetter)
+                if (modifiers != TerminalModifiers.NONE || eventType != NO_EVENT_TYPE) {
+                    CsiWriter.writeCsiModifierLetter(scratch, output, 1, modifiers, csiLetter, eventType)
                 } else {
                     CsiWriter.writeCsiLetter(scratch, output, csiLetter)
                 }
@@ -149,7 +169,7 @@ internal class KittyKeyboardEncoder(
             // 4. Tilde Keys (Insert, Delete, PgUp, PgDn, F5-F12, F3)
             val tildeNumber = KeyMappingTable.TILDE_NUMBERS[keyOrdinal]
             if (tildeNumber >= 0) {
-                CsiWriter.writeCsiTilde(scratch, output, tildeNumber, modifiers)
+                CsiWriter.writeCsiTilde(scratch, output, tildeNumber, modifiers, eventType)
                 return
             }
         } else {
@@ -158,7 +178,7 @@ internal class KittyKeyboardEncoder(
             val kittyCodepoint =
                 if (event.unshiftedCodepoint != TerminalKeyEvent.NO_CODEPOINT) event.unshiftedCodepoint else codepoint
             if (isReportAll || (modifiers != TerminalModifiers.NONE && modifiers != TerminalModifiers.SHIFT)) {
-                CsiWriter.writeCsiU(scratch, output, kittyCodepoint, modifiers)
+                CsiWriter.writeCsiU(scratch, output, kittyCodepoint, modifiers, eventType = eventType)
             } else {
                 if (shouldSuppressForMeta(modifiers)) {
                     return
@@ -276,5 +296,6 @@ internal class KittyKeyboardEncoder(
 
     private companion object {
         private const val BS: Int = 0x08
+        private const val NO_EVENT_TYPE: Int = 0
     }
 }

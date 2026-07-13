@@ -18,6 +18,7 @@ package io.github.ketraterm.input.impl
 import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.input.impl.keyboard.KeyboardEncoder
 import io.github.ketraterm.input.policy.*
@@ -640,6 +641,65 @@ class KeyboardEncoderTest {
     }
 
     @Test
+    fun `Kitty event-type flag encodes lifecycle phases and preserves reset-safe keys`() {
+        val eventTypeBits = kittyKeyboardBits(KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES)
+        val eventTypeReportAllBits =
+            kittyKeyboardBits(
+                KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES or
+                    KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
+            )
+
+        assertBytes(
+            esc("[1;1:1A"),
+            TerminalKeyEvent.key(TerminalKey.UP, type = TerminalKeyEventType.PRESS),
+            eventTypeBits,
+        )
+        assertBytes(
+            esc("[1;5:2A"),
+            TerminalKeyEvent.key(TerminalKey.UP, TerminalModifiers.CTRL, TerminalKeyEventType.REPEAT),
+            eventTypeBits,
+        )
+        assertBytes(
+            esc("[3;1:3~"),
+            TerminalKeyEvent.key(TerminalKey.DELETE, type = TerminalKeyEventType.RELEASE),
+            eventTypeBits,
+        )
+        assertBytes(
+            esc("[13;1:2u"),
+            TerminalKeyEvent.key(TerminalKey.ENTER, type = TerminalKeyEventType.REPEAT),
+            eventTypeBits,
+        )
+        assertBytes(
+            bytes(),
+            TerminalKeyEvent.key(TerminalKey.TAB, type = TerminalKeyEventType.RELEASE),
+            eventTypeBits,
+        )
+        assertBytes(
+            esc("[9;1:3u"),
+            TerminalKeyEvent.key(TerminalKey.TAB, type = TerminalKeyEventType.RELEASE),
+            eventTypeReportAllBits,
+        )
+        assertBytes(
+            esc("[97;1:1u"),
+            TerminalKeyEvent.codepoint('a'.code, type = TerminalKeyEventType.PRESS),
+            eventTypeReportAllBits,
+        )
+    }
+
+    @Test
+    fun `key lifecycle events are suppressed without Kitty event reporting`() {
+        assertBytes(
+            bytes(),
+            TerminalKeyEvent.key(TerminalKey.UP, type = TerminalKeyEventType.RELEASE),
+        )
+        assertBytes(
+            bytes(),
+            TerminalKeyEvent.key(TerminalKey.UP, type = TerminalKeyEventType.REPEAT),
+            kittyKeyboardBits(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES),
+        )
+    }
+
+    @Test
     fun `Kitty keyboard encodes arrows and navigation keys under protocol`() {
         val bits = kittyKeyboardBits(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES)
         val appCursorBits = bits or TerminalModeBits.APPLICATION_CURSOR_KEYS
@@ -701,6 +761,12 @@ class KeyboardEncoderTest {
         assertBytes(esc("[Q"), TerminalKeyEvent.key(TerminalKey.PF2), bits)
         assertBytes(esc("[13~"), TerminalKeyEvent.key(TerminalKey.PF3), bits)
         assertBytes(esc("[S"), TerminalKeyEvent.key(TerminalKey.PF4), bits)
+
+        // F13-F35 use Kitty's contiguous PUA range.
+        assertBytes(esc("[57376u"), TerminalKeyEvent.key(TerminalKey.F13), bits)
+        assertBytes(esc("[57387u"), TerminalKeyEvent.key(TerminalKey.F24), bits)
+        assertBytes(esc("[57398u"), TerminalKeyEvent.key(TerminalKey.F35), bits)
+        assertBytes(esc("[57376;5u"), TerminalKeyEvent.key(TerminalKey.F13, TerminalModifiers.CTRL), bits)
     }
 
     @Test

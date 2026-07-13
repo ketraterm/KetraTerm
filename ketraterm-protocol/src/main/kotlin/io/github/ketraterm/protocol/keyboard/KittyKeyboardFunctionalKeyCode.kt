@@ -35,6 +35,12 @@ object KittyKeyboardFunctionalKeyCode {
     /** Backspace key. */
     const val BACKSPACE: Int = 0x7f
 
+    /** First extended function-key code; F13 through F35 are contiguous. */
+    const val F13: Int = 57376
+
+    /** Final extended function-key code, corresponding to F35. */
+    const val F35: Int = 57398
+
     // Keypad keys (mapped to Private Use Area)
 
     /** Keypad 0. */

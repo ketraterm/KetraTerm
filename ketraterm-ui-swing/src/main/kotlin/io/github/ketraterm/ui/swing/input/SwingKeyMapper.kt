@@ -173,7 +173,14 @@ internal class SwingKeyMapper {
             KeyEvent.VK_MULTIPLY -> TerminalKey.NUMPAD_MULTIPLY
             KeyEvent.VK_SUBTRACT -> TerminalKey.NUMPAD_SUBTRACT
             KeyEvent.VK_ADD -> TerminalKey.NUMPAD_ADD
-            else -> null
+            else -> extendedFunctionKey(keyCode)
+        }
+
+    private fun extendedFunctionKey(keyCode: Int): TerminalKey? =
+        if (keyCode in KeyEvent.VK_F13..KeyEvent.VK_F24) {
+            TerminalKey.entries[TerminalKey.F13.ordinal + keyCode - KeyEvent.VK_F13]
+        } else {
+            null
         }
 
     private fun isPrintableKeypadKey(key: TerminalKey): Boolean =

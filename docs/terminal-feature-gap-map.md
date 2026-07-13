@@ -26,7 +26,7 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 
 ### Tier 2: Useful (Under consideration / partial gaps)
 - *No outstanding SAFE query-response, DECRQSS/XTGETTCAP, push/pop title stack, or host-adapter allow/deny policy-surface gaps (all implemented and verified).*
-- `FIXED(alpha-blocker)`: Kitty keyboard capability advertising now exposes only implemented progressive flags (`1` disambiguate escape codes and `8` report all keys as escape codes). Event types, alternate keys, and associated text remain protocol vocabulary only until the input event model can encode them.
+- `FIXED(alpha-blocker)`: Kitty keyboard capability advertising now exposes only implemented progressive flags (`1` disambiguate escape codes and `8` report all keys as escape codes). Alternate keys and associated text remain protocol vocabulary only until the input event model can encode them.
 
 ### Tier 3: Optional (Graphics & advanced features)
 - Sixel or modern graphics protocols (e.g. Kitty graphics protocol).
@@ -139,8 +139,10 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(input)`: `TerminalKeyEvent` can carry an optional unshifted printable-key scalar, and Kitty CSI-u encoding uses it instead of produced text when present.
 - `DONE(parser/core/host/policy)`: parameterless `CSI ? u` reports only the active, core-masked Kitty keyboard progressive flags through the existing terminal-response policy.
 - `TODO(host)`: the portable Swing adapter cannot truthfully recover a current-layout unshifted key scalar from every AWT event. A host input adapter with reliable layout/IME metadata must supply it before non-US-layout Kitty key identity is fully supported.
+- `DONE(input)`: normalized keyboard events carry an explicit press/repeat/release lifecycle phase without host-toolkit dependencies or encoder hot-path allocation.
+- `DONE(input)`: the Kitty encoder formats the lifecycle phase in the `modifier:event-type` subfield and suppresses lifecycle events when flag `2` is inactive.
+- `TODO(host)`: provide a rich key-event adapter that can reliably identify key press, operating-system repeat, and release for every key, including layout and IME-produced text, before flag `2` is advertised.
 - separate left/right modifier reporting if host event vocabulary grows it.
-- key repeat/release reporting.
 - alternate-key fields and associated text fields.
 - modifier-only key events.
 - complete functional-key numeric table beyond keys already represented by `TerminalKey`.

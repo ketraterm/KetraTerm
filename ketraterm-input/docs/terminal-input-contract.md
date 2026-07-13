@@ -54,6 +54,9 @@ Keyboard events contain exactly one of:
 - a `TerminalKey` for non-printable physical keys
 - a printable Unicode scalar codepoint
 
+Each event also carries a host-reported lifecycle phase: press, repeat, or
+release. Hosts must not infer repeat or release semantics they cannot observe.
+
 Printable events may additionally carry the unshifted scalar that identifies
 the physical text-producing key. Input sources must leave that value unknown
 when they cannot provide it truthfully; it is distinct from the produced text
@@ -154,6 +157,9 @@ Supported modified-key protocol:
 - partial Kitty keyboard handling for progressive flags `1` and `8`. Flag `1`
   preserves legacy Enter, Tab, and Backspace bytes; Kitty CSI-u output uses a
   supplied unshifted key scalar when the input source provides one.
+- Kitty event-type formatting (`modifier:event-type`) is implemented in the
+  encoder for rich host events, but flag `2` is not advertised until a host can
+  truthfully provide the complete required lifecycle metadata.
 
 Not guaranteed yet:
 

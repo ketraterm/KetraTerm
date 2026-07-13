@@ -77,6 +77,13 @@ class SwingKeyMapperTest {
     }
 
     @Test
+    fun mapsExtendedFunctionPressedKey() {
+        val mapped = mapper.keyPressed(pressed(KeyEvent.VK_F24))
+
+        assertEquals(TerminalKey.F24, mapped?.key)
+    }
+
+    @Test
     fun mapsNumpadPressedKeyAndSuppressesFollowingTypedCharacter() {
         val mapped = mapper.keyPressed(pressed(KeyEvent.VK_NUMPAD1))
 

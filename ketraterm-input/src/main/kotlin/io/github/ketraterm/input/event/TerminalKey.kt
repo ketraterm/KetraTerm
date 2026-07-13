@@ -100,6 +100,75 @@ enum class TerminalKey {
     /** Function key F12. */
     F12,
 
+    /** Function key F13. */
+    F13,
+
+    /** Function key F14. */
+    F14,
+
+    /** Function key F15. */
+    F15,
+
+    /** Function key F16. */
+    F16,
+
+    /** Function key F17. */
+    F17,
+
+    /** Function key F18. */
+    F18,
+
+    /** Function key F19. */
+    F19,
+
+    /** Function key F20. */
+    F20,
+
+    /** Function key F21. */
+    F21,
+
+    /** Function key F22. */
+    F22,
+
+    /** Function key F23. */
+    F23,
+
+    /** Function key F24. */
+    F24,
+
+    /** Function key F25. */
+    F25,
+
+    /** Function key F26. */
+    F26,
+
+    /** Function key F27. */
+    F27,
+
+    /** Function key F28. */
+    F28,
+
+    /** Function key F29. */
+    F29,
+
+    /** Function key F30. */
+    F30,
+
+    /** Function key F31. */
+    F31,
+
+    /** Function key F32. */
+    F32,
+
+    /** Function key F33. */
+    F33,
+
+    /** Function key F34. */
+    F34,
+
+    /** Function key F35. */
+    F35,
+
     /** Keypad PF1 key. */
     PF1,
 

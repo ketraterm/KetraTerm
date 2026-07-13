@@ -129,6 +129,9 @@ internal object KeyMappingTable {
         KITTY_PUA_CODES[TerminalKey.NUMPAD_BEGIN.ordinal] = KittyKeyboardFunctionalKeyCode.KP_BEGIN
         KITTY_PUA_CODES[TerminalKey.NUMPAD_SPACE.ordinal] = 32
         KITTY_PUA_CODES[TerminalKey.NUMPAD_TAB.ordinal] = ControlCode.HT
+        repeat(KittyKeyboardFunctionalKeyCode.F35 - KittyKeyboardFunctionalKeyCode.F13 + 1) { offset ->
+            KITTY_PUA_CODES[TerminalKey.F13.ordinal + offset] = KittyKeyboardFunctionalKeyCode.F13 + offset
+        }
 
         // Application Keypad Finals
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_SPACE.ordinal] = ' '.code
