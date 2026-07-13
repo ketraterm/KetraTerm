@@ -86,6 +86,7 @@ internal object GeneratedCsiDispatchTable {
             281474979266685L, // CSI Pn ' }  DECIC
             281474979266686L, // CSI Pn ' ~  DECDC
             281474979463288L, // CSI Ps * x  DECSACE
+            281474979463289L, // CSI Pi;Pg;Pt;Pl;Pb;Pr * y  DECRQCRA
         )
 
     private val COMMANDS: IntArray =
@@ -147,6 +148,7 @@ internal object GeneratedCsiDispatchTable {
             CsiCommand.DECIC,
             CsiCommand.DECDC,
             CsiCommand.DECSACE,
+            CsiCommand.DECRQCRA,
         )
 
     init {

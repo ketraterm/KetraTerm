@@ -198,6 +198,17 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
             "copyRectangle:$sourceTop:$sourceLeft:$sourceBottom:$sourceRight:$sourcePage:$destinationTop:$destinationLeft:$destinationPage"
     }
 
+    override fun requestRectangleChecksum(
+        requestId: Int,
+        page: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) {
+        events += "requestRectangleChecksum:$requestId:$page:$top:$left:$bottom:$right"
+    }
+
     override fun setAttributeChangeExtent(extent: Int) {
         events += "setAttributeChangeExtent:$extent"
     }

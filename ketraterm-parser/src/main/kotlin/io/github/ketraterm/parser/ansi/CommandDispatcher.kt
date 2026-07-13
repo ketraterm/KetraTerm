@@ -169,6 +169,15 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.DECCARA -> dispatchRectangleAttributeChange(sink, state)
             CsiCommand.DECRARA -> dispatchRectangleAttributeReverse(sink, state)
             CsiCommand.DECSACE -> sink.setAttributeChangeExtent(modeParam(state, 0))
+            CsiCommand.DECRQCRA ->
+                sink.requestRectangleChecksum(
+                    requestId = modeParam(state, 0),
+                    page = rectangleParam(state, 1),
+                    top = rectangleParam(state, 2),
+                    left = rectangleParam(state, 3),
+                    bottom = rectangleParam(state, 4),
+                    right = rectangleParam(state, 5),
+                )
             CsiCommand.DECIC -> sink.insertColumns(countParam(state, 0))
             CsiCommand.DECDC -> sink.deleteColumns(countParam(state, 0))
             CsiCommand.IL -> sink.insertLines(countParam(state, 0))

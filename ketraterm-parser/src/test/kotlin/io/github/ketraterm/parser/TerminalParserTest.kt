@@ -582,6 +582,16 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `DECRQCRA preserves request id page and rectangle across a structural chunk boundary`() {
+            val f = TerminalParserFixture()
+
+            f.acceptAscii("\u001B[17;1;2;3")
+            f.acceptAscii(";4;5*y")
+
+            assertEquals(listOf("requestRectangleChecksum:17:1:2:3:4:5"), f.sink.events)
+        }
+
+        @Test
         fun `DEC rectangular attribute commands collapse ordered SGR parameters`() {
             val change = TerminalParserFixture()
             val reverse = TerminalParserFixture()

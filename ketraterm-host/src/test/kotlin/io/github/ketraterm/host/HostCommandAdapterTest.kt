@@ -1173,6 +1173,16 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `DECRQCRA byte stream returns a bounded active page checksum`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 3, height = 1))
+
+            f.acceptAscii("A\u001B[17;1;1;1;1;1*y")
+            f.end()
+
+            assertEquals("\u001BP17!~FFBF\u001B\\", f.drainResponses())
+        }
+
+        @Test
         fun `DECSACE DECCARA and DECRARA update attributes through byte stream`() {
             val f = Fixture(terminal = TerminalBuffers.create(width = 4, height = 2))
 
@@ -1733,6 +1743,16 @@ class HostCommandAdapterTest {
 
             f.acceptAscii("\u001BP\$qm\u001B\\")
             f.acceptAscii("\u001BP+q436f\u001B\\")
+            f.end()
+
+            assertEquals("", f.drainResponses())
+        }
+
+        @Test
+        fun `terminal response policy can deny DECRQCRA responses`() {
+            val f = Fixture(hostPolicy = HostPolicy(terminalResponsePolicy = HostControlPolicy.DENY))
+
+            f.acceptAscii("A\u001B[1;1;1;1;1;1*y")
             f.end()
 
             assertEquals("", f.drainResponses())

@@ -366,6 +366,18 @@ class HostCommandAdapter(
         )
     }
 
+    override fun requestRectangleChecksum(
+        requestId: Int,
+        page: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) {
+        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+        terminal.requestRectangleChecksum(requestId, page, top, left, bottom, right)
+    }
+
     override fun setAttributeChangeExtent(extent: Int) {
         terminal.setAttributeChangeExtent(extent)
     }

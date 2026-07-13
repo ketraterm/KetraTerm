@@ -346,6 +346,23 @@ interface TerminalCommandSink {
     )
 
     /**
+     * Requests a VT420 rectangular-area checksum (DECRQCRA).
+     *
+     * Coordinates retain DEC's one-based inclusive representation so core can
+     * apply the active origin-mode policy. [page] uses DEC's one-based page
+     * numbering; `0` denotes omission. The host/core response path owns page
+     * capability policy and emits no bytes for unsupported requests.
+     */
+    fun requestRectangleChecksum(
+        requestId: Int,
+        page: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    )
+
+    /**
      * Selects the DECSACE extent used by subsequent DECCARA and DECRARA commands.
      *
      * `0` and `1` select the wrapped stream extent; `2` selects the exact rectangular extent.

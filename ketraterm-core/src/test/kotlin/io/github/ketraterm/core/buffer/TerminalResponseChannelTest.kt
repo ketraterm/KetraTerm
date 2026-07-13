@@ -152,6 +152,38 @@ class TerminalResponseChannelTest {
     }
 
     @Test
+    fun `DECRQCRA returns VT420 checksum for visible cells and supported video attributes`() {
+        val buffer = TerminalBuffers.create(width = 3, height = 1)
+
+        buffer.setPenAttributes(
+            fg = 0,
+            bg = 0,
+            bold = true,
+            underlineStyle = io.github.ketraterm.core.model.UnderlineStyle.SINGLE,
+            blink = true,
+            inverse = true,
+            conceal = true,
+        )
+        buffer.setSelectiveEraseProtection(true)
+        buffer.writeCodepoint('A'.code)
+
+        buffer.requestRectangleChecksum(requestId = 42, page = 1, top = 0, left = 0, bottom = 0, right = 0)
+
+        assertEquals("\u001BP42!~FEC3\u001B\\", drain(buffer))
+    }
+
+    @Test
+    fun `DECRQCRA stays silent for unsupported pages and inverted rectangles`() {
+        val buffer = TerminalBuffers.create(width = 3, height = 1)
+        buffer.writeCodepoint('A'.code)
+
+        buffer.requestRectangleChecksum(requestId = 1, page = 2, top = 1, left = 1, bottom = 1, right = 1)
+        buffer.requestRectangleChecksum(requestId = 1, page = 1, top = 2, left = 1, bottom = 1, right = 1)
+
+        assertEquals(0, buffer.pendingResponseBytes)
+    }
+
+    @Test
     fun `grid size report queues current terminal dimensions`() {
         val buffer = TerminalBuffers.create(width = 120, height = 40)
 

@@ -324,6 +324,17 @@ class ActionEngineTest {
                 "copyRectangle:$sourceTop:$sourceLeft:$sourceBottom:$sourceRight:$sourcePage:$destinationTop:$destinationLeft:$destinationPage"
         }
 
+        override fun requestRectangleChecksum(
+            requestId: Int,
+            page: Int,
+            top: Int,
+            left: Int,
+            bottom: Int,
+            right: Int,
+        ) {
+            sinkCalls += "requestRectangleChecksum:$requestId:$page:$top:$left:$bottom:$right"
+        }
+
         override fun setAttributeChangeExtent(extent: Int) {
             sinkCalls += "setAttributeChangeExtent:$extent"
         }

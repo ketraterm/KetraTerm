@@ -37,8 +37,8 @@ package io.github.ketraterm.host
  * resize, minimize, raise, lower, and maximize requests may be forwarded.
  * @property palettePolicy whether OSC palette updates and palette query
  * responses may affect core palette state or enqueue terminal-to-host bytes.
- * @property terminalResponsePolicy whether DA, DSR/CPR, window reports, DECRQSS,
- * and XTGETTCAP requests may enqueue terminal-to-host response bytes.
+ * @property terminalResponsePolicy whether DA, DSR/CPR, window reports, DECRQCRA,
+ * DECRQSS, and XTGETTCAP requests may enqueue terminal-to-host response bytes.
  * @property clipboardPolicy deny-by-default permission and audit policy for
  * terminal-triggered clipboard protocols such as OSC 52.
  * @property maxHyperlinkEntries maximum distinct OSC 8 hyperlink keys retained
