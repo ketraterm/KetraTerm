@@ -600,6 +600,21 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `DEC column edits dispatch default and explicit counts across intermediate boundaries`() {
+            val insert = TerminalParserFixture()
+            val delete = TerminalParserFixture()
+
+            insert.acceptAscii("\u001B[3'}")
+            delete.acceptAscii("\u001B['")
+            delete.acceptAscii("~")
+
+            assertAll(
+                { assertEquals(listOf("insertColumns:3"), insert.sink.events) },
+                { assertEquals(listOf("deleteColumns:1"), delete.sink.events) },
+            )
+        }
+
+        @Test
         fun `DEC private CSI mode dispatch survives chunk boundaries`() {
             val f = TerminalParserFixture()
 

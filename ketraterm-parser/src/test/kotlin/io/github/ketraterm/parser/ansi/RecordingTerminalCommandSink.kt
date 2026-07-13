@@ -223,6 +223,14 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "reverseRectangleAttributes:$top:$left:$bottom:$right:$reverseMask"
     }
 
+    override fun insertColumns(count: Int) {
+        events += "insertColumns:$count"
+    }
+
+    override fun deleteColumns(count: Int) {
+        events += "deleteColumns:$count"
+    }
+
     override fun insertLines(n: Int) {
         events += "insertLines:$n"
     }

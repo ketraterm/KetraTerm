@@ -56,6 +56,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(parser)`: full tab-stop and margin variants beyond the current common set.
 - `DONE(parser/core/host)`: rectangular erase (`DECERA`), selective erase (`DECSERA`), fill (`DECFRA`), and copy (`DECCRA`) preserve wide/cluster span integrity, selective protection, active margin/origin coordinates, and overlap-safe snapshot semantics. `DECCRA` intentionally supports only the active single page (`0` omitted or `1`).
 - `DONE(parser/core/host)`: DECSACE, DECCARA, and DECRARA implement VT420's stream-versus-exact-rectangle extent, ordered visual SGR subset, blank materialization policy, and atomic wide/cluster attribute updates without changing glyph payloads, protection, hyperlinks, or the current pen.
+- `DONE(parser/core/host)`: DECIC and DECDC insert/delete columns across the active vertical scroll region, honor horizontal margins, preserve cursor position and active-buffer isolation, and repair wide/cluster span boundaries before each row shift.
 - `TODO(parser)`: insert/delete/erase variants with selective protection and rectangular bounds.
 - `TODO(parser)`: scroll variants and xterm extensions not yet routed:
   - left/right-margin-aware variants need broader host tests.

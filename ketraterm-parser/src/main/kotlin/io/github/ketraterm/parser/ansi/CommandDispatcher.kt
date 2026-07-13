@@ -169,6 +169,8 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.DECCARA -> dispatchRectangleAttributeChange(sink, state)
             CsiCommand.DECRARA -> dispatchRectangleAttributeReverse(sink, state)
             CsiCommand.DECSACE -> sink.setAttributeChangeExtent(modeParam(state, 0))
+            CsiCommand.DECIC -> sink.insertColumns(countParam(state, 0))
+            CsiCommand.DECDC -> sink.deleteColumns(countParam(state, 0))
             CsiCommand.IL -> sink.insertLines(countParam(state, 0))
             CsiCommand.DL -> sink.deleteLines(countParam(state, 0))
             CsiCommand.ICH -> sink.insertCharacters(countParam(state, 0))

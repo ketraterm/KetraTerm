@@ -350,6 +350,26 @@ interface TerminalWriter {
         reverseMask: Int,
     )
 
+    /**
+     * Inserts DECIC blank columns at the cursor column across the active vertical scroll region.
+     *
+     * The operation shifts only through the current right margin, does nothing when the cursor is
+     * outside either scrolling margin, and leaves the cursor position unchanged.
+     *
+     * @param count Number of columns to insert. Non-positive values are ignored.
+     */
+    fun insertColumns(count: Int)
+
+    /**
+     * Deletes DECDC columns at the cursor column across the active vertical scroll region.
+     *
+     * The operation shifts only through the current right margin, does nothing when the cursor is
+     * outside either scrolling margin, and leaves the cursor position unchanged.
+     *
+     * @param count Number of columns to delete. Non-positive values are ignored.
+     */
+    fun deleteColumns(count: Int)
+
     /** Erases the entire visible screen without moving the cursor (ED 2, `CSI 2 J`). */
     fun eraseEntireScreen()
 

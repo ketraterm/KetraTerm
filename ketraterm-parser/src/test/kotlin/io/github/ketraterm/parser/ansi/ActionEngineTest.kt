@@ -349,6 +349,14 @@ class ActionEngineTest {
             sinkCalls += "reverseRectangleAttributes:$top:$left:$bottom:$right:$reverseMask"
         }
 
+        override fun insertColumns(count: Int) {
+            sinkCalls += "insertColumns:$count"
+        }
+
+        override fun deleteColumns(count: Int) {
+            sinkCalls += "deleteColumns:$count"
+        }
+
         override fun insertLines(n: Int) {
             sinkCalls += "insertLines:$n"
         }

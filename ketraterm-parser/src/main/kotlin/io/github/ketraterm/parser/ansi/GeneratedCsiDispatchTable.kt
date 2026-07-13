@@ -83,6 +83,8 @@ internal object GeneratedCsiDispatchTable {
             281474979070072L, // CSI Pch;Pt;Pl;Pb;Pr $ x  DECFRA
             281474979070074L, // CSI Pt;Pl;Pb;Pr $ z  DECERA
             281474979070075L, // CSI Pt;Pl;Pb;Pr $ {  DECSERA
+            281474979266685L, // CSI Pn ' }  DECIC
+            281474979266686L, // CSI Pn ' ~  DECDC
             281474979463288L, // CSI Ps * x  DECSACE
         )
 
@@ -142,6 +144,8 @@ internal object GeneratedCsiDispatchTable {
             CsiCommand.DECFRA,
             CsiCommand.DECERA,
             CsiCommand.DECSERA,
+            CsiCommand.DECIC,
+            CsiCommand.DECDC,
             CsiCommand.DECSACE,
         )
 

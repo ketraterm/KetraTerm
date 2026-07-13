@@ -797,6 +797,95 @@ internal class MutationEngine(
     }
 
     /**
+     * Inserts blank columns at the cursor through the active vertical scroll region (DECIC).
+     *
+     * Every affected line uses the same horizontal range and boundary repairs as ICH. This keeps
+     * wide leaders/spacers atomic even when a shifted span crosses the cursor or right margin.
+     */
+    fun insertColumns(count: Int) {
+        if (count <= 0) return
+
+        structuralMutation {
+            if (!isCursorInMargins() || state.cursor.row !in state.scrollTop..state.scrollBottom) return@structuralMutation
+            val cCol = state.cursor.col
+            val safeCount = count.coerceAtMost(rightMargin - cCol + 1)
+            if (safeCount <= 0) return@structuralMutation
+
+            for (row in state.scrollTop..state.scrollBottom) {
+                prepareInsertColumnShift(row, cCol, safeCount)
+                val line = getLine(row)
+                line.insertCellsInRange(cCol, safeCount, rightMargin, blankAttr, blankExtendedAttr)
+                line.wrapped = false
+                state.markLineChanged(line)
+            }
+        }
+    }
+
+    /**
+     * Deletes columns at the cursor through the active vertical scroll region (DECDC).
+     *
+     * Every affected line uses the same horizontal range and boundary repairs as DCH. This keeps
+     * wide leaders/spacers atomic even when the deleted range intersects only one visual cell.
+     */
+    fun deleteColumns(count: Int) {
+        if (count <= 0) return
+
+        structuralMutation {
+            if (!isCursorInMargins() || state.cursor.row !in state.scrollTop..state.scrollBottom) return@structuralMutation
+            val cCol = state.cursor.col
+            val safeCount = count.coerceAtMost(rightMargin - cCol + 1)
+            if (safeCount <= 0) return@structuralMutation
+
+            for (row in state.scrollTop..state.scrollBottom) {
+                prepareDeleteColumnShift(row, cCol, safeCount)
+                val line = getLine(row)
+                line.deleteCellsInRange(cCol, safeCount, rightMargin, blankAttr, blankExtendedAttr)
+                line.wrapped = false
+                state.markLineChanged(line)
+            }
+        }
+    }
+
+    /** Removes spans that would otherwise be split by a rightward column shift. */
+    private fun prepareInsertColumnShift(
+        row: Int,
+        col: Int,
+        count: Int,
+    ) {
+        val line = getLine(row)
+        if (line.rawCodepoint(col) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, col)
+        }
+
+        val discardedStart = rightMargin - count + 1
+        if (discardedStart in (col + 1)..rightMargin && line.rawCodepoint(discardedStart) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, discardedStart)
+        }
+
+        if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, rightMargin + 1)
+        }
+    }
+
+    /** Removes spans that would otherwise be split by a leftward column shift. */
+    private fun prepareDeleteColumnShift(
+        row: Int,
+        col: Int,
+        count: Int,
+    ) {
+        annihilateAt(row, col)
+        val line = getLine(row)
+        val firstSurvivor = col + count
+        if (firstSurvivor <= rightMargin && line.rawCodepoint(firstSurvivor) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, firstSurvivor)
+        }
+
+        if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, rightMargin + 1)
+        }
+    }
+
+    /**
      * Erases [count] cells starting at the cursor column without shifting the
      * remainder of the line (ECH).
      *

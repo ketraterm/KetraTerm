@@ -391,6 +391,14 @@ class HostCommandAdapter(
         terminal.reverseRectangleAttributes(top, left, bottom, right, reverseMask)
     }
 
+    override fun insertColumns(count: Int) {
+        terminal.insertColumns(count)
+    }
+
+    override fun deleteColumns(count: Int) {
+        terminal.deleteColumns(count)
+    }
+
     override fun insertLines(n: Int) {
         terminal.insertLines(n)
     }

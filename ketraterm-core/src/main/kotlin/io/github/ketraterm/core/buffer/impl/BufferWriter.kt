@@ -193,6 +193,10 @@ internal class BufferWriter(
         reverseMask: Int,
     ) = mutationEngine.reverseRectangleAttributes(top, left, bottom, right, reverseMask)
 
+    override fun insertColumns(count: Int) = mutationEngine.insertColumns(count)
+
+    override fun deleteColumns(count: Int) = mutationEngine.deleteColumns(count)
+
     override fun eraseEntireScreen() = mutationEngine.clearViewport()
 
     override fun eraseScreenAndHistory() = mutationEngine.eraseScreenAndHistory()

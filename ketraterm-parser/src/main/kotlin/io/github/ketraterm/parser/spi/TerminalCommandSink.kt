@@ -384,6 +384,24 @@ interface TerminalCommandSink {
     )
 
     /**
+     * Inserts blank columns (DECIC) across every row of the active vertical scroll region.
+     *
+     * The core resolves the cursor and horizontal-margin applicability.
+     *
+     * @param count Number of columns to insert; parser defaults omitted or zero values to one.
+     */
+    fun insertColumns(count: Int)
+
+    /**
+     * Deletes columns (DECDC) across every row of the active vertical scroll region.
+     *
+     * The core resolves the cursor and horizontal-margin applicability.
+     *
+     * @param count Number of columns to delete; parser defaults omitted or zero values to one.
+     */
+    fun deleteColumns(count: Int)
+
+    /**
      * Inserts [n] blank lines at the cursor row (IL).
      *
      * @param n Number of lines to insert.
