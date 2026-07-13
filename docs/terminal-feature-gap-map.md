@@ -96,7 +96,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(core/host)`: richer event API for hyperlink metadata, palette changes, terminal notifications, and any future host-observable state that should not be read from render frames.
 
 ### Grid Operations
-- `TODO(core)`: left/right margin interactions need continued property testing across all edit/erase/scroll operations.
+- DONE(core): deterministic randomized left/right-margin properties cover ICH/DCH, selective erase, IL/DL, and partial-region scroll up/down. They model guard-column movement, preserve rows outside the scroll region, and verify protected wide spans plus wide/cluster storage invariants.
 - `TODO(core)`: scrollback policy under alternate-screen and private-mode combinations beyond tested full-viewport and top-anchored primary-screen regions.
 - `TODO(core)`: soft-wrap metadata compatibility with copy/paste/export.
 
