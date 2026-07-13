@@ -51,6 +51,28 @@ class ProtectedCellTest {
     }
 
     @Test
+    fun `alternateScreenPreservesProtectedWideClusterOnPrimary`() {
+        val buffer = TerminalBuffers.create(width = 4, height = 2, maxHistory = 2)
+        val state = stateOf(buffer)
+        buffer.setSelectiveEraseProtection(true)
+        buffer.writeCluster(intArrayOf(0x1F468, 0x200D, 0x1F469))
+
+        buffer.enterAltBuffer()
+        buffer.writeText("alt")
+        buffer.exitAltBuffer()
+
+        val line = buffer.getLine(0)
+        val cluster = IntArray(3)
+        assertAll(
+            { assertTrue(line.isCluster(0)) },
+            { assertEquals(3, line.readCluster(0, cluster)) },
+            { assertEquals(0x1F468, cluster[0]) },
+            { assertEquals(-1, buffer.getCodepointAt(1, 0)) },
+            { assertTrue(AttributeCodec.isProtected(state.primaryBuffer.ring[state.resolveRingIndex(0)].getPackedAttr(0))) },
+        )
+    }
+
+    @Test
     fun `clearAllHistory_ignoresProtection`() {
         val buffer = TerminalBuffers.create(width = 4, height = 2, maxHistory = 2)
         val state = stateOf(buffer)

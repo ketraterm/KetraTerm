@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.pty
 
+import io.github.ketraterm.input.event.TerminalPasteEvent
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
@@ -61,6 +62,29 @@ class PtyRealProcessTest {
 
         assertEquals(100, session.terminal.width)
         assertEquals(30, session.terminal.height)
+    }
+
+    @Test
+    fun `real PTY retains final geometry after rapid sequential resizes`() {
+        assumeNativePty()
+
+        val session =
+            TerminalSessions.localPty(
+                PtyOptions(
+                    command = sleepCommand(seconds = 2),
+                    columns = 40,
+                    rows = 5,
+                ),
+            )
+
+        val sizes = listOf(80 to 24, 132 to 43, 17 to 9, 101 to 31)
+        for ((columns, rows) in sizes) {
+            session.resize(columns, rows)
+        }
+        session.close()
+
+        assertEquals(101, session.terminal.width)
+        assertEquals(31, session.terminal.height)
     }
 
     @Test
@@ -123,6 +147,73 @@ class PtyRealProcessTest {
         assertEquals(expectedCount, session.terminal.getAllAsString().count { it == 'x' })
     }
 
+    @Test
+    fun `real PTY one byte reads preserve mixed line terminator output`() {
+        assumeNativePty()
+
+        val session =
+            TerminalSessions.localPty(
+                PtyOptions(
+                    command = mixedLineEndingCommand(),
+                    columns = 40,
+                    rows = 5,
+                    maxHistory = 10,
+                    readBufferSize = 1,
+                ),
+            )
+
+        waitUntil { session.exitCode == 0 && session.terminal.getAllAsString().contains("A\nB\nC") }
+
+        assertEquals(0, session.exitCode)
+        assertTrue(session.terminal.getAllAsString().contains("A\nB\nC"))
+    }
+
+    @Test
+    fun `real PTY shell redraw and alternate screen restore primary terminal state`() {
+        assumeNativePty()
+
+        val session =
+            TerminalSessions.localPty(
+                PtyOptions(
+                    command = shellRedrawAndAlternateScreenCommand(),
+                    columns = 40,
+                    rows = 5,
+                    maxHistory = 10,
+                    readBufferSize = 1,
+                ),
+            )
+
+        waitUntil { session.exitCode == 0 && session.terminal.getAllAsString().contains("after") }
+
+        val primaryText = session.terminal.getAllAsString()
+        assertAll(
+            { assertTrue(primaryText.contains("prompt> done")) },
+            { assertTrue(primaryText.contains("after")) },
+            { assertFalse(primaryText.contains("FULL"), "alternate-screen content must not leak into primary") },
+        )
+    }
+
+    @Test
+    fun `real PTY accepts bracketed paste while a shell advertises paste mode`() {
+        assumeNativePty()
+
+        val session =
+            TerminalSessions.localPty(
+                PtyOptions(
+                    command = bracketedPasteShellCommand(),
+                    columns = 40,
+                    rows = 5,
+                    readBufferSize = 1,
+                ),
+            )
+
+        waitUntil { session.terminal.getModeSnapshot().isBracketedPasteEnabled }
+        session.encodePaste(TerminalPasteEvent("first\nsecond"))
+
+        assertTrue(session.terminal.getModeSnapshot().isBracketedPasteEnabled)
+        session.close()
+    }
+
     private fun assumeNativePty() {
         assumeTrue(
             System.getProperty("terminal.pty.host") == "true",
@@ -164,6 +255,37 @@ class PtyRealProcessTest {
             )
         } else {
             listOf("/bin/sh", "-lc", "printf '%*s\n' $count '' | tr ' ' '$char'")
+        }
+
+    private fun mixedLineEndingCommand(): List<String> =
+        if (isWindows()) {
+            listOf("powershell.exe", "-NoProfile", "-Command", "[Console]::Out.Write(\"A`r`nB`rC`n\")")
+        } else {
+            listOf("/bin/sh", "-lc", "printf 'A\\r\\nB\\rC\\n'")
+        }
+
+    private fun shellRedrawAndAlternateScreenCommand(): List<String> =
+        if (isWindows()) {
+            listOf(
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                "[Console]::Out.Write('prompt> old' + [char]13 + [char]27 + '[2Kprompt> done' + [char]13 + [char]10 + [char]27 + '[?1049hFULL' + [char]27 + '[?1049lafter' + [char]13 + [char]10')",
+            )
+        } else {
+            listOf("/bin/sh", "-lc", "printf 'prompt> old\\r\\033[2Kprompt> done\\r\\n\\033[?1049hFULL\\033[?1049lafter\\r\\n'")
+        }
+
+    private fun bracketedPasteShellCommand(): List<String> =
+        if (isWindows()) {
+            listOf(
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                "[Console]::Out.Write([char]27 + '[?2004h'); Start-Sleep -Seconds 2",
+            )
+        } else {
+            listOf("/bin/sh", "-lc", "printf '\\033[?2004h'; sleep 2")
         }
 
     private fun isWindows(): Boolean = System.getProperty("os.name").lowercase().contains("windows")
