@@ -1,6 +1,6 @@
 # KetraTerm IntelliJ Plugin Changelog
 
-## [Unreleased]
+## [0.2.1] - 2026-07-14
 
 - Fixed holding Backspace or Delete deleting only one character.
 - Improved compatibility for Ctrl-number shortcuts, modified keys, extended function keys, and applications that configure Backspace behavior.

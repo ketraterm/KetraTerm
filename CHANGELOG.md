@@ -1,6 +1,6 @@
 # KetraTerm Changelog
 
-## [Unreleased]
+## [0.2.1] - 2026-07-14
 
 - Fixed held Backspace and Delete keys so every OS key-repeat event reaches the shell.
 - Improved legacy shell and TUI compatibility for Backspace mode, Ctrl-number shortcuts, modified base keys, and extended function keys.
