@@ -316,6 +316,40 @@ interface TerminalWriter {
         destinationPage: Int,
     )
 
+    /**
+     * Selects DECSACE extent for future DECCARA and DECRARA operations.
+     *
+     * @param extent `0` or `1` selects wrapped stream extent; `2` selects exact rectangle.
+     * Unsupported values leave the current extent unchanged.
+     */
+    fun setAttributeChangeExtent(extent: Int)
+
+    /**
+     * Changes DECCARA visual attributes without changing cell values, protection, hyperlinks, or
+     * the current SGR pen. Masks use [io.github.ketraterm.protocol.DecRectangleAttribute] bits.
+     */
+    fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    )
+
+    /**
+     * Reverses DECRARA visual attributes without changing cell values, protection, hyperlinks,
+     * or the current SGR pen. [reverseMask] uses
+     * [io.github.ketraterm.protocol.DecRectangleAttribute] bits.
+     */
+    fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    )
+
     /** Erases the entire visible screen without moving the cursor (ED 2, `CSI 2 J`). */
     fun eraseEntireScreen()
 

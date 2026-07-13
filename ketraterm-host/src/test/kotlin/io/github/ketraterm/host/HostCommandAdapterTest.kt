@@ -1173,6 +1173,41 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `DECSACE DECCARA and DECRARA update attributes through byte stream`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 4, height = 2))
+
+            f.acceptAscii("A")
+            f.acceptAscii("\u001B[2*x\u001B[1;1;1;2;1;4\$r")
+            f.acceptAscii("\u001B[1;1;1;2;1;4\$t")
+            f.end()
+
+            assertAll(
+                { assertEquals('A'.code, f.terminal.getCodepointAt(0, 0)) },
+                { assertEquals(' '.code, f.terminal.getCodepointAt(1, 0)) },
+                { assertEquals(false, f.terminal.getAttrAt(0, 0)?.bold) },
+                {
+                    assertEquals(
+                        0,
+                        f.terminal
+                            .getAttrAt(0, 0)
+                            ?.underlineStyle
+                            ?.sgrCode,
+                    )
+                },
+                { assertEquals(false, f.terminal.getAttrAt(1, 0)?.bold) },
+                {
+                    assertEquals(
+                        0,
+                        f.terminal
+                            .getAttrAt(1, 0)
+                            ?.underlineStyle
+                            ?.sgrCode,
+                    )
+                },
+            )
+        }
+
+        @Test
         fun `OSC titles and hyperlinks are retained as adapter metadata`() {
             val f = Fixture()
 

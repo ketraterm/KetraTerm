@@ -346,6 +346,44 @@ interface TerminalCommandSink {
     )
 
     /**
+     * Selects the DECSACE extent used by subsequent DECCARA and DECRARA commands.
+     *
+     * `0` and `1` select the wrapped stream extent; `2` selects the exact rectangular extent.
+     * Unsupported values must leave the current selection unchanged.
+     */
+    fun setAttributeChangeExtent(extent: Int)
+
+    /**
+     * Applies VT420 DECCARA visual-attribute changes without changing characters or the pen.
+     *
+     * Coordinates retain DEC's one-based inclusive representation. [setMask] and [clearMask]
+     * use [io.github.ketraterm.protocol.DecRectangleAttribute] bits; the parser has already
+     * collapsed ordered SGR-like parameters into their final operations.
+     */
+    fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    )
+
+    /**
+     * Applies VT420 DECRARA visual-attribute reversals without changing characters or the pen.
+     *
+     * Coordinates retain DEC's one-based inclusive representation. [reverseMask] uses
+     * [io.github.ketraterm.protocol.DecRectangleAttribute] bits.
+     */
+    fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    )
+
+    /**
      * Inserts [n] blank lines at the cursor row (IL).
      *
      * @param n Number of lines to insert.

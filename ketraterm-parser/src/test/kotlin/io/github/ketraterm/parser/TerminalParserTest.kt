@@ -582,6 +582,24 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `DEC rectangular attribute commands collapse ordered SGR parameters`() {
+            val change = TerminalParserFixture()
+            val reverse = TerminalParserFixture()
+            val extent = TerminalParserFixture()
+
+            change.acceptAscii("\u001B[2;3;4;5;0;1;24\$r")
+            reverse.acceptAscii("\u001B[2;3;4;5;0;4;5\$t")
+            extent.acceptAscii("\u001B[2*")
+            extent.acceptAscii("x")
+
+            assertAll(
+                { assertEquals(listOf("changeRectangleAttributes:2:3:4:5:1:14"), change.sink.events) },
+                { assertEquals(listOf("reverseRectangleAttributes:2:3:4:5:9"), reverse.sink.events) },
+                { assertEquals(listOf("setAttributeChangeExtent:2"), extent.sink.events) },
+            )
+        }
+
+        @Test
         fun `DEC private CSI mode dispatch survives chunk boundaries`() {
             val f = TerminalParserFixture()
 

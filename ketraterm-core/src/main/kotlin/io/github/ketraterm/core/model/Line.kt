@@ -142,6 +142,20 @@ internal class Line(
         extendedAttrs[col] = extendedAttr
     }
 
+    /**
+     * Replaces only the packed visual attributes at [col], retaining its raw cell value and any
+     * cluster-store ownership. This is the safe attribute-only mutation used by DEC rectangle
+     * operations.
+     */
+    fun setCellAttributes(
+        col: Int,
+        attr: Long,
+        extendedAttr: Long,
+    ) {
+        attrs[col] = attr
+        extendedAttrs[col] = extendedAttr
+    }
+
     // TerminalLine — public read-only surface
 
     /**

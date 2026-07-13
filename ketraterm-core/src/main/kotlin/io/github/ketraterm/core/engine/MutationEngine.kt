@@ -22,6 +22,7 @@ import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.core.store.ClusterStore
 import io.github.ketraterm.core.util.UnicodeWidth
+import io.github.ketraterm.protocol.DecRectangleAttribute
 
 /**
  * Dedicated mutation engine for grid writes and line-level erase/edit operations.
@@ -1178,6 +1179,164 @@ internal class MutationEngine(
             }
         }
     }
+
+    /** Selects DECSACE's stream (`0`/`1`) or exact rectangle (`2`) extent. */
+    fun setAttributeChangeExtent(extent: Int) {
+        when (extent) {
+            0, 1 -> state.isAttributeChangeExtentRectangle = false
+            2 -> state.isAttributeChangeExtentRectangle = true
+        }
+    }
+
+    /** Applies VT420 DECCARA while preserving glyph payloads and the current SGR pen. */
+    fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    ) = structuralMutation {
+        val supportedSetMask = setMask and DecRectangleAttribute.ALL
+        val supportedClearMask = clearMask and DecRectangleAttribute.ALL
+        if (supportedSetMask == 0 && supportedClearMask == 0) return@structuralMutation
+
+        withAttributeExtent(top, left, bottom, right) { row, from, to, materializeBlanks ->
+            applyRectangleAttributeRange(
+                row = row,
+                from = from,
+                to = to,
+                materializeBlanks = materializeBlanks,
+                setMask = supportedSetMask,
+                clearMask = supportedClearMask,
+                reverseMask = 0,
+            )
+        }
+    }
+
+    /** Applies VT420 DECRARA while preserving glyph payloads and the current SGR pen. */
+    fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    ) = structuralMutation {
+        val supportedReverseMask = reverseMask and DecRectangleAttribute.ALL
+        if (supportedReverseMask == 0) return@structuralMutation
+
+        withAttributeExtent(top, left, bottom, right) { row, from, to, materializeBlanks ->
+            applyRectangleAttributeRange(
+                row = row,
+                from = from,
+                to = to,
+                materializeBlanks = materializeBlanks,
+                setMask = 0,
+                clearMask = 0,
+                reverseMask = supportedReverseMask,
+            )
+        }
+    }
+
+    /**
+     * Resolves DECSACE extent. Stream coordinates identify inclusive endpoints and wrap across
+     * physical line boundaries; exact rectangle coordinates address each row independently.
+     */
+    private inline fun withAttributeExtent(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        block: (row: Int, from: Int, to: Int, materializeBlanks: Boolean) -> Unit,
+    ) {
+        withRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
+            if (state.isAttributeChangeExtentRectangle) {
+                for (row in topRow..bottomRow) {
+                    block(row, leftCol, rightCol, true)
+                }
+            } else {
+                for (row in topRow..bottomRow) {
+                    val from = if (row == topRow) leftCol else 0
+                    val to = if (row == bottomRow) rightCol else width - 1
+                    block(row, from, to, false)
+                }
+            }
+        }
+    }
+
+    /** Updates one DECSACE-selected span without allocating or invalidating cluster handles. */
+    private fun applyRectangleAttributeRange(
+        row: Int,
+        from: Int,
+        to: Int,
+        materializeBlanks: Boolean,
+        setMask: Int,
+        clearMask: Int,
+        reverseMask: Int,
+    ) {
+        val line = getLine(row)
+        var col = from
+        while (col <= to) {
+            val raw = line.rawCodepoint(col)
+            if (raw == TerminalConstants.EMPTY) {
+                if (materializeBlanks) {
+                    val attr = transformRectanglePrimary(line.getPackedAttr(col), setMask, clearMask, reverseMask)
+                    val extendedAttr =
+                        transformRectangleExtended(line.getPackedExtendedAttr(col), setMask, clearMask, reverseMask)
+                    line.setCell(col, ' '.code, attr, extendedAttr)
+                }
+                col++
+                continue
+            }
+
+            val owner = findClusterStart(line, col)
+            updateRectangleCellAttributes(line, owner, setMask, clearMask, reverseMask)
+            val endExclusive = occupantEndExclusive(line, owner)
+            if (endExclusive > owner + 1) {
+                updateRectangleCellAttributes(line, owner + 1, setMask, clearMask, reverseMask)
+            }
+            col = maxOf(col + 1, endExclusive)
+        }
+        state.markLineChanged(line)
+    }
+
+    private fun updateRectangleCellAttributes(
+        line: Line,
+        col: Int,
+        setMask: Int,
+        clearMask: Int,
+        reverseMask: Int,
+    ) {
+        line.setCellAttributes(
+            col,
+            transformRectanglePrimary(line.getPackedAttr(col), setMask, clearMask, reverseMask),
+            transformRectangleExtended(line.getPackedExtendedAttr(col), setMask, clearMask, reverseMask),
+        )
+    }
+
+    private fun transformRectanglePrimary(
+        attr: Long,
+        setMask: Int,
+        clearMask: Int,
+        reverseMask: Int,
+    ): Long =
+        if (reverseMask != 0) {
+            AttributeCodec.reverseRectangularPrimaryAttributes(attr, reverseMask)
+        } else {
+            AttributeCodec.changeRectangularPrimaryAttributes(attr, setMask, clearMask)
+        }
+
+    private fun transformRectangleExtended(
+        extendedAttr: Long,
+        setMask: Int,
+        clearMask: Int,
+        reverseMask: Int,
+    ): Long =
+        if (reverseMask != 0) {
+            AttributeCodec.reverseRectangularExtendedAttributes(extendedAttr, reverseMask)
+        } else {
+            AttributeCodec.changeRectangularExtendedAttributes(extendedAttr, setMask, clearMask)
+        }
 
     /** Snapshots source cells and cluster payloads before DECCRA mutates an overlapping target. */
     private fun snapshotRectangle(
