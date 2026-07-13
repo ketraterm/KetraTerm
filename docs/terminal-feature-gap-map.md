@@ -141,6 +141,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(host)`: the portable Swing adapter cannot truthfully recover a current-layout unshifted key scalar from every AWT event. A host input adapter with reliable layout/IME metadata must supply it before non-US-layout Kitty key identity is fully supported.
 - `DONE(input)`: normalized keyboard events carry an explicit press/repeat/release lifecycle phase without host-toolkit dependencies or encoder hot-path allocation.
 - `DONE(input)`: the Kitty encoder formats the lifecycle phase in the `modifier:event-type` subfield and suppresses lifecycle events when flag `2` is inactive.
+- `DONE(protocol/input/ui)`: the complete Kitty functional-key table is represented by normalized input vocabulary and allocation-free PUA lookup tables; Swing maps the subset exposed by AWT, while richer hosts can supply the remaining keys.
 - `TODO(host)`: provide a rich key-event adapter that can reliably identify key press, operating-system repeat, and release for every key, including layout and IME-produced text, before flag `2` is advertised.
 - separate left/right modifier reporting if host event vocabulary grows it.
 - alternate-key fields and associated text fields.

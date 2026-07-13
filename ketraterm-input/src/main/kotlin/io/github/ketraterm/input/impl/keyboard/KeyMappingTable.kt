@@ -132,6 +132,18 @@ internal object KeyMappingTable {
         repeat(KittyKeyboardFunctionalKeyCode.F35 - KittyKeyboardFunctionalKeyCode.F13 + 1) { offset ->
             KITTY_PUA_CODES[TerminalKey.F13.ordinal + offset] = KittyKeyboardFunctionalKeyCode.F13 + offset
         }
+        repeat(6) { offset ->
+            KITTY_PUA_CODES[TerminalKey.CAPS_LOCK.ordinal + offset] = KittyKeyboardFunctionalKeyCode.CAPS_LOCK + offset
+        }
+        repeat(10) { offset ->
+            KITTY_PUA_CODES[TerminalKey.NUMPAD_LEFT.ordinal + offset] = KittyKeyboardFunctionalKeyCode.KP_LEFT + offset
+        }
+        repeat(13) { offset ->
+            KITTY_PUA_CODES[TerminalKey.MEDIA_PLAY.ordinal + offset] = KittyKeyboardFunctionalKeyCode.MEDIA_PLAY + offset
+        }
+        repeat(14) { offset ->
+            KITTY_PUA_CODES[TerminalKey.LEFT_SHIFT.ordinal + offset] = KittyKeyboardFunctionalKeyCode.LEFT_SHIFT + offset
+        }
 
         // Application Keypad Finals
         APPLICATION_KEYPAD_FINALS[TerminalKey.NUMPAD_SPACE.ordinal] = ' '.code

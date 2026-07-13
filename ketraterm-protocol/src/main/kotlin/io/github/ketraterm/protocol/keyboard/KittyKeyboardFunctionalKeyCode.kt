@@ -41,6 +41,18 @@ object KittyKeyboardFunctionalKeyCode {
     /** Final extended function-key code, corresponding to F35. */
     const val F35: Int = 57398
 
+    /** First lock/system-key code; Caps Lock through Menu are contiguous. */
+    const val CAPS_LOCK: Int = 57358
+
+    /** First keypad-navigation code; KP Left through KP Delete are contiguous. */
+    const val KP_LEFT: Int = 57417
+
+    /** First media/volume code; Media Play through Volume Mute are contiguous. */
+    const val MEDIA_PLAY: Int = 57428
+
+    /** First physical modifier-key code; Left Shift through ISO Level 5 Shift are contiguous. */
+    const val LEFT_SHIFT: Int = 57441
+
     // Keypad keys (mapped to Private Use Area)
 
     /** Keypad 0. */

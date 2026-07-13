@@ -84,6 +84,26 @@ class SwingKeyMapperTest {
     }
 
     @Test
+    fun mapsLockAndPhysicalModifierPressedKeys() {
+        assertEquals(TerminalKey.CAPS_LOCK, mapper.keyPressed(pressed(KeyEvent.VK_CAPS_LOCK))?.key)
+        assertEquals(
+            TerminalKey.RIGHT_SHIFT,
+            mapper.keyPressed(pressed(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_RIGHT))?.key,
+        )
+        assertEquals(
+            TerminalKey.LEFT_SUPER,
+            mapper.keyPressed(pressed(KeyEvent.VK_WINDOWS, keyLocation = KeyEvent.KEY_LOCATION_LEFT))?.key,
+        )
+    }
+
+    @Test
+    fun mapsNumpadNavigationFromKeyLocation() {
+        val mapped = mapper.keyPressed(pressed(KeyEvent.VK_END, keyLocation = KeyEvent.KEY_LOCATION_NUMPAD))
+
+        assertEquals(TerminalKey.NUMPAD_END, mapped?.key)
+    }
+
+    @Test
     fun mapsNumpadPressedKeyAndSuppressesFollowingTypedCharacter() {
         val mapped = mapper.keyPressed(pressed(KeyEvent.VK_NUMPAD1))
 
@@ -167,6 +187,7 @@ class SwingKeyMapperTest {
     private fun pressed(
         keyCode: Int,
         modifiers: Int = 0,
+        keyLocation: Int = KeyEvent.KEY_LOCATION_STANDARD,
     ): KeyEvent =
         KeyEvent(
             source,
@@ -175,5 +196,6 @@ class SwingKeyMapperTest {
             modifiers,
             keyCode,
             KeyEvent.CHAR_UNDEFINED,
+            keyLocation,
         )
 }

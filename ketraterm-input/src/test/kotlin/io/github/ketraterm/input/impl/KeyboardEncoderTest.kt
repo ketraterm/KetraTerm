@@ -801,6 +801,25 @@ class KeyboardEncoderTest {
     }
 
     @Test
+    fun `Kitty keyboard encodes extended functional key ranges`() {
+        val bits = kittyKeyboardBits(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES)
+
+        assertBytes(esc("[57358u"), TerminalKeyEvent.key(TerminalKey.CAPS_LOCK), bits)
+        assertBytes(esc("[57363u"), TerminalKeyEvent.key(TerminalKey.MENU), bits)
+        assertBytes(esc("[57417u"), TerminalKeyEvent.key(TerminalKey.NUMPAD_LEFT), bits)
+        assertBytes(esc("[57426u"), TerminalKeyEvent.key(TerminalKey.NUMPAD_DELETE), bits)
+        assertBytes(esc("[57428u"), TerminalKeyEvent.key(TerminalKey.MEDIA_PLAY), bits)
+        assertBytes(esc("[57440u"), TerminalKeyEvent.key(TerminalKey.VOLUME_MUTE), bits)
+        assertBytes(esc("[57441u"), TerminalKeyEvent.key(TerminalKey.LEFT_SHIFT), bits)
+        assertBytes(esc("[57454u"), TerminalKeyEvent.key(TerminalKey.ISO_LEVEL5_SHIFT), bits)
+        assertBytes(
+            esc("[57448;5u"),
+            TerminalKeyEvent.key(TerminalKey.RIGHT_CONTROL, TerminalModifiers.CTRL),
+            bits,
+        )
+    }
+
+    @Test
     fun `unmodified special keys write static sequence arrays`() {
         val output = ReferenceRecordingHostOutput()
         val encoder = KeyboardEncoder(output, InputScratchBuffer())

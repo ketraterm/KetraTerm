@@ -165,8 +165,7 @@ Not guaranteed yet:
 
 - modifyCursorKeys, modifyFunctionKeys, or modifyKeypadKeys resource variants
 - complete Kitty Keyboard Protocol support, including event types, alternate
-  key values, associated text, modifier-only events, and the full functional
-  key vocabulary
+  key values, associated text, and complete host lifecycle/layout metadata
 
 ## Mouse Contract
 
