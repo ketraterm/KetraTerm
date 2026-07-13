@@ -134,6 +134,10 @@ internal object AnsiStateMachine {
     private fun buildEscape() {
         val s = AnsiState.ESCAPE
 
+        // A non-ASCII byte cannot be an ESC final.  Drop the incomplete ESC sequence so a
+        // malformed UTF-8 lead cannot make a later ASCII byte dispatch the stale sequence.
+        set(s, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
+
         set(s, ByteClass.INTERMEDIATE, AnsiState.ESCAPE_INTERMEDIATE, FsmAction.COLLECT_INTERMEDIATE)
 
         set(s, ByteClass.CSI_INTRO, AnsiState.CSI_ENTRY, FsmAction.CLEAR_SEQUENCE)
@@ -154,6 +158,9 @@ internal object AnsiStateMachine {
     private fun buildEscapeIntermediate() {
         val s = AnsiState.ESCAPE_INTERMEDIATE
 
+        // See ESCAPE: UTF-8 is not valid in an ESC control function.
+        set(s, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
+
         set(s, ByteClass.INTERMEDIATE, s, FsmAction.COLLECT_INTERMEDIATE)
 
         set(s, ByteClass.PARAM_DIGIT, AnsiState.GROUND, FsmAction.ESC_DISPATCH)
@@ -169,6 +176,13 @@ internal object AnsiStateMachine {
     }
 
     private fun buildCsi() {
+        // Non-ASCII bytes are invalid in CSI control functions. Drop the incomplete sequence
+        // immediately so a later ASCII final is ordinary text, never a stale CSI dispatch.
+        set(AnsiState.CSI_ENTRY, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
+        set(AnsiState.CSI_PARAM, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
+        set(AnsiState.CSI_INTERMEDIATE, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
+        set(AnsiState.CSI_IGNORE, ByteClass.UTF8_PAYLOAD, AnsiState.GROUND, FsmAction.CLEAR_SEQUENCE)
+
         // CSI_ENTRY
         set(AnsiState.CSI_ENTRY, ByteClass.PARAM_DIGIT, AnsiState.CSI_PARAM, FsmAction.PARAM_DIGIT)
         set(AnsiState.CSI_ENTRY, ByteClass.COLON, AnsiState.CSI_PARAM, FsmAction.PARAM_COLON)
@@ -255,6 +269,7 @@ internal object AnsiStateMachine {
         set(AnsiState.DCS_ENTRY, ByteClass.OSC_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
         set(AnsiState.DCS_ENTRY, ByteClass.SOS_PM_APC_INTRO, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
         set(AnsiState.DCS_ENTRY, ByteClass.FINAL_BYTE, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
+        set(AnsiState.DCS_ENTRY, ByteClass.UTF8_PAYLOAD, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_IGNORE_START)
 
         val s = AnsiState.DCS_PASSTHROUGH
         set(s, ByteClass.INTERMEDIATE, s, FsmAction.DCS_PUT_ASCII)
@@ -275,7 +290,8 @@ internal object AnsiStateMachine {
         // OSC string body
         // ---------------------------------------------------------------------
         set(AnsiState.OSC_STRING, ByteClass.EXECUTE, AnsiState.OSC_STRING, FsmAction.OSC_EXECUTE_CONTROL)
-        set(AnsiState.OSC_STRING, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.OSC_END)
+        // CAN/SUB abort OSC; unlike BEL/ST they must discard, never dispatch, the partial payload.
+        set(AnsiState.OSC_STRING, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END)
         set(AnsiState.OSC_STRING, ByteClass.ESC, AnsiState.OSC_ESCAPE, FsmAction.IGNORE)
 
         // ESC \ terminates OSC.
@@ -283,7 +299,7 @@ internal object AnsiStateMachine {
 
         // Anything else after ESC inside OSC resumes OSC payload handling.
         set(AnsiState.OSC_ESCAPE, ByteClass.EXECUTE, AnsiState.OSC_STRING, FsmAction.OSC_EXECUTE_CONTROL)
-        set(AnsiState.OSC_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.OSC_END)
+        set(AnsiState.OSC_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END)
         set(AnsiState.OSC_ESCAPE, ByteClass.ESC, AnsiState.OSC_ESCAPE, FsmAction.IGNORE)
         set(AnsiState.OSC_ESCAPE, ByteClass.UTF8_PAYLOAD, AnsiState.OSC_STRING, FsmAction.OSC_PUT_UTF8)
 
@@ -294,7 +310,8 @@ internal object AnsiStateMachine {
         // ---------------------------------------------------------------------
         // In DCS passthrough, ordinary C0 is retained as payload, not executed.
         set(AnsiState.DCS_PASSTHROUGH, ByteClass.EXECUTE, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_PUT_ASCII)
-        set(AnsiState.DCS_PASSTHROUGH, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.DCS_END)
+        // CAN/SUB abort DCS before any bounded payload can reach a dispatcher.
+        set(AnsiState.DCS_PASSTHROUGH, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END)
         set(AnsiState.DCS_PASSTHROUGH, ByteClass.ESC, AnsiState.DCS_ESCAPE, FsmAction.IGNORE)
 
         // ESC \ terminates DCS.
@@ -302,7 +319,7 @@ internal object AnsiStateMachine {
 
         // Anything else after ESC inside DCS resumes DCS payload handling.
         set(AnsiState.DCS_ESCAPE, ByteClass.EXECUTE, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_PUT_ASCII)
-        set(AnsiState.DCS_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.DCS_END)
+        set(AnsiState.DCS_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END)
         set(AnsiState.DCS_ESCAPE, ByteClass.ESC, AnsiState.DCS_ESCAPE, FsmAction.IGNORE)
         set(AnsiState.DCS_ESCAPE, ByteClass.UTF8_PAYLOAD, AnsiState.DCS_PASSTHROUGH, FsmAction.DCS_PUT_UTF8)
 

@@ -375,6 +375,77 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `malformed UTF-8 inside active ESC CSI and DCS cannot dispatch the stale command`() {
+            val cases =
+                listOf(
+                    "ESC" to byteArrayOf(0x1B, 0xC3.toByte(), '7'.code.toByte()),
+                    "CSI" to "\u001B[31".encodeToByteArray() + byteArrayOf(0xC3.toByte(), 'm'.code.toByte()),
+                    "DCS" to "\u001BP\$q".encodeToByteArray() + byteArrayOf(0xC3.toByte()) + "m\u001B\\".encodeToByteArray(),
+                )
+
+            for ((name, stream) in cases) {
+                for (split in 1..stream.size) {
+                    val f = TerminalParserFixture()
+                    f.parser.accept(stream, 0, split)
+                    f.parser.accept(stream, split, stream.size - split)
+                    f.endOfInput()
+
+                    assertAll(
+                        { assertEquals(AnsiState.GROUND, f.state.fsmState, "$name split=$split") },
+                        { assertFalse(f.sink.events.contains("saveCursor"), "$name split=$split") },
+                        { assertFalse(f.sink.events.contains("restoreCursor"), "$name split=$split") },
+                        { assertFalse(f.sink.events.contains("setForegroundIndexed:1"), "$name split=$split") },
+                        { assertFalse(f.sink.events.contains("queryStatusString:m"), "$name split=$split") },
+                        {
+                            assertFalse(
+                                f.sink.events.contains(writeCodepoint(0xC3)),
+                                "malformed byte leaked as printable text; $name split=$split",
+                            )
+                        },
+                    )
+                }
+            }
+        }
+
+        @Test
+        fun `malformed UTF-8 within OSC is contained by BEL ST CAN SUB and never leaks printable bytes`() {
+            val terminators =
+                listOf(
+                    "BEL" to "\u0007".encodeToByteArray(),
+                    "ST" to "\u001B\\".encodeToByteArray(),
+                    "CAN" to byteArrayOf(0x18),
+                    "SUB" to byteArrayOf(0x1A),
+                )
+
+            for ((name, terminator) in terminators) {
+                val stream = "\u001B]2;bad".encodeToByteArray() + byteArrayOf(0xC3.toByte()) + terminator
+                for (split in 1..stream.size) {
+                    val f = TerminalParserFixture()
+                    f.parser.accept(stream, 0, split)
+                    f.parser.accept(stream, split, stream.size - split)
+                    f.endOfInput()
+
+                    assertAll(
+                        { assertEquals(AnsiState.GROUND, f.state.fsmState, "$name split=$split") },
+                        {
+                            assertFalse(
+                                f.sink.events.any { it.startsWith("writeCodepoint:") },
+                                "string payload leaked as printable text; $name split=$split",
+                            )
+                        },
+                        {
+                            if (name == "BEL" || name == "ST") {
+                                assertEquals(listOf("setWindowTitle:bad�"), f.sink.events, "$name split=$split")
+                            } else {
+                                assertTrue(f.sink.events.isEmpty(), "$name split=$split")
+                            }
+                        },
+                    )
+                }
+            }
+        }
+
+        @Test
         fun `combining mark variation selector ZWJ and regional indicators form clusters`() {
             val f = TerminalParserFixture()
 

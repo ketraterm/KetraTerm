@@ -201,15 +201,16 @@ class AnsiStateMachineTest {
         asciiAction: Int,
         executeAction: Int,
         utf8Action: Int,
-        endAction: Int,
+        stEndAction: Int,
+        canSubEndAction: Int,
     ) {
         assertClasses(escapeState, stringAsciiPayloadClassesExceptSt, bodyState, asciiAction)
 
         assertAll(
             { assertTransition(escapeState, ByteClass.EXECUTE, bodyState, executeAction) },
             { assertTransition(escapeState, ByteClass.UTF8_PAYLOAD, bodyState, utf8Action) },
-            { assertTransition(escapeState, ByteClass.ST_INTRO, AnsiState.GROUND, endAction) },
-            { assertTransition(escapeState, ByteClass.CAN_SUB, AnsiState.GROUND, endAction) },
+            { assertTransition(escapeState, ByteClass.ST_INTRO, AnsiState.GROUND, stEndAction) },
+            { assertTransition(escapeState, ByteClass.CAN_SUB, AnsiState.GROUND, canSubEndAction) },
             { assertTransition(escapeState, ByteClass.ESC, escapeState, FsmAction.IGNORE) },
             { assertTransition(escapeState, ByteClass.DEL, escapeState, FsmAction.IGNORE) },
         )
@@ -930,7 +931,8 @@ class AnsiStateMachineTest {
                 asciiAction = FsmAction.OSC_PUT_ASCII,
                 executeAction = FsmAction.OSC_EXECUTE_CONTROL,
                 utf8Action = FsmAction.OSC_PUT_UTF8,
-                endAction = FsmAction.OSC_END,
+                stEndAction = FsmAction.OSC_END,
+                canSubEndAction = FsmAction.STRING_END,
             )
         }
 
@@ -942,7 +944,8 @@ class AnsiStateMachineTest {
                 asciiAction = FsmAction.DCS_PUT_ASCII,
                 executeAction = FsmAction.DCS_PUT_ASCII,
                 utf8Action = FsmAction.DCS_PUT_UTF8,
-                endAction = FsmAction.DCS_END,
+                stEndAction = FsmAction.DCS_END,
+                canSubEndAction = FsmAction.STRING_END,
             )
         }
 
@@ -956,7 +959,8 @@ class AnsiStateMachineTest {
                         asciiAction = FsmAction.IGNORE,
                         executeAction = FsmAction.IGNORE,
                         utf8Action = FsmAction.IGNORE,
-                        endAction = FsmAction.STRING_END,
+                        stEndAction = FsmAction.STRING_END,
+                        canSubEndAction = FsmAction.STRING_END,
                     )
                 },
                 {
@@ -966,7 +970,8 @@ class AnsiStateMachineTest {
                         asciiAction = FsmAction.IGNORE,
                         executeAction = FsmAction.IGNORE,
                         utf8Action = FsmAction.IGNORE,
-                        endAction = FsmAction.STRING_END,
+                        stEndAction = FsmAction.STRING_END,
+                        canSubEndAction = FsmAction.STRING_END,
                     )
                 },
             )
@@ -975,10 +980,10 @@ class AnsiStateMachineTest {
         @Test
         fun `CAN and SUB use string-specific termination actions inside string states`() {
             assertAll(
-                { assertTransition(AnsiState.OSC_STRING, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.OSC_END) },
-                { assertTransition(AnsiState.OSC_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.OSC_END) },
-                { assertTransition(AnsiState.DCS_PASSTHROUGH, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.DCS_END) },
-                { assertTransition(AnsiState.DCS_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.DCS_END) },
+                { assertTransition(AnsiState.OSC_STRING, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
+                { assertTransition(AnsiState.OSC_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
+                { assertTransition(AnsiState.DCS_PASSTHROUGH, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
+                { assertTransition(AnsiState.DCS_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
                 { assertTransition(AnsiState.SOS_PM_APC_STRING, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
                 { assertTransition(AnsiState.SOS_PM_APC_ESCAPE, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
                 { assertTransition(AnsiState.IGNORE_UNTIL_ST, ByteClass.CAN_SUB, AnsiState.GROUND, FsmAction.STRING_END) },
