@@ -278,7 +278,7 @@ internal class SwingKeyMapper {
         if (keyCode in KeyEvent.VK_A..KeyEvent.VK_Z) {
             return 'a'.code + keyCode - KeyEvent.VK_A
         }
-        if (keyCode in KeyEvent.VK_0..KeyEvent.VK_9 && keyCode != KeyEvent.VK_6) {
+        if (keyCode in KeyEvent.VK_0..KeyEvent.VK_9) {
             return '0'.code + keyCode - KeyEvent.VK_0
         }
 
@@ -287,7 +287,6 @@ internal class SwingKeyMapper {
             KeyEvent.VK_OPEN_BRACKET -> '['.code
             KeyEvent.VK_BACK_SLASH -> '\\'.code
             KeyEvent.VK_CLOSE_BRACKET -> ']'.code
-            KeyEvent.VK_6 -> '^'.code
             KeyEvent.VK_MINUS -> '_'.code
             KeyEvent.VK_SLASH -> '?'.code
             else -> null

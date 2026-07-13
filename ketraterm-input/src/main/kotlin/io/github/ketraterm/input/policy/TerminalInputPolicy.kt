@@ -22,7 +22,8 @@ package io.github.ketraterm.input.policy
  * The production encoder suppresses unsupported combinations by default rather
  * than throwing, because UI toolkits may report platform-specific key states.
  *
- * @property backspacePolicy byte sent for the Backspace key.
+ * @property backspacePolicy initial Backspace byte before an explicit DECBKM
+ * set/reset overrides it for the current terminal reset epoch.
  * @property metaKeyPolicy handling for Meta-only printable and legacy key
  * encodings.
  * @property unsupportedModifiedKeyPolicy handling for valid key events whose

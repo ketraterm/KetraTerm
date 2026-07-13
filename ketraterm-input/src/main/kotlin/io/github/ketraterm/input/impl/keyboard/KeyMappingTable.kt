@@ -34,7 +34,13 @@ internal object KeyMappingTable {
      * Map of [TerminalKey.ordinal] to CSI letter final byte ASCII codes (e.g., 'A' for Cursor Up).
      * Entries are -1 if the key does not use a simple CSI letter encoding.
      */
-    val CSI_LETTERS: IntArray = IntArray(entries.size) { -1 }
+    val LEGACY_CSI_LETTERS: IntArray = IntArray(entries.size) { -1 }
+
+    /**
+     * Kitty-compatible CSI final-byte mappings. F3 deliberately remains a
+     * tilde key in Kitty's functional-key vocabulary.
+     */
+    val KITTY_CSI_LETTERS: IntArray = IntArray(entries.size) { -1 }
 
     /**
      * Map of [TerminalKey.ordinal] to legacy CSI tilde parameter numbers (e.g., 3 for Delete, 15 for F5).
@@ -77,18 +83,27 @@ internal object KeyMappingTable {
 
     init {
         // CSI Letters
-        CSI_LETTERS[TerminalKey.UP.ordinal] = 'A'.code
-        CSI_LETTERS[TerminalKey.DOWN.ordinal] = 'B'.code
-        CSI_LETTERS[TerminalKey.RIGHT.ordinal] = 'C'.code
-        CSI_LETTERS[TerminalKey.LEFT.ordinal] = 'D'.code
-        CSI_LETTERS[TerminalKey.HOME.ordinal] = 'H'.code
-        CSI_LETTERS[TerminalKey.END.ordinal] = 'F'.code
-        CSI_LETTERS[TerminalKey.F1.ordinal] = 'P'.code
-        CSI_LETTERS[TerminalKey.F2.ordinal] = 'Q'.code
-        CSI_LETTERS[TerminalKey.F4.ordinal] = 'S'.code
-        CSI_LETTERS[TerminalKey.PF1.ordinal] = 'P'.code
-        CSI_LETTERS[TerminalKey.PF2.ordinal] = 'Q'.code
-        CSI_LETTERS[TerminalKey.PF4.ordinal] = 'S'.code
+        fun mapCsi(
+            key: TerminalKey,
+            final: Char,
+        ) {
+            LEGACY_CSI_LETTERS[key.ordinal] = final.code
+            KITTY_CSI_LETTERS[key.ordinal] = final.code
+        }
+        mapCsi(TerminalKey.UP, 'A')
+        mapCsi(TerminalKey.DOWN, 'B')
+        mapCsi(TerminalKey.RIGHT, 'C')
+        mapCsi(TerminalKey.LEFT, 'D')
+        mapCsi(TerminalKey.HOME, 'H')
+        mapCsi(TerminalKey.END, 'F')
+        mapCsi(TerminalKey.F1, 'P')
+        mapCsi(TerminalKey.F2, 'Q')
+        LEGACY_CSI_LETTERS[TerminalKey.F3.ordinal] = 'R'.code
+        mapCsi(TerminalKey.F4, 'S')
+        mapCsi(TerminalKey.PF1, 'P')
+        mapCsi(TerminalKey.PF2, 'Q')
+        LEGACY_CSI_LETTERS[TerminalKey.PF3.ordinal] = 'R'.code
+        mapCsi(TerminalKey.PF4, 'S')
 
         // Tilde numbers
         TILDE_NUMBERS[TerminalKey.INSERT.ordinal] = 2

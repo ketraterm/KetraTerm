@@ -448,6 +448,21 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `DECBKM set and reset bytes select the Backspace wire byte`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B[?67h")
+            var snapshot = f.terminal.getModeSnapshot()
+            assertTrue(snapshot.isBackarrowKeyModeExplicit)
+            assertTrue(snapshot.isBackarrowKeySendsBackspace)
+
+            f.acceptAscii("\u001B[?67l")
+            snapshot = f.terminal.getModeSnapshot()
+            assertTrue(snapshot.isBackarrowKeyModeExplicit)
+            assertFalse(snapshot.isBackarrowKeySendsBackspace)
+        }
+
+        @Test
         fun `mouse tracking and SGR mouse encoding modes update core snapshot`() {
             val f = Fixture()
 
@@ -719,7 +734,7 @@ class HostCommandAdapterTest {
             f.end()
 
             assertEquals(
-                "\u001B[0n\u001B[2;3R\u001B[?2;3R\u001B[?1;2c\u001B[>0;0;0c",
+                "\u001B[0n\u001B[2;3R\u001B[?2;3R\u001B[?64;1;6;22;28c\u001B[>41;0;0c",
                 f.drainResponses(),
             )
         }

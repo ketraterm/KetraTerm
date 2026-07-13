@@ -50,6 +50,21 @@ internal class TerminalModes : TerminalInputState {
         get() = TerminalModeBits.hasFlag(currentBits, TerminalModeBits.APPLICATION_KEYPAD)
         set(value) = setFlag(TerminalModeBits.APPLICATION_KEYPAD, value)
 
+    /** Atomically records the explicit DECBKM selection for input encoding. */
+    fun setBackarrowKeyMode(sendsBackspace: Boolean) {
+        while (true) {
+            val old = modeBits.get()
+            val withExplicit = old or TerminalModeBits.BACKARROW_KEY_MODE_EXPLICIT
+            val new =
+                if (sendsBackspace) {
+                    withExplicit or TerminalModeBits.BACKARROW_KEY_SENDS_BACKSPACE
+                } else {
+                    withExplicit and TerminalModeBits.BACKARROW_KEY_SENDS_BACKSPACE.inv()
+                }
+            if (old == new || modeBits.compareAndSet(old, new)) return
+        }
+    }
+
     /** Mode 6: Origin Mode (DECOM). False = absolute, true = relative to scroll region. */
     var isOriginMode: Boolean
         get() = TerminalModeBits.hasFlag(currentBits, TerminalModeBits.ORIGIN_MODE)
@@ -195,6 +210,8 @@ internal class TerminalModes : TerminalInputState {
             isAutoWrap = TerminalModeBits.hasFlag(bits, TerminalModeBits.AUTO_WRAP),
             isApplicationCursorKeys = TerminalModeBits.hasFlag(bits, TerminalModeBits.APPLICATION_CURSOR_KEYS),
             isApplicationKeypad = TerminalModeBits.hasFlag(bits, TerminalModeBits.APPLICATION_KEYPAD),
+            isBackarrowKeyModeExplicit = TerminalInputState.isBackarrowKeyModeExplicit(bits),
+            isBackarrowKeySendsBackspace = TerminalInputState.isBackarrowKeySendsBackspace(bits),
             isOriginMode = TerminalModeBits.hasFlag(bits, TerminalModeBits.ORIGIN_MODE),
             isNewLineMode = TerminalModeBits.hasFlag(bits, TerminalModeBits.NEW_LINE_MODE),
             isLeftRightMarginMode = TerminalModeBits.hasFlag(bits, TerminalModeBits.LEFT_RIGHT_MARGIN_MODE),

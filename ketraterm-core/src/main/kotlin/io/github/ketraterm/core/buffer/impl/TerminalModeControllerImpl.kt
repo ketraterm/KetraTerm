@@ -53,6 +53,10 @@ internal class TerminalModeControllerImpl(
         mutateMode { state.modes.isApplicationKeypad = enabled }
     }
 
+    override fun setBackarrowKeyMode(sendsBackspace: Boolean) {
+        mutateMode { state.modes.setBackarrowKeyMode(sendsBackspace) }
+    }
+
     override fun setLeftRightMarginMode(enabled: Boolean) {
         state.cancelPendingWrap()
         if (state.modes.isLeftRightMarginMode == enabled) return

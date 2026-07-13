@@ -230,7 +230,13 @@ internal class BufferResponseChannel(
         state.hostResponses.enqueueByte('?'.code)
         state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.PRIMARY_DA_TERMINAL_CLASS)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.PRIMARY_DA_ADVANCED_VIDEO)
+        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.PRIMARY_DA_132_COLUMNS)
+        state.hostResponses.enqueueByte(';'.code)
+        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.PRIMARY_DA_SELECTIVE_ERASE)
+        state.hostResponses.enqueueByte(';'.code)
+        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.PRIMARY_DA_ANSI_COLOR)
+        state.hostResponses.enqueueByte(';'.code)
+        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.PRIMARY_DA_RECTANGULAR_EDITING)
         state.hostResponses.enqueueByte('c'.code)
     }
 

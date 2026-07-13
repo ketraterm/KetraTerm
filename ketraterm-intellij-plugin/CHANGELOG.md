@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Fixed holding Backspace or Delete deleting only one character.
+- Improved compatibility for Ctrl-number shortcuts, modified keys, extended function keys, and applications that configure Backspace behavior.
+- Reported terminal capabilities more accurately to shells and terminal applications.
 - Improved compatibility with full-screen terminal applications that verify rectangular screen regions.
 
 ## [0.2.0] - 2026-07-13

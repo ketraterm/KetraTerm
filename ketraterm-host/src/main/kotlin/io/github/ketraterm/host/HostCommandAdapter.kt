@@ -478,6 +478,7 @@ class HostCommandAdapter(
             DecPrivateMode.CURSOR_BLINK -> terminal.setCursorBlinking(enable)
             DecPrivateMode.CURSOR_VISIBLE -> terminal.setCursorVisible(enable)
             DecPrivateMode.APPLICATION_KEYPAD -> terminal.setApplicationKeypad(enable)
+            DecPrivateMode.BACKARROW_KEY -> terminal.setBackarrowKeyMode(enable)
             DecPrivateMode.LEFT_RIGHT_MARGIN -> terminal.setLeftRightMarginMode(enable)
             DecPrivateMode.MOUSE_X10 -> setMouseTrackingMode(enable, MouseTrackingMode.X10)
             DecPrivateMode.MOUSE_NORMAL -> setMouseTrackingMode(enable, MouseTrackingMode.NORMAL)

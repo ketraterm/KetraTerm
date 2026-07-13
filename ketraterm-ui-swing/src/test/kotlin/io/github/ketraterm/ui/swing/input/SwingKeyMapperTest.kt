@@ -90,6 +90,23 @@ class SwingKeyMapperTest {
     }
 
     @Test
+    fun mapsHeldBackspaceAndDeletePressesAsRepeats() {
+        val backspacePress = mapper.keyPressed(pressed(KeyEvent.VK_BACK_SPACE))
+        val backspaceRepeat = mapper.keyPressed(pressed(KeyEvent.VK_BACK_SPACE))
+        val deletePress = mapper.keyPressed(pressed(KeyEvent.VK_DELETE))
+        val deleteRepeat = mapper.keyPressed(pressed(KeyEvent.VK_DELETE))
+
+        assertEquals(TerminalKey.BACKSPACE, backspacePress?.key)
+        assertEquals(TerminalKeyEventType.PRESS, backspacePress?.type)
+        assertEquals(TerminalKey.BACKSPACE, backspaceRepeat?.key)
+        assertEquals(TerminalKeyEventType.REPEAT, backspaceRepeat?.type)
+        assertEquals(TerminalKey.DELETE, deletePress?.key)
+        assertEquals(TerminalKeyEventType.PRESS, deletePress?.type)
+        assertEquals(TerminalKey.DELETE, deleteRepeat?.key)
+        assertEquals(TerminalKeyEventType.REPEAT, deleteRepeat?.type)
+    }
+
+    @Test
     fun tracksLeftAndRightPhysicalModifierLifecycleIndependently() {
         mapper.keyPressed(pressed(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_LEFT))
         mapper.keyPressed(pressed(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_RIGHT))
@@ -166,6 +183,16 @@ class SwingKeyMapperTest {
 
         assertEquals('c'.code, mapped?.codepoint)
         assertEquals(TerminalModifiers.CTRL, mapped?.modifiers)
+    }
+
+    @Test
+    fun mapsCtrlNumberShortcutsWithoutLosingTheirPhysicalDigitIdentity() {
+        for (keyCode in KeyEvent.VK_0..KeyEvent.VK_9) {
+            val mapped = mapper.keyPressed(pressed(keyCode, modifiers = KeyEvent.CTRL_DOWN_MASK))
+
+            assertEquals('0'.code + keyCode - KeyEvent.VK_0, mapped?.codepoint)
+            assertEquals(TerminalModifiers.CTRL, mapped?.modifiers)
+        }
     }
 
     @Test

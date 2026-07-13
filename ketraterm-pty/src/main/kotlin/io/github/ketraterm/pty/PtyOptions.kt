@@ -101,8 +101,8 @@ data class PtyOptions
             @JvmStatic
             fun defaultEnvironment(): Map<String, String> {
                 val env = LinkedHashMap(System.getenv())
-                env.putIfAbsent("TERM", TerminalCapabilityIdentity.TERM_NAME)
-                env.putIfAbsent("COLORTERM", TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR)
+                env["TERM"] = TerminalCapabilityIdentity.TERM_NAME
+                env["COLORTERM"] = TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR
                 return env
             }
 
