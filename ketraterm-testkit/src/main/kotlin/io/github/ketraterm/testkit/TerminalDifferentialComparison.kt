@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.testkit
 
-import io.github.ketraterm.render.api.TerminalRenderCellFlags
+import io.github.ketraterm.render.api.*
 
 /** Result of comparing KetraTerm with an independent terminal implementation. */
 data class TerminalDifferentialResult(
@@ -60,9 +60,9 @@ data class TerminalDifferentialResult(
  *
  * This deliberately excludes cursor shape/visibility, discarded-history
  * counters, hyperlinks, icon title, and KetraTerm-specific modes. It also
- * captures—but does not yet compare—cell colors and styles until the packed
- * KetraTerm attribute ABI has a dedicated semantic decoder. Missing oracle
- * state is never guessed or replaced with a default.
+ * Missing oracle state is never guessed or replaced with a default. Underline
+ * styles are reduced to enabled/disabled because xterm.js exposes only that
+ * public distinction through its buffer-cell API.
  */
 object TerminalDifferentialComparator {
     /**
@@ -142,9 +142,67 @@ object TerminalDifferentialComparator {
                     actualCell.width,
                     context,
                 )
+                compareAttributes(rowIndex, column, expectedCell, actualCell, context, collector)
             }
         }
     }
+
+    private fun compareAttributes(
+        row: Int,
+        column: Int,
+        ketraTerm: TerminalCellSnapshot,
+        oracle: TerminalOracleCellSnapshot,
+        context: String,
+        collector: DifferenceCollector,
+    ) {
+        val prefix = "retainedRows[$row].cells[$column]"
+        collector.add(
+            "$prefix.foreground.kind",
+            colorKind(TerminalRenderAttrs.foregroundKind(ketraTerm.attributes)),
+            oracle.foreground.kind,
+            context,
+        )
+        collector.add(
+            "$prefix.foreground.value",
+            TerminalRenderAttrs.foregroundValue(ketraTerm.attributes),
+            oracle.foreground.value,
+            context,
+        )
+        collector.add(
+            "$prefix.background.kind",
+            colorKind(TerminalRenderAttrs.backgroundKind(ketraTerm.attributes)),
+            oracle.background.kind,
+            context,
+        )
+        collector.add(
+            "$prefix.background.value",
+            TerminalRenderAttrs.backgroundValue(ketraTerm.attributes),
+            oracle.background.value,
+            context,
+        )
+        collector.add("$prefix.bold", TerminalRenderAttrs.isBold(ketraTerm.attributes), oracle.bold, context)
+        collector.add("$prefix.italic", TerminalRenderAttrs.isItalic(ketraTerm.attributes), oracle.italic, context)
+        collector.add("$prefix.dim", TerminalRenderAttrs.isFaint(ketraTerm.attributes), oracle.dim, context)
+        collector.add(
+            "$prefix.underline",
+            TerminalRenderAttrs.underlineStyle(ketraTerm.attributes) != TerminalRenderUnderline.NONE,
+            oracle.underline,
+            context,
+        )
+        collector.add("$prefix.blink", TerminalRenderAttrs.isBlink(ketraTerm.attributes), oracle.blink, context)
+        collector.add("$prefix.inverse", TerminalRenderAttrs.isInverse(ketraTerm.attributes), oracle.inverse, context)
+        collector.add("$prefix.invisible", TerminalRenderAttrs.isInvisible(ketraTerm.attributes), oracle.invisible, context)
+        collector.add("$prefix.strikethrough", TerminalRenderAttrs.isStrikethrough(ketraTerm.attributes), oracle.strikethrough, context)
+        collector.add("$prefix.overline", TerminalRenderExtraAttrs.isOverline(ketraTerm.extraAttributes), oracle.overline, context)
+    }
+
+    private fun colorKind(kind: Int): String =
+        when (kind) {
+            TerminalRenderColorKind.DEFAULT -> "default"
+            TerminalRenderColorKind.INDEXED -> "palette"
+            TerminalRenderColorKind.RGB -> "rgb"
+            else -> "unknown($kind)"
+        }
 
     private fun TerminalCellSnapshot.normalizedText(): String =
         when {

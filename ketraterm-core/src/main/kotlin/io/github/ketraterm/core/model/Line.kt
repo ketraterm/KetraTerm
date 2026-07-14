@@ -28,8 +28,8 @@ import io.github.ketraterm.core.store.ClusterStore
  * - `attrs[col]`      — the primary packed cell attribute
  * - `extendedAttrs[col]` — the extended packed cell attribute
  *
- * wrapped=true means this line is a soft continuation of the previous line
- * caused by wrapping at the terminal width.
+ * `wrapped=true` means this line continues into the following physical line
+ * because of a soft wrap at the terminal width.
  *
  * ## Ownership
  *

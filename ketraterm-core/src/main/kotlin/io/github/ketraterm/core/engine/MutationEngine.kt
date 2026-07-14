@@ -438,6 +438,8 @@ internal class MutationEngine(
 
         if (widthInCells == 2 && cCol >= rightMargin) {
             annihilateAt(cRow, cCol)
+            line.wrapped = true
+            state.markLineChanged(line)
             cCol = leftMargin
             cRow = advanceRow(cRow)
             line = getLine(cRow)

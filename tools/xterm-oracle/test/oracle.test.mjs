@@ -55,6 +55,8 @@ test('captures retained grid cursor modes title and response bytes', async () =>
   assert.equal(result.retainedRows[0].cells[1].text, '中');
   assert.equal(result.retainedRows[0].cells[1].width, 2);
   assert.equal(result.retainedRows[0].cells[2].width, 0);
+  assert.deepEqual(result.retainedRows[0].cells[0].foreground, { kind: 'default', value: 0 });
+  assert.deepEqual(result.retainedRows[0].cells[0].background, { kind: 'default', value: 0 });
   assert.deepEqual(result.cursor, { column: 3, row: 0 });
   assert.equal(result.modes.applicationCursorKeys, true);
   assert.equal(result.windowTitle, 'title');

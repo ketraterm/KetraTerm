@@ -53,16 +53,18 @@ function writeAsync(terminal, bytes) {
 }
 
 function cellSnapshot(cell) {
+  const foregroundKind = cell.isFgRGB() ? 'rgb' : cell.isFgPalette() ? 'palette' : 'default';
+  const backgroundKind = cell.isBgRGB() ? 'rgb' : cell.isBgPalette() ? 'palette' : 'default';
   return {
     text: cell.getChars(),
     width: cell.getWidth(),
     foreground: {
-      kind: cell.isFgRGB() ? 'rgb' : cell.isFgPalette() ? 'palette' : 'default',
-      value: cell.getFgColor(),
+      kind: foregroundKind,
+      value: foregroundKind === 'default' ? 0 : cell.getFgColor(),
     },
     background: {
-      kind: cell.isBgRGB() ? 'rgb' : cell.isBgPalette() ? 'palette' : 'default',
-      value: cell.getBgColor(),
+      kind: backgroundKind,
+      value: backgroundKind === 'default' ? 0 : cell.getBgColor(),
     },
     bold: cell.isBold() !== 0,
     italic: cell.isItalic() !== 0,

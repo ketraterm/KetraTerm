@@ -10,9 +10,9 @@ resizes, and explicit end-of-input markers. Every invocation creates a fresh
 xterm.js terminal, preventing state from leaking between conformance cases.
 
 The snapshot exposes only public xterm.js state: retained grid cells, soft-wrap
-links, cursor coordinates, selected modes, title changes, and terminal response
-bytes. State that xterm.js does not publicly expose is omitted rather than
-fabricated.
+links, cursor coordinates, selected modes, title changes, terminal response
+bytes, colors, and public cell styles. State that xterm.js does not publicly
+expose is omitted rather than fabricated.
 
 ## Verification
 

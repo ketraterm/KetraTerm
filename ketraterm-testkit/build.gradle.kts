@@ -67,7 +67,7 @@ tasks.register<Test>("xtermDifferentialTest") {
             .output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform()
-    filter.includeTestsMatching("*XtermDifferentialOracleTest")
+    filter.includeTestsMatching("*Xterm*OracleTest")
     systemProperty("ketraterm.xtermOracle.required", "true")
     systemProperty("ketraterm.xtermOracle.node", "node")
     systemProperty(
