@@ -4,11 +4,14 @@
 
 The `ketraterm-testkit` module is the dedicated test double and mock harness module for KetraTerm Terminal. It provides in-memory connectors and lifecycle simulation tools for testing terminal runtimes, transport layers, and host-bound input/output loops without spinning up physical shells, PTYs, or socket connections.
 
-By decoupling testing from physical operating system interfaces (like OS-level pseudo-terminals or SSH processes), `ketraterm-testkit` enables ultra-fast, deterministic, and platform-agnostic testing of terminal components.
+By decoupling testing from physical operating system interfaces (like OS-level pseudo-terminals or SSH processes), `ketraterm-testkit` enables ultra-fast, deterministic, and platform-agnostic testing of terminal components. It also owns the headless conformance replay harness that drives the production parser-to-core pipeline and captures canonical observable snapshots.
 
 ---
 
 ## Upstream Dependencies
+* **`:ketraterm-core`** (for public terminal state and render-frame contracts).
+* **`:ketraterm-host`** (for production parser-to-core mapping).
+* **`:ketraterm-parser`** (for production byte-stream parsing).
 * **`:ketraterm-transport-api`** (for standard connector and listener contracts).
 
 ---
@@ -30,7 +33,7 @@ graph TD
 
 ## Public API Surface
 
-The module's public surface area contains a single, highly configurable test double:
+The module's public surface contains transport doubles and deterministic conformance replay APIs.
 
 ### [`MockConnector`](src/main/kotlin/io/github/ketraterm/testkit/MockConnector.kt)
 
@@ -45,6 +48,12 @@ The module's public surface area contains a single, highly configurable test dou
 * `feedFromHost(bytes: ByteArray, offset: Int, length: Int)`: Feeds incoming host bytes to the session (triggers `onBytes` on the registered `TerminalConnectorListener`). This mimics raw stdout output from a shell or TUI application.
 * `simulateClosed(exitCode: Int? = null)`: Signals to the session listener that the remote process exited with the given exit code.
 * `simulateCrash(error: Throwable)`: Signals to the session listener that the transport crashed or failed with an exception.
+
+### Headless conformance replay
+
+`TerminalConformanceHarness` replays `TerminalReplayTranscript` events through the production parser, host adapter, core buffer, response channel, and render-frame ABI. Its `TerminalConformanceSnapshot` result captures complete retained rows, live-grid boundaries, soft wraps, cell render values, grapheme clusters, attributes, hyperlinks, cursor, modes, titles, active hyperlink metadata, and ordered response bytes. Snapshots exclude internal storage handles and generation counters so they describe observable terminal semantics rather than implementation details.
+
+`TerminalReplayChunkings` produces named bounded chunk partitions for parser invariance checks, including every two-way split and bytewise delivery. `TerminalConformanceDiffer` reports deterministic field-level mismatch paths with bounded row and response context, allowing corpus failures to identify the first semantic divergence without dumping entire grids.
 
 ---
 
