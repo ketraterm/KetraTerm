@@ -18,6 +18,7 @@
 
 import {readFile} from 'node:fs/promises';
 import {stdin, stdout} from 'node:process';
+import {createInterface} from 'node:readline';
 import xtermHeadless from '@xterm/headless';
 
 const { Terminal } = xtermHeadless;
@@ -121,10 +122,7 @@ function snapshot(terminal, title, outboundChunks) {
   };
 }
 
-async function main() {
-  const chunks = [];
-  for await (const chunk of stdin) chunks.push(chunk);
-  const request = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+async function replayRequest(request) {
   if (request.protocolVersion !== PROTOCOL_VERSION) fail(`protocolVersion must be ${PROTOCOL_VERSION}`);
 
   const columns = requirePositiveInteger(request.columns, 'columns');
@@ -144,12 +142,20 @@ async function main() {
   terminal.onData((value) => { outboundChunks.push(Buffer.from(value, 'utf8')); });
 
   try {
+    let pendingWrites = [];
+    const flushWrites = async () => {
+      if (pendingWrites.length === 0) return;
+      const writes = pendingWrites;
+      pendingWrites = [];
+      await Promise.all(writes);
+    };
     for (const event of request.events) {
       switch (event?.type) {
         case 'input':
-          await writeAsync(terminal, decodeHex(event.hex));
+          pendingWrites.push(writeAsync(terminal, decodeHex(event.hex)));
           break;
         case 'resize':
+          await flushWrites();
           terminal.resize(
             requirePositiveInteger(event.columns, 'resize columns'),
             requirePositiveInteger(event.rows, 'resize rows'),
@@ -161,13 +167,34 @@ async function main() {
           fail(`unsupported event type ${JSON.stringify(event?.type)}`);
       }
     }
-    stdout.write(`${JSON.stringify(snapshot(terminal, title, outboundChunks))}\n`);
+    await flushWrites();
+    return snapshot(terminal, title, outboundChunks);
   } finally {
     terminal.dispose();
   }
 }
 
-main().catch((error) => {
+async function runOneShot() {
+  const chunks = [];
+  for await (const chunk of stdin) chunks.push(chunk);
+  const request = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  stdout.write(`${JSON.stringify(await replayRequest(request))}\n`);
+}
+
+async function runServer() {
+  const lines = createInterface({input: stdin, crlfDelay: Infinity, terminal: false});
+  for await (const line of lines) {
+    if (line.length === 0) continue;
+    try {
+      stdout.write(`${JSON.stringify({ok: true, value: await replayRequest(JSON.parse(line))})}\n`);
+    } catch (error) {
+      stdout.write(`${JSON.stringify({ok: false, error: error.message})}\n`);
+    }
+  }
+}
+
+const operation = process.argv.includes('--server') ? runServer() : runOneShot();
+operation.catch((error) => {
   process.stderr.write(`${error.stack ?? error.message}\n`);
   process.exitCode = 1;
 });

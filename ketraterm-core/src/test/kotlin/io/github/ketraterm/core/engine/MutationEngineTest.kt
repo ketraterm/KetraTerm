@@ -800,6 +800,19 @@ class MutationEngineTest {
     @DisplayName("insertLines")
     inner class InsertLinesTests {
         @Test
+        fun `insertLines breaks soft wrap into insertion row`() {
+            val state = createState(width = 3, height = 2)
+            val writer = MutationEngine(state)
+            seedLine(state, 0, "ABC")
+            lineAt(state, 0).wrapped = true
+            state.cursor.row = 1
+
+            writer.insertLines(1)
+
+            assertFalse(lineAt(state, 0).wrapped)
+        }
+
+        @Test
         fun `insertLines non-positive count is no-op`() {
             val state = createState(width = 3, height = 3)
             val writer = MutationEngine(state)
@@ -969,6 +982,19 @@ class MutationEngineTest {
     @Nested
     @DisplayName("deleteLines")
     inner class DeleteLinesTests {
+        @Test
+        fun `deleteLines breaks soft wrap into deleted row`() {
+            val state = createState(width = 3, height = 2)
+            val writer = MutationEngine(state)
+            seedLine(state, 0, "ABC")
+            lineAt(state, 0).wrapped = true
+            state.cursor.row = 1
+
+            writer.deleteLines(1)
+
+            assertFalse(lineAt(state, 0).wrapped)
+        }
+
         @Test
         fun `deleteLines non-positive count is no-op`() {
             val state = createState(width = 3, height = 3)
@@ -1321,6 +1347,17 @@ class MutationEngineTest {
             writer.newLine()
 
             assertFalse(state.cursor.pendingWrap)
+        }
+
+        @Test
+        fun `newLine breaks stale soft wrap on source row`() {
+            val state = createState(width = 3, height = 2)
+            val writer = MutationEngine(state)
+            lineAt(state, 0).wrapped = true
+
+            writer.newLine()
+
+            assertFalse(lineAt(state, 0).wrapped)
         }
 
         @Test

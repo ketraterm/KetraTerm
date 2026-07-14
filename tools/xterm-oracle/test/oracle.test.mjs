@@ -44,6 +44,25 @@ function request(events) {
   return { protocolVersion: 1, columns: 5, rows: 2, maxHistory: 4, events };
 }
 
+function runServer(requests) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [oraclePath, '--server'], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const output = [];
+    const errors = [];
+    child.stdout.on('data', (chunk) => output.push(chunk));
+    child.stderr.on('data', (chunk) => errors.push(chunk));
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`oracle server exited ${code}: ${Buffer.concat(errors).toString('utf8')}`));
+        return;
+      }
+      resolve(Buffer.concat(output).toString('utf8').trim().split('\n').map(JSON.parse));
+    });
+    child.stdin.end(`${requests.map(JSON.stringify).join('\n')}\n`);
+  });
+}
+
 test('captures retained grid cursor modes title and response bytes', async () => {
   const result = await runOracle(request([
     { type: 'input', hex: Buffer.from('A中\x1b[?1h\x1b]2;title\x07\x1b[6n').toString('hex') },
@@ -79,4 +98,20 @@ test('rejects malformed input instead of guessing', async () => {
     runOracle(request([{ type: 'input', hex: 'not-hex' }])),
     /input hex must contain an even number of hexadecimal digits/,
   );
+});
+
+test('server isolates requests and recovers after a rejected request', async () => {
+  const responses = await runServer([
+    request([{ type: 'input', hex: Buffer.from('first').toString('hex') }]),
+    request([{ type: 'input', hex: 'not-hex' }]),
+    request([{ type: 'input', hex: Buffer.from('second').toString('hex') }]),
+  ]);
+
+  assert.equal(responses.length, 3);
+  assert.equal(responses[0].ok, true);
+  assert.equal(responses[0].value.retainedRows[0].cells[0].text, 'f');
+  assert.equal(responses[1].ok, false);
+  assert.match(responses[1].error, /input hex/);
+  assert.equal(responses[2].ok, true);
+  assert.equal(responses[2].value.retainedRows[0].cells[0].text, 's');
 });

@@ -75,7 +75,65 @@ tasks.register<Test>("xtermDifferentialTest") {
         xtermOracleDirectory.file("oracle.mjs").asFile.absolutePath,
     )
     systemProperty("ketraterm.xtermOracle.workingDirectory", xtermOracleDirectory.asFile.absolutePath)
+    systemProperty("ketraterm.generatedDifferential.cases", providers.gradleProperty("xtermDifferentialCases").getOrElse("2000"))
+    systemProperty(
+        "ketraterm.generatedDifferential.artifacts",
+        layout.buildDirectory
+            .dir("reports/xterm-differential/failures")
+            .get()
+            .asFile.absolutePath,
+    )
 }
+
+fun registerGeneratedDifferentialProfile(
+    taskName: String,
+    descriptionText: String,
+    defaultCases: Int,
+) = tasks.register<Test>(taskName) {
+    group = "verification"
+    description = descriptionText
+    dependsOn(installXtermOracle, testXtermOracle, tasks.testClasses)
+    testClassesDirs =
+        sourceSets.test
+            .get()
+            .output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter.includeTestsMatching("*XtermGeneratedDifferentialOracleTest")
+    systemProperty("ketraterm.xtermOracle.required", "true")
+    systemProperty("ketraterm.xtermOracle.node", "node")
+    systemProperty("ketraterm.xtermOracle.script", xtermOracleDirectory.file("oracle.mjs").asFile.absolutePath)
+    systemProperty("ketraterm.xtermOracle.workingDirectory", xtermOracleDirectory.asFile.absolutePath)
+    systemProperty(
+        "ketraterm.generatedDifferential.cases",
+        providers.gradleProperty("xtermDifferentialCases").getOrElse(defaultCases.toString()),
+    )
+    systemProperty(
+        "ketraterm.generatedDifferential.artifacts",
+        layout.buildDirectory
+            .dir("reports/xterm-differential/failures")
+            .get()
+            .asFile.absolutePath,
+    )
+}
+
+registerGeneratedDifferentialProfile(
+    taskName = "xtermDifferentialSmokeTest",
+    descriptionText = "Runs 100 deterministic generated xterm.js differential cases.",
+    defaultCases = 100,
+)
+
+registerGeneratedDifferentialProfile(
+    taskName = "xtermDifferentialNightlyTest",
+    descriptionText = "Runs 100,000 deterministic generated xterm.js differential cases.",
+    defaultCases = 100_000,
+)
+
+registerGeneratedDifferentialProfile(
+    taskName = "xtermDifferentialReleaseAudit",
+    descriptionText = "Runs 500,000 deterministic generated xterm.js differential cases.",
+    defaultCases = 500_000,
+)
 
 tasks.test {
     useJUnitPlatform()

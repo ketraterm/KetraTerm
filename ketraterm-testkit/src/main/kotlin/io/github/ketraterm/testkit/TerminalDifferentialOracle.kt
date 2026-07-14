@@ -19,7 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import java.io.ByteArrayOutputStream
+import java.io.*
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.time.Duration
@@ -169,7 +169,7 @@ class TerminalProcessOracle(
         val stderrThread = Thread.ofVirtual().start(stderr)
 
         process.outputStream.use { stream ->
-            MAPPER.writeValue(stream, request(columns, rows, maxHistory, transcript))
+            MAPPER.writeValue(stream, encodeRequest(columns, rows, maxHistory, transcript))
         }
         if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
             process.destroyForcibly()
@@ -184,10 +184,10 @@ class TerminalProcessOracle(
         check(process.exitValue() == 0) {
             "terminal oracle exited with ${process.exitValue()}: ${diagnostics.ifBlank { "no diagnostics" }}"
         }
-        return parseSnapshot(MAPPER.readTree(stdout.bytes()))
+        return decodeSnapshot(MAPPER.readTree(stdout.bytes()))
     }
 
-    private fun request(
+    internal fun encodeRequest(
         columns: Int,
         rows: Int,
         maxHistory: Int,
@@ -223,7 +223,7 @@ class TerminalProcessOracle(
             )
         }
 
-    private fun parseSnapshot(root: JsonNode): TerminalOracleSnapshot {
+    internal fun decodeSnapshot(root: JsonNode): TerminalOracleSnapshot {
         require(root.requiredInt("protocolVersion") == PROTOCOL_VERSION) { "unsupported oracle protocol version" }
         val columns = root.requiredInt("columns")
         val visibleRows = root.requiredInt("visibleRows")
@@ -292,7 +292,7 @@ class TerminalProcessOracle(
     private fun JsonNode.toColor() = TerminalOracleColor(requiredText("kind"), requiredInt("value"))
 
     private class BoundedStreamCollector(
-        private val input: java.io.InputStream,
+        private val input: InputStream,
         private val limit: Int,
     ) : Runnable {
         private val output = ByteArrayOutputStream()
@@ -324,6 +324,138 @@ class TerminalProcessOracle(
         const val MAX_OUTPUT_BYTES = 64 * 1024 * 1024
         const val MAX_DIAGNOSTIC_BYTES = 1024 * 1024
         val MAPPER = ObjectMapper()
+    }
+}
+
+/**
+ * Persistent JSON-lines oracle client for high-volume differential campaigns.
+ *
+ * Calls are serialized because one process owns one ordered request/response
+ * stream. The external worker must create a fresh emulator for every request;
+ * persistence amortizes process startup without sharing terminal state.
+ *
+ * @param command executable and arguments selecting the oracle's server mode.
+ * @param workingDirectory process working directory, or `null` to inherit it.
+ * @param timeout maximum duration of one response and graceful shutdown.
+ */
+class TerminalPersistentProcessOracle(
+    command: List<String>,
+    workingDirectory: Path? = null,
+    private val timeout: Duration = Duration.ofSeconds(10),
+) : TerminalDifferentialOracle,
+    AutoCloseable {
+    private val command = command.toList().also { require(it.isNotEmpty()) { "oracle command must not be empty" } }
+    private val codec = TerminalProcessOracle(this.command, workingDirectory, timeout)
+    private val process =
+        ProcessBuilder(this.command)
+            .apply {
+                workingDirectory?.let { directory(it.toFile()) }
+            }.start()
+    private val writer = BufferedWriter(OutputStreamWriter(process.outputStream, StandardCharsets.UTF_8))
+    private val reader = BufferedReader(InputStreamReader(process.inputStream, StandardCharsets.UTF_8))
+    private val diagnostics = PersistentDiagnosticCollector(process.errorStream, MAX_DIAGNOSTIC_BYTES)
+    private val diagnosticsThread = Thread.ofVirtual().start(diagnostics)
+    private var closed = false
+
+    init {
+        require(timeout > Duration.ZERO) { "timeout must be positive, was $timeout" }
+    }
+
+    @Synchronized
+    override fun replay(
+        columns: Int,
+        rows: Int,
+        maxHistory: Int,
+        transcript: TerminalReplayTranscript,
+    ): TerminalOracleSnapshot {
+        check(!closed) { "terminal oracle is closed" }
+        check(process.isAlive) { "terminal oracle exited unexpectedly: ${diagnostics.text()}" }
+        require(columns in 1..4096) { "columns must be in 1..4096, was $columns" }
+        require(rows in 1..4096) { "rows must be in 1..4096, was $rows" }
+        require(maxHistory in 0..1_000_000) { "maxHistory must be in 0..1000000, was $maxHistory" }
+        val request = codec.encodeRequest(columns, rows, maxHistory, transcript)
+        writer.write(MAPPER.writeValueAsString(request))
+        writer.newLine()
+        writer.flush()
+
+        val responseTask = java.util.concurrent.FutureTask { readBoundedLine(reader, MAX_OUTPUT_CHARS) }
+        Thread.ofVirtual().start(responseTask)
+        val line =
+            try {
+                responseTask.get(timeout.toMillis(), TimeUnit.MILLISECONDS)
+            } catch (error: java.util.concurrent.TimeoutException) {
+                process.destroyForcibly()
+                throw IllegalStateException("terminal oracle response timed out after $timeout", error)
+            }
+        check(line != null) { "terminal oracle closed its response stream: ${diagnostics.text()}" }
+        val envelope = MAPPER.readTree(line)
+        check(envelope.requiredBoolean("ok")) {
+            "terminal oracle rejected request: ${envelope.requiredText("error")}"
+        }
+        return codec.decodeSnapshot(envelope.requiredObject("value"))
+    }
+
+    @Synchronized
+    override fun close() {
+        if (closed) return
+        closed = true
+        writer.close()
+        if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+            process.destroyForcibly()
+            process.waitFor()
+        }
+        diagnosticsThread.join()
+        reader.close()
+        check(!diagnostics.overflowed) { "terminal oracle stderr exceeded $MAX_DIAGNOSTIC_BYTES bytes" }
+        check(process.exitValue() == 0) {
+            "terminal oracle exited with ${process.exitValue()}: ${diagnostics.text().ifBlank { "no diagnostics" }}"
+        }
+    }
+
+    private class PersistentDiagnosticCollector(
+        private val input: InputStream,
+        private val limit: Int,
+    ) : Runnable {
+        private val output = ByteArrayOutputStream()
+        var overflowed = false
+            private set
+
+        override fun run() {
+            input.use {
+                val scratch = ByteArray(4096)
+                while (true) {
+                    val count = it.read(scratch)
+                    if (count < 0) return
+                    val remaining = limit - output.size()
+                    if (remaining > 0) output.write(scratch, 0, minOf(count, remaining))
+                    if (count > remaining) overflowed = true
+                }
+            }
+        }
+
+        fun text(): String = output.toString(StandardCharsets.UTF_8)
+    }
+
+    private companion object {
+        const val MAX_OUTPUT_CHARS = 64 * 1024 * 1024
+        const val MAX_DIAGNOSTIC_BYTES = 1024 * 1024
+        val MAPPER = ObjectMapper()
+
+        fun readBoundedLine(
+            reader: BufferedReader,
+            limit: Int,
+        ): String? {
+            val result = StringBuilder(minOf(limit, 8192))
+            while (true) {
+                val value = reader.read()
+                if (value < 0) return if (result.isEmpty()) null else result.toString()
+                if (value == '\n'.code) return result.toString()
+                if (value != '\r'.code) {
+                    check(result.length < limit) { "terminal oracle response exceeded $limit characters" }
+                    result.append(value.toChar())
+                }
+            }
+        }
     }
 }
 

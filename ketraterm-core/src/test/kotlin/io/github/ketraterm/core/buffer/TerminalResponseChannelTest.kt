@@ -248,13 +248,13 @@ class TerminalResponseChannelTest {
     }
 
     @Test
-    fun `hard reset clears pending host responses`() {
+    fun `hard reset preserves responses generated before reset`() {
         val buffer = TerminalBuffers.create(width = 10, height = 5)
 
         buffer.requestDeviceStatusReport(mode = 5, decPrivate = false)
         buffer.reset()
 
-        assertEquals(0, buffer.pendingResponseBytes)
+        assertEquals("\u001B[0n", drain(buffer))
     }
 
     @Test

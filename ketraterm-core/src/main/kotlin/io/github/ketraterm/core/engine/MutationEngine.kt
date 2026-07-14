@@ -637,6 +637,15 @@ internal class MutationEngine(
 
         val absCursorRow = state.resolveRingIndex(cRow)
         val absBottom = state.resolveRingIndex(bottom)
+        // IL/DL replace the row at cRow, severing any soft-wrap continuation
+        // from the preceding display row into that content.
+        if (cRow > 0) {
+            val preceding = getLine(cRow - 1)
+            if (preceding.wrapped) {
+                preceding.wrapped = false
+                state.markLineChanged(preceding)
+            }
+        }
         onMutate(absCursorRow, absBottom, times)
     }
 
@@ -1644,6 +1653,11 @@ internal class MutationEngine(
         structuralMutation {
             val oldCursorCol = state.cursor.col
             val oldCursorRow = state.cursor.row
+            val sourceLine = getLine(oldCursorRow)
+            if (sourceLine.wrapped) {
+                sourceLine.wrapped = false
+                state.markLineChanged(sourceLine)
+            }
             state.cursor.row = advanceRow(state.cursor.row)
             markCursorIfMoved(oldCursorCol, oldCursorRow)
         }

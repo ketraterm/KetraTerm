@@ -6,8 +6,10 @@ and not a source of normative terminal semantics.
 
 The executable accepts one JSON request on standard input and emits one JSON
 snapshot on standard output. Protocol version 1 supports exact byte chunks,
-resizes, and explicit end-of-input markers. Every invocation creates a fresh
-xterm.js terminal, preventing state from leaking between conformance cases.
+resizes, and explicit end-of-input markers. Passing `--server` selects a
+JSON-lines protocol for high-volume campaigns: the process remains resident,
+but every request still receives a fresh terminal so state cannot leak between
+cases. Server errors are returned per request and do not poison later requests.
 
 The snapshot exposes only public xterm.js state: retained grid cells, soft-wrap
 links, cursor coordinates, selected modes, title changes, terminal response
@@ -23,10 +25,23 @@ From the repository root:
 ```
 
 The Gradle task runs `npm ci`, executes the oracle's Node tests, then runs the
-curated KetraTerm-versus-xterm.js JVM suite. `package-lock.json` pins the exact
-dependency graph. The regular repository `test` task does not download npm
-dependencies; its xterm-specific test class is skipped unless the dedicated
-task enables it.
+curated suite and 2,000 deterministic generated scenarios. `package-lock.json`
+pins the exact dependency graph. Use `-PxtermDifferentialCases=N` to override
+the generated count. The regular repository `test` task does not download npm
+dependencies; xterm-specific tests are skipped unless a dedicated task enables
+them.
+
+Additional profiles are available for automation:
+
+```shell
+./gradlew :ketraterm-testkit:xtermDifferentialSmokeTest   # 100 cases
+./gradlew :ketraterm-testkit:xtermDifferentialNightlyTest # 100,000 cases
+./gradlew :ketraterm-testkit:xtermDifferentialReleaseAudit # 500,000 cases
+```
+
+Generated failures are deterministically shrunk by operation group and written
+as replayable JSON under
+`ketraterm-testkit/build/reports/xterm-differential/failures`.
 
 ## Correct interpretation
 

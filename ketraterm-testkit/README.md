@@ -55,7 +55,7 @@ The module's public surface contains transport doubles and deterministic conform
 
 [`TerminalReplayChunkings`](src/main/kotlin/io/github/ketraterm/testkit/TerminalReplayChunkings.kt) generates named single-chunk, every-two-way-split, bytewise, and fixed hostile partitions for bounded protocol fixtures. [`TerminalConformanceDiffer`](src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceDiff.kt) compares snapshots field by field and reports bounded structural paths with local row or response context.
 
-[`TerminalProcessOracle`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialOracle.kt) runs an independent emulator behind a bounded, versioned JSON process boundary. [`TerminalDifferentialComparator`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialComparison.kt) compares only state explicitly exposed by both implementations; it never invents values for unavailable oracle fields. The first adapter uses the version-pinned [`@xterm/headless`](../tools/xterm-oracle/README.md) executable.
+[`TerminalProcessOracle`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialOracle.kt) runs one independent-emulator replay behind a bounded, versioned JSON process boundary. [`TerminalPersistentProcessOracle`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialOracle.kt) keeps a JSON-lines worker resident for high-volume campaigns while preserving a fresh emulator per request. [`TerminalDifferentialComparator`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialComparison.kt) compares only state explicitly exposed by both implementations; it never invents values for unavailable oracle fields. The first adapter uses the version-pinned [`@xterm/headless`](../tools/xterm-oracle/README.md) executable.
 
 The differential corpus covers controls, cursor movement, insert/delete/erase operations, margins and scrolling, pending wrap, wide and combining text, malformed UTF-8 recovery, durable SGR styles and colors, modes, alternate screen, reset, responses, OSC titles, resize policy, and exhaustive bounded chunk partitions. Intentional disagreements must declare both a rationale and the exact structural mismatch paths; an added, removed, or changed mismatch fails the suite.
 
@@ -138,4 +138,15 @@ To run the checks for this module:
 
 # Install, unit-test, and compare against the pinned xterm.js oracle
 ./gradlew :ketraterm-testkit:xtermDifferentialTest
+
+# Fast CI and larger scheduled campaigns
+./gradlew :ketraterm-testkit:xtermDifferentialSmokeTest
+./gradlew :ketraterm-testkit:xtermDifferentialNightlyTest
+./gradlew :ketraterm-testkit:xtermDifferentialReleaseAudit
 ```
+
+The default generated campaign has 2,000 deterministic scenarios. Override any
+profile with `-PxtermDifferentialCases=N`. A mismatch is reduced by a
+delta-debugging shrinker and recorded with its seed, dimensions, chunk seed,
+original operations, minimized operations, and structural differences under
+`build/reports/xterm-differential/failures`.

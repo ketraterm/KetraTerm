@@ -152,7 +152,6 @@ internal class DefaultTerminalBuffer private constructor(
         state.altBuffer.resetLeftRightMargins(state.dimensions.width)
         state.primaryBuffer.clearKittyKeyboardStack()
         state.altBuffer.clearKittyKeyboardStack()
-        state.hostResponses.clear()
         state.isAttributeChangeExtentRectangle = false
         state.modes.reset()
         state.tabStops.resetToDefault()
