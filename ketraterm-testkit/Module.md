@@ -55,6 +55,8 @@ The module's public surface contains transport doubles and deterministic conform
 
 `TerminalReplayChunkings` produces named bounded chunk partitions for parser invariance checks, including every two-way split and bytewise delivery. `TerminalConformanceDiffer` reports deterministic field-level mismatch paths with bounded row and response context, allowing corpus failures to identify the first semantic divergence without dumping entire grids.
 
+Independent implementations attach through the versioned, process-isolated `TerminalDifferentialOracle` contract. `TerminalDifferentialComparator` compares only the supported semantic intersection without treating an external implementation as authoritative. The repository's first adapter is a version-pinned headless xterm.js tool under `tools/xterm-oracle`.
+
 ---
 
 ## How to Use in Tests
@@ -117,4 +119,7 @@ class ConnectorTest {
 To run the checks for this module:
 ```bash
 ./gradlew :ketraterm-testkit:test
+
+# Install, unit-test, and compare against the pinned xterm.js oracle
+./gradlew :ketraterm-testkit:xtermDifferentialTest
 ```

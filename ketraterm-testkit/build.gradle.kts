@@ -23,12 +23,58 @@ repositories {
 }
 
 dependencies {
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.22.1")
     implementation(project(":ketraterm-core"))
     implementation(project(":ketraterm-host"))
     implementation(project(":ketraterm-parser"))
     implementation(project(":ketraterm-transport-api"))
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.1")
+}
+
+val xtermOracleDirectory = rootProject.layout.projectDirectory.dir("tools/xterm-oracle")
+val npmExecutable = if (System.getProperty("os.name").startsWith("Windows")) "npm.cmd" else "npm"
+
+val installXtermOracle =
+    tasks.register<Exec>("installXtermOracle") {
+        group = "verification"
+        description = "Installs the version-pinned xterm.js differential oracle."
+        workingDir(xtermOracleDirectory)
+        commandLine(npmExecutable, "ci", "--ignore-scripts")
+        inputs.files(
+            xtermOracleDirectory.file("package.json"),
+            xtermOracleDirectory.file("package-lock.json"),
+        )
+        outputs.dir(xtermOracleDirectory.dir("node_modules"))
+    }
+
+val testXtermOracle =
+    tasks.register<Exec>("testXtermOracle") {
+        group = "verification"
+        description = "Runs the process-isolated xterm.js oracle unit tests."
+        dependsOn(installXtermOracle)
+        workingDir(xtermOracleDirectory)
+        commandLine(npmExecutable, "test")
+    }
+
+tasks.register<Test>("xtermDifferentialTest") {
+    group = "verification"
+    description = "Runs KetraTerm against the pinned xterm.js differential oracle."
+    dependsOn(installXtermOracle, testXtermOracle, tasks.testClasses)
+    testClassesDirs =
+        sourceSets.test
+            .get()
+            .output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter.includeTestsMatching("*XtermDifferentialOracleTest")
+    systemProperty("ketraterm.xtermOracle.required", "true")
+    systemProperty("ketraterm.xtermOracle.node", "node")
+    systemProperty(
+        "ketraterm.xtermOracle.script",
+        xtermOracleDirectory.file("oracle.mjs").asFile.absolutePath,
+    )
+    systemProperty("ketraterm.xtermOracle.workingDirectory", xtermOracleDirectory.asFile.absolutePath)
 }
 
 tasks.test {

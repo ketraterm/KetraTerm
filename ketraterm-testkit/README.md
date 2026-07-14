@@ -55,6 +55,8 @@ The module's public surface contains transport doubles and deterministic conform
 
 [`TerminalReplayChunkings`](src/main/kotlin/io/github/ketraterm/testkit/TerminalReplayChunkings.kt) generates named single-chunk, every-two-way-split, bytewise, and fixed hostile partitions for bounded protocol fixtures. [`TerminalConformanceDiffer`](src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceDiff.kt) compares snapshots field by field and reports bounded structural paths with local row or response context.
 
+[`TerminalProcessOracle`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialOracle.kt) runs an independent emulator behind a bounded, versioned JSON process boundary. [`TerminalDifferentialComparator`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialComparison.kt) compares only state explicitly exposed by both implementations; it never invents values for unavailable oracle fields. The first adapter uses the version-pinned [`@xterm/headless`](../tools/xterm-oracle/README.md) executable.
+
 ```kotlin
 val snapshot = TerminalConformanceHarness(columns = 80, rows = 24).replay(
     TerminalReplayTranscript.of(
@@ -131,4 +133,7 @@ class ConnectorTest {
 To run the checks for this module:
 ```bash
 ./gradlew :ketraterm-testkit:test
+
+# Install, unit-test, and compare against the pinned xterm.js oracle
+./gradlew :ketraterm-testkit:xtermDifferentialTest
 ```
