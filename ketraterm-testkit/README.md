@@ -2,11 +2,14 @@
 
 The `ketraterm-testkit` module is the dedicated test double and mock harness module for KetraTerm Terminal. It provides in-memory connectors and lifecycle simulation tools for testing terminal runtimes, transport layers, and host-bound input/output loops without spinning up physical shells, PTYs, or socket connections.
 
-By decoupling testing from physical operating system interfaces (like OS-level pseudo-terminals or SSH processes), `ketraterm-testkit` enables ultra-fast, deterministic, and platform-agnostic testing of terminal components.
+By decoupling testing from physical operating system interfaces (like OS-level pseudo-terminals or SSH processes), `ketraterm-testkit` enables ultra-fast, deterministic, and platform-agnostic testing of terminal components. It also provides a production-pipeline conformance harness for replaying exact host byte chunks and resize events through parser, host, core, response, and render APIs.
 
 ---
 
 ## Upstream Dependencies
+* **`:ketraterm-core`** (for public terminal state and render-frame contracts).
+* **`:ketraterm-host`** (for production parser-to-core mapping).
+* **`:ketraterm-parser`** (for production byte-stream parsing).
 * **`:ketraterm-transport-api`** (for standard connector and listener contracts).
 
 ---
@@ -28,7 +31,7 @@ graph TD
 
 ## Public API Surface
 
-The module's public surface area contains a single, highly configurable test double:
+The module's public surface contains transport doubles and deterministic conformance replay APIs.
 
 ### [`MockConnector`](src/main/kotlin/io/github/ketraterm/testkit/MockConnector.kt)
 
@@ -43,6 +46,28 @@ The module's public surface area contains a single, highly configurable test dou
 * `feedFromHost(bytes: ByteArray, offset: Int, length: Int)`: Feeds incoming host bytes to the session (triggers `onBytes` on the registered `TerminalConnectorListener`). This mimics raw stdout output from a shell or TUI application.
 * `simulateClosed(exitCode: Int? = null)`: Signals to the session listener that the remote process exited with the given exit code.
 * `simulateCrash(error: Throwable)`: Signals to the session listener that the transport crashed or failed with an exception.
+
+### Headless conformance replay
+
+[`TerminalConformanceHarness`](src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceHarness.kt) wires the production parser, host adapter, core buffer, terminal response channel, and public render-frame ABI without starting a PTY or UI.
+
+[`TerminalReplayTranscript`](src/main/kotlin/io/github/ketraterm/testkit/TerminalReplayTranscript.kt) preserves exact parser chunk boundaries, interleaved terminal resizes, and explicit end-of-input placement. [`TerminalConformanceSnapshot`](src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceSnapshot.kt) captures history plus the live grid, soft-wrap state, cells, grapheme clusters, attributes, hyperlinks, cursor, modes, titles, active hyperlink metadata, and cumulative terminal-to-host response bytes using content-based value semantics.
+
+[`TerminalReplayChunkings`](src/main/kotlin/io/github/ketraterm/testkit/TerminalReplayChunkings.kt) generates named single-chunk, every-two-way-split, bytewise, and fixed hostile partitions for bounded protocol fixtures. [`TerminalConformanceDiffer`](src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceDiff.kt) compares snapshots field by field and reports bounded structural paths with local row or response context.
+
+```kotlin
+val snapshot = TerminalConformanceHarness(columns = 80, rows = 24).replay(
+    TerminalReplayTranscript.of(
+        TerminalReplayEvent.Input.utf8("\u001B[2;3Hhello"),
+        TerminalReplayEvent.Resize(columns = 100, rows = 30),
+        TerminalReplayEvent.Input.utf8("\u001B[6n"),
+        TerminalReplayEvent.EndOfInput,
+    )
+)
+
+val diff = TerminalConformanceDiffer.compare(expectedSnapshot, snapshot)
+check(diff.isEmpty) { diff.format() }
+```
 
 ---
 

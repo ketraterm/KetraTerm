@@ -23,7 +23,9 @@ repositories {
 }
 
 dependencies {
-
+    implementation(project(":ketraterm-core"))
+    implementation(project(":ketraterm-host"))
+    implementation(project(":ketraterm-parser"))
     implementation(project(":ketraterm-transport-api"))
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.1")
