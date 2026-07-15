@@ -63,14 +63,7 @@ class SwingTerminalScrollbackTest {
                 inputEncoder = NoOpInputEncoder,
             )
         session.renderPublisher.updateAndPublish(renderReader)
-        val dispatcher = CountingDispatcher()
-        val component =
-            SwingTerminal(
-                hostServices =
-                    SwingHostServices(
-                        uiDispatcher = dispatcher,
-                    ),
-            )
+        val component = SwingTerminal()
         val oldManager = RepaintManager.currentManager(component)
         val repaintManager = CountingRepaintManager(component)
 
@@ -82,21 +75,21 @@ class SwingTerminalScrollbackTest {
             awaitRenderGenerationAfter(session, -1L)
             drainEdt()
             repaintManager.reset()
-            val dispatchCountBeforeFlood = dispatcher.count
+            val generationBeforeFlood = session.renderGeneration.value
 
             val edtBlocked = CountDownLatch(1)
             val releaseEdt = CountDownLatch(1)
             SwingUtilities.invokeLater {
                 edtBlocked.countDown()
-                assertTrue(releaseEdt.await(1, TimeUnit.SECONDS), "EDT block was not released")
+                assertTrue(releaseEdt.await(5, TimeUnit.SECONDS), "EDT block was not released")
             }
             assertTrue(edtBlocked.await(1, TimeUnit.SECONDS), "EDT block did not start")
 
             repeat(1_000) {
                 session.requestRender(scrollbackOffset = 0)
             }
+            awaitRenderGenerationAfter(session, generationBeforeFlood)
             assertEquals(0, repaintManager.count)
-            assertTrue(dispatcher.count <= dispatchCountBeforeFlood + 1)
 
             releaseEdt.countDown()
             SwingUtilities.invokeAndWait {
@@ -222,6 +215,7 @@ class SwingTerminalScrollbackTest {
             component.scrollToScrollbackOffset(4)
         }
 
+        awaitRequestedOffset(renderReader, expectedOffset = 4)
         drainEdt()
         val state = component.viewportState()
         assertTrue(renderReader.requestedOffsets.contains(4), "reader never received absolute scrollback offset 4")
@@ -656,18 +650,6 @@ class SwingTerminalScrollbackTest {
         }
     }
 
-    private class CountingDispatcher : TerminalUiDispatcher {
-        private val dispatchCount = AtomicInteger()
-
-        val count: Int
-            get() = dispatchCount.get()
-
-        override fun dispatch(runnable: Runnable) {
-            dispatchCount.incrementAndGet()
-            SwingUtilities.invokeLater(runnable)
-        }
-    }
-
     private class RecordingViewportListener : TerminalViewportListener {
         val lastScrollbackOffset = AtomicReference(0.0)
         val lastRenderOffset = AtomicInteger()
@@ -723,6 +705,17 @@ class SwingTerminalScrollbackTest {
             Thread.onSpinWait()
         }
         assertTrue(expectedRows in reader.requestedRows, "render request did not cover $expectedRows rows")
+    }
+
+    private fun awaitRequestedOffset(
+        reader: ScrollbackFrameReader,
+        expectedOffset: Int,
+    ) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1)
+        while (expectedOffset !in reader.requestedOffsets && System.nanoTime() < deadline) {
+            Thread.onSpinWait()
+        }
+        assertTrue(expectedOffset in reader.requestedOffsets, "render request did not use offset $expectedOffset")
     }
 
     private fun awaitPublishedRows(

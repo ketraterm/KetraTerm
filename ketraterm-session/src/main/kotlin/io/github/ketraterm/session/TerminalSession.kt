@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Runtime terminal session that binds core, parser, input encoding, and a
@@ -87,6 +88,7 @@ class TerminalSession(
     private val responseScratch = ByteArray(RESPONSE_BUFFER_SIZE)
     private val synchronizedTimeoutJob = AtomicReference<Job?>(null)
     private val renderRequests = Channel<Unit>(Channel.CONFLATED)
+    private val immediateRenderRequests = Channel<Unit>(Channel.CONFLATED)
     private val sessionJob = SupervisorJob()
     private val sessionScope =
         CoroutineScope(
@@ -349,17 +351,18 @@ class TerminalSession(
         }
 
         drainResponses()
-        invalidateRender()
+        invalidateRender(immediate = false)
     }
 
     /**
      * Invalidates the current requested viewport without changing its offset or
      * row count.
      */
-    private fun invalidateRender() {
+    private fun invalidateRender(immediate: Boolean = true) {
         if (isSessionClosed()) return
         pendingRenderGeneration.incrementAndGet()
         renderRequests.trySend(Unit)
+        if (immediate) immediateRenderRequests.trySend(Unit)
     }
 
     /**
@@ -407,7 +410,7 @@ class TerminalSession(
         val timeoutJob =
             sessionScope.launch(start = CoroutineStart.LAZY) {
                 try {
-                    delay(SYNCHRONIZED_OUTPUT_TIMEOUT_MS)
+                    delay(SYNCHRONIZED_OUTPUT_TIMEOUT_MS.milliseconds)
                     var changed = false
                     synchronized(mutationLock) {
                         if (terminal.getModeSnapshot().isSynchronizedOutput) {
@@ -437,6 +440,7 @@ class TerminalSession(
         var failedGeneration = NO_RENDER_GENERATION
         while (!isSessionClosed()) {
             currentCoroutineContext().ensureActive()
+            immediateRenderRequests.tryReceive()
             val generation = pendingRenderGeneration.get()
             if (generation == publishedGeneration || generation == failedGeneration) return
 
@@ -460,8 +464,16 @@ class TerminalSession(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                failedGeneration = generation
                 return
+            }
+
+            // The first publication after an idle period is immediate. While
+            // host output remains active, wait one display interval before
+            // sampling the packed request and generation again. Explicit UI
+            // requests interrupt the wait so scrolling and resizing stay
+            // responsive. The last host invalidation becomes a trailing frame.
+            withTimeoutOrNull(RENDER_PUBLICATION_INTERVAL_MS.milliseconds) {
+                immediateRenderRequests.receiveCatching()
             }
         }
     }
@@ -596,6 +608,7 @@ class TerminalSession(
     private fun cleanupParser() {
         cancelSynchronizedOutputTimeout()
         renderRequests.close()
+        immediateRenderRequests.close()
         sessionScope.cancel()
         synchronized(mutationLock) {
             parser.endOfInput()
@@ -611,6 +624,7 @@ class TerminalSession(
             AtomicInteger(1)
         private const val RESPONSE_BUFFER_SIZE: Int = 1024
         private const val NO_RENDER_GENERATION: Long = -1L
+        internal const val RENDER_PUBLICATION_INTERVAL_MS: Long = 16L
         private const val SYNCHRONIZED_OUTPUT_TIMEOUT_MS: Long = 100L
 
         private fun packRenderRequest(

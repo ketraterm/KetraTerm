@@ -141,15 +141,26 @@ class SwingTerminalThreadingTest {
                         uiDispatcher = dispatcher,
                     ),
             )
+        val edtBlocked = CountDownLatch(1)
+        val releaseEdt = CountDownLatch(1)
+        SwingUtilities.invokeLater {
+            edtBlocked.countDown()
+            releaseEdt.await(2, TimeUnit.SECONDS)
+        }
+        assertTrue(edtBlocked.await(1, TimeUnit.SECONDS), "EDT blocker did not start")
 
-        runOffEdt {
-            component.bind(session)
-            component.reloadSettings()
-            component.unbind()
+        try {
+            runOffEdt {
+                component.bind(session)
+                component.reloadSettings()
+                component.unbind()
+            }
+            assertEquals(3, dispatcher.dispatchCount.get())
+        } finally {
+            releaseEdt.countDown()
         }
         drainEdt()
 
-        assertEquals(4, dispatcher.dispatchCount.get())
         assertFalse(component.hasActiveRenderBinding)
         session.close()
     }

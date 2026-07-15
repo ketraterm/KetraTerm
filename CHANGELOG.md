@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- Refactored session and render orchestration around coroutine-based lifecycle and conflated frame publication, with Swing/workspace rendering kept off core read paths.
+- Refactored session and render orchestration around coroutine-based lifecycle and bounded latest-frame publication, reducing redundant frame extraction during heavy output while keeping Swing/workspace rendering off core read paths.
 
 ## [0.2.1] - 2026-07-14
 

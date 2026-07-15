@@ -40,6 +40,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
@@ -895,7 +896,7 @@ class TerminalSessionTest {
             runCurrent()
             assertEquals(-1L, session.renderGeneration.value)
 
-            advanceTimeBy(100)
+            advanceTimeBy(100.milliseconds)
             runCurrent()
             assertTrue(session.renderGeneration.value >= 0L)
 
@@ -934,6 +935,80 @@ class TerminalSessionTest {
         assertEquals(2, renderReader.readCalls)
         session.close()
     }
+
+    @Test
+    fun `sustained host output publishes only the latest generation once per interval`() =
+        runTest {
+            val terminal = TerminalBuffers.create(width = 10, height = 3)
+            val connector = MockConnector()
+            val renderReader = OffsetRecordingRenderReader()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val session =
+                TerminalSession(
+                    terminal = terminal,
+                    renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                    renderReader = renderReader,
+                    responseReader = terminal,
+                    connector = connector,
+                    parser = RecordingParser(),
+                    inputEncoder = NoOpInputEncoder,
+                    workerDispatcher = dispatcher,
+                )
+
+            session.requestRender(scrollbackOffset = 0)
+            runCurrent()
+            assertAll(
+                { assertEquals(1, renderReader.readCalls) },
+                { assertEquals(0, renderReader.lastOffset) },
+            )
+
+            repeat(3) {
+                session.onBytes(byteArrayOf('x'.code.toByte()), offset = 0, length = 1)
+            }
+            runCurrent()
+            assertEquals(1, renderReader.readCalls)
+
+            advanceTimeBy(TerminalSession.RENDER_PUBLICATION_INTERVAL_MS.milliseconds)
+            runCurrent()
+            assertAll(
+                { assertEquals(2, renderReader.readCalls) },
+                { assertEquals(4L, session.renderGeneration.value) },
+            )
+            session.close()
+        }
+
+    @Test
+    fun `explicit viewport request interrupts host output publication interval`() =
+        runTest {
+            val terminal = TerminalBuffers.create(width = 10, height = 3)
+            val connector = MockConnector()
+            val renderReader = OffsetRecordingRenderReader()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val session =
+                TerminalSession(
+                    terminal = terminal,
+                    renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                    renderReader = renderReader,
+                    responseReader = terminal,
+                    connector = connector,
+                    parser = RecordingParser(),
+                    inputEncoder = NoOpInputEncoder,
+                    workerDispatcher = dispatcher,
+                )
+
+            session.requestRender(scrollbackOffset = 0)
+            runCurrent()
+            session.onBytes(byteArrayOf('x'.code.toByte()), offset = 0, length = 1)
+            session.requestRender(scrollbackOffset = 5)
+            runCurrent()
+
+            assertAll(
+                { assertEquals(2, renderReader.readCalls) },
+                { assertEquals(5, renderReader.lastOffset) },
+                { assertEquals(5, session.renderPublisher.current()?.scrollbackOffset) },
+            )
+            session.close()
+        }
 
     @Test
     fun `requestRender publishes latest viewport after in flight render`() {
@@ -1284,7 +1359,7 @@ class TerminalSessionTest {
 
     private fun TerminalSession.awaitRenderGenerationAfter(generation: Long): Long =
         runBlocking {
-            withTimeout(1_000) {
+            withTimeout(1_000.milliseconds) {
                 renderGeneration.first { it > generation }
             }
         }
