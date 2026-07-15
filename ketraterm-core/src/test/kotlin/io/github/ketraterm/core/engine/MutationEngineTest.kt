@@ -507,8 +507,21 @@ class MutationEngineTest {
 
             assertAll(
                 { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(2)) },
-                { assertFalse(lineAt(state, 0).wrapped, "Erase to end MUST break the soft-wrap flag") },
+                { assertFalse(lineAt(state, 0).wrapped, "Erase to end must break the soft-wrap flag") },
             )
+        }
+
+        @Test
+        fun `eraseLineToEnd from left edge breaks soft wrap into current row`() {
+            val state = createState(width = 4, height = 2)
+            val writer = MutationEngine(state)
+            lineAt(state, 0).wrapped = true
+            state.cursor.row = 1
+            state.cursor.col = 0
+
+            writer.eraseLineToEnd()
+
+            assertFalse(lineAt(state, 0).wrapped)
         }
 
         @Test
@@ -522,7 +535,7 @@ class MutationEngineTest {
 
             assertAll(
                 { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(0)) },
-                { assertFalse(lineAt(state, 0).wrapped, "Erase whole line MUST break the soft-wrap flag") },
+                { assertFalse(lineAt(state, 0).wrapped, "Erase whole line must break the soft-wrap flag") },
             )
         }
     }
@@ -653,12 +666,12 @@ class MutationEngineTest {
         }
 
         @Test
-        fun `deletes from cursor, shifts left, and fills trailing cells with pen attr`() {
+        fun `deletes from cursor, shifts left, and fills trailing cells with BCE attr`() {
             val state = createState(width = 6, height = 1)
             val writer = MutationEngine(state)
             seedLine(state, 0, "ABCDEF", attr = 10)
             state.pen.setAttributes(fg = 3, bg = 4, underlineStyle = io.github.ketraterm.core.model.UnderlineStyle.SINGLE)
-            val fillAttr = state.pen.currentAttr
+            val fillAttr = state.pen.blankAttr
             state.cursor.col = 1
 
             writer.deleteCharacters(2)
@@ -800,6 +813,39 @@ class MutationEngineTest {
     @DisplayName("insertLines")
     inner class InsertLinesTests {
         @Test
+        fun `horizontal slice insertion annihilates wide occupant crossing left margin`() {
+            val state = createState(width = 5, height = 3)
+            val writer = MutationEngine(state)
+            writer.printCodepoint(0x1F600, 2)
+            state.modes.isLeftRightMarginMode = true
+            state.activeBuffer.setLeftRightMargins(2, 5, 5)
+            state.cursor.row = 0
+            state.cursor.col = 1
+
+            writer.insertLines(1)
+
+            assertAll(
+                { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).rawCodepoint(0)) },
+                { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).rawCodepoint(1)) },
+                { assertEquals(TerminalConstants.EMPTY, lineAt(state, 1).rawCodepoint(0)) },
+                { assertEquals(TerminalConstants.EMPTY, lineAt(state, 1).rawCodepoint(1)) },
+            )
+        }
+
+        @Test
+        fun `insertLines breaks soft wrap into insertion row`() {
+            val state = createState(width = 3, height = 2)
+            val writer = MutationEngine(state)
+            seedLine(state, 0, "ABC")
+            lineAt(state, 0).wrapped = true
+            state.cursor.row = 1
+
+            writer.insertLines(1)
+
+            assertFalse(lineAt(state, 0).wrapped)
+        }
+
+        @Test
         fun `insertLines non-positive count is no-op`() {
             val state = createState(width = 3, height = 3)
             val writer = MutationEngine(state)
@@ -928,14 +974,14 @@ class MutationEngineTest {
         }
 
         @Test
-        fun `insertLines clears inserted rows using current pen attribute`() {
+        fun `insertLines clears inserted rows using BCE attribute`() {
             val state = createState(width = 3, height = 3)
             val writer = MutationEngine(state)
             seedLine(state, 0, "AAA", attr = 11)
             seedLine(state, 1, "BBB", attr = 11)
             seedLine(state, 2, "CCC", attr = 11)
             state.pen.setAttributes(fg = 5, bg = 2, bold = true)
-            val clearAttr = state.pen.currentAttr
+            val clearAttr = state.pen.blankAttr
             state.cursor.row = 1
 
             writer.insertLines(1)
@@ -969,6 +1015,19 @@ class MutationEngineTest {
     @Nested
     @DisplayName("deleteLines")
     inner class DeleteLinesTests {
+        @Test
+        fun `deleteLines breaks soft wrap into deleted row`() {
+            val state = createState(width = 3, height = 2)
+            val writer = MutationEngine(state)
+            seedLine(state, 0, "ABC")
+            lineAt(state, 0).wrapped = true
+            state.cursor.row = 1
+
+            writer.deleteLines(1)
+
+            assertFalse(lineAt(state, 0).wrapped)
+        }
+
         @Test
         fun `deleteLines non-positive count is no-op`() {
             val state = createState(width = 3, height = 3)
@@ -1321,6 +1380,17 @@ class MutationEngineTest {
             writer.newLine()
 
             assertFalse(state.cursor.pendingWrap)
+        }
+
+        @Test
+        fun `newLine breaks stale soft wrap on source row`() {
+            val state = createState(width = 3, height = 2)
+            val writer = MutationEngine(state)
+            lineAt(state, 0).wrapped = true
+
+            writer.newLine()
+
+            assertFalse(lineAt(state, 0).wrapped)
         }
 
         @Test
@@ -1799,14 +1869,14 @@ class MutationEngineTest {
     }
 
     @Nested
-    @DisplayName("clearViewport and clearAllHistory pen attribute")
+    @DisplayName("clearViewport and clearAllHistory BCE attribute")
     inner class ClearPenAttributeTests {
         @Test
-        fun `clearViewport fills lines with current pen attribute`() {
+        fun `clearViewport fills lines with BCE attribute`() {
             val state = createState(width = 2, height = 2)
             val writer = MutationEngine(state)
             state.pen.setAttributes(fg = 3, bg = 5, bold = true)
-            val clearAttr = state.pen.currentAttr
+            val clearAttr = state.pen.blankAttr
 
             writer.clearViewport()
 
@@ -1815,11 +1885,11 @@ class MutationEngineTest {
         }
 
         @Test
-        fun `clearAllHistory fills new lines with current pen attribute`() {
+        fun `clearAllHistory fills new lines with BCE attribute`() {
             val state = createState(width = 2, height = 2, history = 4)
             val writer = MutationEngine(state)
             state.pen.setAttributes(fg = 2, bg = 7, italic = true)
-            val clearAttr = state.pen.currentAttr
+            val clearAttr = state.pen.blankAttr
 
             writer.clearAllHistory()
 

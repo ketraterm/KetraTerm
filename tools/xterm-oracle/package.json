@@ -1,0 +1,13 @@
+{
+  "name": "@ketraterm/xterm-oracle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Process-isolated xterm.js differential oracle for KetraTerm conformance tests",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@xterm/headless": "6.0.0"
+  }
+}

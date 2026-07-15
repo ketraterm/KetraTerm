@@ -55,6 +55,10 @@ The module's public surface contains transport doubles and deterministic conform
 
 [`TerminalReplayChunkings`](src/main/kotlin/io/github/ketraterm/testkit/TerminalReplayChunkings.kt) generates named single-chunk, every-two-way-split, bytewise, and fixed hostile partitions for bounded protocol fixtures. [`TerminalConformanceDiffer`](src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceDiff.kt) compares snapshots field by field and reports bounded structural paths with local row or response context.
 
+[`TerminalProcessOracle`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialOracle.kt) runs one independent-emulator replay behind a bounded, versioned JSON process boundary. [`TerminalPersistentProcessOracle`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialOracle.kt) keeps a JSON-lines worker resident for high-volume campaigns while preserving a fresh emulator per request. [`TerminalDifferentialComparator`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialComparison.kt) compares only state explicitly exposed by both implementations; it never invents values for unavailable oracle fields. The first adapter uses the version-pinned [`@xterm/headless`](../tools/xterm-oracle/README.md) executable.
+
+The differential corpus covers controls, cursor movement, insert/delete/erase operations, margins and scrolling, pending wrap, wide and combining text, malformed UTF-8 recovery, durable SGR styles and colors, modes, alternate screen, reset, responses, OSC titles, resize policy, and exhaustive bounded chunk partitions. Intentional disagreements must declare both a rationale and the exact structural mismatch paths; an added, removed, or changed mismatch fails the suite.
+
 ```kotlin
 val snapshot = TerminalConformanceHarness(columns = 80, rows = 24).replay(
     TerminalReplayTranscript.of(
@@ -131,4 +135,52 @@ class ConnectorTest {
 To run the checks for this module:
 ```bash
 ./gradlew :ketraterm-testkit:test
+
+# Install, unit-test, and compare against the pinned xterm.js oracle
+./gradlew :ketraterm-testkit:xtermDifferentialTest
+
+# Fast CI and larger scheduled campaigns
+./gradlew :ketraterm-testkit:xtermDifferentialSmokeTest
+./gradlew :ketraterm-testkit:xtermDifferentialNightlyTest
+./gradlew :ketraterm-testkit:xtermDifferentialReleaseAudit
+
+# State-aware Unicode resize/reflow preservation campaigns
+./gradlew :ketraterm-testkit:resizeReflowInvariantSmokeTest
+./gradlew :ketraterm-testkit:resizeReflowInvariantNightlyTest
+
+# Independent model oracle for cursor movement, deferred wrap, and scrolling
+./gradlew :ketraterm-testkit:cursorWrapModelSmokeTest
+./gradlew :ketraterm-testkit:cursorWrapModelNightlyTest
 ```
+
+The default generated campaign has 2,000 deterministic scenarios. Override any
+profile with `-PxtermDifferentialCases=N`; select a deterministic shard with
+`-PxtermDifferentialStartIndex=N`. A mismatch is reduced by a delta-debugging
+shrinker and recorded with its seed, dimensions, chunk seed, original
+operations, minimized operations, structural differences, commit SHA, and
+comparison scope under `build/reports/xterm-differential/failures`.
+
+Each run writes a campaign manifest named `campaign-<start>-<end>.json` beside
+the failure directory. CI runs 100 cases for every pull request and shards the
+scheduled 100,000-case campaign into four ranges of 25,000 cases. Campaign
+manifests are retained for all shards; minimized reproductions and JUnit reports
+are uploaded automatically for failed shards.
+
+The resize/reflow campaign constructs deterministic mixed-width Unicode state,
+then applies repeated width and height changes. It verifies exact grapheme order,
+dimensions, cursor bounds, render-cell flags, and wide-cell adjacency without
+using xterm.js as an oracle because KetraTerm deliberately reflows logical lines
+while headless xterm.js retains physical rows. Override its size and shard with
+`-PresizeReflowCases=N` and `-PresizeReflowStartIndex=N`. Passing runs write a
+metadata manifest under `build/reports/resize-reflow-invariant`; failures also
+record the original and resize-minimized replay event sequences.
+
+The grid-physics campaign executes generated ASCII, combining, CJK, and emoji
+writes together with CR, LF, BS, CUP, CUF, CUB, DECAWM, DECSTBM, DECSLRM,
+DECLRMM, DECOM, RI, IL, DL, SU, and SD against both the production
+parser-to-core pipeline and a small independent grid model. It compares cells,
+wide spans, clusters, cursor position, margins, origin mode, autowrap, soft-wrap
+markers, regional scrolling, line mutations, and retained history. Override and shard it with
+`-PcursorWrapCases=N` and `-PcursorWrapStartIndex=N`; failing streams are
+prefix-independent delta-minimized and stored under
+`build/reports/cursor-wrap-model/failures`.

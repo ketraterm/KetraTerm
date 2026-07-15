@@ -199,6 +199,7 @@ class TerminalLeftRightMarginTest {
     @Test
     fun `wide glyph at horizontal right margin wraps as one span`() {
         val buffer = TerminalBuffers.create(width = 8, height = 2)
+        val state = stateOf(buffer)
         buffer.setLeftRightMarginMode(true)
         buffer.setLeftRightMargins(3, 5)
         buffer.positionCursor(4, 0)
@@ -211,6 +212,12 @@ class TerminalLeftRightMarginTest {
             { assertEquals(-1, buffer.getCodepointAt(3, 1)) },
             { assertEquals(4, buffer.cursorCol) },
             { assertEquals(1, buffer.cursorRow) },
+            {
+                assertTrue(
+                    state.activeBuffer.ring[state.resolveRingIndex(0)].wrapped,
+                    "the vacated row must remain linked to the wrapped wide glyph",
+                )
+            },
             { assertEquals(0, buffer.getCodepointAt(5, 1), "right-margin guard must remain untouched") },
         )
     }

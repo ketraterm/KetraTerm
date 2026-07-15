@@ -26,7 +26,6 @@ internal class TerminalModeControllerImpl(
     private val cursorEngine: CursorEngine,
 ) : TerminalModeController {
     private inline fun mutateMode(block: () -> Unit) {
-        state.cancelPendingWrap()
         block()
     }
 
@@ -35,7 +34,8 @@ internal class TerminalModeControllerImpl(
     }
 
     override fun setAutoWrap(enabled: Boolean) {
-        mutateMode { state.modes.isAutoWrap = enabled }
+        state.cancelPendingWrap()
+        state.modes.isAutoWrap = enabled
     }
 
     override fun setOriginMode(enabled: Boolean) {

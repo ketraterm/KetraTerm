@@ -196,6 +196,9 @@ internal object AttributeCodec {
 
     fun backgroundColor(v: Long): CellColor = decodeColor(((v ushr BG_SHIFT) and COLOR_SLOT_MASK).toInt())
 
+    /** Returns a blank-cell attribute retaining only the encoded background color (BCE). */
+    fun backgroundOnly(v: Long): Long = v and (COLOR_SLOT_MASK shl BG_SHIFT)
+
     fun underlineColor(v: Long): CellColor = decodeColor((v and COLOR_SLOT_MASK).toInt())
 
     fun isBold(v: Long): Boolean = v and (1L shl BOLD_BIT) != 0L

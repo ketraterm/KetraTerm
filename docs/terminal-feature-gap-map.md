@@ -52,6 +52,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 ## Parser Gaps
 
 ### CSI Protocols
+- `TODO(parser/core)`: conditional ANSI SCP compatibility for parameterless `CSI s` / `CSI u`. KetraTerm currently reserves plain `CSI s` for DECSLRM; xterm-style save/restore requires mode-aware disambiguation so parameterless DECSLRM continues to reset horizontal margins when DECLRMM is active.
 - `TODO(parser/core)`: broader DEC-specific status reports beyond the safe DSR/CPR/DA baseline.
 - `TODO(parser)`: full tab-stop and margin variants beyond the current common set.
 - `DONE(parser/core/host)`: rectangular erase (`DECERA`), selective erase (`DECSERA`), fill (`DECFRA`), copy (`DECCRA`), and checksum response (`DECRQCRA`) preserve active margin/origin coordinates; mutation operations preserve wide/cluster span integrity and `DECCRA` uses overlap-safe snapshot semantics. Copy/checksum intentionally support only the active single page (`0` omitted or `1`); checksum responses are terminal-response-policy gated and use the VT420 default 16-bit algorithm.
