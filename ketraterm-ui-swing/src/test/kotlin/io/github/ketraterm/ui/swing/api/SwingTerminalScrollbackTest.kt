@@ -258,6 +258,8 @@ class SwingTerminalScrollbackTest {
             component.setSize(30, 100)
             component.bind(session)
         }
+        awaitRenderGenerationAfter(session, -1L)
+        awaitViewportOffset(component, expectedOffset = 0.0)
         repeat(3) {
             component.scrollViewportBy(0.25)
         }
@@ -613,9 +615,7 @@ class SwingTerminalScrollbackTest {
             val alternateGeneration = session.renderGeneration.value
             session.requestRender(scrollbackOffset = 0)
             awaitRenderGenerationAfter(session, alternateGeneration)
-            drainEdt()
-
-            assertEquals(0.0, component.viewportState().scrollbackOffset)
+            awaitViewportOffset(component, expectedOffset = 0.0)
             assertEquals(0, component.viewportState().renderOffset)
 
             reader.activeBuffer = TerminalRenderBufferKind.PRIMARY
@@ -623,9 +623,7 @@ class SwingTerminalScrollbackTest {
             val primaryGeneration = session.renderGeneration.value
             session.requestRender(scrollbackOffset = 0)
             awaitRenderGenerationAfter(session, primaryGeneration)
-            drainEdt()
-
-            assertEquals(0.0, component.viewportState().scrollbackOffset)
+            awaitViewportOffset(component, expectedOffset = 0.0)
             assertEquals(0, component.viewportState().renderOffset)
         } finally {
             session.close()
