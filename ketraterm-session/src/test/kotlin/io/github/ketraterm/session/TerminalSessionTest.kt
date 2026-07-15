@@ -27,6 +27,12 @@ import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.nio.charset.StandardCharsets
@@ -35,6 +41,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @Test
     fun `DSR CSI 5 n replies OK status`() {
@@ -88,17 +95,44 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `lifecycle state is retained from creation through closure`() =
+        runTest {
+            val connector = MockConnector()
+            val terminal = TerminalBuffers.create(width = 10, height = 3)
+            val session =
+                TerminalSession.create(
+                    terminal = terminal,
+                    connector = connector,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                )
+
+            assertSame(TerminalSessionState.Created, session.state.value)
+
+            session.start(columns = 10, rows = 3)
+            assertSame(TerminalSessionState.Running, session.state.value)
+
+            session.close()
+            val closed = session.state.value as TerminalSessionState.Closed
+            assertTrue(closed.event.locallyRequested)
+            assertEquals(closed, session.state.first())
+            assertFalse(session.isCoroutineScopeActive)
+        }
+
+    @Test
     fun `remote close records exit code`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)
-        val closeEvents = mutableListOf<TerminalSessionCloseEvent>()
-        session.addCloseListener { _, event -> closeEvents += event }
 
         connector.simulateClosed(7)
 
         assertEquals(7, session.exitCode)
         assertEquals(0, connector.closeCount)
-        assertEquals(listOf(TerminalSessionCloseEvent(exitCode = 7, failure = null, locallyRequested = false)), closeEvents)
+        assertEquals(
+            TerminalSessionState.Closed(
+                TerminalSessionCloseEvent(exitCode = 7, failure = null, locallyRequested = false),
+            ),
+            session.state.value,
+        )
     }
 
     @Test
@@ -106,15 +140,18 @@ class TerminalSessionTest {
         val connector = MockConnector()
         val session = createStartedSession(connector)
         val failure = IllegalStateException("transport failed")
-        val closeEvents = mutableListOf<TerminalSessionCloseEvent>()
-        session.addCloseListener { _, event -> closeEvents += event }
 
         connector.simulateCrash(failure)
 
         assertEquals(failure, session.failure)
         assertNull(session.exitCode)
         assertEquals(0, connector.closeCount)
-        assertEquals(listOf(TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false)), closeEvents)
+        assertEquals(
+            TerminalSessionState.Closed(
+                TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false),
+            ),
+            session.state.value,
+        )
     }
 
     @Test
@@ -131,13 +168,16 @@ class TerminalSessionTest {
     fun `local cleanup after remote close does not emit duplicate close event`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)
-        val closeEvents = mutableListOf<TerminalSessionCloseEvent>()
-        session.addCloseListener { _, event -> closeEvents += event }
 
         connector.simulateClosed(1)
         session.close()
 
-        assertEquals(listOf(TerminalSessionCloseEvent(exitCode = 1, failure = null, locallyRequested = false)), closeEvents)
+        assertEquals(
+            TerminalSessionState.Closed(
+                TerminalSessionCloseEvent(exitCode = 1, failure = null, locallyRequested = false),
+            ),
+            session.state.value,
+        )
     }
 
     @Test
@@ -166,14 +206,17 @@ class TerminalSessionTest {
     fun `local close emits local lifecycle event once`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)
-        val closeEvents = mutableListOf<TerminalSessionCloseEvent>()
-        session.addCloseListener { _, event -> closeEvents += event }
 
         session.close()
         session.close()
 
         assertTrue(session.isClosed)
-        assertEquals(listOf(TerminalSessionCloseEvent(exitCode = null, failure = null, locallyRequested = true)), closeEvents)
+        assertEquals(
+            TerminalSessionState.Closed(
+                TerminalSessionCloseEvent(exitCode = null, failure = null, locallyRequested = true),
+            ),
+            session.state.value,
+        )
     }
 
     @Test
@@ -209,7 +252,7 @@ class TerminalSessionTest {
                 session.start(columns = 10, rows = 3)
             }
 
-        assertEquals("session already started", error.message)
+        assertEquals("session already started or closed", error.message)
         assertEquals(1, connector.startCount)
         session.close()
     }
@@ -703,7 +746,7 @@ class TerminalSessionTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
                 renderReader = terminal as TerminalRenderFrameReader,
                 responseReader = terminal,
                 connector = connector,
@@ -741,7 +784,7 @@ class TerminalSessionTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
                 renderReader = terminal as TerminalRenderFrameReader,
                 responseReader = terminal,
                 connector = connector,
@@ -768,7 +811,7 @@ class TerminalSessionTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
                 renderReader = renderReader,
                 responseReader = terminal,
                 connector = connector,
@@ -789,127 +832,105 @@ class TerminalSessionTest {
         val terminal = TerminalBuffers.create(width = 10, height = 3)
         val connector = MockConnector()
         val renderReader = OffsetRecordingRenderReader()
-        val renderPublished = CountDownLatch(1)
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
                 renderReader = renderReader,
                 responseReader = terminal,
                 connector = connector,
                 parser = RecordingParser(),
                 inputEncoder = NoOpInputEncoder,
             )
-        session.onDirty = { renderPublished.countDown() }
-
+        val previousGeneration = session.renderGeneration.value
         session.requestRender(scrollbackOffset = 3)
 
-        assertTrue(renderPublished.await(1, TimeUnit.SECONDS), "render was not published")
+        session.awaitRenderGenerationAfter(previousGeneration)
         assertAll(
             { assertEquals(3, renderReader.lastOffset) },
-            { assertEquals(3, session.publisher.current()?.scrollbackOffset) },
+            { assertEquals(3, session.renderPublisher.current()?.scrollbackOffset) },
         )
         session.close()
     }
 
     @Test
-    fun `synchronized output mode defers rendering and flushes on disable`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector)
-        val renderPublished = CountDownLatch(1)
-        val dirtyCalls = AtomicInteger(0)
-        session.onDirty = {
-            dirtyCalls.incrementAndGet()
-            renderPublished.countDown()
+    fun `synchronized output mode defers rendering and flushes on disable`() =
+        runTest {
+            val connector = MockConnector()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val terminal = TerminalBuffers.create(width = 10, height = 3)
+            val session = TerminalSession.create(terminal, connector, workerDispatcher = dispatcher)
+            session.start(columns = 10, rows = 3)
+
+            // Enable synchronized output mode: CSI ? 2026 h
+            connector.feedFromHost("\u001B[?2026h".toByteArray(StandardCharsets.US_ASCII))
+
+            // Write some text to trigger render requests
+            connector.feedFromHost("hello".toByteArray(StandardCharsets.US_ASCII))
+
+            runCurrent()
+            assertEquals(-1L, session.renderGeneration.value)
+
+            // Disable synchronized output mode: CSI ? 2026 l
+            connector.feedFromHost("\u001B[?2026l".toByteArray(StandardCharsets.US_ASCII))
+
+            runCurrent()
+            assertTrue(session.renderGeneration.value >= 0L)
+            assertEquals("hello", session.terminal.getLineAsString(0))
+            session.close()
         }
-
-        // Enable synchronized output mode: CSI ? 2026 h
-        connector.feedFromHost("\u001B[?2026h".toByteArray(StandardCharsets.US_ASCII))
-
-        // Write some text to trigger render requests
-        connector.feedFromHost("hello".toByteArray(StandardCharsets.US_ASCII))
-
-        // Verify that no render has been published yet.
-        // We submit a no-op task to the single-threaded renderWorker and await its completion.
-        // This guarantees that the render drain task has executed on the worker queue.
-        session.renderWorker.submit {}.get(1, TimeUnit.SECONDS)
-        assertEquals(0, dirtyCalls.get())
-
-        // Disable synchronized output mode: CSI ? 2026 l
-        val renderLatch = CountDownLatch(1)
-        session.onDirty = {
-            dirtyCalls.incrementAndGet()
-            renderLatch.countDown()
-        }
-        connector.feedFromHost("\u001B[?2026l".toByteArray(StandardCharsets.US_ASCII))
-
-        // Verify that rendering immediately occurs
-        assertTrue(renderLatch.await(1, TimeUnit.SECONDS), "render was not published after disable")
-        assertEquals(1, dirtyCalls.get())
-        assertEquals("hello", session.terminal.getLineAsString(0))
-        session.close()
-    }
 
     @Test
-    fun `synchronized output mode automatically times out and flushes`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector)
-        val renderPublished = CountDownLatch(1)
-        session.onDirty = {
-            renderPublished.countDown()
+    fun `synchronized output mode automatically times out and flushes`() =
+        runTest {
+            val connector = MockConnector()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val terminal = TerminalBuffers.create(width = 10, height = 3)
+            val session = TerminalSession.create(terminal, connector, workerDispatcher = dispatcher)
+            session.start(columns = 10, rows = 3)
+
+            // Enable synchronized output mode and write some text
+            connector.feedFromHost("\u001B[?2026hhello".toByteArray(StandardCharsets.US_ASCII))
+
+            runCurrent()
+            assertEquals(-1L, session.renderGeneration.value)
+
+            advanceTimeBy(100)
+            runCurrent()
+            assertTrue(session.renderGeneration.value >= 0L)
+
+            // Verify synchronized output mode is turned off in the core
+            assertFalse(session.terminal.getModeSnapshot().isSynchronizedOutput)
+            assertEquals("hello", session.terminal.getLineAsString(0))
+            session.close()
         }
 
-        // Enable synchronized output mode and write some text
-        connector.feedFromHost("\u001B[?2026hhello".toByteArray(StandardCharsets.US_ASCII))
-
-        // Verify it doesn't render immediately
-        session.renderWorker.submit {}.get(1, TimeUnit.SECONDS)
-        assertEquals(1, renderPublished.count)
-
-        // Wait for safety timeout to expire (timeout is 100ms, wait 1 second to be safe on slow CI)
-        assertTrue(renderPublished.await(1, TimeUnit.SECONDS), "render was not flushed by timeout")
-
-        // Verify synchronized output mode is turned off in the core
-        assertFalse(session.terminal.getModeSnapshot().isSynchronizedOutput)
-        assertEquals("hello", session.terminal.getLineAsString(0))
-        session.close()
-    }
-
     @Test
-    fun `notifyRenderDirty coalesces renders while worker is busy`() {
+    fun `render requests coalesce while worker is busy`() {
         val terminal = TerminalBuffers.create(width = 10, height = 3)
         val connector = MockConnector()
         val renderReader = BlockingFirstRenderReader()
-        val dirtyCalls = AtomicInteger(0)
-        val twoDirtyCalls = CountDownLatch(2)
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
                 renderReader = renderReader,
                 responseReader = terminal,
                 connector = connector,
                 parser = RecordingParser(),
                 inputEncoder = NoOpInputEncoder,
             )
-        session.onDirty = {
-            dirtyCalls.incrementAndGet()
-            twoDirtyCalls.countDown()
-        }
-
-        session.notifyRenderDirty()
+        session.requestRender(scrollbackOffset = 0)
         assertTrue(renderReader.awaitFirstRead(), "first render did not start")
 
         repeat(5) {
-            session.notifyRenderDirty()
+            session.requestRender(scrollbackOffset = 0)
         }
 
         renderReader.releaseFirstRead()
 
-        assertTrue(twoDirtyCalls.await(1, TimeUnit.SECONDS), "coalesced render did not complete")
-        Thread.sleep(100)
+        session.awaitRenderGenerationAfter(4L)
 
-        assertEquals(2, dirtyCalls.get())
         assertEquals(2, renderReader.readCalls)
         session.close()
     }
@@ -919,21 +940,16 @@ class TerminalSessionTest {
         val terminal = TerminalBuffers.create(width = 10, height = 3)
         val connector = MockConnector()
         val renderReader = BlockingFirstOffsetRenderReader()
-        val twoDirtyCalls = CountDownLatch(2)
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
                 renderReader = renderReader,
                 responseReader = terminal,
                 connector = connector,
                 parser = RecordingParser(),
                 inputEncoder = NoOpInputEncoder,
             )
-        session.onDirty = {
-            twoDirtyCalls.countDown()
-        }
-
         session.requestRender(scrollbackOffset = 1)
         assertTrue(renderReader.awaitFirstRead(), "first render did not start")
 
@@ -941,13 +957,12 @@ class TerminalSessionTest {
         session.requestRender(scrollbackOffset = 5)
         renderReader.releaseFirstRead()
 
-        assertTrue(twoDirtyCalls.await(1, TimeUnit.SECONDS), "latest render was not published")
-        Thread.sleep(100)
+        session.awaitRenderGenerationAfter(1L)
 
         assertAll(
             { assertEquals(2, renderReader.readCalls) },
             { assertEquals(listOf(1, 5), renderReader.offsets.toList()) },
-            { assertEquals(5, session.publisher.current()?.scrollbackOffset) },
+            { assertEquals(5, session.renderPublisher.current()?.scrollbackOffset) },
         )
         session.close()
     }
@@ -957,89 +972,79 @@ class TerminalSessionTest {
         val terminal = TerminalBuffers.create(width = 10, height = 3)
         val connector = MockConnector()
         val renderReader = FailingFirstOffsetRenderReader()
-        val dirtyCalls = AtomicInteger(0)
-        val renderPublished = CountDownLatch(1)
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
                 renderReader = renderReader,
                 responseReader = terminal,
                 connector = connector,
                 parser = RecordingParser(),
                 inputEncoder = NoOpInputEncoder,
             )
-        session.onDirty = {
-            dirtyCalls.incrementAndGet()
-            renderPublished.countDown()
-        }
-
         session.requestRender(scrollbackOffset = 1)
         assertTrue(renderReader.awaitFirstRead(), "first render did not start")
-        Thread.sleep(100)
 
         assertAll(
             { assertEquals(1, renderReader.readCalls) },
-            { assertEquals(0, dirtyCalls.get()) },
-            { assertNull(session.publisher.current()) },
+            { assertEquals(-1L, session.renderGeneration.value) },
+            { assertNull(session.renderPublisher.current()) },
         )
 
         session.requestRender(scrollbackOffset = 2)
 
-        assertTrue(renderPublished.await(1, TimeUnit.SECONDS), "second render was not published")
+        session.awaitRenderGenerationAfter(-1L)
         assertAll(
             { assertEquals(2, renderReader.readCalls) },
-            { assertEquals(1, dirtyCalls.get()) },
-            { assertEquals(2, session.publisher.current()?.scrollbackOffset) },
+            { assertEquals(2, session.renderPublisher.current()?.scrollbackOffset) },
         )
         session.close()
     }
 
     @Test
-    fun `onDirty exception does not republish completed generation`() {
+    fun `subscriber failure does not stop render publication`() {
         val terminal = TerminalBuffers.create(width = 10, height = 3)
         val connector = MockConnector()
         val renderReader = OffsetRecordingRenderReader()
-        val firstDirtyCall = CountDownLatch(1)
-        val secondDirtyCall = CountDownLatch(1)
-        val dirtyCalls = AtomicInteger(0)
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
                 renderReader = renderReader,
                 responseReader = terminal,
                 connector = connector,
                 parser = RecordingParser(),
                 inputEncoder = NoOpInputEncoder,
             )
-        session.onDirty = {
-            val call = dirtyCalls.incrementAndGet()
-            if (call == 1) {
-                firstDirtyCall.countDown()
-                throw IllegalStateException("dirty callback failed")
-            }
-            secondDirtyCall.countDown()
+        val collectorFailed = CountDownLatch(1)
+        val collectorScope =
+            CoroutineScope(
+                SupervisorJob() +
+                    Dispatchers.Default +
+                    CoroutineExceptionHandler { _, _ -> collectorFailed.countDown() },
+            )
+        collectorScope.launch {
+            session.renderGeneration.first { it >= 0L }
+            throw IllegalStateException("subscriber failed")
         }
 
         session.requestRender(scrollbackOffset = 1)
-        assertTrue(firstDirtyCall.await(1, TimeUnit.SECONDS), "first dirty callback did not run")
-        Thread.sleep(100)
+        val firstGeneration = session.awaitRenderGenerationAfter(-1L)
+        assertTrue(collectorFailed.await(1, TimeUnit.SECONDS), "subscriber failure was not observed")
 
         assertAll(
             { assertEquals(1, renderReader.readCalls) },
-            { assertEquals(1, dirtyCalls.get()) },
-            { assertEquals(1, session.publisher.current()?.scrollbackOffset) },
+            { assertEquals(1, session.renderPublisher.current()?.scrollbackOffset) },
         )
 
         session.requestRender(scrollbackOffset = 2)
 
-        assertTrue(secondDirtyCall.await(1, TimeUnit.SECONDS), "second dirty callback did not run")
+        session.awaitRenderGenerationAfter(firstGeneration)
         assertAll(
             { assertEquals(2, renderReader.readCalls) },
-            { assertEquals(2, dirtyCalls.get()) },
-            { assertEquals(2, session.publisher.current()?.scrollbackOffset) },
+            { assertEquals(2, session.renderPublisher.current()?.scrollbackOffset) },
         )
+        collectorScope.cancel()
         session.close()
     }
 
@@ -1051,7 +1056,7 @@ class TerminalSessionTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
                 renderReader = terminal as TerminalRenderFrameReader,
                 responseReader = terminal,
                 connector = connector,
@@ -1153,7 +1158,7 @@ class TerminalSessionTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
                 renderReader = BlockingCopyRenderReader(copyEntered, releaseCopy),
                 responseReader = terminal,
                 connector = connector,
@@ -1212,7 +1217,7 @@ class TerminalSessionTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
                 renderReader = terminal as TerminalRenderFrameReader,
                 responseReader = terminal,
                 connector = connector,
@@ -1276,6 +1281,13 @@ class TerminalSessionTest {
         session.start(columns, rows)
         return session
     }
+
+    private fun TerminalSession.awaitRenderGenerationAfter(generation: Long): Long =
+        runBlocking {
+            withTimeout(1_000) {
+                renderGeneration.first { it > generation }
+            }
+        }
 
     private class RecordingHostEvents : HostEventSink by HostEventSink.NONE {
         val clipboardAudits = mutableListOf<TerminalClipboardAuditEvent>()

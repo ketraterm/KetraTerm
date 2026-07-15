@@ -245,7 +245,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(10, 10),
+                renderPublisher = TerminalRenderPublisher(10, 10),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -278,7 +278,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(10, 10),
+                renderPublisher = TerminalRenderPublisher(10, 10),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -311,7 +311,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(6, 2),
+                renderPublisher = TerminalRenderPublisher(6, 2),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -347,7 +347,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(3, 2),
+                renderPublisher = TerminalRenderPublisher(3, 2),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -381,7 +381,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(6, 2),
+                renderPublisher = TerminalRenderPublisher(6, 2),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -535,7 +535,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(10, 10),
+                renderPublisher = TerminalRenderPublisher(10, 10),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,

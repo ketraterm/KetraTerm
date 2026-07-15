@@ -134,7 +134,7 @@ internal class TerminalPane private constructor(
             shortcutControllerRef[0] = pane.shortcutController
             paneRef[0] = pane
 
-            tab.session.notifyRenderDirty()
+            tab.session.requestRender(scrollbackOffset = 0)
             return pane
         }
 

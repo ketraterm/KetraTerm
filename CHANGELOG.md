@@ -1,5 +1,9 @@
 # KetraTerm Changelog
 
+## [Unreleased]
+
+- Refactored session and render orchestration around coroutine-based lifecycle and conflated frame publication, with Swing/workspace rendering kept off core read paths.
+
 ## [0.2.1] - 2026-07-14
 
 - Fixed held Backspace and Delete keys so every OS key-repeat event reaches the shell.

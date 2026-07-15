@@ -22,6 +22,7 @@ import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.parser.api.TerminalOutputParser
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.session.TerminalSession
@@ -43,6 +44,75 @@ import kotlin.concurrent.thread
 
 class SwingTerminalThreadingTest {
     @Test
+    fun `dispose cancels the component coroutine scope`() {
+        val component = SwingTerminal()
+
+        SwingUtilities.invokeAndWait {
+            assertTrue(component.isCoroutineScopeActive)
+            component.dispose()
+            assertFalse(component.isCoroutineScopeActive)
+        }
+    }
+
+    @Test
+    fun `routine frame consumption never reads the session on the EDT`() {
+        val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
+        val checkingReader = EdtCheckingRenderReader(terminal as TerminalRenderFrameReader)
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(3, 1),
+                renderReader = checkingReader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+            )
+        val component = SwingTerminal()
+
+        component.bind(session)
+        awaitRenderAfter(session, -1L)
+        drainEdt()
+
+        assertFalse(checkingReader.readOnEdt.get())
+        session.close()
+    }
+
+    @Test
+    fun `publication from a previously bound session is ignored`() {
+        val first = testSession()
+        val second = testSession()
+        repeat(3) {
+            first.terminal.writeCodepoint('x'.code)
+            first.terminal.carriageReturn()
+            first.terminal.newLine()
+        }
+        val component = SwingTerminal()
+        edtCall {
+            component.size = component.preferredGridSize(3, 1)
+        }
+
+        component.bind(first)
+        awaitRenderAfter(first, -1L)
+        drainEdt()
+        assertTrue(component.viewportState().historySize > 0)
+
+        component.bind(second)
+        awaitRenderAfter(second, -1L)
+        drainEdt()
+        assertEquals(0, component.viewportState().historySize)
+
+        val previousFirstGeneration = first.renderGeneration.value
+        first.requestRender(scrollbackOffset = 0)
+        awaitRenderAfter(first, previousFirstGeneration)
+        drainEdt()
+        assertEquals(0, component.viewportState().historySize)
+
+        first.close()
+        second.close()
+    }
+
+    @Test
     fun `bind and unbind may be called from a background thread`() {
         val session = testSession()
         val component = SwingTerminal()
@@ -51,14 +121,14 @@ class SwingTerminalThreadingTest {
             component.bind(session)
         }
         drainEdt()
-        assertNotNull(session.onDirty)
+        assertTrue(component.hasActiveRenderBinding)
 
         runOffEdt {
             component.unbind()
         }
         drainEdt()
 
-        assertNull(session.onDirty)
+        assertFalse(component.hasActiveRenderBinding)
         session.close()
     }
 
@@ -81,8 +151,8 @@ class SwingTerminalThreadingTest {
         }
         drainEdt()
 
-        assertEquals(3, dispatcher.dispatchCount.get())
-        assertNull(session.onDirty)
+        assertEquals(4, dispatcher.dispatchCount.get())
+        assertFalse(component.hasActiveRenderBinding)
         session.close()
     }
 
@@ -124,7 +194,7 @@ class SwingTerminalThreadingTest {
         worker.join(1_000)
         failure.get()?.let { throw it }
         drainEdt()
-        assertNotNull(session.onDirty)
+        assertTrue(component.hasActiveRenderBinding)
         session.close()
     }
 
@@ -297,7 +367,7 @@ class SwingTerminalThreadingTest {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
         return TerminalSession(
             terminal = terminal,
-            publisher = TerminalRenderPublisher(3, 1),
+            renderPublisher = TerminalRenderPublisher(3, 1),
             renderReader = terminal as TerminalRenderFrameReader,
             responseReader = terminal,
             connector = connector,
@@ -334,6 +404,49 @@ class SwingTerminalThreadingTest {
 
     private fun drainEdt() {
         edtCall { }
+    }
+
+    private fun awaitRenderAfter(
+        session: TerminalSession,
+        generation: Long,
+    ) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1)
+        while (session.renderGeneration.value <= generation && System.nanoTime() < deadline) {
+            Thread.onSpinWait()
+        }
+        assertTrue(session.renderGeneration.value > generation, "render was not published")
+    }
+
+    private class EdtCheckingRenderReader(
+        private val delegate: TerminalRenderFrameReader,
+    ) : TerminalRenderFrameReader {
+        val readOnEdt = AtomicBoolean(false)
+
+        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+            recordThread()
+            delegate.readRenderFrame(consumer)
+        }
+
+        override fun readRenderFrame(
+            scrollbackOffset: Int,
+            consumer: TerminalRenderFrameConsumer,
+        ) {
+            recordThread()
+            delegate.readRenderFrame(scrollbackOffset, consumer)
+        }
+
+        override fun readRenderFrame(
+            scrollbackOffset: Int,
+            viewportRows: Int,
+            consumer: TerminalRenderFrameConsumer,
+        ) {
+            recordThread()
+            delegate.readRenderFrame(scrollbackOffset, viewportRows, consumer)
+        }
+
+        private fun recordThread() {
+            if (SwingUtilities.isEventDispatchThread()) readOnEdt.set(true)
+        }
     }
 
     private object NoOpConnector : TerminalConnector {

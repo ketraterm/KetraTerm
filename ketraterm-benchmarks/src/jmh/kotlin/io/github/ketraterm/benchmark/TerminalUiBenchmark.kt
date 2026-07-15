@@ -168,7 +168,7 @@ open class SwingPaintBenchmark {
         }
 
         session = benchmarkSession(terminal)
-        session.publisher.updateAndPublish(terminal as io.github.ketraterm.render.api.TerminalRenderFrameReader)
+        session.renderPublisher.updateAndPublish(terminal as io.github.ketraterm.render.api.TerminalRenderFrameReader)
 
         component =
             SwingTerminal(

@@ -42,11 +42,15 @@ import io.github.ketraterm.ui.swing.viewport.SmoothRowScrollHost
 import io.github.ketraterm.ui.swing.viewport.SmoothRowScroller
 import io.github.ketraterm.ui.swing.viewport.SwingViewportController
 import io.github.ketraterm.ui.swing.viewport.TerminalScrollbarOverlay
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.filter
 import java.awt.*
 import java.awt.event.*
+import java.lang.Runnable
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import javax.swing.Timer
+import kotlin.coroutines.CoroutineContext
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -80,6 +84,27 @@ class SwingTerminal
         private var lastResizedColumns: Int = NO_RESIZE_DIMENSION
         private var lastResizedRows: Int = NO_RESIZE_DIMENSION
         private val unbindRunnable = Runnable { unbindOnEdt() }
+        private val componentJob = SupervisorJob()
+        private val uiCoroutineDispatcher =
+            object : CoroutineDispatcher() {
+                override fun isDispatchNeeded(context: CoroutineContext): Boolean = !SwingUtilities.isEventDispatchThread()
+
+                override fun dispatch(
+                    context: CoroutineContext,
+                    block: Runnable,
+                ) {
+                    hostServices.uiDispatcher.dispatch(block)
+                }
+            }
+        private val componentScope =
+            CoroutineScope(componentJob + uiCoroutineDispatcher + CoroutineName("swing-terminal"))
+        private var bindingJob: Job? = null
+
+        internal val hasActiveRenderBinding: Boolean
+            get() = bindingJob?.isActive == true
+
+        internal val isCoroutineScopeActive: Boolean
+            get() = componentJob.isActive
 
         private val painter = GridPainter(hostServices.fontResolver)
         private val visualBellController =
@@ -228,21 +253,20 @@ class SwingTerminal
 
         private val hyperlinkDiscoveryController =
             TerminalHyperlinkDiscoveryController(
-                object : TerminalHyperlinkDiscoveryHost {
-                    override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
-                    override val hyperlinkDetector: SwingHyperlinkDetector get() = this@SwingTerminal.hostServices.hyperlinkDetector
+                host =
+                    object : TerminalHyperlinkDiscoveryHost {
+                        override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
+                        override val hyperlinkDetector: SwingHyperlinkDetector
+                            get() = this@SwingTerminal.hostServices.hyperlinkDetector
 
-                    override fun dispatch(action: Runnable) {
-                        hostServices.uiDispatcher.dispatch(action)
-                    }
-
-                    override fun repaintHyperlinkSpan(
-                        startRow: Int,
-                        startColumn: Int,
-                        endRow: Int,
-                        endColumn: Int,
-                    ) = this@SwingTerminal.repaintHyperlinkSpan(startRow, startColumn, endRow, endColumn)
-                },
+                        override fun repaintHyperlinkSpan(
+                            startRow: Int,
+                            startColumn: Int,
+                            endRow: Int,
+                            endColumn: Int,
+                        ) = this@SwingTerminal.repaintHyperlinkSpan(startRow, startColumn, endRow, endColumn)
+                    },
+                scope = componentScope,
             )
         private val hyperlinkController =
             TerminalHyperlinkController(
@@ -433,16 +457,16 @@ class SwingTerminal
                     override val componentHeight: Int get() = this@SwingTerminal.height
                     override val cursorPresentationEnabled: Boolean get() = this@SwingTerminal.cursorPresentationEnabled
 
-                    override fun dispatch(action: Runnable) {
-                        hostServices.uiDispatcher.dispatch(action)
-                    }
-
                     override fun resetCursorBlinkForFrame() {
                         this@SwingTerminal.resetCursorBlinkOnEdt(forceRepaint = false)
                     }
 
                     override fun refreshRenderCacheFromSession(session: TerminalSession) {
                         this@SwingTerminal.refreshRenderCacheFromSession(session)
+                    }
+
+                    override fun requestRender(session: TerminalSession) {
+                        this@SwingTerminal.requestRenderFromSession(session)
                     }
 
                     override fun syncTerminalGridToActiveChrome(): Boolean =
@@ -480,8 +504,6 @@ class SwingTerminal
                     }
                 },
             )
-        private val dirtyListener = { renderFrameController.schedulePublishedFrame() }
-
         internal val cursorTimer =
             Timer(cursorTimerDelay(settings)) {
                 cursorBlinkVisible = !cursorBlinkVisible
@@ -491,7 +513,9 @@ class SwingTerminal
         private val resizeListener =
             object : ComponentAdapter() {
                 override fun componentResized(event: ComponentEvent) {
-                    resizeSessionToVisibleGridOnEdt()
+                    if (resizeSessionToVisibleGridOnEdt()) {
+                        session?.let(::requestRenderFromSession)
+                    }
                 }
             }
 
@@ -1006,11 +1030,10 @@ class SwingTerminal
 
         private fun bindOnEdt(session: TerminalSession) {
             if (disposed) return
-            this.session?.removeDirtyListener(dirtyListener)
+            bindingJob?.cancel()
             this.session = session
             updateMinimizedStateFromAncestor()
             applySettingsToSession(session, settings)
-            session.addDirtyListener(dirtyListener)
             resetScrollbackState()
             selectionController.clearSelection()
             searchController.reset(renderCache.rows)
@@ -1026,14 +1049,31 @@ class SwingTerminal
             hyperlinkController.clearHyperlinkHover()
             hyperlinkDiscoveryController.reset()
             resizeSessionToVisibleGridOnEdt()
-            refreshRenderCacheFromSession(session)
-            refreshShellIntegrationDecorations(session)
+            bindingJob =
+                componentScope.launch {
+                    session.renderGeneration
+                        .filter { it >= 0L }
+                        .collect {
+                            if (this@SwingTerminal.session === session) {
+                                renderFrameController.handlePublishedFrame()
+                            }
+                        }
+                }
+            var publishedFrameAvailable = false
+            session.renderPublisher.readCurrent {
+                publishedFrameAvailable = true
+            }
+            if (publishedFrameAvailable) {
+                renderFrameController.handlePublishedFrame()
+            }
+            requestRenderFromSession(session)
             publishViewportState(renderCache.historySize)
             repaint()
         }
 
         private fun unbindOnEdt() {
-            session?.removeDirtyListener(dirtyListener)
+            bindingJob?.cancel()
+            bindingJob = null
             session = null
             resetScrollbackState()
             selectionController.clearSelection()
@@ -1061,6 +1101,7 @@ class SwingTerminal
             rowScroller.finish()
             selectionController.stopSelectionDrag()
             hyperlinkDiscoveryController.dispose()
+            componentScope.cancel()
         }
 
         private fun reloadSettingsOnEdt() {
@@ -1085,8 +1126,7 @@ class SwingTerminal
             hyperlinkDiscoveryController.reset()
             resizeSessionToVisibleGridOnEdt()
             session?.let {
-                refreshRenderCacheFromSession(it)
-                refreshShellIntegrationDecorations(it)
+                requestRenderFromSession(it)
             }
             publishViewportState(renderCache.historySize)
             revalidate()
@@ -1595,9 +1635,7 @@ class SwingTerminal
                 oldRenderOffset != viewportController.requestedOffset ||
                     oldRequestedRows != requestedRenderRows()
             if (boundSession != null && renderMappingChanged) {
-                refreshRenderCacheFromSession(boundSession)
-                refreshShellIntegrationDecorations(boundSession)
-                searchController.updateViewportHighlights()
+                requestRenderFromSession(boundSession)
             } else {
                 updateVisualViewportGeometry()
             }
@@ -1723,12 +1761,17 @@ class SwingTerminal
             }
 
         private fun refreshRenderCacheFromSession(session: TerminalSession) {
-            renderCache.updateFrom(
-                reader = session,
+            session.renderPublisher.readCurrent { published ->
+                renderCache.updateFrom(published)
+            }
+            hyperlinkDiscoveryController.scheduleForFrame()
+        }
+
+        private fun requestRenderFromSession(session: TerminalSession) {
+            session.requestRender(
                 scrollbackOffset = viewportController.requestedOffset,
                 viewportRows = requestedRenderRows(),
             )
-            hyperlinkDiscoveryController.scheduleForFrame()
         }
 
         private fun refreshShellIntegrationDecorations(session: TerminalSession): Boolean {

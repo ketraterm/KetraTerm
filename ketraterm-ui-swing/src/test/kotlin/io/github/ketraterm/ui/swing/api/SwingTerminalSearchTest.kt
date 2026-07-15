@@ -28,6 +28,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import kotlinx.coroutines.Dispatchers
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.awt.Insets
@@ -80,15 +81,19 @@ class SwingTerminalSearchTest {
         inputEncoder: TerminalInputEncoder = NoOpInputEncoder,
     ): TerminalSession {
         val terminal = TerminalBuffers.create(width = 12, height = 1, maxHistory = 5)
-        return TerminalSession(
-            terminal = terminal,
-            publisher = TerminalRenderPublisher(12, 1),
-            renderReader = renderReader,
-            responseReader = terminal,
-            connector = NoOpConnector,
-            parser = NoOpParser,
-            inputEncoder = inputEncoder,
-        )
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(12, 1),
+                renderReader = renderReader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = inputEncoder,
+                workerDispatcher = Dispatchers.Unconfined,
+            )
+        session.renderPublisher.updateAndPublish(renderReader)
+        return session
     }
 
     private class SearchFrameReader : TerminalRenderFrameReader {

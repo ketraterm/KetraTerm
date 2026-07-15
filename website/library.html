@@ -97,11 +97,11 @@
                     <h2 style="font-size: 34px; margin-bottom: 16px;">Strict Unidirectional Pipeline</h2>
                     <p class="text-dim" style="font-size: 15px; margin-bottom: 20px;">Traditional terminal components often share mutable state, leading to race conditions or split-escape character corruption. KetraTerm serializes all bytes and mutations into a strict, unidirectional event-driven flow.</p>
                     
-                    <h4 style="color: white; font-size: 16px; margin-bottom: 12px;">Three-Tier Concurrency Lock Guard</h4>
+                    <h4 style="color: white; font-size: 16px; margin-bottom: 12px;">Synchronous Core, Coroutine Publication</h4>
                     <ul style="list-style: none; display: flex; flex-direction: column; gap: 14px; font-size: 14px;">
                         <li>
-                            <strong style="color: #60a5fa;">inboundLock:</strong>
-                            <span class="text-dim">Serializes raw bytes entering the parser. Blocks concurrent PTY read buffers to protect the UTF-8 decoder state machine from corrupted escape splits.</span>
+                            <strong style="color: #60a5fa;">Transport contract:</strong>
+                            <span class="text-dim">Delivers raw byte ranges synchronously, serially, and in stream order, so the session does not need a redundant inbound lock.</span>
                         </li>
                         <li>
                             <strong style="color: #a78bfa;">mutationLock:</strong>
@@ -110,6 +110,10 @@
                         <li>
                             <strong style="color: #f472b6;">outboundWriteLock:</strong>
                             <span class="text-dim">Synchronizes process stdin write calls. Guarantees keystrokes, pastes, and device query responses (CPR/DSR) are written atomically without interleaved bytes.</span>
+                        </li>
+                        <li>
+                            <strong style="color: #34d399;">render publication:</strong>
+                            <span class="text-dim">A conflated coroutine worker publishes copied frames and a StateFlow generation for lifecycle-aware UI consumption.</span>
                         </li>
                     </ul>
                 </div>
@@ -124,10 +128,10 @@
                     </div>
                     <div class="terminal-body" style="font-size: 13px; line-height: 1.65;">
                         <div class="dim-text">// Inbound Stream (PTY bytes to screen grid)</div>
-                        <div>PTY Process ➔ <span class="cyan-text">inboundLock</span> ➔ Parser ➔ Core Grid (under <span class="cyan-text">mutationLock</span>)</div>
+                        <div>PTY Process ➔ ordered transport callback ➔ Parser ➔ Core Grid (under <span class="cyan-text">mutationLock</span>)</div>
                         <br>
                         <div class="dim-text">// Rendering Path (Core grid to UI repaint)</div>
-                        <div>Core Grid ➔ Render API ➔ Triple-Buffered Cache ➔ Swing component (EDT)</div>
+                        <div>Core Grid ➔ coroutine publisher ➔ StateFlow generation ➔ Swing cache (EDT)</div>
                         <br>
                         <div class="dim-text">// Outbound Stream (User keys/pastes to process)</div>
                         <div>Keyboard/Paste Event ➔ Input Encoder ➔ <span class="cyan-text">outboundWriteLock</span> ➔ PTY stdin</div>

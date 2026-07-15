@@ -256,7 +256,7 @@ internal class KetraTermTerminalPane private constructor(
                     add(scrollbar, BorderLayout.EAST)
                 }
 
-            tab.session.notifyRenderDirty()
+            tab.session.requestRender(scrollbackOffset = 0)
             return KetraTermTerminalPane(tab, terminal, component, searchBar, hostActions).also { pane ->
                 pane.shortcutController = KetraTermTerminalShortcutController(pane)
                 shortcutControllerRef[0] = pane.shortcutController

@@ -52,11 +52,11 @@ The KetraTerm codebase is partitioned into highly specialized modules with stric
 
 ## Concurrency & Locking Architecture
 
-Operating a multithreaded terminal on the JVM introduces concurrent events from the host PTY (background reads), the OS (resizing and focus shifts), and the UI (user keystrokes and paint ticks). To protect memory structures, three dedicated locks are managed by `TerminalSession`:
+Operating a multithreaded terminal on the JVM introduces concurrent events from the host PTY (background reads), the OS (resizing and focus shifts), and the UI (user keystrokes and paint ticks). The transport contract already guarantees ordered, serial byte delivery, so `TerminalSession` needs two locks and one coroutine publication worker:
 
-1. **`inboundLock`**: Guards host bytes entering `onBytes`. Ensures bytes are fed to the parser in sequential stream order and prevents concurrent processing if multiple read buffers arrive simultaneously.
-2. **`mutationLock`**: The core-critical lock. It blocks parser execution, grid resizing, and render frame copying. While a thread copies the current screen state into cache, background parser writes are held. This ensures the drawing thread never sees half-written rows or mismatched widths.
-3. **`outboundWriteLock`**: Synchronizes writes to the host stdin. Guarantees that user typing, clipboard paste, and synchronous query responses (like CPR/DSR replies) are written atomically and do not interleave.
+1. **`mutationLock`**: The core-critical lock. It blocks parser execution, grid resizing, borrowed frame reads, and render-frame extraction. This ensures copied frames never contain half-written rows or mismatched widths.
+2. **`outboundWriteLock`**: A reentrant monitor that synchronizes writes to host stdin and protects encoder scratch buffers. It guarantees that user input and synchronous query responses are written in exact order without interleaved bytes.
+3. **Render publication worker**: A conflated coroutine channel wakes one session worker. The worker extracts a frame under `mutationLock`, promotes it through `TerminalRenderPublisher`, and updates a `StateFlow` generation consumed by UI renderers.
 
 ---
 

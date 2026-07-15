@@ -38,10 +38,14 @@ import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.transport.checkBounds
-import java.util.concurrent.*
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Runtime terminal session that binds core, parser, input encoding, and a
@@ -50,13 +54,17 @@ import java.util.concurrent.atomic.AtomicLong
  * The connector owns transport threads. This session owns parser/core mutation
  * serialization and all host-bound write ordering.
  *
+ * A session publishes one active render viewport. Two independently scrolling
+ * renderers must use separate sessions so their viewport requests do not race.
+ *
  * @property terminal public terminal buffer mutated by host output.
- * @property publisher the render publisher responsible for frames updates.
+ * @property renderPublisher the render publisher responsible for frame updates.
  * @property shellIntegrationState shared host-side prompt and command marker state.
+ * @property workerDispatcher non-owned dispatcher used for session background work.
  */
 class TerminalSession(
     val terminal: TerminalBuffer,
-    val publisher: TerminalRenderPublisher,
+    val renderPublisher: TerminalRenderPublisher,
     private val renderReader: TerminalRenderFrameReader,
     private val responseReader: TerminalHostResponseReader,
     private val connector: TerminalConnector,
@@ -67,89 +75,46 @@ class TerminalSession(
     val shellIntegrationState: TerminalShellIntegrationState = TerminalShellIntegrationState(),
     private val hostCommandAdapter: HostCommandAdapter? = null,
     private var inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
+    private val workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : TerminalConnectorListener,
     TerminalInputEncoder,
     TerminalRenderFrameReader,
     AutoCloseable {
-    private val localCloseRequested = AtomicBoolean(false)
-    private val remoteClosed = AtomicBoolean(false)
-    private val parserClosed = AtomicBoolean(false)
-    private val closeNotified = AtomicBoolean(false)
-    private val started = AtomicBoolean(false)
-    private val renderScheduled = AtomicBoolean(false)
     private val pendingRenderRequest = AtomicLong(packRenderRequest(scrollbackOffset = 0, viewportRows = 0))
     private val pendingRenderGeneration = AtomicLong(0)
 
-    private val inboundLock = Any()
     private val mutationLock = Any()
     private val responseScratch = ByteArray(RESPONSE_BUFFER_SIZE)
+    private val synchronizedTimeoutJob = AtomicReference<Job?>(null)
+    private val renderRequests = Channel<Unit>(Channel.CONFLATED)
+    private val sessionJob = SupervisorJob()
+    private val sessionScope =
+        CoroutineScope(
+            sessionJob +
+                workerDispatcher +
+                CoroutineName("terminal-session-${SESSION_COUNTER.getAndIncrement()}"),
+        )
+    private val mutableState = MutableStateFlow<TerminalSessionState>(TerminalSessionState.Created)
+    private val mutableRenderGeneration = MutableStateFlow(NO_RENDER_GENERATION)
 
-    private val timeoutLock = Any()
-    private var synchronizedTimeoutFuture: ScheduledFuture<*>? = null
+    /** Lifecycle state retained for current and future collectors. */
+    val state: StateFlow<TerminalSessionState> = mutableState.asStateFlow()
 
-    internal val renderWorker: ScheduledExecutorService =
-        Executors.newSingleThreadScheduledExecutor { r ->
-            Thread(r, "terminal-render-worker-${SESSION_COUNTER.getAndIncrement()}").apply { isDaemon = true }
+    /**
+     * Latest successfully published render generation, or `-1` before the
+     * first frame is available.
+     */
+    val renderGeneration: StateFlow<Long> = mutableRenderGeneration.asStateFlow()
+
+    internal val isCoroutineScopeActive: Boolean
+        get() = sessionJob.isActive
+
+    init {
+        sessionScope.launch {
+            for (signal in renderRequests) {
+                drainRenderRequests()
+            }
         }
-
-    private val dirtyListeners = CopyOnWriteArrayList<() -> Unit>()
-    private val closeListeners = CopyOnWriteArrayList<TerminalSessionCloseListener>()
-
-    @Volatile
-    private var legacyOnDirty: (() -> Unit)? = null
-
-    /**
-     * Optional callback invoked after a render frame is published.
-     *
-     * UI components should use this to trigger a repaint. The callback is
-     * invoked from the [renderWorker] thread.
-     */
-    var onDirty: (() -> Unit)?
-        get() = legacyOnDirty ?: dirtyListeners.firstOrNull()
-        set(value) {
-            legacyOnDirty = value
-        }
-
-    /**
-     * Registers a listener to be notified when the session needs a render repaint.
-     *
-     * @param listener the callback listener to add.
-     */
-    fun addDirtyListener(listener: () -> Unit) {
-        dirtyListeners.add(listener)
-    }
-
-    /**
-     * Unregisters a previously registered render repaint listener.
-     *
-     * @param listener the callback listener to remove.
-     */
-    fun removeDirtyListener(listener: () -> Unit) {
-        dirtyListeners.remove(listener)
-    }
-
-    /**
-     * Registers a listener that is invoked exactly once when this session
-     * reaches a terminal lifecycle state.
-     *
-     * The callback runs on the thread that observes the close: connector
-     * watcher/reader thread for remote closure or the caller thread for local
-     * [close]. Implementations should return quickly and marshal to UI threads
-     * themselves when needed.
-     *
-     * @param listener listener to add.
-     */
-    fun addCloseListener(listener: TerminalSessionCloseListener) {
-        closeListeners.add(listener)
-    }
-
-    /**
-     * Unregisters a previously registered session close listener.
-     *
-     * @param listener listener to remove.
-     */
-    fun removeCloseListener(listener: TerminalSessionCloseListener) {
-        closeListeners.remove(listener)
     }
 
     /**
@@ -162,17 +127,15 @@ class TerminalSession(
     /**
      * Remote process exit code after [onClosed] receives one.
      */
-    @Volatile
-    var exitCode: Int? = null
-        private set
+    val exitCode: Int?
+        get() = (state.value as? TerminalSessionState.Closed)?.event?.exitCode
 
     /**
      * Transport failure reported by [onError], or `null` when the remote closed
      * normally or the session was locally closed.
      */
-    @Volatile
-    var failure: Throwable? = null
-        private set
+    val failure: Throwable?
+        get() = (state.value as? TerminalSessionState.Closed)?.event?.failure
 
     /**
      * Resolves a primitive render-frame hyperlink id to a target URI.
@@ -207,7 +170,9 @@ class TerminalSession(
     ) {
         require(columns > 0) { "columns must be positive, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
-        check(started.compareAndSet(false, true)) { "session already started" }
+        check(mutableState.compareAndSet(TerminalSessionState.Created, TerminalSessionState.Running)) {
+            "session already started or closed"
+        }
 
         synchronized(mutationLock) {
             terminal.resize(columns, rows)
@@ -217,7 +182,7 @@ class TerminalSession(
     }
 
     /**
-     * Resizes core, publisher, and the active connector.
+     * Resizes core and the active connector, then requests a new published frame.
      *
      * @param columns target terminal column width.
      * @param rows target terminal row height.
@@ -239,7 +204,7 @@ class TerminalSession(
             result = terminal.resize(columns, rows, oldScrollbackOffset)
         }
         connector.resize(columns, rows)
-        notifyRenderDirty()
+        invalidateRender()
         return result
     }
 
@@ -269,6 +234,7 @@ class TerminalSession(
         synchronized(mutationLock) {
             terminal.setThemePalette(palette)
         }
+        invalidateRender()
     }
 
     /**
@@ -279,6 +245,7 @@ class TerminalSession(
             terminal.setDefaultCursorShape(shape)
             terminal.setCursorShape(shape)
         }
+        invalidateRender()
     }
 
     /**
@@ -375,24 +342,24 @@ class TerminalSession(
         length: Int,
     ) {
         bytes.checkBounds(offset, length)
+        if (isSessionClosed()) return
 
-        synchronized(inboundLock) {
-            if (isSessionClosed()) return
-
-            synchronized(mutationLock) {
-                parser.accept(bytes, offset, length)
-            }
-
-            drainResponses()
-            notifyRenderDirty()
+        synchronized(mutationLock) {
+            parser.accept(bytes, offset, length)
         }
+
+        drainResponses()
+        invalidateRender()
     }
 
     /**
-     * Submits a render task to the worker thread.
+     * Invalidates the current requested viewport without changing its offset or
+     * row count.
      */
-    fun notifyRenderDirty() {
-        requestRender(scrollbackOffset = 0)
+    private fun invalidateRender() {
+        if (isSessionClosed()) return
+        pendingRenderGeneration.incrementAndGet()
+        renderRequests.trySend(Unit)
     }
 
     /**
@@ -400,7 +367,8 @@ class TerminalSession(
      *
      * The offset is transient render request state, not terminal state. UI
      * layers own scrollback policy and pass the desired offset for each
-     * publication they need.
+     * publication they need. A newer request replaces the active render
+     * viewport for this session.
      *
      * @param scrollbackOffset logical whole-row offset from live viewport.
      */
@@ -430,100 +398,70 @@ class TerminalSession(
                 viewportRows = viewportRows.coerceAtLeast(0),
             ),
         )
-        pendingRenderGeneration.incrementAndGet()
-        scheduleRenderDrain()
-    }
-
-    private fun scheduleRenderDrain() {
-        if (renderScheduled.compareAndSet(false, true)) {
-            renderWorker.execute {
-                drainRenderRequests()
-            }
-        }
+        invalidateRender()
     }
 
     private fun scheduleSynchronizedOutputTimeout() {
-        synchronized(timeoutLock) {
-            if (synchronizedTimeoutFuture == null) {
-                synchronizedTimeoutFuture =
-                    renderWorker.schedule({
-                        synchronized(mutationLock) {
-                            if (terminal.getModeSnapshot().isSynchronizedOutput) {
-                                terminal.setSynchronizedOutput(false)
-                                notifyRenderDirty()
-                            }
+        if (synchronizedTimeoutJob.get() != null || isSessionClosed()) return
+
+        val timeoutJob =
+            sessionScope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    delay(SYNCHRONIZED_OUTPUT_TIMEOUT_MS)
+                    var changed = false
+                    synchronized(mutationLock) {
+                        if (terminal.getModeSnapshot().isSynchronizedOutput) {
+                            terminal.setSynchronizedOutput(false)
+                            changed = true
                         }
-                        synchronized(timeoutLock) {
-                            synchronizedTimeoutFuture = null
-                        }
-                    }, SYNCHRONIZED_OUTPUT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                    }
+                    if (changed) invalidateRender()
+                } finally {
+                    synchronizedTimeoutJob.compareAndSet(currentCoroutineContext().job, null)
+                }
             }
+
+        if (synchronizedTimeoutJob.compareAndSet(null, timeoutJob)) {
+            timeoutJob.start()
+        } else {
+            timeoutJob.cancel()
         }
     }
 
     private fun cancelSynchronizedOutputTimeout() {
-        synchronized(timeoutLock) {
-            synchronizedTimeoutFuture?.let {
-                it.cancel(false)
-                synchronizedTimeoutFuture = null
-            }
-        }
+        synchronizedTimeoutJob.getAndSet(null)?.cancel()
     }
 
-    private fun drainRenderRequests() {
-        var publishedGeneration = -1L
+    private suspend fun drainRenderRequests() {
+        var publishedGeneration = mutableRenderGeneration.value
         var failedGeneration = NO_RENDER_GENERATION
-        var reschedule = true
-        try {
-            while (!isSessionClosed()) {
-                val generation = pendingRenderGeneration.get()
-                if (generation == publishedGeneration) return
+        while (!isSessionClosed()) {
+            currentCoroutineContext().ensureActive()
+            val generation = pendingRenderGeneration.get()
+            if (generation == publishedGeneration || generation == failedGeneration) return
 
-                val request = pendingRenderRequest.get()
-                val offset = unpackScrollbackOffset(request)
-                val rows = unpackViewportRows(request)
+            val request = pendingRenderRequest.get()
+            val offset = unpackScrollbackOffset(request)
+            val rows = unpackViewportRows(request)
 
-                val modeSnapshot = terminal.getModeSnapshot()
-                if (modeSnapshot.isSynchronizedOutput) {
-                    scheduleSynchronizedOutputTimeout()
-                    publishedGeneration = generation
-                    return
-                }
-
-                cancelSynchronizedOutputTimeout()
-
-                try {
-                    publisher.updateAndPublish(this, offset, rows)
-                    publishedGeneration = generation
-                } catch (e: Exception) {
-                    if (e is InterruptedException) {
-                        Thread.currentThread().interrupt()
-                    }
-                    failedGeneration = generation
-                    return
-                }
-
-                try {
-                    legacyOnDirty?.invoke()
-                    for (listener in dirtyListeners) {
-                        listener.invoke()
-                    }
-                } catch (e: Exception) {
-                    // UI notification failure must not invalidate an already-published frame.
-                }
+            val modeSnapshot = terminal.getModeSnapshot()
+            if (modeSnapshot.isSynchronizedOutput) {
+                scheduleSynchronizedOutputTimeout()
+                return
             }
-        } catch (e: Error) {
-            reschedule = false
-            throw e
-        } finally {
-            renderScheduled.set(false)
-            val pendingGeneration = pendingRenderGeneration.get()
-            if (reschedule &&
-                !isSessionClosed() &&
-                pendingGeneration != publishedGeneration &&
-                pendingGeneration != failedGeneration
-            ) {
-                scheduleRenderDrain()
+
+            cancelSynchronizedOutputTimeout()
+
+            try {
+                renderPublisher.updateAndPublish(this, offset, rows)
+                publishedGeneration = generation
+                currentCoroutineContext().ensureActive()
+                mutableRenderGeneration.value = generation
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                failedGeneration = generation
+                return
             }
         }
     }
@@ -598,10 +536,7 @@ class TerminalSession(
      * Records remote closure and closes the parser exactly once.
      */
     override fun onClosed(exitCode: Int?) {
-        if (!remoteClosed.compareAndSet(false, true)) return
-        this.exitCode = exitCode
-        cleanupParser()
-        notifyCloseListenersOnce(TerminalSessionCloseEvent(exitCode = exitCode, failure = null, locallyRequested = false))
+        transitionToClosed(TerminalSessionCloseEvent(exitCode = exitCode, failure = null, locallyRequested = false))
     }
 
     /**
@@ -611,23 +546,17 @@ class TerminalSession(
      * @param error the transport failure exception.
      */
     override fun onError(error: Throwable) {
-        if (!remoteClosed.compareAndSet(false, true)) return
-        failure = error
-        cleanupParser()
-        notifyCloseListenersOnce(TerminalSessionCloseEvent(exitCode = null, failure = error, locallyRequested = false))
+        transitionToClosed(TerminalSessionCloseEvent(exitCode = null, failure = error, locallyRequested = false))
     }
 
     /**
      * Requests local connector shutdown and closes parser input exactly once.
      */
     override fun close() {
-        if (!localCloseRequested.compareAndSet(false, true)) return
-        if (!remoteClosed.get()) {
-            connector.close()
-        }
-        cleanupParser()
-        notifyCloseListenersOnce(TerminalSessionCloseEvent(exitCode = exitCode, failure = failure, locallyRequested = true))
-        renderWorker.awaitTermination(500, TimeUnit.MILLISECONDS)
+        transitionToClosed(
+            event = TerminalSessionCloseEvent(exitCode = null, failure = null, locallyRequested = true),
+            closeConnector = true,
+        )
     }
 
     private fun drainResponses() {
@@ -647,29 +576,35 @@ class TerminalSession(
         }
     }
 
+    private fun transitionToClosed(
+        event: TerminalSessionCloseEvent,
+        closeConnector: Boolean = false,
+    ) {
+        while (true) {
+            val current = mutableState.value
+            if (current is TerminalSessionState.Closed) return
+            if (mutableState.compareAndSet(current, TerminalSessionState.Closed(event))) break
+        }
+
+        try {
+            if (closeConnector) connector.close()
+        } finally {
+            cleanupParser()
+        }
+    }
+
     private fun cleanupParser() {
-        if (!parserClosed.compareAndSet(false, true)) return
         cancelSynchronizedOutputTimeout()
+        renderRequests.close()
+        sessionScope.cancel()
         synchronized(mutationLock) {
             parser.endOfInput()
         }
-        renderWorker.shutdown()
     }
 
-    private fun notifyCloseListenersOnce(event: TerminalSessionCloseEvent) {
-        if (!closeNotified.compareAndSet(false, true)) return
-        for (listener in closeListeners) {
-            try {
-                listener.sessionClosed(this, event)
-            } catch (_: Exception) {
-                // Lifecycle listener failures must not interfere with cleanup.
-            }
-        }
-    }
+    private fun isSessionClosed(): Boolean = state.value is TerminalSessionState.Closed
 
-    private fun isSessionClosed(): Boolean = localCloseRequested.get() || remoteClosed.get()
-
-    private fun isAcceptingInput(): Boolean = started.get() && !isSessionClosed()
+    private fun isAcceptingInput(): Boolean = state.value === TerminalSessionState.Running
 
     companion object {
         private val SESSION_COUNTER =
@@ -699,6 +634,7 @@ class TerminalSession(
          * @param kittyKeyboardSupportedFlags progressive Kitty keyboard flags
          * the active input host can provide truthfully. Defaults to the
          * conservative portable-host profile.
+         * @param workerDispatcher non-owned dispatcher used for render publication and timeouts.
          * @return standard production terminal session.
          */
         @JvmStatic
@@ -710,6 +646,7 @@ class TerminalSession(
             hostPolicy: HostPolicy = HostPolicy(),
             inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
             kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
+            workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
         ): TerminalSession {
             val outboundWriteLock = Any()
             val hostOutput = ConnectorTerminalHostOutput(connector, outboundWriteLock)
@@ -727,12 +664,11 @@ class TerminalSession(
             val parser = TerminalParsers.create(sink)
             val inputEncoder = TerminalInputEncoders.create(terminal, hostOutput, inputPolicy)
 
-            // Create a publisher with initial dimensions
-            val publisher = TerminalRenderPublisher(terminal.width, terminal.height)
+            val renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height)
 
             return TerminalSession(
                 terminal = terminal,
-                publisher = publisher,
+                renderPublisher = renderPublisher,
                 renderReader = renderReader,
                 responseReader = terminal,
                 connector = connector,
@@ -743,6 +679,7 @@ class TerminalSession(
                 shellIntegrationState = shellIntegrationState,
                 hostCommandAdapter = sink,
                 inputPolicy = inputPolicy,
+                workerDispatcher = workerDispatcher,
             )
         }
     }
