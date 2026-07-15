@@ -247,8 +247,8 @@ registerCursorWrapModelProfile(
 
 registerCursorWrapModelProfile(
     taskName = "cursorWrapModelNightlyTest",
-    descriptionText = "Runs 10,000 deterministic model-based cursor and deferred-wrap cases.",
-    defaultCases = 10_000,
+    descriptionText = "Runs 25,000 deterministic model-based terminal grid-physics cases.",
+    defaultCases = 25_000,
 )
 
 tasks.test {

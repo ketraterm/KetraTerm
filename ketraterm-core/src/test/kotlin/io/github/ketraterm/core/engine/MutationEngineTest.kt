@@ -813,6 +813,26 @@ class MutationEngineTest {
     @DisplayName("insertLines")
     inner class InsertLinesTests {
         @Test
+        fun `horizontal slice insertion annihilates wide occupant crossing left margin`() {
+            val state = createState(width = 5, height = 3)
+            val writer = MutationEngine(state)
+            writer.printCodepoint(0x1F600, 2)
+            state.modes.isLeftRightMarginMode = true
+            state.activeBuffer.setLeftRightMargins(2, 5, 5)
+            state.cursor.row = 0
+            state.cursor.col = 1
+
+            writer.insertLines(1)
+
+            assertAll(
+                { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).rawCodepoint(0)) },
+                { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).rawCodepoint(1)) },
+                { assertEquals(TerminalConstants.EMPTY, lineAt(state, 1).rawCodepoint(0)) },
+                { assertEquals(TerminalConstants.EMPTY, lineAt(state, 1).rawCodepoint(1)) },
+            )
+        }
+
+        @Test
         fun `insertLines breaks soft wrap into insertion row`() {
             val state = createState(width = 3, height = 2)
             val writer = MutationEngine(state)

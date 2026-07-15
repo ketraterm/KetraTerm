@@ -175,10 +175,12 @@ while headless xterm.js retains physical rows. Override its size and shard with
 metadata manifest under `build/reports/resize-reflow-invariant`; failures also
 record the original and resize-minimized replay event sequences.
 
-The cursor/wrap campaign executes generated ASCII writes, CR, LF, BS, CUP, CUF,
-CUB, and DECAWM changes against both the production parser-to-core pipeline and
-a small independent grid model. It compares cells, cursor position, autowrap,
-soft-wrap markers, scrolling, and retained history. Override and shard it with
+The grid-physics campaign executes generated ASCII, combining, CJK, and emoji
+writes together with CR, LF, BS, CUP, CUF, CUB, DECAWM, DECSTBM, DECSLRM,
+DECLRMM, DECOM, RI, IL, DL, SU, and SD against both the production
+parser-to-core pipeline and a small independent grid model. It compares cells,
+wide spans, clusters, cursor position, margins, origin mode, autowrap, soft-wrap
+markers, regional scrolling, line mutations, and retained history. Override and shard it with
 `-PcursorWrapCases=N` and `-PcursorWrapStartIndex=N`; failing streams are
 prefix-independent delta-minimized and stored under
 `build/reports/cursor-wrap-model/failures`.

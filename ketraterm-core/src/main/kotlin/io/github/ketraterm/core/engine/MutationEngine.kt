@@ -254,11 +254,6 @@ internal class MutationEngine(
         left: Int,
         right: Int,
     ) {
-        // Clear potential orphaned spacer on dest
-        if (right + 1 < width && dest.rawCodepoint(right + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
-            dest.setCell(right + 1, TerminalConstants.EMPTY, blankAttr, blankExtendedAttr)
-        }
-
         for (col in left..right) {
             var raw = src.rawCodepoint(col)
             var attr = src.getPackedAttr(col)
@@ -266,6 +261,17 @@ internal class MutationEngine(
 
             if (col == left && raw == TerminalConstants.WIDE_CHAR_SPACER) {
                 // Do not copy the spacer without its leader
+                raw = TerminalConstants.EMPTY
+                attr = blankAttr
+                extendedAttr = blankExtendedAttr
+            }
+
+            if (
+                col == right &&
+                right + 1 < width &&
+                src.rawCodepoint(right + 1) == TerminalConstants.WIDE_CHAR_SPACER
+            ) {
+                // Do not copy a wide leader without its trailing spacer.
                 raw = TerminalConstants.EMPTY
                 attr = blankAttr
                 extendedAttr = blankExtendedAttr
@@ -281,6 +287,17 @@ internal class MutationEngine(
             } else {
                 dest.setCell(col, raw, attr, extendedAttr)
             }
+        }
+    }
+
+    /** Clears destination occupants crossing either horizontal slice boundary. */
+    private fun prepareHorizontalSliceDestination(row: Int) {
+        val line = getLine(row)
+        if (line.rawCodepoint(leftMargin) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, leftMargin)
+        }
+        if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, rightMargin + 1)
         }
     }
 
@@ -668,15 +685,14 @@ internal class MutationEngine(
                 val topRow = state.cursor.row
                 val bottomRow = state.scrollBottom
                 for (row in bottomRow downTo topRow + times) {
+                    prepareHorizontalSliceDestination(row)
                     copySlice(getLine(row - times), getLine(row), leftMargin, rightMargin)
                     getLine(row).wrapped = false
                     state.markLineChanged(getLine(row))
                 }
                 for (row in topRow until topRow + times) {
                     val line = getLine(row)
-                    if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
-                        annihilateAt(row, rightMargin + 1)
-                    }
+                    prepareHorizontalSliceDestination(row)
                     line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
                     line.wrapped = false
                     state.markLineChanged(line)
@@ -706,15 +722,14 @@ internal class MutationEngine(
                 val topRow = state.cursor.row
                 val bottomRow = state.scrollBottom
                 for (row in topRow..bottomRow - times) {
+                    prepareHorizontalSliceDestination(row)
                     copySlice(getLine(row + times), getLine(row), leftMargin, rightMargin)
                     getLine(row).wrapped = false
                     state.markLineChanged(getLine(row))
                 }
                 for (row in bottomRow - times + 1..bottomRow) {
                     val line = getLine(row)
-                    if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
-                        annihilateAt(row, rightMargin + 1)
-                    }
+                    prepareHorizontalSliceDestination(row)
                     line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
                     line.wrapped = false
                     state.markLineChanged(line)
