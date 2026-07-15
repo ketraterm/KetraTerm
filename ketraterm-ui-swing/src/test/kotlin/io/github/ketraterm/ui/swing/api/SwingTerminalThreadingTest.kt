@@ -94,13 +94,11 @@ class SwingTerminalThreadingTest {
 
         component.bind(first)
         awaitRenderAfter(first, -1L)
-        drainEdt()
-        assertTrue(component.viewportState().historySize > 0)
+        awaitHistorySize(component) { it > 0 }
 
         component.bind(second)
         awaitRenderAfter(second, -1L)
-        drainEdt()
-        assertEquals(0, component.viewportState().historySize)
+        awaitHistorySize(component) { it == 0 }
 
         val previousFirstGeneration = first.renderGeneration.value
         first.requestRender(scrollbackOffset = 0)
@@ -415,6 +413,21 @@ class SwingTerminalThreadingTest {
             Thread.onSpinWait()
         }
         assertTrue(session.renderGeneration.value > generation, "render was not published")
+    }
+
+    private fun awaitHistorySize(
+        component: SwingTerminal,
+        predicate: (Int) -> Boolean,
+    ) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+        var historySize = component.viewportState().historySize
+        while (System.nanoTime() < deadline) {
+            drainEdt()
+            historySize = component.viewportState().historySize
+            if (predicate(historySize)) return
+            Thread.sleep(5)
+        }
+        assertTrue(predicate(historySize), "unexpected Swing history size: $historySize")
     }
 
     private class EdtCheckingRenderReader(
