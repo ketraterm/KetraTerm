@@ -16,12 +16,7 @@
 package io.github.ketraterm.workspace
 
 import io.github.ketraterm.core.TerminalBuffers
-import io.github.ketraterm.host.TerminalClipboardAuditEvent
-import io.github.ketraterm.host.TerminalClipboardDecision
-import io.github.ketraterm.host.TerminalClipboardOperation
-import io.github.ketraterm.host.TerminalClipboardOrigin
-import io.github.ketraterm.host.TerminalClipboardPromptEvent
-import io.github.ketraterm.host.TerminalClipboardWriteEvent
+import io.github.ketraterm.host.*
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
@@ -37,10 +32,7 @@ import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class TerminalWorkspaceTest {
     @Test
@@ -341,10 +333,15 @@ class TerminalWorkspaceTest {
                 profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
                 options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
             )
+        assertTrue(workspace.isCoroutineScopeActive)
+        assertEquals(1, workspace.sessionCollectionCount)
 
         workspace.closeTab(tab.id)
 
         assertEquals(emptyList<String>(), closeEvents)
+        assertEquals(0, workspace.sessionCollectionCount)
+        workspace.close()
+        assertFalse(workspace.isCoroutineScopeActive)
     }
 
     @Test
@@ -463,7 +460,7 @@ class TerminalWorkspaceTest {
         val terminal = TerminalBuffers.create(width = 80, height = 24, maxHistory = 100)
         return TerminalSession(
             terminal = terminal,
-            publisher = TerminalRenderPublisher(80, 24),
+            renderPublisher = TerminalRenderPublisher(80, 24),
             renderReader = terminal as TerminalRenderFrameReader,
             responseReader = terminal,
             connector = connector,

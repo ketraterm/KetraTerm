@@ -285,7 +285,7 @@ class TerminalSearchControllerTest {
         val terminal = TerminalBuffers.create(width = renderReader.columns, height = renderReader.visibleRows, maxHistory = 5)
         return TerminalSession(
             terminal = terminal,
-            publisher = TerminalRenderPublisher(renderReader.columns, renderReader.visibleRows),
+            renderPublisher = TerminalRenderPublisher(renderReader.columns, renderReader.visibleRows),
             renderReader = renderReader,
             responseReader = terminal,
             connector = NoOpConnector,

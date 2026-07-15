@@ -1,5 +1,9 @@
 # KetraTerm IntelliJ Plugin Changelog
 
+## [Unreleased]
+
+- Improved terminal rendering performance.
+
 ## [0.2.1] - 2026-07-14
 
 - Fixed holding Backspace or Delete deleting only one character.

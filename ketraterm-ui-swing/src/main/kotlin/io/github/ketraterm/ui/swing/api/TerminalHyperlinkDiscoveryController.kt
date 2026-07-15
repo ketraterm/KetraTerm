@@ -18,15 +18,12 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.*
 import javax.swing.Timer
 
 internal interface TerminalHyperlinkDiscoveryHost {
     val renderCache: TerminalRenderCache
     val hyperlinkDetector: SwingHyperlinkDetector
-
-    fun dispatch(action: Runnable)
 
     fun repaintHyperlinkSpan(
         startRow: Int,
@@ -38,15 +35,11 @@ internal interface TerminalHyperlinkDiscoveryHost {
 
 internal class TerminalHyperlinkDiscoveryController(
     private val host: TerminalHyperlinkDiscoveryHost,
+    private val scope: CoroutineScope,
+    private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val snapshotBuilder = TerminalHyperlinkViewportSnapshotBuilder()
     private val overlay = TerminalHyperlinkOverlay()
-    private val analysisExecutor =
-        Executors.newSingleThreadExecutor { runnable ->
-            Thread(runnable, "terminal-hyperlink-discovery-${WORKER_COUNTER.getAndIncrement()}").apply {
-                isDaemon = true
-            }
-        }
     private val debounceTimer =
         Timer(DEBOUNCE_MILLIS) {
             startAnalysisOnEdt()
@@ -54,10 +47,13 @@ internal class TerminalHyperlinkDiscoveryController(
             isRepeats = false
         }
     private var analysisSequence: Long = 0L
+    private var analysisJob: Job? = null
     private var disposed: Boolean = false
 
     fun reset() {
         analysisSequence++
+        analysisJob?.cancel()
+        analysisJob = null
         debounceTimer.stop()
         overlay.clear()
     }
@@ -66,7 +62,6 @@ internal class TerminalHyperlinkDiscoveryController(
         if (disposed) return
         disposed = true
         reset()
-        analysisExecutor.shutdownNow()
     }
 
     fun scheduleForFrame() {
@@ -113,29 +108,28 @@ internal class TerminalHyperlinkDiscoveryController(
 
         val sequence = analysisSequence
         val snapshot = snapshotBuilder.snapshot(host.renderCache)
-        analysisExecutor.execute {
-            val accumulator = TerminalHyperlinkDetectionAccumulator()
-            try {
-                detector.detect(snapshot.request, accumulator)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                return@execute
-            } catch (error: VirtualMachineError) {
-                throw error
-            } catch (_: Exception) {
-                return@execute
+        analysisJob?.cancel()
+        analysisJob =
+            scope.launch {
+                val candidate =
+                    withContext(analysisDispatcher) {
+                        val accumulator = TerminalHyperlinkDetectionAccumulator()
+                        try {
+                            detector.detect(snapshot.request, accumulator)
+                        } catch (error: VirtualMachineError) {
+                            throw error
+                        } catch (_: Exception) {
+                            return@withContext null
+                        }
+                        ensureActive()
+                        snapshot.buildOverlay(accumulator.detectedLinks)
+                    }
+                ensureActive()
+                if (disposed) return@launch
+                if (sequence != analysisSequence) return@launch
+                if (!snapshot.key.matches(host.renderCache)) return@launch
+                publishOverlay(snapshot.key, candidate)
             }
-
-            val candidate = snapshot.buildOverlay(accumulator.detectedLinks)
-            host.dispatch(
-                Runnable {
-                    if (disposed) return@Runnable
-                    if (sequence != analysisSequence) return@Runnable
-                    if (!snapshot.key.matches(host.renderCache)) return@Runnable
-                    publishOverlay(snapshot.key, candidate)
-                },
-            )
-        }
     }
 
     private fun publishOverlay(
@@ -188,7 +182,6 @@ internal class TerminalHyperlinkDiscoveryController(
     private companion object {
         private const val DEBOUNCE_MILLIS = 125
         private const val NO_HYPERLINK_ID = 0
-        private val WORKER_COUNTER = AtomicInteger(1)
     }
 }
 

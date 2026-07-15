@@ -355,6 +355,88 @@ class TerminalRenderCacheTest {
         )
     }
 
+    @Test
+    fun `cache copy preserves primitive frame state`() {
+        val frame = MutableFrame(columns = 3, rows = 2)
+        frame.setClusterRow("e\u0301x")
+        frame.setRow(1, "xyz")
+        frame.setLineId(row = 1, lineId = 99L)
+        frame.setWrapped(row = 1, wrapped = true)
+        frame.setBlink(row = 1, column = 2, blink = true)
+        frame.activeBuffer = TerminalRenderBufferKind.ALTERNATE
+        frame.cursor =
+            TerminalRenderCursor(
+                column = 2,
+                row = 1,
+                visible = true,
+                blinking = true,
+                shape = TerminalRenderCursorShape.BAR,
+                generation = 42L,
+            )
+        val source = TerminalRenderCache(columns = 3, rows = 2)
+        source.updateFrom(frame.reader)
+        source.hyperlinkIds[source.rowOffset(1) + 1] = 17
+        source.extraAttrWords[source.rowOffset(1) + 2] = 23L
+
+        val destination = TerminalRenderCache(columns = 1, rows = 1)
+        destination.updateFrom(source)
+
+        val cellCount = source.columns * source.rows
+        assertAll(
+            { assertEquals(source.columns, destination.columns) },
+            { assertEquals(source.rows, destination.rows) },
+            { assertArrayEquals(source.codeWords.copyOf(cellCount), destination.codeWords.copyOf(cellCount)) },
+            { assertArrayEquals(source.attrWords.copyOf(cellCount), destination.attrWords.copyOf(cellCount)) },
+            { assertArrayEquals(source.flags.copyOf(cellCount), destination.flags.copyOf(cellCount)) },
+            { assertArrayEquals(source.extraAttrWords.copyOf(cellCount), destination.extraAttrWords.copyOf(cellCount)) },
+            { assertArrayEquals(source.hyperlinkIds.copyOf(cellCount), destination.hyperlinkIds.copyOf(cellCount)) },
+            { assertArrayEquals(source.clusterRefs.copyOf(cellCount), destination.clusterRefs.copyOf(cellCount)) },
+            { assertArrayEquals(source.lineGenerations.copyOf(source.rows), destination.lineGenerations.copyOf(destination.rows)) },
+            { assertArrayEquals(source.lineIds.copyOf(source.rows), destination.lineIds.copyOf(destination.rows)) },
+            { assertArrayEquals(source.lineWrapped.copyOf(source.rows), destination.lineWrapped.copyOf(destination.rows)) },
+            { assertEquals("e\u0301", destination.clusterText(0, 0)) },
+            { assertEquals(source.cursor, destination.cursor) },
+            { assertEquals(source.palette, destination.palette) },
+            { assertEquals(source.activeBuffer, destination.activeBuffer) },
+            { assertEquals(source.frameGeneration, destination.frameGeneration) },
+            { assertEquals(source.structureGeneration, destination.structureGeneration) },
+            { assertTrue(destination.hasBlinkingText) },
+            { assertTrue(destination.shapeChangedOnLastUpdate) },
+            { assertTrue(destination.cursorChangedOnLastUpdate) },
+        )
+    }
+
+    @Test
+    fun `cache copy clears rows and clusters left stale by a smaller frame`() {
+        val largeFrame = MutableFrame(columns = 3, rows = 3)
+        largeFrame.setClusterRow("e\u0301x")
+        largeFrame.setRow(1, "abc")
+        largeFrame.setRow(2, "def")
+        val largeSource = TerminalRenderCache(columns = 3, rows = 3)
+        largeSource.updateFrom(largeFrame.reader)
+
+        val destination = TerminalRenderCache(columns = 3, rows = 1, rowCapacityReserve = 3)
+        destination.updateFrom(largeSource)
+
+        val smallFrame = MutableFrame(columns = 3, rows = 1)
+        smallFrame.setRow(0, "new")
+        val smallSource = TerminalRenderCache(columns = 3, rows = 1)
+        smallSource.updateFrom(smallFrame.reader)
+        destination.updateFrom(smallSource)
+
+        assertAll(
+            { assertEquals("new", destination.rowText(0)) },
+            { assertTrue(destination.codeWords.sliceArray(3 until 9).all { it == 0 }, "code words") },
+            { assertTrue(destination.attrWords.sliceArray(3 until 9).all { it == TerminalRenderAttrs.DEFAULT }, "attributes") },
+            { assertTrue(destination.flags.sliceArray(3 until 9).all { it == TerminalRenderCellFlags.EMPTY }, "flags") },
+            { assertTrue(destination.hyperlinkIds.sliceArray(3 until 9).all { it == 0 }, "hyperlinks") },
+            { assertTrue(destination.clusterRefs.sliceArray(3 until 9).all { it == 0L }, "cluster references") },
+            { assertTrue(destination.clusterCodepoints.all { it == 0 }, "cluster codepoints") },
+            { assertTrue(destination.lineIds.sliceArray(1 until 3).all { it == 0L }, "line ids") },
+            { assertTrue(destination.lineWrapped.sliceArray(1 until 3).none { it }, "wrap flags") },
+        )
+    }
+
     private fun TerminalRenderCache.rowText(row: Int): String {
         val start = rowOffset(row)
         return buildString(columns) {
@@ -556,6 +638,14 @@ class TerminalRenderCacheTest {
             lineId: Long,
         ) {
             lineIds[row] = lineId
+            frameGeneration++
+        }
+
+        fun setWrapped(
+            row: Int,
+            wrapped: Boolean,
+        ) {
+            this.wrapped[row] = wrapped
             frameGeneration++
         }
 

@@ -26,11 +26,14 @@ import io.github.ketraterm.pty.PtyOptions
 import io.github.ketraterm.pty.TerminalSessions
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalSessionState
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import java.net.URI
 import java.net.URISyntaxException
 import java.nio.file.Path
 import java.util.*
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -43,6 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class TerminalWorkspace internal constructor(
     private val listener: TerminalWorkspaceListener,
     private val sessionFactory: TerminalWorkspaceSessionFactory,
+    workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : AutoCloseable {
     /**
      * Creates a workspace backed by local PTY sessions.
@@ -55,22 +59,33 @@ class TerminalWorkspace internal constructor(
     )
 
     private val tabs = ArrayList<TerminalWorkspaceTab>(INITIAL_TAB_CAPACITY)
+    private val stateLock = Any()
+    private val sessionStateJobs = HashMap<String, Job>()
+    private val workspaceJob = SupervisorJob()
+    private val workspaceScope =
+        CoroutineScope(workspaceJob + workerDispatcher + CoroutineName("terminal-workspace"))
     private val nextTabNumber = AtomicInteger(1)
     private var selectedTabId: String? = null
+
+    internal val isCoroutineScopeActive: Boolean
+        get() = workspaceJob.isActive
+
+    internal val sessionCollectionCount: Int
+        get() = synchronized(stateLock) { sessionStateJobs.size }
 
     /**
      * Returns a stable snapshot of currently open tabs.
      *
      * @return a list containing all currently open [TerminalWorkspaceTab]s.
      */
-    fun tabSnapshot(): List<TerminalWorkspaceTab> = tabs.toList()
+    fun tabSnapshot(): List<TerminalWorkspaceTab> = synchronized(stateLock) { tabs.toList() }
 
     /**
      * Returns the currently selected tab, or `null` when no tabs are open.
      *
      * @return the selected [TerminalWorkspaceTab], or null if none.
      */
-    fun selectedTab(): TerminalWorkspaceTab? = selectedTabId?.let(::tabById)
+    fun selectedTab(): TerminalWorkspaceTab? = synchronized(stateLock) { selectedTabId?.let(::tabByIdLocked) }
 
     /**
      * Opens a new local PTY-backed tab.
@@ -96,18 +111,24 @@ class TerminalWorkspace internal constructor(
                 onTitleChanged = { t, titleText -> listener.titleChanged(t, titleText) },
                 onCurrentWorkingDirectoryChanged = { t, uri -> listener.currentWorkingDirectoryChanged(t, uri) },
             )
-        tabs += tab
-        val closeNotified = AtomicBoolean(false)
-        session.addCloseListener { closedSession, event ->
-            if (!event.locallyRequested && closeNotified.compareAndSet(false, true)) {
-                tabBySession(closedSession)?.let { listener.sessionClosed(it, event.exitCode, event.failure) }
-            }
+        synchronized(stateLock) {
+            tabs += tab
         }
         session.currentWorkingDirectoryUri()?.let(tab::updateCurrentWorkingDirectoryUri)
         selectTab(id)
         listener.tabOpened(tab)
-        if (session.isClosed && closeNotified.compareAndSet(false, true)) {
-            notifyAlreadyClosedSession(tab, session)
+
+        val stateJob =
+            workspaceScope.launch {
+                val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
+                if (!closed.event.locallyRequested) {
+                    tabBySession(session)?.let {
+                        listener.sessionClosed(it, closed.event.exitCode, closed.event.failure)
+                    }
+                }
+            }
+        synchronized(stateLock) {
+            sessionStateJobs[id] = stateJob
         }
         return tab
     }
@@ -118,8 +139,10 @@ class TerminalWorkspace internal constructor(
      * @param id tab id.
      */
     fun selectTab(id: String) {
-        require(tabById(id) != null) { "unknown terminal tab id: $id" }
-        selectedTabId = id
+        synchronized(stateLock) {
+            require(tabByIdLocked(id) != null) { "unknown terminal tab id: $id" }
+            selectedTabId = id
+        }
         listener.tabSelected(id)
     }
 
@@ -129,15 +152,21 @@ class TerminalWorkspace internal constructor(
      * @param id tab id.
      */
     fun closeTab(id: String) {
-        val index = tabs.indexOfFirst { it.id == id }
-        if (index < 0) return
-        val tab = tabs.removeAt(index)
+        val result =
+            synchronized(stateLock) {
+                val index = tabs.indexOfFirst { it.id == id }
+                if (index < 0) return
+                val tab = tabs.removeAt(index)
+                sessionStateJobs.remove(id)?.cancel()
+                if (selectedTabId == id) {
+                    selectedTabId = tabs.getOrNull(index.coerceAtMost(tabs.lastIndex))?.id
+                }
+                tab to selectedTabId
+            }
+        val (tab, nextSelectedTabId) = result
         tab.session.close()
-        if (selectedTabId == id) {
-            selectedTabId = tabs.getOrNull(index.coerceAtMost(tabs.lastIndex))?.id
-        }
         listener.tabClosed(id)
-        selectedTabId?.let(listener::tabSelected)
+        nextSelectedTabId?.let(listener::tabSelected)
     }
 
     /**
@@ -150,17 +179,18 @@ class TerminalWorkspace internal constructor(
         palette: TerminalColorPalette,
         treatAmbiguousAsWide: Boolean,
     ) {
-        for (tab in tabs) {
+        for (tab in tabSnapshot()) {
             tab.session.setThemePalette(palette)
             tab.session.setTreatAmbiguousAsWide(treatAmbiguousAsWide)
-            tab.session.notifyRenderDirty()
         }
     }
 
     override fun close() {
-        while (tabs.isNotEmpty()) {
-            closeTab(tabs.last().id)
+        while (true) {
+            val id = synchronized(stateLock) { tabs.lastOrNull()?.id } ?: break
+            closeTab(id)
         }
+        workspaceScope.cancel()
     }
 
     private fun tabEventListener(tabId: String): PtyEventListener =
@@ -267,16 +297,12 @@ class TerminalWorkspace internal constructor(
             }
         }
 
-    private fun tabById(id: String): TerminalWorkspaceTab? = tabs.firstOrNull { it.id == id }
+    private fun tabById(id: String): TerminalWorkspaceTab? = synchronized(stateLock) { tabByIdLocked(id) }
 
-    private fun tabBySession(session: TerminalSession): TerminalWorkspaceTab? = tabs.firstOrNull { it.session === session }
+    private fun tabByIdLocked(id: String): TerminalWorkspaceTab? = tabs.firstOrNull { it.id == id }
 
-    private fun notifyAlreadyClosedSession(
-        tab: TerminalWorkspaceTab,
-        session: TerminalSession,
-    ) {
-        listener.sessionClosed(tab, session.exitCode, session.failure)
-    }
+    private fun tabBySession(session: TerminalSession): TerminalWorkspaceTab? =
+        synchronized(stateLock) { tabs.firstOrNull { it.session === session } }
 
     private companion object {
         private const val INITIAL_TAB_CAPACITY = 4

@@ -17,6 +17,9 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
@@ -24,6 +27,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.SwingUtilities
+import kotlin.coroutines.CoroutineContext
 
 class TerminalHyperlinkDiscoveryControllerTest {
     @Test
@@ -51,7 +55,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     },
                 repaintObserved = repaintObserved,
             )
-        val controller = TerminalHyperlinkDiscoveryController(host)
+        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
 
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
@@ -101,7 +105,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     },
                 repaintObserved = repaintObserved,
             )
-        val controller = TerminalHyperlinkDiscoveryController(host)
+        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
 
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
@@ -155,7 +159,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     },
                 repaintObserved = repaintObserved,
             )
-        val controller = TerminalHyperlinkDiscoveryController(host)
+        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
 
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
@@ -218,7 +222,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     },
                 repaintObserved = repaintObserved,
             )
-        val controller = TerminalHyperlinkDiscoveryController(host)
+        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
 
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
@@ -269,7 +273,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     },
                 repaintObserved = repaintObserved,
             )
-        val controller = TerminalHyperlinkDiscoveryController(host)
+        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
 
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
@@ -329,7 +333,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     },
                 repaintObserved = repaintObserved,
             )
-        val controller = TerminalHyperlinkDiscoveryController(host)
+        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
 
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
@@ -377,7 +381,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     },
                 repaintObserved = repaintObserved,
             )
-        val controller = TerminalHyperlinkDiscoveryController(host)
+        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
 
         SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
@@ -594,6 +598,19 @@ class TerminalHyperlinkDiscoveryControllerTest {
         }
     }
 
+    private fun testScope(): CoroutineScope =
+        CoroutineScope(
+            SupervisorJob() +
+                object : CoroutineDispatcher() {
+                    override fun dispatch(
+                        context: CoroutineContext,
+                        block: Runnable,
+                    ) {
+                        SwingUtilities.invokeLater(block)
+                    }
+                },
+        )
+
     private data class FrameScheduleResult(
         val ids: IntArray,
         val detectorCalls: Int,
@@ -604,10 +621,6 @@ class TerminalHyperlinkDiscoveryControllerTest {
         override val hyperlinkDetector: SwingHyperlinkDetector,
         private val repaintObserved: CountDownLatch = CountDownLatch(0),
     ) : TerminalHyperlinkDiscoveryHost {
-        override fun dispatch(action: Runnable) {
-            SwingUtilities.invokeLater(action)
-        }
-
         override fun repaintHyperlinkSpan(
             startRow: Int,
             startColumn: Int,

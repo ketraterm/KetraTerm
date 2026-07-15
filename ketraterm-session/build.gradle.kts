@@ -24,6 +24,8 @@ repositories {
 }
 
 dependencies {
+    val kotlinxCoroutinesVersion = rootProject.extra["kotlinxCoroutinesVersion"] as String
+
     api(project(":ketraterm-core"))
     api(project(":ketraterm-parser"))
     api(project(":ketraterm-host"))
@@ -31,11 +33,13 @@ dependencies {
     api(project(":ketraterm-render-api"))
     api(project(":ketraterm-render-cache"))
     api(project(":ketraterm-transport-api"))
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
     implementation(project(":ketraterm-protocol"))
     testImplementation(project(":ketraterm-testkit"))
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion")
 }
 
 tasks.test {

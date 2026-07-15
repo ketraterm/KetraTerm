@@ -1,44 +1,29 @@
-# Session Concurrency & Locking Invariants
+# Session concurrency and locking invariants
 
-The `ketraterm-session` module acts as the synchronization pipeline coordinator that integrates the terminal core, host transport, and input encoding. It manages concurrency using a three-tier locking system:
+`TerminalSession` keeps transport, parser, core, input, and rendering contracts synchronous where borrowed buffers or exact byte ordering require it. Coroutines orchestrate lifecycle, timeouts, and render publication; they do not run inside parser or core mutation loops.
 
----
+## Retained monitors
 
-## 1. The Locking Tiers
+- `mutationLock` serializes parser/core mutation, resize and render extraction. A borrowed `TerminalRenderFrame` is valid only while its callback holds this monitor. Consumers must copy promptly and must not call a mutating session API from the callback.
+- `outboundWriteLock` serializes encoder scratch-buffer use, UI input, and parser-generated response bytes. It remains a reentrant JVM monitor because the call graph is synchronous and can re-enter host output without suspension.
+- `TerminalRenderPublisher` owns its lease lock so the worker can promote a back cache only when no reader still leases the front cache.
 
-```
-                 +-----------------------+
-                 |    TerminalSession    |
-                 +-----------+-----------+
-                             |
-         ┌───────────────────┼───────────────────┐
-         ▼                   ▼                   ▼
-  [inboundLock]       [mutationLock]     [outboundWriteLock]
-  (PTY read/parse)   (Grid state updates)  (Keystroke writes)
-```
+There is no inbound monitor. `TerminalConnector` guarantees serial, ordered delivery of borrowed byte ranges, and `TerminalSession.onBytes` consumes each range synchronously before returning.
 
-### A. `inboundLock`
-* **Purpose**: Serializes execution of parser byte ingestion.
-* **Scope**: Guards the [onBytes](../src/main/kotlin/io/github/ketraterm/session/TerminalSession.kt#L271) callback thread. It ensures that only one byte block from the transport is processed by the parser FSM at a time, preventing split-escape corruptions.
+Do not replace either retained monitor with coroutine `Mutex`: these sections contain no suspension, and the outbound path depends on monitor reentrancy.
 
-### B. `mutationLock`
-* **Purpose**: Serializes all terminal grid, pen, and mode state mutations.
-* **Scope**: Guards the execution of [HostCommandAdapter](../../ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostCommandAdapter.kt) commands, terminal resizes, theme palette changes, and cursor shape settings.
-* **Deadlock Protection**: Implementations of `TerminalRenderFrameReader.readRenderFrame` acquire the `mutationLock` to provide a stable, thread-safe snapshot to the render consumer. Because of this, consumers **must not** block or call mutating APIs during a frame read callback.
+## Ordering
 
-### C. `outboundWriteLock`
-* **Purpose**: Serializes all host-bound traffic.
-* **Scope**: Guards the outbound `TerminalHostOutput` write channels (e.g. keyboard inputs, clipboard pastes, and query responses generated during parsing). It prevents concurrent responses and user typing events from interleaving raw bytes on the PTY stdin stream.
+Inbound processing follows this order:
 
----
+1. The connector invokes `onBytes` in stream order.
+2. The session acquires `mutationLock`, parses the entire range, and mutates core.
+3. The session drains core response bytes.
+4. Each response acquires `outboundWriteLock` and is written synchronously.
+5. Render invalidation wakes the conflated session render worker.
 
-## 2. Inbound Query-Response Lock Flow
+UI input acquires only `outboundWriteLock`. Render extraction acquires only `mutationLock`, releases it after the primitive cache copy, then promotes through the publisher lease lock.
 
-When the parser handles an escape-sequence query (e.g. Device Status Report `DSR`):
+## Lifecycle
 
-1. The PTY thread invokes `onBytes` under **`inboundLock`**.
-2. The parser processes bytes and calls a query method on `HostCommandAdapter` under **`mutationLock`**.
-3. The adapter generates a response sequence and writes it to the connector.
-4. To prevent interleaving with concurrent UI input typing, the write acquires the **`outboundWriteLock`**.
-
-**Lock Ordering Rule**: `inboundLock` ? `mutationLock` ? `outboundWriteLock` must always be acquired in this order. Never attempt to acquire `mutationLock` if `outboundWriteLock` is already held.
+`TerminalSession.state` is a retained `StateFlow` with `Created`, `Running`, and `Closed` states. Local close, remote close, and transport error race through one atomic state transition. The winner publishes `Closed` before cancelling session children and ending parser input.

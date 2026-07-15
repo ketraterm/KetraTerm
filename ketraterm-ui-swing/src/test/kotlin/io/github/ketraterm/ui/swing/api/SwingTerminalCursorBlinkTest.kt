@@ -33,7 +33,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.awt.event.FocusEvent
 import java.awt.event.KeyEvent
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.swing.JFrame
 import javax.swing.SwingUtilities
@@ -98,7 +97,7 @@ class SwingTerminalCursorBlinkTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(3, 1),
+                renderPublisher = TerminalRenderPublisher(3, 1),
                 renderReader = renderReader,
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -147,18 +146,11 @@ class SwingTerminalCursorBlinkTest {
                 assertFalse(component.cursorBlinkVisible)
             }
 
-            // Trigger a session dirty update to simulate a frame update.
-            val renderPublished = CountDownLatch(1)
-            val publicationListener = { renderPublished.countDown() }
-            session.addDirtyListener(publicationListener)
-            try {
-                session.requestRender(scrollbackOffset = 0)
-                assertTrue(renderPublished.await(1, TimeUnit.SECONDS), "render was not published")
-            } finally {
-                session.removeDirtyListener(publicationListener)
-            }
+            val previousGeneration = session.renderGeneration.value
+            session.requestRender(scrollbackOffset = 0)
+            awaitRenderPublication(session, previousGeneration)
             SwingUtilities.invokeAndWait {
-                // Drain dirty runnable
+                // Drain the StateFlow collection on the EDT.
             }
 
             // Verify cursorBlinkVisible resets back to true on frame updates
@@ -169,6 +161,17 @@ class SwingTerminalCursorBlinkTest {
             }
             session.close()
         }
+    }
+
+    private fun awaitRenderPublication(
+        session: TerminalSession,
+        previousGeneration: Long,
+    ) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1)
+        while (session.renderGeneration.value <= previousGeneration && System.nanoTime() < deadline) {
+            Thread.onSpinWait()
+        }
+        assertTrue(session.renderGeneration.value > previousGeneration, "render was not published")
     }
 
     private class SimpleFrameReader : TerminalRenderFrameReader {

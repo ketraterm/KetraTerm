@@ -30,6 +30,7 @@ import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import kotlinx.coroutines.Dispatchers
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.awt.Cursor
@@ -394,7 +395,7 @@ class SwingTerminalCommandNavigationTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(12, 2),
+                renderPublisher = TerminalRenderPublisher(12, 2),
                 renderReader = renderReader,
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -402,6 +403,7 @@ class SwingTerminalCommandNavigationTest {
                 inputEncoder = NoOpInputEncoder,
                 shellIntegrationState =
                     TerminalShellIntegrationState(capacity = capacity),
+                workerDispatcher = Dispatchers.Unconfined,
             )
         val state = session.shellIntegrationState
         state.recordPromptStart(lineIdForAbsoluteRow(1))
@@ -419,6 +421,7 @@ class SwingTerminalCommandNavigationTest {
         state.recordPromptEnd(lineIdForAbsoluteRow(5))
         state.recordCommandStart(lineIdForAbsoluteRow(6), includeLine = true)
         state.recordCommandFinished(lineIdForAbsoluteRow(7), exitCode = 1)
+        session.renderPublisher.updateAndPublish(renderReader)
         return session
     }
 

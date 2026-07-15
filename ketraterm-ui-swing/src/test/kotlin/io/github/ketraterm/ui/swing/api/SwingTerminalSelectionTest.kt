@@ -52,7 +52,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
         }
 
@@ -69,7 +69,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
         }
@@ -125,7 +125,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach { it.mousePressed(mousePressedWithAlt(component, x = 8, y = 8)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDraggedWithAlt(component, x = 80, y = 8)) }
         }
@@ -217,7 +217,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 2)) }
             assertTrue(component.copySelectionToClipboard())
         }
@@ -256,7 +256,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
             assertTrue(component.copySelectionToClipboard())
@@ -281,7 +281,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
             assertTrue(component.copySelectionToClipboard())
@@ -425,7 +425,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(80, 40)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressedWithCtrl(component, x = 8, y = 8))
             }
@@ -472,7 +472,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(80, 40)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1))
             }
@@ -493,16 +493,19 @@ class SwingTerminalSelectionTest {
         hyperlinkResolver: TerminalHyperlinkResolver = TerminalHyperlinkResolver.NONE,
     ): TerminalSession {
         val terminal = TerminalBuffers.create(width = frame.columns, height = frame.rows, maxHistory = 5)
-        return TerminalSession(
-            terminal = terminal,
-            publisher = TerminalRenderPublisher(frame.columns, frame.rows),
-            renderReader = renderReader,
-            responseReader = terminal,
-            connector = NoOpConnector,
-            parser = NoOpParser,
-            inputEncoder = inputEncoder,
-            hyperlinkResolver = hyperlinkResolver,
-        )
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(frame.columns, frame.rows),
+                renderReader = renderReader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = inputEncoder,
+                hyperlinkResolver = hyperlinkResolver,
+            )
+        session.renderPublisher.updateAndPublish(renderReader)
+        return session
     }
 
     private fun mousePressed(

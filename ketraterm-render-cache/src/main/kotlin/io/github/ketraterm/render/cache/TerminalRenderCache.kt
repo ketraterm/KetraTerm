@@ -373,6 +373,101 @@ class TerminalRenderCache(
     }
 
     /**
+     * Bulk-copies a stable published cache into this caller-owned cache.
+     *
+     * The caller must keep [source] leased from its publisher for the duration
+     * of this call. Primitive storage is reused whenever the destination has
+     * sufficient capacity, and no per-cell objects are allocated.
+     *
+     * @param source stable published cache to copy.
+     */
+    fun updateFrom(source: TerminalRenderCache) {
+        require(source !== this) { "source cache must differ from destination cache" }
+
+        val previousColumns = columns
+        val previousRows = rows
+        val previousCellCount = previousColumns * previousRows
+        val oldHasCursor = hasCursor
+        val oldCursorColumn = cursorColumn
+        val oldCursorRow = cursorRow
+        val oldCursorVisible = cursorVisible
+        val oldCursorBlinking = cursorBlinking
+        val oldCursorShape = cursorShape
+        val oldCursorGeneration = cursorGeneration
+        shapeChangedOnLastUpdate = columns != source.columns || rows != source.rows
+        if (columns != source.columns || source.rows > storageRows) {
+            resizeStorage(source.columns, source.rows)
+        } else {
+            rows = source.rows
+        }
+
+        val cellCount = source.columns * source.rows
+        System.arraycopy(source.codeWords, 0, codeWords, 0, cellCount)
+        System.arraycopy(source.attrWords, 0, attrWords, 0, cellCount)
+        System.arraycopy(source.flags, 0, flags, 0, cellCount)
+        System.arraycopy(source.extraAttrWords, 0, extraAttrWords, 0, cellCount)
+        System.arraycopy(source.hyperlinkIds, 0, hyperlinkIds, 0, cellCount)
+        System.arraycopy(source.clusterRefs, 0, clusterRefs, 0, cellCount)
+        System.arraycopy(source.lineGenerations, 0, lineGenerations, 0, source.rows)
+        System.arraycopy(source.lineIds, 0, lineIds, 0, source.rows)
+        System.arraycopy(source.lineWrapped, 0, lineWrapped, 0, source.rows)
+        System.arraycopy(source.lineHasBlinkingText, 0, lineHasBlinkingText, 0, source.rows)
+
+        if (previousColumns == source.columns && source.rows < previousRows) {
+            codeWords.fill(0, cellCount, previousCellCount)
+            attrWords.fill(TerminalRenderAttrs.DEFAULT, cellCount, previousCellCount)
+            flags.fill(TerminalRenderCellFlags.EMPTY, cellCount, previousCellCount)
+            extraAttrWords.fill(TerminalRenderExtraAttrs.DEFAULT, cellCount, previousCellCount)
+            hyperlinkIds.fill(0, cellCount, previousCellCount)
+            clusterRefs.fill(0L, cellCount, previousCellCount)
+            lineGenerations.fill(UNINITIALIZED_GENERATION, source.rows, previousRows)
+            lineIds.fill(0L, source.rows, previousRows)
+            lineWrapped.fill(false, source.rows, previousRows)
+            lineHasBlinkingText.fill(false, source.rows, previousRows)
+        }
+
+        val previousClusterCodepointCount = clusterCodepointCount
+        if (clusterCodepoints.size < source.clusterCodepointCount) {
+            clusterCodepoints = IntArray(source.clusterCodepointCount)
+        }
+        System.arraycopy(
+            source.clusterCodepoints,
+            0,
+            clusterCodepoints,
+            0,
+            source.clusterCodepointCount,
+        )
+        if (source.clusterCodepointCount < previousClusterCodepointCount) {
+            clusterCodepoints.fill(0, source.clusterCodepointCount, previousClusterCodepointCount)
+        }
+        clusterCodepointCount = source.clusterCodepointCount
+
+        historySize = source.historySize
+        scrollbackOffset = source.scrollbackOffset
+        discardedCount = source.discardedCount
+        hasBlinkingText = source.hasBlinkingText
+        frameGeneration = source.frameGeneration
+        structureGeneration = source.structureGeneration
+        activeBuffer = source.activeBuffer
+        palette = source.palette
+        hasCursor = source.hasCursor
+        cursorColumn = source.cursorColumn
+        cursorRow = source.cursorRow
+        cursorVisible = source.cursorVisible
+        cursorBlinking = source.cursorBlinking
+        cursorShape = source.cursorShape
+        cursorGeneration = source.cursorGeneration
+        cursorChangedOnLastUpdate =
+            oldHasCursor != hasCursor ||
+            oldCursorColumn != cursorColumn ||
+            oldCursorRow != cursorRow ||
+            oldCursorVisible != cursorVisible ||
+            oldCursorBlinking != cursorBlinking ||
+            oldCursorShape != cursorShape ||
+            oldCursorGeneration != cursorGeneration
+    }
+
+    /**
      * Copies row data, cursor state, active buffer kind, and color palette
      * from the given [frame] into this cache's primitive storage.
      *
