@@ -143,6 +143,10 @@ To run the checks for this module:
 ./gradlew :ketraterm-testkit:xtermDifferentialSmokeTest
 ./gradlew :ketraterm-testkit:xtermDifferentialNightlyTest
 ./gradlew :ketraterm-testkit:xtermDifferentialReleaseAudit
+
+# State-aware Unicode resize/reflow preservation campaigns
+./gradlew :ketraterm-testkit:resizeReflowInvariantSmokeTest
+./gradlew :ketraterm-testkit:resizeReflowInvariantNightlyTest
 ```
 
 The default generated campaign has 2,000 deterministic scenarios. Override any
@@ -157,3 +161,12 @@ the failure directory. CI runs 100 cases for every pull request and shards the
 scheduled 100,000-case campaign into four ranges of 25,000 cases. Campaign
 manifests are retained for all shards; minimized reproductions and JUnit reports
 are uploaded automatically for failed shards.
+
+The resize/reflow campaign constructs deterministic mixed-width Unicode state,
+then applies repeated width and height changes. It verifies exact grapheme order,
+dimensions, cursor bounds, render-cell flags, and wide-cell adjacency without
+using xterm.js as an oracle because KetraTerm deliberately reflows logical lines
+while headless xterm.js retains physical rows. Override its size and shard with
+`-PresizeReflowCases=N` and `-PresizeReflowStartIndex=N`. Passing runs write a
+metadata manifest under `build/reports/resize-reflow-invariant`; failures also
+record the original and resize-minimized replay event sequences.

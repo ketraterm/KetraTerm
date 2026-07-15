@@ -147,6 +147,58 @@ registerGeneratedDifferentialProfile(
     defaultCases = 500_000,
 )
 
+fun registerResizeReflowInvariantProfile(
+    taskName: String,
+    descriptionText: String,
+    defaultCases: Int,
+) = tasks.register<Test>(taskName) {
+    group = "verification"
+    description = descriptionText
+    dependsOn(tasks.testClasses)
+    testClassesDirs =
+        sourceSets.test
+            .get()
+            .output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter.includeTestsMatching("*TerminalResizeReflowInvariantCampaignTest")
+    systemProperty("ketraterm.resizeReflow.required", "true")
+    systemProperty(
+        "ketraterm.resizeReflow.cases",
+        providers.gradleProperty("resizeReflowCases").getOrElse(defaultCases.toString()),
+    )
+    systemProperty(
+        "ketraterm.resizeReflow.startIndex",
+        providers.gradleProperty("resizeReflowStartIndex").getOrElse("0"),
+    )
+    systemProperty(
+        "ketraterm.resizeReflow.commitSha",
+        providers
+            .gradleProperty("resizeReflowCommitSha")
+            .orElse(providers.environmentVariable("GITHUB_SHA"))
+            .getOrElse("unknown"),
+    )
+    systemProperty(
+        "ketraterm.resizeReflow.artifacts",
+        layout.buildDirectory
+            .dir("reports/resize-reflow-invariant")
+            .get()
+            .asFile.absolutePath,
+    )
+}
+
+registerResizeReflowInvariantProfile(
+    taskName = "resizeReflowInvariantSmokeTest",
+    descriptionText = "Runs 100 deterministic state-aware resize/reflow invariant cases.",
+    defaultCases = 100,
+)
+
+registerResizeReflowInvariantProfile(
+    taskName = "resizeReflowInvariantNightlyTest",
+    descriptionText = "Runs 10,000 deterministic state-aware resize/reflow invariant cases.",
+    defaultCases = 10_000,
+)
+
 tasks.test {
     useJUnitPlatform()
 }

@@ -48,8 +48,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run differential smoke campaign
-        run: ./gradlew :ketraterm-testkit:xtermDifferentialSmokeTest
+      - name: Run terminal state campaigns
+        run: >-
+          ./gradlew
+          :ketraterm-testkit:xtermDifferentialSmokeTest
+          :ketraterm-testkit:resizeReflowInvariantSmokeTest
 
       - name: Upload campaign report
         if: always()
@@ -57,6 +60,15 @@ jobs:
         with:
           name: xterm-differential-smoke-${{ github.run_id }}
           path: ketraterm-testkit/build/reports/xterm-differential/campaign-*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload resize/reflow campaign report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resize-reflow-smoke-${{ github.run_id }}
+          path: ketraterm-testkit/build/reports/resize-reflow-invariant/campaign-*.json
           if-no-files-found: warn
           retention-days: 14
 
@@ -69,6 +81,9 @@ jobs:
             ketraterm-testkit/build/reports/xterm-differential/failures/*.json
             ketraterm-testkit/build/reports/tests/xtermDifferentialSmokeTest/
             ketraterm-testkit/build/test-results/xtermDifferentialSmokeTest/
+            ketraterm-testkit/build/reports/resize-reflow-invariant/failures/*.json
+            ketraterm-testkit/build/reports/tests/resizeReflowInvariantSmokeTest/
+            ketraterm-testkit/build/test-results/resizeReflowInvariantSmokeTest/
           if-no-files-found: warn
           retention-days: 30
 
@@ -85,18 +100,26 @@ jobs:
             start: 0
             count: 25000
             end: 24999
+            resizeStart: 0
+            resizeCount: 2500
           - shard: 1
             start: 25000
             count: 25000
             end: 49999
+            resizeStart: 2500
+            resizeCount: 2500
           - shard: 2
             start: 50000
             count: 25000
             end: 74999
+            resizeStart: 5000
+            resizeCount: 2500
           - shard: 3
             start: 75000
             count: 25000
             end: 99999
+            resizeStart: 7500
+            resizeCount: 2500
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -120,8 +143,11 @@ jobs:
       - name: Run deterministic nightly shard
         run: >-
           ./gradlew :ketraterm-testkit:xtermDifferentialNightlyTest
+          :ketraterm-testkit:resizeReflowInvariantNightlyTest
           -PxtermDifferentialStartIndex=${{ matrix.start }}
           -PxtermDifferentialCases=${{ matrix.count }}
+          -PresizeReflowStartIndex=${{ matrix.resizeStart }}
+          -PresizeReflowCases=${{ matrix.resizeCount }}
 
       - name: Upload shard campaign report
         if: always()
@@ -129,6 +155,15 @@ jobs:
         with:
           name: xterm-differential-nightly-shard-${{ matrix.shard }}-${{ github.run_id }}
           path: ketraterm-testkit/build/reports/xterm-differential/campaign-*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload resize/reflow shard report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resize-reflow-nightly-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: ketraterm-testkit/build/reports/resize-reflow-invariant/campaign-*.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -141,5 +176,8 @@ jobs:
             ketraterm-testkit/build/reports/xterm-differential/failures/*.json
             ketraterm-testkit/build/reports/tests/xtermDifferentialNightlyTest/
             ketraterm-testkit/build/test-results/xtermDifferentialNightlyTest/
+            ketraterm-testkit/build/reports/resize-reflow-invariant/failures/*.json
+            ketraterm-testkit/build/reports/tests/resizeReflowInvariantNightlyTest/
+            ketraterm-testkit/build/test-results/resizeReflowInvariantNightlyTest/
           if-no-files-found: warn
           retention-days: 90
