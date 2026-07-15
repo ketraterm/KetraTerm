@@ -147,6 +147,10 @@ To run the checks for this module:
 # State-aware Unicode resize/reflow preservation campaigns
 ./gradlew :ketraterm-testkit:resizeReflowInvariantSmokeTest
 ./gradlew :ketraterm-testkit:resizeReflowInvariantNightlyTest
+
+# Independent model oracle for cursor movement, deferred wrap, and scrolling
+./gradlew :ketraterm-testkit:cursorWrapModelSmokeTest
+./gradlew :ketraterm-testkit:cursorWrapModelNightlyTest
 ```
 
 The default generated campaign has 2,000 deterministic scenarios. Override any
@@ -170,3 +174,11 @@ while headless xterm.js retains physical rows. Override its size and shard with
 `-PresizeReflowCases=N` and `-PresizeReflowStartIndex=N`. Passing runs write a
 metadata manifest under `build/reports/resize-reflow-invariant`; failures also
 record the original and resize-minimized replay event sequences.
+
+The cursor/wrap campaign executes generated ASCII writes, CR, LF, BS, CUP, CUF,
+CUB, and DECAWM changes against both the production parser-to-core pipeline and
+a small independent grid model. It compares cells, cursor position, autowrap,
+soft-wrap markers, scrolling, and retained history. Override and shard it with
+`-PcursorWrapCases=N` and `-PcursorWrapStartIndex=N`; failing streams are
+prefix-independent delta-minimized and stored under
+`build/reports/cursor-wrap-model/failures`.

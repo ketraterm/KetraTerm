@@ -199,6 +199,58 @@ registerResizeReflowInvariantProfile(
     defaultCases = 10_000,
 )
 
+fun registerCursorWrapModelProfile(
+    taskName: String,
+    descriptionText: String,
+    defaultCases: Int,
+) = tasks.register<Test>(taskName) {
+    group = "verification"
+    description = descriptionText
+    dependsOn(tasks.testClasses)
+    testClassesDirs =
+        sourceSets.test
+            .get()
+            .output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter.includeTestsMatching("*TerminalCursorWrapModelCampaignTest")
+    systemProperty("ketraterm.cursorWrap.required", "true")
+    systemProperty(
+        "ketraterm.cursorWrap.cases",
+        providers.gradleProperty("cursorWrapCases").getOrElse(defaultCases.toString()),
+    )
+    systemProperty(
+        "ketraterm.cursorWrap.startIndex",
+        providers.gradleProperty("cursorWrapStartIndex").getOrElse("0"),
+    )
+    systemProperty(
+        "ketraterm.cursorWrap.commitSha",
+        providers
+            .gradleProperty("cursorWrapCommitSha")
+            .orElse(providers.environmentVariable("GITHUB_SHA"))
+            .getOrElse("unknown"),
+    )
+    systemProperty(
+        "ketraterm.cursorWrap.artifacts",
+        layout.buildDirectory
+            .dir("reports/cursor-wrap-model")
+            .get()
+            .asFile.absolutePath,
+    )
+}
+
+registerCursorWrapModelProfile(
+    taskName = "cursorWrapModelSmokeTest",
+    descriptionText = "Runs 100 deterministic model-based cursor and deferred-wrap cases.",
+    defaultCases = 100,
+)
+
+registerCursorWrapModelProfile(
+    taskName = "cursorWrapModelNightlyTest",
+    descriptionText = "Runs 10,000 deterministic model-based cursor and deferred-wrap cases.",
+    defaultCases = 10_000,
+)
+
 tasks.test {
     useJUnitPlatform()
 }

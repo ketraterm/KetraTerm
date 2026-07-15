@@ -53,6 +53,7 @@ jobs:
           ./gradlew
           :ketraterm-testkit:xtermDifferentialSmokeTest
           :ketraterm-testkit:resizeReflowInvariantSmokeTest
+          :ketraterm-testkit:cursorWrapModelSmokeTest
 
       - name: Upload campaign report
         if: always()
@@ -72,6 +73,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload cursor/wrap campaign report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cursor-wrap-smoke-${{ github.run_id }}
+          path: ketraterm-testkit/build/reports/cursor-wrap-model/campaign-*.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload minimized differential failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -84,6 +94,9 @@ jobs:
             ketraterm-testkit/build/reports/resize-reflow-invariant/failures/*.json
             ketraterm-testkit/build/reports/tests/resizeReflowInvariantSmokeTest/
             ketraterm-testkit/build/test-results/resizeReflowInvariantSmokeTest/
+            ketraterm-testkit/build/reports/cursor-wrap-model/failures/*.json
+            ketraterm-testkit/build/reports/tests/cursorWrapModelSmokeTest/
+            ketraterm-testkit/build/test-results/cursorWrapModelSmokeTest/
           if-no-files-found: warn
           retention-days: 30
 
@@ -144,10 +157,13 @@ jobs:
         run: >-
           ./gradlew :ketraterm-testkit:xtermDifferentialNightlyTest
           :ketraterm-testkit:resizeReflowInvariantNightlyTest
+          :ketraterm-testkit:cursorWrapModelNightlyTest
           -PxtermDifferentialStartIndex=${{ matrix.start }}
           -PxtermDifferentialCases=${{ matrix.count }}
           -PresizeReflowStartIndex=${{ matrix.resizeStart }}
           -PresizeReflowCases=${{ matrix.resizeCount }}
+          -PcursorWrapStartIndex=${{ matrix.resizeStart }}
+          -PcursorWrapCases=${{ matrix.resizeCount }}
 
       - name: Upload shard campaign report
         if: always()
@@ -167,6 +183,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Upload cursor/wrap shard report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cursor-wrap-nightly-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: ketraterm-testkit/build/reports/cursor-wrap-model/campaign-*.json
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Upload minimized differential failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -179,5 +204,8 @@ jobs:
             ketraterm-testkit/build/reports/resize-reflow-invariant/failures/*.json
             ketraterm-testkit/build/reports/tests/resizeReflowInvariantNightlyTest/
             ketraterm-testkit/build/test-results/resizeReflowInvariantNightlyTest/
+            ketraterm-testkit/build/reports/cursor-wrap-model/failures/*.json
+            ketraterm-testkit/build/reports/tests/cursorWrapModelNightlyTest/
+            ketraterm-testkit/build/test-results/cursorWrapModelNightlyTest/
           if-no-files-found: warn
           retention-days: 90
