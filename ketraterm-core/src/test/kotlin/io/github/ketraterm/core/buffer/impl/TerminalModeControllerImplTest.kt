@@ -28,13 +28,23 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalModeControllerImplTest {
-    private fun withPendingWrap(
+    private fun assertCancelsPendingWrap(
         state: TerminalState,
         assertion: () -> Unit,
     ) {
         state.cursor.pendingWrap = true
         assertion()
         assertFalse(state.cursor.pendingWrap)
+    }
+
+    private fun assertPreservesPendingWrap(
+        state: TerminalState,
+        assertion: () -> Unit,
+    ) {
+        state.cursor.pendingWrap = true
+        assertion()
+        assertTrue(state.cursor.pendingWrap)
+        state.cursor.pendingWrap = false
     }
 
     @Test
@@ -147,37 +157,43 @@ class TerminalModeControllerImplTest {
     }
 
     @Test
-    fun `public mode setters cancel pending wrap`() {
+    fun `cursor-affecting mode setters cancel pending wrap`() {
         val state = TerminalState(8, 4, 2)
         val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
 
-        withPendingWrap(state) { modeController.setInsertMode(true) }
-        withPendingWrap(state) { modeController.setAutoWrap(true) }
-        withPendingWrap(state) { modeController.setAutoWrap(false) }
-        withPendingWrap(state) { modeController.setOriginMode(true) }
-        withPendingWrap(state) { modeController.setApplicationCursorKeys(true) }
-        withPendingWrap(state) { modeController.setApplicationKeypad(true) }
-        withPendingWrap(state) { modeController.setLeftRightMarginMode(true) }
-        withPendingWrap(state) { modeController.setLeftRightMarginMode(true) }
-        withPendingWrap(state) { modeController.setLeftRightMarginMode(false) }
-        withPendingWrap(state) { modeController.setNewLineMode(true) }
-        withPendingWrap(state) { modeController.setMouseTrackingMode(MouseTrackingMode.NORMAL) }
-        withPendingWrap(state) { modeController.setMouseEncodingMode(MouseEncodingMode.SGR) }
-        withPendingWrap(state) { modeController.setBracketedPasteEnabled(true) }
-        withPendingWrap(state) { modeController.setFocusReportingEnabled(true) }
-        withPendingWrap(state) { modeController.setModifyOtherKeysMode(2) }
-        withPendingWrap(state) { modeController.setFormatOtherKeysMode(1) }
-        withPendingWrap(state) {
-            modeController.setKittyKeyboardFlags(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES)
-        }
-        withPendingWrap(state) { modeController.setReverseVideo(true) }
-        withPendingWrap(state) { modeController.setCursorVisible(false) }
-        withPendingWrap(state) { modeController.setCursorBlinking(true) }
-        withPendingWrap(state) { modeController.setTreatAmbiguousAsWide(true) }
+        assertCancelsPendingWrap(state) { modeController.setAutoWrap(true) }
+        assertCancelsPendingWrap(state) { modeController.setAutoWrap(false) }
+        assertCancelsPendingWrap(state) { modeController.setOriginMode(true) }
+        assertCancelsPendingWrap(state) { modeController.setLeftRightMarginMode(true) }
+        assertCancelsPendingWrap(state) { modeController.setLeftRightMarginMode(false) }
     }
 
     @Test
-    fun `next printable after mode setter does not consume stale pending wrap`() {
+    fun `non-cursor mode setters preserve pending wrap`() {
+        val state = TerminalState(8, 4, 2)
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+
+        assertPreservesPendingWrap(state) { modeController.setInsertMode(true) }
+        assertPreservesPendingWrap(state) { modeController.setApplicationCursorKeys(true) }
+        assertPreservesPendingWrap(state) { modeController.setApplicationKeypad(true) }
+        assertPreservesPendingWrap(state) { modeController.setNewLineMode(true) }
+        assertPreservesPendingWrap(state) { modeController.setMouseTrackingMode(MouseTrackingMode.NORMAL) }
+        assertPreservesPendingWrap(state) { modeController.setMouseEncodingMode(MouseEncodingMode.SGR) }
+        assertPreservesPendingWrap(state) { modeController.setBracketedPasteEnabled(true) }
+        assertPreservesPendingWrap(state) { modeController.setFocusReportingEnabled(true) }
+        assertPreservesPendingWrap(state) { modeController.setModifyOtherKeysMode(2) }
+        assertPreservesPendingWrap(state) { modeController.setFormatOtherKeysMode(1) }
+        assertPreservesPendingWrap(state) {
+            modeController.setKittyKeyboardFlags(KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES)
+        }
+        assertPreservesPendingWrap(state) { modeController.setReverseVideo(true) }
+        assertPreservesPendingWrap(state) { modeController.setCursorVisible(false) }
+        assertPreservesPendingWrap(state) { modeController.setCursorBlinking(true) }
+        assertPreservesPendingWrap(state) { modeController.setTreatAmbiguousAsWide(true) }
+    }
+
+    @Test
+    fun `next printable after non-cursor mode setter consumes pending wrap`() {
         val state = TerminalState(4, 2, 1)
         val cursorEngine = CursorEngine(state)
         val modeController = TerminalModeControllerImpl(state, cursorEngine)
@@ -193,10 +209,10 @@ class TerminalModeControllerImplTest {
             { assertEquals('A'.code, state.ring[state.resolveRingIndex(0)].getCodepoint(0)) },
             { assertEquals('B'.code, state.ring[state.resolveRingIndex(0)].getCodepoint(1)) },
             { assertEquals('C'.code, state.ring[state.resolveRingIndex(0)].getCodepoint(2)) },
-            { assertEquals('X'.code, state.ring[state.resolveRingIndex(0)].getCodepoint(3)) },
-            { assertEquals(0, state.ring[state.resolveRingIndex(1)].getCodepoint(0)) },
-            { assertEquals(3, state.cursor.col) },
-            { assertEquals(0, state.cursor.row) },
+            { assertEquals('D'.code, state.ring[state.resolveRingIndex(0)].getCodepoint(3)) },
+            { assertEquals('X'.code, state.ring[state.resolveRingIndex(1)].getCodepoint(0)) },
+            { assertEquals(1, state.cursor.col) },
+            { assertEquals(1, state.cursor.row) },
         )
     }
 

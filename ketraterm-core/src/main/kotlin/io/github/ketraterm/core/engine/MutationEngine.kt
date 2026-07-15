@@ -216,15 +216,14 @@ internal class MutationEngine(
     private fun annihilateAt(
         row: Int,
         col: Int,
+        attr: Long = blankAttr,
+        extendedAttr: Long = blankExtendedAttr,
     ) {
         if (row !in 0 until height || col !in 0 until width) return
 
         val line = getLine(row)
         val start = findClusterStart(line, col)
         val raw = line.rawCodepoint(start)
-        val attr = blankAttr
-        val extendedAttr = blankExtendedAttr
-
         if (raw == TerminalConstants.WIDE_CHAR_SPACER) {
             line.setCell(start, TerminalConstants.EMPTY, attr, extendedAttr)
             state.markLineChanged(line)
@@ -437,7 +436,7 @@ internal class MutationEngine(
         }
 
         if (widthInCells == 2 && cCol >= rightMargin) {
-            annihilateAt(cRow, cCol)
+            annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
             line.wrapped = true
             state.markLineChanged(line)
             cCol = leftMargin
@@ -447,15 +446,15 @@ internal class MutationEngine(
 
         if (state.modes.isInsertMode) {
             if (line.rawCodepoint(cCol) == TerminalConstants.WIDE_CHAR_SPACER) {
-                annihilateAt(cRow, cCol)
+                annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
             }
             line.insertCellsInRange(cCol, widthInCells, rightMargin, blankAttr, blankExtendedAttr)
             state.markLineChanged(line)
         }
 
-        annihilateAt(cRow, cCol)
+        annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
         if (widthInCells == 2 && cCol + 1 <= rightMargin) {
-            annihilateAt(cRow, cCol + 1)
+            annihilateAt(cRow, cCol + 1, state.pen.currentAttr, state.pen.currentExtendedAttr)
         }
 
         val writtenCol = cCol
@@ -587,7 +586,7 @@ internal class MutationEngine(
                 annihilateAt(row, col + 1)
             }
         } else if (col + 1 < width && line.rawCodepoint(col + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
-            line.setCell(col + 1, TerminalConstants.EMPTY, blankAttr, blankExtendedAttr)
+            line.setCell(col + 1, TerminalConstants.EMPTY, attr, extendedAttr)
         }
 
         line.setCluster(col, clusterScratch, existingLength + 1, attr, extendedAttr)
@@ -929,11 +928,10 @@ internal class MutationEngine(
         cRow: Int,
         cCol: Int,
     ) {
+        if (cCol <= leftMargin) breakSoftWrapInto(cRow)
         val line = getLine(cRow)
         if (state.modes.isLeftRightMarginMode) {
             if (cCol !in leftMargin..rightMargin) {
-                line.wrapped = false
-                state.markLineChanged(line)
                 return
             }
             val start = maxOf(cCol, leftMargin)
@@ -967,6 +965,7 @@ internal class MutationEngine(
         cRow: Int,
         cCol: Int,
     ) {
+        breakSoftWrapInto(cRow)
         val line = getLine(cRow)
         if (state.modes.isLeftRightMarginMode) {
             if (cCol !in leftMargin..rightMargin) return
@@ -997,6 +996,7 @@ internal class MutationEngine(
         structuralMutation {
             val cRow = state.cursor.row
             if (cRow !in 0 until height) return@structuralMutation
+            breakSoftWrapInto(cRow)
             val line = getLine(cRow)
             if (state.modes.isLeftRightMarginMode) {
                 line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
@@ -1006,6 +1006,15 @@ internal class MutationEngine(
             line.wrapped = false
             state.markLineChanged(line)
         }
+
+    private fun breakSoftWrapInto(row: Int) {
+        if (row <= 0) return
+        val preceding = getLine(row - 1)
+        if (preceding.wrapped) {
+            preceding.wrapped = false
+            state.markLineChanged(preceding)
+        }
+    }
 
     /** Selectively erases from the cursor through the end of the current line (DECSEL 0). */
     fun selectiveEraseLineToEnd() =

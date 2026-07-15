@@ -71,6 +71,7 @@ object TerminalDifferentialComparator {
      * @param ketraTerm canonical KetraTerm state.
      * @param oracle normalized independent implementation state.
      * @param maxDifferences maximum number of differences retained in the result.
+     * @param compareWrappedRows whether to compare implementation-defined logical-line wrap metadata.
      * @return bounded structural comparison result.
      */
     @JvmStatic
@@ -79,6 +80,7 @@ object TerminalDifferentialComparator {
         ketraTerm: TerminalConformanceSnapshot,
         oracle: TerminalOracleSnapshot,
         maxDifferences: Int = 32,
+        compareWrappedRows: Boolean = true,
     ): TerminalDifferentialResult {
         require(maxDifferences > 0) { "maxDifferences must be > 0, was $maxDifferences" }
         val collector = DifferenceCollector(maxDifferences)
@@ -94,7 +96,7 @@ object TerminalDifferentialComparator {
         compareModes(ketraTerm.modes, oracle.modes, collector)
         collector.add("windowTitle", ketraTerm.windowTitle, oracle.windowTitle)
         collector.add("outboundBytes", ketraTerm.outboundBytes.toHexString(), oracle.outboundBytes.toHexString())
-        compareRows(ketraTerm.retainedRows, oracle.retainedRows, collector)
+        compareRows(ketraTerm.retainedRows, oracle.retainedRows, collector, compareWrappedRows)
         return TerminalDifferentialResult(oracle.oracle, collector.differences, collector.truncated)
     }
 
@@ -118,6 +120,7 @@ object TerminalDifferentialComparator {
         ketraTerm: List<TerminalRowSnapshot>,
         oracle: List<TerminalOracleRowSnapshot>,
         collector: DifferenceCollector,
+        compareWrappedRows: Boolean,
     ) {
         collector.add("retainedRows.size", ketraTerm.size, oracle.size)
         val rowCount = minOf(ketraTerm.size, oracle.size)
@@ -125,7 +128,9 @@ object TerminalDifferentialComparator {
             val expectedRow = ketraTerm[rowIndex]
             val actualRow = oracle[rowIndex]
             val context = "row=$rowIndex"
-            collector.add("retainedRows[$rowIndex].wrapped", expectedRow.wrapped, actualRow.wrapsToNext, context)
+            if (compareWrappedRows) {
+                collector.add("retainedRows[$rowIndex].wrapped", expectedRow.wrapped, actualRow.wrapsToNext, context)
+            }
             val cellCount = minOf(expectedRow.cells.size, actualRow.cells.size)
             for (column in 0 until cellCount) {
                 val expectedCell = expectedRow.cells[column]

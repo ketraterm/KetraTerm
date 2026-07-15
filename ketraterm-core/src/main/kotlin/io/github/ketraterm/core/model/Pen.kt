@@ -28,10 +28,10 @@ internal class Pen {
         private set
 
     val blankAttr: Long
-        get() = AttributeCodec.withProtected(currentAttr, enabled = false)
+        get() = AttributeCodec.backgroundOnly(currentAttr)
 
     val blankExtendedAttr: Long
-        get() = currentExtendedAttr
+        get() = AttributeCodec.DEFAULT_EXTENDED_ATTR
 
     val isSelectiveEraseProtected: Boolean
         get() = AttributeCodec.isProtected(currentAttr)

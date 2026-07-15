@@ -177,7 +177,8 @@ Durable mode state currently exposed by core:
 
 Guaranteed behavior:
 
-- public non-printing mode setters cancel `pendingWrap`
+- mode setters that home or otherwise alter cursor physics cancel `pendingWrap`;
+  input, reporting, presentation, palette, and other non-cursor modes preserve it
 - public mode reads are immutable snapshots
 - input/UI code cannot mutate internal mode storage directly
 
