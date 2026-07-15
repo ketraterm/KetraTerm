@@ -26,6 +26,8 @@ Designed for embedding into IDEs, developer tools, and standalone desktop applic
 
 > For a complete specification of all supported capabilities, see the [Terminal Feature Map](docs/terminal-feature-map.md). A detailed list of current backlog items and compatibility decisions is maintained in the [Terminal Feature Gap Map](docs/terminal-feature-gap-map.md)
 
+> Deterministic differential, resize/reflow, and independent grid-model verification are documented in [Terminal Conformance Testing](docs/terminal-conformance-testing.md).
+
 ---
 
 
@@ -120,6 +122,12 @@ KetraTerm is composed of strict, decoupled Gradle modules:
   ./gradlew :ketraterm-parser:test
   ./gradlew :ketraterm-core:test
   ./gradlew :ketraterm-ui-swing:test
+  ```
+* **Run Generated Terminal Campaigns**:
+  ```bash
+  ./gradlew :ketraterm-testkit:xtermDifferentialSmokeTest
+  ./gradlew :ketraterm-testkit:resizeReflowInvariantSmokeTest
+  ./gradlew :ketraterm-testkit:cursorWrapModelSmokeTest
   ```
 * **Launch Standalone Swing App**:
   ```bash

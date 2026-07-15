@@ -493,7 +493,10 @@ class TerminalCursorWrapModelCampaignTest {
             }
         }
 
-        private fun copyHorizontalSlice(source: Row, destination: Row) {
+        private fun copyHorizontalSlice(
+            source: Row,
+            destination: Row,
+        ) {
             for (cell in leftMargin..rightMargin) {
                 destination.cells[cell] =
                     when {
