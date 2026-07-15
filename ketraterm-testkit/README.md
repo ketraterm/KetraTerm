@@ -146,7 +146,14 @@ To run the checks for this module:
 ```
 
 The default generated campaign has 2,000 deterministic scenarios. Override any
-profile with `-PxtermDifferentialCases=N`. A mismatch is reduced by a
-delta-debugging shrinker and recorded with its seed, dimensions, chunk seed,
-original operations, minimized operations, and structural differences under
-`build/reports/xterm-differential/failures`.
+profile with `-PxtermDifferentialCases=N`; select a deterministic shard with
+`-PxtermDifferentialStartIndex=N`. A mismatch is reduced by a delta-debugging
+shrinker and recorded with its seed, dimensions, chunk seed, original
+operations, minimized operations, structural differences, commit SHA, and
+comparison scope under `build/reports/xterm-differential/failures`.
+
+Each run writes a campaign manifest named `campaign-<start>-<end>.json` beside
+the failure directory. CI runs 100 cases for every pull request and shards the
+scheduled 100,000-case campaign into four ranges of 25,000 cases. Campaign
+manifests are retained for all shards; minimized reproductions and JUnit reports
+are uploaded automatically for failed shards.

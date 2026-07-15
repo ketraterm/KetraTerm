@@ -27,9 +27,10 @@ From the repository root:
 The Gradle task runs `npm ci`, executes the oracle's Node tests, then runs the
 curated suite and 2,000 deterministic generated scenarios. `package-lock.json`
 pins the exact dependency graph. Use `-PxtermDifferentialCases=N` to override
-the generated count. The regular repository `test` task does not download npm
-dependencies; xterm-specific tests are skipped unless a dedicated task enables
-them.
+the generated count and `-PxtermDifferentialStartIndex=N` to select a
+non-overlapping deterministic seed range. The regular repository `test` task
+does not download npm dependencies; xterm-specific tests are skipped unless a
+dedicated task enables them.
 
 Additional profiles are available for automation:
 
@@ -42,6 +43,13 @@ Additional profiles are available for automation:
 Generated failures are deterministically shrunk by operation group and written
 as replayable JSON under
 `ketraterm-testkit/build/reports/xterm-differential/failures`.
+Every campaign also writes `campaign-<start>-<end>.json` with the oracle
+identity and version, base seed, case range, commit SHA, completion status, and
+comparison scope.
+
+Pull requests run the 100-case smoke profile. A scheduled workflow divides the
+100,000-case nightly profile into four independent 25,000-case seed ranges and
+uploads minimized reproductions plus test diagnostics whenever a shard fails.
 
 ## Correct interpretation
 

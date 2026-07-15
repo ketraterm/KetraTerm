@@ -1,0 +1,145 @@
+name: Terminal Differential Conformance
+
+on:
+  pull_request:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Differential campaign profile
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - nightly
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terminal-differential-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  smoke:
+    name: Differential smoke (100 cases)
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.profile == 'smoke')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/xterm-oracle/package-lock.json
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run differential smoke campaign
+        run: ./gradlew :ketraterm-testkit:xtermDifferentialSmokeTest
+
+      - name: Upload campaign report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xterm-differential-smoke-${{ github.run_id }}
+          path: ketraterm-testkit/build/reports/xterm-differential/campaign-*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload minimized differential failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xterm-differential-smoke-failure-${{ github.run_id }}
+          path: |
+            ketraterm-testkit/build/reports/xterm-differential/failures/*.json
+            ketraterm-testkit/build/reports/tests/xtermDifferentialSmokeTest/
+            ketraterm-testkit/build/test-results/xtermDifferentialSmokeTest/
+          if-no-files-found: warn
+          retention-days: 30
+
+  nightly:
+    name: Nightly shard ${{ matrix.shard }} (${{ matrix.start }}..${{ matrix.end }})
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.profile == 'nightly')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 0
+            start: 0
+            count: 25000
+            end: 24999
+          - shard: 1
+            start: 25000
+            count: 25000
+            end: 49999
+          - shard: 2
+            start: 50000
+            count: 25000
+            end: 74999
+          - shard: 3
+            start: 75000
+            count: 25000
+            end: 99999
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/xterm-oracle/package-lock.json
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run deterministic nightly shard
+        run: >-
+          ./gradlew :ketraterm-testkit:xtermDifferentialNightlyTest
+          -PxtermDifferentialStartIndex=${{ matrix.start }}
+          -PxtermDifferentialCases=${{ matrix.count }}
+
+      - name: Upload shard campaign report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xterm-differential-nightly-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: ketraterm-testkit/build/reports/xterm-differential/campaign-*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload minimized differential failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xterm-differential-nightly-failure-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: |
+            ketraterm-testkit/build/reports/xterm-differential/failures/*.json
+            ketraterm-testkit/build/reports/tests/xtermDifferentialNightlyTest/
+            ketraterm-testkit/build/test-results/xtermDifferentialNightlyTest/
+          if-no-files-found: warn
+          retention-days: 90

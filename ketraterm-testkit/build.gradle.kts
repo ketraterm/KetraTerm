@@ -35,6 +35,35 @@ dependencies {
 val xtermOracleDirectory = rootProject.layout.projectDirectory.dir("tools/xterm-oracle")
 val npmExecutable = if (System.getProperty("os.name").startsWith("Windows")) "npm.cmd" else "npm"
 
+fun Test.configureGeneratedDifferentialCampaign(defaultCases: Int) {
+    systemProperty(
+        "ketraterm.generatedDifferential.cases",
+        providers.gradleProperty("xtermDifferentialCases").getOrElse(defaultCases.toString()),
+    )
+    systemProperty(
+        "ketraterm.generatedDifferential.startIndex",
+        providers.gradleProperty("xtermDifferentialStartIndex").getOrElse("0"),
+    )
+    systemProperty(
+        "ketraterm.generatedDifferential.commitSha",
+        providers
+            .gradleProperty("xtermDifferentialCommitSha")
+            .orElse(providers.environmentVariable("GITHUB_SHA"))
+            .getOrElse("unknown"),
+    )
+    systemProperty(
+        "ketraterm.generatedDifferential.artifacts",
+        providers
+            .gradleProperty("xtermDifferentialArtifactDirectory")
+            .getOrElse(
+                layout.buildDirectory
+                    .dir("reports/xterm-differential")
+                    .get()
+                    .asFile.absolutePath,
+            ),
+    )
+}
+
 val installXtermOracle =
     tasks.register<Exec>("installXtermOracle") {
         group = "verification"
@@ -75,14 +104,7 @@ tasks.register<Test>("xtermDifferentialTest") {
         xtermOracleDirectory.file("oracle.mjs").asFile.absolutePath,
     )
     systemProperty("ketraterm.xtermOracle.workingDirectory", xtermOracleDirectory.asFile.absolutePath)
-    systemProperty("ketraterm.generatedDifferential.cases", providers.gradleProperty("xtermDifferentialCases").getOrElse("2000"))
-    systemProperty(
-        "ketraterm.generatedDifferential.artifacts",
-        layout.buildDirectory
-            .dir("reports/xterm-differential/failures")
-            .get()
-            .asFile.absolutePath,
-    )
+    configureGeneratedDifferentialCampaign(defaultCases = 2000)
 }
 
 fun registerGeneratedDifferentialProfile(
@@ -104,17 +126,7 @@ fun registerGeneratedDifferentialProfile(
     systemProperty("ketraterm.xtermOracle.node", "node")
     systemProperty("ketraterm.xtermOracle.script", xtermOracleDirectory.file("oracle.mjs").asFile.absolutePath)
     systemProperty("ketraterm.xtermOracle.workingDirectory", xtermOracleDirectory.asFile.absolutePath)
-    systemProperty(
-        "ketraterm.generatedDifferential.cases",
-        providers.gradleProperty("xtermDifferentialCases").getOrElse(defaultCases.toString()),
-    )
-    systemProperty(
-        "ketraterm.generatedDifferential.artifacts",
-        layout.buildDirectory
-            .dir("reports/xterm-differential/failures")
-            .get()
-            .asFile.absolutePath,
-    )
+    configureGeneratedDifferentialCampaign(defaultCases)
 }
 
 registerGeneratedDifferentialProfile(

@@ -31,21 +31,40 @@ import java.util.*
 class XtermGeneratedDifferentialOracleTest {
     @Test
     fun `generated protocol campaigns agree with xterm js`() {
-        val caseCount = System.getProperty("ketraterm.generatedDifferential.cases", "2000").toInt()
-        require(caseCount > 0) { "generated case count must be positive" }
-        for (index in 0 until caseCount) {
-            val seed = BASE_SEED + index
-            val scenario = ScenarioGenerator.generate(seed)
-            val result = compare(scenario)
-            if (!result.isEmpty) {
-                val minimized = ScenarioShrinker.shrink(scenario, ::hasMismatch)
-                val minimizedResult = compare(minimized)
-                val artifact = FailureArtifactWriter.write(scenario, result, minimized, minimizedResult)
-                fail<Unit>(
-                    "generated differential mismatch seed=$seed case=$index/$caseCount\n" +
-                        "artifact=$artifact\n${minimizedResult.format()}",
-                )
+        val campaign = CampaignConfiguration.fromSystemProperties()
+        var oracleIdentity: TerminalOracleIdentity? = null
+        var completedCases = 0
+        var failureSeed: Long? = null
+        try {
+            for (localIndex in 0 until campaign.caseCount) {
+                val globalIndex = Math.addExact(campaign.startIndex, localIndex.toLong())
+                val seed = Math.addExact(campaign.baseSeed, globalIndex)
+                val scenario = ScenarioGenerator.generate(seed)
+                val result = compare(scenario)
+                oracleIdentity = result.oracle
+                if (!result.isEmpty) {
+                    failureSeed = seed
+                    val minimized = ScenarioShrinker.shrink(scenario, ::hasMismatch)
+                    val minimizedResult = compare(minimized)
+                    val artifact =
+                        FailureArtifactWriter.write(
+                            campaign,
+                            globalIndex,
+                            scenario,
+                            result,
+                            minimized,
+                            minimizedResult,
+                        )
+                    fail<Unit>(
+                        "generated differential mismatch seed=$seed " +
+                            "globalCase=$globalIndex localCase=$localIndex/${campaign.caseCount}\n" +
+                            "artifact=$artifact\n${minimizedResult.format()}",
+                    )
+                }
+                completedCases++
             }
+        } finally {
+            CampaignReportWriter.write(campaign, oracleIdentity, completedCases, failureSeed)
         }
     }
 
@@ -184,15 +203,19 @@ class XtermGeneratedDifferentialOracleTest {
 
     private object FailureArtifactWriter {
         fun write(
+            campaign: CampaignConfiguration,
+            globalIndex: Long,
             original: GeneratedScenario,
             originalResult: TerminalDifferentialResult,
             minimized: GeneratedScenario,
             minimizedResult: TerminalDifferentialResult,
         ): Path {
-            Files.createDirectories(artifactDirectory)
-            val destination = artifactDirectory.resolve("seed-${original.seed}.json")
+            val failureDirectory = artifactDirectory.resolve("failures")
+            Files.createDirectories(failureDirectory)
+            val destination = failureDirectory.resolve("seed-${original.seed}.json")
             val root = MAPPER.createObjectNode()
             root.put("schemaVersion", 1)
+            root.set<ObjectNode>("campaign", campaignNode(campaign, globalIndex))
             root.put("seed", original.seed)
             root.put("columns", original.columns)
             root.put("rows", original.rows)
@@ -205,6 +228,21 @@ class XtermGeneratedDifferentialOracleTest {
             MAPPER.writerWithDefaultPrettyPrinter().writeValue(destination.toFile(), root)
             return destination
         }
+
+        private fun campaignNode(
+            campaign: CampaignConfiguration,
+            globalIndex: Long,
+        ): ObjectNode =
+            MAPPER.createObjectNode().apply {
+                put("baseSeed", campaign.baseSeed)
+                put("startIndex", campaign.startIndex)
+                put("caseCount", campaign.caseCount)
+                put("endIndexExclusive", campaign.endIndexExclusive)
+                put("globalCaseIndex", globalIndex)
+                put("commitSha", campaign.commitSha)
+                put("comparisonScope", COMPARISON_SCOPE)
+                put("compareWrappedRows", false)
+            }
 
         private fun operationArray(operations: List<ByteArray>): ArrayNode =
             MAPPER.createArrayNode().also { array ->
@@ -234,10 +272,72 @@ class XtermGeneratedDifferentialOracleTest {
             }
     }
 
+    private object CampaignReportWriter {
+        fun write(
+            campaign: CampaignConfiguration,
+            oracleIdentity: TerminalOracleIdentity?,
+            completedCases: Int,
+            failureSeed: Long?,
+        ): Path {
+            Files.createDirectories(artifactDirectory)
+            val destination =
+                artifactDirectory.resolve(
+                    "campaign-${campaign.startIndex}-${campaign.endIndexExclusive}.json",
+                )
+            val root = MAPPER.createObjectNode()
+            root.put("schemaVersion", 1)
+            root.put("status", if (completedCases == campaign.caseCount) "passed" else "failed")
+            root.put("baseSeed", campaign.baseSeed)
+            root.put("startIndex", campaign.startIndex)
+            root.put("caseCount", campaign.caseCount)
+            root.put("endIndexExclusive", campaign.endIndexExclusive)
+            root.put("firstSeed", campaign.firstSeed)
+            root.put("lastSeed", campaign.lastSeed)
+            root.put("completedCases", completedCases)
+            root.put("commitSha", campaign.commitSha)
+            root.put("comparisonScope", COMPARISON_SCOPE)
+            root.put("compareWrappedRows", false)
+            oracleIdentity?.let {
+                root.put("oracleName", it.name)
+                root.put("oracleVersion", it.version)
+            }
+            failureSeed?.let { root.put("failureSeed", it) }
+            MAPPER.writerWithDefaultPrettyPrinter().writeValue(destination.toFile(), root)
+            return destination
+        }
+    }
+
+    private data class CampaignConfiguration(
+        val baseSeed: Long,
+        val startIndex: Long,
+        val caseCount: Int,
+        val commitSha: String,
+    ) {
+        val endIndexExclusive: Long = Math.addExact(startIndex, caseCount.toLong())
+        val firstSeed: Long = Math.addExact(baseSeed, startIndex)
+        val lastSeed: Long = Math.addExact(firstSeed, caseCount.toLong() - 1L)
+
+        companion object {
+            fun fromSystemProperties(): CampaignConfiguration {
+                val startIndex = System.getProperty("ketraterm.generatedDifferential.startIndex", "0").toLong()
+                val caseCount = System.getProperty("ketraterm.generatedDifferential.cases", "2000").toInt()
+                require(startIndex >= 0) { "generated start index must be non-negative" }
+                require(caseCount > 0) { "generated case count must be positive" }
+                return CampaignConfiguration(
+                    baseSeed = BASE_SEED,
+                    startIndex = startIndex,
+                    caseCount = caseCount,
+                    commitSha = System.getProperty("ketraterm.generatedDifferential.commitSha", "unknown"),
+                )
+            }
+        }
+    }
+
     companion object {
         private const val BASE_SEED = 0x4B455452_00000000L
         private const val MAX_CHUNK_SIZE = 8
         private const val MAX_DIFFERENCES = 64
+        private const val COMPARISON_SCOPE = "standardized-observable-v1"
         private val MAPPER = ObjectMapper()
         private lateinit var oracle: TerminalPersistentProcessOracle
         private lateinit var artifactDirectory: Path
