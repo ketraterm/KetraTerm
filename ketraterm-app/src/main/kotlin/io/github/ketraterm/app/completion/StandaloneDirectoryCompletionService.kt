@@ -18,6 +18,8 @@ package io.github.ketraterm.app.completion
 import io.github.ketraterm.completion.api.TerminalDirectoryListingRequest
 import io.github.ketraterm.completion.api.TerminalFileEntry
 import io.github.ketraterm.completion.api.TerminalFileSystemProvider
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import java.net.URI
 import java.nio.file.FileSystems
 import java.nio.file.Files
@@ -26,9 +28,6 @@ import java.nio.file.Paths
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.Locale
 import java.util.PriorityQueue
-import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.Executor
-import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -40,46 +39,59 @@ import java.util.concurrent.atomic.AtomicBoolean
  * work are shared and bounded for the owning application window.
  */
 internal class StandaloneDirectoryCompletionService : AutoCloseable {
-    private val executor =
-        ThreadPoolExecutor(
-            WORKER_COUNT,
-            WORKER_COUNT,
-            WORKER_KEEP_ALIVE_SECONDS,
-            TimeUnit.SECONDS,
-            ArrayBlockingQueue(WORK_QUEUE_CAPACITY),
-            { task ->
-                Thread(task, "ketraterm-directory-completion").apply {
-                    isDaemon = true
-                    priority = Thread.MIN_PRIORITY
+    private val serviceJob = SupervisorJob()
+    private val serviceScope =
+        CoroutineScope(
+            serviceJob +
+                Dispatchers.IO.limitedParallelism(WORKER_COUNT) +
+                CoroutineName("directory-completion"),
+        )
+    private val workQueue = Channel<suspend () -> Unit>(WORK_QUEUE_CAPACITY)
+    private val scheduler = StandaloneDirectoryLoadScheduler { work -> workQueue.trySend(work).isSuccess }
+
+    init {
+        repeat(WORKER_COUNT) { workerIndex ->
+            serviceScope.launch(CoroutineName("directory-completion-worker-$workerIndex")) {
+                for (work in workQueue) {
+                    try {
+                        work()
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: RuntimeException) {
+                        // One failed provider request must not terminate the shared worker.
+                    }
                 }
-            },
-            ThreadPoolExecutor.AbortPolicy(),
-        ).apply {
-            allowCoreThreadTimeOut(true)
+            }
         }
+    }
 
     fun createProvider(onSnapshotChanged: () -> Unit): StandaloneAsyncFileSystemProvider =
         StandaloneAsyncFileSystemProvider(
-            executor = executor,
+            scheduler = scheduler,
             onSnapshotChanged = onSnapshotChanged,
         )
 
     override fun close() {
-        executor.shutdownNow()
+        workQueue.close()
+        serviceJob.cancel()
     }
 
     private companion object {
         private const val WORKER_COUNT = 2
         private const val WORK_QUEUE_CAPACITY = 32
-        private const val WORKER_KEEP_ALIVE_SECONDS = 15L
     }
+}
+
+/** Bounded scheduler seam used to test coroutine directory work deterministically. */
+internal fun interface StandaloneDirectoryLoadScheduler {
+    fun schedule(work: suspend () -> Unit): Boolean
 }
 
 /**
  * Session-local, non-blocking filesystem adapter backed by immutable snapshots.
  */
 internal class StandaloneAsyncFileSystemProvider(
-    private val executor: Executor,
+    private val scheduler: StandaloneDirectoryLoadScheduler,
     private val onSnapshotChanged: () -> Unit,
     private val resolver: StandalonePathResolver = StandalonePathResolver(),
     private val scanner: StandaloneDirectoryScanner = BoundedStandaloneDirectoryScanner(),
@@ -137,8 +149,8 @@ internal class StandaloneAsyncFileSystemProvider(
         key: QueryKey,
         entryNamePrefix: String,
     ) {
-        try {
-            executor.execute {
+        val accepted =
+            scheduler.schedule {
                 val shouldScan =
                     synchronized(lock) {
                         !closed.get() && activeKey == key && inFlightGenerations.containsKey(key)
@@ -147,7 +159,7 @@ internal class StandaloneAsyncFileSystemProvider(
                     synchronized(lock) {
                         inFlightGenerations.remove(key)
                     }
-                    return@execute
+                    return@schedule
                 }
                 val entries = scanner.scan(key.directory, entryNamePrefix).toList()
                 var publish = false
@@ -167,7 +179,7 @@ internal class StandaloneAsyncFileSystemProvider(
                     }
                 }
             }
-        } catch (_: RuntimeException) {
+        if (!accepted) {
             synchronized(lock) {
                 inFlightGenerations.remove(key)
             }

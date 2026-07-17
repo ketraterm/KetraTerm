@@ -138,6 +138,14 @@ escaping is necessary, and `PLAIN` omits replacements that would require
 dialect-specific escaping. Existing single- and double-quote styles are
 preserved when that style can safely represent the candidate.
 
+Path interpretation is host-owned. The pure source emits a
+`TerminalDirectoryListingRequest` containing the authoritative working-directory
+URI, a transport-neutral lexical directory prefix, and the active entry-name
+prefix. It does not discard URI authorities, expand `~`, or interpret drive and
+UNC roots. Hosts must reject remote authorities they cannot map safely and
+return only bounded, already-published snapshots from the synchronous provider
+callback.
+
 Live trigger policy is command-context aware. Hyphen, path separator, and
 environment-variable triggers remain immediate. A trailing space is immediate
 only when the resolved context expects useful candidates, such as paths after
@@ -183,8 +191,13 @@ scalar positional fields remain the fallback for compact specs.
 ## Host Dynamic Providers
 
 Standalone and IntelliJ completion providers are expected to differ internally.
-The standalone app may use bounded local filesystem/process adapters with
-timeouts and background caches. The IntelliJ plugin should prefer IDE services
+The standalone app uses session-local, immutable directory snapshots fed by a
+window-owned coroutine service with a bounded channel and two IO workers.
+Enumeration has visit, result, and elapsed-time caps; caches have capacity and
+expiry bounds; request generations prevent stale work from refreshing the
+popup. The app resolves local and `localhost` file URIs, explicit home paths,
+Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7
+authorities. The IntelliJ plugin should prefer IDE services
 for VCS roots, branches, changelists, project files, indexes, SDKs, run
 configurations, and other project context.
 

@@ -17,9 +17,9 @@ package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalDirectoryListingRequest
 import io.github.ketraterm.completion.api.TerminalFileEntry
+import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.concurrent.Executor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -68,15 +68,15 @@ class StandaloneDirectoryCompletionServiceTest {
 
     @Test
     fun `provider returns immediately and publishes immutable ready snapshot`() {
-        val executor = RecordingExecutor()
+        val scheduler = RecordingLoadScheduler()
         var publications = 0
         val expected = listOf(TerminalFileEntry("src", isDirectory = true))
-        val provider = provider(executor, onSnapshotChanged = { publications++ }) { _, _ -> expected }
+        val provider = provider(scheduler, onSnapshotChanged = { publications++ }) { _, _ -> expected }
 
         assertTrue(provider.listDirectory(request()).isEmpty())
-        assertEquals(1, executor.size)
+        assertEquals(1, scheduler.size)
 
-        executor.runNext()
+        scheduler.runNext()
 
         assertEquals(1, publications)
         assertEquals(expected, provider.listDirectory(request()))
@@ -84,30 +84,30 @@ class StandaloneDirectoryCompletionServiceTest {
 
     @Test
     fun `completion from superseded request does not publish stale refresh`() {
-        val executor = RecordingExecutor()
+        val scheduler = RecordingLoadScheduler()
         var publications = 0
         val provider =
-            provider(executor, onSnapshotChanged = { publications++ }) { _, prefix ->
+            provider(scheduler, onSnapshotChanged = { publications++ }) { _, prefix ->
                 listOf(TerminalFileEntry(prefix, isDirectory = true))
             }
 
         provider.listDirectory(request(entryNamePrefix = "a"))
         provider.listDirectory(request(entryNamePrefix = "b"))
 
-        executor.runNext()
+        scheduler.runNext()
         assertEquals(0, publications)
 
-        executor.runNext()
+        scheduler.runNext()
         assertEquals(1, publications)
         assertEquals("b", provider.listDirectory(request(entryNamePrefix = "b")).single().name)
     }
 
     @Test
     fun `returning to an in-flight request updates its accepted generation`() {
-        val executor = RecordingExecutor()
+        val scheduler = RecordingLoadScheduler()
         var publications = 0
         val provider =
-            provider(executor, onSnapshotChanged = { publications++ }) { _, prefix ->
+            provider(scheduler, onSnapshotChanged = { publications++ }) { _, prefix ->
                 listOf(TerminalFileEntry(prefix, isDirectory = true))
             }
 
@@ -115,7 +115,7 @@ class StandaloneDirectoryCompletionServiceTest {
         provider.listDirectory(request(entryNamePrefix = "b"))
         provider.listDirectory(request(entryNamePrefix = "a"))
 
-        executor.runNext()
+        scheduler.runNext()
 
         assertEquals(1, publications)
         assertEquals("a", provider.listDirectory(request(entryNamePrefix = "a")).single().name)
@@ -123,19 +123,38 @@ class StandaloneDirectoryCompletionServiceTest {
 
     @Test
     fun `closed provider discards queued results and callbacks`() {
-        val executor = RecordingExecutor()
+        val scheduler = RecordingLoadScheduler()
         var publications = 0
         val provider =
-            provider(executor, onSnapshotChanged = { publications++ }) { _, _ ->
+            provider(scheduler, onSnapshotChanged = { publications++ }) { _, _ ->
                 listOf(TerminalFileEntry("src", isDirectory = true))
             }
         provider.listDirectory(request())
 
         provider.close()
-        executor.runNext()
+        scheduler.runNext()
 
         assertEquals(0, publications)
         assertTrue(provider.listDirectory(request()).isEmpty())
+    }
+
+    @Test
+    fun `rejected bounded queue submission does not leave request stuck in flight`() {
+        var attempts = 0
+        val provider =
+            provider(
+                scheduler =
+                    StandaloneDirectoryLoadScheduler {
+                        attempts++
+                        false
+                    },
+                onSnapshotChanged = {},
+            ) { _, _ -> error("rejected work must not execute") }
+
+        assertTrue(provider.listDirectory(request()).isEmpty())
+        assertTrue(provider.listDirectory(request()).isEmpty())
+
+        assertEquals(2, attempts)
     }
 
     @Test
@@ -166,12 +185,12 @@ class StandaloneDirectoryCompletionServiceTest {
     }
 
     private fun provider(
-        executor: Executor,
+        scheduler: StandaloneDirectoryLoadScheduler,
         onSnapshotChanged: () -> Unit,
         scanner: StandaloneDirectoryScanner,
     ): StandaloneAsyncFileSystemProvider =
         StandaloneAsyncFileSystemProvider(
-            executor = executor,
+            scheduler = scheduler,
             onSnapshotChanged = onSnapshotChanged,
             resolver = StandalonePathResolver(homeDirectory = null, windows = false),
             scanner = scanner,
@@ -195,17 +214,20 @@ class StandaloneDirectoryCompletionServiceTest {
             entryNamePrefix = entryNamePrefix,
         )
 
-    private class RecordingExecutor : Executor {
-        private val tasks = ArrayDeque<Runnable>()
+    private class RecordingLoadScheduler : StandaloneDirectoryLoadScheduler {
+        private val tasks = ArrayDeque<suspend () -> Unit>()
         val size: Int
             get() = tasks.size
 
-        override fun execute(command: Runnable) {
-            tasks.addLast(command)
+        override fun schedule(work: suspend () -> Unit): Boolean {
+            tasks.addLast(work)
+            return true
         }
 
         fun runNext() {
-            tasks.removeFirst().run()
+            runBlocking {
+                tasks.removeFirst().invoke()
+            }
         }
     }
 }

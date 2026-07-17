@@ -24,12 +24,15 @@ repositories {
 }
 
 dependencies {
+    val kotlinxCoroutinesVersion = rootProject.extra["kotlinxCoroutinesVersion"] as String
+
     implementation("com.formdev:flatlaf:3.7.1")
     implementation("com.formdev:flatlaf-extras:3.7.1")
     implementation(project(":ketraterm-completion"))
     implementation(project(":ketraterm-ui-swing"))
     implementation(project(":ketraterm-ui-swing-host"))
     implementation(project(":ketraterm-workspace"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
 
     runtimeOnly("org.slf4j:slf4j-nop:2.0.18")
 
