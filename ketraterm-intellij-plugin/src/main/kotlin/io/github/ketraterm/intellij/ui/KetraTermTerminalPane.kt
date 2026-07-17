@@ -231,6 +231,7 @@ internal class KetraTermTerminalPane private constructor(
                             hyperlinkDetector = IntellijTerminalHyperlinkDetector(project),
                             viewportListener = scrollbarAdapter,
                             scrollbarOverlayEnabled = false,
+                            shellSuggestionKeymap = KetraTermShellSuggestionKeymap,
                             uiDispatcher = TerminalUiDispatcher { runnable ->
                                 ApplicationManager.getApplication().invokeLater(runnable)
                             },

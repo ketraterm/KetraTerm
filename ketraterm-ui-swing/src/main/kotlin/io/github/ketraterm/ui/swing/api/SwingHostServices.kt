@@ -20,6 +20,7 @@ import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import java.awt.event.KeyEvent
 import javax.swing.SwingUtilities
@@ -103,6 +104,9 @@ fun interface SwingTerminalHostKeyHandler {
  * a shell suggestion from the reusable popup.
  * @property shellSuggestionFeedbackHandler host callback invoked when the user
  * accepts or explicitly dismisses a shell suggestion.
+ * @property shellSuggestionKeymap host-owned mapping from Swing key events to
+ * semantic suggestion actions. Standalone hosts may retain the standard map;
+ * platform integrations should resolve their active application keymap.
  * @property hostKeyHandler host-owned keyboard action policy evaluated before
  * terminal input encoding.
  * @property contextMenuHandler host-owned right-click popup policy. The
@@ -122,6 +126,7 @@ data class SwingHostServices
         val shellSuggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
         val shellSuggestionHandler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
         val shellSuggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+        val shellSuggestionKeymap: SwingShellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
         val hostKeyHandler: SwingTerminalHostKeyHandler = SwingTerminalHostKeyHandler.NONE,
         val contextMenuHandler: SwingTerminalContextMenuHandler = SwingTerminalContextMenuHandler.NONE,
         val fontResolver: TerminalFontResolver? = null,

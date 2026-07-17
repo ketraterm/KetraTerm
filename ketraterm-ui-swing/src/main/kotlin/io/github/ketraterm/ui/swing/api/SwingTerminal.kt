@@ -322,6 +322,7 @@ class SwingTerminal
             SwingShellSuggestionController(
                 object : SwingShellSuggestionHost {
                     override val settings: SwingSettings get() = this@SwingTerminal.settings
+                    override val suggestionKeymap get() = hostServices.shellSuggestionKeymap
                     override val suggestionHandler: SwingShellSuggestionHandler get() = hostServices.shellSuggestionHandler
                     override val suggestionFeedbackHandler get() = hostServices.shellSuggestionFeedbackHandler
 

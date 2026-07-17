@@ -163,6 +163,7 @@ internal class TerminalPane private constructor(
                             shellSuggestionProvider = suggestionProvider,
                             shellSuggestionHandler = shellSuggestionHandler,
                             shellSuggestionFeedbackHandler = wrappedFeedbackHandler,
+                            shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
                             hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
                             contextMenuHandler =
                                 SwingTerminalContextMenuHandler { request ->

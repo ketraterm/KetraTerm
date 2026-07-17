@@ -73,6 +73,23 @@ class SwingShellSuggestionControllerTest {
     }
 
     @Test
+    fun `host keymap controls acceptance bindings`() {
+        val host =
+            RecordingSuggestionHost(
+                suggestionKeymap =
+                    SwingShellSuggestionKeymap { event ->
+                        if (event.keyCode == KeyEvent.VK_F2) SwingShellSuggestionAction.ACCEPT else null
+                    },
+            )
+        val controller = SwingShellSuggestionController(host)
+        controller.show(request(), suggestions(1), selectedIndex = 0)
+
+        assertFalse(controller.handleKeyPressed(keyPressed(KeyEvent.VK_ENTER)))
+        assertTrue(controller.handleKeyPressed(keyPressed(KeyEvent.VK_F2)))
+        assertEquals(1, host.acceptedSuggestions.size)
+    }
+
+    @Test
     fun `show retains only visible suggestions so keyboard selection cannot move off popup`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)
@@ -176,6 +193,7 @@ class SwingShellSuggestionControllerTest {
 
     private class RecordingSuggestionHost(
         override var settings: SwingSettings = SwingSettings(),
+        override val suggestionKeymap: SwingShellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
     ) : SwingShellSuggestionHost {
         val acceptedSuggestions = ArrayList<SwingShellSuggestion>()
         val acceptedIndexes = ArrayList<Int>()

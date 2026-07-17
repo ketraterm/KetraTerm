@@ -81,21 +81,23 @@ internal class SwingShellSuggestionController(
 
     fun handleKeyPressed(event: KeyEvent): Boolean {
         if (!popup.isVisible || suggestions.isEmpty()) return false
-        val handled =
-            when (event.keyCode) {
-                KeyEvent.VK_DOWN -> selectRelative(1)
-                KeyEvent.VK_UP -> selectRelative(-1)
-                KeyEvent.VK_HOME -> select(0)
-                KeyEvent.VK_END -> select(suggestions.lastIndex)
-                KeyEvent.VK_PAGE_DOWN -> selectRelative(PAGE_STEP)
-                KeyEvent.VK_PAGE_UP -> selectRelative(-PAGE_STEP)
-                KeyEvent.VK_ENTER, KeyEvent.VK_TAB -> acceptSelected()
-                KeyEvent.VK_ESCAPE -> dismissSelected()
-                else -> false
-            }
+        val action = host.suggestionKeymap.actionFor(event) ?: return false
+        val handled = handleAction(action)
         if (handled) event.consume()
         return handled
     }
+
+    private fun handleAction(action: SwingShellSuggestionAction): Boolean =
+        when (action) {
+            SwingShellSuggestionAction.SELECT_NEXT -> selectRelative(1)
+            SwingShellSuggestionAction.SELECT_PREVIOUS -> selectRelative(-1)
+            SwingShellSuggestionAction.SELECT_FIRST -> select(0)
+            SwingShellSuggestionAction.SELECT_LAST -> select(suggestions.lastIndex)
+            SwingShellSuggestionAction.SELECT_NEXT_PAGE -> selectRelative(PAGE_STEP)
+            SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE -> selectRelative(-PAGE_STEP)
+            SwingShellSuggestionAction.ACCEPT -> acceptSelected()
+            SwingShellSuggestionAction.DISMISS -> dismissSelected()
+        }
 
     fun state(): SwingShellSuggestionState =
         if (!popup.isVisible || suggestions.isEmpty()) {
@@ -188,6 +190,7 @@ internal class SwingShellSuggestionController(
 
 internal interface SwingShellSuggestionHost {
     val settings: SwingSettings
+    val suggestionKeymap: SwingShellSuggestionKeymap
     val suggestionHandler: SwingShellSuggestionHandler
     val suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler
 

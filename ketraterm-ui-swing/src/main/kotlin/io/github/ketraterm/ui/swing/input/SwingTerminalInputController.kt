@@ -27,21 +27,30 @@ internal class SwingTerminalInputController(
     private val host: SwingTerminalInputHost,
 ) {
     private val keyMapper = SwingKeyMapper()
+    private val claimedKeyLifecycle = ClaimedSwingKeyLifecycle()
 
     val keyListener =
         object : KeyAdapter() {
             override fun keyPressed(event: KeyEvent) {
+                if (claimedKeyLifecycle.ownsRepeatedPress(event)) {
+                    event.consume()
+                    return
+                }
+
+                if (host.handleShellSuggestionKeyPressed(event)) {
+                    claimedKeyLifecycle.claim(event)
+                    event.consume()
+                    return
+                }
+
                 if (host.handleHostKeyPressed(event)) {
+                    claimedKeyLifecycle.claim(event)
                     event.consume()
                     return
                 }
 
                 host.updateHyperlinkActivationHover(event.isControlDown)
                 host.resetCursorBlink(forceRepaint = true)
-
-                if (!event.isAltGraphDown) {
-                    if (host.handleShellSuggestionKeyPressed(event)) return
-                }
 
                 val keyEvent = keyMapper.keyPressed(event) ?: return
                 host.session?.encodeKey(keyEvent)
@@ -50,6 +59,10 @@ internal class SwingTerminalInputController(
 
             override fun keyReleased(event: KeyEvent) {
                 host.updateHyperlinkActivationHover(event.isControlDown)
+                if (claimedKeyLifecycle.release(event)) {
+                    event.consume()
+                    return
+                }
                 val keyEvent = keyMapper.keyReleased(event) ?: return
                 host.session?.encodeKey(keyEvent)
                 event.consume()
@@ -57,6 +70,10 @@ internal class SwingTerminalInputController(
 
             override fun keyTyped(event: KeyEvent) {
                 host.resetCursorBlink(forceRepaint = true)
+                if (claimedKeyLifecycle.ownsTypedEvent()) {
+                    event.consume()
+                    return
+                }
                 val keyEvent = keyMapper.keyTyped(event) ?: return
                 host.session?.encodeKey(keyEvent)
                 event.consume()
@@ -72,6 +89,7 @@ internal class SwingTerminalInputController(
             }
 
             override fun focusLost(event: FocusEvent) {
+                claimedKeyLifecycle.clear()
                 host.setTerminalFocused(false)
                 host.repaintCursorState()
                 host.hideShellSuggestions()

@@ -59,7 +59,7 @@ class SwingTerminalInputControllerTest {
             controller.keyListener.keyPressed(event)
 
             assertEquals(1, host.hostKeyPressCount)
-            assertEquals(0, host.shellSuggestionKeyPressCount)
+            assertEquals(1, host.shellSuggestionKeyPressCount)
             assertTrue(host.hyperlinkHoverUpdates.isEmpty())
             assertTrue(host.cursorBlinkResets.isEmpty())
             assertTrue(event.isConsumed)
@@ -78,6 +78,38 @@ class SwingTerminalInputControllerTest {
 
             assertEquals(1, host.shellSuggestionKeyPressCount)
             assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `suggestion action takes precedence over a matching host shortcut`() {
+            val host = RecordingInputHost(hostKeyHandled = true, shellSuggestionKeyHandled = true)
+            val controller = SwingTerminalInputController(host)
+
+            controller.keyListener.keyPressed(keyPressed(KeyEvent.VK_ENTER, 0))
+
+            assertEquals(1, host.shellSuggestionKeyPressCount)
+            assertEquals(0, host.hostKeyPressCount)
+        }
+
+        @Test
+        fun `claimed key owns repeat typed and release events after popup closes`() {
+            val host = RecordingInputHost(shellSuggestionKeyHandled = true)
+            val controller = SwingTerminalInputController(host)
+            val press = keyPressed(KeyEvent.VK_ENTER, 0)
+            val repeat = keyPressed(KeyEvent.VK_ENTER, 0)
+            val typed = keyTyped('\n')
+            val release = keyReleased(KeyEvent.VK_ENTER, 0)
+
+            controller.keyListener.keyPressed(press)
+            controller.keyListener.keyPressed(repeat)
+            controller.keyListener.keyTyped(typed)
+            controller.keyListener.keyReleased(release)
+
+            assertEquals(1, host.shellSuggestionKeyPressCount)
+            assertTrue(press.isConsumed)
+            assertTrue(repeat.isConsumed)
+            assertTrue(typed.isConsumed)
+            assertTrue(release.isConsumed)
         }
     }
 
@@ -121,6 +153,16 @@ class SwingTerminalInputControllerTest {
             modifiers,
             keyCode,
             KeyEvent.CHAR_UNDEFINED,
+        )
+
+    private fun keyTyped(character: Char): KeyEvent =
+        KeyEvent(
+            source,
+            KeyEvent.KEY_TYPED,
+            System.currentTimeMillis(),
+            0,
+            KeyEvent.VK_UNDEFINED,
+            character,
         )
 
     private class RecordingInputHost(
