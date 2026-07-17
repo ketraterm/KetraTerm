@@ -46,6 +46,7 @@ internal class ValueDomainCompletionSource(
     private val domain: TerminalCompletionValueDomain,
     private val sourceId: String,
     private val valuesProvider: () -> List<TerminalCompletionDomainValue>,
+    private val allowedCommandNames: Set<String>,
     commandSpecs: List<TerminalCommandSpec>,
 ) : ContextAwareCompletionSource {
     private val commandSpecs = commandSpecs.toList()
@@ -53,6 +54,7 @@ internal class ValueDomainCompletionSource(
     init {
         require(domain != TerminalCompletionValueDomain.NONE) { "domain must not be NONE" }
         require(sourceId.isNotBlank()) { "sourceId must not be blank" }
+        require(allowedCommandNames.none(String::isBlank)) { "allowedCommandNames must not contain blank values" }
     }
 
     /**
@@ -92,7 +94,11 @@ internal class ValueDomainCompletionSource(
                 lineContext = commandLineContext,
                 commandSpecs = commandSpecs,
             )
-        if (context.expectedValueDomain != domain) return emptyList()
+        if (context.expectedValueDomain != domain ||
+            (allowedCommandNames.isNotEmpty() && context.currentCommand?.name !in allowedCommandNames)
+        ) {
+            return emptyList()
+        }
 
         val prefix = context.activePrefix
         val values = valuesProvider()

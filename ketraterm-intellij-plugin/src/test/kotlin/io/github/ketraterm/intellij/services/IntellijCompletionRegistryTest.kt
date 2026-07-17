@@ -103,6 +103,85 @@ class IntellijCompletionRegistryTest {
     }
 
     @Test
+    fun `remote git branch snapshot is available for checkout but not switch`() {
+        val registry = IntellijCompletionRegistry()
+        try {
+            val changed = CountDownLatch(1)
+            val session =
+                registry.openSession(
+                    context("remote-branch").copy(
+                        providerFactories =
+                            listOf(
+                                IntellijGitRemoteBranchProviderFactory {
+                                    listOf(
+                                        TerminalCompletionDomainValue(
+                                            "origin/feature/terminal",
+                                            detail = "remote branch"
+                                        )
+                                    )
+                                },
+                            ),
+                    ),
+                )
+            session.onSourceChanged(changed::countDown)
+
+            session.provider.suggestions(request("git checkout or"))
+            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            var suggestions = session.provider.suggestions(request("git checkout or"))
+            while (suggestions.none { it.source == "intellij-git-remote-branch" } && System.nanoTime() < deadline) {
+                Thread.sleep(5)
+                suggestions = session.provider.suggestions(request("git checkout or"))
+            }
+
+            val suggestion = suggestions.single { it.source == "intellij-git-remote-branch" }
+            assertEquals("origin/feature/terminal", suggestion.replacementText)
+            assertEquals("remote branch", suggestion.detail)
+            assertTrue(
+                session.provider.suggestions(request("git switch or"))
+                    .none { it.source == "intellij-git-remote-branch" })
+        } finally {
+            registry.close()
+        }
+    }
+
+    @Test
+    fun `git tag snapshot is available for checkout but not switch`() {
+        val registry = IntellijCompletionRegistry()
+        try {
+            val changed = CountDownLatch(1)
+            val session =
+                registry.openSession(
+                    context("git-tag").copy(
+                        providerFactories =
+                            listOf(
+                                IntellijGitTagProviderFactory {
+                                    listOf(TerminalCompletionDomainValue("v2.0.0", detail = "tag"))
+                                },
+                            ),
+                    ),
+                )
+            session.onSourceChanged(changed::countDown)
+
+            session.provider.suggestions(request("git checkout v"))
+            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            var suggestions = session.provider.suggestions(request("git checkout v"))
+            while (suggestions.none { it.source == "intellij-git-tag" } && System.nanoTime() < deadline) {
+                Thread.sleep(5)
+                suggestions = session.provider.suggestions(request("git checkout v"))
+            }
+
+            val suggestion = suggestions.single { it.source == "intellij-git-tag" }
+            assertEquals("v2.0.0", suggestion.replacementText)
+            assertEquals("tag", suggestion.detail)
+            assertTrue(session.provider.suggestions(request("git switch v")).none { it.source == "intellij-git-tag" })
+        } finally {
+            registry.close()
+        }
+    }
+
+    @Test
     fun `project fuzzy path snapshot refreshes the owning session provider`() {
         val registry = IntellijCompletionRegistry()
         try {

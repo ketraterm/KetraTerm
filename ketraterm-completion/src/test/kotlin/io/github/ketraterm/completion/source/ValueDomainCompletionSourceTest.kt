@@ -61,6 +61,23 @@ class ValueDomainCompletionSourceTest {
         assertEquals("feature/terminal", source.complete(request("git rebase fe")).single().replacementText)
     }
 
+    @Test
+    fun `can restrict a domain snapshot to selected command contexts`() {
+        val remoteSource =
+            TerminalCompletionSources.valueDomain(
+                domain = TerminalCompletionValueDomain.GIT_BRANCH,
+                sourceId = "intellij-git-remote-branch",
+                valuesProvider = { listOf(TerminalCompletionDomainValue("origin/feature/terminal")) },
+                allowedCommandNames = setOf("checkout", "merge", "rebase"),
+            )
+
+        assertEquals(
+            "origin/feature/terminal",
+            remoteSource.complete(request("git checkout or")).single().replacementText,
+        )
+        assertTrue(remoteSource.complete(request("git switch or")).isEmpty())
+    }
+
     /** Verifies that host values pass through shell-specific safe replacement encoding. */
     @Test
     fun `escapes host values through the request shell policy`() {

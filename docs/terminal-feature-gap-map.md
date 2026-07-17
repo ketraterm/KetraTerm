@@ -171,6 +171,10 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe local Git branch snapshots from
   Git4Idea for `git switch`, `checkout`, `merge`, and `rebase`, and uses the IDE VFS/project-content model for path
   directories inside the project with a bounded local-filesystem fallback elsewhere.
+- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe remote Git branch snapshots for
+  `checkout`, `merge`, and `rebase`; `git switch` deliberately remains local-branch-only.
+- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe Git tag snapshots for `checkout`,
+  `merge`, and `rebase`; `git switch` deliberately remains local-branch-only.
 - `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe project-content fuzzy path snapshots
   for declared or explicitly path-like completion positions. Direct directory completion stays higher priority for
   concise immediate-child results.
@@ -178,7 +182,7 @@ These are not badges of compatibility for this project. They expand attack surfa
   change-list model for changed and untracked paths in the selected repository. The provider is active for `git add`,
   `restore`, `rm`, and `diff`, and never starts a Git process.
 - `TODO(completion/provider)`: implement remaining standalone and IntelliJ dynamic providers for declared value domains,
-  such as remote Git refs, Kubernetes namespaces for `kubectl --namespace`, Docker contexts for
+  such as Kubernetes namespaces for `kubectl --namespace`, Docker contexts for
   `docker --context`, npm scripts, AWS profiles/regions, and IDE run configurations.
   Providers must remain host-owned and feed domain-tagged candidates into the shared engine.
 - `TODO(completion/policy)`: add tested lexical and quoting capability sets for Command Prompt, Fish, Nushell, and other shell dialects. Until a host provides a complete capability contract, use `TerminalShellCapabilities.PLAIN`; do not infer dialect behavior from command text.

@@ -47,7 +47,8 @@ in implementation packages and must stay `internal`.
 `TerminalCompletionSources.valueDomain(...)` adapts a bounded immutable host snapshot for one declared
 `TerminalCompletionValueDomain`. It resolves the active spec context through the shared tokenizer, applies the request's
 shell quoting policy, and emits domain-tagged argument candidates. Its snapshot supplier is a pure ready-state read and
-must never perform host I/O.
+must never perform host I/O. A provider may additionally restrict itself to canonical command/subcommand names when a
+value domain has command-specific validity.
 
 `TerminalCompletionSources.fuzzyPath(...)` adapts a bounded immutable host path snapshot for context-aware fuzzy path
 completion. Hosts own indexing and asynchronous refresh; the shared source retains path-kind filtering, explicit
@@ -225,10 +226,13 @@ local and `localhost` file URIs, explicit home paths,
 Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses
 project-aware VFS directory snapshots for paths inside project content and bounded local scanning elsewhere. Its first
 dynamic value provider reads local branches from the Git4Idea repository that contains the terminal working directory
-and publishes generation-safe, failure-retryable snapshots for `git switch`, `checkout`, `merge`, and `rebase`.
+and publishes generation-safe, failure-retryable snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Remote
+branches are published through a separate snapshot for `checkout`, `merge`, and `rebase`, avoiding invalid remote
+suggestions for `git switch`. Tags use the same bounded, repository-selected Git4Idea snapshot and are available for
+`checkout`, `merge`, and `rebase`; `git switch` remains local-branch-only.
 Whole-project fuzzy paths use a separate bounded VFS snapshot source and only activate in declared or explicitly
-path-like terminal positions; direct directory completion remains higher priority for immediate children. Remote refs,
-changelists, SDKs, and run configurations remain follow-up work. A separate Git status snapshot supplies changed and
+path-like terminal positions; direct directory completion remains higher priority for immediate children. Changelists,
+SDKs, and run configurations remain follow-up work. A separate Git status snapshot supplies changed and
 untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Git process.
 
 IntelliJ dynamic providers are composed through additive provider factories. Each factory returns one prioritized source
