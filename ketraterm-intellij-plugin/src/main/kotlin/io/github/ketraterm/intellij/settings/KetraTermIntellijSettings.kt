@@ -183,9 +183,6 @@ class KetraTermIntellijSettings :
      * @property defaultTabName user-visible name for newly opened tabs.
      * @property shellSuggestionsEnabled whether host-provided shell suggestions
      * may appear in IDE-hosted terminals.
-     * TODO(intellij-completion): Add IntelliJ-owned persistent suggestion
-     * learning once the plugin wires shared completion feedback and a compact
-     * stats store equivalent to the standalone host.
      */
     data class State(
         @JvmField val themeId: String = DEFAULT_THEME_ID,

@@ -57,12 +57,24 @@ private val ketratermVersion = version.toString()
 
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
-    implementation("io.github.ketraterm:ketraterm-ui-swing-host:$ketratermVersion")
-    implementation("io.github.ketraterm:ketraterm-ui-swing:$ketratermVersion")
+    implementation("io.github.ketraterm:ketraterm-completion:$ketratermVersion") {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+    }
+    implementation("io.github.ketraterm:ketraterm-ui-swing-host:$ketratermVersion") {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+    }
+    implementation("io.github.ketraterm:ketraterm-ui-swing:$ketratermVersion") {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+    }
     implementation("io.github.ketraterm:ketraterm-workspace:$ketratermVersion") {
         exclude(group = "org.jetbrains.pty4j", module = "pty4j")
         exclude(group = "net.java.dev.jna", module = "jna")
         exclude(group = "net.java.dev.jna", module = "jna-platform")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
     }
     runtimeOnly("org.slf4j:slf4j-nop:2.0.18")
 
