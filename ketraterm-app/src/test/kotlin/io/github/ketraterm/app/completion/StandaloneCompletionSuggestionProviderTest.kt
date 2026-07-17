@@ -55,12 +55,12 @@ class StandaloneCompletionSuggestionProviderTest {
     fun `preserves option detail`() {
         val provider = provider()
 
-        val suggestion = provider.suggestions(request("git --")).single()
+        val suggestion = provider.suggestions(request("git --h")).single()
 
         assertEquals("--help", suggestion.replacementText)
         assertEquals("show help", suggestion.detail)
         assertEquals(4, suggestion.replacementStartOffset)
-        assertEquals(6, suggestion.replacementEndOffset)
+        assertEquals(7, suggestion.replacementEndOffset)
     }
 
     @Test
