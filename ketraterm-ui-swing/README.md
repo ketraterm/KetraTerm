@@ -19,7 +19,7 @@ A reusable, premium-tier Swing terminal component built in Kotlin/JVM 21.
 
 The module is built on three core design philosophies:
 1. **Complete Protocol Ignorance:** The UI has zero knowledge of ANSI, VT, ESC, OSC, or DCS bytes. It never parses stream protocols or executes grid mutation rules.
-2. **Data-Driven Decoupling:** The UI consumes **immutable snapshots** of render frames published from `ketraterm-render-cache` and updates state through the `TerminalSession` boundary.
+2. **Data-Driven Decoupling:** The UI collects `TerminalSession.renderGeneration`, leases the published front cache, and bulk-copies primitive state into its EDT-owned cache.
 3. **EDT Isolation & Swing Safety:** The Swing component state belongs strictly to the Event Dispatch Thread (EDT). Background rendering and I/O processes interact only through thread-safe snapshot mechanisms.
 
 ```mermaid
@@ -41,15 +41,17 @@ graph TD
     end
 
     subgraph Pipeline Boundaries
-        Cache["TerminalRenderCache (Snapshot)"]
+        PublishedCache["TerminalRenderPublisher (Leased Front Cache)"]
         SessionBoundary["TerminalSession"]
     end
 
     Host -->|binds| Terminal
-    Terminal -->|reads frame| Cache
-    Terminal -->|listener: onDirty| Terminal
+    SessionBoundary -->|renderGeneration StateFlow| Terminal
+    Terminal -->|leases and bulk-copies| PublishedCache
     KeyMapper -->|encodes input| SessionBoundary
 ```
+
+Routine painting never calls `TerminalSession.readRenderFrame`; it reads only the EDT-owned cache. Absolute-range operations such as selection and search may still use synchronous session frame reads. One session has one active render viewport, so independently scrolling components must use separate sessions.
 
 ---
 

@@ -496,12 +496,23 @@ class PathCompletionSourceTest {
             uri: String,
             entries: List<TerminalFileEntry>,
         ) {
-            directories[java.net.URI(uri).normalize().path.removeSuffix("/")] = entries
+            directories[
+                java.net
+                    .URI(uri)
+                    .normalize()
+                    .path
+                    .removeSuffix("/"),
+            ] = entries
         }
 
         override fun listDirectory(request: TerminalDirectoryListingRequest): List<TerminalFileEntry> {
             val base = java.net.URI(request.workingDirectoryUri.removeSuffix("/") + "/")
-            val key = base.resolve(request.directoryPrefix).normalize().path.removeSuffix("/")
+            val key =
+                base
+                    .resolve(request.directoryPrefix)
+                    .normalize()
+                    .path
+                    .removeSuffix("/")
             return directories[key].orEmpty()
         }
     }

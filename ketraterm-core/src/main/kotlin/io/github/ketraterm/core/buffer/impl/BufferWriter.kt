@@ -138,6 +138,65 @@ internal class BufferWriter(
 
     override fun selectiveEraseEntireScreen() = mutationEngine.selectiveEraseEntireScreen()
 
+    override fun eraseRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        selective: Boolean,
+    ) = mutationEngine.eraseRectangle(top, left, bottom, right, selective)
+
+    override fun fillRectangle(
+        codepoint: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) = mutationEngine.fillRectangle(codepoint, top, left, bottom, right)
+
+    override fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    ) = mutationEngine.copyRectangle(
+        sourceTop,
+        sourceLeft,
+        sourceBottom,
+        sourceRight,
+        sourcePage,
+        destinationTop,
+        destinationLeft,
+        destinationPage,
+    )
+
+    override fun setAttributeChangeExtent(extent: Int) = mutationEngine.setAttributeChangeExtent(extent)
+
+    override fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    ) = mutationEngine.changeRectangleAttributes(top, left, bottom, right, setMask, clearMask)
+
+    override fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    ) = mutationEngine.reverseRectangleAttributes(top, left, bottom, right, reverseMask)
+
+    override fun insertColumns(count: Int) = mutationEngine.insertColumns(count)
+
+    override fun deleteColumns(count: Int) = mutationEngine.deleteColumns(count)
+
     override fun eraseEntireScreen() = mutationEngine.clearViewport()
 
     override fun eraseScreenAndHistory() = mutationEngine.eraseScreenAndHistory()

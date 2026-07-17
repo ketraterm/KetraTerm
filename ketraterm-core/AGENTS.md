@@ -65,8 +65,9 @@ Core width policy must account for:
 - variation selectors.
 - ambiguous-width policy from terminal mode/configuration.
 
-Generated Unicode tables should eventually replace curated seed ranges. Keep the
-API table-shaped now so generation is a mechanical upgrade later.
+Width data is generated from Unicode data files. Keep width APIs table-shaped so
+future Unicode upgrades remain mechanical and do not move width policy out of
+core.
 
 ## Attribute Ownership
 

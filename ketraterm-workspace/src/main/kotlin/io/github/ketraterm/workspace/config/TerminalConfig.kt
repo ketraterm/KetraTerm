@@ -111,6 +111,7 @@ data class TerminalConfig(
     val clipboardMaxDecodedBytes: Int = DEFAULT_CLIPBOARD_MAX_DECODED_BYTES,
     val titleLocalPermission: TerminalTitlePermission = DEFAULT_TITLE_LOCAL_PERMISSION,
     val titleRemotePermission: TerminalTitlePermission = DEFAULT_TITLE_REMOTE_PERMISSION,
+    val scrollOnOutput: Boolean = DEFAULT_SCROLL_ON_OUTPUT,
 ) {
     init {
         require(columns in COLUMNS_MIN..COLUMNS_MAX) {
@@ -172,6 +173,7 @@ data class TerminalConfig(
         const val DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED: Boolean = true
         const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
         const val DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED: Boolean = false
+        const val DEFAULT_SCROLL_ON_OUTPUT: Boolean = true
 
         val DEFAULT_CLIPBOARD_LOCAL_WRITE: TerminalClipboardPermission = TerminalClipboardPermission.PROMPT
         val DEFAULT_CLIPBOARD_REMOTE_WRITE: TerminalClipboardPermission = TerminalClipboardPermission.DENY

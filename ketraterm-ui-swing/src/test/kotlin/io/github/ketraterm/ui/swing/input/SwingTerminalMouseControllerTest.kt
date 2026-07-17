@@ -15,6 +15,9 @@
  */
 package io.github.ketraterm.ui.swing.input
 
+import io.github.ketraterm.input.api.TerminalInputEncoder
+import io.github.ketraterm.input.event.TerminalKey
+import io.github.ketraterm.input.event.TerminalMouseButton
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.render.api.*
@@ -36,27 +39,13 @@ class SwingTerminalMouseControllerTest {
     @Nested
     inner class PressRouting {
         @Test
-        fun `middle mouse press pastes when enabled and consumes event`() {
-            val host = RecordingMouseHost(settings = SwingSettings(pasteOnMiddleClick = true))
+        fun `middle mouse press falls through to selection routing`() {
+            val host = RecordingMouseHost()
             val controller = SwingTerminalMouseController(host)
             val event = mousePressed(button = MouseEvent.BUTTON2, modifiers = InputEvent.BUTTON2_DOWN_MASK)
 
             controller.mouseListener.mousePressed(event)
 
-            assertEquals(1, host.pasteCount)
-            assertEquals(0, host.selectionPressCount)
-            assertTrue(event.isConsumed)
-        }
-
-        @Test
-        fun `middle mouse press falls through to selection when paste is disabled`() {
-            val host = RecordingMouseHost(settings = SwingSettings(pasteOnMiddleClick = false))
-            val controller = SwingTerminalMouseController(host)
-            val event = mousePressed(button = MouseEvent.BUTTON2, modifiers = InputEvent.BUTTON2_DOWN_MASK)
-
-            controller.mouseListener.mousePressed(event)
-
-            assertEquals(0, host.pasteCount)
             assertEquals(1, host.selectionPressCount)
             assertFalse(event.isConsumed)
         }
@@ -71,6 +60,61 @@ class SwingTerminalMouseControllerTest {
 
             assertEquals(1, host.hyperlinkPressCount)
             assertEquals(0, host.selectionPressCount)
+        }
+
+        @Test
+        fun `mouse press requests focus in window even when mouse tracking is active`() {
+            val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL)
+            val controller = SwingTerminalMouseController(host)
+            val event = mousePressed(button = MouseEvent.BUTTON1, modifiers = InputEvent.BUTTON1_DOWN_MASK)
+
+            controller.mouseListener.mousePressed(event)
+
+            assertEquals(1, host.requestFocusInWindowCount)
+            assertEquals(1, host.mouseReports.size)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `popup trigger opens context menu when mouse tracking is off`() {
+            val host = RecordingMouseHost()
+            val controller = SwingTerminalMouseController(host)
+            val event = popupPressed()
+
+            controller.mouseListener.mousePressed(event)
+
+            assertEquals(1, host.contextMenuCount)
+            assertFalse(host.lastContextMenuForcedByShift)
+            assertEquals(0, host.mouseReports.size)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `plain popup trigger is sent to PTY when mouse tracking is active`() {
+            val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL)
+            val controller = SwingTerminalMouseController(host)
+            val event = popupPressed()
+
+            controller.mouseListener.mousePressed(event)
+
+            assertEquals(0, host.contextMenuCount)
+            assertEquals(1, host.mouseReports.size)
+            assertEquals(TerminalMouseButton.RIGHT, host.mouseReports.single().button)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `shift popup trigger forces context menu when mouse tracking is active`() {
+            val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL)
+            val controller = SwingTerminalMouseController(host)
+            val event = popupPressed(InputEvent.SHIFT_DOWN_MASK)
+
+            controller.mouseListener.mousePressed(event)
+
+            assertEquals(1, host.contextMenuCount)
+            assertTrue(host.lastContextMenuForcedByShift)
+            assertEquals(0, host.mouseReports.size)
+            assertTrue(event.isConsumed)
         }
     }
 
@@ -165,7 +209,86 @@ class SwingTerminalMouseControllerTest {
             controller.wheelListener.mouseWheelMoved(event)
 
             assertEquals(3, host.mouseReports.size)
-            assertTrue(host.mouseReports.all { it.button == io.github.ketraterm.input.event.TerminalMouseButton.WHEEL_UP })
+            assertTrue(host.mouseReports.all { it.button == TerminalMouseButton.WHEEL_UP })
+            assertEquals(0, host.scrollCount)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `scroll up in alternate screen buffer with mouse tracking off translates to UP keys`() {
+            val encodedKeys = ArrayList<io.github.ketraterm.input.event.TerminalKeyEvent>()
+            val fakeSession =
+                object : TerminalInputEncoder {
+                    override fun encodeKey(event: io.github.ketraterm.input.event.TerminalKeyEvent) {
+                        encodedKeys += event
+                    }
+
+                    override fun encodePaste(event: io.github.ketraterm.input.event.TerminalPasteEvent) {}
+
+                    override fun encodeFocus(event: io.github.ketraterm.input.event.TerminalFocusEvent) {}
+
+                    override fun encodeMouse(event: TerminalMouseEvent) {}
+                }
+
+            val host = RecordingMouseHost(session = fakeSession)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+
+            // rotation = -1.0 means scrolling UP (clicks = 1.0, delta = 3.0)
+            val event = mouseWheel(rotation = -1.0)
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertEquals(3, encodedKeys.size)
+            assertTrue(encodedKeys.all { it.key == TerminalKey.UP })
+            assertEquals(0, host.scrollCount)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `scroll down in alternate screen buffer with mouse tracking off translates to DOWN keys`() {
+            val encodedKeys = ArrayList<io.github.ketraterm.input.event.TerminalKeyEvent>()
+            val fakeSession =
+                object : TerminalInputEncoder {
+                    override fun encodeKey(event: io.github.ketraterm.input.event.TerminalKeyEvent) {
+                        encodedKeys += event
+                    }
+
+                    override fun encodePaste(event: io.github.ketraterm.input.event.TerminalPasteEvent) {}
+
+                    override fun encodeFocus(event: io.github.ketraterm.input.event.TerminalFocusEvent) {}
+
+                    override fun encodeMouse(event: TerminalMouseEvent) {}
+                }
+
+            val host = RecordingMouseHost(session = fakeSession)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+
+            // rotation = 1.0 means scrolling DOWN (clicks = -1.0, delta = -3.0)
+            val event = mouseWheel(rotation = 1.0)
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertEquals(3, encodedKeys.size)
+            assertTrue(encodedKeys.all { it.key == TerminalKey.DOWN })
+            assertEquals(0, host.scrollCount)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `scroll in alternate screen buffer does not crash and consumes event when session is null`() {
+            val host = RecordingMouseHost(session = null)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+
+            val event = mouseWheel(rotation = -1.0)
+            controller.wheelListener.mouseWheelMoved(event)
+
             assertEquals(0, host.scrollCount)
             assertTrue(event.isConsumed)
         }
@@ -209,6 +332,19 @@ class SwingTerminalMouseControllerTest {
             1,
             false,
             button,
+        )
+
+    private fun popupPressed(modifiers: Int = 0): MouseEvent =
+        MouseEvent(
+            source,
+            MouseEvent.MOUSE_PRESSED,
+            System.currentTimeMillis(),
+            modifiers or InputEvent.BUTTON3_DOWN_MASK,
+            20,
+            30,
+            1,
+            true,
+            MouseEvent.BUTTON3,
         )
 
     private fun mouseReleased(): MouseEvent =
@@ -286,6 +422,7 @@ class SwingTerminalMouseControllerTest {
         private val hyperlinkPressHandled: Boolean = false,
         private val scrollResult: Boolean = true,
         private val mouseTrackingMode: MouseTrackingMode = MouseTrackingMode.OFF,
+        override val session: TerminalInputEncoder? = null,
     ) : SwingTerminalMouseHost {
         override val metrics =
             SwingMetrics(
@@ -300,7 +437,7 @@ class SwingTerminalMouseControllerTest {
         override val renderCache = TerminalRenderCache(80, 24)
 
         var scrollCount = 0
-        var pasteCount = 0
+        var requestFocusInWindowCount = 0
         var hyperlinkPressCount = 0
         var hyperlinkMoveCount = 0
         var hyperlinkExitCount = 0
@@ -308,6 +445,8 @@ class SwingTerminalMouseControllerTest {
         var selectionPressCount = 0
         var selectionReleaseCount = 0
         var selectionDragCount = 0
+        var contextMenuCount = 0
+        var lastContextMenuForcedByShift = false
         var lastScrollDelta = 0.0
         var finishWheelAnimationCount = 0
         val mouseReports = ArrayList<TerminalMouseEvent>()
@@ -341,8 +480,17 @@ class SwingTerminalMouseControllerTest {
             finishWheelAnimationCount++
         }
 
-        override fun pasteClipboardText(): Boolean {
-            pasteCount++
+        override fun requestFocusInWindow(): Boolean {
+            requestFocusInWindowCount++
+            return true
+        }
+
+        override fun handleContextMenuMouseEvent(
+            event: MouseEvent,
+            forcedByShift: Boolean,
+        ): Boolean {
+            contextMenuCount++
+            lastContextMenuForcedByShift = forcedByShift
             return true
         }
 
@@ -402,12 +550,12 @@ class SwingTerminalMouseControllerTest {
     private class FakeFrame(
         override val historySize: Int,
         override val rows: Int,
+        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
     ) : TerminalRenderFrame {
         override val columns: Int = 80
         override val scrollbackOffset: Int = 0
         override val frameGeneration: Long = 1L
         override val structureGeneration: Long = 1L
-        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
         override val cursor = TerminalRenderCursor(0, 0, false, false, TerminalRenderCursorShape.BLOCK, 1L)
         override val discardedCount: Long = 0L
 

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.render.cache
 
+import io.github.ketraterm.ui.swing.api.TerminalFontResolver
 import io.github.ketraterm.ui.swing.render.font.TerminalSystemFallbackFonts
 import io.github.ketraterm.ui.swing.render.font.TerminalSystemFontFamilies
 import java.awt.Font
@@ -33,6 +34,7 @@ internal class FontCache(
     codePointFallbackCapacityPerStyle: Int = DEFAULT_CODE_POINT_FALLBACK_CAPACITY_PER_STYLE,
     textFallbackCapacityPerStyle: Int = DEFAULT_TEXT_FALLBACK_CAPACITY_PER_STYLE,
     private val systemFontFamilies: TerminalSystemFontFamilies = TerminalSystemFallbackFonts,
+    private val fontResolver: TerminalFontResolver? = null,
 ) {
     init {
         require(codePointFallbackCapacityPerStyle > 0) {
@@ -49,7 +51,7 @@ internal class FontCache(
     private var useSystemFallbackFonts: Boolean = false
     private val styleFonts = arrayOfNulls<Font>(STYLE_COUNT)
     private var fallbackStyleFonts: Array<Array<Font?>> = emptyArray()
-    private var systemStyleFonts: Array<Array<Font?>> = emptyArray()
+    private val systemFontCache = SystemFontLru(DEFAULT_SYSTEM_FONT_CACHE_CAPACITY)
     private val resolvedCodePointFonts =
         Array(STYLE_COUNT) {
             IntFontLru(codePointFallbackCapacityPerStyle)
@@ -101,7 +103,7 @@ internal class FontCache(
         fallbackStyleFonts = Array(fallbackFonts.size) { arrayOfNulls(STYLE_COUNT) }
 
         systemFallbackFamilies = emptyList()
-        systemStyleFonts = emptyArray()
+        systemFontCache.clear()
 
         invalidateResolvedCaches()
         return true
@@ -137,17 +139,41 @@ internal class FontCache(
         style: Int,
     ): Font {
         val normalizedStyle = style and STYLE_MASK
-        if (isEmojiPresentationCodePoint(codePoint)) {
-            val emojiFont = emojiFontForCodePoint(codePoint, normalizedStyle)
-            if (emojiFont != null) return emojiFont
-        }
-
-        val primary = font(normalizedStyle)
-        if (primary.canDisplay(codePoint)) return primary
-
         val styleResolvedFonts = resolvedCodePointFonts[normalizedStyle]
         val cached = styleResolvedFonts[codePoint]
         if (cached != null) return cached
+
+        val primary = font(normalizedStyle)
+        val isEmoji = isEmojiPresentationCodePoint(codePoint)
+
+        if (isEmoji && fontResolver != null) {
+            val resolved = fontResolver.resolveFallbackFont(codePoint, normalizedStyle, primary.size2D)
+            if (resolved != null) {
+                val derived = resolved.deriveFont(Font.PLAIN, primary.size2D)
+                styleResolvedFonts.put(codePoint, derived)
+                return derived
+            }
+        }
+
+        if (isEmoji) {
+            val emojiFont = emojiFontForCodePoint(codePoint, normalizedStyle)
+            if (emojiFont != null) {
+                styleResolvedFonts.put(codePoint, emojiFont)
+                return emojiFont
+            }
+        }
+
+        if (primary.canDisplay(codePoint)) return primary
+
+        if (fontResolver != null) {
+            val resolved = fontResolver.resolveFallbackFont(codePoint, normalizedStyle, primary.size2D)
+            if (resolved != null) {
+                val effectiveStyle = if (isEmojiFontFamily(resolved.family)) Font.PLAIN else normalizedStyle
+                val derived = resolved.deriveFont(effectiveStyle, primary.size2D)
+                styleResolvedFonts.put(codePoint, derived)
+                return derived
+            }
+        }
 
         var index = 0
         while (index < fallbackBaseFonts.size) {
@@ -189,17 +215,41 @@ internal class FontCache(
         style: Int,
     ): Font {
         val normalizedStyle = style and STYLE_MASK
-        if (containsEmojiPresentation(text)) {
-            val emojiFont = emojiFontForText(text, normalizedStyle)
-            if (emojiFont != null) return emojiFont
-        }
-
-        val primary = font(normalizedStyle)
-        if (primary.canDisplayUpTo(text) < 0) return primary
-
         val styleResolvedTextFonts = resolvedTextFonts[normalizedStyle]
         val cached = styleResolvedTextFonts[text]
         if (cached != null) return cached
+
+        val primary = font(normalizedStyle)
+        val isEmoji = containsEmojiPresentation(text)
+
+        if (isEmoji && fontResolver != null) {
+            val resolved = fontResolver.resolveFallbackFont(text, normalizedStyle, primary.size2D)
+            if (resolved != null) {
+                val derived = resolved.deriveFont(Font.PLAIN, primary.size2D)
+                styleResolvedTextFonts[text] = derived
+                return derived
+            }
+        }
+
+        if (isEmoji) {
+            val emojiFont = emojiFontForText(text, normalizedStyle)
+            if (emojiFont != null) {
+                styleResolvedTextFonts[text] = emojiFont
+                return emojiFont
+            }
+        }
+
+        if (primary.canDisplayUpTo(text) < 0) return primary
+
+        if (fontResolver != null) {
+            val resolved = fontResolver.resolveFallbackFont(text, normalizedStyle, primary.size2D)
+            if (resolved != null) {
+                val effectiveStyle = if (isEmojiFontFamily(resolved.family)) Font.PLAIN else normalizedStyle
+                val derived = resolved.deriveFont(effectiveStyle, primary.size2D)
+                styleResolvedTextFonts[text] = derived
+                return derived
+            }
+        }
 
         var index = 0
         while (index < fallbackBaseFonts.size) {
@@ -300,7 +350,7 @@ internal class FontCache(
         if (loadedFamilies == systemFallbackFamilies) return false
 
         systemFallbackFamilies = loadedFamilies
-        systemStyleFonts = Array(loadedFamilies.size) { arrayOfNulls(STYLE_COUNT) }
+        systemFontCache.clear()
         invalidateResolvedCaches()
         return true
     }
@@ -346,23 +396,30 @@ internal class FontCache(
         style: Int,
     ): Font {
         val normalizedStyle = style and STYLE_MASK
-        val cached = systemStyleFonts[index][normalizedStyle]
+        val family = systemFallbackFamilies[index]
+        val key = "$family:$normalizedStyle"
+        val cached = systemFontCache[key]
         if (cached != null) return cached
 
         val base =
             requireNotNull(baseFont) {
                 "FontCache.update must be called before systemFallbackFont"
             }
-        val family = systemFallbackFamilies[index]
         val effectiveStyle = if (isEmojiFontFamily(family)) Font.PLAIN else normalizedStyle
         val fallback =
             Font(family, effectiveStyle, base.size)
                 .deriveFont(base.size2D)
-        systemStyleFonts[index][normalizedStyle] = fallback
+        systemFontCache[key] = fallback
         return fallback
     }
 
     private class StringFontLru(
+        private val capacity: Int,
+    ) : LinkedHashMap<String, Font>(capacity, LOAD_FACTOR, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Font>?): Boolean = size > capacity
+    }
+
+    private class SystemFontLru(
         private val capacity: Int,
     ) : LinkedHashMap<String, Font>(capacity, LOAD_FACTOR, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Font>?): Boolean = size > capacity
@@ -524,6 +581,7 @@ internal class FontCache(
         private const val STYLE_MASK = Font.BOLD or Font.ITALIC
         private const val DEFAULT_CODE_POINT_FALLBACK_CAPACITY_PER_STYLE = 4096
         private const val DEFAULT_TEXT_FALLBACK_CAPACITY_PER_STYLE = 1024
+        private const val DEFAULT_SYSTEM_FONT_CACHE_CAPACITY = 64
         private const val LOAD_FACTOR = 0.75f
         private const val EMPTY = -1
 

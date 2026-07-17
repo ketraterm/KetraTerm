@@ -28,8 +28,8 @@ import io.github.ketraterm.core.store.ClusterStore
  * - `attrs[col]`      — the primary packed cell attribute
  * - `extendedAttrs[col]` — the extended packed cell attribute
  *
- * wrapped=true means this line is a soft continuation of the previous line
- * caused by wrapping at the terminal width.
+ * `wrapped=true` means this line continues into the following physical line
+ * because of a soft wrap at the terminal width.
  *
  * ## Ownership
  *
@@ -138,6 +138,20 @@ internal class Line(
         extendedAttr: Long = 0L,
     ) {
         codepoints[col] = raw
+        attrs[col] = attr
+        extendedAttrs[col] = extendedAttr
+    }
+
+    /**
+     * Replaces only the packed visual attributes at [col], retaining its raw cell value and any
+     * cluster-store ownership. This is the safe attribute-only mutation used by DEC rectangle
+     * operations.
+     */
+    fun setCellAttributes(
+        col: Int,
+        attr: Long,
+        extendedAttr: Long,
+    ) {
         attrs[col] = attr
         extendedAttrs[col] = extendedAttr
     }

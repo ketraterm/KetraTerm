@@ -66,13 +66,19 @@ internal object CsiWriter {
         prefixNumber: Int,
         modifiers: Int,
         finalByte: Int,
+        eventType: Int = NO_EVENT_TYPE,
+        kittyModifiers: Boolean = false,
     ) {
         scratch.clear()
         scratch.appendByte(ControlCode.ESC)
         scratch.appendByte('['.code)
         scratch.appendDecimal(prefixNumber)
         scratch.appendByte(';'.code)
-        scratch.appendDecimal(TerminalModifiers.toCsiModifierParam(modifiers))
+        scratch.appendDecimal(modifierParam(modifiers, kittyModifiers))
+        if (eventType != NO_EVENT_TYPE) {
+            scratch.appendByte(':'.code)
+            scratch.appendDecimal(eventType)
+        }
         scratch.appendByte(finalByte)
         scratch.writeTo(output)
     }
@@ -94,15 +100,21 @@ internal object CsiWriter {
         output: TerminalHostOutput,
         number: Int,
         modifiers: Int,
+        eventType: Int = NO_EVENT_TYPE,
+        kittyModifiers: Boolean = false,
     ) {
         scratch.clear()
         scratch.appendByte(ControlCode.ESC)
         scratch.appendByte('['.code)
         scratch.appendDecimal(number)
 
-        if (modifiers != TerminalModifiers.NONE) {
+        if (modifiers != TerminalModifiers.NONE || eventType != NO_EVENT_TYPE) {
             scratch.appendByte(';'.code)
-            scratch.appendDecimal(TerminalModifiers.toCsiModifierParam(modifiers))
+            scratch.appendDecimal(modifierParam(modifiers, kittyModifiers))
+            if (eventType != NO_EVENT_TYPE) {
+                scratch.appendByte(':'.code)
+                scratch.appendDecimal(eventType)
+            }
         }
 
         scratch.appendByte('~'.code)
@@ -129,20 +141,70 @@ internal object CsiWriter {
         code: Int,
         modifiers: Int,
         forceModifier: Boolean = false,
+        eventType: Int = NO_EVENT_TYPE,
+        kittyModifiers: Boolean = false,
+        shiftedCodepoint: Int = NO_CODEPOINT,
+        baseLayoutCodepoint: Int = NO_CODEPOINT,
+        associatedText: String? = null,
     ) {
         scratch.clear()
         scratch.appendByte(ControlCode.ESC)
         scratch.appendByte('['.code)
         scratch.appendDecimal(code)
+        if (shiftedCodepoint != NO_CODEPOINT || baseLayoutCodepoint != NO_CODEPOINT) {
+            scratch.appendByte(':'.code)
+            if (shiftedCodepoint != NO_CODEPOINT) scratch.appendDecimal(shiftedCodepoint)
+            if (baseLayoutCodepoint != NO_CODEPOINT) {
+                scratch.appendByte(':'.code)
+                scratch.appendDecimal(baseLayoutCodepoint)
+            }
+        }
 
-        if (modifiers != TerminalModifiers.NONE || forceModifier) {
+        val hasModifierField = modifiers != TerminalModifiers.NONE || forceModifier || eventType != NO_EVENT_TYPE
+        if (hasModifierField) {
             scratch.appendByte(';'.code)
-            scratch.appendDecimal(TerminalModifiers.toCsiModifierParam(modifiers))
+            scratch.appendDecimal(modifierParam(modifiers, kittyModifiers))
+            if (eventType != NO_EVENT_TYPE) {
+                scratch.appendByte(':'.code)
+                scratch.appendDecimal(eventType)
+            }
+        }
+
+        if (associatedText != null) {
+            if (!hasModifierField) scratch.appendByte(';'.code)
+            scratch.appendByte(';'.code)
+            appendAssociatedText(scratch, associatedText)
         }
 
         scratch.appendByte('u'.code)
         scratch.writeTo(output)
     }
+
+    private const val NO_EVENT_TYPE: Int = 0
+    private const val NO_CODEPOINT: Int = -1
+
+    private fun appendAssociatedText(
+        scratch: InputScratchBuffer,
+        text: String,
+    ) {
+        var index = 0
+        while (index < text.length) {
+            if (index > 0) scratch.appendByte(':'.code)
+            val codepoint = text.codePointAt(index)
+            scratch.appendDecimal(codepoint)
+            index += Character.charCount(codepoint)
+        }
+    }
+
+    private fun modifierParam(
+        modifiers: Int,
+        kittyModifiers: Boolean,
+    ): Int =
+        if (kittyModifiers) {
+            TerminalModifiers.toKittyCsiModifierParam(modifiers)
+        } else {
+            TerminalModifiers.toCsiModifierParam(modifiers)
+        }
 
     /**
      * Writes a Single Shift Select (SS3) sequence of the format: `ESC O <finalByte>`.

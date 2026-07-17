@@ -70,4 +70,17 @@ internal object CsiCommand {
     const val KITTY_KEYBOARD_POP: Int = 42
     const val KITTY_KEYBOARD_FLAGS: Int = 43
     const val KITTY_KEYBOARD_PUSH: Int = 44
+    const val KITTY_KEYBOARD_QUERY: Int = 45
+    const val XTQMODKEYS: Int = 46
+    const val XTDISMODKEYS: Int = 47
+    const val DECFRA: Int = 48
+    const val DECERA: Int = 49
+    const val DECSERA: Int = 50
+    const val DECCRA: Int = 51
+    const val DECCARA: Int = 52
+    const val DECRARA: Int = 53
+    const val DECSACE: Int = 54
+    const val DECIC: Int = 55
+    const val DECDC: Int = 56
+    const val DECRQCRA: Int = 57
 }

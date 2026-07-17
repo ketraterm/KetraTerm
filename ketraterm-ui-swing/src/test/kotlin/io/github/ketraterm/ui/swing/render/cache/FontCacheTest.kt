@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.render.cache
 
+import io.github.ketraterm.ui.swing.api.TerminalFontResolver
 import io.github.ketraterm.ui.swing.render.font.TerminalSystemFontFamilies
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
@@ -228,5 +229,93 @@ class FontCacheTest {
             calls++
             return families
         }
+    }
+
+    @Test
+    fun `custom fontResolver resolves and caches code point fallbacks`() {
+        val primary = TerminalCacheTestFonts.primary(17f)
+        val expectedFallback = Font(Font.SANS_SERIF, Font.PLAIN, 17)
+        val fallbackChar = TerminalCacheTestFonts.FALLBACK_ONLY_TEXT.codePointAt(0)
+        val resolver =
+            object : TerminalFontResolver {
+                override fun resolveFallbackFont(
+                    codePoint: Int,
+                    style: Int,
+                    size2D: Float,
+                ): Font? {
+                    if (codePoint == fallbackChar) return expectedFallback
+                    return null
+                }
+
+                override fun resolveFallbackFont(
+                    text: String,
+                    style: Int,
+                    size2D: Float,
+                ): Font? = null
+            }
+
+        val cache = FontCache(fontResolver = resolver)
+        cache.update(primary, emptyList(), useSystemFallbackFonts = false)
+
+        val resolved = cache.fontForCodePoint(fallbackChar, Font.PLAIN)
+        Assertions.assertEquals(Font.SANS_SERIF, resolved.family)
+        Assertions.assertEquals(17f, resolved.size2D)
+    }
+
+    @Test
+    fun `custom fontResolver resolves and caches text fallbacks`() {
+        val primary = TerminalCacheTestFonts.primary(17f)
+        val expectedFallback = Font(Font.SERIF, Font.PLAIN, 17)
+        val fallbackText = TerminalCacheTestFonts.FALLBACK_ONLY_TEXT
+        val resolver =
+            object : TerminalFontResolver {
+                override fun resolveFallbackFont(
+                    codePoint: Int,
+                    style: Int,
+                    size2D: Float,
+                ): Font? = null
+
+                override fun resolveFallbackFont(
+                    text: String,
+                    style: Int,
+                    size2D: Float,
+                ): Font? {
+                    if (text == fallbackText) return expectedFallback
+                    return null
+                }
+            }
+
+        val cache = FontCache(fontResolver = resolver)
+        cache.update(primary, emptyList(), useSystemFallbackFonts = false)
+
+        val resolved = cache.fontForText(fallbackText, Font.PLAIN)
+        Assertions.assertEquals(Font.SERIF, resolved.family)
+        Assertions.assertEquals(17f, resolved.size2D)
+    }
+
+    @Test
+    fun `custom fontResolver returns null falls back to normal chain`() {
+        val primary = TerminalCacheTestFonts.primary(17f)
+        val fallbackFamily = TerminalCacheTestFonts.registerFallbackFamily()
+        val resolver =
+            object : TerminalFontResolver {
+                override fun resolveFallbackFont(
+                    codePoint: Int,
+                    style: Int,
+                    size2D: Float,
+                ): Font? = null
+
+                override fun resolveFallbackFont(
+                    text: String,
+                    style: Int,
+                    size2D: Float,
+                ): Font? = null
+            }
+        val fallback = Font(fallbackFamily, Font.PLAIN, 17)
+        val cache = FontCache(fontResolver = resolver)
+        cache.update(primary, listOf(fallback), useSystemFallbackFonts = false)
+
+        val resolved = cache.fontForCodePoint(TerminalCacheTestFonts.FALLBACK_ONLY_TEXT.codePointAt(0), Font.PLAIN)
+        Assertions.assertEquals(fallbackFamily, resolved.family)
     }
 }

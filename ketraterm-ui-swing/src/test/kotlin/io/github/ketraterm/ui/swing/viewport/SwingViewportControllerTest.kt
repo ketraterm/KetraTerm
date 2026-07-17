@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test
 import java.awt.Insets
 
 class SwingViewportControllerTest {
-    private val settings = SwingSettings(padding = Insets(3, 5, 7, 11))
+    private val settings = SwingSettings(padding = Insets(3, 5, 7, 11), shellIntegrationDecorationGutterWidth = 0)
     private val metrics =
         SwingMetrics(
             cellWidth = 10,
@@ -57,9 +57,13 @@ class SwingViewportControllerTest {
         }
 
         @Test
-        fun `alternate screen visible grid uses symmetric chrome instead of primary prompt gutter`() {
+        fun `alternate screen visible grid uses explicit alternate chrome instead of primary gutters`() {
             val controller = SwingViewportController { _, _, _, _, _ -> }
-            val settings = SwingSettings(padding = Insets(0, 20, 8, 12))
+            val settings =
+                SwingSettings(
+                    padding = Insets(0, 4, 8, 12),
+                    alternateScreenPadding = Insets(0, 8, 8, 8),
+                )
 
             val primary =
                 controller.visibleGridSizeOnEdt(
@@ -143,7 +147,7 @@ class SwingViewportControllerTest {
             val listener = RecordingViewportListener()
             val controller = SwingViewportController(listener)
 
-            controller.updateVisualMetrics(historySize = 100, cellHeight = 20, visualOverflowPixels = 0)
+            controller.updateVisualMetrics(historySize = 100, discardedCount = 0L, cellHeight = 20, visualOverflowPixels = 0)
             assertTrue(controller.scrollTo(offsetLines = 12.5, historySize = 100))
             controller.publishViewportState(
                 historySize = 100,
@@ -177,7 +181,7 @@ class SwingViewportControllerTest {
             val listener = RecordingViewportListener()
             val controller = SwingViewportController(listener)
 
-            controller.updateVisualMetrics(historySize = 10, cellHeight = 20, visualOverflowPixels = 0)
+            controller.updateVisualMetrics(historySize = 10, discardedCount = 0L, cellHeight = 20, visualOverflowPixels = 0)
             controller.scrollTo(offsetLines = 3.0, historySize = 10)
             controller.publishViewportState(
                 historySize = 10,
@@ -210,7 +214,7 @@ class SwingViewportControllerTest {
         fun `publishViewportState can notify primitive listener without full snapshot`() {
             val listener = RecordingViewportListener()
             val controller = SwingViewportController(listener)
-            controller.updateVisualMetrics(historySize = 10, cellHeight = 20, visualOverflowPixels = 0)
+            controller.updateVisualMetrics(historySize = 10, discardedCount = 0L, cellHeight = 20, visualOverflowPixels = 0)
             controller.scrollTo(offsetLines = 2.5, historySize = 10)
 
             controller.publishViewportState(
@@ -281,7 +285,7 @@ class SwingViewportControllerTest {
             val controller = SwingViewportController { _, _, _, _, _ -> }
 
             assertThrows(IllegalArgumentException::class.java) {
-                controller.updateVisualMetrics(historySize = 0, cellHeight = 20, visualOverflowPixels = 12)
+                controller.updateVisualMetrics(historySize = 0, discardedCount = 0L, cellHeight = 20, visualOverflowPixels = 12)
             }
         }
 
@@ -291,9 +295,9 @@ class SwingViewportControllerTest {
 
             controller.scrollTo(offsetLines = 10.0, historySize = 10)
 
-            assertTrue(controller.clamp(historySize = 3))
+            assertTrue(controller.clamp(historySize = 3, discardedCount = 0L, scrollOnOutput = true))
             assertEquals(3, controller.requestedOffset)
-            assertFalse(controller.clamp(historySize = 3))
+            assertFalse(controller.clamp(historySize = 3, discardedCount = 0L, scrollOnOutput = true))
         }
 
         @Test
@@ -302,7 +306,7 @@ class SwingViewportControllerTest {
 
             controller.scrollTo(offsetLines = 4.5, historySize = 10)
             controller.reset()
-            controller.updateVisualMetrics(historySize = 10, cellHeight = 20, visualOverflowPixels = 0)
+            controller.updateVisualMetrics(historySize = 10, discardedCount = 0L, cellHeight = 20, visualOverflowPixels = 0)
             controller.publishViewportState(
                 historySize = 10,
                 visibleRows = 4,

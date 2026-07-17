@@ -34,10 +34,14 @@ internal class TerminalSelectionTextExtractor {
         val result = StringBuilder()
         var row = selection.startRow.coerceAtLeast(0)
         val lastRow = selection.endRow.coerceAtMost(cache.rows - 1)
+        var hasPreviousSelectedRow = false
         while (row <= lastRow) {
             val range = selection.packedColumnRange(row, cache.columns, cache)
             if (range != CellSelection.NO_RANGE) {
-                if (result.isNotEmpty() && (!joinSoftWrappedRows || row == 0 || !cache.lineWrapped[row - 1])) {
+                if (
+                    hasPreviousSelectedRow &&
+                    (!joinSoftWrappedRows || selection.isBlock || row == 0 || !cache.lineWrapped[row - 1])
+                ) {
                     result.append('\n')
                 }
                 appendTrimmedRow(
@@ -47,6 +51,7 @@ internal class TerminalSelectionTextExtractor {
                     startColumn = CellSelection.rangeStart(range),
                     endColumn = CellSelection.rangeEnd(range),
                 )
+                hasPreviousSelectedRow = true
             }
             row++
         }
@@ -124,8 +129,9 @@ internal class TerminalSelectionTextExtractor {
         endColumn: Int,
     ) {
         rowScratch.setLength(0)
+        val contentEndColumn = selectedContentEndColumn(cache, row, startColumn, endColumn)
         var column = startColumn
-        while (column < endColumn) {
+        while (column < contentEndColumn) {
             column = appendCell(rowScratch, cache, row, column)
         }
 
@@ -134,6 +140,32 @@ internal class TerminalSelectionTextExtractor {
             trimmedEnd--
         }
         destination.append(rowScratch, 0, trimmedEnd)
+    }
+
+    private fun selectedContentEndColumn(
+        cache: TerminalRenderCache,
+        row: Int,
+        startColumn: Int,
+        endColumn: Int,
+    ): Int {
+        val rowOffset = cache.rowOffset(row)
+        var column = startColumn
+        var contentEndColumn = startColumn
+        while (column < endColumn) {
+            val flags = cache.flags[rowOffset + column]
+            if (flags and TerminalRenderCellFlags.WIDE_TRAILING == 0 &&
+                flags and
+                (
+                    TerminalRenderCellFlags.CODEPOINT or
+                        TerminalRenderCellFlags.CLUSTER or
+                        TerminalRenderCellFlags.WIDE_LEADING
+                ) != 0
+            ) {
+                contentEndColumn = column + if (flags and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1
+            }
+            column++
+        }
+        return contentEndColumn.coerceAtMost(endColumn)
     }
 
     private fun appendCell(

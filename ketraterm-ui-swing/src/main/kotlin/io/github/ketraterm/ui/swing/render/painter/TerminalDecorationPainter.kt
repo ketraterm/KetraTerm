@@ -74,10 +74,6 @@ internal class TerminalDecorationPainter(
 
     /**
      * Paints the UI hyperlink affordance for a contiguous linked span.
-     *
-     * Non-hovered links use a dotted underline. Hovered links use a solid
-     * underline so explicit activation intent is visible without changing core
-     * terminal attributes.
      */
     fun paintHyperlink(
         g: Graphics2D,
@@ -95,18 +91,7 @@ internal class TerminalDecorationPainter(
         val rowY = row * metrics.cellHeight
         val y = rowY + metrics.underlineY
         g.color = colorCache.color(color)
-
-        if (hovered) {
-            g.fillRect(x, y, width, DECORATION_THICKNESS)
-            return
-        }
-
-        val endX = x + width
-        var dotX = x
-        while (dotX < endX) {
-            g.fillRect(dotX, y, DOT_WIDTH, DECORATION_THICKNESS)
-            dotX += DOT_STRIDE
-        }
+        g.fillRect(x, y, width, if (hovered) HOVER_DECORATION_THICKNESS else DECORATION_THICKNESS)
     }
 
     private fun underlineColor(
@@ -125,8 +110,7 @@ internal class TerminalDecorationPainter(
 
     private companion object {
         private const val DECORATION_THICKNESS = 1
+        private const val HOVER_DECORATION_THICKNESS = 2
         private const val DOUBLE_UNDERLINE_OFFSET = 2
-        private const val DOT_WIDTH = 1
-        private const val DOT_STRIDE = 3
     }
 }

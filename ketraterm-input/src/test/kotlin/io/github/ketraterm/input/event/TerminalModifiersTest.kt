@@ -28,6 +28,7 @@ class TerminalModifiersTest {
             { assertFalse(TerminalModifiers.hasAlt(modifiers)) },
             { assertTrue(TerminalModifiers.hasCtrl(modifiers)) },
             { assertFalse(TerminalModifiers.hasMeta(modifiers)) },
+            { assertFalse(TerminalModifiers.hasSuper(modifiers)) },
         )
     }
 
@@ -57,6 +58,19 @@ class TerminalModifiersTest {
             },
             { assertEquals(5, TerminalModifiers.toCsiModifierParam(TerminalModifiers.CTRL)) },
             { assertEquals(9, TerminalModifiers.toCsiModifierParam(TerminalModifiers.META)) },
+            { assertEquals(9, TerminalModifiers.toCsiModifierParam(TerminalModifiers.SUPER)) },
+            { assertEquals(1, TerminalModifiers.toCsiModifierParam(TerminalModifiers.CAPS_LOCK)) },
+        )
+    }
+
+    @Test
+    fun `converts all Kitty modifier bits without legacy collapsing`() {
+        assertAll(
+            { assertEquals(9, TerminalModifiers.toKittyCsiModifierParam(TerminalModifiers.SUPER)) },
+            { assertEquals(17, TerminalModifiers.toKittyCsiModifierParam(TerminalModifiers.HYPER)) },
+            { assertEquals(33, TerminalModifiers.toKittyCsiModifierParam(TerminalModifiers.META)) },
+            { assertEquals(65, TerminalModifiers.toKittyCsiModifierParam(TerminalModifiers.CAPS_LOCK)) },
+            { assertEquals(129, TerminalModifiers.toKittyCsiModifierParam(TerminalModifiers.NUM_LOCK)) },
         )
     }
 

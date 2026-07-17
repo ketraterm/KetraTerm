@@ -12,18 +12,21 @@ Designed for embedding into IDEs, developer tools, and standalone desktop applic
 * **Native Pseudo-Terminal (PTY) Integration**: Seamless cross-platform native execution using JetBrains [Pty4J](https://github.com/traff/pty4j) with full Windows ConPTY support, built to handle modern shells (Zsh, Fish, PowerShell) and prompt size propagation.
 * **Modern TUI & vt100/xterm Compliance**: Passes most tests of the rigorous `vttest` suite, ensuring flawless rendering for heavy interactive TUI applications like Neovim, Tmux, Htop, Fzf, and lazygit.
 * **Richer Styling & 24-Bit TrueColor**: Bypasses the limits of standard 256-color palettes with full 24-bit TrueColor RGB mapping. Renders overline decorations and modern underline styles (Single, Double, Curly, Dotted, Dashed) with custom underline colors.
-* **Advanced Keyboard Shortcuts**: Supports xterm `modifyOtherKeys`, compact CSI-u, and the implemented Kitty keyboard progressive flags for escape-code disambiguation and reporting text keys as CSI-u. Richer Kitty event types, alternate keys, and associated text fields remain intentionally deferred until the public input event model can carry them truthfully.
-* **Unbounded Mouse Tracking**: Supports legacy mouse tracking alongside modern Standard SGR Mouse (`1006`) and URXVT (`1015`) decimal-packed mouse coordinates, allowing clicks, drags, and scroll-wheel interactions to work on high-resolution displays larger than 223 columns.
+* **Advanced Keyboard Shortcuts**: Supports DEC Backarrow mode, conventional Ctrl-number controls, xterm modified and extended function keys, `modifyOtherKeys`, compact CSI-u, and Kitty keyboard progressive flags `1` (escape-code disambiguation) and `8` (report all keys as CSI-u). Swing preserves press/repeat/release for AWT-visible non-text physical keys without per-event allocation. Rich native layout, IME, alternate-key, and associated-text reporting (`2`, `4`, `16`) is explicitly deferred and never advertised by portable hosts.
+* **Unbounded Mouse Tracking**: Supports legacy mouse tracking alongside modern Standard SGR Mouse (`1006`), SGR-Pixels (`1016`), and URXVT (`1015`) decimal-packed coordinates, allowing precise clicks, drags, and scroll-wheel interactions beyond the legacy 223-cell limit.
 * **Tear-Free Triple-Buffered Rendering**: Decouples active parsing from the UI drawing loops using an asynchronous dirty-coalescing rendering worker and a triple-buffered publisher. Delivers a clean **60+ FPS** paint cycle with zero visual tearing or stuttering under massive log outputs.
 * **Security-Hardened Design**: Hardened against malicious escape sequence exploits. Utilizes a bounded, double-indexed LRU cache for OSC 8 hyperlinks, strict xterm title stack limits, and pre-allocated OSC/DCS payload buffers to block memory exhaustion.
 * **Pixel-Perfect Typography & Color Emojis**: Integrates UAX #29 grapheme cluster segmentation, East Asian width policies, custom fallback font chains, and prioritized OS color emojis (Apple, Segoe, Noto). Programmatically paints box-drawing and block characters to eliminate anti-aliased line gaps.
 * **Zero-Allocation Memory Profile**: Core grid storage is built on flat parallel primitive arrays (no object-per-cell overhead) and a circular arena allocator (`ClusterStore`), ensuring near-zero garbage collector pressure and pauses during active shell throughput.
 * **Independent Buffer & Margin Physics**: Employs vertical and horizontal scroll margins (`DECSLRM`/`DECSTBM`) with instant switching between primary and alt buffers (`?1049`) carrying independent margins and cursor state save slots.
+* **VT420 Rectangular Operations**: Supports protected, wide-glyph-safe rectangular erase, fill, copy, attribute updates, column edits, and active-page checksum responses for demanding text TUIs.
 * **Native Desktop Notifications**: Fully supports native desktop notifications triggered directly via iTerm2-style `OSC 9` and urxvt-style `OSC 777` sequences, featuring a KetraTerm-specific severity extension (`info`, `warning`, `error`, `none`), ConEmu subcommand conflict filtering, and self-cleaning tray icon management.
-* **Exceptional Utf-8 Support**: Supports UTF-8 input and output, including Unicode grapheme cluster segmentation, East Asian width policies, and full Unicode 15.0 coverage for emojis, symbols, and scripts.
+* **Exceptional Utf-8 Support**: Supports UTF-8 input and output, with Unicode 17.0.0 data-backed grapheme segmentation, emoji properties, and East Asian width policies for modern emojis, symbols, and scripts.
 * **Modern Shell Integration**: Implements modern shell integration protocols (`OSC 133`, `OSC 7`) for accurate prompt detection, command lifecycle tracking, exit status reporting, and current working directory synchronization.
 
 > For a complete specification of all supported capabilities, see the [Terminal Feature Map](docs/terminal-feature-map.md). A detailed list of current backlog items and compatibility decisions is maintained in the [Terminal Feature Gap Map](docs/terminal-feature-gap-map.md)
+
+> Deterministic differential, resize/reflow, and independent grid-model verification are documented in [Terminal Conformance Testing](docs/terminal-conformance-testing.md).
 
 ---
 
@@ -119,6 +122,12 @@ KetraTerm is composed of strict, decoupled Gradle modules:
   ./gradlew :ketraterm-parser:test
   ./gradlew :ketraterm-core:test
   ./gradlew :ketraterm-ui-swing:test
+  ```
+* **Run Generated Terminal Campaigns**:
+  ```bash
+  ./gradlew :ketraterm-testkit:xtermDifferentialSmokeTest
+  ./gradlew :ketraterm-testkit:resizeReflowInvariantSmokeTest
+  ./gradlew :ketraterm-testkit:cursorWrapModelSmokeTest
   ```
 * **Launch Standalone Swing App**:
   ```bash

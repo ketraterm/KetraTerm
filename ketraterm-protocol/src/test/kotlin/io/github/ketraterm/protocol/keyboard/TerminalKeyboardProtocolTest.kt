@@ -57,8 +57,18 @@ class TerminalKeyboardProtocolTest {
             {
                 assertEquals(
                     KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
+                        KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES or
+                        KittyKeyboardProgressiveFlag.REPORT_ALTERNATE_KEYS or
+                        KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES or
+                        KittyKeyboardProgressiveFlag.REPORT_ASSOCIATED_TEXT,
+                    KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK,
+                )
+            },
+            {
+                assertEquals(
+                    KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
                         KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES,
-                    KittyKeyboardProgressiveFlag.SUPPORTED_MASK,
+                    KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
                 )
             },
         )

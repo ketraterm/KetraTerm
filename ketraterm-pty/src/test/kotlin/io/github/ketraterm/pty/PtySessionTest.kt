@@ -17,6 +17,7 @@ package io.github.ketraterm.pty
 
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
 import io.github.ketraterm.session.TerminalSession
 import org.junit.jupiter.api.Assertions.*
@@ -33,16 +34,8 @@ class PtySessionTest {
     @Test
     fun `default environment advertises the shared terminal capability identity`() {
         val environment = PtyOptions.defaultEnvironment()
-        val systemEnvironment = System.getenv()
-
-        assertEquals(
-            systemEnvironment["TERM"] ?: TerminalCapabilityIdentity.TERM_NAME,
-            environment.getValue("TERM"),
-        )
-        assertEquals(
-            systemEnvironment["COLORTERM"] ?: TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR,
-            environment.getValue("COLORTERM"),
-        )
+        assertEquals(TerminalCapabilityIdentity.TERM_NAME, environment.getValue("TERM"))
+        assertEquals(TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR, environment.getValue("COLORTERM"))
     }
 
     @Test
@@ -107,6 +100,20 @@ class PtySessionTest {
         session.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER))
 
         assertEquals("\r", process.outputText())
+    }
+
+    @Test
+    fun `default PTY paste canonicalizes unbracketed clipboard newlines to CR`() {
+        val process = FakePtyProcess.running()
+        val session =
+            PtySessions.start(
+                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                processFactory = FixedProcessFactory(process),
+            )
+
+        session.encodePaste(TerminalPasteEvent("first\r\nsecond\nthird\rfourth"))
+
+        assertEquals("first\rsecond\rthird\rfourth", process.outputText())
     }
 
     @Test

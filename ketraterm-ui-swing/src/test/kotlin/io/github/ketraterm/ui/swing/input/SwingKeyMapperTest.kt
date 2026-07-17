@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.input
 
 import io.github.ketraterm.input.event.TerminalKey
+import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.event.TerminalModifiers
 import java.awt.Canvas
 import java.awt.event.KeyEvent
@@ -77,6 +78,76 @@ class SwingKeyMapperTest {
     }
 
     @Test
+    fun mapsPhysicalKeyLifecycleWithoutInferringUnobservedReleases() {
+        val press = mapper.keyPressed(pressed(KeyEvent.VK_UP))
+        val repeat = mapper.keyPressed(pressed(KeyEvent.VK_UP))
+        val release = mapper.keyReleased(released(KeyEvent.VK_UP))
+
+        assertEquals(TerminalKeyEventType.PRESS, press?.type)
+        assertEquals(TerminalKeyEventType.REPEAT, repeat?.type)
+        assertEquals(TerminalKeyEventType.RELEASE, release?.type)
+        assertNull(mapper.keyReleased(released(KeyEvent.VK_UP)))
+    }
+
+    @Test
+    fun mapsHeldBackspaceAndDeletePressesAsRepeats() {
+        val backspacePress = mapper.keyPressed(pressed(KeyEvent.VK_BACK_SPACE))
+        val backspaceRepeat = mapper.keyPressed(pressed(KeyEvent.VK_BACK_SPACE))
+        val deletePress = mapper.keyPressed(pressed(KeyEvent.VK_DELETE))
+        val deleteRepeat = mapper.keyPressed(pressed(KeyEvent.VK_DELETE))
+
+        assertEquals(TerminalKey.BACKSPACE, backspacePress?.key)
+        assertEquals(TerminalKeyEventType.PRESS, backspacePress?.type)
+        assertEquals(TerminalKey.BACKSPACE, backspaceRepeat?.key)
+        assertEquals(TerminalKeyEventType.REPEAT, backspaceRepeat?.type)
+        assertEquals(TerminalKey.DELETE, deletePress?.key)
+        assertEquals(TerminalKeyEventType.PRESS, deletePress?.type)
+        assertEquals(TerminalKey.DELETE, deleteRepeat?.key)
+        assertEquals(TerminalKeyEventType.REPEAT, deleteRepeat?.type)
+    }
+
+    @Test
+    fun tracksLeftAndRightPhysicalModifierLifecycleIndependently() {
+        mapper.keyPressed(pressed(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_LEFT))
+        mapper.keyPressed(pressed(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_RIGHT))
+
+        val leftRelease = mapper.keyReleased(released(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_LEFT))
+        val rightRelease = mapper.keyReleased(released(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_RIGHT))
+
+        assertEquals(TerminalKey.LEFT_SHIFT, leftRelease?.key)
+        assertEquals(TerminalKey.RIGHT_SHIFT, rightRelease?.key)
+        assertEquals(TerminalKeyEventType.RELEASE, leftRelease?.type)
+        assertEquals(TerminalKeyEventType.RELEASE, rightRelease?.type)
+    }
+
+    @Test
+    fun mapsExtendedFunctionPressedKey() {
+        val mapped = mapper.keyPressed(pressed(KeyEvent.VK_F24))
+
+        assertEquals(TerminalKey.F24, mapped?.key)
+    }
+
+    @Test
+    fun mapsLockAndPhysicalModifierPressedKeys() {
+        assertEquals(TerminalKey.CAPS_LOCK, mapper.keyPressed(pressed(KeyEvent.VK_CAPS_LOCK))?.key)
+        assertEquals(
+            TerminalKey.RIGHT_SHIFT,
+            mapper.keyPressed(pressed(KeyEvent.VK_SHIFT, keyLocation = KeyEvent.KEY_LOCATION_RIGHT))?.key,
+        )
+        assertEquals(
+            TerminalKey.LEFT_SUPER,
+            mapper.keyPressed(pressed(KeyEvent.VK_WINDOWS, keyLocation = KeyEvent.KEY_LOCATION_LEFT))?.key,
+        )
+    }
+
+    @Test
+    fun mapsNumpadNavigationFromKeyLocation() {
+        val mapped = mapper.keyPressed(pressed(KeyEvent.VK_END, keyLocation = KeyEvent.KEY_LOCATION_NUMPAD))
+
+        assertEquals(TerminalKey.NUMPAD_END, mapped?.key)
+    }
+
+    @Test
     fun mapsNumpadPressedKeyAndSuppressesFollowingTypedCharacter() {
         val mapped = mapper.keyPressed(pressed(KeyEvent.VK_NUMPAD1))
 
@@ -115,8 +186,43 @@ class SwingKeyMapperTest {
     }
 
     @Test
+    fun mapsCtrlNumberShortcutsWithoutLosingTheirPhysicalDigitIdentity() {
+        for (keyCode in KeyEvent.VK_0..KeyEvent.VK_9) {
+            val mapped = mapper.keyPressed(pressed(keyCode, modifiers = KeyEvent.CTRL_DOWN_MASK))
+
+            assertEquals('0'.code + keyCode - KeyEvent.VK_0, mapped?.codepoint)
+            assertEquals(TerminalModifiers.CTRL, mapped?.modifiers)
+        }
+    }
+
+    @Test
     fun leavesPlainPrintablePressedKeyForTypedEvent() {
         assertNull(mapper.keyPressed(pressed(KeyEvent.VK_A)))
+    }
+
+    @Test
+    fun ignoresAltGrKeyPressedForPrintableCharacters() {
+        val modifiers = KeyEvent.CTRL_DOWN_MASK or KeyEvent.ALT_DOWN_MASK or KeyEvent.ALT_GRAPH_DOWN_MASK
+        val mapped = mapper.keyPressed(pressed(KeyEvent.VK_0, modifiers = modifiers))
+        assertNull(mapped)
+    }
+
+    @Test
+    fun mapsAltGrKeyTypedCharacterWithoutCtrlAltModifiers() {
+        val modifiers = KeyEvent.CTRL_DOWN_MASK or KeyEvent.ALT_DOWN_MASK or KeyEvent.ALT_GRAPH_DOWN_MASK
+        val mapped = mapper.keyTyped(typed('@', modifiers = modifiers))
+
+        assertEquals('@'.code, mapped?.codepoint)
+        assertEquals(TerminalModifiers.NONE, mapped?.modifiers)
+    }
+
+    @Test
+    fun mapsShiftAltGrKeyTypedCharacterWithShiftModifier() {
+        val modifiers = KeyEvent.CTRL_DOWN_MASK or KeyEvent.ALT_DOWN_MASK or KeyEvent.ALT_GRAPH_DOWN_MASK or KeyEvent.SHIFT_DOWN_MASK
+        val mapped = mapper.keyTyped(typed('Ω', modifiers = modifiers))
+
+        assertEquals('Ω'.code, mapped?.codepoint)
+        assertEquals(TerminalModifiers.SHIFT, mapped?.modifiers)
     }
 
     private fun typed(
@@ -135,6 +241,7 @@ class SwingKeyMapperTest {
     private fun pressed(
         keyCode: Int,
         modifiers: Int = 0,
+        keyLocation: Int = KeyEvent.KEY_LOCATION_STANDARD,
     ): KeyEvent =
         KeyEvent(
             source,
@@ -143,5 +250,21 @@ class SwingKeyMapperTest {
             modifiers,
             keyCode,
             KeyEvent.CHAR_UNDEFINED,
+            keyLocation,
+        )
+
+    private fun released(
+        keyCode: Int,
+        modifiers: Int = 0,
+        keyLocation: Int = KeyEvent.KEY_LOCATION_STANDARD,
+    ): KeyEvent =
+        KeyEvent(
+            source,
+            KeyEvent.KEY_RELEASED,
+            System.currentTimeMillis(),
+            modifiers,
+            keyCode,
+            KeyEvent.CHAR_UNDEFINED,
+            keyLocation,
         )
 }

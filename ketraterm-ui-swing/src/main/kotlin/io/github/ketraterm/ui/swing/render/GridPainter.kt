@@ -19,6 +19,7 @@ import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.api.CellSelection
+import io.github.ketraterm.ui.swing.api.TerminalFontResolver
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.render.painter.*
 import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
@@ -40,14 +41,16 @@ import kotlin.math.floor
  * single component-owned painter instance so those caches are reused across
  * paint calls.
  */
-internal class GridPainter {
+internal class GridPainter(
+    fontResolver: TerminalFontResolver? = null,
+) {
     private val colorCache = AwtColorCache()
     private val backgroundPainter = TerminalBackgroundPainter(colorCache)
     private val selectionPainter = TerminalSelectionPainter(colorCache)
     private val searchPainter = TerminalSearchPainter(colorCache)
     private val shellIntegrationDecorationPainter = TerminalShellIntegrationDecorationPainter(colorCache)
     private val decorationPainter = TerminalDecorationPainter(colorCache)
-    private val textPainter = TerminalTextPainter(colorCache, decorationPainter)
+    private val textPainter = TerminalTextPainter(colorCache, decorationPainter, fontResolver = fontResolver)
     private val cursorPainter = TerminalCursorPainter(colorCache, textPainter)
     private val clipScratch = Rectangle()
 
@@ -81,6 +84,7 @@ internal class GridPainter {
         searchHighlights: TerminalSearchViewportHighlights? = null,
         shellIntegrationDecorations: TerminalShellIntegrationViewportDecorations? = null,
         hoveredPromptMarkerRow: Int = -1,
+        hyperlinkIds: IntArray = cache.hyperlinkIds,
         hoveredHyperlinkId: Int = 0,
         hoveredHyperlinkStartRow: Int = 0,
         hoveredHyperlinkStartColumn: Int = 0,
@@ -104,8 +108,8 @@ internal class GridPainter {
         backgroundPainter.clear(g, palette, width, height)
 
         val paddingLeft = SwingTerminalChrome.left(settings, cache.activeBuffer)
-        val paddingTop = SwingTerminalChrome.top(settings)
-        val paddingBottom = SwingTerminalChrome.bottom(settings)
+        val paddingTop = SwingTerminalChrome.top(settings, cache.activeBuffer)
+        val paddingBottom = SwingTerminalChrome.bottom(settings, cache.activeBuffer)
         val gridPaintHeight = height - paddingTop - paddingBottom
         if (gridPaintHeight <= 0) return
 
@@ -154,6 +158,7 @@ internal class GridPainter {
                     row = row,
                     fontRenderContext = fontRenderContext,
                     textBlinkVisible = textBlinkVisible,
+                    hyperlinkIds = hyperlinkIds,
                     hoveredHyperlinkId = hoveredHyperlinkId,
                     hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
                     hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,

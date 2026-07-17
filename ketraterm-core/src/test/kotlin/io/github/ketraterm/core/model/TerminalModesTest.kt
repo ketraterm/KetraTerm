@@ -23,6 +23,32 @@ import org.junit.jupiter.api.Test
 
 class TerminalModesTest {
     @Test
+    fun `DECBKM selection is atomic explicit and cleared by resets`() {
+        val modes = TerminalModes()
+
+        var snapshot = modes.getModeSnapshot()
+        assertFalse(snapshot.isBackarrowKeyModeExplicit)
+        assertFalse(snapshot.isBackarrowKeySendsBackspace)
+
+        modes.setBackarrowKeyMode(true)
+        snapshot = modes.getModeSnapshot()
+        assertTrue(snapshot.isBackarrowKeyModeExplicit)
+        assertTrue(snapshot.isBackarrowKeySendsBackspace)
+
+        modes.setBackarrowKeyMode(false)
+        snapshot = modes.getModeSnapshot()
+        assertTrue(snapshot.isBackarrowKeyModeExplicit)
+        assertFalse(snapshot.isBackarrowKeySendsBackspace)
+
+        modes.softReset()
+        assertFalse(modes.getModeSnapshot().isBackarrowKeyModeExplicit)
+
+        modes.setBackarrowKeyMode(true)
+        modes.reset()
+        assertFalse(modes.getModeSnapshot().isBackarrowKeyModeExplicit)
+    }
+
+    @Test
     fun `defaults reflect current shared terminal state contract`() {
         val modes = TerminalModes()
 
@@ -71,7 +97,7 @@ class TerminalModesTest {
         modes.mouseEncodingMode = MouseEncodingMode.SGR
         modes.modifyOtherKeysMode = 2
         modes.formatOtherKeysMode = 1
-        modes.kittyKeyboardFlags = KittyKeyboardProgressiveFlag.SUPPORTED_MASK
+        modes.kittyKeyboardFlags = KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK
         modes.isSynchronizedOutput = true
         modes.isBellIsUrgent = true
         modes.isPopOnBell = true
@@ -154,7 +180,7 @@ class TerminalModesTest {
 
         modes.kittyKeyboardFlags = Int.MAX_VALUE
 
-        assertEquals(KittyKeyboardProgressiveFlag.SUPPORTED_MASK, modes.kittyKeyboardFlags)
+        assertEquals(KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK, modes.kittyKeyboardFlags)
     }
 
     @Test
@@ -177,7 +203,7 @@ class TerminalModesTest {
         modes.mouseEncodingMode = MouseEncodingMode.URXVT
         modes.modifyOtherKeysMode = 2
         modes.formatOtherKeysMode = 1
-        modes.kittyKeyboardFlags = KittyKeyboardProgressiveFlag.SUPPORTED_MASK
+        modes.kittyKeyboardFlags = KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK
         modes.isSynchronizedOutput = true
         modes.isBellIsUrgent = true
         modes.isPopOnBell = true

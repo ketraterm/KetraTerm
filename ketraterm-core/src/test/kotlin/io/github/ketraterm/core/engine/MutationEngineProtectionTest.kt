@@ -190,6 +190,34 @@ class MutationEngineProtectionTest {
     }
 
     @Test
+    fun `selectiveEraseScreenToEnd_preservesWideSpanWhenCursorStartsOnProtectedSpacer`() {
+        val state = createState(width = 5, height = 2)
+        val writer = MutationEngine(state)
+        writer.printCodepoint('A'.code, 1)
+        state.pen.setSelectiveEraseProtection(true)
+        writer.printCodepoint(0x1F600, 2)
+        state.pen.setSelectiveEraseProtection(false)
+        writer.printCodepoint('B'.code, 1)
+        state.cursor.row = 1
+        state.cursor.col = 0
+        state.cursor.pendingWrap = false
+        writer.printCodepoint('C'.code, 1)
+
+        state.cursor.row = 0
+        state.cursor.col = 2
+        state.cursor.pendingWrap = false
+        writer.selectiveEraseScreenToEnd()
+
+        assertAll(
+            { assertEquals('A'.code, lineAt(state, 0).getCodepoint(0)) },
+            { assertEquals(0x1F600, lineAt(state, 0).getCodepoint(1)) },
+            { assertEquals(TerminalConstants.WIDE_CHAR_SPACER, lineAt(state, 0).rawCodepoint(2)) },
+            { assertEquals(TerminalConstants.EMPTY, lineAt(state, 0).getCodepoint(3)) },
+            { assertEquals(TerminalConstants.EMPTY, lineAt(state, 1).getCodepoint(0)) },
+        )
+    }
+
+    @Test
     fun `ich_shiftedCells_preserveProtectionBit`() {
         val state = createState(width = 5, height = 1)
         val writer = MutationEngine(state)

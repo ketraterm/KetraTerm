@@ -1,56 +1,21 @@
-# Asynchronous Render Coalescing & Event Loops
+# Coroutine render publication
 
-To prevent UI repainting bottlenecks under high-frequency terminal byte floods (such as running `cat` on a large log file), the `ketraterm-session` module utilizes an asynchronous render coalescing loop.
+`TerminalSession` owns one long-lived render worker coroutine in a `SupervisorJob`. The dispatcher is configurable and non-owned; closing a session cancels its jobs, not the dispatcher.
 
----
+## Invalidation and conflation
 
-## 1. The Render Worker Thread (`renderWorker`)
+A conflated `Channel<Unit>` wakes the worker. Viewport offset and requested row count stay packed in one atomic `Long`, while an atomic generation identifies newer invalidations without allocating request objects.
 
-The session spawns a dedicated, single-threaded ScheduledExecutorService named [renderWorker](../src/main/kotlin/io/github/ketraterm/session/TerminalSession.kt#L84):
+The worker extracts the latest requested viewport under `mutationLock`, copies it into `TerminalRenderPublisher`, and updates `renderGeneration: StateFlow<Long>` only after promotion succeeds. The first publication after an idle period is immediate. During continuous host output, publication is limited to one newest snapshot per 16-millisecond display interval, and the final invalidation in the burst is published as a trailing frame. Intermediate host-output generations are never copied merely to catch up. Explicit UI viewport, resize, palette, and cursor requests interrupt the interval so interaction remains immediate.
 
-* **Daemon Thread**: Spawns daemon threads (`terminal-render-worker-*`) to avoid preventing JVM shutdown when the session is closed.
-* **Isolation**: Decouples the UI painting ticks and PTY reader threads from the rendering cache updates.
+New host output preserves the current requested scrollback offset. A UI viewport change replaces that request. One session therefore supports one active render viewport; independently scrolling views require separate sessions.
 
----
+## Failure and synchronized output
 
-## 2. Dirty Request Coalescing
+Copy failure keeps the previous published cache and does not spin. That generation is retried only after a newer invalidation. Coroutine cancellation is always rethrown.
 
-When a write operation occurs (e.g. host bytes written to screen), the session marks the display as dirty:
+Synchronized-output mode defers publication. A cancellable child job disables the mode after the safety timeout and invalidates rendering. Disabling the mode normally cancels the timeout and publishes immediately.
 
-```
-               Grid Content Mutated
-                        │
-                        ▼
-            [notifyRenderDirty()]
-                        │
-       Is renderScheduled already true?
-               ├──► YES ──► (Ignore request, coalesced!)
-               │
-               └──► NO  ──► [renderScheduled.set(true)]
-                             │
-                             ▼
-                   Schedule render task on
-                    [renderWorker] thread
-                             │
-                             ▼
-                [publish new frame cache]
-                             │
-                             ▼
-                 Invoke [onDirty()] callback
-                             │
-                             ▼
-                 [renderScheduled.set(false)]
-```
+## Allocation boundary
 
-### Invalidation Logic:
-* **Atomic Bit Flag**: An atomic boolean `renderScheduled` acts as a guard. If a render is already pending on the executor queue, subsequent screen mutations are coalesced without scheduling redundant task payloads.
-* **Generation Comparison**: The rendering worker compares the current terminal frame generation against `pendingRenderGeneration`. If the generations match, it skips updating the cache, conserving CPU cycles.
-* **Overscan Packing**: Viewport configurations (like scrollback offset and overscan viewport rows) are packed atomically into a single `Long` (`pendingRenderRequest`), guaranteeing atomic updates between UI adjustments and background cache promotion.
-
----
-
-## 3. Pre-Allocated Response Buffer
-
-For outbound host responses generated dynamically inside the parser loop (such as cursor reports or status queries):
-* **`responseScratch`**: The session pre-allocates a static byte buffer of size `1024` bytes.
-* **Zero Allocations**: Responses are formatted and copied directly into this buffer and sent to `TerminalHostOutput` in a single system block call, eliminating garbage collector pressure on hot parsing paths.
+Invalidation allocates no render-request object. Parser/core mutation, per-cell copying, codepoint handling, and ordinary input encoding contain no coroutine dispatch. Core response bytes continue to use the preallocated session response buffer.

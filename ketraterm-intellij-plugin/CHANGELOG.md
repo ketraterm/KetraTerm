@@ -2,7 +2,44 @@
 
 ## [Unreleased]
 
-- No unreleased changes.
+- Improved terminal rendering performance.
+
+## [0.2.1] - 2026-07-14
+
+- Fixed holding Backspace or Delete deleting only one character.
+- Improved compatibility for Ctrl-number shortcuts, modified keys, extended function keys, and applications that configure Backspace behavior.
+- Reported terminal capabilities more accurately to shells and terminal applications.
+- Improved compatibility with full-screen terminal applications that verify rectangular screen regions.
+
+## [0.2.0] - 2026-07-13
+
+- Fixed multiline paste.
+- Fixed terminal selection copying that could intermittently copy the wrong text or leave the previous clipboard contents unchanged.
+- Improved copying of scrollback selections, wrapped lines, and trailing empty cells.
+- Fixed scrollback behavior in terminal apps (including TUIs like codex logs) so historical output is scrollable again.
+- Fixed prompt gutter clicks wrong selection under certain circumstances.
+
+## [0.1.3] - 2026-07-08
+
+- Improved focused-terminal shortcuts for copy, paste, search, and page scrolling.
+- Added an "Override IDE shortcuts in focused terminal" setting for Ctrl+F search behavior.
+- Added a compact floating search bar with result navigation and match-case control.
+- Added an IDE-native terminal context menu that respects TUI mouse tracking.
+- Improved macOS shortcut behavior with standard Cmd+C, Cmd+V, and Cmd+F bindings.
+
+## [0.1.2] - 2026-07-03
+
+- Added terminal process close confirmation dialog.
+- Added IDE-discovered terminal links, so plain URLs and IDE-recognized file locations in output can be highlighted and opened from KetraTerm.
+- Added option to toggle "Scroll on output" under terminal behavior settings, allowing users to lock their scroll position while background tasks compile or output text.
+- Fixed selection copying to support selecting and copying text spanning across the entire terminal scrollback history.
+- Fixed first-run TUI wrapping corruption.
+
+## [0.1.1] - 2026-07-02
+
+- Fixed AltGr character input and terminal grid corruption on AZERTY keyboards for Windows/Linux.
+- Fixed terminal tool window focus issue where clicking on the terminal component (including Vim/Neovim mouse tracking and hyperlinks) failed to transfer focus back from the editor.
+- Fixed Settings dialog EDT blocking exception when opening settings from the tool window gear icon.
 
 ## [0.1.0] - 2026-06-30
 

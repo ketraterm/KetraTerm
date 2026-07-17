@@ -33,22 +33,25 @@ internal interface SwingRenderFrameHost {
     val componentHeight: Int
     val cursorPresentationEnabled: Boolean
 
-    fun dispatch(action: Runnable)
-
     fun resetCursorBlinkForFrame()
 
     fun refreshRenderCacheFromSession(session: TerminalSession)
+
+    fun requestRender(session: TerminalSession)
 
     /**
      * Resizes the bound terminal grid when the latest rendered frame changes
      * active-buffer chrome enough to alter visible rows or columns.
      *
-     * @return true when the terminal grid was resized and the render cache must
-     * be refreshed from the session again.
+     * @return true when the terminal grid was resized and another render
+     * publication must be requested.
      */
     fun syncTerminalGridToActiveChrome(): Boolean
 
-    fun clampViewport(historySize: Int): Boolean
+    fun clampViewport(
+        historySize: Int,
+        discardedCount: Long,
+    ): Boolean
 
     fun requestedViewportOffset(): Int
 

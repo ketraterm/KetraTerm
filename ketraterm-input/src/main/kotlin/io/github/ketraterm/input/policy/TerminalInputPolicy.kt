@@ -22,7 +22,8 @@ package io.github.ketraterm.input.policy
  * The production encoder suppresses unsupported combinations by default rather
  * than throwing, because UI toolkits may report platform-specific key states.
  *
- * @property backspacePolicy byte sent for the Backspace key.
+ * @property backspacePolicy initial Backspace byte before an explicit DECBKM
+ * set/reset overrides it for the current terminal reset epoch.
  * @property metaKeyPolicy handling for Meta-only printable and legacy key
  * encodings.
  * @property unsupportedModifiedKeyPolicy handling for valid key events whose
@@ -33,8 +34,9 @@ package io.github.ketraterm.input.policy
  * ANSI Line Feed/New Line mode is active.
  * @property mouseCoordinateLimitPolicy handling for legacy mouse coordinates
  * outside the bounded `ESC [ M` byte range.
- * @property pasteSanitizationPolicy handling for pasted text before optional
- * bracketed-paste wrapping.
+ * @property pasteSanitizationPolicy payload sanitization for pasted text.
+ * @property pasteLineEndingPolicy newline canonicalization for unbracketed
+ * pasted text. Bracketed paste always preserves original line endings.
  */
 data class TerminalInputPolicy(
     val backspacePolicy: BackspacePolicy = BackspacePolicy.DELETE,
@@ -46,6 +48,7 @@ data class TerminalInputPolicy(
     val mouseCoordinateLimitPolicy: MouseCoordinateLimitPolicy =
         MouseCoordinateLimitPolicy.SUPPRESS_OUT_OF_RANGE,
     val pasteSanitizationPolicy: PasteSanitizationPolicy = PasteSanitizationPolicy.RAW,
+    val pasteLineEndingPolicy: PasteLineEndingPolicy = PasteLineEndingPolicy.PRESERVE,
 )
 
 /**
@@ -119,6 +122,26 @@ enum class PasteSanitizationPolicy {
     /** Drop C0 controls except TAB, CR, and LF. */
     STRIP_C0_EXCEPT_TAB_CR_LF,
 
-    /** Normalize CRLF and lone CR line endings to LF. */
+    /** Normalize line endings through [TerminalInputPolicy.pasteLineEndingPolicy], defaulting to LF. */
     NORMALIZE_LINE_ENDINGS,
+}
+
+/**
+ * Canonical line ending emitted for unbracketed pasted text.
+ *
+ * Bracketed paste deliberately bypasses this transformation so the receiving
+ * application receives the original clipboard payload.
+ */
+enum class PasteLineEndingPolicy {
+    /** Preserve clipboard line endings exactly. */
+    PRESERVE,
+
+    /** Convert every recognized line ending to LF. */
+    LINE_FEED,
+
+    /** Convert every recognized line ending to CR. */
+    CARRIAGE_RETURN,
+
+    /** Convert every recognized line ending to CRLF. */
+    CARRIAGE_RETURN_AND_LINE_FEED,
 }

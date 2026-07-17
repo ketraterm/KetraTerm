@@ -37,6 +37,7 @@ import org.junit.jupiter.api.Test
 import java.awt.Cursor
 import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JButton
 
@@ -50,8 +51,9 @@ class TerminalHyperlinkControllerTest {
 
     private class FakeHyperlinkHost(
         override val renderCache: TerminalRenderCache,
-        override val session: TerminalSession?,
-        override val hostServices: SwingHostServices,
+        private val session: TerminalSession?,
+        private val hostServices: SwingHostServices,
+        private val discoveredActions: Map<Int, () -> Boolean> = emptyMap(),
     ) : TerminalHyperlinkHost {
         override var cursor: Cursor = Cursor.getDefaultCursor()
         var repaints = 0
@@ -73,6 +75,24 @@ class TerminalHyperlinkControllerTest {
             endColumn: Int,
         ) {
             repaintSpans += RepaintSpan(startRow, startColumn, endRow, endColumn)
+        }
+
+        override fun hyperlinkIdAt(
+            row: Int,
+            column: Int,
+        ): Int = renderCache.hyperlinkIds[renderCache.rowOffset(row) + column]
+
+        override fun isHyperlinkResolvable(hyperlinkId: Int): Boolean =
+            if (hyperlinkId > 0) {
+                session?.hyperlinkUri(hyperlinkId) != null
+            } else {
+                discoveredActions.containsKey(hyperlinkId)
+            }
+
+        override fun openHyperlink(hyperlinkId: Int): Boolean {
+            if (hyperlinkId < 0) return discoveredActions[hyperlinkId]?.invoke() == true
+            val uri = session?.hyperlinkUri(hyperlinkId) ?: return false
+            return hostServices.hyperlinkHandler.openHyperlink(uri)
         }
     }
 
@@ -225,7 +245,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(10, 10),
+                renderPublisher = TerminalRenderPublisher(10, 10),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -258,7 +278,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(10, 10),
+                renderPublisher = TerminalRenderPublisher(10, 10),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -291,7 +311,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(6, 2),
+                renderPublisher = TerminalRenderPublisher(6, 2),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -327,7 +347,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(3, 2),
+                renderPublisher = TerminalRenderPublisher(3, 2),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -361,7 +381,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(6, 2),
+                renderPublisher = TerminalRenderPublisher(6, 2),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -515,7 +535,7 @@ class TerminalHyperlinkControllerTest {
         val session =
             TerminalSession(
                 terminal = terminal,
-                publisher = TerminalRenderPublisher(10, 10),
+                renderPublisher = TerminalRenderPublisher(10, 10),
                 renderReader = FakeFrameReader(),
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -549,6 +569,47 @@ class TerminalHyperlinkControllerTest {
 
         assertTrue(consumed)
         assertEquals("https://example.com", openedUri.get())
+    }
+
+    @Test
+    fun `ctrl click on discovered hyperlink invokes discovered action`() {
+        val cache =
+            TerminalRenderCache(10, 10).apply {
+                hyperlinkIds[rowOffset(1) + 1] = -1
+            }
+        val opened = AtomicBoolean(false)
+        val host =
+            FakeHyperlinkHost(
+                renderCache = cache,
+                session = null,
+                hostServices = SwingHostServices(),
+                discoveredActions =
+                    mapOf(
+                        -1 to {
+                            opened.set(true)
+                            true
+                        },
+                    ),
+            )
+        val controller = TerminalHyperlinkController(host)
+
+        val button = JButton()
+        val clickEvent =
+            MouseEvent(
+                button,
+                MouseEvent.MOUSE_PRESSED,
+                System.currentTimeMillis(),
+                InputEvent.BUTTON1_DOWN_MASK or InputEvent.CTRL_DOWN_MASK,
+                15,
+                25,
+                1,
+                false,
+                MouseEvent.BUTTON1,
+            )
+        val consumed = controller.handleMousePressed(clickEvent)
+
+        assertTrue(consumed)
+        assertTrue(opened.get())
     }
 
     private companion object {

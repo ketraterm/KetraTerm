@@ -164,6 +164,84 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "eraseInLine:$mode:$selective"
     }
 
+    override fun eraseRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        selective: Boolean,
+    ) {
+        events += "eraseRectangle:$top:$left:$bottom:$right:$selective"
+    }
+
+    override fun fillRectangle(
+        codepoint: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) {
+        events += "fillRectangle:$codepoint:$top:$left:$bottom:$right"
+    }
+
+    override fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    ) {
+        events +=
+            "copyRectangle:$sourceTop:$sourceLeft:$sourceBottom:$sourceRight:$sourcePage:$destinationTop:$destinationLeft:$destinationPage"
+    }
+
+    override fun requestRectangleChecksum(
+        requestId: Int,
+        page: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) {
+        events += "requestRectangleChecksum:$requestId:$page:$top:$left:$bottom:$right"
+    }
+
+    override fun setAttributeChangeExtent(extent: Int) {
+        events += "setAttributeChangeExtent:$extent"
+    }
+
+    override fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    ) {
+        events += "changeRectangleAttributes:$top:$left:$bottom:$right:$setMask:$clearMask"
+    }
+
+    override fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    ) {
+        events += "reverseRectangleAttributes:$top:$left:$bottom:$right:$reverseMask"
+    }
+
+    override fun insertColumns(count: Int) {
+        events += "insertColumns:$count"
+    }
+
+    override fun deleteColumns(count: Int) {
+        events += "deleteColumns:$count"
+    }
+
     override fun insertLines(n: Int) {
         events += "insertLines:$n"
     }
@@ -233,6 +311,14 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "resetKeyModifierOptions"
     }
 
+    override fun disableKeyModifierOption(resource: Int) {
+        events += "disableKeyModifierOption:$resource"
+    }
+
+    override fun requestKeyModifierOption(resource: Int) {
+        events += "requestKeyModifierOption:$resource"
+    }
+
     override fun setKeyFormatOption(
         resource: Int,
         value: Int,
@@ -275,6 +361,10 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         parameter: Int,
     ) {
         events += "requestDeviceAttributes:$kind:$parameter"
+    }
+
+    override fun requestKittyKeyboardFlags() {
+        events += "requestKittyKeyboardFlags"
     }
 
     override fun requestWindowReport(mode: Int) {

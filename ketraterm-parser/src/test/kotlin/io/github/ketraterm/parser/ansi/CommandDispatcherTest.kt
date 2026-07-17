@@ -638,6 +638,16 @@ class CommandDispatcherTest {
         }
 
         @Test
+        fun `CSI question-mark u dispatches a parameterless Kitty keyboard query`() {
+            assertEquals(
+                listOf("requestKittyKeyboardFlags"),
+                dispatchCsi('u', privateMarker = '?'.code).events,
+            )
+            assertTrue(dispatchCsi('u', params = listOf(0), privateMarker = '?'.code).events.isEmpty())
+            assertTrue(dispatchCsi('u', params = listOf(1), privateMarker = '?'.code).events.isEmpty())
+        }
+
+        @Test
         fun `CSI h and l dispatch ANSI mode set and reset`() {
             assertEquals(
                 listOf("setAnsiMode:4:true", "setAnsiMode:20:true"),

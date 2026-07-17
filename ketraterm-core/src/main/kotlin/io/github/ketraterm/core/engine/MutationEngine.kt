@@ -22,6 +22,7 @@ import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.core.store.ClusterStore
 import io.github.ketraterm.core.util.UnicodeWidth
+import io.github.ketraterm.protocol.DecRectangleAttribute
 
 /**
  * Dedicated mutation engine for grid writes and line-level erase/edit operations.
@@ -53,6 +54,14 @@ internal class MutationEngine(
     private val blankAttr: Long get() = state.pen.blankAttr
     private val blankExtendedAttr: Long get() = state.pen.blankExtendedAttr
     private var clusterScratch = IntArray(16)
+
+    // Reused by DECCRA. Rectangular copies are unusual but must not allocate per command.
+    private var rectangleCodepoints = IntArray(0)
+    private var rectangleAttrs = LongArray(0)
+    private var rectangleExtendedAttrs = LongArray(0)
+    private var rectangleClusterOffsets = IntArray(0)
+    private var rectangleClusterLengths = IntArray(0)
+    private var rectangleClusterData = IntArray(0)
 
     /**
      * Wraps mutations that conceptually break phantom-column state.
@@ -94,9 +103,19 @@ internal class MutationEngine(
         val n = count.coerceIn(0, bottom - top + 1)
         if (n == 0) return
 
-        if (state.isFullViewportScroll) {
+        if (top == 0) {
             repeat(n) {
                 val line = state.ring.push()
+                if (bottom < state.dimensions.height - 1) {
+                    // Pushing admits the top row to history but initially puts
+                    // the recycled blank at the viewport bottom. Move that
+                    // line to the bottom of the top-anchored scroll region so
+                    // rows below the region retain their viewport positions.
+                    state.ring.rotateDown(
+                        state.resolveRingIndex(bottom),
+                        state.resolveRingIndex(state.dimensions.height - 1),
+                    )
+                }
                 state.clearLineAsNew(line, blankAttr, blankExtendedAttr)
                 state.markLineChanged(line)
             }
@@ -197,15 +216,14 @@ internal class MutationEngine(
     private fun annihilateAt(
         row: Int,
         col: Int,
+        attr: Long = blankAttr,
+        extendedAttr: Long = blankExtendedAttr,
     ) {
         if (row !in 0 until height || col !in 0 until width) return
 
         val line = getLine(row)
         val start = findClusterStart(line, col)
         val raw = line.rawCodepoint(start)
-        val attr = blankAttr
-        val extendedAttr = blankExtendedAttr
-
         if (raw == TerminalConstants.WIDE_CHAR_SPACER) {
             line.setCell(start, TerminalConstants.EMPTY, attr, extendedAttr)
             state.markLineChanged(line)
@@ -236,11 +254,6 @@ internal class MutationEngine(
         left: Int,
         right: Int,
     ) {
-        // Clear potential orphaned spacer on dest
-        if (right + 1 < width && dest.rawCodepoint(right + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
-            dest.setCell(right + 1, TerminalConstants.EMPTY, blankAttr, blankExtendedAttr)
-        }
-
         for (col in left..right) {
             var raw = src.rawCodepoint(col)
             var attr = src.getPackedAttr(col)
@@ -248,6 +261,17 @@ internal class MutationEngine(
 
             if (col == left && raw == TerminalConstants.WIDE_CHAR_SPACER) {
                 // Do not copy the spacer without its leader
+                raw = TerminalConstants.EMPTY
+                attr = blankAttr
+                extendedAttr = blankExtendedAttr
+            }
+
+            if (
+                col == right &&
+                right + 1 < width &&
+                src.rawCodepoint(right + 1) == TerminalConstants.WIDE_CHAR_SPACER
+            ) {
+                // Do not copy a wide leader without its trailing spacer.
                 raw = TerminalConstants.EMPTY
                 attr = blankAttr
                 extendedAttr = blankExtendedAttr
@@ -263,6 +287,17 @@ internal class MutationEngine(
             } else {
                 dest.setCell(col, raw, attr, extendedAttr)
             }
+        }
+    }
+
+    /** Clears destination occupants crossing either horizontal slice boundary. */
+    private fun prepareHorizontalSliceDestination(row: Int) {
+        val line = getLine(row)
+        if (line.rawCodepoint(leftMargin) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, leftMargin)
+        }
+        if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, rightMargin + 1)
         }
     }
 
@@ -418,7 +453,9 @@ internal class MutationEngine(
         }
 
         if (widthInCells == 2 && cCol >= rightMargin) {
-            annihilateAt(cRow, cCol)
+            annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
+            line.wrapped = true
+            state.markLineChanged(line)
             cCol = leftMargin
             cRow = advanceRow(cRow)
             line = getLine(cRow)
@@ -426,15 +463,15 @@ internal class MutationEngine(
 
         if (state.modes.isInsertMode) {
             if (line.rawCodepoint(cCol) == TerminalConstants.WIDE_CHAR_SPACER) {
-                annihilateAt(cRow, cCol)
+                annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
             }
             line.insertCellsInRange(cCol, widthInCells, rightMargin, blankAttr, blankExtendedAttr)
             state.markLineChanged(line)
         }
 
-        annihilateAt(cRow, cCol)
+        annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
         if (widthInCells == 2 && cCol + 1 <= rightMargin) {
-            annihilateAt(cRow, cCol + 1)
+            annihilateAt(cRow, cCol + 1, state.pen.currentAttr, state.pen.currentExtendedAttr)
         }
 
         val writtenCol = cCol
@@ -566,7 +603,7 @@ internal class MutationEngine(
                 annihilateAt(row, col + 1)
             }
         } else if (col + 1 < width && line.rawCodepoint(col + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
-            line.setCell(col + 1, TerminalConstants.EMPTY, blankAttr, blankExtendedAttr)
+            line.setCell(col + 1, TerminalConstants.EMPTY, attr, extendedAttr)
         }
 
         line.setCluster(col, clusterScratch, existingLength + 1, attr, extendedAttr)
@@ -616,6 +653,15 @@ internal class MutationEngine(
 
         val absCursorRow = state.resolveRingIndex(cRow)
         val absBottom = state.resolveRingIndex(bottom)
+        // IL/DL replace the row at cRow, severing any soft-wrap continuation
+        // from the preceding display row into that content.
+        if (cRow > 0) {
+            val preceding = getLine(cRow - 1)
+            if (preceding.wrapped) {
+                preceding.wrapped = false
+                state.markLineChanged(preceding)
+            }
+        }
         onMutate(absCursorRow, absBottom, times)
     }
 
@@ -639,15 +685,14 @@ internal class MutationEngine(
                 val topRow = state.cursor.row
                 val bottomRow = state.scrollBottom
                 for (row in bottomRow downTo topRow + times) {
+                    prepareHorizontalSliceDestination(row)
                     copySlice(getLine(row - times), getLine(row), leftMargin, rightMargin)
                     getLine(row).wrapped = false
                     state.markLineChanged(getLine(row))
                 }
                 for (row in topRow until topRow + times) {
                     val line = getLine(row)
-                    if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
-                        annihilateAt(row, rightMargin + 1)
-                    }
+                    prepareHorizontalSliceDestination(row)
                     line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
                     line.wrapped = false
                     state.markLineChanged(line)
@@ -677,15 +722,14 @@ internal class MutationEngine(
                 val topRow = state.cursor.row
                 val bottomRow = state.scrollBottom
                 for (row in topRow..bottomRow - times) {
+                    prepareHorizontalSliceDestination(row)
                     copySlice(getLine(row + times), getLine(row), leftMargin, rightMargin)
                     getLine(row).wrapped = false
                     state.markLineChanged(getLine(row))
                 }
                 for (row in bottomRow - times + 1..bottomRow) {
                     val line = getLine(row)
-                    if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
-                        annihilateAt(row, rightMargin + 1)
-                    }
+                    prepareHorizontalSliceDestination(row)
                     line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
                     line.wrapped = false
                     state.markLineChanged(line)
@@ -778,6 +822,95 @@ internal class MutationEngine(
     }
 
     /**
+     * Inserts blank columns at the cursor through the active vertical scroll region (DECIC).
+     *
+     * Every affected line uses the same horizontal range and boundary repairs as ICH. This keeps
+     * wide leaders/spacers atomic even when a shifted span crosses the cursor or right margin.
+     */
+    fun insertColumns(count: Int) {
+        if (count <= 0) return
+
+        structuralMutation {
+            if (!isCursorInMargins() || state.cursor.row !in state.scrollTop..state.scrollBottom) return@structuralMutation
+            val cCol = state.cursor.col
+            val safeCount = count.coerceAtMost(rightMargin - cCol + 1)
+            if (safeCount <= 0) return@structuralMutation
+
+            for (row in state.scrollTop..state.scrollBottom) {
+                prepareInsertColumnShift(row, cCol, safeCount)
+                val line = getLine(row)
+                line.insertCellsInRange(cCol, safeCount, rightMargin, blankAttr, blankExtendedAttr)
+                line.wrapped = false
+                state.markLineChanged(line)
+            }
+        }
+    }
+
+    /**
+     * Deletes columns at the cursor through the active vertical scroll region (DECDC).
+     *
+     * Every affected line uses the same horizontal range and boundary repairs as DCH. This keeps
+     * wide leaders/spacers atomic even when the deleted range intersects only one visual cell.
+     */
+    fun deleteColumns(count: Int) {
+        if (count <= 0) return
+
+        structuralMutation {
+            if (!isCursorInMargins() || state.cursor.row !in state.scrollTop..state.scrollBottom) return@structuralMutation
+            val cCol = state.cursor.col
+            val safeCount = count.coerceAtMost(rightMargin - cCol + 1)
+            if (safeCount <= 0) return@structuralMutation
+
+            for (row in state.scrollTop..state.scrollBottom) {
+                prepareDeleteColumnShift(row, cCol, safeCount)
+                val line = getLine(row)
+                line.deleteCellsInRange(cCol, safeCount, rightMargin, blankAttr, blankExtendedAttr)
+                line.wrapped = false
+                state.markLineChanged(line)
+            }
+        }
+    }
+
+    /** Removes spans that would otherwise be split by a rightward column shift. */
+    private fun prepareInsertColumnShift(
+        row: Int,
+        col: Int,
+        count: Int,
+    ) {
+        val line = getLine(row)
+        if (line.rawCodepoint(col) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, col)
+        }
+
+        val discardedStart = rightMargin - count + 1
+        if (discardedStart in (col + 1)..rightMargin && line.rawCodepoint(discardedStart) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, discardedStart)
+        }
+
+        if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, rightMargin + 1)
+        }
+    }
+
+    /** Removes spans that would otherwise be split by a leftward column shift. */
+    private fun prepareDeleteColumnShift(
+        row: Int,
+        col: Int,
+        count: Int,
+    ) {
+        annihilateAt(row, col)
+        val line = getLine(row)
+        val firstSurvivor = col + count
+        if (firstSurvivor <= rightMargin && line.rawCodepoint(firstSurvivor) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, firstSurvivor)
+        }
+
+        if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(row, rightMargin + 1)
+        }
+    }
+
+    /**
      * Erases [count] cells starting at the cursor column without shifting the
      * remainder of the line (ECH).
      *
@@ -810,11 +943,10 @@ internal class MutationEngine(
         cRow: Int,
         cCol: Int,
     ) {
+        if (cCol <= leftMargin) breakSoftWrapInto(cRow)
         val line = getLine(cRow)
         if (state.modes.isLeftRightMarginMode) {
             if (cCol !in leftMargin..rightMargin) {
-                line.wrapped = false
-                state.markLineChanged(line)
                 return
             }
             val start = maxOf(cCol, leftMargin)
@@ -848,6 +980,7 @@ internal class MutationEngine(
         cRow: Int,
         cCol: Int,
     ) {
+        breakSoftWrapInto(cRow)
         val line = getLine(cRow)
         if (state.modes.isLeftRightMarginMode) {
             if (cCol !in leftMargin..rightMargin) return
@@ -878,6 +1011,7 @@ internal class MutationEngine(
         structuralMutation {
             val cRow = state.cursor.row
             if (cRow !in 0 until height) return@structuralMutation
+            breakSoftWrapInto(cRow)
             val line = getLine(cRow)
             if (state.modes.isLeftRightMarginMode) {
                 line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
@@ -887,6 +1021,15 @@ internal class MutationEngine(
             line.wrapped = false
             state.markLineChanged(line)
         }
+
+    private fun breakSoftWrapInto(row: Int) {
+        if (row <= 0) return
+        val preceding = getLine(row - 1)
+        if (preceding.wrapped) {
+            preceding.wrapped = false
+            state.markLineChanged(preceding)
+        }
+    }
 
     /** Selectively erases from the cursor through the end of the current line (DECSEL 0). */
     fun selectiveEraseLineToEnd() =
@@ -1028,6 +1171,401 @@ internal class MutationEngine(
         }
 
     /**
+     * Applies a VT400 rectangular erase operation without moving the cursor.
+     *
+     * The DEC coordinates are one-based and inclusive. Origin mode rebases them onto the active
+     * scroll region and, when horizontal margins are enabled, its active column region. Rectangles
+     * outside that domain are clipped to it. Any visual occupant intersecting the rectangle is
+     * handled atomically so a wide leader/spacer pair or grapheme cluster cannot be split.
+     */
+    fun eraseRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        selective: Boolean,
+    ) = structuralMutation {
+        withRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
+            for (row in topRow..bottomRow) {
+                if (selective) {
+                    selectiveEraseRange(row, leftCol, rightCol + 1)
+                } else {
+                    eraseRange(row, leftCol, rightCol + 1)
+                }
+            }
+        }
+    }
+
+    /**
+     * Applies a VT420 rectangular fill operation without moving the cursor.
+     *
+     * DECFRA addresses terminal cells rather than printable-stream columns, so the fill character
+     * is installed as one cell even if a host supplied an unusual wide scalar. Existing visual
+     * occupants are first annihilated as full spans to preserve grid integrity.
+     */
+    fun fillRectangle(
+        codepoint: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) = structuralMutation {
+        if (codepoint !in 0..0x10FFFF || codepoint in 0xD800..0xDFFF) return@structuralMutation
+
+        withRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
+            for (row in topRow..bottomRow) {
+                val line = getLine(row)
+                for (col in leftCol..rightCol) {
+                    annihilateAt(row, col)
+                    line.setCell(col, codepoint, state.pen.currentAttr, state.pen.currentExtendedAttr)
+                }
+                line.wrapped = false
+                state.markLineChanged(line)
+            }
+        }
+    }
+
+    /**
+     * Applies VT420 DECCRA using a source snapshot, giving overlapping copies memmove semantics.
+     *
+     * VT420 page numbers are normalized to this emulator's single active page: omitted page zero
+     * and page one are accepted; all other pages are unsupported and therefore have no effect.
+     */
+    fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    ) = structuralMutation {
+        if (sourcePage !in 0..1 || destinationPage !in 0..1) return@structuralMutation
+
+        withRectangle(sourceTop, sourceLeft, sourceBottom, sourceRight) { topRow, leftCol, bottomRow, rightCol ->
+            val originRows = state.modes.isOriginMode
+            val originColumns = originRows && state.modes.isLeftRightMarginMode
+            val rowBase = if (originRows) state.scrollTop else 0
+            val rowLimit = if (originRows) state.scrollBottom else height - 1
+            val colBase = if (originColumns) leftMargin else 0
+            val colLimit = if (originColumns) rightMargin else width - 1
+            val destinationRow = rowBase + if (destinationTop <= 0) 0 else destinationTop - 1
+            val destinationCol = colBase + if (destinationLeft <= 0) 0 else destinationLeft - 1
+            if (destinationRow !in rowBase..rowLimit || destinationCol !in colBase..colLimit) return@withRectangle
+
+            val sourceRows = bottomRow - topRow + 1
+            val sourceColumns = rightCol - leftCol + 1
+            val copyRows = minOf(sourceRows, rowLimit - destinationRow + 1)
+            val copyColumns = minOf(sourceColumns, colLimit - destinationCol + 1)
+            if (copyRows <= 0 || copyColumns <= 0) return@withRectangle
+
+            snapshotRectangle(topRow, leftCol, copyRows, copyColumns)
+
+            // Clear all target occupants before writing so a copied leader and spacer cannot
+            // annihilate one another while a wide span is being reconstructed.
+            for (rowOffset in 0 until copyRows) {
+                val row = destinationRow + rowOffset
+                for (colOffset in 0 until copyColumns) {
+                    annihilateAt(row, destinationCol + colOffset)
+                }
+            }
+
+            for (rowOffset in 0 until copyRows) {
+                val line = getLine(destinationRow + rowOffset)
+                val rowStart = rowOffset * copyColumns
+                for (colOffset in 0 until copyColumns) {
+                    val index = rowStart + colOffset
+                    val raw = rectangleCodepoints[index]
+                    val attr = rectangleAttrs[index]
+                    val extendedAttr = rectangleExtendedAttrs[index]
+                    val clusterLength = rectangleClusterLengths[index]
+                    if (clusterLength != 0) {
+                        ensureClusterScratchCapacity(clusterLength)
+                        rectangleClusterData.copyInto(
+                            clusterScratch,
+                            destinationOffset = 0,
+                            startIndex = rectangleClusterOffsets[index],
+                            endIndex = rectangleClusterOffsets[index] + clusterLength,
+                        )
+                        line.setCluster(
+                            destinationCol + colOffset,
+                            clusterScratch,
+                            clusterLength,
+                            attr,
+                            extendedAttr,
+                        )
+                    } else {
+                        line.setCell(destinationCol + colOffset, raw, attr, extendedAttr)
+                    }
+                }
+                state.markLineChanged(line)
+            }
+        }
+    }
+
+    /** Selects DECSACE's stream (`0`/`1`) or exact rectangle (`2`) extent. */
+    fun setAttributeChangeExtent(extent: Int) {
+        when (extent) {
+            0, 1 -> state.isAttributeChangeExtentRectangle = false
+            2 -> state.isAttributeChangeExtentRectangle = true
+        }
+    }
+
+    /** Applies VT420 DECCARA while preserving glyph payloads and the current SGR pen. */
+    fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    ) = structuralMutation {
+        val supportedSetMask = setMask and DecRectangleAttribute.ALL
+        val supportedClearMask = clearMask and DecRectangleAttribute.ALL
+        if (supportedSetMask == 0 && supportedClearMask == 0) return@structuralMutation
+
+        withAttributeExtent(top, left, bottom, right) { row, from, to, materializeBlanks ->
+            applyRectangleAttributeRange(
+                row = row,
+                from = from,
+                to = to,
+                materializeBlanks = materializeBlanks,
+                setMask = supportedSetMask,
+                clearMask = supportedClearMask,
+                reverseMask = 0,
+            )
+        }
+    }
+
+    /** Applies VT420 DECRARA while preserving glyph payloads and the current SGR pen. */
+    fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    ) = structuralMutation {
+        val supportedReverseMask = reverseMask and DecRectangleAttribute.ALL
+        if (supportedReverseMask == 0) return@structuralMutation
+
+        withAttributeExtent(top, left, bottom, right) { row, from, to, materializeBlanks ->
+            applyRectangleAttributeRange(
+                row = row,
+                from = from,
+                to = to,
+                materializeBlanks = materializeBlanks,
+                setMask = 0,
+                clearMask = 0,
+                reverseMask = supportedReverseMask,
+            )
+        }
+    }
+
+    /**
+     * Resolves DECSACE extent. Stream coordinates identify inclusive endpoints and wrap across
+     * physical line boundaries; exact rectangle coordinates address each row independently.
+     */
+    private inline fun withAttributeExtent(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        block: (row: Int, from: Int, to: Int, materializeBlanks: Boolean) -> Unit,
+    ) {
+        withRectangle(top, left, bottom, right) { topRow, leftCol, bottomRow, rightCol ->
+            if (state.isAttributeChangeExtentRectangle) {
+                for (row in topRow..bottomRow) {
+                    block(row, leftCol, rightCol, true)
+                }
+            } else {
+                for (row in topRow..bottomRow) {
+                    val from = if (row == topRow) leftCol else 0
+                    val to = if (row == bottomRow) rightCol else width - 1
+                    block(row, from, to, false)
+                }
+            }
+        }
+    }
+
+    /** Updates one DECSACE-selected span without allocating or invalidating cluster handles. */
+    private fun applyRectangleAttributeRange(
+        row: Int,
+        from: Int,
+        to: Int,
+        materializeBlanks: Boolean,
+        setMask: Int,
+        clearMask: Int,
+        reverseMask: Int,
+    ) {
+        val line = getLine(row)
+        var col = from
+        while (col <= to) {
+            val raw = line.rawCodepoint(col)
+            if (raw == TerminalConstants.EMPTY) {
+                if (materializeBlanks) {
+                    val attr = transformRectanglePrimary(line.getPackedAttr(col), setMask, clearMask, reverseMask)
+                    val extendedAttr =
+                        transformRectangleExtended(line.getPackedExtendedAttr(col), setMask, clearMask, reverseMask)
+                    line.setCell(col, ' '.code, attr, extendedAttr)
+                }
+                col++
+                continue
+            }
+
+            val owner = findClusterStart(line, col)
+            updateRectangleCellAttributes(line, owner, setMask, clearMask, reverseMask)
+            val endExclusive = occupantEndExclusive(line, owner)
+            if (endExclusive > owner + 1) {
+                updateRectangleCellAttributes(line, owner + 1, setMask, clearMask, reverseMask)
+            }
+            col = maxOf(col + 1, endExclusive)
+        }
+        state.markLineChanged(line)
+    }
+
+    private fun updateRectangleCellAttributes(
+        line: Line,
+        col: Int,
+        setMask: Int,
+        clearMask: Int,
+        reverseMask: Int,
+    ) {
+        line.setCellAttributes(
+            col,
+            transformRectanglePrimary(line.getPackedAttr(col), setMask, clearMask, reverseMask),
+            transformRectangleExtended(line.getPackedExtendedAttr(col), setMask, clearMask, reverseMask),
+        )
+    }
+
+    private fun transformRectanglePrimary(
+        attr: Long,
+        setMask: Int,
+        clearMask: Int,
+        reverseMask: Int,
+    ): Long =
+        if (reverseMask != 0) {
+            AttributeCodec.reverseRectangularPrimaryAttributes(attr, reverseMask)
+        } else {
+            AttributeCodec.changeRectangularPrimaryAttributes(attr, setMask, clearMask)
+        }
+
+    private fun transformRectangleExtended(
+        extendedAttr: Long,
+        setMask: Int,
+        clearMask: Int,
+        reverseMask: Int,
+    ): Long =
+        if (reverseMask != 0) {
+            AttributeCodec.reverseRectangularExtendedAttributes(extendedAttr, reverseMask)
+        } else {
+            AttributeCodec.changeRectangularExtendedAttributes(extendedAttr, setMask, clearMask)
+        }
+
+    /** Snapshots source cells and cluster payloads before DECCRA mutates an overlapping target. */
+    private fun snapshotRectangle(
+        topRow: Int,
+        leftCol: Int,
+        rows: Int,
+        columns: Int,
+    ) {
+        val cellCount = rows * columns
+        ensureRectangleCellCapacity(cellCount)
+        var clusterDataSize = 0
+        for (rowOffset in 0 until rows) {
+            val line = getLine(topRow + rowOffset)
+            val rowStart = rowOffset * columns
+            for (colOffset in 0 until columns) {
+                val index = rowStart + colOffset
+                val sourceCol = leftCol + colOffset
+                val raw = line.rawCodepoint(sourceCol)
+                rectangleCodepoints[index] = raw
+                rectangleAttrs[index] = line.getPackedAttr(sourceCol)
+                rectangleExtendedAttrs[index] = line.getPackedExtendedAttr(sourceCol)
+                if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
+                    val clusterLength = line.store.length(raw)
+                    ensureRectangleClusterDataCapacity(clusterDataSize + clusterLength)
+                    line.store.readInto(raw, rectangleClusterData, clusterDataSize)
+                    rectangleClusterOffsets[index] = clusterDataSize
+                    rectangleClusterLengths[index] = clusterLength
+                    clusterDataSize += clusterLength
+                } else {
+                    rectangleClusterOffsets[index] = 0
+                    rectangleClusterLengths[index] = 0
+                }
+            }
+
+            val first = rowStart
+            val last = rowStart + columns - 1
+            if (rectangleCodepoints[first] == TerminalConstants.WIDE_CHAR_SPACER) {
+                setSnapshotBlank(first)
+            }
+            if (
+                rectangleCodepoints[last] != TerminalConstants.WIDE_CHAR_SPACER &&
+                leftCol + columns < width &&
+                line.rawCodepoint(leftCol + columns) == TerminalConstants.WIDE_CHAR_SPACER
+            ) {
+                setSnapshotBlank(last)
+            }
+        }
+    }
+
+    private fun setSnapshotBlank(index: Int) {
+        rectangleCodepoints[index] = TerminalConstants.EMPTY
+        rectangleAttrs[index] = blankAttr
+        rectangleExtendedAttrs[index] = blankExtendedAttr
+        rectangleClusterOffsets[index] = 0
+        rectangleClusterLengths[index] = 0
+    }
+
+    private fun ensureRectangleCellCapacity(required: Int) {
+        if (rectangleCodepoints.size >= required) return
+        var nextSize = rectangleCodepoints.size.coerceAtLeast(16)
+        while (nextSize < required) nextSize *= 2
+        rectangleCodepoints = IntArray(nextSize)
+        rectangleAttrs = LongArray(nextSize)
+        rectangleExtendedAttrs = LongArray(nextSize)
+        rectangleClusterOffsets = IntArray(nextSize)
+        rectangleClusterLengths = IntArray(nextSize)
+    }
+
+    private fun ensureRectangleClusterDataCapacity(required: Int) {
+        if (rectangleClusterData.size >= required) return
+        var nextSize = rectangleClusterData.size.coerceAtLeast(16)
+        while (nextSize < required) nextSize *= 2
+        rectangleClusterData = IntArray(nextSize)
+    }
+
+    private inline fun withRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        block: (topRow: Int, leftCol: Int, bottomRow: Int, rightCol: Int) -> Unit,
+    ) {
+        val originRows = state.modes.isOriginMode
+        val originColumns = originRows && state.modes.isLeftRightMarginMode
+        val rowBase = if (originRows) state.scrollTop else 0
+        val rowLimit = if (originRows) state.scrollBottom else height - 1
+        val colBase = if (originColumns) leftMargin else 0
+        val colLimit = if (originColumns) rightMargin else width - 1
+
+        val requestedTop = rowBase + if (top <= 0) 0 else top - 1
+        val requestedLeft = colBase + if (left <= 0) 0 else left - 1
+        val requestedBottom = rowBase + if (bottom <= 0) rowLimit - rowBase else bottom - 1
+        val requestedRight = colBase + if (right <= 0) colLimit - colBase else right - 1
+        if (requestedTop > requestedBottom || requestedLeft > requestedRight) return
+
+        val topRow = requestedTop.coerceIn(rowBase, rowLimit)
+        val leftCol = requestedLeft.coerceIn(colBase, colLimit)
+        val bottomRow = requestedBottom.coerceIn(rowBase, rowLimit)
+        val rightCol = requestedRight.coerceIn(colBase, colLimit)
+        if (topRow > bottomRow || leftCol > rightCol) return
+
+        block(topRow, leftCol, bottomRow, rightCol)
+    }
+
+    /**
      * Clears scrollback history while preserving the current visible viewport (ED 3).
      *
      * Visible rows are deep-copied into a fresh ring/store pair so dropped
@@ -1139,6 +1677,11 @@ internal class MutationEngine(
         structuralMutation {
             val oldCursorCol = state.cursor.col
             val oldCursorRow = state.cursor.row
+            val sourceLine = getLine(oldCursorRow)
+            if (sourceLine.wrapped) {
+                sourceLine.wrapped = false
+                state.markLineChanged(sourceLine)
+            }
             state.cursor.row = advanceRow(state.cursor.row)
             markCursorIfMoved(oldCursorCol, oldCursorRow)
         }

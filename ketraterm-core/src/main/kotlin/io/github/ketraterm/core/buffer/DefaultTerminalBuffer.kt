@@ -152,7 +152,7 @@ internal class DefaultTerminalBuffer private constructor(
         state.altBuffer.resetLeftRightMargins(state.dimensions.width)
         state.primaryBuffer.clearKittyKeyboardStack()
         state.altBuffer.clearKittyKeyboardStack()
-        state.hostResponses.clear()
+        state.isAttributeChangeExtentRectangle = false
         state.modes.reset()
         state.tabStops.resetToDefault()
         state.cursorShape = state.defaultCursorShape
@@ -164,6 +164,7 @@ internal class DefaultTerminalBuffer private constructor(
     override fun softReset() {
         val wasReverseVideo = state.modes.isReverseVideo
         state.pen.reset()
+        state.isAttributeChangeExtentRectangle = false
 
         state.modes.softReset()
 

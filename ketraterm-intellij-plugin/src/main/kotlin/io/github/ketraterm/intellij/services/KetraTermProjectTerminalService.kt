@@ -23,18 +23,24 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.ui.content.Content
+import com.intellij.ui.content.ContentManager
+import com.intellij.ui.content.ContentManagerEvent
+import com.intellij.ui.content.ContentManagerListener
 import io.github.ketraterm.host.TerminalClipboardOrigin
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.ui.KetraTermTerminalPane
+import io.github.ketraterm.intellij.ui.KetraTermTerminalPaneHostActions
 import io.github.ketraterm.intellij.ui.KetraTermTerminalStartupView
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.workspace.*
 import java.awt.BorderLayout
+import java.awt.Component
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JPanel
+import javax.swing.SwingUtilities
 
 /**
  * Project-level owner for IntelliJ-hosted KetraTerm tabs and sessions.
@@ -52,6 +58,7 @@ class KetraTermProjectTerminalService(
     private val contentsByTabId = LinkedHashMap<String, Content>()
     private val pendingTabsById = LinkedHashMap<String, PendingTerminalTab>()
     private val panesByTabId = LinkedHashMap<String, KetraTermTerminalPane>()
+    private val closeListenersByTabId = LinkedHashMap<String, ContentCloseQueryRegistration>()
     private val workspace = TerminalWorkspace(IntellijWorkspaceListener())
     private val workspaceLock = Any()
     private val nextPendingTabNumber = AtomicInteger(1)
@@ -68,6 +75,26 @@ class KetraTermProjectTerminalService(
      * Returns true when this project already has an open terminal tab.
      */
     fun hasOpenTabs(): Boolean = contentsByTabId.isNotEmpty() || pendingTabsById.isNotEmpty()
+
+    /**
+     * Finds the terminal pane that owns [component].
+     *
+     * Registered IntelliJ actions use this to scope global keymap shortcuts to
+     * the focused KetraTerm terminal pane without installing per-pane action
+     * instances.
+     *
+     * @param component focused Swing component from the action event context.
+     * @return owning terminal pane, or `null` when focus is outside KetraTerm.
+     */
+    internal fun paneForComponent(component: Component?): KetraTermTerminalPane? {
+        if (component == null || disposed) return null
+        for (pane in panesByTabId.values) {
+            if (component === pane.component || SwingUtilities.isDescendingFrom(component, pane.component)) {
+                return pane
+            }
+        }
+        return null
+    }
 
     /**
      * Opens the initial terminal tab if no terminal content exists yet.
@@ -166,9 +193,15 @@ class KetraTermProjectTerminalService(
         disposed = true
 
         val panes = panesByTabId.values.toList()
+        val closeRegistrations = closeListenersByTabId.values.toList()
+        for (registration in closeRegistrations) {
+            registration.manager.removeContentManagerListener(registration.listener)
+        }
+
         panesByTabId.clear()
         contentsByTabId.clear()
         pendingTabsById.clear()
+        closeListenersByTabId.clear()
 
         for (pane in panes) {
             pane.close()
@@ -184,6 +217,7 @@ class KetraTermProjectTerminalService(
 
         val pane = panesByTabId.remove(tabId)
         val content = contentsByTabId.remove(tabId)
+        removeCloseQueryListener(tabId)
         if (pane == null && content == null) return
 
         pane?.close()
@@ -197,6 +231,7 @@ class KetraTermProjectTerminalService(
 
         val pane = panesByTabId.remove(tab.id) ?: return
         val content = contentsByTabId.remove(tab.id)
+        removeCloseQueryListener(tab.id)
 
         pane.close()
         synchronized(workspaceLock) {
@@ -262,11 +297,23 @@ class KetraTermProjectTerminalService(
         pendingTab: PendingTerminalTab,
         workspaceTab: TerminalWorkspaceTab,
     ) {
-        val pane = KetraTermTerminalPane.create(workspaceTab)
+        val pane =
+            KetraTermTerminalPane.create(
+                project = project,
+                tab = workspaceTab,
+                hostActions =
+                    KetraTermTerminalPaneHostActions(
+                        openNewTabAction = ::openDefaultTabFromContextMenu,
+                        canOpenTerminalHereAction = ::canOpenTerminalHere,
+                        openTerminalHereAction = ::openTerminalHere,
+                        closePaneAction = ::closePaneFromContextMenu,
+                    ),
+            )
         replaceContent(pendingTab.container, pane.component)
         pendingTab.content.displayName = workspaceTab.title
         pendingTab.content.preferredFocusableComponent = pane.terminal
         pendingTab.content.setDisposer(TerminalTabDisposable(workspaceTab.id))
+        installCloseQueryListener(pendingTab.content, workspaceTab)
         contentsByTabId[workspaceTab.id] = pendingTab.content
         panesByTabId[workspaceTab.id] = pane
         pane.requestFocus()
@@ -286,12 +333,37 @@ class KetraTermProjectTerminalService(
 
     private fun replaceContent(
         container: JPanel,
-        component: java.awt.Component,
+        component: Component,
     ) {
         container.removeAll()
         container.add(component, BorderLayout.CENTER)
         container.revalidate()
         container.repaint()
+    }
+
+    private fun openDefaultTabFromContextMenu(): Boolean {
+        val toolWindow = lastToolWindow ?: return false
+        openDefaultTab(toolWindow)
+        return true
+    }
+
+    private fun canOpenTerminalHere(tab: TerminalWorkspaceTab): Boolean =
+        lastToolWindow != null && IntellijWorkingDirectoryResolver.resolve(tab.currentWorkingDirectoryUri) != null
+
+    private fun openTerminalHere(tab: TerminalWorkspaceTab): Boolean {
+        val toolWindow = lastToolWindow ?: return false
+        val workingDirectory = IntellijWorkingDirectoryResolver.resolve(tab.currentWorkingDirectoryUri) ?: return false
+        openTab(
+            toolWindow = toolWindow,
+            profile = tab.profile.copy(workingDirectory = workingDirectory),
+            settings = KetraTermIntellijSettings.getInstance().current(),
+        )
+        return true
+    }
+
+    private fun closePaneFromContextMenu(tab: TerminalWorkspaceTab) {
+        val content = contentsByTabId[tab.id] ?: return
+        content.manager?.removeContent(content, true)
     }
 
     private fun reloadOpenTerminalSettings() {
@@ -314,6 +386,48 @@ class KetraTermProjectTerminalService(
             pasteSanitizationPolicy = settings.pasteSanitizationPolicy,
             hostPolicy = KetraTermIntellijSettings.getInstance().createHostPolicy(profile.command),
         )
+
+    private fun installCloseQueryListener(
+        content: Content,
+        tab: TerminalWorkspaceTab,
+    ) {
+        val listener =
+            object : ContentManagerListener {
+                override fun contentRemoveQuery(event: ContentManagerEvent) {
+                    if (event.content !== content) return
+                    if (!confirmLiveProcessClose(tab)) {
+                        event.consume()
+                    }
+                }
+
+                override fun contentRemoved(event: ContentManagerEvent) {
+                    if (event.content !== content) return
+                    removeCloseQueryListener(tab.id)
+                }
+            }
+        val manager = content.manager ?: return
+        manager.addContentManagerListener(listener)
+        closeListenersByTabId[tab.id] = ContentCloseQueryRegistration(manager, listener)
+    }
+
+    private fun removeCloseQueryListener(tabId: String) {
+        val registration = closeListenersByTabId.remove(tabId) ?: return
+        registration.manager.removeContentManagerListener(registration.listener)
+    }
+
+    private fun confirmLiveProcessClose(tab: TerminalWorkspaceTab): Boolean {
+        if (!tab.session.shellIntegrationState.hasRunningCommand()) return true
+        val answer =
+            Messages.showYesNoDialog(
+                project,
+                "Closing \"${tab.title}\" will terminate its running process.",
+                "Terminate Terminal Process?",
+                "Terminate",
+                "Cancel",
+                Messages.getWarningIcon(),
+            )
+        return answer == Messages.YES
+    }
 
     private inner class TerminalTabDisposable(
         private val tabId: String,
@@ -392,6 +506,7 @@ class KetraTermProjectTerminalService(
             invokeLaterIfAlive {
                 contentsByTabId.remove(tabId)
                 panesByTabId.remove(tabId)
+                removeCloseQueryListener(tabId)
             }
         }
 
@@ -427,6 +542,11 @@ class KetraTermProjectTerminalService(
     private data class PendingTerminalTab(
         val content: Content,
         val container: JPanel,
+    )
+
+    private data class ContentCloseQueryRegistration(
+        val manager: ContentManager,
+        val listener: ContentManagerListener,
     )
 
     private sealed interface TerminalStartupResult {

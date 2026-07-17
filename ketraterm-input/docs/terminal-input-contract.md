@@ -53,12 +53,25 @@ Keyboard events contain exactly one of:
 
 - a `TerminalKey` for non-printable physical keys
 - a printable Unicode scalar codepoint
+- Kitty text-only key code `0` with non-empty associated text when an IME or
+  host text API has no physical-key identity
+
+Each event also carries a host-reported lifecycle phase: press, repeat, or
+release. Hosts must not infer repeat or release semantics they cannot observe.
+
+Printable events may additionally carry unshifted, shifted current-layout, and
+standard PC-101 base-layout scalars that identify the physical text-producing
+key, as well as associated host-owned text. Input sources must leave each value
+unknown when they cannot provide it truthfully; each is distinct from produced
+text and is used only by the relevant Kitty-compatible CSI-u progressive flag.
 
 Guaranteed behavior:
 
 - invalid modifier bitmasks are rejected
 - surrogate codepoints and values above `U+10FFFF` are rejected
 - C0 control codepoints and DEL are rejected as printable input
+- text-only events require scalar-valid associated text and cannot carry
+  physical-key scalar metadata
 - physical control-ish input such as Enter, Tab, Escape, and Backspace uses
   `TerminalKey`
 
@@ -125,12 +138,16 @@ keyboard mode.
 
 Guaranteed behavior:
 
+- repeat events use normal press encoding unless Kitty event-type reporting is
+  active; release events are suppressed when the active protocol cannot
+  represent releases
 - Ctrl mappings are explicit and never silently drop unsupported modifiers
 - Alt can prefix applicable legacy encodings with ESC under policy
 - Meta handling for legacy printable/control encodings follows policy
 - special keys with xterm CSI modifier encodings may encode Meta as modifier
   parameter 9
-- Backspace byte selection follows `BackspacePolicy`
+- Backspace byte selection follows `BackspacePolicy` until the host explicitly
+  selects DECBKM; DECSET 67 sends BS and DECRST 67 sends DEL until reset
 - Enter follows newline mode for unmodified or policy-accepted events unless
   the active input policy forces CR-only Return for cooked PTY hosts
 - application cursor and application keypad modes are read from the per-event
@@ -146,11 +163,32 @@ Supported modified-key protocol:
   `CSI 27 ; modifier ; codepoint ~`, for mode 1, mode 2, and mode 3
 - xterm `formatOtherKeys=1` / CSI-u format,
   `CSI codepoint ; modifier u`, when enabled by core input-mode state
+- partial Kitty keyboard handling for progressive flags `1` and `8`. Flag `1`
+  preserves legacy Enter, Tab, and Backspace bytes; Kitty CSI-u output uses a
+  supplied unshifted key scalar when the input source provides one.
+- Kitty modifier encoding uses all eight protocol-defined bits. Legacy xterm
+  encodings retain their four-modifier representation; modifier-only key events
+  are emitted only when Kitty report-all-keys mode (`8`) is active.
+- Kitty event-type formatting (`modifier:event-type`) is implemented in the
+  encoder for rich host events, but flag `2` is not advertised until a host can
+  truthfully provide the complete required lifecycle metadata.
+- Kitty alternate-key formatting is implemented for host-supplied shifted and
+  base-layout scalars, but flag `4` is not advertised until a host can provide
+  those layout values truthfully.
+- Kitty associated-text formatting is implemented for validated host-owned
+  text and writes codepoints directly to the reusable CSI buffer. Flag `16`
+  remains unadvertised pending complete rich-host text/IME support.
+- The active host session admits a subset of encoder-supported Kitty flags.
+  Portable Swing sessions admit only flags `1` and `8`; a richer host must
+  explicitly declare the complete metadata it can provide before enabling
+  flags `2`, `4`, or `16`. Native rich-input adapters are deferred, so this
+  limitation also applies to IntelliJ-hosted Swing sessions.
 
 Not guaranteed yet:
 
 - modifyCursorKeys, modifyFunctionKeys, or modifyKeypadKeys resource variants
-- Kitty Keyboard Protocol
+- complete Kitty Keyboard Protocol support, including event types, alternate
+  key values, associated text, and complete host lifecycle/layout metadata
 
 ## Mouse Contract
 
@@ -169,6 +207,7 @@ Tracking suppression is guaranteed:
 Supported mouse encodings:
 
 - SGR mouse
+- SGR-Pixels mouse (`?1016`) when the host supplies one-based pixel coordinates
 - default legacy `ESC [ M`
 - UTF-8 extended mouse (`?1005`)
 - URXVT mouse (`?1015`)
@@ -184,21 +223,26 @@ Guaranteed behavior:
 
 Not guaranteed yet:
 
-- SGR-Pixels mouse mode (`?1016`)
 - xterm highlight mouse tracking (`?1001`)
 - UI pointer capture, drag threshold, or double/triple-click interpretation
 
 ## Paste And Focus Contract
 
 Paste encoding preserves payload bytes by default after UTF-8 conversion from
-the provided Kotlin string. Bracketed paste mode wraps the payload with
-`CSI 200~` and `CSI 201~` when enabled in the per-event mode snapshot.
+the provided Kotlin string. Bracketed paste mode wraps the original payload with
+`CSI 200~` and `CSI 201~` when enabled in the per-event mode snapshot; it never
+rewrites line endings. Unbracketed pastes may canonicalize line endings through
+the host-owned input policy.
 
 Paste policy may:
 
 - preserve text exactly as provided
 - strip C0 controls except TAB, CR, and LF
 - normalize CRLF and lone CR line endings to LF
+
+The separate unbracketed line-ending policy may preserve input or canonicalize
+all newline forms to LF, CR, or CRLF. Local PTY hosts select CR so each pasted
+line boundary has the same host-input semantics as the Enter key.
 
 Focus encoding emits `CSI I` and `CSI O` only when focus reporting is enabled
 in the per-event mode snapshot.
@@ -275,8 +319,6 @@ Likely to evolve before 1.0:
 
 - broader modified-key protocol support
 - optional Kitty keyboard protocol as a separate encoder path
-- SGR-Pixels mouse event vocabulary if renderer/UI host supplies pixel
-  coordinates
 - paste policy surface if host host needs stricter security defaults
 - a future `:ketraterm-core-api` split for input-facing mode reads
 

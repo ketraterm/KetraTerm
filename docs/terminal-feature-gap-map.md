@@ -26,12 +26,11 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 
 ### Tier 2: Useful (Under consideration / partial gaps)
 - *No outstanding SAFE query-response, DECRQSS/XTGETTCAP, push/pop title stack, or host-adapter allow/deny policy-surface gaps (all implemented and verified).*
-- `FIXED(alpha-blocker)`: Kitty keyboard capability advertising now exposes only implemented progressive flags (`1` disambiguate escape codes and `8` report all keys as escape codes). Event types, alternate keys, and associated text remain protocol vocabulary only until the input event model can encode them.
+- `FIXED(alpha-blocker)`: Kitty keyboard capability advertising is per-session and admits only progressive flags backed by complete active-host metadata. The portable Swing profile, including IntelliJ-hosted Swing, exposes `1` (disambiguate escape codes) and `8` (report all keys as escape codes); richer flags stay unadvertised.
 
 ### Tier 3: Optional (Graphics & advanced features)
 - Sixel or modern graphics protocols (e.g. Kitty graphics protocol).
 - Richer hyperlink, title, palette, and notification host callbacks.
-- Synchronized output mode extensions.
 
 ---
 
@@ -53,16 +52,13 @@ These are not badges of compatibility for this project. They expand attack surfa
 ## Parser Gaps
 
 ### CSI Protocols
+- `TODO(parser/core)`: conditional ANSI SCP compatibility for parameterless `CSI s` / `CSI u`. KetraTerm currently reserves plain `CSI s` for DECSLRM; xterm-style save/restore requires mode-aware disambiguation so parameterless DECSLRM continues to reset horizontal margins when DECLRMM is active.
 - `TODO(parser/core)`: broader DEC-specific status reports beyond the safe DSR/CPR/DA baseline.
-- `TODO(parser)`: character attribute/protection commands not covered by SGR:
-  - `DECSACE`
 - `TODO(parser)`: full tab-stop and margin variants beyond the current common set.
-- `TODO(parser)`: rectangular area operations:
-  - `DECCRA`
-  - `DECERA`
-  - `DECFRA`
-  - `DECSERA`
-  - `DECSACE`
+- `DONE(parser/core/host)`: rectangular erase (`DECERA`), selective erase (`DECSERA`), fill (`DECFRA`), copy (`DECCRA`), and checksum response (`DECRQCRA`) preserve active margin/origin coordinates; mutation operations preserve wide/cluster span integrity and `DECCRA` uses overlap-safe snapshot semantics. Copy/checksum intentionally support only the active single page (`0` omitted or `1`); checksum responses are terminal-response-policy gated and use the VT420 default 16-bit algorithm.
+- `TODO(policy)`: xterm `XTCHECKSUM` extensions (`CSI Ps # y`) are not implemented. The stable DECRQCRA path deliberately uses the base VT420 behavior: erased/spacer cells omitted, base glyph values masked to eight bits, and supported legacy video attributes included; no color, combining-sequence, or alternate xterm extension semantics are claimed.
+- `DONE(parser/core/host)`: DECSACE, DECCARA, and DECRARA implement VT420's stream-versus-exact-rectangle extent, ordered visual SGR subset, blank materialization policy, and atomic wide/cluster attribute updates without changing glyph payloads, protection, hyperlinks, or the current pen.
+- `DONE(parser/core/host)`: DECIC and DECDC insert/delete columns across the active vertical scroll region, honor horizontal margins, preserve cursor position and active-buffer isolation, and repair wide/cluster span boundaries before each row shift.
 - `TODO(parser)`: insert/delete/erase variants with selective protection and rectangular bounds.
 - `TODO(parser)`: scroll variants and xterm extensions not yet routed:
   - left/right-margin-aware variants need broader host tests.
@@ -87,7 +83,9 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(policy)`: any DCS that can exfiltrate host capabilities needs a response policy and terminal-to-host channel.
 
 ### Text and Unicode
-- `TODO(parser)`: malformed UTF-8 policy tests across all structural boundary bytes.
+- `DONE(parser)`: malformed UTF-8 recovery is exercised immediately before and inside ESC, CSI,
+  OSC (BEL/ST/CAN/SUB), DCS ST, and end-of-input, with every split boundary proving that malformed
+  bytes do not print or complete stale structural commands.
 - `TODO(parser)`: configurable replacement policy if needed by host applications.
 - `TODO(parser)`: broader ISO 2022 charset mapping.
 
@@ -99,10 +97,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(core/host)`: richer event API for hyperlink metadata, palette changes, terminal notifications, and any future host-observable state that should not be read from render frames.
 
 ### Grid Operations
-- `TODO(core)`: rectangular area operations if parser support is added (copy, erase, fill, selective erase).
-- `TODO(core)`: left/right margin interactions need continued property testing across all edit/erase/scroll operations.
-- `TODO(core)`: full DEC protection behavior across all rectangular operations.
-- `TODO(core)`: scrollback policy under alternate-screen and private-mode combinations beyond current tested cases.
+- DONE(core): deterministic randomized left/right-margin properties cover ICH/DCH, selective erase, IL/DL, and partial-region scroll up/down. They model guard-column movement, preserve rows outside the scroll region, and verify protected wide spans plus wide/cluster storage invariants.
+- `TODO(core)`: scrollback policy under alternate-screen and private-mode combinations beyond tested full-viewport and top-anchored primary-screen regions.
 - `TODO(core)`: soft-wrap metadata compatibility with copy/paste/export.
 
 ### Unicode Width
@@ -124,36 +120,41 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ## Input Module Gaps
 
-- `DONE(input/policy)`: paste encoding, bracketed-paste wrapping, and `TerminalInputPolicy` paste sanitization are implemented and tested. The encoder preserves payloads by default, can strip C0 controls except TAB/CR/LF, can normalize CRLF/lone-CR line endings, and wraps with `CSI 200~` / `CSI 201~` when bracketed paste mode is active.
+- `DONE(input/policy)`: paste encoding, bracketed-paste wrapping, and `TerminalInputPolicy` paste sanitization are implemented and tested. The generic encoder preserves payloads by default, can strip C0 controls except TAB/CR/LF, can canonicalize CRLF/CR/LF through an explicit host policy, and wraps with `CSI 200~` / `CSI 201~` when bracketed paste mode is active. Bracketed payloads preserve their original line endings; unbracketed local PTY input canonicalizes newline forms to CR.
 - `DONE(host/profile)`: standalone/workspace local PTY profiles persist `paste_sanitization` (`raw`, `strip-c0`, or `normalize-line-endings`) and apply it to newly opened tabs and splits through `TerminalWorkspaceOpenOptions` and `PtyOptions.inputPolicy`.
 - `TODO(host/profile)`: expose paste policy defaults for SSH and IDE/workspace embedding profiles when those product surfaces are wired; input already provides the mechanism.
 - `TODO(input)`: broader modified-key encoding:
-  - xterm modifyOtherKeys subparameter mask support such as `CSI > 4 : 1 m`.
-  - query/disable controls for xterm key modifier options.
+  - xterm modifyOtherKeys subparameter mask support such as `CSI > 4 : 1 m`; this factors modifiers out of the source keysym and therefore remains deferred with rich layout-aware input metadata.
 - `TODO(parser/core/input)`: xterm modified-key policy surface for `modifyCursorKeys`, `modifyFunctionKeys`, and `modifyKeypadKeys`.
 - `TODO(input/policy)`: additional xterm-compatible key policies when a real ambiguity exists, such as Delete behavior and optional eight-bit Meta output.
+- `DONE(protocol/core/host/input/ui)`: DECBKM mode 67, conventional Ctrl+2 through Ctrl+8 control bytes, xterm modified F3, legacy F13-F35 aliases, and lossless Shift/Ctrl fallback for base Enter/Escape/Backspace/keypad keys are implemented through allocation-free packed mode state and primitive lookup tables.
 - `TODO(parser/core/input)`: xterm highlight mouse tracking (`?1001`) if full xterm mouse parity is required.
 
 ### Deferred Kitty Keyboard Protocol Scope
 - `DONE(protocol/core/pty)`: terminal capability identity contract centralizes `$TERM`, `COLORTERM`, DA/DA2, XTGETTCAP terminal-name/color claims, and the implemented Kitty keyboard flag mask.
-- `DONE(protocol/core/input)`: advertised Kitty keyboard progressive mask is restricted to implemented flags: disambiguate escape codes (`1`) and report-all-keys-as-escape-codes (`8`). Unsupported progressive bits are masked out of input-facing core mode state.
-- `TODO(parser/core/policy)`: `CSI ? u` Kitty keyboard capability query response remains disabled until a response shape and fingerprinting policy are implemented.
-- separate left/right modifier reporting if host event vocabulary grows it.
-- key repeat/release reporting.
-- alternate-key fields and associated text fields.
-- modifier-only key events.
-- complete functional-key numeric table beyond keys already represented by `TerminalKey`.
+- `DONE(protocol/core/host/session/input)`: Kitty capability handling distinguishes the full encoder mask from the conservative portable-host mask. The parser-to-core adapter applies a per-session host mask to replace/set/clear/push operations, so query responses reflect only capabilities the active host has explicitly declared.
+- `DONE(input)`: `TerminalKeyEvent` can carry an optional unshifted printable-key scalar, and Kitty CSI-u encoding uses it instead of produced text when present.
+- `DONE(parser/core/host/policy)`: parameterless `CSI ? u` reports only active Kitty keyboard progressive flags admitted by the session's host capability mask through the existing terminal-response policy.
+- `TODO(host, deferred)`: native rich-input adapters for layout-aware physical-key identity, IME text, and complete lifecycle metadata. This requires host-specific native integration; no portable Swing or IntelliJ-hosted Swing session may advertise flags `2`, `4`, or `16` until that work is implemented and verified.
+- `DONE(input)`: normalized keyboard events carry an explicit press/repeat/release lifecycle phase without host-toolkit dependencies or encoder hot-path allocation.
+- `DONE(input)`: the Kitty encoder formats the lifecycle phase in the `modifier:event-type` subfield; without flag `2`, releases are suppressed while repeats retain normal press encoding.
+- `DONE(ui)`: Swing preserves press/repeat/release for AWT-visible non-text physical keys through a fixed preallocated pressed-key table; unmatched releases are not invented or emitted.
+- `DONE(protocol/input/ui)`: the complete Kitty functional-key table is represented by normalized input vocabulary and allocation-free PUA lookup tables; Swing maps the subset exposed by AWT, while richer hosts can supply the remaining keys.
+- `DONE(input)`: normalized modifiers preserve Kitty's independent Super, Hyper, Meta, Caps Lock, and Num Lock bits while legacy CSI encodings retain their compatible four-modifier representation. Modifier-only key reports are gated by flag `8`.
+- `DONE(input)`: normalized printable events carry validated Kitty shifted and base-layout alternate key scalars; the encoder formats both fields, including the required empty shifted field when only a base-layout scalar exists.
+- `DONE(input)`: host-owned associated text is scalar-validated and encoded as Kitty colon-separated text codepoints without encoder-side allocation.
 
 ---
 
 ## Session, Transport, Rendering, and Host Integration Gaps
 
-- `TODO(host)`: richer font fallback policy, bundled/host-provided font resolver host, script/run-level shaping, and fallback cache eviction.
-- `TODO(host)`: richer font measurement policy for script/run-level shaping, fallback run metrics, and backend painter integrations beyond the current Java2D/Swing path.
-- `TODO(host)`: custom line spacing/height metrics in the renderer.
-- `TODO(host/ui)`: richer UI scrollback controls, selection behavior while scrolled, and auto-follow/offset-retention policy beyond the current fixed-grid Swing scrollbar and viewport mapping.
+- `DONE(host)`: custom host-provided font resolver API (`TerminalFontResolver`) and IntelliJ-native fallback integration.
+- `TODO(host)`: OS-native font linking/cascading (DirectWrite/CoreText/FontConfig) in the standalone application and native font handle cache eviction.
+- `TODO(host)`: richer font measurement policy for native shaping backends, fallback run metrics, and backend painter integrations beyond the current Java2D/Swing script-run shaping path.
+- `DONE(host)`: custom line spacing/height metrics in the renderer.
+- `DONE(host/ui)`: scrollback controls, selection behavior while scrolled, scroll-on-output policy, and resize offset retention.
 - `TODO(host/ui)`: IntelliJ completion-provider wiring through a plugin-owned adapter, Fig-style spec corpus import, dynamic host providers for Git branches/status paths, project files, Docker contexts, Kubernetes namespaces, IDE run configurations, and IntelliJ-native popup styling remain host-owned follow-up work. The reusable Swing terminal popup surface, keyboard/mouse selection, acceptance callback, range-aware Swing acceptance, dependency-free layered completion foundation, deterministic source merge/ranking/deduplication with context-aware command/subcommand/option/value/path/domain ranking, context-aware live trigger policy, bounded in-memory session MRU plus session-only observed-token learning for unknown executable families, spec-declared path argument metadata, repeatable subcommand/task metadata, static option value domains, dynamic value-domain metadata for host providers, command-aware standalone path completion with trailing-space argument semantics, quote-preserving and shell-escaped path replacement, cursor-aware POSIX/PowerShell command segments with graceful incomplete-input recovery, standalone spec/MRU provider wiring with request context, compact standalone exact command/shape/source-feedback stats, source-specific feedback-aware ranking, and standalone/IntelliJ enablement settings exist. Shell-returned completions are intentionally deferred.
-- `TODO(completion/provider)`: implement standalone and IntelliJ dynamic providers for declared value domains, such as Git branches for `git switch`, Kubernetes namespaces for `kubectl --namespace`, Docker contexts for `docker --context`, npm scripts for `npm run`, AWS profiles/regions, project files, and IDE run configurations. Providers must remain host-owned and feed domain-tagged candidates into the shared engine instead of embedding host-specific lookup logic in `ketraterm-completion`.
+- `TODO(completion/provider)`: implement standalone and IntelliJ dynamic providers for declared value domains, such as Git branches for `git switch`, Kubernetes namespaces for `kubectl --namespace`, Docker contexts for `docker --context`, npm scripts, AWS profiles/regions, project files, and IDE run configurations. Providers must remain host-owned and feed domain-tagged candidates into the shared engine.
 - `TODO(completion/policy)`: add tested lexical and quoting capability sets for Command Prompt, Fish, Nushell, and other shell dialects. Until a host provides a complete capability contract, use `TerminalShellCapabilities.PLAIN`; do not infer dialect behavior from command text.
 - `TODO(host)`: accessibility/export APIs.
 - `TODO(host)`: performance benchmarks for large scrollback, resize, and dense SGR streams.

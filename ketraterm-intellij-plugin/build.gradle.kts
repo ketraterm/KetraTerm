@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 Gagik Sargsyan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
@@ -23,6 +39,17 @@ val pluginDescription =
     <p>It provides project-aware terminal tabs, quick shell-profile launch actions, IDE color-scheme integration, configurable typography and cursor behavior, scrollback, paste handling, visual bell support, and guarded clipboard/title controls.</p>
     <p>KetraTerm focuses on contemporary terminal workflows: responsive rendering, Unicode-aware text, modern color and notification sequences, and security-conscious handling of terminal-initiated IDE actions.</p>
     """.trimIndent()
+val pluginChangeNotes =
+    providers.fileContents(layout.projectDirectory.file("CHANGELOG.md")).asText.map { changelog ->
+        changelog
+            .lineSequence()
+            .dropWhile { line -> !line.startsWith("## ") }
+            .drop(1)
+            .takeWhile { line -> !line.startsWith("## ") }
+            .joinToString("\n")
+            .trim()
+            .ifBlank { "See CHANGELOG.md for release notes." }
+    }
 
 version = pluginVersionProvider.get()
 
@@ -30,6 +57,7 @@ private val ketratermVersion = version.toString()
 
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
+    implementation("io.github.ketraterm:ketraterm-ui-swing-host:$ketratermVersion")
     implementation("io.github.ketraterm:ketraterm-ui-swing:$ketratermVersion")
     implementation("io.github.ketraterm:ketraterm-workspace:$ketratermVersion") {
         exclude(group = "org.jetbrains.pty4j", module = "pty4j")
@@ -56,6 +84,7 @@ intellijPlatform {
         name.set("KetraTerm")
         version.set(project.version.toString())
         description.set(pluginDescription)
+        changeNotes.set(pluginChangeNotes)
 
         ideaVersion {
             sinceBuild.set(pluginSinceBuild)

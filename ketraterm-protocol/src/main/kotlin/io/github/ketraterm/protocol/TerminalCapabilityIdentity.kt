@@ -37,20 +37,25 @@ object TerminalCapabilityIdentity {
      */
     const val COLOR_TERM_TRUECOLOR: String = "truecolor"
 
-    /**
-     * Primary DA terminal class. `1` is VT100.
-     */
-    const val PRIMARY_DA_TERMINAL_CLASS: Int = 1
+    /** Primary DA terminal class. `64` identifies VT420-level DEC controls. */
+    const val PRIMARY_DA_TERMINAL_CLASS: Int = 64
+
+    /** Primary DA allowlisted option: 132-column mode. */
+    const val PRIMARY_DA_132_COLUMNS: Int = 1
+
+    /** Primary DA allowlisted option: selective erase. */
+    const val PRIMARY_DA_SELECTIVE_ERASE: Int = 6
+
+    /** Primary DA allowlisted option: ANSI color. */
+    const val PRIMARY_DA_ANSI_COLOR: Int = 22
+
+    /** Primary DA allowlisted option: rectangular editing. */
+    const val PRIMARY_DA_RECTANGULAR_EDITING: Int = 28
 
     /**
-     * Primary DA option for advanced video support.
+     * Secondary DA terminal id. `41` is the VT420 equipment class.
      */
-    const val PRIMARY_DA_ADVANCED_VIDEO: Int = 2
-
-    /**
-     * Secondary DA terminal id. Zero is a generic/versionless identity.
-     */
-    const val SECONDARY_DA_TERMINAL_ID: Int = 0
+    const val SECONDARY_DA_TERMINAL_ID: Int = 41
 
     /**
      * Secondary DA firmware/version field. Zero avoids product version leakage.
@@ -78,13 +83,16 @@ object TerminalCapabilityIdentity {
     const val TERMINFO_TRUECOLOR_SUPPORTED: Boolean = true
 
     /**
-     * Kitty keyboard progressive flags currently understood by input encoding.
+     * Conservative Kitty keyboard progressive flags for the default host
+     * profile. Per-session host integration may advertise a different subset
+     * of encoder-supported flags when it can provide the required metadata.
      */
-    const val KITTY_KEYBOARD_SUPPORTED_FLAGS: Int = KittyKeyboardProgressiveFlag.SUPPORTED_MASK
+    const val KITTY_KEYBOARD_SUPPORTED_FLAGS: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK
 
     /**
-     * `CSI ? u` Kitty keyboard capability query responses are intentionally not
-     * emitted until a response shape and identity policy are implemented.
+     * `CSI ? u` Kitty keyboard capability queries return only the active,
+     * supported progressive-enhancement flags through the terminal response
+     * policy channel.
      */
-    const val KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED: Boolean = false
+    const val KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED: Boolean = true
 }

@@ -19,12 +19,16 @@ plugins {
 }
 
 dependencies {
+    val kotlinxCoroutinesVersion = rootProject.extra["kotlinxCoroutinesVersion"] as String
+
     api(project(":ketraterm-session"))
     api(project(":ketraterm-completion"))
     implementation(project(":ketraterm-pty"))
     implementation(project(":ketraterm-render-api"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
 
     testImplementation(kotlin("test"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion")
 }
 
 tasks.test {

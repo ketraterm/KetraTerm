@@ -12,7 +12,7 @@ This module is designed to be completely decoupled from any specific UI toolkit,
 - **`:ketraterm-protocol`** (vocabulary, mode IDs, enums)
 - **`:ketraterm-render-api`** (render frame primitives and color palettes)
 - **`:ketraterm-transport-api`** (duplex connector contracts)
-- **`:ketraterm-session`** (session orchestration and lock loops)
+- **`:ketraterm-session`** (session orchestration, lifecycle state, and render publication)
 - **`:ketraterm-pty`** (local PTY process management and options)
 
 ---
@@ -20,6 +20,8 @@ This module is designed to be completely decoupled from any specific UI toolkit,
 ## Architectural Role
 
 `TerminalWorkspace` manages a collection of tabs. Each tab wraps an active, running `TerminalSession` tied to a specific `TerminalProfile` launch configuration.
+
+The workspace owns a supervisor scope and one `TerminalSession.state` collection job per tab. Removing a tab cancels its job; closing the workspace cancels the scope. Local tab closure remains distinct from unexpected remote closure, and host callbacks run outside the workspace state lock.
 
 ```mermaid
 graph TD

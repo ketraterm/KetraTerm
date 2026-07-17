@@ -123,13 +123,18 @@ internal class SwingViewportController(
         historySize: Int,
     ): Boolean = scrollModel.scrollTo(offsetLines, historySize)
 
-    fun clamp(historySize: Int): Boolean = scrollModel.clamp(historySize)
+    fun clamp(
+        historySize: Int,
+        discardedCount: Long,
+        scrollOnOutput: Boolean,
+    ): Boolean = scrollModel.clamp(historySize, discardedCount, scrollOnOutput)
 
     fun updateVisualMetrics(
         historySize: Int,
+        discardedCount: Long,
         cellHeight: Int,
         visualOverflowPixels: Int,
-    ): Boolean = scrollModel.updateVisualMetrics(historySize, cellHeight, visualOverflowPixels)
+    ): Boolean = scrollModel.updateVisualMetrics(historySize, discardedCount, cellHeight, visualOverflowPixels)
 
     fun resizeRequestedOffset(): Int = scrollModel.requestedOffset
 
@@ -229,7 +234,13 @@ internal class SwingViewportController(
         ): Int =
             maxOf(
                 1,
-                (componentWidth - SwingTerminalChrome.horizontalInset(settings, activeBuffer)) / metrics.cellWidth,
+                (
+                    componentWidth -
+                        SwingTerminalChrome.horizontalInset(
+                            settings,
+                            activeBuffer,
+                        )
+                ) / metrics.cellWidth,
             )
 
         private fun packVisibleGridSize(

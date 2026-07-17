@@ -245,8 +245,7 @@ internal class StandalonePathResolver(
             null
         }
 
-    private fun String.hasWindowsDriveRoot(): Boolean =
-        length >= 3 && this[0].isLetter() && this[1] == ':' && this[2] == '/'
+    private fun String.hasWindowsDriveRoot(): Boolean = length >= 3 && this[0].isLetter() && this[1] == ':' && this[2] == '/'
 }
 
 /** Background directory scan contract, injectable for deterministic tests. */

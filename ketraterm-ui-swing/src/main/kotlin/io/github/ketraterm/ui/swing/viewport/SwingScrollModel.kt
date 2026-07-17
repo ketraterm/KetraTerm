@@ -29,6 +29,7 @@ import kotlin.math.floor
 internal class SwingScrollModel {
     private var cellHeight: Int = 1
     private var historySize: Int = 0
+    private var discardedCount: Long = 0L
     private var preciseOffset: Double = 0.0
     private var committedOffset: Int = 0
     private var renderOffset: Int = 0
@@ -81,6 +82,7 @@ internal class SwingScrollModel {
     fun reset() {
         cellHeight = 1
         historySize = 0
+        discardedCount = 0L
         preciseOffset = 0.0
         committedOffset = 0
         renderOffset = 0
@@ -92,9 +94,24 @@ internal class SwingScrollModel {
      *
      * @return true when the requested render offset changed.
      */
-    fun clamp(historySize: Int): Boolean {
+    fun clamp(
+        historySize: Int,
+        discardedCount: Long,
+        scrollOnOutput: Boolean,
+    ): Boolean {
         require(historySize >= 0) { "historySize must be >= 0, was $historySize" }
+        require(discardedCount >= 0L) { "discardedCount must be >= 0, was $discardedCount" }
+        val deltaBottom = (historySize + discardedCount) - (this.historySize + this.discardedCount)
         this.historySize = historySize
+        this.discardedCount = discardedCount
+
+        if (deltaBottom > 0) {
+            if (scrollOnOutput || preciseOffset == 0.0) {
+                preciseOffset = 0.0
+            } else {
+                preciseOffset += deltaBottom
+            }
+        }
         return clampPreciseOffset()
     }
 
@@ -105,13 +122,16 @@ internal class SwingScrollModel {
      */
     fun updateVisualMetrics(
         historySize: Int,
+        discardedCount: Long,
         cellHeight: Int,
         visualOverflowPixels: Int,
     ): Boolean {
         require(historySize >= 0) { "historySize must be >= 0, was $historySize" }
+        require(discardedCount >= 0L) { "discardedCount must be >= 0, was $discardedCount" }
         require(cellHeight > 0) { "cellHeight must be > 0, was $cellHeight" }
         require(visualOverflowPixels == 0) { "visualOverflowPixels must be 0 for fixed-row geometry, was $visualOverflowPixels" }
         this.historySize = historySize
+        this.discardedCount = discardedCount
         this.cellHeight = cellHeight
         return clampPreciseOffset()
     }

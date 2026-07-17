@@ -37,37 +37,6 @@ import java.awt.Insets
 
 class SwingRenderFrameControllerTest {
     @Nested
-    inner class Scheduling {
-        @Test
-        fun `schedulePublishedFrame coalesces until dispatched runnable runs`() {
-            val host = RecordingRenderFrameHost(session = null)
-            val controller = SwingRenderFrameController(host)
-
-            controller.schedulePublishedFrame()
-            controller.schedulePublishedFrame()
-
-            assertEquals(1, host.dispatchCount)
-
-            host.runLastDispatched()
-            controller.schedulePublishedFrame()
-
-            assertEquals(2, host.dispatchCount)
-        }
-
-        @Test
-        fun `reset clears pending render request`() {
-            val host = RecordingRenderFrameHost(session = null)
-            val controller = SwingRenderFrameController(host)
-
-            controller.schedulePublishedFrame()
-            controller.reset()
-            controller.schedulePublishedFrame()
-
-            assertEquals(2, host.dispatchCount)
-        }
-    }
-
-    @Nested
     inner class RepaintRouting {
         @Test
         fun `blink repaint is ignored when no session is attached`() {
@@ -112,7 +81,7 @@ class SwingRenderFrameControllerTest {
         }
 
         @Test
-        fun `published frame refreshes render cache again when viewport clamp changes request`() {
+        fun `published frame requests follow up when viewport clamp changes request`() {
             val session = createSession()
             val host = RecordingRenderFrameHost(session = session, clampViewportResult = true)
             val controller = SwingRenderFrameController(host)
@@ -120,14 +89,15 @@ class SwingRenderFrameControllerTest {
             try {
                 controller.handlePublishedFrame()
 
-                assertEquals(2, host.refreshCount)
+                assertEquals(1, host.refreshCount)
+                assertEquals(1, host.renderRequestCount)
             } finally {
                 session.close()
             }
         }
 
         @Test
-        fun `published frame refreshes render cache again when active chrome resizes grid`() {
+        fun `published frame requests follow up when active chrome resizes grid`() {
             val session = createSession()
             val host = RecordingRenderFrameHost(session = session, syncGridToChromeResult = true)
             val controller = SwingRenderFrameController(host)
@@ -135,7 +105,8 @@ class SwingRenderFrameControllerTest {
             try {
                 controller.handlePublishedFrame()
 
-                assertEquals(2, host.refreshCount)
+                assertEquals(1, host.refreshCount)
+                assertEquals(1, host.renderRequestCount)
             } finally {
                 session.close()
             }
@@ -164,22 +135,12 @@ class SwingRenderFrameControllerTest {
         override val componentHeight = 480
         override val cursorPresentationEnabled = true
 
-        var dispatchCount = 0
         var fullRepaintCount = 0
         var regionRepaintCount = 0
         var refreshCount = 0
+        var renderRequestCount = 0
         val semanticCalls = ArrayList<String>()
         val publishHistorySizes = ArrayList<Int>()
-        private var lastDispatched: Runnable? = null
-
-        override fun dispatch(action: Runnable) {
-            dispatchCount++
-            lastDispatched = action
-        }
-
-        fun runLastDispatched() {
-            lastDispatched?.run()
-        }
 
         override fun resetCursorBlinkForFrame() {
             semanticCalls += "resetCursorBlinkForFrame"
@@ -188,7 +149,11 @@ class SwingRenderFrameControllerTest {
         override fun refreshRenderCacheFromSession(session: TerminalSession) {
             refreshCount++
             semanticCalls += "refreshRenderCacheFromSession"
-            renderCache.updateFrom(session)
+            session.renderPublisher.readCurrent { published -> renderCache.updateFrom(published) }
+        }
+
+        override fun requestRender(session: TerminalSession) {
+            renderRequestCount++
         }
 
         override fun syncTerminalGridToActiveChrome(): Boolean {
@@ -196,7 +161,10 @@ class SwingRenderFrameControllerTest {
             return syncGridToChromeResult
         }
 
-        override fun clampViewport(historySize: Int): Boolean = clampViewportResult
+        override fun clampViewport(
+            historySize: Int,
+            discardedCount: Long,
+        ): Boolean = clampViewportResult
 
         override fun requestedViewportOffset(): Int = 0
 
@@ -230,15 +198,18 @@ class SwingRenderFrameControllerTest {
 
     private fun createSession(): TerminalSession {
         val terminal = TerminalBuffers.create(width = 2, height = 1, maxHistory = 1)
-        return TerminalSession(
-            terminal = terminal,
-            publisher = TerminalRenderPublisher(2, 1),
-            renderReader = terminal as TerminalRenderFrameReader,
-            responseReader = terminal,
-            connector = NoOpConnector,
-            parser = NoOpParser,
-            inputEncoder = NoOpInputEncoder,
-        )
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(2, 1),
+                renderReader = terminal as TerminalRenderFrameReader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+            )
+        session.renderPublisher.updateAndPublish(terminal as TerminalRenderFrameReader)
+        return session
     }
 
     private object NoOpConnector : TerminalConnector {

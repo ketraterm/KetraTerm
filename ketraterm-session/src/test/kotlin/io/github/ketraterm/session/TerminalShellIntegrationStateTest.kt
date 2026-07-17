@@ -63,6 +63,34 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `running command query follows shell integration command lifecycle`() {
+        val state = TerminalShellIntegrationState()
+
+        assertFalse(state.hasRunningCommand())
+
+        state.recordPromptStart(10)
+        state.recordPromptEnd(10)
+        assertFalse(state.hasRunningCommand())
+
+        state.recordCommandStart(11, includeLine = true)
+        assertTrue(state.hasRunningCommand())
+
+        state.recordCommandFinished(12, exitCode = 0)
+        assertFalse(state.hasRunningCommand())
+    }
+
+    @Test
+    fun `new prompt clears running command query for abandoned command`() {
+        val state = TerminalShellIntegrationState()
+
+        state.recordCommandStart(10, includeLine = true)
+        assertTrue(state.hasRunningCommand())
+
+        state.recordPromptStart(20)
+        assertFalse(state.hasRunningCommand())
+    }
+
+    @Test
     fun `prompt command lifecycle projects prompt starts and failed output into viewport`() {
         val state = TerminalShellIntegrationState()
         val promptStarts = BooleanArray(5)
@@ -164,6 +192,39 @@ class TerminalShellIntegrationStateTest {
 
         assertContentEquals(booleanArrayOf(true, true), promptStarts)
         assertContentEquals(booleanArrayOf(false, false), failedCommandRails)
+    }
+
+    @Test
+    fun `copy command output range excludes next prompt line using the same output boundary as failed rails`() {
+        val state = TerminalShellIntegrationState()
+        val range = LongArray(TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS)
+
+        state.recordPromptStart(10)
+        state.recordPromptEnd(10)
+        state.recordCommandStart(10, includeLine = false)
+        state.recordCommandFinished(11, exitCode = 1)
+        state.recordPromptStart(11)
+
+        val commandRecordId = state.commandRecordIdAtLine(10)
+
+        assertFalse(state.copyCommandOutputRange(commandRecordId, range))
+    }
+
+    @Test
+    fun `copy command block range preserves a silent command prompt while excluding the next prompt`() {
+        val state = TerminalShellIntegrationState()
+        val range = LongArray(TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS)
+
+        state.recordPromptStart(10)
+        state.recordPromptEnd(10)
+        state.recordCommandStart(10, includeLine = false)
+        state.recordCommandFinished(11, exitCode = 0)
+        state.recordPromptStart(11)
+
+        val commandRecordId = state.commandRecordIdAtLine(10)
+
+        assertTrue(state.copyCommandBlockRange(commandRecordId, range))
+        assertContentEquals(longArrayOf(10, 10), range)
     }
 
     @Test
@@ -837,6 +898,26 @@ class TerminalShellIntegrationStateTest {
             ),
             projection.commandLifecycleStates,
         )
+    }
+
+    @Test
+    fun `viewport projection drops evicted decorations after repeated line identity movement`() {
+        val state = TerminalShellIntegrationState(capacity = 2)
+
+        state.recordCommandStart(10, includeLine = true)
+        state.recordCommandFinished(11, exitCode = 1)
+        state.recordCommandStart(20, includeLine = true)
+        state.recordCommandFinished(21, exitCode = 0)
+        state.recordCommandStart(30, includeLine = true)
+        state.recordCommandFinished(31, exitCode = 1)
+
+        val projection = state.project(longArrayOf(31, 10, 20, 21, 30))
+
+        assertEquals(TerminalShellIntegrationCommandRecord.NONE, projection.commandRecordIds[1])
+        assertEquals(TerminalShellIntegrationCommandLifecycle.NONE, projection.commandLifecycleStates[1])
+        assertNotEquals(TerminalShellIntegrationCommandRecord.NONE, projection.commandRecordIds[0])
+        assertNotEquals(TerminalShellIntegrationCommandRecord.NONE, projection.commandRecordIds[2])
+        assertNotEquals(TerminalShellIntegrationCommandRecord.NONE, projection.commandRecordIds[4])
     }
 
     @Test

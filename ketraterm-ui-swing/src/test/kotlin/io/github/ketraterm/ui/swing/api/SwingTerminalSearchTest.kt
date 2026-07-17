@@ -28,32 +28,31 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import kotlinx.coroutines.Dispatchers
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.awt.Insets
-import java.awt.event.InputEvent
-import java.awt.event.KeyEvent
 import javax.swing.SwingUtilities
 
 class SwingTerminalSearchTest {
     @Test
-    fun `ctrl shift f opens search overlay without sending terminal input`() {
-        val input = RecordingInputEncoder()
+    fun `clearSearch clears query and result highlights`() {
         val reader = SearchFrameReader()
-        val session = testSession(reader, input)
+        val session = testSession(reader)
         val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 1)
             component.bind(session)
-            component.keyListeners.forEach { listener ->
-                listener.keyPressed(searchShortcut(component))
-            }
+            component.search("needle")
+            component.clearSearch()
+
+            val state = component.currentSearchState()
+            assertEquals("", state.query)
+            assertEquals(0, state.resultCount)
+            assertEquals(-1, state.activeResultIndex)
         }
 
-        assertTrue(component.currentSearchState().visible)
-        assertEquals(0, input.keyCount)
         session.close()
     }
 
@@ -82,26 +81,20 @@ class SwingTerminalSearchTest {
         inputEncoder: TerminalInputEncoder = NoOpInputEncoder,
     ): TerminalSession {
         val terminal = TerminalBuffers.create(width = 12, height = 1, maxHistory = 5)
-        return TerminalSession(
-            terminal = terminal,
-            publisher = TerminalRenderPublisher(12, 1),
-            renderReader = renderReader,
-            responseReader = terminal,
-            connector = NoOpConnector,
-            parser = NoOpParser,
-            inputEncoder = inputEncoder,
-        )
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(12, 1),
+                renderReader = renderReader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = inputEncoder,
+                workerDispatcher = Dispatchers.Unconfined,
+            )
+        session.renderPublisher.updateAndPublish(renderReader)
+        return session
     }
-
-    private fun searchShortcut(component: SwingTerminal): KeyEvent =
-        KeyEvent(
-            component,
-            KeyEvent.KEY_PRESSED,
-            System.currentTimeMillis(),
-            InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK,
-            KeyEvent.VK_F,
-            KeyEvent.CHAR_UNDEFINED,
-        )
 
     private class SearchFrameReader : TerminalRenderFrameReader {
         override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
@@ -179,21 +172,6 @@ class SwingTerminalSearchTest {
                 column++
             }
         }
-    }
-
-    private class RecordingInputEncoder : TerminalInputEncoder {
-        var keyCount: Int = 0
-            private set
-
-        override fun encodeKey(event: TerminalKeyEvent) {
-            keyCount++
-        }
-
-        override fun encodePaste(event: TerminalPasteEvent) = Unit
-
-        override fun encodeFocus(event: TerminalFocusEvent) = Unit
-
-        override fun encodeMouse(event: TerminalMouseEvent) = Unit
     }
 
     private object NoOpConnector : TerminalConnector {

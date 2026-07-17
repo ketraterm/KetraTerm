@@ -15,11 +15,9 @@
  */
 package io.github.ketraterm.ui.swing.input
 
-import io.github.ketraterm.input.event.TerminalModifiers
-import io.github.ketraterm.input.event.TerminalMouseButton
-import io.github.ketraterm.input.event.TerminalMouseEvent
-import io.github.ketraterm.input.event.TerminalMouseEventType
+import io.github.ketraterm.input.event.*
 import io.github.ketraterm.protocol.MouseTrackingMode
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.ui.swing.settings.SwingTerminalChrome
 import java.awt.event.*
 import javax.swing.SwingUtilities
@@ -39,20 +37,16 @@ internal class SwingTerminalMouseController(
     val mouseListener =
         object : MouseAdapter() {
             override fun mousePressed(event: MouseEvent) {
+                host.requestFocusInWindow()
+                if (handleContextMenu(event)) return
                 if (host.handlePromptMarkerMousePressed(event)) return
                 if (handleMouseTracking(event, TerminalMouseEventType.PRESS)) return
                 if (host.handleHyperlinkMousePressed(event)) return
-                if (SwingUtilities.isMiddleMouseButton(event)) {
-                    if (host.settings.pasteOnMiddleClick) {
-                        host.pasteClipboardText()
-                        event.consume()
-                        return
-                    }
-                }
                 host.handleSelectionMousePressed(event)
             }
 
             override fun mouseReleased(event: MouseEvent) {
+                if (handleContextMenu(event)) return
                 if (handleMouseTracking(event, TerminalMouseEventType.RELEASE)) return
                 host.handleSelectionMouseReleased(event)
             }
@@ -94,14 +88,37 @@ internal class SwingTerminalMouseController(
             return
         }
 
+        if (host.renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+            val key = if (delta > 0.0) TerminalKey.UP else TerminalKey.DOWN
+            val count = kotlin.math.round(kotlin.math.abs(delta)).toInt()
+            val session = host.session
+            if (session != null && count > 0) {
+                val keyEvent = TerminalKeyEvent.key(key)
+                for (i in 0 until count) {
+                    session.encodeKey(keyEvent)
+                }
+            }
+            event.consume()
+            return
+        }
+
         if (host.scrollViewportByPreciseRows(delta)) {
             event.consume()
         }
     }
 
-    private fun isMouseTrackingIntercepted(event: MouseEvent): Boolean {
+    fun isMouseTrackingIntercepted(event: MouseEvent): Boolean {
         if (event.isShiftDown) return false
         return host.mouseTrackingMode() != MouseTrackingMode.OFF
+    }
+
+    private fun handleContextMenu(event: MouseEvent): Boolean {
+        if (!event.isPopupTrigger) return false
+        if (!event.isShiftDown && host.mouseTrackingMode() != MouseTrackingMode.OFF) return false
+        val handled = host.handleContextMenuMouseEvent(event, forcedByShift = event.isShiftDown)
+        if (!handled) return false
+        event.consume()
+        return true
     }
 
     private fun handleMouseTracking(
@@ -139,9 +156,13 @@ internal class SwingTerminalMouseController(
         if (event.isShiftDown) mods = mods or TerminalModifiers.SHIFT
         if (event.isAltDown) mods = mods or TerminalModifiers.ALT
         if (event.isControlDown) mods = mods or TerminalModifiers.CTRL
-        if (event.isMetaDown) mods = mods or TerminalModifiers.META
+        if (event.isMetaDown) mods = mods or TerminalModifiers.SUPER
 
-        val paddingLeft = SwingTerminalChrome.left(host.settings, host.renderCache.activeBuffer)
+        val paddingLeft =
+            SwingTerminalChrome.left(
+                host.settings,
+                host.renderCache.activeBuffer,
+            )
         val gridWidth = host.renderCache.columns * host.metrics.cellWidth
         val gridHeight = host.renderCache.rows * host.metrics.cellHeight
         val pixelX = (event.x - paddingLeft).coerceIn(0, gridWidth - 1)

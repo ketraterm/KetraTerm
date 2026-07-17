@@ -22,20 +22,22 @@ import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.api.SwingHostServices
-import io.github.ketraterm.ui.swing.api.SwingScrollbarAdapter
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuHandler
+import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
+import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.suggestion.*
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
-import java.awt.Adjustable
-import java.awt.BorderLayout
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collect
 import javax.swing.JPanel
-import javax.swing.JScrollBar
 
 /**
  * Owns one terminal pane in the standalone host.
  *
  * A pane binds a workspace tab's session to one reusable Swing terminal
- * component and owns pane-local viewport chrome such as the scrollbar.
+ * component.
  */
 internal class TerminalPane private constructor(
     val tab: TerminalWorkspaceTab,
@@ -43,8 +45,11 @@ internal class TerminalPane private constructor(
     val component: JPanel,
     private val settings: KetraTermSettings,
     private val completionTriggerController: StandaloneCompletionTriggerController,
-    private val completionDirtyListener: () -> Unit,
-) {
+    private val completionObservationJob: Job,
+    private val searchBar: SwingTerminalSearchBar,
+) : TerminalPaneActionTarget {
+    private var shortcutController: TerminalPaneShortcutController? = null
+
     fun requestFocus() {
         terminal.requestFocusInWindow()
     }
@@ -52,6 +57,7 @@ internal class TerminalPane private constructor(
     fun reloadSettings() {
         terminal.reloadSettings()
         component.background = terminal.background
+        searchBar.refreshColors()
         tab.session.setHostPolicy(settings.createHostPolicy(tab.profile.command))
         if (settings.shellSuggestionsEnabled) {
             completionTriggerController.scheduleRefresh()
@@ -65,10 +71,47 @@ internal class TerminalPane private constructor(
         completionTriggerController.sourceSnapshotChanged()
     }
 
+    override fun hasSelection(): Boolean = terminal.currentSelection() != null
+
+    override fun copySelectionToClipboard(): Boolean = terminal.copySelectionToClipboard()
+
+    override fun pasteClipboardText(): Boolean = terminal.pasteClipboardText()
+
+    override fun selectAll(): Boolean = terminal.selectAll()
+
+    override fun clearScreen(): Boolean = terminal.clearScreen()
+
+    override fun openSearch() {
+        searchBar.open()
+    }
+
+    override fun scrollPageUp() {
+        terminal.scrollViewportBy(
+            terminal
+                .visibleGridSize()
+                .height
+                .coerceAtLeast(1)
+                .toDouble(),
+        )
+    }
+
+    override fun scrollPageDown() {
+        terminal.scrollViewportBy(
+            -terminal
+                .visibleGridSize()
+                .height
+                .coerceAtLeast(1)
+                .toDouble(),
+        )
+    }
+
     fun close() {
-        tab.session.removeDirtyListener(completionDirtyListener)
+        completionObservationJob.cancel()
         completionTriggerController.cancelAndHide()
-        terminal.unbind()
+        searchBar.close()
+        shortcutController?.dispose()
+        shortcutController = null
+        terminal.dispose()
     }
 
     internal companion object {
@@ -79,10 +122,10 @@ internal class TerminalPane private constructor(
             suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
             commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
             shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
-            onContextMenu: (TerminalPane, Int, Int) -> Unit,
+            onContextMenu: (TerminalPane, SwingTerminalContextMenuRequest) -> Unit,
         ): TerminalPane {
-            val scrollbar = JScrollBar(Adjustable.VERTICAL)
-            val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
+            val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
+            val paneRef = arrayOfNulls<TerminalPane>(1)
             lateinit var terminalRef: SwingTerminal
             val completionTriggerController =
                 StandaloneCompletionTriggerController(
@@ -94,73 +137,68 @@ internal class TerminalPane private constructor(
                     commandSpecs = commandSpecs,
                     shellCapabilities = shellCapabilities,
                 )
-
             val defaultHandler = SwingShellSuggestionHandler.createDefault(tab.session)
             val shellSuggestionHandler =
                 SwingShellSuggestionHandler { acceptance ->
                     val request = acceptance.request
                     val replacement = acceptance.suggestion.replacementFor(request)
                     if (replacement != null) {
-                        val resultText = acceptance.suggestion.commandTextAfterReplacement(request)
-                        if (resultText != null) {
+                        acceptance.suggestion.commandTextAfterReplacement(request)?.let { resultText ->
                             val resultCursor = replacement.startOffset + replacement.replacementText.length
                             completionTriggerController.suppressNextTriggerFor(resultText, resultCursor)
                         }
                     }
                     defaultHandler.onSuggestionAccepted(acceptance)
                 }
-
             val wrappedFeedbackHandler =
                 SwingShellSuggestionFeedbackHandler { feedback ->
                     completionTriggerController.invalidateLastRequest()
                     suggestionFeedbackHandler.onSuggestionFeedback(feedback)
                 }
-
             val terminal =
                 SwingTerminal(
                     settingsProvider = { settings.current() },
                     hostServices =
                         SwingHostServices(
-                            viewportListener = scrollbarAdapter,
                             shellSuggestionProvider = suggestionProvider,
                             shellSuggestionHandler = shellSuggestionHandler,
                             shellSuggestionFeedbackHandler = wrappedFeedbackHandler,
+                            hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
+                            contextMenuHandler =
+                                SwingTerminalContextMenuHandler { request ->
+                                    val pane = paneRef[0] ?: return@SwingTerminalContextMenuHandler false
+                                    onContextMenu(pane, request)
+                                    true
+                                },
                         ),
                 )
             terminalRef = terminal
 
-            scrollbarAdapter.attach(terminal)
-            configureScrollbar(scrollbar)
-
             terminal.bind(tab.session)
-            val completionDirtyListener = completionTriggerController::scheduleRefresh
-            tab.session.addDirtyListener(completionDirtyListener)
+            val completionObservationJob =
+                CoroutineScope(Dispatchers.Default + CoroutineName("completion-${tab.id}"))
+                    .launch {
+                        tab.session.renderGeneration.collect {
+                            completionTriggerController.scheduleRefresh()
+                        }
+                    }
 
+            val searchBar = SwingTerminalSearchBar(terminal)
+            val component = terminalPanel(terminal, searchBar)
             val pane =
                 TerminalPane(
                     tab = tab,
                     terminal = terminal,
-                    component = terminalPanel(terminal, scrollbar),
+                    component = component,
                     settings = settings,
                     completionTriggerController = completionTriggerController,
-                    completionDirtyListener = completionDirtyListener,
+                    completionObservationJob = completionObservationJob,
+                    searchBar = searchBar,
                 )
+            pane.shortcutController = TerminalPaneShortcutController(pane, settings)
+            shortcutControllerRef[0] = pane.shortcutController
+            paneRef[0] = pane
 
-            terminal.addMouseListener(
-                object : java.awt.event.MouseAdapter() {
-                    override fun mousePressed(e: java.awt.event.MouseEvent) {
-                        if (e.isPopupTrigger) {
-                            onContextMenu(pane, e.x, e.y)
-                        }
-                    }
-
-                    override fun mouseReleased(e: java.awt.event.MouseEvent) {
-                        if (e.isPopupTrigger) {
-                            onContextMenu(pane, e.x, e.y)
-                        }
-                    }
-                },
-            )
             terminal.addFocusListener(
                 object : java.awt.event.FocusAdapter() {
                     override fun focusLost(e: java.awt.event.FocusEvent) {
@@ -168,8 +206,7 @@ internal class TerminalPane private constructor(
                     }
                 },
             )
-
-            tab.session.notifyRenderDirty()
+            tab.session.requestRender(scrollbackOffset = 0)
             return pane
         }
 
@@ -184,24 +221,12 @@ internal class TerminalPane private constructor(
 
         private fun terminalPanel(
             terminal: SwingTerminal,
-            scrollbar: JScrollBar,
+            searchBar: SwingTerminalSearchBar,
         ): JPanel =
-            JPanel(BorderLayout()).apply {
+            SwingTerminalOverlayPane(terminal, searchBar.component).apply {
                 background = terminal.background
                 border = null
                 terminal.border = null
-                add(terminal, BorderLayout.CENTER)
-                add(scrollbar, BorderLayout.EAST)
             }
-
-        private fun configureScrollbar(scrollbar: JScrollBar) {
-            scrollbar.unitIncrement = 1
-            scrollbar.blockIncrement = 8
-            scrollbar.preferredSize = Chrome.scrollbarSize
-            scrollbar.ui = ScrollBarUi()
-            scrollbar.isVisible = false
-            scrollbar.isFocusable = false
-            scrollbar.isOpaque = false
-        }
     }
 }

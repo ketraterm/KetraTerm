@@ -62,6 +62,47 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
     )
 
     /**
+     * Enqueues the active Kitty keyboard progressive-enhancement flags as a
+     * parameterless `CSI ? u` query response. Core reports only flags retained
+     * by its supported-mode mask.
+     */
+    fun requestKittyKeyboardFlags()
+
+    /**
+     * Enqueues an allowlisted xterm key-modifier option response.
+     *
+     * Unsupported resources produce no response.
+     *
+     * @param resource The queried xterm key-modifier resource identifier.
+     */
+    fun requestKeyModifierOption(resource: Int)
+
+    /**
+     * Enqueues a VT420 DECRQCRA response for an active-page rectangular area.
+     *
+     * The compatibility contract accepts page `0` (omitted) and page `1` only.
+     * Other pages, malformed rectangles, and out-of-domain requests are silent.
+     * The checksum uses the VT420-compatible default algorithm: erased cells and
+     * wide spacer cells are omitted; printable base codepoints are reduced to
+     * eight bits; and the supported VT100 video attributes are included.
+     *
+     * @param requestId Host-supplied request identifier echoed in the DCS response.
+     * @param page DEC page number (`0` omitted or `1` active page).
+     * @param top One-based top row, or `0` when omitted.
+     * @param left One-based left column, or `0` when omitted.
+     * @param bottom One-based bottom row, or `0` when omitted.
+     * @param right One-based right column, or `0` when omitted.
+     */
+    fun requestRectangleChecksum(
+        requestId: Int,
+        page: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    )
+
+    /**
      * Updates the recorded window size in pixels.
      *
      * @param width Width in pixels.

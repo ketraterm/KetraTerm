@@ -27,9 +27,12 @@ class TerminalCapabilityIdentityTest {
         assertAll(
             { assertEquals("xterm-256color", TerminalCapabilityIdentity.TERM_NAME) },
             { assertEquals("truecolor", TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR) },
-            { assertEquals(1, TerminalCapabilityIdentity.PRIMARY_DA_TERMINAL_CLASS) },
-            { assertEquals(2, TerminalCapabilityIdentity.PRIMARY_DA_ADVANCED_VIDEO) },
-            { assertEquals(0, TerminalCapabilityIdentity.SECONDARY_DA_TERMINAL_ID) },
+            { assertEquals(64, TerminalCapabilityIdentity.PRIMARY_DA_TERMINAL_CLASS) },
+            { assertEquals(1, TerminalCapabilityIdentity.PRIMARY_DA_132_COLUMNS) },
+            { assertEquals(6, TerminalCapabilityIdentity.PRIMARY_DA_SELECTIVE_ERASE) },
+            { assertEquals(22, TerminalCapabilityIdentity.PRIMARY_DA_ANSI_COLOR) },
+            { assertEquals(28, TerminalCapabilityIdentity.PRIMARY_DA_RECTANGULAR_EDITING) },
+            { assertEquals(41, TerminalCapabilityIdentity.SECONDARY_DA_TERMINAL_ID) },
             { assertEquals(0, TerminalCapabilityIdentity.SECONDARY_DA_VERSION) },
             { assertEquals(0, TerminalCapabilityIdentity.SECONDARY_DA_OPTIONS) },
             { assertFalse(TerminalCapabilityIdentity.TERTIARY_DA_SUPPORTED) },
@@ -43,11 +46,11 @@ class TerminalCapabilityIdentityTest {
             { assertTrue(TerminalCapabilityIdentity.TERMINFO_TRUECOLOR_SUPPORTED) },
             {
                 assertEquals(
-                    KittyKeyboardProgressiveFlag.SUPPORTED_MASK,
+                    KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
                     TerminalCapabilityIdentity.KITTY_KEYBOARD_SUPPORTED_FLAGS,
                 )
             },
-            { assertFalse(TerminalCapabilityIdentity.KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED) },
+            { assertTrue(TerminalCapabilityIdentity.KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED) },
         )
     }
 }

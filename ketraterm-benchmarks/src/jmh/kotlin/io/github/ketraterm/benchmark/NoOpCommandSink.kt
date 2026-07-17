@@ -104,6 +104,65 @@ internal class NoOpCommandSink : TerminalCommandSink {
         selective: Boolean,
     ) {}
 
+    override fun eraseRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        selective: Boolean,
+    ) {}
+
+    override fun fillRectangle(
+        codepoint: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) {}
+
+    override fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    ) {}
+
+    override fun requestRectangleChecksum(
+        requestId: Int,
+        page: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    ) {}
+
+    override fun setAttributeChangeExtent(extent: Int) {}
+
+    override fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    ) {}
+
+    override fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    ) {}
+
+    override fun insertColumns(count: Int) {}
+
+    override fun deleteColumns(count: Int) {}
+
     override fun insertLines(n: Int) {}
 
     override fun deleteLines(n: Int) {}
@@ -143,6 +202,10 @@ internal class NoOpCommandSink : TerminalCommandSink {
 
     override fun resetKeyModifierOptions() {}
 
+    override fun disableKeyModifierOption(resource: Int) {}
+
+    override fun requestKeyModifierOption(resource: Int) {}
+
     override fun setKeyFormatOption(
         resource: Int,
         value: Int,
@@ -170,6 +233,8 @@ internal class NoOpCommandSink : TerminalCommandSink {
         kind: Int,
         parameter: Int,
     ) {}
+
+    override fun requestKittyKeyboardFlags() {}
 
     override fun requestWindowReport(mode: Int) {}
 

@@ -19,7 +19,6 @@ import io.github.ketraterm.ui.swing.settings.SwingTerminalChrome
 import io.github.ketraterm.ui.swing.viewport.SwingRepaintPlanner
 import io.github.ketraterm.ui.swing.viewport.TerminalRepaintSink
 import java.awt.Insets
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * EDT render-frame scheduler and repaint planner for the Swing terminal.
@@ -29,7 +28,6 @@ internal class SwingRenderFrameController(
 ) {
     private val repaintPlanner = SwingRepaintPlanner()
     private val repaintPaddingScratch = Insets(0, 0, 0, 0)
-    private val renderPending = AtomicBoolean(false)
     private val repaintSink =
         object : TerminalRepaintSink {
             override fun requestFullRepaint() {
@@ -45,40 +43,21 @@ internal class SwingRenderFrameController(
                 host.repaintRegion(x, y, width, height)
             }
         }
-    private val publishedFrameRunnable =
-        Runnable {
-            renderPending.set(false)
-            handlePublishedFrame()
-        }
 
     fun reset() {
         repaintPlanner.reset()
-        renderPending.set(false)
-    }
-
-    /**
-     * Coalesces high-frequency render requests from the background IO thread.
-     */
-    fun schedulePublishedFrame() {
-        if (!renderPending.compareAndSet(false, true)) return
-        host.dispatch(publishedFrameRunnable)
     }
 
     fun handlePublishedFrame() {
         val boundSession = host.session ?: return
         host.resetCursorBlinkForFrame()
         host.refreshRenderCacheFromSession(boundSession)
-        if (host.syncTerminalGridToActiveChrome()) {
-            host.refreshRenderCacheFromSession(boundSession)
-        }
-        if (host.clampViewport(host.renderCache.historySize) || host.renderCache.scrollbackOffset != host.requestedViewportOffset()) {
-            host.refreshRenderCacheFromSession(boundSession)
-        }
+        val followUpRenderRequired =
+            host.syncTerminalGridToActiveChrome() ||
+                host.clampViewport(host.renderCache.historySize, host.renderCache.discardedCount) ||
+                host.renderCache.scrollbackOffset != host.requestedViewportOffset()
         var shellIntegrationDecorationsChanged = host.refreshShellIntegrationDecorations(boundSession)
-        if (host.renderCache.scrollbackOffset != host.requestedViewportOffset()) {
-            host.refreshRenderCacheFromSession(boundSession)
-            shellIntegrationDecorationsChanged = host.refreshShellIntegrationDecorations(boundSession) || shellIntegrationDecorationsChanged
-        }
+        if (followUpRenderRequired) host.requestRender(boundSession)
         host.refreshSearchForFrame()
         host.publishViewportState(host.renderCache.historySize)
         repaintPlanner.requestFrameRepaint(
@@ -133,9 +112,13 @@ internal class SwingRenderFrameController(
     private fun repaintPadding(): Insets {
         val settings = host.settings
         val activeBuffer = host.renderCache.activeBuffer
-        repaintPaddingScratch.top = SwingTerminalChrome.top(settings)
-        repaintPaddingScratch.left = SwingTerminalChrome.left(settings, activeBuffer)
-        repaintPaddingScratch.bottom = SwingTerminalChrome.bottom(settings)
+        repaintPaddingScratch.top = SwingTerminalChrome.top(settings, activeBuffer)
+        repaintPaddingScratch.left =
+            SwingTerminalChrome.left(
+                settings,
+                activeBuffer,
+            )
+        repaintPaddingScratch.bottom = SwingTerminalChrome.bottom(settings, activeBuffer)
         repaintPaddingScratch.right = SwingTerminalChrome.right(settings, activeBuffer)
         return repaintPaddingScratch
     }

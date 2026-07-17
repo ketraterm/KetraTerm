@@ -65,15 +65,28 @@ internal object GeneratedCsiDispatchTable {
             15971L, // CSI > c  DA2
             15974L, // CSI > f  XTFMTKEYS
             15981L, // CSI > m  XTMODKEYS
+            15982L, // CSI > n  XTDISMODKEYS
             15989L, // CSI > u  Kitty keyboard push flags
             16202L, // CSI ? J  DECSED
             16203L, // CSI ? K  DECSEL
             16232L, // CSI ? h  DECSET
             16236L, // CSI ? l  DECRST
+            16237L, // CSI ? m  XTQMODKEYS
             16238L, // CSI ? n  DEC DSR
+            16245L, // CSI ? u  Kitty keyboard query flags
             281474978807921L, // CSI SP q  DECSCUSR
             281474978873456L, // CSI ! p  DECSTR
             281474978938993L, // CSI " q  DECSCA
+            281474979070066L, // CSI Pt;Pl;Pb;Pr;Ps... $ r  DECCARA
+            281474979070068L, // CSI Pt;Pl;Pb;Pr;Ps... $ t  DECRARA
+            281474979070070L, // CSI Pts;Pls;Pbs;Prs;Pps;Ptd;Pld;Ppd $ v  DECCRA
+            281474979070072L, // CSI Pch;Pt;Pl;Pb;Pr $ x  DECFRA
+            281474979070074L, // CSI Pt;Pl;Pb;Pr $ z  DECERA
+            281474979070075L, // CSI Pt;Pl;Pb;Pr $ {  DECSERA
+            281474979266685L, // CSI Pn ' }  DECIC
+            281474979266686L, // CSI Pn ' ~  DECDC
+            281474979463288L, // CSI Ps * x  DECSACE
+            281474979463289L, // CSI Pi;Pg;Pt;Pl;Pb;Pr * y  DECRQCRA
         )
 
     private val COMMANDS: IntArray =
@@ -114,15 +127,28 @@ internal object GeneratedCsiDispatchTable {
             CsiCommand.DA_SECONDARY,
             CsiCommand.XTFMTKEYS,
             CsiCommand.XTMODKEYS,
+            CsiCommand.XTDISMODKEYS,
             CsiCommand.KITTY_KEYBOARD_PUSH,
             CsiCommand.DECSED,
             CsiCommand.DECSEL,
             CsiCommand.SM_DEC,
             CsiCommand.RM_DEC,
+            CsiCommand.XTQMODKEYS,
             CsiCommand.DSR_DEC,
+            CsiCommand.KITTY_KEYBOARD_QUERY,
             CsiCommand.DECSCUSR,
             CsiCommand.DECSTR,
             CsiCommand.DECSCA,
+            CsiCommand.DECCARA,
+            CsiCommand.DECRARA,
+            CsiCommand.DECCRA,
+            CsiCommand.DECFRA,
+            CsiCommand.DECERA,
+            CsiCommand.DECSERA,
+            CsiCommand.DECIC,
+            CsiCommand.DECDC,
+            CsiCommand.DECSACE,
+            CsiCommand.DECRQCRA,
         )
 
     init {

@@ -32,13 +32,11 @@ import io.github.ketraterm.ui.swing.render.TestCell
 import io.github.ketraterm.ui.swing.render.TestRenderFrame
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
-import io.github.ketraterm.ui.swing.settings.TerminalClipboardShortcuts
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Insets
 import java.awt.event.InputEvent
-import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -54,7 +52,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
         }
 
@@ -71,7 +69,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
         }
@@ -127,7 +125,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach { it.mousePressed(mousePressedWithAlt(component, x = 8, y = 8)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDraggedWithAlt(component, x = 80, y = 8)) }
         }
@@ -201,17 +199,14 @@ class SwingTerminalSelectionTest {
     }
 
     @Test
-    fun `windows native ctrl c copies selected text to clipboard`() {
+    fun `copySelectionToClipboard copies selected text to clipboard`() {
         val clipboard = RecordingClipboard()
         val frame = TestRenderFrame.text("hello world")
         val session = testSession(frame = frame)
         val component =
             SwingTerminal(
                 settingsProvider = {
-                    SwingSettings(
-                        clipboardShortcuts = TerminalClipboardShortcuts.windows(),
-                        padding = Insets(0, 0, 0, 0),
-                    )
+                    SwingSettings(padding = Insets(0, 0, 0, 0))
                 },
                 hostServices =
                     SwingHostServices(
@@ -222,9 +217,9 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 2)) }
-            component.keyListeners.forEach { it.keyPressed(copyKey(component, InputEvent.CTRL_DOWN_MASK)) }
+            assertTrue(component.copySelectionToClipboard())
         }
 
         assertEquals("hello", clipboard.copied.get())
@@ -232,17 +227,25 @@ class SwingTerminalSelectionTest {
     }
 
     @Test
-    fun `linux terminal ctrl shift c copies selected text to clipboard`() {
+    fun `copySelectionToClipboard ignores selected empty cells after row content`() {
         val clipboard = RecordingClipboard()
-        val frame = TestRenderFrame.text("hello world")
+        val frame =
+            TestRenderFrame(
+                arrayOf(
+                    arrayOf(
+                        TestCell(codeWord = 'h'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+                        TestCell(codeWord = 'i'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+                        TestCell(),
+                        TestCell(),
+                        TestCell(),
+                    ),
+                ),
+            )
         val session = testSession(frame = frame)
         val component =
             SwingTerminal(
                 settingsProvider = {
-                    SwingSettings(
-                        clipboardShortcuts = TerminalClipboardShortcuts.linuxAndUnix(),
-                        padding = Insets(0, 0, 0, 0),
-                    )
+                    SwingSettings(padding = Insets(0, 0, 0, 0))
                 },
                 hostServices =
                     SwingHostServices(
@@ -253,19 +256,43 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
-            component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 2)) }
-            component.keyListeners.forEach {
-                it.keyPressed(copyKey(component, InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK))
-            }
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
+            component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
+            assertTrue(component.copySelectionToClipboard())
         }
 
-        assertEquals("hello", clipboard.copied.get())
+        assertEquals("hi", clipboard.copied.get())
         session.close()
     }
 
     @Test
-    fun `windows native ctrl v reads clipboard and sends paste event through session`() {
+    fun `copySelectionToClipboard replaces stale clipboard content for an empty-cell selection`() {
+        val clipboard = RecordingClipboard()
+        clipboard.copyText("stale")
+        val frame = TestRenderFrame(arrayOf(Array(5) { TestCell() }))
+        val session = testSession(frame = frame)
+        val component =
+            SwingTerminal(
+                settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
+                hostServices = SwingHostServices(clipboardHandler = clipboard),
+            )
+
+        SwingUtilities.invokeAndWait {
+            component.setSize(300, 80)
+            component.bind(session)
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
+            component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
+            assertTrue(component.copySelectionToClipboard())
+        }
+
+        assertEquals("", clipboard.copied.get())
+        session.close()
+    }
+
+    @Test
+    fun `pasteClipboardText reads clipboard and sends paste event through session`() {
         val clipboard = RecordingClipboard(readValue = "pasted text")
         val input = RecordingInputEncoder()
         val frame = TestRenderFrame.text("ready")
@@ -273,10 +300,7 @@ class SwingTerminalSelectionTest {
         val component =
             SwingTerminal(
                 settingsProvider = {
-                    SwingSettings(
-                        clipboardShortcuts = TerminalClipboardShortcuts.windows(),
-                        padding = Insets(0, 0, 0, 0),
-                    )
+                    SwingSettings(padding = Insets(0, 0, 0, 0))
                 },
                 hostServices =
                     SwingHostServices(
@@ -288,7 +312,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            component.keyListeners.forEach { it.keyPressed(pasteKey(component, InputEvent.CTRL_DOWN_MASK)) }
+            assertTrue(component.pasteClipboardText())
         }
 
         assertEquals("pasted text", input.pasteText.get())
@@ -296,7 +320,7 @@ class SwingTerminalSelectionTest {
     }
 
     @Test
-    fun `middle click with pasteOnMiddleClick enabled pastes clipboard text`() {
+    fun `middle click is not bound to paste by reusable SwingTerminal`() {
         val clipboard = RecordingClipboard(readValue = "middle click pasted text")
         val input = RecordingInputEncoder()
         val frame = TestRenderFrame.text("ready")
@@ -304,43 +328,7 @@ class SwingTerminalSelectionTest {
         val component =
             SwingTerminal(
                 settingsProvider = {
-                    SwingSettings(
-                        pasteOnMiddleClick = true,
-                        padding = Insets(0, 0, 0, 0),
-                    )
-                },
-                hostServices =
-                    SwingHostServices(
-                        clipboardHandler = clipboard,
-                    ),
-            )
-
-        session.start(columns = 5, rows = 1)
-        SwingUtilities.invokeAndWait {
-            component.setSize(300, 80)
-            component.bind(session)
-            component.mouseListeners.forEach {
-                it.mousePressed(mousePressedMiddle(component, x = 8, y = 8, clickCount = 1))
-            }
-        }
-
-        assertEquals("middle click pasted text", input.pasteText.get())
-        session.close()
-    }
-
-    @Test
-    fun `middle click with pasteOnMiddleClick disabled does not paste clipboard text`() {
-        val clipboard = RecordingClipboard(readValue = "middle click pasted text")
-        val input = RecordingInputEncoder()
-        val frame = TestRenderFrame.text("ready")
-        val session = testSession(frame = frame, inputEncoder = input)
-        val component =
-            SwingTerminal(
-                settingsProvider = {
-                    SwingSettings(
-                        pasteOnMiddleClick = false,
-                        padding = Insets(0, 0, 0, 0),
-                    )
+                    SwingSettings(padding = Insets(0, 0, 0, 0))
                 },
                 hostServices =
                     SwingHostServices(
@@ -370,10 +358,7 @@ class SwingTerminalSelectionTest {
         val component =
             SwingTerminal(
                 settingsProvider = {
-                    SwingSettings(
-                        pasteOnMiddleClick = true,
-                        padding = Insets(0, 0, 0, 0),
-                    )
+                    SwingSettings(padding = Insets(0, 0, 0, 0))
                 },
                 hostServices =
                     SwingHostServices(
@@ -398,38 +383,6 @@ class SwingTerminalSelectionTest {
         assertEquals(io.github.ketraterm.input.event.TerminalMouseButton.MIDDLE, mouseEvent!!.button)
         assertEquals(io.github.ketraterm.input.event.TerminalMouseEventType.PRESS, mouseEvent.type)
 
-        session.close()
-    }
-
-    @Test
-    fun `copy shortcut without selection falls through to terminal input`() {
-        val clipboard = RecordingClipboard()
-        val input = RecordingInputEncoder()
-        val frame = TestRenderFrame.text("ready")
-        val session = testSession(frame = frame, inputEncoder = input)
-        val component =
-            SwingTerminal(
-                settingsProvider = {
-                    SwingSettings(
-                        clipboardShortcuts = TerminalClipboardShortcuts.windows(),
-                        padding = Insets(0, 0, 0, 0),
-                    )
-                },
-                hostServices =
-                    SwingHostServices(
-                        clipboardHandler = clipboard,
-                    ),
-            )
-
-        session.start(columns = 5, rows = 1)
-        SwingUtilities.invokeAndWait {
-            component.setSize(300, 80)
-            component.bind(session)
-            component.keyListeners.forEach { it.keyPressed(copyKey(component, InputEvent.CTRL_DOWN_MASK)) }
-        }
-
-        assertEquals(1, input.keyCount)
-        assertEquals(null, clipboard.copied.get())
         session.close()
     }
 
@@ -472,7 +425,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(80, 40)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressedWithCtrl(component, x = 8, y = 8))
             }
@@ -519,7 +472,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(80, 40)
             component.bind(session)
-            session.publisher.updateAndPublish(StaticFrameReader(frame))
+            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1))
             }
@@ -540,16 +493,19 @@ class SwingTerminalSelectionTest {
         hyperlinkResolver: TerminalHyperlinkResolver = TerminalHyperlinkResolver.NONE,
     ): TerminalSession {
         val terminal = TerminalBuffers.create(width = frame.columns, height = frame.rows, maxHistory = 5)
-        return TerminalSession(
-            terminal = terminal,
-            publisher = TerminalRenderPublisher(frame.columns, frame.rows),
-            renderReader = renderReader,
-            responseReader = terminal,
-            connector = NoOpConnector,
-            parser = NoOpParser,
-            inputEncoder = inputEncoder,
-            hyperlinkResolver = hyperlinkResolver,
-        )
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(frame.columns, frame.rows),
+                renderReader = renderReader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = inputEncoder,
+                hyperlinkResolver = hyperlinkResolver,
+            )
+        session.renderPublisher.updateAndPublish(renderReader)
+        return session
     }
 
     private fun mousePressed(
@@ -584,23 +540,6 @@ class SwingTerminalSelectionTest {
             x,
             y,
             clickCount,
-            false,
-            MouseEvent.BUTTON2,
-        )
-
-    private fun mouseReleasedMiddle(
-        component: SwingTerminal,
-        x: Int,
-        y: Int,
-    ): MouseEvent =
-        MouseEvent(
-            component,
-            MouseEvent.MOUSE_RELEASED,
-            System.currentTimeMillis(),
-            InputEvent.BUTTON2_DOWN_MASK,
-            x,
-            y,
-            1,
             false,
             MouseEvent.BUTTON2,
         )
@@ -688,30 +627,6 @@ class SwingTerminalSelectionTest {
             0,
             false,
             MouseEvent.BUTTON1,
-        )
-
-    private fun copyKey(
-        component: SwingTerminal,
-        modifiers: Int,
-    ): KeyEvent = clipboardKey(component, KeyEvent.VK_C, modifiers)
-
-    private fun pasteKey(
-        component: SwingTerminal,
-        modifiers: Int,
-    ): KeyEvent = clipboardKey(component, KeyEvent.VK_V, modifiers)
-
-    private fun clipboardKey(
-        component: SwingTerminal,
-        keyCode: Int,
-        modifiers: Int,
-    ): KeyEvent =
-        KeyEvent(
-            component,
-            KeyEvent.KEY_PRESSED,
-            System.currentTimeMillis(),
-            modifiers,
-            keyCode,
-            KeyEvent.CHAR_UNDEFINED,
         )
 
     private class StaticFrameReader(

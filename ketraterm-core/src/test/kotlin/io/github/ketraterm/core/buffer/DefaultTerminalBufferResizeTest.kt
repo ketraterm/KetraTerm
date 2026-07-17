@@ -79,4 +79,35 @@ class DefaultTerminalBufferResizeTest {
             { assertTrue(state.altBuffer.scrollTop <= state.altBuffer.scrollBottom) },
         )
     }
+
+    @Test
+    fun `resize while scrolled into top anchored history preserves viewport anchor`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 3, initialHeight = 4, maxHistory = 8)
+        val state = stateOf(buffer)
+        val rows = arrayOf("AAA", "BBB", "CCC", "DDD")
+        for (row in rows.indices) {
+            val line = state.primaryBuffer.ring[row]
+            for (column in rows[row].indices) {
+                line.setCell(column, rows[row][column].code, state.pen.currentAttr)
+            }
+        }
+        buffer.setScrollRegion(top = 1, bottom = 3)
+        buffer.positionCursor(col = 0, row = 2)
+        buffer.newLine()
+
+        val anchoredLine = state.ring[state.resolveScrollbackRingIndex(viewportRow = 0, scrollbackOffset = 1)]
+        val anchoredLineId = anchoredLine.lineId
+        assertEquals("AAA", anchoredLine.toTextTrimmed())
+
+        val (newOffset, newHistorySize) = buffer.resize(newWidth = 4, newHeight = 4, oldScrollbackOffset = 1)
+
+        val reanchoredLine = state.ring[state.resolveScrollbackRingIndex(viewportRow = 0, scrollbackOffset = newOffset)]
+        assertAll(
+            { assertEquals(1, newOffset) },
+            { assertEquals(1, newHistorySize) },
+            { assertEquals(anchoredLineId, reanchoredLine.lineId) },
+            { assertEquals("AAA", reanchoredLine.toTextTrimmed()) },
+            { assertEquals("DDD", state.ring[state.resolveRingIndex(3)].toTextTrimmed()) },
+        )
+    }
 }

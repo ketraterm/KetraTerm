@@ -19,6 +19,7 @@ import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.api.TerminalFontResolver
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.render.cache.*
 import io.github.ketraterm.ui.swing.render.font.TerminalTextRunBuffer
@@ -38,8 +39,9 @@ internal class TerminalTextPainter(
     private val colorCache: AwtColorCache,
     private val decorationPainter: TerminalDecorationPainter,
     private val platformEmojiPainter: TerminalPlatformEmojiPainter = TerminalPlatformEmojiPainter(),
+    fontResolver: TerminalFontResolver? = null,
 ) {
-    private val fontCache = FontCache()
+    private val fontCache = FontCache(fontResolver = fontResolver)
     private val complexTextLayouts = TerminalComplexTextLayoutCache()
     private val asciiGlyphVectors = TerminalAsciiGlyphVectorCache()
     private val asciiDrawChars = TerminalAsciiDrawCharsCache()
@@ -80,6 +82,7 @@ internal class TerminalTextPainter(
         row: Int,
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean = true,
+        hyperlinkIds: IntArray = cache.hyperlinkIds,
         hoveredHyperlinkId: Int = NO_HYPERLINK_ID,
         hoveredHyperlinkStartRow: Int = DEFAULT_HOVER_START_ROW,
         hoveredHyperlinkStartColumn: Int = 0,
@@ -97,6 +100,7 @@ internal class TerminalTextPainter(
                 row = row,
                 fontRenderContext = fontRenderContext,
                 textBlinkVisible = textBlinkVisible,
+                hyperlinkIds = hyperlinkIds,
                 hoveredHyperlinkId = hoveredHyperlinkId,
                 hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
                 hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
@@ -142,6 +146,7 @@ internal class TerminalTextPainter(
                             baselineY = baselineY,
                             fontRenderContext = fontRenderContext,
                             textBlinkVisible = textBlinkVisible,
+                            hyperlinkIds = hyperlinkIds,
                             hoveredHyperlinkId = hoveredHyperlinkId,
                             hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
                             hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
@@ -162,6 +167,7 @@ internal class TerminalTextPainter(
                             baselineY = baselineY,
                             fontRenderContext = fontRenderContext,
                             textBlinkVisible = textBlinkVisible,
+                            hyperlinkIds = hyperlinkIds,
                             hoveredHyperlinkId = hoveredHyperlinkId,
                             hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
                             hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
@@ -182,6 +188,7 @@ internal class TerminalTextPainter(
                             baselineY = baselineY,
                             fontRenderContext = fontRenderContext,
                             textBlinkVisible = textBlinkVisible,
+                            hyperlinkIds = hyperlinkIds,
                             hoveredHyperlinkId = hoveredHyperlinkId,
                             hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
                             hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
@@ -305,6 +312,7 @@ internal class TerminalTextPainter(
         baselineY: Int,
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean,
+        hyperlinkIds: IntArray,
         hoveredHyperlinkId: Int,
         hoveredHyperlinkStartRow: Int,
         hoveredHyperlinkStartColumn: Int,
@@ -317,7 +325,6 @@ internal class TerminalTextPainter(
         val attrWords = cache.attrWords
         val extraAttrWords = cache.extraAttrWords
         val codeWords = cache.codeWords
-        val hyperlinkIds = cache.hyperlinkIds
         val rowOffset = cache.rowOffset(row)
         val startIndex = rowOffset + startColumn
         val attr = attrWords[startIndex]
@@ -416,6 +423,7 @@ internal class TerminalTextPainter(
         baselineY: Int,
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean,
+        hyperlinkIds: IntArray,
         hoveredHyperlinkId: Int,
         hoveredHyperlinkStartRow: Int,
         hoveredHyperlinkStartColumn: Int,
@@ -428,7 +436,6 @@ internal class TerminalTextPainter(
         val attrWords = cache.attrWords
         val extraAttrWords = cache.extraAttrWords
         val codeWords = cache.codeWords
-        val hyperlinkIds = cache.hyperlinkIds
         val clusterRefs = cache.clusterRefs
         val index = cache.rowOffset(row) + column
         val flags = flagsPlane[index]

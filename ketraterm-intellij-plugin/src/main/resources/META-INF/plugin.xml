@@ -1,3 +1,19 @@
+<!--
+  ~ Copyright 2026 Gagik Sargsyan
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~     https://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
 <idea-plugin>
     <id>io.github.ketraterm.terminal</id>
 
@@ -28,5 +44,84 @@
                     factoryClass="io.github.ketraterm.intellij.ui.KetraTermToolWindowFactory"
                     icon="/icons/ketraterm-toolwindow.svg"/>
     </extensions>
+
+    <actions>
+        <action id="KetraTerm.Terminal.CopySelection"
+                class="io.github.ketraterm.intellij.ui.KetraTermCopySelectionAction"
+                text="Copy"
+                description="Copy the current KetraTerm terminal selection to the clipboard">
+            <keyboard-shortcut keymap="$default" first-keystroke="control C"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="control C" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control C" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta C"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta C"/>
+        </action>
+
+        <action id="KetraTerm.Terminal.PasteClipboard"
+                class="io.github.ketraterm.intellij.ui.KetraTermPasteClipboardAction"
+                text="Paste"
+                description="Paste clipboard text into the focused KetraTerm terminal">
+            <keyboard-shortcut keymap="$default" first-keystroke="control V"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="control V" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control V" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta V"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta V"/>
+        </action>
+
+        <action id="KetraTerm.Terminal.OpenSearch"
+                class="io.github.ketraterm.intellij.ui.KetraTermOpenSearchAction"
+                text="Find"
+                description="Open search for the focused KetraTerm terminal">
+            <keyboard-shortcut keymap="$default" first-keystroke="control F"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="control F" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control F" remove="true"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta F"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta F"/>
+        </action>
+
+        <action id="KetraTerm.Terminal.SelectAll"
+                class="io.github.ketraterm.intellij.ui.KetraTermSelectAllAction"
+                text="Select All"
+                description="Select all retained text in the focused KetraTerm terminal"
+        />
+
+        <action id="KetraTerm.Terminal.ClearScreen"
+                class="io.github.ketraterm.intellij.ui.KetraTermClearScreenAction"
+                text="Clear"
+                description="Request the focused terminal process to clear the screen"
+        />
+
+        <action id="KetraTerm.Terminal.NewTab"
+                class="io.github.ketraterm.intellij.ui.KetraTermNewTabAction"
+                text="New Tab"
+                description="Open a new KetraTerm terminal tab"
+        />
+
+        <action id="KetraTerm.Terminal.CloseTab"
+                class="io.github.ketraterm.intellij.ui.KetraTermCloseTabAction"
+                text="Close Tab"
+                description="Close the focused KetraTerm terminal tab"
+        />
+
+        <action id="KetraTerm.Terminal.OpenTerminalHere"
+                class="io.github.ketraterm.intellij.ui.KetraTermOpenTerminalHereAction"
+                text="Open Terminal Here"
+                description="Open a KetraTerm terminal tab in the focused terminal directory"
+        />
+
+        <action id="KetraTerm.Terminal.ScrollPageUp"
+                class="io.github.ketraterm.intellij.ui.KetraTermScrollPageUpAction"
+                text="Scroll Terminal Page Up"
+                description="Scroll the focused KetraTerm terminal one page up">
+            <keyboard-shortcut keymap="$default" first-keystroke="shift PAGE_UP"/>
+        </action>
+
+        <action id="KetraTerm.Terminal.ScrollPageDown"
+                class="io.github.ketraterm.intellij.ui.KetraTermScrollPageDownAction"
+                text="Scroll Terminal Page Down"
+                description="Scroll the focused KetraTerm terminal one page down">
+            <keyboard-shortcut keymap="$default" first-keystroke="shift PAGE_DOWN"/>
+        </action>
+    </actions>
 
 </idea-plugin>

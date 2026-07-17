@@ -61,6 +61,13 @@ interface TerminalModeController {
     fun setApplicationKeypad(enabled: Boolean)
 
     /**
+     * Selects the Backspace wire byte through DECBKM (`CSI ? 67 h/l`).
+     *
+     * @param sendsBackspace `true` for BS (`0x08`), `false` for DEL (`0x7f`).
+     */
+    fun setBackarrowKeyMode(sendsBackspace: Boolean)
+
+    /**
      * Enables or disables left/right margin mode (DECLRMM, `CSI ? 69 h` / `CSI ? 69 l`).
      *
      * The mode flag is global, while the actual horizontal margins are stored
@@ -108,7 +115,8 @@ interface TerminalModeController {
     /**
      * Sets the modify-other-keys reporting level.
      *
-     * @param mode The modify-other-keys mode level (0, 1, or 2).
+     * @param mode The modify-other-keys mode level, where `-1` is xterm's
+     * explicit disabled state and `0` is the reset/default state.
      */
     fun setModifyOtherKeysMode(mode: Int)
 

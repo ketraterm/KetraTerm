@@ -6,6 +6,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
@@ -18,10 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -48,18 +48,84 @@ jobs:
       - name: Generate Dokka Docs
         run: ./gradlew dokkaGenerate
 
-      - name: Replace Version Placeholders
-        shell: bash
-        run: |
-          VERSION=$(cat VERSION | tr -d '\r\n')
-          echo "Injecting version: $VERSION"
-          sed -i "s/@VERSION@/$VERSION/g" website/*.html
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: old-gh-pages
+        continue-on-error: true
 
       - name: Prepare Website & Docs Bundle
+        shell: bash
         run: |
+          # Extract version from tag name if available (v0.1.1 -> 0.1.1), otherwise fall back to VERSION file
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(cat VERSION | tr -d '\r\n')
+          fi
+          
+          # Check if the version is stable (does not contain pre-release tags like alpha, beta, rc, SNAPSHOT, etc.)
+          IS_STABLE=true
+          if [[ "$VERSION" =~ (alpha|beta|rc|SNAPSHOT|-) ]]; then
+            IS_STABLE=false
+          fi
+          
+          echo "Building docs for version: $VERSION (Stable: $IS_STABLE)"
+          
+          # 1. Create clean build directory
+          mkdir -p build/website
+          
+          # 2. Copy base landing pages and files
+          if [ "$IS_STABLE" = "true" ] || [ ! -d old-gh-pages ]; then
+            # Stable release (or first run): Update root pages to the new version
+            sed -i "s/@VERSION@/$VERSION/g" website/*.html
+            cp -R website/* build/website/
+          else
+            # Pre-release / Unstable: Preserve current stable landing pages from gh-pages
+            # Copy all files from old-gh-pages except the 'docs' folder
+            for file in old-gh-pages/*; do
+              basename=$(basename "$file")
+              if [ "$basename" != "docs" ] && [ "$basename" != "*" ]; then
+                cp -R "$file" build/website/
+              fi
+            done
+          fi
+          
+          # 3. Handle documentation folders
           mkdir -p build/website/docs
-          cp -R website/* build/website/
-          cp -R build/dokka/html/* build/website/docs/
+          
+          # Preserve existing versioned documentation directories
+          if [ -d old-gh-pages/docs ]; then
+            cp -R old-gh-pages/docs/* build/website/docs/
+          fi
+          
+          # Write the new version-specific documentation
+          mkdir -p build/website/docs/v$VERSION
+          cp -R build/dokka/html/* build/website/docs/v$VERSION/
+          
+          # If stable release, update the 'latest' alias folder
+          if [ "$IS_STABLE" = "true" ] || [ ! -d old-gh-pages ]; then
+            mkdir -p build/website/docs/latest
+            cp -R build/dokka/html/* build/website/docs/latest/
+          fi
+          
+          # 4. Generate the root redirect for docs/
+          cat <<'EOF' > build/website/docs/index.html
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta http-equiv="refresh" content="0; url=latest/">
+            <script type="text/javascript">
+              window.location.href = "latest/"
+            </script>
+            <title>Redirecting...</title>
+          </head>
+          <body>
+            If you are not redirected, <a href="latest/">click here</a>.
+          </body>
+          </html>
+          EOF
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -69,6 +135,13 @@ jobs:
         with:
           path: 'build/website'
 
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

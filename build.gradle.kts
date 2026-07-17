@@ -16,10 +16,12 @@
 
 plugins {
     kotlin("jvm") version "2.4.0" apply false
-    id("com.diffplug.spotless") version "8.7.0"
+    id("com.diffplug.spotless") version "8.8.0"
     id("org.jetbrains.dokka") version "2.2.0"
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
 }
+
+extra["kotlinxCoroutinesVersion"] = "1.11.0"
 
 repositories {
     mavenCentral()
@@ -37,6 +39,7 @@ dependencies {
     dokka(project(":ketraterm-transport-api"))
     dokka(project(":ketraterm-session"))
     dokka(project(":ketraterm-ui-swing"))
+    dokka(project(":ketraterm-ui-swing-host"))
     dokka(project(":ketraterm-testkit"))
     dokka(project(":ketraterm-pty"))
     dokka(project(":ketraterm-workspace"))

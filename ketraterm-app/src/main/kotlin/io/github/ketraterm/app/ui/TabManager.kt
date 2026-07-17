@@ -26,6 +26,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
+import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.workspace.*
 import io.github.ketraterm.workspace.persistence.CommandCompletionStatsStore
 import java.awt.*
@@ -53,6 +54,7 @@ internal class TabManager(
     private val tabContentPanel: JPanel,
     private val settings: KetraTermSettings,
     private val defaultProfileProvider: () -> TerminalProfile,
+    private val closeConfirmation: TerminalCloseConfirmation = SwingTerminalCloseConfirmation(frame),
 ) {
     private val panes = ArrayList<TerminalPane>(INITIAL_TAB_CAPACITY)
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
@@ -238,8 +240,8 @@ internal class TabManager(
                         profileId = workspaceTab.profile.id,
                         workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
                     ),
-            ) { p, x, y ->
-                showPaneContextMenu(p, p.terminal, x, y)
+            ) { p, request ->
+                showPaneContextMenu(p, request)
             }
         pane = createdPane
         panes += createdPane
@@ -264,9 +266,23 @@ internal class TabManager(
         return true
     }
 
-    /** Closes the tab identified by [id]. No-op if the id is unknown. */
-    fun closeTab(id: String) {
-        val root = tabRoots[id] ?: return
+    /**
+     * Closes the tab identified by [id].
+     *
+     * @return true when the tab is now closed or was already unknown; false
+     * when the user rejected closing a live process.
+     */
+    fun closeTab(id: String): Boolean {
+        val root = tabRoots[id] ?: return true
+        if (!confirmClose(root)) return false
+        closeTabWithoutConfirmation(id, root)
+        return true
+    }
+
+    private fun closeTabWithoutConfirmation(
+        id: String,
+        root: SplitNode,
+    ) {
         val tabPanes = root.allPanes()
         for (pane in tabPanes) {
             panes.remove(pane)
@@ -284,12 +300,24 @@ internal class TabManager(
         selectedPane?.let { onTabSelected(it.tab.id) }
     }
 
-    /** Closes every open tab and shuts down the workspace. */
-    fun closeAllTabs() {
+    /**
+     * Closes every open tab and shuts down the workspace after one aggregated
+     * confirmation for all live processes.
+     *
+     * @return true when shutdown completed; false when the user cancelled.
+     */
+    fun closeAllTabs(): Boolean {
+        if (!confirmCloseAllTabs()) return false
+        closeAllTabsWithoutConfirmation()
+        return true
+    }
+
+    /** Closes every open tab without prompting; used after remote/session shutdown. */
+    fun closeAllTabsWithoutConfirmation() {
         KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(keyEventDispatcher)
         val tabIds = tabRoots.keys.toList()
         for (tabId in tabIds) {
-            closeTab(tabId)
+            tabRoots[tabId]?.let { closeTabWithoutConfirmation(tabId, it) }
         }
         completionRegistry.close()
         workspace.close()
@@ -403,8 +431,8 @@ internal class TabManager(
                         profileId = workspaceTab.profile.id,
                         workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
                     ),
-            ) { p, x, y ->
-                showPaneContextMenu(p, p.terminal, x, y)
+            ) { p, request ->
+                showPaneContextMenu(p, request)
             }
         newPane = createdPane
 
@@ -462,12 +490,19 @@ internal class TabManager(
         val allPanes = root.allPanes()
 
         if (allPanes.size <= 1) {
-            closeTab(tabId)
-            if (openReplacementWhenLastPane && tabRoots.isEmpty()) {
+            val closed =
+                if (openReplacementWhenLastPane) {
+                    closeTabWithoutUserPrompt(tabId)
+                } else {
+                    closeTab(tabId)
+                }
+            if (closed && openReplacementWhenLastPane && tabRoots.isEmpty()) {
                 openTab(defaultProfileProvider())
             }
             return
         }
+
+        if (!openReplacementWhenLastPane && !confirmClose(listOf(pane))) return
 
         val newRoot = root.removePane(pane)
         if (newRoot != null) {
@@ -506,30 +541,55 @@ internal class TabManager(
 
     fun showPaneContextMenu(
         pane: TerminalPane,
-        component: Component,
-        x: Int,
-        y: Int,
+        request: SwingTerminalContextMenuRequest,
     ) {
         val menu = JPopupMenu()
 
+        val hyperlink = request.hyperlink
+        if (hyperlink != null) {
+            menu.add(
+                JMenuItem("Open Link").apply {
+                    addActionListener { hyperlink.open() }
+                },
+            )
+            menu.add(
+                JMenuItem("Copy Link").apply {
+                    isEnabled = hyperlink.uri != null
+                    addActionListener { hyperlink.copyUri() }
+                },
+            )
+            menu.addSeparator()
+        }
+
         val copyItem =
             JMenuItem("Copy").apply {
-                isEnabled = pane.terminal.currentSelection() != null
-                addActionListener {
-                    pane.terminal.copySelectionToClipboard()
-                }
+                isEnabled = request.hasSelection()
+                addActionListener { request.copySelection() }
             }
         val pasteItem =
             JMenuItem("Paste").apply {
-                addActionListener {
-                    pane.terminal.pasteClipboardText()
-                }
+                addActionListener { request.pasteClipboard() }
+            }
+        val selectAllItem =
+            JMenuItem("Select All").apply {
+                addActionListener { request.selectAll() }
+            }
+        val searchItem =
+            JMenuItem("Search").apply {
+                addActionListener { pane.openSearch() }
+            }
+        val clearItem =
+            JMenuItem("Clear").apply {
+                addActionListener { request.clearScreen() }
             }
 
         menu.add(copyItem)
         menu.add(pasteItem)
+        menu.add(selectAllItem)
+        menu.add(searchItem)
+        menu.add(clearItem)
 
-        val commandRecordId = pane.terminal.commandRecordAt(x, y)
+        val commandRecordId = pane.terminal.commandRecordAt(request.x, request.y)
         if (commandRecordId != 0) {
             menu.addSeparator()
             menu.add(
@@ -590,7 +650,7 @@ internal class TabManager(
         menu.addSeparator()
         menu.add(closeItem)
 
-        menu.show(component, x, y)
+        menu.show(request.terminal, request.x, request.y)
     }
 
     private fun exportCommandOutput(
@@ -644,6 +704,50 @@ internal class TabManager(
 
     private fun showPane(tabId: String) {
         (tabContentPanel.layout as CardLayout).show(tabContentPanel, tabId)
+    }
+
+    private fun closeTabWithoutUserPrompt(id: String): Boolean {
+        val root = tabRoots[id] ?: return true
+        closeTabWithoutConfirmation(id, root)
+        return true
+    }
+
+    private fun confirmClose(root: SplitNode): Boolean = confirmClose(root.allPanes())
+
+    private fun confirmClose(panesToClose: List<TerminalPane>): Boolean {
+        val liveProcessCount =
+            panesToClose.count {
+                it.tab.session.shellIntegrationState
+                    .hasRunningCommand()
+            }
+        if (liveProcessCount == 0) return true
+        val displayName = closeDisplayName(panesToClose)
+        return closeConfirmation.confirmClose(TerminalCloseRequest(displayName, liveProcessCount))
+    }
+
+    private fun confirmCloseAllTabs(): Boolean {
+        val tabIds = tabRoots.keys.toList()
+        val liveProcessCount =
+            tabIds.sumOf { tabId ->
+                tabRoots[tabId]?.allPanes()?.count {
+                    it.tab.session.shellIntegrationState
+                        .hasRunningCommand()
+                } ?: 0
+            }
+        if (liveProcessCount == 0) return true
+        return closeConfirmation.confirmClose(
+            TerminalCloseRequest(
+                displayName = Chrome.APP_TITLE,
+                liveProcessCount = liveProcessCount,
+            ),
+        )
+    }
+
+    private fun closeDisplayName(panesToClose: List<TerminalPane>): String {
+        if (panesToClose.size == 1) return panesToClose[0].tab.title
+        val active = tabBar.selectedId()?.let(::getActivePane)
+        if (active != null && panesToClose.any { it === active }) return active.tab.title
+        return panesToClose.firstOrNull()?.tab?.title ?: Chrome.APP_TITLE
     }
 
     private fun updateTabTitle(

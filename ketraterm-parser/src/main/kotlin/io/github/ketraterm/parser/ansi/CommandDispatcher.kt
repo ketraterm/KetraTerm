@@ -20,6 +20,7 @@ import io.github.ketraterm.parser.charset.CharsetMapper
 import io.github.ketraterm.parser.runtime.ParserState
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.protocol.ControlCode
+import io.github.ketraterm.protocol.DecRectangleAttribute
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardFlagApplicationMode
 
 /**
@@ -48,6 +49,8 @@ internal interface CommandDispatcher {
 }
 
 internal object AnsiCommandDispatcher : CommandDispatcher {
+    private const val RECTANGLE_ATTRIBUTE_START: Int = 4
+
     override fun executeControl(
         sink: TerminalCommandSink,
         state: ParserState,
@@ -142,6 +145,41 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.EL -> sink.eraseInLine(modeParam(state, 0), selective = false)
             CsiCommand.DECSED -> sink.eraseInDisplay(modeParam(state, 0), selective = true)
             CsiCommand.DECSEL -> sink.eraseInLine(modeParam(state, 0), selective = true)
+            CsiCommand.DECERA -> dispatchRectangleErase(sink, state, selective = false)
+            CsiCommand.DECSERA -> dispatchRectangleErase(sink, state, selective = true)
+            CsiCommand.DECFRA ->
+                sink.fillRectangle(
+                    codepoint = modeParam(state, 0),
+                    top = rectangleParam(state, 1),
+                    left = rectangleParam(state, 2),
+                    bottom = rectangleParam(state, 3),
+                    right = rectangleParam(state, 4),
+                )
+            CsiCommand.DECCRA ->
+                sink.copyRectangle(
+                    sourceTop = rectangleParam(state, 0),
+                    sourceLeft = rectangleParam(state, 1),
+                    sourceBottom = rectangleParam(state, 2),
+                    sourceRight = rectangleParam(state, 3),
+                    sourcePage = rectangleParam(state, 4),
+                    destinationTop = rectangleParam(state, 5),
+                    destinationLeft = rectangleParam(state, 6),
+                    destinationPage = rectangleParam(state, 7),
+                )
+            CsiCommand.DECCARA -> dispatchRectangleAttributeChange(sink, state)
+            CsiCommand.DECRARA -> dispatchRectangleAttributeReverse(sink, state)
+            CsiCommand.DECSACE -> sink.setAttributeChangeExtent(modeParam(state, 0))
+            CsiCommand.DECRQCRA ->
+                sink.requestRectangleChecksum(
+                    requestId = modeParam(state, 0),
+                    page = rectangleParam(state, 1),
+                    top = rectangleParam(state, 2),
+                    left = rectangleParam(state, 3),
+                    bottom = rectangleParam(state, 4),
+                    right = rectangleParam(state, 5),
+                )
+            CsiCommand.DECIC -> sink.insertColumns(countParam(state, 0))
+            CsiCommand.DECDC -> sink.deleteColumns(countParam(state, 0))
             CsiCommand.IL -> sink.insertLines(countParam(state, 0))
             CsiCommand.DL -> sink.deleteLines(countParam(state, 0))
             CsiCommand.ICH -> sink.insertCharacters(countParam(state, 0))
@@ -155,9 +193,14 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.WINDOW_OP -> dispatchWindowOperation(sink, state)
             CsiCommand.XTFMTKEYS -> dispatchKeyFormatOption(sink, state)
             CsiCommand.XTMODKEYS -> dispatchKeyModifierOption(sink, state)
+            CsiCommand.XTDISMODKEYS -> dispatchDisableKeyModifierOption(sink, state)
+            CsiCommand.XTQMODKEYS -> dispatchQueryKeyModifierOption(sink, state)
             CsiCommand.KITTY_KEYBOARD_FLAGS -> dispatchKittyKeyboardFlags(sink, state)
             CsiCommand.KITTY_KEYBOARD_PUSH -> dispatchKittyKeyboardPush(sink, state)
             CsiCommand.KITTY_KEYBOARD_POP -> dispatchKittyKeyboardPop(sink, state)
+            CsiCommand.KITTY_KEYBOARD_QUERY -> {
+                if (state.paramCount == 0) sink.requestKittyKeyboardFlags()
+            }
             CsiCommand.DECSTBM ->
                 sink.setScrollRegion(
                     top = scrollRegionTopParam(state, 0),
@@ -241,6 +284,118 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         state: ParserState,
         index: Int,
     ): Int = if (index < state.paramCount) state.params[index] else -1
+
+    private fun rectangleParam(
+        state: ParserState,
+        index: Int,
+    ): Int {
+        val value = paramOrMissing(state, index)
+        return if (value <= 0) 0 else value
+    }
+
+    private fun dispatchRectangleErase(
+        sink: TerminalCommandSink,
+        state: ParserState,
+        selective: Boolean,
+    ) {
+        sink.eraseRectangle(
+            top = rectangleParam(state, 0),
+            left = rectangleParam(state, 1),
+            bottom = rectangleParam(state, 2),
+            right = rectangleParam(state, 3),
+            selective = selective,
+        )
+    }
+
+    private fun dispatchRectangleAttributeChange(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        var setMask = 0
+        var clearMask = 0
+        if (state.paramCount <= RECTANGLE_ATTRIBUTE_START) {
+            clearMask = DecRectangleAttribute.ALL
+        } else {
+            for (index in RECTANGLE_ATTRIBUTE_START until state.paramCount) {
+                when (modeParam(state, index)) {
+                    0 -> {
+                        setMask = 0
+                        clearMask = DecRectangleAttribute.ALL
+                    }
+                    1 -> {
+                        setMask = setMask or DecRectangleAttribute.BOLD
+                        clearMask = clearMask and DecRectangleAttribute.BOLD.inv()
+                    }
+                    4 -> {
+                        setMask = setMask or DecRectangleAttribute.UNDERLINE
+                        clearMask = clearMask and DecRectangleAttribute.UNDERLINE.inv()
+                    }
+                    5 -> {
+                        setMask = setMask or DecRectangleAttribute.BLINK
+                        clearMask = clearMask and DecRectangleAttribute.BLINK.inv()
+                    }
+                    7 -> {
+                        setMask = setMask or DecRectangleAttribute.INVERSE
+                        clearMask = clearMask and DecRectangleAttribute.INVERSE.inv()
+                    }
+                    22 -> {
+                        clearMask = clearMask or DecRectangleAttribute.BOLD
+                        setMask = setMask and DecRectangleAttribute.BOLD.inv()
+                    }
+                    24 -> {
+                        clearMask = clearMask or DecRectangleAttribute.UNDERLINE
+                        setMask = setMask and DecRectangleAttribute.UNDERLINE.inv()
+                    }
+                    25 -> {
+                        clearMask = clearMask or DecRectangleAttribute.BLINK
+                        setMask = setMask and DecRectangleAttribute.BLINK.inv()
+                    }
+                    27 -> {
+                        clearMask = clearMask or DecRectangleAttribute.INVERSE
+                        setMask = setMask and DecRectangleAttribute.INVERSE.inv()
+                    }
+                }
+            }
+        }
+        sink.changeRectangleAttributes(
+            top = rectangleParam(state, 0),
+            left = rectangleParam(state, 1),
+            bottom = rectangleParam(state, 2),
+            right = rectangleParam(state, 3),
+            setMask = setMask,
+            clearMask = clearMask,
+        )
+    }
+
+    private fun dispatchRectangleAttributeReverse(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        var reverseMask = 0
+        if (state.paramCount <= RECTANGLE_ATTRIBUTE_START) {
+            reverseMask = DecRectangleAttribute.ALL
+        } else {
+            for (index in RECTANGLE_ATTRIBUTE_START until state.paramCount) {
+                val mask =
+                    when (modeParam(state, index)) {
+                        0 -> DecRectangleAttribute.ALL
+                        1 -> DecRectangleAttribute.BOLD
+                        4 -> DecRectangleAttribute.UNDERLINE
+                        5 -> DecRectangleAttribute.BLINK
+                        7 -> DecRectangleAttribute.INVERSE
+                        else -> 0
+                    }
+                reverseMask = reverseMask xor mask
+            }
+        }
+        sink.reverseRectangleAttributes(
+            top = rectangleParam(state, 0),
+            left = rectangleParam(state, 1),
+            bottom = rectangleParam(state, 2),
+            right = rectangleParam(state, 3),
+            reverseMask = reverseMask,
+        )
+    }
 
     private fun dispatchAnsiMode(
         sink: TerminalCommandSink,
@@ -352,6 +507,24 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             resetOne = { resource -> sink.resetKeyFormatOption(resource) },
             set = { resource, value -> sink.setKeyFormatOption(resource, value) },
         )
+    }
+
+    private fun dispatchDisableKeyModifierOption(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        if (state.paramCount != 1 || isSubParameter(state, 0)) return
+        val resource = paramOrMissing(state, 0)
+        if (resource >= 0) sink.disableKeyModifierOption(resource)
+    }
+
+    private fun dispatchQueryKeyModifierOption(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        if (state.paramCount != 1 || isSubParameter(state, 0)) return
+        val resource = paramOrMissing(state, 0)
+        if (resource >= 0) sink.requestKeyModifierOption(resource)
     }
 
     private fun dispatchKittyKeyboardFlags(

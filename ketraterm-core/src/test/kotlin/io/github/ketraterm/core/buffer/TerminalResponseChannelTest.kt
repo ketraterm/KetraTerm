@@ -19,6 +19,7 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalResponseChannel
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
+import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -94,7 +95,7 @@ class TerminalResponseChannelTest {
         buffer.requestDeviceAttributes(TerminalResponseChannel.DEVICE_ATTRIBUTES_SECONDARY, parameter = 0)
         buffer.requestDeviceAttributes(TerminalResponseChannel.DEVICE_ATTRIBUTES_TERTIARY, parameter = 0)
 
-        assertEquals("\u001B[?1;2c\u001B[>0;0;0c", drain(buffer))
+        assertEquals("\u001B[?64;1;6;22;28c\u001B[>41;0;0c", drain(buffer))
     }
 
     @Test
@@ -106,12 +107,40 @@ class TerminalResponseChannelTest {
 
         assertEquals(
             "\u001B[?${TerminalCapabilityIdentity.PRIMARY_DA_TERMINAL_CLASS};" +
-                "${TerminalCapabilityIdentity.PRIMARY_DA_ADVANCED_VIDEO}c" +
+                "${TerminalCapabilityIdentity.PRIMARY_DA_132_COLUMNS};" +
+                "${TerminalCapabilityIdentity.PRIMARY_DA_SELECTIVE_ERASE};" +
+                "${TerminalCapabilityIdentity.PRIMARY_DA_ANSI_COLOR};" +
+                "${TerminalCapabilityIdentity.PRIMARY_DA_RECTANGULAR_EDITING}c" +
                 "\u001B[>${TerminalCapabilityIdentity.SECONDARY_DA_TERMINAL_ID};" +
                 "${TerminalCapabilityIdentity.SECONDARY_DA_VERSION};" +
                 "${TerminalCapabilityIdentity.SECONDARY_DA_OPTIONS}c",
             drain(buffer),
         )
+    }
+
+    @Test
+    fun `Kitty keyboard query reports every active encoder-supported progressive flag`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+
+        buffer.setKittyKeyboardFlags(
+            KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES or
+                KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES or
+                KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES,
+        )
+        buffer.requestKittyKeyboardFlags()
+
+        assertEquals("\u001B[?11u", drain(buffer))
+    }
+
+    @Test
+    fun `xterm modify-other-keys query reports only the allowlisted resource and preserves explicit disable`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+        buffer.setModifyOtherKeysMode(-1)
+
+        buffer.requestKeyModifierOption(4)
+        buffer.requestKeyModifierOption(1)
+
+        assertEquals("\u001B[>4;-1m", drain(buffer))
     }
 
     @Test
@@ -121,6 +150,38 @@ class TerminalResponseChannelTest {
         buffer.requestDeviceStatusReport(mode = 0, decPrivate = false)
         buffer.requestDeviceStatusReport(mode = 5, decPrivate = true)
         buffer.requestDeviceAttributes(TerminalResponseChannel.DEVICE_ATTRIBUTES_PRIMARY, parameter = 1)
+
+        assertEquals(0, buffer.pendingResponseBytes)
+    }
+
+    @Test
+    fun `DECRQCRA returns VT420 checksum for visible cells and supported video attributes`() {
+        val buffer = TerminalBuffers.create(width = 3, height = 1)
+
+        buffer.setPenAttributes(
+            fg = 0,
+            bg = 0,
+            bold = true,
+            underlineStyle = io.github.ketraterm.core.model.UnderlineStyle.SINGLE,
+            blink = true,
+            inverse = true,
+            conceal = true,
+        )
+        buffer.setSelectiveEraseProtection(true)
+        buffer.writeCodepoint('A'.code)
+
+        buffer.requestRectangleChecksum(requestId = 42, page = 1, top = 0, left = 0, bottom = 0, right = 0)
+
+        assertEquals("\u001BP42!~FEC3\u001B\\", drain(buffer))
+    }
+
+    @Test
+    fun `DECRQCRA stays silent for unsupported pages and inverted rectangles`() {
+        val buffer = TerminalBuffers.create(width = 3, height = 1)
+        buffer.writeCodepoint('A'.code)
+
+        buffer.requestRectangleChecksum(requestId = 1, page = 2, top = 1, left = 1, bottom = 1, right = 1)
+        buffer.requestRectangleChecksum(requestId = 1, page = 1, top = 2, left = 1, bottom = 1, right = 1)
 
         assertEquals(0, buffer.pendingResponseBytes)
     }
@@ -187,13 +248,13 @@ class TerminalResponseChannelTest {
     }
 
     @Test
-    fun `hard reset clears pending host responses`() {
+    fun `hard reset preserves responses generated before reset`() {
         val buffer = TerminalBuffers.create(width = 10, height = 5)
 
         buffer.requestDeviceStatusReport(mode = 5, decPrivate = false)
         buffer.reset()
 
-        assertEquals(0, buffer.pendingResponseBytes)
+        assertEquals("\u001B[0n", drain(buffer))
     }
 
     @Test

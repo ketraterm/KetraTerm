@@ -177,7 +177,8 @@ Durable mode state currently exposed by core:
 
 Guaranteed behavior:
 
-- public non-printing mode setters cancel `pendingWrap`
+- mode setters that home or otherwise alter cursor physics cancel `pendingWrap`;
+  input, reporting, presentation, palette, and other non-cursor modes preserve it
 - public mode reads are immutable snapshots
 - input/UI code cannot mutate internal mode storage directly
 
@@ -285,6 +286,8 @@ Guaranteed behavior:
 The core maintains these invariants on public mutation paths:
 
 - no orphaned wide spacers
+- horizontal-margin line mutations annihilate destination occupants crossing
+  either slice boundary and never copy an incomplete wide source span
 - no stale live cluster handles after erase/shift/resize paths
 - per-buffer cluster-store ownership is never shared
 - tab-stop array width always matches terminal width

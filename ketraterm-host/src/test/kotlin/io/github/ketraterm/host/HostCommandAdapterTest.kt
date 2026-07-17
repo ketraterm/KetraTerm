@@ -37,12 +37,14 @@ class HostCommandAdapterTest {
     private data class Fixture(
         val terminal: TerminalBuffer = TerminalBuffers.create(width = 10, height = 5),
         val hostPolicy: HostPolicy = HostPolicy(),
+        val kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
         val events: RecordingHostEventSink = RecordingHostEventSink(),
         val sink: HostCommandAdapter =
             HostCommandAdapter(
                 terminal = terminal,
                 hostEvents = events,
                 hostPolicy = hostPolicy,
+                kittyKeyboardSupportedFlags = kittyKeyboardSupportedFlags,
             ),
         val parser: TerminalOutputParser = TerminalParsers.create(sink),
     ) {
@@ -83,6 +85,77 @@ class HostCommandAdapterTest {
             assertAll(
                 { assertEquals("PS C:\\Users\\gagik> ", f.terminal.getLineAsString(0)) },
                 { assertEquals(19, f.terminal.cursorCol) },
+            )
+        }
+
+        @Test
+        fun `Codex inline history sequence retains rows scrolled from a top anchored region`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 3, height = 4, maxHistory = 8))
+            f.acceptAscii("\u001B[1;1HAAA\u001B[2;1HBBB\u001B[3;1HCCC\u001B[4;1HDDD")
+
+            f.acceptAscii("\u001B[1;3r\u001B[3;1H\r\nNEW\u001B[r")
+
+            assertAll(
+                { assertEquals(1, f.terminal.historySize) },
+                { assertEquals("AAA\nBBB\nCCC\nNEW\nDDD", f.terminal.getAllAsString()) },
+                { assertEquals("BBB", f.terminal.getLineAsString(0)) },
+                { assertEquals("CCC", f.terminal.getLineAsString(1)) },
+                { assertEquals("NEW", f.terminal.getLineAsString(2)) },
+                { assertEquals("DDD", f.terminal.getLineAsString(3)) },
+            )
+        }
+
+        @Test
+        fun `top anchored structural scroll commands and line edits preserve lower rows without history`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 3, height = 4, maxHistory = 8))
+
+            fun seed() {
+                f.acceptAscii("\u001B[1;1HAAA\u001B[2;1HBBB\u001B[3;1HCCC\u001B[4;1HDDD\u001B[1;3r")
+            }
+
+            seed()
+            f.acceptAscii("\u001B[1;1H\u001B[1T")
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("", f.terminal.getLineAsString(0)) },
+                { assertEquals("AAA", f.terminal.getLineAsString(1)) },
+                { assertEquals("BBB", f.terminal.getLineAsString(2)) },
+                { assertEquals("DDD", f.terminal.getLineAsString(3)) },
+            )
+
+            seed()
+            f.acceptAscii("\u001B[1;1H\u001BM")
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("", f.terminal.getLineAsString(0)) },
+                { assertEquals("AAA", f.terminal.getLineAsString(1)) },
+                { assertEquals("BBB", f.terminal.getLineAsString(2)) },
+                { assertEquals("DDD", f.terminal.getLineAsString(3)) },
+            )
+
+            seed()
+            f.acceptAscii("\u001B[2;1H\u001B[1L\u001B[1M")
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("AAA", f.terminal.getLineAsString(0)) },
+                { assertEquals("BBB", f.terminal.getLineAsString(1)) },
+                { assertEquals("", f.terminal.getLineAsString(2)) },
+                { assertEquals("DDD", f.terminal.getLineAsString(3)) },
+            )
+        }
+
+        @Test
+        fun `ED 3 clears retained history while preserving the visible viewport`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 3, height = 2, maxHistory = 8))
+            f.acceptAscii("\u001B[1;1HAAA\u001B[2;1HBBB\u001B[2;1H\r\n")
+
+            assertEquals(1, f.terminal.historySize)
+
+            f.acceptAscii("\u001B[3J")
+
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("BBB", f.terminal.getLineAsString(0)) },
             )
         }
 
@@ -375,6 +448,21 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `DECBKM set and reset bytes select the Backspace wire byte`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B[?67h")
+            var snapshot = f.terminal.getModeSnapshot()
+            assertTrue(snapshot.isBackarrowKeyModeExplicit)
+            assertTrue(snapshot.isBackarrowKeySendsBackspace)
+
+            f.acceptAscii("\u001B[?67l")
+            snapshot = f.terminal.getModeSnapshot()
+            assertTrue(snapshot.isBackarrowKeyModeExplicit)
+            assertFalse(snapshot.isBackarrowKeySendsBackspace)
+        }
+
+        @Test
         fun `mouse tracking and SGR mouse encoding modes update core snapshot`() {
             val f = Fixture()
 
@@ -478,6 +566,29 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `xterm key modifier query and disable preserve the distinct disabled state`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B[>4;2m\u001B[?4m")
+            assertEquals("\u001B[>4;2m", f.drainResponses())
+
+            f.acceptAscii("\u001B[>4n\u001B[?4m")
+            assertAll(
+                { assertEquals(-1, f.terminal.getModeSnapshot().modifyOtherKeysMode) },
+                { assertEquals("\u001B[>4;-1m", f.drainResponses()) },
+            )
+        }
+
+        @Test
+        fun `terminal response policy suppresses xterm key modifier query responses`() {
+            val f = Fixture(hostPolicy = HostPolicy(terminalResponsePolicy = HostControlPolicy.DENY))
+
+            f.acceptAscii("\u001B[?4m")
+
+            assertEquals("", f.drainResponses())
+        }
+
+        @Test
         fun `unsupported xterm key option controls leave core mode snapshot unchanged`() {
             val f = Fixture()
 
@@ -521,7 +632,44 @@ class HostCommandAdapterTest {
 
             f.acceptAscii("\u001B[=1023u")
 
-            assertEquals(KittyKeyboardProgressiveFlag.SUPPORTED_MASK, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals(KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+        }
+
+        @Test
+        fun `rich host capability enables every encoder-supported Kitty flag through parser host core pipeline`() {
+            val f = Fixture(kittyKeyboardSupportedFlags = KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK)
+
+            f.acceptAscii("\u001B[=31u\u001B[?u")
+
+            assertEquals(KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals("\u001B[?31u", f.drainResponses())
+        }
+
+        @Test
+        fun `host capability mask constrains Kitty push state as well as replace set and clear`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B[=9u\u001B[>31u")
+
+            assertEquals(KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+        }
+
+        @Test
+        fun `Kitty keyboard query reports active flags through the parser host core pipeline`() {
+            val f = Fixture()
+
+            f.acceptAscii("\u001B[=9u\u001B[?u")
+
+            assertEquals("\u001B[?9u", f.drainResponses())
+        }
+
+        @Test
+        fun `terminal response policy suppresses Kitty keyboard query responses`() {
+            val f = Fixture(hostPolicy = HostPolicy(terminalResponsePolicy = HostControlPolicy.DENY))
+
+            f.acceptAscii("\u001B[?u")
+
+            assertEquals("", f.drainResponses())
         }
 
         @Test
@@ -586,7 +734,7 @@ class HostCommandAdapterTest {
             f.end()
 
             assertEquals(
-                "\u001B[0n\u001B[2;3R\u001B[?2;3R\u001B[?1;2c\u001B[>0;0;0c",
+                "\u001B[0n\u001B[2;3R\u001B[?2;3R\u001B[?64;1;6;22;28c\u001B[>41;0;0c",
                 f.drainResponses(),
             )
         }
@@ -711,6 +859,89 @@ class HostCommandAdapterTest {
 
             f.acceptAscii("\u001B[?47l")
             assertEquals("PQ", f.terminal.getLineAsString(0))
+        }
+
+        @Test
+        fun `alternate modes preserve primary protected wide content across resize and reset lifecycle`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 8, height = 3, maxHistory = 4))
+
+            f.acceptAscii("\u001B[?69h\u001B[3;6s\u001B[2;3r\u001B[1\"q\u001B[2;3H🙂")
+            f.acceptAscii("\u001B[?1048h\u001B[1;1H\u001B[?1048lR")
+
+            assertAll(
+                { assertEquals(0x1F642, f.terminal.getCodepointAt(2, 1)) },
+                { assertTrue(f.terminal.getAttrAt(2, 1)?.selectiveEraseProtected == true) },
+                { assertEquals('R'.code, f.terminal.getCodepointAt(4, 1)) },
+            )
+
+            f.acceptAscii("\u001B[?47hALT")
+            f.terminal.resize(newWidth = 6, newHeight = 3)
+            f.acceptAscii("\u001B[?47l")
+
+            assertAll(
+                { assertEquals(0x1F642, f.terminal.getCodepointAt(2, 1)) },
+                { assertTrue(f.terminal.getAttrAt(2, 1)?.selectiveEraseProtected == true) },
+                { assertEquals('R'.code, f.terminal.getCodepointAt(4, 1)) },
+            )
+
+            f.acceptAscii("\u001B[?47hS\u001B[?47l\u001B[?1047h")
+            assertEquals("", f.terminal.getLineAsString(0))
+            f.acceptAscii("\u001B[?1047l\u001B[?1049hZ")
+
+            f.terminal.reset()
+
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals(6, f.terminal.width) },
+                { assertEquals(3, f.terminal.height) },
+                { assertEquals("", f.terminal.getLineAsString(0)) },
+                { assertFalse(f.terminal.getModeSnapshot().isLeftRightMarginMode) },
+            )
+        }
+
+        @Test
+        fun `horizontal margins and alternate screen are invariant under byte chunking`() {
+            val stream = "\u001B[?69h\u001B[3;5sAB\u001B[?1049hZ\u001B[?1049lC".encodeToByteArray()
+
+            for (chunkSize in 1..stream.size) {
+                val f = Fixture(terminal = TerminalBuffers.create(width = 8, height = 3))
+                var offset = 0
+                while (offset < stream.size) {
+                    val length = minOf(chunkSize, stream.size - offset)
+                    f.parser.accept(stream, offset, length)
+                    offset += length
+                }
+                f.end()
+
+                assertAll(
+                    { assertEquals("  ABC", f.terminal.getLineAsString(0), "chunkSize=$chunkSize") },
+                    { assertEquals(4, f.terminal.cursorCol, "chunkSize=$chunkSize") },
+                    { assertEquals(0, f.terminal.cursorRow, "chunkSize=$chunkSize") },
+                )
+            }
+        }
+
+        @Test
+        fun `origin mode addresses the intersection of vertical and horizontal margins under every chunking`() {
+            val stream = "\u001B[?69h\u001B[3;6s\u001B[2;4r\u001B[?6h\u001B[1;1HX\u001B[?6l\u001B[1;1HY".encodeToByteArray()
+
+            for (chunkSize in 1..stream.size) {
+                val f = Fixture(terminal = TerminalBuffers.create(width = 8, height = 5))
+                var offset = 0
+                while (offset < stream.size) {
+                    val length = minOf(chunkSize, stream.size - offset)
+                    f.parser.accept(stream, offset, length)
+                    offset += length
+                }
+                f.end()
+
+                assertAll(
+                    { assertEquals('X'.code, f.terminal.getCodepointAt(2, 1), "chunkSize=$chunkSize") },
+                    { assertEquals('Y'.code, f.terminal.getCodepointAt(2, 0), "chunkSize=$chunkSize") },
+                    { assertEquals(3, f.terminal.cursorCol, "chunkSize=$chunkSize") },
+                    { assertEquals(0, f.terminal.cursorRow, "chunkSize=$chunkSize") },
+                )
+            }
         }
 
         @Test
@@ -906,6 +1137,116 @@ class HostCommandAdapterTest {
                 { assertEquals("A", f.terminal.getLineAsString(0)) },
                 { assertEquals("", f.terminal.getLineAsString(1)) },
                 { assertTrue(f.terminal.getAttrAt(0, 0)?.selectiveEraseProtected == true) },
+            )
+        }
+
+        @Test
+        fun `DECSEL preserves protected wide cluster and clears adjacent unprotected cell`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 6, height = 2))
+
+            f.acceptAscii("\u001B[1\"q\uD83D\uDE00")
+            f.acceptAscii("\u001B[2\"qB")
+            f.acceptAscii("\u001B[1;1H\u001B[?2K")
+            f.end()
+
+            assertAll(
+                { assertEquals(0x1F600, f.terminal.getCodepointAt(0, 0)) },
+                { assertEquals(-1, f.terminal.getCodepointAt(1, 0)) },
+                { assertEquals(0, f.terminal.getCodepointAt(2, 0)) },
+                { assertTrue(f.terminal.getAttrAt(0, 0)?.selectiveEraseProtected == true) },
+            )
+        }
+
+        @Test
+        fun `DEC rectangular fill erase and selective erase flow from bytes into core`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 6, height = 3))
+
+            f.acceptAscii("\u001B[35;3;2;3;3\$x")
+            f.acceptAscii("\u001B[1\"q\u001B[1;2H🙂\u001B[0\"qB")
+            f.acceptAscii("\u001B[1;3;1;4\${")
+            f.acceptAscii("\u001B[2;2;2;3\$z")
+            f.end()
+
+            assertAll(
+                { assertEquals('#'.code, f.terminal.getCodepointAt(1, 2)) },
+                { assertEquals(0x1F642, f.terminal.getCodepointAt(1, 0)) },
+                { assertEquals(-1, f.terminal.getCodepointAt(2, 0)) },
+                { assertTrue(f.terminal.getAttrAt(1, 0)?.selectiveEraseProtected == true) },
+                { assertEquals(0, f.terminal.getCodepointAt(3, 1)) },
+            )
+        }
+
+        @Test
+        fun `DECCRA byte stream performs overlap safe active page copy`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 6, height = 2))
+
+            f.acceptAscii("ABCDEF")
+            f.acceptAscii("\u001B[1;1;1;4;1;1;2;1\$v")
+            f.end()
+
+            assertEquals("AABCDF", f.terminal.getLineAsString(0))
+        }
+
+        @Test
+        fun `DECRQCRA byte stream returns a bounded active page checksum`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 3, height = 1))
+
+            f.acceptAscii("A\u001B[17;1;1;1;1;1*y")
+            f.end()
+
+            assertEquals("\u001BP17!~FFBF\u001B\\", f.drainResponses())
+        }
+
+        @Test
+        fun `DECSACE DECCARA and DECRARA update attributes through byte stream`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 4, height = 2))
+
+            f.acceptAscii("A")
+            f.acceptAscii("\u001B[2*x\u001B[1;1;1;2;1;4\$r")
+            f.acceptAscii("\u001B[1;1;1;2;1;4\$t")
+            f.end()
+
+            assertAll(
+                { assertEquals('A'.code, f.terminal.getCodepointAt(0, 0)) },
+                { assertEquals(' '.code, f.terminal.getCodepointAt(1, 0)) },
+                { assertEquals(false, f.terminal.getAttrAt(0, 0)?.bold) },
+                {
+                    assertEquals(
+                        0,
+                        f.terminal
+                            .getAttrAt(0, 0)
+                            ?.underlineStyle
+                            ?.sgrCode,
+                    )
+                },
+                { assertEquals(false, f.terminal.getAttrAt(1, 0)?.bold) },
+                {
+                    assertEquals(
+                        0,
+                        f.terminal
+                            .getAttrAt(1, 0)
+                            ?.underlineStyle
+                            ?.sgrCode,
+                    )
+                },
+            )
+        }
+
+        @Test
+        fun `DECIC and DECDC bytes shift every row in the active scroll region`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 6, height = 3))
+
+            f.acceptAscii("\u001B[1;1HABCDEF\u001B[2;1HABCDEF\u001B[3;1HABCDEF")
+            f.acceptAscii("\u001B[2;3r\u001B[2;2H\u001B[2'}")
+            f.acceptAscii("\u001B[1'~")
+            f.end()
+
+            assertAll(
+                { assertEquals("ABCDEF", f.terminal.getLineAsString(0)) },
+                { assertEquals("A BCD", f.terminal.getLineAsString(1)) },
+                { assertEquals("A BCD", f.terminal.getLineAsString(2)) },
+                { assertEquals(1, f.terminal.cursorCol) },
+                { assertEquals(1, f.terminal.cursorRow) },
             )
         }
 
@@ -1417,6 +1758,16 @@ class HostCommandAdapterTest {
 
             f.acceptAscii("\u001BP\$qm\u001B\\")
             f.acceptAscii("\u001BP+q436f\u001B\\")
+            f.end()
+
+            assertEquals("", f.drainResponses())
+        }
+
+        @Test
+        fun `terminal response policy can deny DECRQCRA responses`() {
+            val f = Fixture(hostPolicy = HostPolicy(terminalResponsePolicy = HostControlPolicy.DENY))
+
+            f.acceptAscii("A\u001B[1;1;1;1;1;1*y")
             f.end()
 
             assertEquals("", f.drainResponses())

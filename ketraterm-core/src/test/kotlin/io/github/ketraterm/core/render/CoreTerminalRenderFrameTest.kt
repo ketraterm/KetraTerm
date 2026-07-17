@@ -102,6 +102,30 @@ class CoreTerminalRenderFrameTest {
     }
 
     @Test
+    fun `absolute range read maps retained history without a stale relative offset`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 3, initialHeight = 2)
+        val reader = buffer as TerminalRenderFrameReader
+        buffer.writeText("a")
+        buffer.carriageReturn()
+        buffer.newLine()
+        buffer.writeText("b")
+        buffer.carriageReturn()
+        buffer.newLine()
+        buffer.writeText("c")
+
+        reader.readRenderFrameForAbsoluteRange(startAbsoluteRow = 0L, endAbsoluteRow = 1L) { frame ->
+            val first = copyRow(frame, row = 0)
+            val second = copyRow(frame, row = 1)
+            assertAll(
+                { assertEquals(1, frame.scrollbackOffset) },
+                { assertEquals(2, frame.rows) },
+                { assertEquals('a'.code, first.codeWords[0]) },
+                { assertEquals('b'.code, second.codeWords[0]) },
+            )
+        }
+    }
+
+    @Test
     fun `resize reflow preserves logical line id across rewrapped physical rows`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 8, initialHeight = 3)
         val reader = buffer as TerminalRenderFrameReader

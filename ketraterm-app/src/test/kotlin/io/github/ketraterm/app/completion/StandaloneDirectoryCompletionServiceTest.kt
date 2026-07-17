@@ -86,9 +86,10 @@ class StandaloneDirectoryCompletionServiceTest {
     fun `completion from superseded request does not publish stale refresh`() {
         val executor = RecordingExecutor()
         var publications = 0
-        val provider = provider(executor, onSnapshotChanged = { publications++ }) { _, prefix ->
-            listOf(TerminalFileEntry(prefix, isDirectory = true))
-        }
+        val provider =
+            provider(executor, onSnapshotChanged = { publications++ }) { _, prefix ->
+                listOf(TerminalFileEntry(prefix, isDirectory = true))
+            }
 
         provider.listDirectory(request(entryNamePrefix = "a"))
         provider.listDirectory(request(entryNamePrefix = "b"))
@@ -105,9 +106,10 @@ class StandaloneDirectoryCompletionServiceTest {
     fun `returning to an in-flight request updates its accepted generation`() {
         val executor = RecordingExecutor()
         var publications = 0
-        val provider = provider(executor, onSnapshotChanged = { publications++ }) { _, prefix ->
-            listOf(TerminalFileEntry(prefix, isDirectory = true))
-        }
+        val provider =
+            provider(executor, onSnapshotChanged = { publications++ }) { _, prefix ->
+                listOf(TerminalFileEntry(prefix, isDirectory = true))
+            }
 
         provider.listDirectory(request(entryNamePrefix = "a"))
         provider.listDirectory(request(entryNamePrefix = "b"))
@@ -123,9 +125,10 @@ class StandaloneDirectoryCompletionServiceTest {
     fun `closed provider discards queued results and callbacks`() {
         val executor = RecordingExecutor()
         var publications = 0
-        val provider = provider(executor, onSnapshotChanged = { publications++ }) { _, _ ->
-            listOf(TerminalFileEntry("src", isDirectory = true))
-        }
+        val provider =
+            provider(executor, onSnapshotChanged = { publications++ }) { _, _ ->
+                listOf(TerminalFileEntry("src", isDirectory = true))
+            }
         provider.listDirectory(request())
 
         provider.close()
@@ -176,7 +179,13 @@ class StandaloneDirectoryCompletionServiceTest {
         )
 
     private fun request(
-        workingDirectoryUri: String = Path.of(".").toAbsolutePath().normalize().toUri().toString(),
+        workingDirectoryUri: String =
+            Path
+                .of(".")
+                .toAbsolutePath()
+                .normalize()
+                .toUri()
+                .toString(),
         directoryPrefix: String = "",
         entryNamePrefix: String = "",
     ): TerminalDirectoryListingRequest =

@@ -17,6 +17,7 @@ package io.github.ketraterm.core.buffer
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.codec.AttributeCodec
 import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.state.TerminalState
 import org.junit.jupiter.api.Assertions.*
@@ -32,6 +33,50 @@ class TerminalLeftRightMarginTest {
         val stateField = components.javaClass.getDeclaredField("state")
         stateField.isAccessible = true
         return stateField.get(components) as TerminalState
+    }
+
+    @Test
+    fun `mixed character edits never cross active horizontal margins`() {
+        val buffer = TerminalBuffers.create(width = 8, height = 3)
+        val state = stateOf(buffer)
+        val random = Random(0x1E_F7)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 6)
+        buffer.setScrollRegion(1, 3)
+        buffer.setAutoWrap(false)
+
+        for (row in 0 until 3) {
+            val line = state.activeBuffer.ring[state.resolveRingIndex(row)]
+            line.setCell(0, 'L'.code + row, 0)
+            line.setCell(1, 'l'.code + row, 0)
+            line.setCell(6, 'R'.code + row, 0)
+            line.setCell(7, 'r'.code + row, 0)
+        }
+
+        repeat(600) { step ->
+            buffer.positionCursor(2 + random.nextInt(4), random.nextInt(3))
+            when (random.nextInt(10)) {
+                0 -> buffer.writeCodepoint('a'.code + random.nextInt(26))
+                1 -> buffer.writeCodepoint(0x1F600 + random.nextInt(5))
+                2 -> buffer.insertBlankCharacters(1 + random.nextInt(3))
+                3 -> buffer.deleteCharacters(1 + random.nextInt(3))
+                4 -> buffer.eraseCharacters(1 + random.nextInt(3))
+                5 -> buffer.selectiveEraseLineToEnd()
+                6 -> buffer.selectiveEraseLineToCursor()
+                7 -> buffer.selectiveEraseCurrentLine()
+                8 -> buffer.insertLines(1 + random.nextInt(2))
+                else -> buffer.deleteLines(1 + random.nextInt(2))
+            }
+
+            for (row in 0 until 3) {
+                assertAll(
+                    { assertEquals('L'.code + row, buffer.getCodepointAt(0, row), "step=$step row=$row") },
+                    { assertEquals('l'.code + row, buffer.getCodepointAt(1, row), "step=$step row=$row") },
+                    { assertEquals('R'.code + row, buffer.getCodepointAt(6, row), "step=$step row=$row") },
+                    { assertEquals('r'.code + row, buffer.getCodepointAt(7, row), "step=$step row=$row") },
+                )
+            }
+        }
     }
 
     @Test
@@ -148,6 +193,32 @@ class TerminalLeftRightMarginTest {
             { assertEquals('D'.code, buffer.getCodepointAt(4, 0)) },
             { assertEquals(4, buffer.cursorCol) },
             { assertEquals(0, buffer.cursorRow) },
+        )
+    }
+
+    @Test
+    fun `wide glyph at horizontal right margin wraps as one span`() {
+        val buffer = TerminalBuffers.create(width = 8, height = 2)
+        val state = stateOf(buffer)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 5)
+        buffer.positionCursor(4, 0)
+
+        buffer.writeCodepoint(0x1F600)
+
+        assertAll(
+            { assertEquals(0, buffer.getCodepointAt(4, 0), "wide glyph must not be split at the right margin") },
+            { assertEquals(0x1F600, buffer.getCodepointAt(2, 1)) },
+            { assertEquals(-1, buffer.getCodepointAt(3, 1)) },
+            { assertEquals(4, buffer.cursorCol) },
+            { assertEquals(1, buffer.cursorRow) },
+            {
+                assertTrue(
+                    state.activeBuffer.ring[state.resolveRingIndex(0)].wrapped,
+                    "the vacated row must remain linked to the wrapped wide glyph",
+                )
+            },
+            { assertEquals(0, buffer.getCodepointAt(5, 1), "right-margin guard must remain untouched") },
         )
     }
 
@@ -613,7 +684,7 @@ class TerminalLeftRightMarginTest {
                 }
 
                 // Perform a random edit or cursor operation
-                when (random.nextInt(18)) {
+                when (random.nextInt(26)) {
                     0 -> {
                         val cp = 'A'.code + random.nextInt(26)
                         buffer.writeCodepoint(cp)
@@ -697,9 +768,41 @@ class TerminalLeftRightMarginTest {
                             logs.add("Step $step: restoreCursor()")
                         }
                     }
-                    else -> {
+                    17 -> {
                         buffer.writeText("xyz")
                         logs.add("Step $step: writeText(xyz)")
+                    }
+                    18 -> {
+                        buffer.selectiveEraseLineToEnd()
+                        logs.add("Step $step: selectiveEraseLineToEnd()")
+                    }
+                    19 -> {
+                        buffer.selectiveEraseLineToCursor()
+                        logs.add("Step $step: selectiveEraseLineToCursor()")
+                    }
+                    20 -> {
+                        buffer.selectiveEraseCurrentLine()
+                        logs.add("Step $step: selectiveEraseCurrentLine()")
+                    }
+                    21 -> {
+                        buffer.eraseScreenToEnd()
+                        logs.add("Step $step: eraseScreenToEnd()")
+                    }
+                    22 -> {
+                        buffer.eraseScreenToCursor()
+                        logs.add("Step $step: eraseScreenToCursor()")
+                    }
+                    23 -> {
+                        buffer.selectiveEraseScreenToEnd()
+                        logs.add("Step $step: selectiveEraseScreenToEnd()")
+                    }
+                    24 -> {
+                        buffer.selectiveEraseScreenToCursor()
+                        logs.add("Step $step: selectiveEraseScreenToCursor()")
+                    }
+                    else -> {
+                        buffer.selectiveEraseEntireScreen()
+                        logs.add("Step $step: selectiveEraseEntireScreen()")
                     }
                 }
 
@@ -746,8 +849,7 @@ class TerminalLeftRightMarginTest {
                 val rowStr =
                     (0 until buffer.width)
                         .map { c ->
-                            val cp = buffer.getCodepointAt(c, r)
-                            when (cp) {
+                            when (val cp = buffer.getCodepointAt(c, r)) {
                                 TerminalConstants.EMPTY -> "."
                                 TerminalConstants.WIDE_CHAR_SPACER -> "S"
                                 else -> cp.toChar().toString()
@@ -756,6 +858,81 @@ class TerminalLeftRightMarginTest {
                 println("Row $r: $rowStr")
             }
             throw e
+        }
+    }
+
+    @Test
+    fun `partial region scroll property preserves rows outside region and models guard-column movement`() {
+        val buffer = TerminalBuffers.create(width = 8, height = 4)
+        val state = stateOf(buffer)
+        val random = Random(0x5C0A11)
+        val expectedLeft = IntArray(4) { 'L'.code + it }
+        val expectedRight = IntArray(4) { 'R'.code + it }
+
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 6)
+        buffer.setScrollRegion(2, 3)
+        for (row in 0 until 4) {
+            val line = state.activeBuffer.ring[state.resolveRingIndex(row)]
+            line.setCell(0, expectedLeft[row], 0)
+            line.setCell(7, expectedRight[row], 0)
+        }
+
+        repeat(400) { step ->
+            if (random.nextBoolean()) {
+                buffer.scrollUp()
+                expectedLeft[1] = expectedLeft[2]
+                expectedRight[1] = expectedRight[2]
+                expectedLeft[2] = TerminalConstants.EMPTY
+                expectedRight[2] = TerminalConstants.EMPTY
+            } else {
+                buffer.scrollDown()
+                expectedLeft[2] = expectedLeft[1]
+                expectedRight[2] = expectedRight[1]
+                expectedLeft[1] = TerminalConstants.EMPTY
+                expectedRight[1] = TerminalConstants.EMPTY
+            }
+
+            for (row in 0 until 4) {
+                assertAll(
+                    { assertEquals(expectedLeft[row], buffer.getCodepointAt(0, row), "step=$step row=$row left") },
+                    { assertEquals(expectedRight[row], buffer.getCodepointAt(7, row), "step=$step row=$row right") },
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `random selective erases preserve protected wide clusters within horizontal margins`() {
+        val buffer = TerminalBuffers.create(width = 8, height = 3)
+        val state = stateOf(buffer)
+        val random = Random(0x51EC7)
+
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(3, 6)
+        buffer.setSelectiveEraseProtection(true)
+        for (row in 0 until 3) {
+            buffer.positionCursor(2, row)
+            buffer.writeCodepoint(0x1F600 + row)
+        }
+        buffer.setSelectiveEraseProtection(false)
+
+        repeat(400) { step ->
+            buffer.positionCursor(2 + random.nextInt(4), random.nextInt(3))
+            when (random.nextInt(3)) {
+                0 -> buffer.selectiveEraseLineToEnd()
+                1 -> buffer.selectiveEraseLineToCursor()
+                else -> buffer.selectiveEraseCurrentLine()
+            }
+
+            for (row in 0 until 3) {
+                val line = state.activeBuffer.ring[state.resolveRingIndex(row)]
+                assertAll(
+                    { assertEquals(0x1F600 + row, buffer.getCodepointAt(2, row), "step=$step row=$row leader") },
+                    { assertEquals(TerminalConstants.WIDE_CHAR_SPACER, buffer.getCodepointAt(3, row), "step=$step row=$row spacer") },
+                    { assertTrue(AttributeCodec.isProtected(line.getPackedAttr(2)), "step=$step row=$row protection") },
+                )
+            }
         }
     }
 }

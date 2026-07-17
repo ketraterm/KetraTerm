@@ -1,6 +1,6 @@
 # Keyboard Input Protocol Vocabulary
 
-This document outlines the low-level constants and structures defined in `ketraterm-protocol` to support advanced keyboard input encoding standards, specifically **xterm modifyOtherKeys** and the **Kitty Keyboard Protocol**.
+This document outlines the low-level constants and structures defined in `ketraterm-protocol` to support advanced keyboard input encoding standards, specifically **xterm modifyOtherKeys** and the **Kitty Keyboard Protocol**. KetraTerm supports the modifyOtherKeys resource's set/reset, explicit-disable, and query controls; only the implemented resource is allowed to produce a query response.
 
 ---
 
@@ -30,7 +30,7 @@ Controls the structure used to format key sequences when `modifyOtherKeys` is ac
 
 ## 3. Kitty Keyboard Progressive Enhancement Flags
 
-The `KittyKeyboardProgressiveFlag` constants represent bit fields toggled using `CSI = flags ; mode u`. They enable applications to selectively receive richer keyboard events. `SUPPORTED_MASK` intentionally includes only flags implemented by the current input encoder; additional constants remain shared protocol vocabulary for future event-model work.
+The `KittyKeyboardProgressiveFlag` constants represent bit fields toggled using `CSI = flags ; mode u`. `ENCODER_SUPPORTED_MASK` contains every flag implemented by the normalized input vocabulary and encoder. `DEFAULT_HOST_SUPPORTED_MASK` is the conservative portable-host profile; integration supplies a per-session subset of the encoder mask and must advertise only metadata it can provide truthfully. Portable Swing, including IntelliJ-hosted Swing, advertises flags `1` and `8`; native rich-input adapters for flags `2`, `4`, and `16` are explicitly deferred.
 
 | Constant Name | Value (Bit Shift) | Description |
 | :--- | :--- | :--- |

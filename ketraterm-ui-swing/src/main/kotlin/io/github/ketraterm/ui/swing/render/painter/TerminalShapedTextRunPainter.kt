@@ -80,6 +80,7 @@ internal class TerminalShapedTextRunPainter(
         row: Int,
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean,
+        hyperlinkIds: IntArray,
         hoveredHyperlinkId: Int,
         hoveredHyperlinkStartRow: Int,
         hoveredHyperlinkStartColumn: Int,
@@ -106,6 +107,7 @@ internal class TerminalShapedTextRunPainter(
                         startColumn = segmentStart,
                         runLimit = runLimit,
                         textBlinkVisible = textBlinkVisible,
+                        hyperlinkIds = hyperlinkIds,
                         hoveredHyperlinkId = hoveredHyperlinkId,
                         hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
                         hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
@@ -132,6 +134,7 @@ internal class TerminalShapedTextRunPainter(
                     baselineY = baselineY,
                     fontRenderContext = fontRenderContext,
                     textBlinkVisible = textBlinkVisible,
+                    hyperlinkIds = hyperlinkIds,
                     hoveredHyperlinkId = hoveredHyperlinkId,
                     hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
                     hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
@@ -157,6 +160,7 @@ internal class TerminalShapedTextRunPainter(
         baselineY: Int,
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean,
+        hyperlinkIds: IntArray,
         hoveredHyperlinkId: Int,
         hoveredHyperlinkStartRow: Int,
         hoveredHyperlinkStartColumn: Int,
@@ -172,6 +176,7 @@ internal class TerminalShapedTextRunPainter(
                 row = row,
                 startColumn = startColumn,
                 textBlinkVisible = textBlinkVisible,
+                hyperlinkIds = hyperlinkIds,
                 hoveredHyperlinkId = hoveredHyperlinkId,
                 hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
                 hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
@@ -192,6 +197,7 @@ internal class TerminalShapedTextRunPainter(
             baselineY = baselineY,
             fontRenderContext = fontRenderContext,
             textBlinkVisible = textBlinkVisible,
+            hyperlinkIds = hyperlinkIds,
             hoveredHyperlinkId = hoveredHyperlinkId,
             hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
             hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
@@ -271,6 +277,7 @@ internal class TerminalShapedTextRunPainter(
         startColumn: Int,
         runLimit: Int,
         textBlinkVisible: Boolean,
+        hyperlinkIds: IntArray,
         hoveredHyperlinkId: Int,
         hoveredHyperlinkStartRow: Int,
         hoveredHyperlinkStartColumn: Int,
@@ -284,7 +291,7 @@ internal class TerminalShapedTextRunPainter(
         val category = cellCategory(cache, startIndex)
         val attr = cache.attrWords[startIndex]
         val extraAttr = cache.extraAttrWords[startIndex]
-        val hyperlinkId = cache.hyperlinkIds[startIndex]
+        val hyperlinkId = hyperlinkIds[startIndex]
         val hovered =
             isHoveredHyperlink(
                 hyperlinkId,
@@ -308,15 +315,19 @@ internal class TerminalShapedTextRunPainter(
         val fontStyle = terminalFontStyle(attr)
         val decoration = decorationKey(attr, extraAttr)
         val blinkHidden = isBlinkHidden(attr, textBlinkVisible)
+        val script = scriptKeyForSegment(cache, rowOffset, startColumn, runLimit)
         var column = startColumn + 1
         while (column < runLimit) {
             val index = rowOffset + column
             if (cellCategory(cache, index) != category) {
                 break
             }
+            if (!isCompatibleScriptCell(cache, rowOffset, column, runLimit, script)) {
+                break
+            }
             val currentAttr = cache.attrWords[index]
             val currentExtraAttr = cache.extraAttrWords[index]
-            val currentHyperlinkId = cache.hyperlinkIds[index]
+            val currentHyperlinkId = hyperlinkIds[index]
             val currentHovered =
                 isHoveredHyperlink(
                     currentHyperlinkId,
@@ -357,6 +368,7 @@ internal class TerminalShapedTextRunPainter(
         row: Int,
         startColumn: Int,
         textBlinkVisible: Boolean,
+        hyperlinkIds: IntArray,
         hoveredHyperlinkId: Int,
         hoveredHyperlinkStartRow: Int,
         hoveredHyperlinkStartColumn: Int,
@@ -369,7 +381,7 @@ internal class TerminalShapedTextRunPainter(
         val startIndex = rowOffset + startColumn
         val attr = cache.attrWords[startIndex]
         val extraAttr = cache.extraAttrWords[startIndex]
-        val hyperlinkId = cache.hyperlinkIds[startIndex]
+        val hyperlinkId = hyperlinkIds[startIndex]
         val hovered =
             isHoveredHyperlink(
                 hyperlinkId,
@@ -392,14 +404,16 @@ internal class TerminalShapedTextRunPainter(
             )
         val fontStyle = terminalFontStyle(attr)
         val decoration = decorationKey(attr, extraAttr)
+        val script = scriptKeyForSegment(cache, rowOffset, startColumn, cache.columns)
         var column = startColumn + 1
         while (column < cache.columns) {
             val index = rowOffset + column
             if (!isComplexShapingRunContinuation(cache, rowOffset, column)) break
+            if (!isCompatibleScriptCell(cache, rowOffset, column, cache.columns, script)) break
 
             val currentAttr = cache.attrWords[index]
             val currentExtraAttr = cache.extraAttrWords[index]
-            val currentHyperlinkId = cache.hyperlinkIds[index]
+            val currentHyperlinkId = hyperlinkIds[index]
             val currentHovered =
                 isHoveredHyperlink(
                     currentHyperlinkId,
@@ -461,6 +475,7 @@ internal class TerminalShapedTextRunPainter(
         baselineY: Int,
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean,
+        hyperlinkIds: IntArray,
         hoveredHyperlinkId: Int,
         hoveredHyperlinkStartRow: Int,
         hoveredHyperlinkStartColumn: Int,
@@ -475,7 +490,7 @@ internal class TerminalShapedTextRunPainter(
         if (isBlinkHidden(attr, textBlinkVisible)) return
 
         val extraAttr = cache.extraAttrWords[index]
-        val hyperlinkId = cache.hyperlinkIds[index]
+        val hyperlinkId = hyperlinkIds[index]
         val hovered =
             isHoveredHyperlink(
                 hyperlinkId,
@@ -507,7 +522,7 @@ internal class TerminalShapedTextRunPainter(
             try {
                 g.clipRect(x, row * metrics.cellHeight, cellPixelWidth, metrics.cellHeight)
                 val layout =
-                    complexTextLayouts.clusterLayout(
+                    complexTextLayouts.scriptRunLayout(
                         segmentCodepoints,
                         0,
                         length,
@@ -651,6 +666,56 @@ internal class TerminalShapedTextRunPainter(
         return length
     }
 
+    private fun scriptKeyForSegment(
+        cache: TerminalRenderCache,
+        rowOffset: Int,
+        startColumn: Int,
+        limitColumn: Int,
+    ): Int {
+        var column = startColumn
+        while (column < limitColumn) {
+            val script = cellScript(cache, rowOffset + column)
+            if (script != COMMON_SCRIPT) return script
+            column++
+        }
+        return COMMON_SCRIPT
+    }
+
+    private fun isCompatibleScriptCell(
+        cache: TerminalRenderCache,
+        rowOffset: Int,
+        column: Int,
+        limitColumn: Int,
+        script: Int,
+    ): Boolean {
+        val currentScript = cellScript(cache, rowOffset + column)
+        if (currentScript == COMMON_SCRIPT || currentScript == script) return true
+        if (script != COMMON_SCRIPT) return false
+        return currentScript == scriptKeyForSegment(cache, rowOffset, column, limitColumn)
+    }
+
+    private fun cellScript(
+        cache: TerminalRenderCache,
+        index: Int,
+    ): Int {
+        val flags = cache.flags[index]
+        if (!hasDrawableText(flags) || flags and TerminalRenderCellFlags.WIDE_TRAILING != 0) return COMMON_SCRIPT
+        if (flags and TerminalRenderCellFlags.CLUSTER != 0) {
+            val clusterRef = cache.clusterRefs[index]
+            if (clusterRef == 0L) return COMMON_SCRIPT
+            val offset = cache.clusterOffset(clusterRef)
+            val end = offset + cache.clusterLength(clusterRef)
+            var clusterIndex = offset
+            while (clusterIndex < end) {
+                val script = codePointScript(cache.clusterCodepoints[clusterIndex])
+                if (script != COMMON_SCRIPT) return script
+                clusterIndex++
+            }
+            return COMMON_SCRIPT
+        }
+        return codePointScript(cache.codeWords[index])
+    }
+
     private fun ensureRowCharCapacity(columns: Int) {
         if (rowChars.size >= columns) return
         var capacity = rowChars.size
@@ -775,6 +840,18 @@ internal class TerminalShapedTextRunPainter(
         private const val MAX_CODEPOINTS_PER_CELL = 4
         private const val REPLACEMENT_CHAR = '\uFFFD'
         private const val INVALID_GENERATION = Long.MIN_VALUE
+        private const val COMMON_SCRIPT = 0
+
+        @JvmStatic
+        private fun codePointScript(codePoint: Int): Int =
+            when (val script = Character.UnicodeScript.of(codePoint)) {
+                Character.UnicodeScript.COMMON,
+                Character.UnicodeScript.INHERITED,
+                Character.UnicodeScript.UNKNOWN,
+                -> COMMON_SCRIPT
+
+                else -> script.ordinal + 1
+            }
 
         @JvmStatic
         private fun isStrongRtl(codePoint: Int): Boolean =

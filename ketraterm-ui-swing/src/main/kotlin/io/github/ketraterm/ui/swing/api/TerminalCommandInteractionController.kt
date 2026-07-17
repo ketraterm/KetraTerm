@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellIntegrationCommandBlockRange
 import io.github.ketraterm.session.TerminalShellIntegrationCommandOutputRange
 import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
 
@@ -27,6 +28,7 @@ internal class TerminalCommandInteractionController(
     private val host: TerminalCommandInteractionHost,
 ) {
     private val commandOutputRangeScratch = LongArray(TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS)
+    private val commandBlockRangeScratch = LongArray(TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS)
     private val textExtractor = TerminalSelectionTextExtractor()
 
     fun scrollToCommand(previous: Boolean): Boolean {
@@ -112,6 +114,31 @@ internal class TerminalCommandInteractionController(
         return true
     }
 
+    fun selectCommandBlock(recordId: Int): Boolean {
+        val boundSession = host.session ?: return false
+        if (recordId == TerminalShellIntegrationCommandRecord.NONE) return false
+        val shellState = boundSession.shellIntegrationState
+        if (!shellState.copyCommandBlockRange(recordId, commandBlockRangeScratch)) return false
+
+        refreshCommandNavigationCache(boundSession)
+        val startLineId = commandBlockRangeScratch[TerminalShellIntegrationCommandBlockRange.START_LINE_ID_INDEX]
+        val endLineId = commandBlockRangeScratch[TerminalShellIntegrationCommandBlockRange.END_LINE_ID_INDEX]
+        val startAbsoluteRow = firstLineAbsoluteRow(host.searchCache, startLineId, endLineId)
+        if (startAbsoluteRow == NO_COMMAND_ABSOLUTE_ROW) return false
+        val endAbsoluteRow = lastLineAbsoluteRow(host.searchCache, startLineId, endLineId)
+        if (endAbsoluteRow == NO_COMMAND_ABSOLUTE_ROW || endAbsoluteRow < startAbsoluteRow) return false
+
+        host.selectAbsoluteRows(startAbsoluteRow, endAbsoluteRow, host.searchCache.columns)
+        val desiredOffset = host.searchCache.discardedCount + host.searchCache.historySize - startAbsoluteRow
+        host.scrollViewportTo(
+            desiredOffset.coerceIn(0L, host.searchCache.historySize.toLong()).toInt(),
+            historySize = host.searchCache.historySize,
+            boundSession,
+        )
+        host.repaint()
+        return true
+    }
+
     fun commandOutputText(recordId: Int): String? {
         val boundSession = host.session ?: return null
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return null
@@ -181,6 +208,21 @@ internal class TerminalCommandInteractionController(
             if (lineId >= firstLineId && lineId <= lastLineId && (includeStart || lineId != startLineId)) {
                 return firstAbsoluteRow + row
             }
+            row++
+        }
+        return NO_COMMAND_ABSOLUTE_ROW
+    }
+
+    private fun firstLineAbsoluteRow(
+        cache: TerminalRenderCache,
+        startLineId: Long,
+        endLineId: Long,
+    ): Long {
+        val firstAbsoluteRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+        var row = 0
+        while (row < cache.rows) {
+            val lineId = cache.lineIds[row]
+            if (lineId >= startLineId && lineId <= endLineId) return firstAbsoluteRow + row
             row++
         }
         return NO_COMMAND_ABSOLUTE_ROW

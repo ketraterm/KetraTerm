@@ -69,9 +69,23 @@ class PenProtectionTest {
     }
 
     @Test
-    fun `blankAttr strips selective erase protection while preserving visual attrs`() {
+    fun `blank attributes retain only background color for BCE`() {
         val pen = Pen()
-        pen.setAttributes(fg = 6, bg = 1, bold = true, italic = false, underlineStyle = UnderlineStyle.SINGLE)
+        pen.setAttributes(
+            fg = 6,
+            bg = 1,
+            bold = true,
+            faint = true,
+            italic = true,
+            underlineStyle = UnderlineStyle.SINGLE,
+            strikethrough = true,
+            overline = true,
+            blink = true,
+            inverse = true,
+            conceal = true,
+            underlineColor = 3,
+        )
+        pen.setHyperlinkId(7)
         pen.setSelectiveEraseProtection(true)
 
         val blankAttr = pen.blankAttr
@@ -79,11 +93,14 @@ class PenProtectionTest {
 
         assertAll(
             { assertFalse(AttributeCodec.isProtected(blankAttr)) },
-            { assertEquals(AttributeCodec.foreground(pen.currentAttr), AttributeCodec.foreground(blankAttr)) },
+            { assertEquals(0, AttributeCodec.foreground(blankAttr)) },
             { assertEquals(AttributeCodec.background(pen.currentAttr), AttributeCodec.background(blankAttr)) },
-            { assertEquals(AttributeCodec.isBold(pen.currentAttr), AttributeCodec.isBold(blankAttr)) },
-            { assertEquals(AttributeCodec.isItalic(pen.currentAttr), AttributeCodec.isItalic(blankAttr)) },
-            { assertEquals(pen.currentExtendedAttr, blankExtendedAttr) },
+            { assertFalse(AttributeCodec.isBold(blankAttr)) },
+            { assertFalse(AttributeCodec.isFaint(blankAttr)) },
+            { assertFalse(AttributeCodec.isItalic(blankAttr)) },
+            { assertFalse(AttributeCodec.isBlink(blankAttr)) },
+            { assertFalse(AttributeCodec.isInverse(blankAttr)) },
+            { assertEquals(AttributeCodec.DEFAULT_EXTENDED_ATTR, blankExtendedAttr) },
         )
     }
 }

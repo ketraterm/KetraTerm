@@ -17,6 +17,7 @@ package io.github.ketraterm.pty
 
 import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.input.policy.EnterNewLineModePolicy
+import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
 import java.nio.file.Path
@@ -37,6 +38,8 @@ import java.nio.file.Path
  * @param inputPolicy host-bound input encoding policy. Local PTY sessions
  * default Return/Enter to CR even when LNM is active, because contemporary PTY
  * line disciplines can otherwise turn DEC CR LF into an extra newline.
+ * Unbracketed paste line endings are likewise canonicalized to CR so every
+ * pasted boundary has the same input semantics as Enter.
  * @param maxHistory maximum scrollback lines retained by the core buffer.
  * @param readBufferSize buffer size used by the PTY stdout reader thread.
  * @param readerThreadName name for the daemon PTY stdout reader thread.
@@ -98,8 +101,8 @@ data class PtyOptions
             @JvmStatic
             fun defaultEnvironment(): Map<String, String> {
                 val env = LinkedHashMap(System.getenv())
-                env.putIfAbsent("TERM", TerminalCapabilityIdentity.TERM_NAME)
-                env.putIfAbsent("COLORTERM", TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR)
+                env["TERM"] = TerminalCapabilityIdentity.TERM_NAME
+                env["COLORTERM"] = TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR
                 return env
             }
 
@@ -112,6 +115,7 @@ data class PtyOptions
             fun defaultInputPolicy(): TerminalInputPolicy =
                 TerminalInputPolicy(
                     enterNewLineModePolicy = EnterNewLineModePolicy.SEND_CR,
+                    pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN,
                 )
         }
     }

@@ -56,6 +56,7 @@ class SettingsModelTest {
         assertEquals(settings.shellRequestWindowManipulation, state.shellRequestWindowManipulation)
         assertEquals(settings.shellSuggestionsEnabled, state.shellSuggestionsEnabled)
         assertEquals(settings.persistentSuggestionLearningEnabled, state.persistentSuggestionLearningEnabled)
+        assertEquals(settings.scrollOnOutput, state.scrollOnOutput)
         assertFalse(model.hasChanges(state))
     }
 
@@ -100,6 +101,7 @@ class SettingsModelTest {
                 clipboardMaxDecodedBytes = 2048,
                 titleLocalPermission = TerminalTitlePermission.DENY,
                 titleRemotePermission = TerminalTitlePermission.ALLOW,
+                scrollOnOutput = false,
             )
 
         assertTrue(model.hasChanges(modifiedState))
@@ -124,6 +126,7 @@ class SettingsModelTest {
         assertEquals(2048, settings.clipboardMaxDecodedBytes)
         assertEquals(TerminalTitlePermission.DENY, settings.titleLocalPermission)
         assertEquals(TerminalTitlePermission.ALLOW, settings.titleRemotePermission)
+        assertFalse(settings.scrollOnOutput)
 
         // Snapshot should be updated, so it shouldn't show changes against modified state anymore
         assertFalse(model.hasChanges(modifiedState))

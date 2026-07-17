@@ -17,6 +17,7 @@ package io.github.ketraterm.input.impl.keyboard
 
 import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.impl.InputScratchBuffer
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.host.TerminalHostOutput
@@ -66,6 +67,12 @@ internal class KeyboardEncoder(
         modeBits: Long,
     ) {
         val kittyFlags = TerminalInputState.kittyKeyboardFlags(modeBits)
+        if (
+            event.type == TerminalKeyEventType.RELEASE &&
+            (kittyFlags and io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES) == 0
+        ) {
+            return
+        }
         if (kittyFlags > 0) {
             kitty.encode(event, kittyFlags, modeBits)
         } else {

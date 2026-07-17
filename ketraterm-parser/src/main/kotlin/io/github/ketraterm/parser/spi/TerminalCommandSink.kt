@@ -289,6 +289,136 @@ interface TerminalCommandSink {
     )
 
     /**
+     * Erases a VT400 rectangular area (DECERA / DECSERA).
+     *
+     * Coordinates retain DEC's one-based inclusive representation so the core can apply its active
+     * origin-mode policy. A value of `0` denotes an omitted parameter and is resolved by the core.
+     *
+     * @param top One-based top row.
+     * @param left One-based left column.
+     * @param bottom One-based bottom row.
+     * @param right One-based right column.
+     * @param selective `true` for DECSERA, which preserves selectively protected cells.
+     */
+    fun eraseRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        selective: Boolean,
+    )
+
+    /**
+     * Fills a VT420 rectangular area (DECFRA) with [codepoint].
+     *
+     * Coordinates retain DEC's one-based inclusive representation so the core can apply its active
+     * origin-mode policy. A value of `0` denotes an omitted parameter and is resolved by the core.
+     *
+     * @param codepoint Decimal fill character.
+     * @param top One-based top row.
+     * @param left One-based left column.
+     * @param bottom One-based bottom row.
+     * @param right One-based right column.
+     */
+    fun fillRectangle(
+        codepoint: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    )
+
+    /**
+     * Copies a VT400 rectangular area (DECCRA).
+     *
+     * Coordinates retain DEC's one-based inclusive representation so the core can apply active
+     * origin-mode policy. Page numbers use DEC's one-based numbering; `0` denotes omission.
+     */
+    fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    )
+
+    /**
+     * Requests a VT420 rectangular-area checksum (DECRQCRA).
+     *
+     * Coordinates retain DEC's one-based inclusive representation so core can
+     * apply the active origin-mode policy. [page] uses DEC's one-based page
+     * numbering; `0` denotes omission. The host/core response path owns page
+     * capability policy and emits no bytes for unsupported requests.
+     */
+    fun requestRectangleChecksum(
+        requestId: Int,
+        page: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    )
+
+    /**
+     * Selects the DECSACE extent used by subsequent DECCARA and DECRARA commands.
+     *
+     * `0` and `1` select the wrapped stream extent; `2` selects the exact rectangular extent.
+     * Unsupported values must leave the current selection unchanged.
+     */
+    fun setAttributeChangeExtent(extent: Int)
+
+    /**
+     * Applies VT420 DECCARA visual-attribute changes without changing characters or the pen.
+     *
+     * Coordinates retain DEC's one-based inclusive representation. [setMask] and [clearMask]
+     * use [io.github.ketraterm.protocol.DecRectangleAttribute] bits; the parser has already
+     * collapsed ordered SGR-like parameters into their final operations.
+     */
+    fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    )
+
+    /**
+     * Applies VT420 DECRARA visual-attribute reversals without changing characters or the pen.
+     *
+     * Coordinates retain DEC's one-based inclusive representation. [reverseMask] uses
+     * [io.github.ketraterm.protocol.DecRectangleAttribute] bits.
+     */
+    fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    )
+
+    /**
+     * Inserts blank columns (DECIC) across every row of the active vertical scroll region.
+     *
+     * The core resolves the cursor and horizontal-margin applicability.
+     *
+     * @param count Number of columns to insert; parser defaults omitted or zero values to one.
+     */
+    fun insertColumns(count: Int)
+
+    /**
+     * Deletes columns (DECDC) across every row of the active vertical scroll region.
+     *
+     * The core resolves the cursor and horizontal-margin applicability.
+     *
+     * @param count Number of columns to delete; parser defaults omitted or zero values to one.
+     */
+    fun deleteColumns(count: Int)
+
+    /**
      * Inserts [n] blank lines at the cursor row (IL).
      *
      * @param n Number of lines to insert.
@@ -414,6 +544,23 @@ interface TerminalCommandSink {
     fun resetKeyModifierOptions()
 
     /**
+     * Disables one xterm key modifier option, `CSI > Ps n`.
+     *
+     * This is distinct from reset: xterm represents disable as resource value
+     * `-1`, which must remain observable to a later query.
+     *
+     * @param resource The resource/modifier identifier to disable.
+     */
+    fun disableKeyModifierOption(resource: Int)
+
+    /**
+     * Requests one xterm key modifier option, `CSI ? Pp m`.
+     *
+     * @param resource The resource/modifier identifier to report.
+     */
+    fun requestKeyModifierOption(resource: Int)
+
+    /**
      * Xterm key format option set, `CSI > Pp ; Pv f`.
      *
      * @param resource The resource/format identifier.
@@ -500,6 +647,12 @@ interface TerminalCommandSink {
         kind: Int,
         parameter: Int,
     )
+
+    /**
+     * Requests the active Kitty keyboard progressive-enhancement flag report
+     * for parameterless `CSI ? u`.
+     */
+    fun requestKittyKeyboardFlags()
 
     /**
      * Safe xterm window report request.

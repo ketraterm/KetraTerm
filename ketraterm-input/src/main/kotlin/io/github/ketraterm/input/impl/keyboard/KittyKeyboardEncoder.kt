@@ -18,6 +18,7 @@ package io.github.ketraterm.input.impl.keyboard
 import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.input.impl.InputScratchBuffer
 import io.github.ketraterm.input.impl.TerminalSequences
@@ -70,7 +71,27 @@ internal class KittyKeyboardEncoder(
         val key = event.key
         val modifiers = event.modifiers
         val isDisambiguate = (kittyFlags and KittyKeyboardProgressiveFlag.DISAMBIGUATE_ESCAPE_CODES) != 0
+        val isReportEventTypes = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES) != 0
+        val isReportAlternateKeys = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_ALTERNATE_KEYS) != 0
         val isReportAll = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES) != 0
+        val isReportAssociatedText = (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_ASSOCIATED_TEXT) != 0
+        val eventType = if (isReportEventTypes) event.type.ordinal + 1 else NO_EVENT_TYPE
+        val hasPressEncodingSemantics = !isReportEventTypes || event.type == TerminalKeyEventType.PRESS
+
+        if (
+            event.codepoint == TerminalKeyEvent.TEXT_ONLY_CODEPOINT &&
+            (!isReportAll || !isReportAssociatedText)
+        ) {
+            return
+        }
+
+        if (
+            event.type == TerminalKeyEventType.RELEASE &&
+            !isReportAll &&
+            (event.key == TerminalKey.ENTER || event.key == TerminalKey.TAB || event.key == TerminalKey.BACKSPACE)
+        ) {
+            return
+        }
 
         if (key != null) {
             val keyOrdinal = key.ordinal
@@ -78,32 +99,51 @@ internal class KittyKeyboardEncoder(
             // 1. Keypad Keys (mapped to Kitty PUA)
             val puaCode = KeyMappingTable.KITTY_PUA_CODES[keyOrdinal]
             if (puaCode >= 0) {
-                CsiWriter.writeCsiU(scratch, output, puaCode, modifiers)
+                if (isModifierKey(key) && !isReportAll) return
+                CsiWriter.writeCsiU(scratch, output, puaCode, modifiers, eventType = eventType, kittyModifiers = true)
                 return
             }
 
             // 2. Core Functional Keys (Enter, Tab, Escape, Backspace)
             when (key) {
                 TerminalKey.ENTER -> {
-                    if (isDisambiguate || isReportAll || modifiers != TerminalModifiers.NONE) {
-                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.ENTER, modifiers)
+                    if (isReportAll ||
+                        !hasPressEncodingSemantics ||
+                        TerminalModifiers.hasMeta(modifiers) ||
+                        (!isDisambiguate && modifiers != TerminalModifiers.NONE)
+                    ) {
+                        CsiWriter.writeCsiU(
+                            scratch,
+                            output,
+                            KittyKeyboardFunctionalKeyCode.ENTER,
+                            modifiers,
+                            eventType = eventType,
+                            kittyModifiers = true,
+                        )
+                    } else if (isDisambiguate) {
+                        writeDisambiguatedEnter(modifiers, modeBits)
                     } else {
-                        if (
-                            TerminalInputState.isNewLineMode(modeBits) &&
-                            policy.enterNewLineModePolicy == EnterNewLineModePolicy.SEND_CR_LF
-                        ) {
-                            output.writeByte(ControlCode.CR)
-                            output.writeByte(ControlCode.LF)
-                        } else {
-                            output.writeByte(ControlCode.CR)
-                        }
+                        writeLegacyEnter(modeBits)
                     }
                     return
                 }
 
                 TerminalKey.TAB -> {
-                    if (isDisambiguate || isReportAll || (modifiers != TerminalModifiers.NONE && modifiers != TerminalModifiers.SHIFT)) {
-                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.TAB, modifiers)
+                    if (isReportAll ||
+                        !hasPressEncodingSemantics ||
+                        TerminalModifiers.hasMeta(modifiers) ||
+                        (!isDisambiguate && modifiers != TerminalModifiers.NONE && modifiers != TerminalModifiers.SHIFT)
+                    ) {
+                        CsiWriter.writeCsiU(
+                            scratch,
+                            output,
+                            KittyKeyboardFunctionalKeyCode.TAB,
+                            modifiers,
+                            eventType = eventType,
+                            kittyModifiers = true,
+                        )
+                    } else if (isDisambiguate) {
+                        writeDisambiguatedTab(modifiers)
                     } else {
                         if (modifiers == TerminalModifiers.SHIFT) {
                             output.writeBytes(TerminalSequences.BACK_TAB, 0, TerminalSequences.BACK_TAB.size)
@@ -115,8 +155,15 @@ internal class KittyKeyboardEncoder(
                 }
 
                 TerminalKey.ESCAPE -> {
-                    if (isDisambiguate || isReportAll || modifiers != TerminalModifiers.NONE) {
-                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.ESCAPE, modifiers)
+                    if (isDisambiguate || isReportAll || !hasPressEncodingSemantics || modifiers != TerminalModifiers.NONE) {
+                        CsiWriter.writeCsiU(
+                            scratch,
+                            output,
+                            KittyKeyboardFunctionalKeyCode.ESCAPE,
+                            modifiers,
+                            eventType = eventType,
+                            kittyModifiers = true,
+                        )
                     } else {
                         output.writeByte(ControlCode.ESC)
                     }
@@ -124,15 +171,23 @@ internal class KittyKeyboardEncoder(
                 }
 
                 TerminalKey.BACKSPACE -> {
-                    if (isDisambiguate || isReportAll || modifiers != TerminalModifiers.NONE) {
-                        CsiWriter.writeCsiU(scratch, output, KittyKeyboardFunctionalKeyCode.BACKSPACE, modifiers)
+                    if (isReportAll ||
+                        !hasPressEncodingSemantics ||
+                        TerminalModifiers.hasMeta(modifiers) ||
+                        (!isDisambiguate && modifiers != TerminalModifiers.NONE)
+                    ) {
+                        CsiWriter.writeCsiU(
+                            scratch,
+                            output,
+                            KittyKeyboardFunctionalKeyCode.BACKSPACE,
+                            modifiers,
+                            eventType = eventType,
+                            kittyModifiers = true,
+                        )
+                    } else if (isDisambiguate) {
+                        writeDisambiguatedBackspace(modifiers)
                     } else {
-                        val baseByte =
-                            when (policy.backspacePolicy) {
-                                BackspacePolicy.DELETE -> ControlCode.DEL
-                                BackspacePolicy.BACKSPACE -> BS
-                            }
-                        output.writeByte(baseByte)
+                        output.writeByte(configuredBackspaceByte())
                     }
                     return
                 }
@@ -140,10 +195,10 @@ internal class KittyKeyboardEncoder(
             }
 
             // 3. CSI Letter Keys (Arrows, Home, End, F1-F4)
-            val csiLetter = KeyMappingTable.CSI_LETTERS[keyOrdinal]
+            val csiLetter = KeyMappingTable.KITTY_CSI_LETTERS[keyOrdinal]
             if (csiLetter >= 0) {
-                if (modifiers != TerminalModifiers.NONE) {
-                    CsiWriter.writeCsiModifierLetter(scratch, output, 1, modifiers, csiLetter)
+                if (modifiers != TerminalModifiers.NONE || eventType != NO_EVENT_TYPE) {
+                    CsiWriter.writeCsiModifierLetter(scratch, output, 1, modifiers, csiLetter, eventType, kittyModifiers = true)
                 } else {
                     CsiWriter.writeCsiLetter(scratch, output, csiLetter)
                 }
@@ -153,14 +208,29 @@ internal class KittyKeyboardEncoder(
             // 4. Tilde Keys (Insert, Delete, PgUp, PgDn, F5-F12, F3)
             val tildeNumber = KeyMappingTable.TILDE_NUMBERS[keyOrdinal]
             if (tildeNumber >= 0) {
-                CsiWriter.writeCsiTilde(scratch, output, tildeNumber, modifiers)
+                CsiWriter.writeCsiTilde(scratch, output, tildeNumber, modifiers, eventType, kittyModifiers = true)
                 return
             }
         } else {
             // Printable Codepoints
             val codepoint = event.codepoint
+            val kittyCodepoint =
+                if (event.unshiftedCodepoint != TerminalKeyEvent.NO_CODEPOINT) event.unshiftedCodepoint else codepoint
+            val shiftedCodepoint = if (isReportAlternateKeys) event.shiftedCodepoint else TerminalKeyEvent.NO_CODEPOINT
+            val baseLayoutCodepoint = if (isReportAlternateKeys) event.baseLayoutCodepoint else TerminalKeyEvent.NO_CODEPOINT
+            val associatedText = if (isReportAssociatedText && isReportAll) event.associatedText else null
             if (isReportAll || (modifiers != TerminalModifiers.NONE && modifiers != TerminalModifiers.SHIFT)) {
-                CsiWriter.writeCsiU(scratch, output, codepoint, modifiers)
+                CsiWriter.writeCsiU(
+                    scratch,
+                    output,
+                    kittyCodepoint,
+                    modifiers,
+                    eventType = eventType,
+                    kittyModifiers = true,
+                    shiftedCodepoint = shiftedCodepoint,
+                    baseLayoutCodepoint = baseLayoutCodepoint,
+                    associatedText = associatedText,
+                )
             } else {
                 if (shouldSuppressForMeta(modifiers)) {
                     return
@@ -172,6 +242,76 @@ internal class KittyKeyboardEncoder(
             }
         }
     }
+
+    /**
+     * Writes the reset-safe legacy Enter representation required while Kitty
+     * disambiguate-escape-codes mode is active. Alt retains the conventional
+     * escape prefix; Shift and Control do not alter the return bytes.
+     */
+    private fun writeDisambiguatedEnter(
+        modifiers: Int,
+        modeBits: Long,
+    ) {
+        if (TerminalModifiers.hasAlt(modifiers)) {
+            output.writeByte(ControlCode.ESC)
+        }
+        writeLegacyEnter(modeBits)
+    }
+
+    /**
+     * Writes Enter according to the host's newline-mode policy.
+     */
+    private fun writeLegacyEnter(modeBits: Long) {
+        output.writeByte(ControlCode.CR)
+        if (
+            TerminalInputState.isNewLineMode(modeBits) &&
+            policy.enterNewLineModePolicy == EnterNewLineModePolicy.SEND_CR_LF
+        ) {
+            output.writeByte(ControlCode.LF)
+        }
+    }
+
+    /**
+     * Writes the reset-safe legacy Tab representation required while Kitty
+     * disambiguate-escape-codes mode is active.
+     */
+    private fun writeDisambiguatedTab(modifiers: Int) {
+        if (TerminalModifiers.hasAlt(modifiers)) {
+            output.writeByte(ControlCode.ESC)
+        }
+        if (TerminalModifiers.hasShift(modifiers)) {
+            output.writeBytes(TerminalSequences.BACK_TAB, 0, TerminalSequences.BACK_TAB.size)
+        } else {
+            output.writeByte(ControlCode.HT)
+        }
+    }
+
+    /**
+     * Writes the reset-safe legacy Backspace representation required while Kitty
+     * disambiguate-escape-codes mode is active.
+     */
+    private fun writeDisambiguatedBackspace(modifiers: Int) {
+        if (TerminalModifiers.hasAlt(modifiers)) {
+            output.writeByte(ControlCode.ESC)
+        }
+        output.writeByte(backspaceByte(modifiers))
+    }
+
+    /**
+     * Selects the configured Backspace byte, swapping it for Control+Backspace.
+     */
+    private fun backspaceByte(modifiers: Int): Int {
+        val baseByte = configuredBackspaceByte()
+        return if (TerminalModifiers.hasCtrl(modifiers)) invertBackspaceByte(baseByte) else baseByte
+    }
+
+    private fun configuredBackspaceByte(): Int =
+        when (policy.backspacePolicy) {
+            BackspacePolicy.DELETE -> ControlCode.DEL
+            BackspacePolicy.BACKSPACE -> BS
+        }
+
+    private fun invertBackspaceByte(baseByte: Int): Int = if (baseByte == ControlCode.DEL) BS else ControlCode.DEL
 
     /**
      * Determines if a key event with a Meta modifier should be suppressed based on the Meta Key Policy.
@@ -206,7 +346,11 @@ internal class KittyKeyboardEncoder(
         return false
     }
 
+    private fun isModifierKey(key: TerminalKey): Boolean =
+        key.ordinal in TerminalKey.LEFT_SHIFT.ordinal..TerminalKey.ISO_LEVEL5_SHIFT.ordinal
+
     private companion object {
         private const val BS: Int = 0x08
+        private const val NO_EVENT_TYPE: Int = 0
     }
 }

@@ -214,10 +214,63 @@ internal class TerminalSelectionController(
         }
     }
 
-    fun getSelectedText(cache: TerminalRenderCache): String? {
-        val currentSelection = getViewportSelection(cache) ?: return null
-        val text = selectionTextExtractor.selectedText(cache, currentSelection)
-        return if (text.isEmpty()) null else text
+    fun getSelectedText(reader: io.github.ketraterm.render.api.TerminalRenderFrameReader): String? {
+        val anchorAbsRow = selectionAnchorAbsoluteRow ?: return null
+        val caretAbsRow = selectionCaretAbsoluteRow ?: return null
+
+        val isForward =
+            caretAbsRow > anchorAbsRow ||
+                (caretAbsRow == anchorAbsRow && selectionCaretColumn >= selectionAnchorColumn)
+
+        val startAbsRow = if (isForward) anchorAbsRow else caretAbsRow
+        val startCol = if (isForward) selectionAnchorColumn else selectionCaretColumn
+        val endAbsRow = if (isForward) caretAbsRow else anchorAbsRow
+        val endCol = if (isForward) selectionCaretColumn else selectionAnchorColumn
+
+        var text: String? = null
+        reader.readRenderFrameForAbsoluteRange(startAbsRow, endAbsRow) { frame ->
+            val frameTopAbsRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
+            val frameLastAbsRow = frameTopAbsRow + frame.rows - 1L
+            val clampedStart = maxOf(startAbsRow, frame.discardedCount)
+            val clampedEnd = minOf(endAbsRow, frameLastAbsRow)
+            if (clampedStart > clampedEnd) return@readRenderFrameForAbsoluteRange
+
+            val tempCache = TerminalRenderCache(frame.columns, frame.rows)
+            tempCache.accept(frame)
+
+            val startRowInFrame = (clampedStart - frameTopAbsRow).toInt()
+            val endRowInFrame = (clampedEnd - frameTopAbsRow).toInt()
+            if (startRowInFrame !in 0 until frame.rows || endRowInFrame !in 0 until frame.rows) {
+                return@readRenderFrameForAbsoluteRange
+            }
+
+            val relativeSelection =
+                if (isForward) {
+                    CellSelection(
+                        anchorColumn = startCol.coerceIn(0, frame.columns),
+                        anchorRow = startRowInFrame,
+                        caretColumn = endCol.coerceIn(0, frame.columns),
+                        caretRow = endRowInFrame,
+                        isBlock = selectionIsBlock,
+                    )
+                } else {
+                    CellSelection(
+                        anchorColumn = endCol.coerceIn(0, frame.columns),
+                        anchorRow = endRowInFrame,
+                        caretColumn = startCol.coerceIn(0, frame.columns),
+                        caretRow = startRowInFrame,
+                        isBlock = selectionIsBlock,
+                    )
+                }
+            val extracted =
+                selectionTextExtractor.selectedText(
+                    cache = tempCache,
+                    selection = relativeSelection,
+                    joinSoftWrappedRows = !selectionIsBlock,
+                )
+            text = extracted
+        }
+        return text
     }
 
     private fun updateSelectionCaret(
@@ -282,7 +335,6 @@ internal class TerminalSelectionController(
             return
         }
 
-        val cache = host.renderCache
         val delta = selectionAutoscrollDelta(lastSelectionDragY)
         if (delta == 0) {
             selectionAutoscrollTimer.stop()

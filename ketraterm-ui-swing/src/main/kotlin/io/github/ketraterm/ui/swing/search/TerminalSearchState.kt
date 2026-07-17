@@ -16,16 +16,14 @@
 package io.github.ketraterm.ui.swing.search
 
 /**
- * Public snapshot of the Swing terminal search UI.
+ * Public snapshot of terminal search results.
  *
- * @property visible whether the overlay search bar is open.
  * @property query current literal search query.
  * @property resultCount number of matches in the current buffer snapshot.
  * @property activeResultIndex zero-based active match, or `-1` when no match is
  * active.
  */
 data class TerminalSearchState(
-    val visible: Boolean,
     val query: String,
     val resultCount: Int,
     val activeResultIndex: Int,

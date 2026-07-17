@@ -211,6 +211,241 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `truncated UTF-8 before chunked CSI emits one replacement then dispatches CSI`() {
+            val f = TerminalParserFixture()
+
+            f.parser.accept(byteArrayOf(0xF0.toByte(), 0x9F.toByte()))
+            f.parser.accept(byteArrayOf(0x1B, '['.code.toByte(), '2'.code.toByte(), 'B'.code.toByte()))
+
+            assertAll(
+                { assertEquals(AnsiState.GROUND, f.state.fsmState) },
+                {
+                    assertEquals(
+                        listOf(writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT), "cursorDown:2"),
+                        f.sink.events,
+                    )
+                },
+                { assertFalse(f.sink.events.contains(writeCodepoint(0x1B))) },
+            )
+        }
+
+        @Test
+        fun `truncated UTF-8 before chunked OSC BEL emits one replacement then dispatches OSC`() {
+            val f = TerminalParserFixture()
+
+            f.parser.accept(byteArrayOf(0xE2.toByte()))
+            f.parser.accept(byteArrayOf(0x1B, ']'.code.toByte(), '2'.code.toByte(), ';'.code.toByte()))
+            f.parser.accept("title\u0007".encodeToByteArray())
+
+            assertAll(
+                { assertEquals(AnsiState.GROUND, f.state.fsmState) },
+                {
+                    assertEquals(
+                        listOf(writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT), "setWindowTitle:title"),
+                        f.sink.events,
+                    )
+                },
+                { assertFalse(f.sink.events.contains(writeCodepoint(0x1B))) },
+            )
+        }
+
+        @Test
+        fun `truncated UTF-8 before split OSC ST emits one replacement then dispatches OSC`() {
+            val f = TerminalParserFixture()
+
+            f.parser.accept(byteArrayOf(0xC3.toByte()))
+            f.parser.accept("\u001B]1;name\u001B".encodeToByteArray())
+            f.parser.accept(byteArrayOf('\\'.code.toByte()))
+
+            assertAll(
+                { assertEquals(AnsiState.GROUND, f.state.fsmState) },
+                {
+                    assertEquals(
+                        listOf(writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT), "setIconTitle:name"),
+                        f.sink.events,
+                    )
+                },
+                { assertFalse(f.sink.events.contains(writeCodepoint(0x1B))) },
+            )
+        }
+
+        @Test
+        fun `malformed UTF-8 recovers before every structural terminator across all chunk boundaries`() {
+            val stream =
+                byteArrayOf(0xC3.toByte()) +
+                    "\u001B[A".encodeToByteArray() +
+                    byteArrayOf(0xC3.toByte()) +
+                    "\u001B]2;bel\u0007".encodeToByteArray() +
+                    byteArrayOf(0xC3.toByte()) +
+                    "\u001B]2;st\u001B\\".encodeToByteArray() +
+                    byteArrayOf(0xC3.toByte()) +
+                    "\u001BP\$qm\u001B\\".encodeToByteArray() +
+                    byteArrayOf(0xC3.toByte()) +
+                    "\u001B[31\u0018A".encodeToByteArray() +
+                    byteArrayOf(0xC3.toByte()) +
+                    "\u001B[31\u001AB".encodeToByteArray() +
+                    byteArrayOf(0xC3.toByte())
+
+            val expected =
+                listOf(
+                    writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT),
+                    "cursorUp:1",
+                    writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT),
+                    "setWindowTitle:bel",
+                    writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT),
+                    "setWindowTitle:st",
+                    writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT),
+                    "queryStatusString:m",
+                    writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT),
+                    writeCodepoint('A'.code),
+                    writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT),
+                    writeCodepoint('B'.code),
+                    writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT),
+                )
+
+            for (chunkSize in 1..stream.size) {
+                val f = TerminalParserFixture()
+                var offset = 0
+                while (offset < stream.size) {
+                    val length = minOf(chunkSize, stream.size - offset)
+                    f.parser.accept(stream, offset, length)
+                    offset += length
+                }
+                f.endOfInput()
+
+                assertAll(
+                    { assertEquals(expected, f.sink.events, "chunkSize=$chunkSize") },
+                    { assertEquals(AnsiState.GROUND, f.state.fsmState, "chunkSize=$chunkSize") },
+                )
+            }
+        }
+
+        @Test
+        fun `all host chunk boundaries preserve malformed UTF-8 CSI and OSC recovery`() {
+            val stream =
+                byteArrayOf(
+                    'A'.code.toByte(),
+                    0xE2.toByte(),
+                    0x1B,
+                    '['.code.toByte(),
+                    '2'.code.toByte(),
+                    'B'.code.toByte(),
+                    0x1B,
+                    ']'.code.toByte(),
+                    '2'.code.toByte(),
+                    ';'.code.toByte(),
+                    't'.code.toByte(),
+                    'i'.code.toByte(),
+                    't'.code.toByte(),
+                    'l'.code.toByte(),
+                    'e'.code.toByte(),
+                    0x07,
+                    'Z'.code.toByte(),
+                )
+            val expected =
+                listOf(
+                    writeCodepoint('A'.code),
+                    writeCodepoint(Utf8Decoder.REPLACEMENT_CODEPOINT),
+                    "cursorDown:2",
+                    "setWindowTitle:title",
+                    writeCodepoint('Z'.code),
+                )
+
+            for (chunkSize in 1..stream.size) {
+                val f = TerminalParserFixture()
+                var offset = 0
+                while (offset < stream.size) {
+                    val length = minOf(chunkSize, stream.size - offset)
+                    f.parser.accept(stream, offset, length)
+                    offset += length
+                }
+                f.endOfInput()
+
+                assertAll(
+                    { assertEquals(AnsiState.GROUND, f.state.fsmState, "chunkSize=$chunkSize") },
+                    { assertEquals(expected, f.sink.events, "chunkSize=$chunkSize") },
+                    {
+                        assertFalse(
+                            f.sink.events.contains(writeCodepoint(0x1B)),
+                            "ESC must remain structural; chunkSize=$chunkSize",
+                        )
+                    },
+                )
+            }
+        }
+
+        @Test
+        fun `malformed UTF-8 inside active ESC CSI and DCS cannot dispatch the stale command`() {
+            val cases =
+                listOf(
+                    "ESC" to byteArrayOf(0x1B, 0xC3.toByte(), '7'.code.toByte()),
+                    "CSI" to "\u001B[31".encodeToByteArray() + byteArrayOf(0xC3.toByte(), 'm'.code.toByte()),
+                    "DCS" to "\u001BP\$q".encodeToByteArray() + byteArrayOf(0xC3.toByte()) + "m\u001B\\".encodeToByteArray(),
+                )
+
+            for ((name, stream) in cases) {
+                for (split in 1..stream.size) {
+                    val f = TerminalParserFixture()
+                    f.parser.accept(stream, 0, split)
+                    f.parser.accept(stream, split, stream.size - split)
+                    f.endOfInput()
+
+                    assertAll(
+                        { assertEquals(AnsiState.GROUND, f.state.fsmState, "$name split=$split") },
+                        { assertFalse(f.sink.events.contains("saveCursor"), "$name split=$split") },
+                        { assertFalse(f.sink.events.contains("restoreCursor"), "$name split=$split") },
+                        { assertFalse(f.sink.events.contains("setForegroundIndexed:1"), "$name split=$split") },
+                        { assertFalse(f.sink.events.contains("queryStatusString:m"), "$name split=$split") },
+                        {
+                            assertFalse(
+                                f.sink.events.contains(writeCodepoint(0xC3)),
+                                "malformed byte leaked as printable text; $name split=$split",
+                            )
+                        },
+                    )
+                }
+            }
+        }
+
+        @Test
+        fun `malformed UTF-8 within OSC is contained by BEL ST CAN SUB and never leaks printable bytes`() {
+            val terminators =
+                listOf(
+                    "BEL" to "\u0007".encodeToByteArray(),
+                    "ST" to "\u001B\\".encodeToByteArray(),
+                    "CAN" to byteArrayOf(0x18),
+                    "SUB" to byteArrayOf(0x1A),
+                )
+
+            for ((name, terminator) in terminators) {
+                val stream = "\u001B]2;bad".encodeToByteArray() + byteArrayOf(0xC3.toByte()) + terminator
+                for (split in 1..stream.size) {
+                    val f = TerminalParserFixture()
+                    f.parser.accept(stream, 0, split)
+                    f.parser.accept(stream, split, stream.size - split)
+                    f.endOfInput()
+
+                    assertAll(
+                        { assertEquals(AnsiState.GROUND, f.state.fsmState, "$name split=$split") },
+                        {
+                            assertFalse(
+                                f.sink.events.any { it.startsWith("writeCodepoint:") },
+                                "string payload leaked as printable text; $name split=$split",
+                            )
+                        },
+                        {
+                            if (name == "BEL" || name == "ST") {
+                                assertEquals(listOf("setWindowTitle:bad�"), f.sink.events, "$name split=$split")
+                            } else {
+                                assertTrue(f.sink.events.isEmpty(), "$name split=$split")
+                            }
+                        },
+                    )
+                }
+            }
+        }
+
+        @Test
         fun `combining mark variation selector ZWJ and regional indicators form clusters`() {
             val f = TerminalParserFixture()
 
@@ -392,6 +627,75 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `DEC rectangular erase and fill commands preserve one based parameters`() {
+            val normalErase = TerminalParserFixture()
+            val selectiveErase = TerminalParserFixture()
+            val fill = TerminalParserFixture()
+
+            normalErase.acceptAscii("\u001B[2;3;4;5\$z")
+            selectiveErase.acceptAscii("\u001B[2;3;4;5\${")
+            fill.acceptAscii("\u001B[35;2;3;4;5\$x")
+
+            assertAll(
+                { assertEquals(listOf("eraseRectangle:2:3:4:5:false"), normalErase.sink.events) },
+                { assertEquals(listOf("eraseRectangle:2:3:4:5:true"), selectiveErase.sink.events) },
+                { assertEquals(listOf("fillRectangle:35:2:3:4:5"), fill.sink.events) },
+            )
+        }
+
+        @Test
+        fun `DECCRA preserves source and destination parameters`() {
+            val f = TerminalParserFixture()
+
+            f.acceptAscii("\u001B[2;3;4;5;1;6;7;1\$v")
+
+            assertEquals(listOf("copyRectangle:2:3:4:5:1:6:7:1"), f.sink.events)
+        }
+
+        @Test
+        fun `DECRQCRA preserves request id page and rectangle across a structural chunk boundary`() {
+            val f = TerminalParserFixture()
+
+            f.acceptAscii("\u001B[17;1;2;3")
+            f.acceptAscii(";4;5*y")
+
+            assertEquals(listOf("requestRectangleChecksum:17:1:2:3:4:5"), f.sink.events)
+        }
+
+        @Test
+        fun `DEC rectangular attribute commands collapse ordered SGR parameters`() {
+            val change = TerminalParserFixture()
+            val reverse = TerminalParserFixture()
+            val extent = TerminalParserFixture()
+
+            change.acceptAscii("\u001B[2;3;4;5;0;1;24\$r")
+            reverse.acceptAscii("\u001B[2;3;4;5;0;4;5\$t")
+            extent.acceptAscii("\u001B[2*")
+            extent.acceptAscii("x")
+
+            assertAll(
+                { assertEquals(listOf("changeRectangleAttributes:2:3:4:5:1:14"), change.sink.events) },
+                { assertEquals(listOf("reverseRectangleAttributes:2:3:4:5:9"), reverse.sink.events) },
+                { assertEquals(listOf("setAttributeChangeExtent:2"), extent.sink.events) },
+            )
+        }
+
+        @Test
+        fun `DEC column edits dispatch default and explicit counts across intermediate boundaries`() {
+            val insert = TerminalParserFixture()
+            val delete = TerminalParserFixture()
+
+            insert.acceptAscii("\u001B[3'}")
+            delete.acceptAscii("\u001B['")
+            delete.acceptAscii("~")
+
+            assertAll(
+                { assertEquals(listOf("insertColumns:3"), insert.sink.events) },
+                { assertEquals(listOf("deleteColumns:1"), delete.sink.events) },
+            )
+        }
+
+        @Test
         fun `DEC private CSI mode dispatch survives chunk boundaries`() {
             val f = TerminalParserFixture()
 
@@ -486,6 +790,32 @@ class TerminalParserTest {
                 { assertTrue(overflowed.sink.events.isEmpty()) },
                 { assertEquals(listOf("requestClipboard:c:SGVsbG8="), clipboard.sink.events) },
             )
+        }
+
+        @Test
+        fun `OSC payload ceiling is exact and independent of host chunking`() {
+            val atLimit = "\u001B]2;abc\u0007".encodeToByteArray()
+            val overLimit = "\u001B]2;abcd\u0007".encodeToByteArray()
+
+            for (chunkSize in 1..atLimit.size) {
+                val accepted = TerminalParserFixture(state = ParserState(maxPayload = 5))
+                var offset = 0
+                while (offset < atLimit.size) {
+                    val length = minOf(chunkSize, atLimit.size - offset)
+                    accepted.parser.accept(atLimit, offset, length)
+                    offset += length
+                }
+
+                val rejected = TerminalParserFixture(state = ParserState(maxPayload = 5))
+                rejected.parser.accept(overLimit)
+
+                assertAll(
+                    { assertEquals(listOf("setWindowTitle:abc"), accepted.sink.events, "chunkSize=$chunkSize") },
+                    { assertEquals(AnsiState.GROUND, accepted.state.fsmState, "chunkSize=$chunkSize") },
+                    { assertTrue(rejected.sink.events.isEmpty()) },
+                    { assertEquals(AnsiState.GROUND, rejected.state.fsmState) },
+                )
+            }
         }
 
         @Test
@@ -624,6 +954,33 @@ class TerminalParserTest {
                 { assertEquals(AnsiState.GROUND, f.state.fsmState) },
                 { assertTrue(f.sink.events.isEmpty()) },
             )
+        }
+
+        @Test
+        fun `DCS payload ceiling rejects overflow and recovers at every chunk boundary`() {
+            val acceptedBytes = "\u001BP\$qm\u001B\\".encodeToByteArray()
+            val overflowedBytes = "\u001BP\$qmx\u001B\\Y".encodeToByteArray()
+
+            for (chunkSize in 1..overflowedBytes.size) {
+                val accepted = TerminalParserFixture(state = ParserState(maxPayload = 3))
+                accepted.parser.accept(acceptedBytes)
+
+                val overflowed = TerminalParserFixture(state = ParserState(maxPayload = 3))
+                var offset = 0
+                while (offset < overflowedBytes.size) {
+                    val length = minOf(chunkSize, overflowedBytes.size - offset)
+                    overflowed.parser.accept(overflowedBytes, offset, length)
+                    offset += length
+                }
+                overflowed.endOfInput()
+
+                assertAll(
+                    { assertEquals(listOf("queryStatusString:m"), accepted.sink.events, "chunkSize=$chunkSize") },
+                    { assertEquals(AnsiState.GROUND, accepted.state.fsmState, "chunkSize=$chunkSize") },
+                    { assertEquals(listOf("writeCodepoint:89"), overflowed.sink.events, "chunkSize=$chunkSize") },
+                    { assertEquals(AnsiState.GROUND, overflowed.state.fsmState, "chunkSize=$chunkSize") },
+                )
+            }
         }
 
         @Test

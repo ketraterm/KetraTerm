@@ -78,6 +78,9 @@ object TerminalModeBits {
     /** Width in bits of the packed modify-other-keys mode field. */
     const val MODIFY_OTHER_KEYS_WIDTH: Int = 3
 
+    /** Reserved packed sentinel representing xterm's explicit disabled value `-1`. */
+    const val MODIFY_OTHER_KEYS_EXPLICITLY_DISABLED: Int = 7
+
     /** Bit mask for the packed modify-other-keys mode field. */
     const val MODIFY_OTHER_KEYS_MASK: Long =
         ((1L shl MODIFY_OTHER_KEYS_WIDTH) - 1L) shl MODIFY_OTHER_KEYS_SHIFT
@@ -121,6 +124,12 @@ object TerminalModeBits {
     /** Bit mask for the packed Kitty keyboard progressive-enhancement flags. */
     const val KITTY_KEYBOARD_FLAGS_MASK: Long =
         ((1L shl KITTY_KEYBOARD_FLAGS_WIDTH) - 1L) shl KITTY_KEYBOARD_FLAGS_SHIFT
+
+    /** DECBKM value: Backspace emits BS rather than DEL. */
+    const val BACKARROW_KEY_SENDS_BACKSPACE: Long = 1L shl 34
+
+    /** Whether the host has explicitly selected a DECBKM value for this reset epoch. */
+    const val BACKARROW_KEY_MODE_EXPLICIT: Long = 1L shl 35
 
     /**
      * Returns true when [flag] is set in [bits].

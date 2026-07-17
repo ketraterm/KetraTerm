@@ -172,6 +172,12 @@ internal class KetraTermSettings(
             updateConfig(config.copy(shellSuggestionsEnabled = value))
         }
 
+    var scrollOnOutput: Boolean
+        get() = config.scrollOnOutput
+        set(value) {
+            updateConfig(config.copy(scrollOnOutput = value))
+        }
+
     var clipboardLocalWrite: TerminalClipboardPermission
         get() = config.clipboardLocalWrite
         set(value) {
@@ -223,7 +229,6 @@ internal class KetraTermSettings(
             cursorBlinkMillis = config.cursorBlinkMillis,
             useSystemFallbackFonts = config.useSystemFallbackFonts,
             visualBellEnabled = config.visualBell,
-            pasteOnMiddleClick = config.pasteOnMiddleClick,
             pasteSanitizationPolicy = config.pasteSanitizationPolicy,
             cursorShape = parseCursorShape(config.cursorShape),
             scrollbackLines = config.scrollbackLines,
@@ -231,6 +236,7 @@ internal class KetraTermSettings(
             shellRequestResizeWindow = config.shellRequestResizeWindow,
             shellRequestWindowManipulation = config.shellRequestWindowManipulation,
             shellSuggestionsEnabled = config.shellSuggestionsEnabled,
+            scrollOnOutput = config.scrollOnOutput,
         )
     }
 

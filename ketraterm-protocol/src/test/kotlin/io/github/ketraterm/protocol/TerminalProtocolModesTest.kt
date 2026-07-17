@@ -60,6 +60,7 @@ class TerminalProtocolModesTest {
             { assertEquals(12, DecPrivateMode.CURSOR_BLINK) },
             { assertEquals(25, DecPrivateMode.CURSOR_VISIBLE) },
             { assertEquals(66, DecPrivateMode.APPLICATION_KEYPAD) },
+            { assertEquals(67, DecPrivateMode.BACKARROW_KEY) },
             { assertEquals(69, DecPrivateMode.LEFT_RIGHT_MARGIN) },
             { assertEquals(47, DecPrivateMode.ALT_SCREEN) },
             { assertEquals(1047, DecPrivateMode.ALT_SCREEN_BUFFER) },

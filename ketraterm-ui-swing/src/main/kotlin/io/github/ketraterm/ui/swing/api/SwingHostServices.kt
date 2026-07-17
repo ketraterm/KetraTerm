@@ -21,6 +21,7 @@ import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import java.awt.event.KeyEvent
 import javax.swing.SwingUtilities
 
 /**
@@ -52,6 +53,32 @@ fun interface TerminalUiDispatcher {
 }
 
 /**
+ * Host-owned keyboard action hook for [SwingTerminal].
+ *
+ * The reusable terminal asks this hook before encoding key presses for the
+ * shell. Returning `true` means the host handled the key as application policy
+ * and the terminal must not send it to the session. Returning `false` passes
+ * the key through to terminal input handling.
+ */
+fun interface SwingTerminalHostKeyHandler {
+    /**
+     * Handles a key press before terminal input encoding.
+     *
+     * @param event Swing key event owned by the EDT.
+     * @return `true` when the host handled and consumed the key.
+     */
+    fun handleKeyPressed(event: KeyEvent): Boolean
+
+    companion object {
+        /**
+         * Handler that never claims keys.
+         */
+        @JvmField
+        val NONE: SwingTerminalHostKeyHandler = SwingTerminalHostKeyHandler { false }
+    }
+}
+
+/**
  * Host-provided non-render services for [SwingTerminal].
  *
  * These services are intentionally kept out of row painters. Rendering consumes
@@ -62,14 +89,26 @@ fun interface TerminalUiDispatcher {
  * @property clipboardHandler host clipboard adapter for copy and paste actions.
  * @property hyperlinkHandler host policy for explicit Ctrl-click hyperlink
  * activation.
+ * @property hyperlinkDetector host detector for links discovered from the
+ * currently visible terminal viewport. Detection runs outside paint and mouse
+ * movement, and reported actions are invoked only after explicit activation.
  * @property viewportListener host scrollbar adapter notified when the terminal
  * scrollback viewport changes.
+ * @property scrollbarOverlayEnabled whether the reusable component should draw
+ * and handle its own overlay scrollbar. Hosts that install a native external
+ * scrollbar should set this to `false`.
  * @property shellSuggestionProvider host provider queried for bounded
  * command-line suggestion snapshots.
  * @property shellSuggestionHandler host callback invoked after the user accepts
  * a shell suggestion from the reusable popup.
  * @property shellSuggestionFeedbackHandler host callback invoked when the user
  * accepts or explicitly dismisses a shell suggestion.
+ * @property hostKeyHandler host-owned keyboard action policy evaluated before
+ * terminal input encoding.
+ * @property contextMenuHandler host-owned right-click popup policy. The
+ * reusable terminal invokes it only when terminal UI owns the right-click
+ * gesture; application mouse reporting takes precedence unless Shift is held.
+ * @property fontResolver custom host font resolver policy.
  */
 data class SwingHostServices
     @JvmOverloads
@@ -77,8 +116,13 @@ data class SwingHostServices
         val uiDispatcher: TerminalUiDispatcher = SWING,
         val clipboardHandler: TerminalClipboardHandler = TerminalClipboardHandler.SYSTEM,
         val hyperlinkHandler: TerminalHyperlinkHandler = TerminalHyperlinkHandler.SYSTEM,
+        val hyperlinkDetector: SwingHyperlinkDetector = SwingHyperlinkDetector.NONE,
         val viewportListener: TerminalViewportListener = TerminalViewportListener.NONE,
+        val scrollbarOverlayEnabled: Boolean = true,
         val shellSuggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
         val shellSuggestionHandler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
         val shellSuggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+        val hostKeyHandler: SwingTerminalHostKeyHandler = SwingTerminalHostKeyHandler.NONE,
+        val contextMenuHandler: SwingTerminalContextMenuHandler = SwingTerminalContextMenuHandler.NONE,
+        val fontResolver: TerminalFontResolver? = null,
     )

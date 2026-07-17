@@ -58,6 +58,32 @@ class TerminalSearchModelTest {
         assertEquals(1, model.search(cache, "build", ignoreCase = false).resultCount)
     }
 
+    @Test
+    fun `search reanchors absolute rows after repeated history eviction`() {
+        val model = TerminalSearchModel()
+        val beforeEviction =
+            renderCache(
+                WrappedTextFrame(
+                    textRows = arrayOf("needle"),
+                    historySize = 5,
+                    scrollbackOffset = 2,
+                    discardedCount = 0,
+                ),
+            )
+        val afterEviction =
+            renderCache(
+                WrappedTextFrame(
+                    textRows = arrayOf("needle"),
+                    historySize = 5,
+                    scrollbackOffset = 2,
+                    discardedCount = 3,
+                ),
+            )
+
+        assertEquals(3L, model.search(beforeEviction, "needle", ignoreCase = true).activeStartAbsoluteRow())
+        assertEquals(6L, model.search(afterEviction, "needle", ignoreCase = true).activeStartAbsoluteRow())
+    }
+
     private fun renderCache(frame: TerminalRenderFrame): TerminalRenderCache {
         val cache = TerminalRenderCache(frame.columns, frame.rows)
         cache.updateFrom(
@@ -73,6 +99,9 @@ class TerminalSearchModelTest {
     private class WrappedTextFrame(
         private val textRows: Array<String>,
         private val wrapped: BooleanArray = BooleanArray(textRows.size),
+        override val historySize: Int = 0,
+        override val scrollbackOffset: Int = 0,
+        override val discardedCount: Long = 0L,
     ) : TerminalRenderFrame {
         override val columns: Int = textRows.maxOf { it.length }
         override val rows: Int = textRows.size

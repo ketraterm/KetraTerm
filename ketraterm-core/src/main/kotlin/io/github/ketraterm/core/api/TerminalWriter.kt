@@ -245,6 +245,131 @@ interface TerminalWriter {
     /** Selectively erases the entire visible screen without moving the cursor (DECSED 2). */
     fun selectiveEraseEntireScreen()
 
+    /**
+     * Erases a VT400 rectangular area (DECERA / DECSERA).
+     *
+     * Coordinates use DEC's one-based inclusive form. Zero values denote omitted parameters and
+     * resolve to the corresponding active-viewport edge. When origin mode is enabled, coordinates
+     * are relative to the active scrolling margins. Selective erasure preserves protected cells.
+     *
+     * @param top One-based top row, or `0` when omitted.
+     * @param left One-based left column, or `0` when omitted.
+     * @param bottom One-based bottom row, or `0` when omitted.
+     * @param right One-based right column, or `0` when omitted.
+     * @param selective `true` for DECSERA, `false` for DECERA.
+     */
+    fun eraseRectangle(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        selective: Boolean,
+    )
+
+    /**
+     * Fills a VT420 rectangular area (DECFRA) with a one-cell DEC character.
+     *
+     * Coordinates use DEC's one-based inclusive form. Zero values denote omitted parameters and
+     * resolve to the corresponding active-viewport edge. When origin mode is enabled, coordinates
+     * are relative to the active scrolling margins.
+     *
+     * @param codepoint Decimal fill character. Invalid scalar values are ignored.
+     * @param top One-based top row, or `0` when omitted.
+     * @param left One-based left column, or `0` when omitted.
+     * @param bottom One-based bottom row, or `0` when omitted.
+     * @param right One-based right column, or `0` when omitted.
+     */
+    fun fillRectangle(
+        codepoint: Int,
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+    )
+
+    /**
+     * Copies a VT420 rectangular area (DECCRA) without moving the cursor.
+     *
+     * Coordinates are DEC one-based values. The source rectangle is inclusive; destination
+     * coordinates identify its new upper-left cell. This single-page terminal accepts omitted
+     * page parameters (`0`) and page `1`; every other page value is ignored. Source data is
+     * snapshotted before destination cells are mutated, so overlapping copies have memmove
+     * semantics and preserve grapheme-cluster ownership.
+     *
+     * @param sourceTop One-based source top row, or `0` when omitted.
+     * @param sourceLeft One-based source left column, or `0` when omitted.
+     * @param sourceBottom One-based source bottom row, or `0` when omitted.
+     * @param sourceRight One-based source right column, or `0` when omitted.
+     * @param sourcePage Source page (`0` omitted or `1` for the active page).
+     * @param destinationTop One-based destination top row, or `0` when omitted.
+     * @param destinationLeft One-based destination left column, or `0` when omitted.
+     * @param destinationPage Destination page (`0` omitted or `1` for the active page).
+     */
+    fun copyRectangle(
+        sourceTop: Int,
+        sourceLeft: Int,
+        sourceBottom: Int,
+        sourceRight: Int,
+        sourcePage: Int,
+        destinationTop: Int,
+        destinationLeft: Int,
+        destinationPage: Int,
+    )
+
+    /**
+     * Selects DECSACE extent for future DECCARA and DECRARA operations.
+     *
+     * @param extent `0` or `1` selects wrapped stream extent; `2` selects exact rectangle.
+     * Unsupported values leave the current extent unchanged.
+     */
+    fun setAttributeChangeExtent(extent: Int)
+
+    /**
+     * Changes DECCARA visual attributes without changing cell values, protection, hyperlinks, or
+     * the current SGR pen. Masks use [io.github.ketraterm.protocol.DecRectangleAttribute] bits.
+     */
+    fun changeRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        setMask: Int,
+        clearMask: Int,
+    )
+
+    /**
+     * Reverses DECRARA visual attributes without changing cell values, protection, hyperlinks,
+     * or the current SGR pen. [reverseMask] uses
+     * [io.github.ketraterm.protocol.DecRectangleAttribute] bits.
+     */
+    fun reverseRectangleAttributes(
+        top: Int,
+        left: Int,
+        bottom: Int,
+        right: Int,
+        reverseMask: Int,
+    )
+
+    /**
+     * Inserts DECIC blank columns at the cursor column across the active vertical scroll region.
+     *
+     * The operation shifts only through the current right margin, does nothing when the cursor is
+     * outside either scrolling margin, and leaves the cursor position unchanged.
+     *
+     * @param count Number of columns to insert. Non-positive values are ignored.
+     */
+    fun insertColumns(count: Int)
+
+    /**
+     * Deletes DECDC columns at the cursor column across the active vertical scroll region.
+     *
+     * The operation shifts only through the current right margin, does nothing when the cursor is
+     * outside either scrolling margin, and leaves the cursor position unchanged.
+     *
+     * @param count Number of columns to delete. Non-positive values are ignored.
+     */
+    fun deleteColumns(count: Int)
+
     /** Erases the entire visible screen without moving the cursor (ED 2, `CSI 2 J`). */
     fun eraseEntireScreen()
 

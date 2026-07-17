@@ -20,11 +20,10 @@ import io.github.ketraterm.render.api.TerminalRenderBufferKind
 /**
  * Computes visual terminal chrome insets without changing terminal semantics.
  *
- * The alternate screen suppresses shell-integration decorations and uses the
- * bottom spacer as its symmetric left/right side inset. The visible grid must
- * therefore be recalculated when the active buffer changes; this lets
- * full-screen TUIs receive the extra columns made available by removing the
- * primary prompt gutter.
+ * Primary screen chrome composes host/user margin plus terminal-owned gutters:
+ * `left margin | prompt gutter | grid | scrollbar gutter`. Alternate screen
+ * chrome uses its own explicit inset snapshot, so full-screen TUIs can receive
+ * an edge-to-edge viewport without hidden coupling to primary-screen padding.
  */
 internal object SwingTerminalChrome {
     fun horizontalInset(
@@ -35,16 +34,16 @@ internal object SwingTerminalChrome {
     fun verticalInset(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-    ): Int = top(settings) + bottom(settings)
+    ): Int = top(settings, activeBuffer) + bottom(settings, activeBuffer)
 
     fun left(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
     ): Int =
         if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
-            alternateScreenSideInset(settings)
+            settings.alternateScreenPadding.left
         } else {
-            settings.padding.left
+            settings.padding.left + promptDecorationGutterWidth(settings, activeBuffer)
         }
 
     fun right(
@@ -52,14 +51,30 @@ internal object SwingTerminalChrome {
         activeBuffer: TerminalRenderBufferKind,
     ): Int =
         if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
-            alternateScreenSideInset(settings)
+            settings.alternateScreenPadding.right
         } else {
             settings.padding.right
         }
 
-    fun top(settings: SwingSettings): Int = settings.padding.top
+    fun top(
+        settings: SwingSettings,
+        activeBuffer: TerminalRenderBufferKind,
+    ): Int =
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+            settings.alternateScreenPadding.top
+        } else {
+            settings.padding.top
+        }
 
-    fun bottom(settings: SwingSettings): Int = settings.padding.bottom
+    fun bottom(
+        settings: SwingSettings,
+        activeBuffer: TerminalRenderBufferKind,
+    ): Int =
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+            settings.alternateScreenPadding.bottom
+        } else {
+            settings.padding.bottom
+        }
 
     fun promptDecorationGutterWidth(
         settings: SwingSettings,
@@ -68,8 +83,6 @@ internal object SwingTerminalChrome {
         if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
             0
         } else {
-            settings.shellIntegrationDecorationGutterWidth.coerceAtMost(settings.padding.left)
+            settings.shellIntegrationDecorationGutterWidth
         }
-
-    private fun alternateScreenSideInset(settings: SwingSettings): Int = settings.padding.bottom
 }
