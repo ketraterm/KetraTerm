@@ -20,11 +20,7 @@ import io.github.ketraterm.core.api.TerminalHostResponseReader
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.TerminalInputEncoders
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.event.TerminalFocusEvent
-import io.github.ketraterm.input.event.TerminalKeyEvent
-import io.github.ketraterm.input.event.TerminalMouseEvent
-import io.github.ketraterm.input.event.TerminalPasteEvent
-import io.github.ketraterm.input.event.TerminalTextReplacementEvent
+import io.github.ketraterm.input.event.*
 import io.github.ketraterm.input.policy.PasteSanitizationPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
@@ -47,7 +43,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Runtime terminal session that binds core, parser, input encoding, and a
@@ -443,7 +438,7 @@ class TerminalSession(
         val timeoutJob =
             sessionScope.launch(start = CoroutineStart.LAZY) {
                 try {
-                    delay(SYNCHRONIZED_OUTPUT_TIMEOUT_MS.milliseconds)
+                    delay(SYNCHRONIZED_OUTPUT_TIMEOUT_MS)
                     var changed = false
                     synchronized(mutationLock) {
                         if (terminal.getModeSnapshot().isSynchronizedOutput) {
@@ -470,7 +465,7 @@ class TerminalSession(
 
     private suspend fun drainRenderRequests() {
         var publishedGeneration = mutableRenderGeneration.value
-        var failedGeneration = NO_RENDER_GENERATION
+        val failedGeneration = NO_RENDER_GENERATION
         while (!isSessionClosed()) {
             currentCoroutineContext().ensureActive()
             immediateRenderRequests.tryReceive()
@@ -505,7 +500,7 @@ class TerminalSession(
             // sampling the packed request and generation again. Explicit UI
             // requests interrupt the wait so scrolling and resizing stay
             // responsive. The last host invalidation becomes a trailing frame.
-            withTimeoutOrNull(RENDER_PUBLICATION_INTERVAL_MS.milliseconds) {
+            withTimeoutOrNull(RENDER_PUBLICATION_INTERVAL_MS) {
                 immediateRenderRequests.receiveCatching()
             }
         }

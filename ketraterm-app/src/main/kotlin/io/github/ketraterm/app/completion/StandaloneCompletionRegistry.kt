@@ -98,8 +98,8 @@ internal class StandaloneCompletionRegistry(
                     add(
                         TerminalCompletionSourceEntry(
                             feedbackAware(source),
-                            priority = PERSISTENT_STATS_SOURCE_PRIORITY
-                        )
+                            priority = PERSISTENT_STATS_SOURCE_PRIORITY,
+                        ),
                     )
                 }
                 add(TerminalCompletionSourceEntry(specSource, priority = SPEC_SOURCE_PRIORITY))

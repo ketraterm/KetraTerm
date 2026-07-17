@@ -729,12 +729,13 @@ internal class TabManager(
                         .hasRunningCommand()
                 } ?: 0
             }
-        return liveProcessCount == 0 || closeConfirmation.confirmClose(
-            TerminalCloseRequest(
-                displayName = Chrome.APP_TITLE,
-                liveProcessCount = liveProcessCount,
-            ),
-        )
+        return liveProcessCount == 0 ||
+                closeConfirmation.confirmClose(
+                    TerminalCloseRequest(
+                        displayName = Chrome.APP_TITLE,
+                        liveProcessCount = liveProcessCount,
+                    ),
+                )
     }
 
     private fun closeDisplayName(panesToClose: List<TerminalPane>): String {

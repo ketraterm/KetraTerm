@@ -88,7 +88,7 @@ internal class TerminalCompletionStatsStoreTest {
         TerminalCompletionStatsStore(path).use { reloaded ->
             assertEquals(
                 TerminalCommandCompletionStatsSnapshot(shapeStats = listOf(shapeRecord)),
-                reloaded.loadSnapshot()
+                reloaded.loadSnapshot(),
             )
         }
         val persisted = Files.readString(path)
@@ -120,7 +120,7 @@ internal class TerminalCompletionStatsStoreTest {
         TerminalCompletionStatsStore(path).use { reloaded ->
             assertEquals(
                 TerminalCommandCompletionStatsSnapshot(feedbackStats = listOf(feedbackRecord)),
-                reloaded.loadSnapshot()
+                reloaded.loadSnapshot(),
             )
         }
     }
@@ -137,12 +137,13 @@ internal class TerminalCompletionStatsStoreTest {
         TerminalCompletionStatsStore(path).use { store ->
             store.persist(
                 TerminalCommandCompletionStatsSnapshot(
-                    commandStats = listOf(
-                        safe,
-                        privateByWhitespace,
-                        privateByKeyword
-                    )
-                )
+                    commandStats =
+                        listOf(
+                            safe,
+                            privateByWhitespace,
+                            privateByKeyword,
+                        ),
+                ),
             )
             store.flush()
         }

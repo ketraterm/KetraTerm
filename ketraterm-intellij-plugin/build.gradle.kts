@@ -15,6 +15,7 @@
  */
 
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import java.util.zip.ZipFile
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -96,6 +97,18 @@ dependencies {
     }
 }
 
+// IntelliJ loads its bundled Kotlin runtime parent-first. Shipping another
+// stdlib in the plugin cannot override that runtime and can hide incompatible
+// API usage during packaging, so keep every transitive stdlib variant out.
+listOf("runtimeClasspath", "testRuntimeClasspath").forEach { configurationName ->
+    configurations.named(configurationName) {
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-common")
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk7")
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
+    }
+}
+
 intellijPlatform {
     pluginConfiguration {
         id.set("io.github.ketraterm.terminal")
@@ -121,4 +134,42 @@ intellijPlatform {
 
 kotlin {
     jvmToolchain(21)
+}
+
+val pluginDistributionArchives =
+    layout.buildDirectory.dir("distributions").map { directory ->
+        directory.asFileTree.matching { include("*.zip") }
+    }
+val verifyNoBundledKotlinStdlib =
+    tasks.register("verifyNoBundledKotlinStdlib") {
+        group = "verification"
+        description = "Verifies that the plugin archive relies on IntelliJ's bundled Kotlin runtime."
+        dependsOn(tasks.named("buildPlugin"))
+        inputs.files(pluginDistributionArchives)
+
+        doLast {
+            val archives = inputs.files.files
+            check(archives.isNotEmpty()) { "No IntelliJ plugin distribution was produced" }
+
+            val bundledStdlibEntries =
+                archives.flatMap { archive ->
+                    ZipFile(archive).use { pluginArchive ->
+                        pluginArchive
+                            .entries()
+                            .asSequence()
+                            .map { entry -> entry.name }
+                            .filter { entryName ->
+                                entryName.contains("/lib/kotlin-stdlib") && entryName.endsWith(".jar")
+                            }.map { entryName -> "${archive.name}: $entryName" }
+                            .toList()
+                    }
+                }
+            check(bundledStdlibEntries.isEmpty()) {
+                "IntelliJ plugins must not bundle Kotlin stdlib: ${bundledStdlibEntries.joinToString()}"
+            }
+        }
+    }
+
+tasks.named("check") {
+    dependsOn(verifyNoBundledKotlinStdlib)
 }
