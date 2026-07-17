@@ -18,8 +18,6 @@ package io.github.ketraterm.intellij.services
 import io.github.ketraterm.completion.api.TerminalDirectoryListingRequest
 import io.github.ketraterm.completion.api.TerminalFileEntry
 import io.github.ketraterm.completion.api.TerminalFileSystemProvider
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import java.net.URI
 import java.nio.file.FileSystems
 import java.nio.file.Files
@@ -30,58 +28,14 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Application-scoped owner of bounded IntelliJ directory-completion work. */
-internal class IntellijDirectoryCompletionService : AutoCloseable {
-    private val scope =
-        CoroutineScope(
-            SupervisorJob() +
-                    Dispatchers.IO.limitedParallelism(WORKER_COUNT) +
-                    CoroutineName("intellij-directory-completion"),
-        )
-    private val workQueue = Channel<suspend () -> Unit>(WORK_QUEUE_CAPACITY)
-    private val scheduler = IntellijDirectoryLoadScheduler { work -> workQueue.trySend(work).isSuccess }
-
-    init {
-        repeat(WORKER_COUNT) { workerIndex ->
-            scope.launch(CoroutineName("intellij-directory-completion-worker-$workerIndex")) {
-                for (work in workQueue) {
-                    try {
-                        work()
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (_: RuntimeException) {
-                        // A provider failure must not terminate the shared worker.
-                    }
-                }
-            }
-        }
-    }
-
-    fun createProvider(onSnapshotChanged: () -> Unit): IntellijAsyncFileSystemProvider =
-        IntellijAsyncFileSystemProvider(
-            scheduler = scheduler,
-            onSnapshotChanged = onSnapshotChanged,
-        )
-
-    override fun close() {
-        workQueue.close()
-        scope.cancel()
-    }
-
-    private companion object {
-        private const val WORKER_COUNT = 2
-        private const val WORK_QUEUE_CAPACITY = 32
-    }
-}
-
-/** Bounded scheduling seam for deterministic directory-provider tests. */
-internal fun interface IntellijDirectoryLoadScheduler {
+/** Bounded scheduling seam for deterministic asynchronous-provider tests. */
+internal fun interface IntellijCompletionLoadScheduler {
     fun schedule(work: suspend () -> Unit): Boolean
 }
 
 /** Session-local non-blocking filesystem provider backed by immutable snapshots. */
 internal class IntellijAsyncFileSystemProvider(
-    private val scheduler: IntellijDirectoryLoadScheduler,
+    private val scheduler: IntellijCompletionLoadScheduler,
     private val onSnapshotChanged: () -> Unit,
     private val resolver: IntellijCompletionPathResolver = IntellijCompletionPathResolver(),
     private val scanner: IntellijDirectoryScanner = BoundedIntellijDirectoryScanner(),

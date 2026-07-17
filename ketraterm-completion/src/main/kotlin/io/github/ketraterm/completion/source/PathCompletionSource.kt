@@ -101,11 +101,10 @@ internal class PathCompletionSource(
                 val rawSuffix = if (entry.isDirectory) "$pathSeparator" else ""
                 val rawReplacement = directoryPortion + entry.name + rawSuffix
                 val replacementText =
-                    replacementText(
-                        request = request,
+                    ShellReplacementText.encode(
+                        value = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement,
                         activeTokenQuote = context.activeTokenQuote,
-                        rawReplacement = rawReplacement,
-                        pathSeparator = pathSeparator,
+                        policy = request.shellCapabilities.quoting,
                     ) ?: continue
 
                 candidates +=
@@ -124,127 +123,6 @@ internal class PathCompletionSource(
 
         return candidates.sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER).take(request.maxCandidates)
     }
-
-    private fun replacementText(
-        request: TerminalCompletionRequest,
-        activeTokenQuote: Char,
-        rawReplacement: String,
-        pathSeparator: Char,
-    ): String? {
-        val normalizedReplacement = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement
-        val policy = request.shellCapabilities.quoting
-        return when (activeTokenQuote) {
-            SINGLE_QUOTE -> quoteSingle(normalizedReplacement, policy)
-            DOUBLE_QUOTE -> quoteDouble(normalizedReplacement, policy)
-            else -> unquotedReplacement(normalizedReplacement, policy)
-        }
-    }
-
-    private fun unquotedReplacement(
-        value: String,
-        policy: TerminalShellQuotingPolicy,
-    ): String? {
-        if (!needsEscaping(value, policy)) return value
-        return when (policy) {
-            TerminalShellQuotingPolicy.CONSERVATIVE -> null
-            TerminalShellQuotingPolicy.POSIX -> escapePosixUnquoted(value)
-            TerminalShellQuotingPolicy.POWERSHELL -> quoteSingle(value, policy)
-        }
-    }
-
-    private fun quoteSingle(
-        value: String,
-        policy: TerminalShellQuotingPolicy,
-    ): String? =
-        when (policy) {
-            TerminalShellQuotingPolicy.CONSERVATIVE ->
-                if (value.contains(SINGLE_QUOTE)) null else "'$value'"
-            TerminalShellQuotingPolicy.POWERSHELL -> "'${value.replace("'", "''")}'"
-            TerminalShellQuotingPolicy.POSIX,
-            -> "'${value.replace("'", "'\\''")}'"
-        }
-
-    private fun quoteDouble(
-        value: String,
-        policy: TerminalShellQuotingPolicy,
-    ): String? =
-        when (policy) {
-            TerminalShellQuotingPolicy.CONSERVATIVE ->
-                if (value.any { it == DOUBLE_QUOTE || it == DOLLAR || it == BACKTICK }) null else "\"$value\""
-            TerminalShellQuotingPolicy.POWERSHELL ->
-                buildString(value.length + 2) {
-                    append(DOUBLE_QUOTE)
-                    for (ch in value) {
-                        if (ch == DOUBLE_QUOTE || ch == BACKTICK || ch == DOLLAR) append(BACKTICK)
-                        append(ch)
-                    }
-                    append(DOUBLE_QUOTE)
-                }
-            TerminalShellQuotingPolicy.POSIX,
-            ->
-                buildString(value.length + 2) {
-                    append(DOUBLE_QUOTE)
-                    for (ch in value) {
-                        if (ch == DOUBLE_QUOTE || ch == BACKSLASH || ch == DOLLAR || ch == BACKTICK) append(BACKSLASH)
-                        append(ch)
-                    }
-                    append(DOUBLE_QUOTE)
-                }
-        }
-
-    private fun escapePosixUnquoted(value: String): String =
-        buildString(value.length) {
-            for (ch in value) {
-                if (ch.needsPosixUnquotedEscape()) append(BACKSLASH)
-                append(ch)
-            }
-        }
-
-    private fun needsEscaping(
-        value: String,
-        policy: TerminalShellQuotingPolicy,
-    ): Boolean =
-        when (policy) {
-            TerminalShellQuotingPolicy.POSIX -> value.any { it.needsPosixUnquotedEscape() }
-            TerminalShellQuotingPolicy.POWERSHELL -> value.any { it.needsPowerShellUnquotedEscape() }
-            TerminalShellQuotingPolicy.CONSERVATIVE ->
-                value.any { it.needsPosixUnquotedEscape() || it.needsPowerShellUnquotedEscape() }
-        }
-
-    private fun Char.needsPosixUnquotedEscape(): Boolean =
-        isShellWhitespace() ||
-            this == SINGLE_QUOTE ||
-            this == DOUBLE_QUOTE ||
-            this == BACKSLASH ||
-            this == DOLLAR ||
-            this == BACKTICK ||
-            this == SEMICOLON ||
-            this == AMPERSAND ||
-            this == LEFT_PAREN ||
-            this == RIGHT_PAREN
-
-    private fun Char.needsPowerShellUnquotedEscape(): Boolean =
-        isShellWhitespace() ||
-            this == BACKTICK ||
-            this == DOLLAR ||
-            this == SINGLE_QUOTE ||
-            this == DOUBLE_QUOTE ||
-            this == LEFT_PAREN ||
-            this == RIGHT_PAREN ||
-            this == LEFT_BRACE ||
-            this == RIGHT_BRACE ||
-            this == LEFT_BRACKET ||
-            this == RIGHT_BRACKET ||
-            this == LESS_THAN ||
-            this == GREATER_THAN ||
-            this == PIPE ||
-            this == AMPERSAND ||
-            this == SEMICOLON ||
-            this == COMMA ||
-            this == AT ||
-            this == HASH
-
-    private fun Char.isShellWhitespace(): Boolean = this == ' ' || this == '\t' || this == '\r' || this == '\n'
 
     private fun isPathLike(prefix: String): Boolean =
         prefix.startsWith("/") ||
@@ -288,25 +166,6 @@ internal class PathCompletionSource(
     private companion object {
         private const val SOURCE_PATH = "path"
         private const val PATH_BASE_SCORE = 200
-        private const val SINGLE_QUOTE = '\''
-        private const val DOUBLE_QUOTE = '"'
-        private const val BACKSLASH = '\\'
-        private const val BACKTICK = '`'
-        private const val DOLLAR = '$'
-        private const val SEMICOLON = ';'
-        private const val AMPERSAND = '&'
-        private const val LEFT_PAREN = '('
-        private const val RIGHT_PAREN = ')'
-        private const val LEFT_BRACE = '{'
-        private const val RIGHT_BRACE = '}'
-        private const val LEFT_BRACKET = '['
-        private const val RIGHT_BRACKET = ']'
-        private const val LESS_THAN = '<'
-        private const val GREATER_THAN = '>'
-        private const val PIPE = '|'
-        private const val COMMA = ','
-        private const val AT = '@'
-        private const val HASH = '#'
     }
 
     private data class PathParts(

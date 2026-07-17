@@ -232,7 +232,7 @@ internal class KetraTermTerminalPane private constructor(
             tab: TerminalWorkspaceTab,
             hostActions: KetraTermTerminalPaneHostActions = KetraTermTerminalPaneHostActions.NONE,
         ): KetraTermTerminalPane {
-            val completionSession = KetraTermCompletionService.getInstance().openSession(tab)
+            val completionSession = KetraTermCompletionService.getInstance().openSession(project, tab)
             val completionScope =
                 CoroutineScope(
                     SupervisorJob() +

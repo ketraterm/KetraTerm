@@ -153,7 +153,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(host)`: richer font measurement policy for native shaping backends, fallback run metrics, and backend painter integrations beyond the current Java2D/Swing script-run shaping path.
 - `DONE(host)`: custom line spacing/height metrics in the renderer.
 - `DONE(host/ui)`: scrollback controls, selection behavior while scrolled, scroll-on-output policy, and resize offset retention.
-- `TODO(host/ui)`: Fig-style spec corpus import, dynamic host providers for Git branches/status paths, project files,
+- `TODO(host/ui)`: Fig-style spec corpus import, dynamic host providers for Git status paths and whole-project fuzzy
+  files,
   Docker contexts, Kubernetes namespaces, IDE run configurations, and IntelliJ-native popup styling remain host-owned
   follow-up work. IntelliJ now has a plugin-owned shared-engine adapter with profile/current-directory context,
   coroutine-debounced live refresh, active-keymap acceptance, session MRU, privacy-filtered application-level
@@ -168,7 +169,13 @@ These are not badges of compatibility for this project. They expand attack surfa
   IntelliJ spec/MRU provider wiring, compact exact command/shape/source-feedback stats, source-specific feedback-aware
   ranking, bounded coroutine-backed directory snapshots, and standalone/IntelliJ enablement settings exist.
   Shell-returned completions are intentionally deferred.
-- `TODO(completion/provider)`: implement standalone and IntelliJ dynamic providers for declared value domains, such as Git branches for `git switch`, Kubernetes namespaces for `kubectl --namespace`, Docker contexts for `docker --context`, npm scripts, AWS profiles/regions, project files, and IDE run configurations. Providers must remain host-owned and feed domain-tagged candidates into the shared engine.
+- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe local Git branch snapshots from
+  Git4Idea for `git switch`, `checkout`, `merge`, and `rebase`, and uses the IDE VFS/project-content model for path
+  directories inside the project with a bounded local-filesystem fallback elsewhere.
+- `TODO(completion/provider)`: implement remaining standalone and IntelliJ dynamic providers for declared value domains,
+  such as remote Git refs/status paths, Kubernetes namespaces for `kubectl --namespace`, Docker contexts for
+  `docker --context`, npm scripts, AWS profiles/regions, whole-project fuzzy files, and IDE run configurations.
+  Providers must remain host-owned and feed domain-tagged candidates into the shared engine.
 - `TODO(completion/policy)`: add tested lexical and quoting capability sets for Command Prompt, Fish, Nushell, and other shell dialects. Until a host provides a complete capability contract, use `TerminalShellCapabilities.PLAIN`; do not infer dialect behavior from command text.
 - `TODO(host)`: accessibility/export APIs.
 - `TODO(host)`: performance benchmarks for large scrollback, resize, and dense SGR streams.

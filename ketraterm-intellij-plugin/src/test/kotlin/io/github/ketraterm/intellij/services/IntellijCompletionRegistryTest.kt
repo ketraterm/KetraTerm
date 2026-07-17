@@ -17,6 +17,7 @@ package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
@@ -30,6 +31,41 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class IntellijCompletionRegistryTest {
+    @Test
+    fun `git branch snapshot refreshes the owning session provider`() {
+        val registry = IntellijCompletionRegistry()
+        try {
+            val changed = CountDownLatch(1)
+            val session =
+                registry.openSession(
+                    context("first").copy(
+                        gitBranchLoader = {
+                            listOf(
+                                TerminalCompletionDomainValue("feature/terminal", detail = "local branch"),
+                            )
+                        },
+                    ),
+                )
+            session.onSourceChanged(changed::countDown)
+
+            session.provider.suggestions(request("git switch fe"))
+            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            var suggestions = session.provider.suggestions(request("git switch fe"))
+            while (suggestions.none { it.source == "intellij-git-branch" } && System.nanoTime() < deadline) {
+                Thread.sleep(5)
+                suggestions = session.provider.suggestions(request("git switch fe"))
+            }
+
+            val suggestion = suggestions.single { it.source == "intellij-git-branch" }
+            assertEquals("feature/terminal", suggestion.replacementText)
+            assertEquals("local branch", suggestion.detail)
+            assertEquals("intellij-git-branch", suggestion.source)
+        } finally {
+            registry.close()
+        }
+    }
+
     @Test
     fun `successful commands feed only their owning session MRU`() {
         val registry = IntellijCompletionRegistry(specs = emptyList())

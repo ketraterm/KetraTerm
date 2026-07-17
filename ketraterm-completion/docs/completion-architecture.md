@@ -39,6 +39,11 @@ constructor state.
 Types used only to tokenize, classify, rank, merge, or index suggestions belong
 in implementation packages and must stay `internal`.
 
+`TerminalCompletionSources.valueDomain(...)` adapts a bounded immutable host snapshot for one declared
+`TerminalCompletionValueDomain`. It resolves the active spec context through the shared tokenizer, applies the request's
+shell quoting policy, and emits domain-tagged argument candidates. Its snapshot supplier is a pure ready-state read and
+must never perform host I/O.
+
 `TerminalCompletionContextResolver` is the shared internal command-line context
 resolver. Sources and ranking decorators should use it instead of independently
 guessing command position, subcommand position, option-name position,
@@ -196,10 +201,11 @@ window-owned coroutine service with a bounded channel and two IO workers.
 Enumeration has visit, result, and elapsed-time caps; caches have capacity and
 expiry bounds; request generations prevent stale work from refreshing the
 popup. The app resolves local and `localhost` file URIs, explicit home paths,
-Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7
-authorities. The IntelliJ plugin should prefer IDE services
-for VCS roots, branches, changelists, project files, indexes, SDKs, run
-configurations, and other project context.
+Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses
+project-aware VFS directory snapshots for paths inside project content and bounded local scanning elsewhere. Its first
+dynamic value provider reads local branches from the Git4Idea repository that contains the terminal working directory
+and publishes generation-safe snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Remote refs, changelists,
+whole-project fuzzy paths, SDKs, and run configurations remain follow-up work.
 
 Both hosts should map their data into the shared request/candidate/source
 contracts and let the shared engine merge, deduplicate, and rank candidates.

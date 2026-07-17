@@ -72,7 +72,7 @@ class IntellijDirectoryCompletionServiceTest {
     }
 
     private fun provider(
-        scheduler: IntellijDirectoryLoadScheduler,
+        scheduler: IntellijCompletionLoadScheduler,
         onSnapshotChanged: () -> Unit,
         scanner: IntellijDirectoryScanner,
     ): IntellijAsyncFileSystemProvider =
@@ -91,7 +91,7 @@ class IntellijDirectoryCompletionServiceTest {
     ): TerminalDirectoryListingRequest =
         TerminalDirectoryListingRequest(workingDirectoryUri, directoryPrefix, entryNamePrefix)
 
-    private class RecordingScheduler : IntellijDirectoryLoadScheduler {
+    private class RecordingScheduler : IntellijCompletionLoadScheduler {
         private val tasks = ArrayDeque<suspend () -> Unit>()
 
         override fun schedule(work: suspend () -> Unit): Boolean {

@@ -162,8 +162,16 @@ object TerminalCommandSpecs {
                     TerminalCommandSpec("pull", "fetch from and integrate with another repository"),
                     TerminalCommandSpec("push", "update remote refs"),
                     TerminalCommandSpec("fetch", "download objects and refs"),
-                    TerminalCommandSpec("merge", "join development histories"),
-                    TerminalCommandSpec("rebase", "reapply commits on top of another base"),
+                    TerminalCommandSpec(
+                        name = "merge",
+                        description = "join development histories",
+                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    ),
+                    TerminalCommandSpec(
+                        name = "rebase",
+                        description = "reapply commits on top of another base",
+                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    ),
                     TerminalCommandSpec("log", "show commit logs"),
                     TerminalCommandSpec(
                         name = "diff",

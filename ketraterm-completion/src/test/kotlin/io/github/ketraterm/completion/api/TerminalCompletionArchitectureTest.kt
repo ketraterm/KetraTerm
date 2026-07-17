@@ -252,6 +252,7 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCompletionFeedbackContext",
                 "TerminalCompletionFeedbackKind",
                 "TerminalCompletionFeedbackStats",
+                "TerminalCompletionDomainValue",
                 "TerminalCompletionTokenPosition",
                 "TerminalCompletionValueDomain",
                 "TerminalHiddenPathPolicy",
@@ -285,6 +286,7 @@ internal class TerminalCompletionArchitectureTest {
                 "fromSpecs",
                 "sessionMru",
                 "path",
+                "valueDomain",
             )
         private val PUBLIC_COMPLETION_ENGINE_FACTORIES =
             setOf(
@@ -312,7 +314,8 @@ internal class TerminalCompletionArchitectureTest {
                 "api/TerminalCompletionEngine.kt" to setOf("complete"),
                 "api/TerminalCompletionEngines.kt" to setOf("fromSources"),
                 "api/TerminalCompletionSource.kt" to setOf("complete"),
-                "api/TerminalCompletionSources.kt" to setOf("commandStats", "feedbackAware", "fromSpecs", "sessionMru", "path"),
+                "api/TerminalCompletionSources.kt" to
+                        setOf("commandStats", "feedbackAware", "fromSpecs", "sessionMru", "path", "valueDomain"),
                 "api/TerminalSessionMruCompletionSource.kt" to setOf("recordSuccessfulCommand", "clear"),
                 "api/TerminalCompletionTriggerEvaluator.kt" to setOf("shouldTrigger", "isLiveTrigger"),
                 "api/TerminalFileSystemProvider.kt" to setOf("listDirectory"),

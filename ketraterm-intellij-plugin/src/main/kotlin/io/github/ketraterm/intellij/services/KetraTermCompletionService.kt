@@ -19,6 +19,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.project.Project
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.history.CommandPersistencePrivacyPolicy
 import io.github.ketraterm.completion.model.*
@@ -48,13 +49,18 @@ internal class KetraTermCompletionService : Disposable {
             persistStats = statsStore::persist,
         )
 
-    fun openSession(tab: TerminalWorkspaceTab): IntellijCompletionSession =
+    fun openSession(
+        project: Project,
+        tab: TerminalWorkspaceTab,
+    ): IntellijCompletionSession =
         registry.openSession(
             IntellijCompletionSessionContext(
                 sessionId = tab.id,
                 profileId = tab.profile.id,
                 workingDirectoryUriProvider = { tab.currentWorkingDirectoryUri },
                 shellCapabilities = tab.profile.kind.intellijCompletionShellCapabilities(),
+                gitBranchLoader = IntellijGitBranchLoader(project)::load,
+                directoryScanner = IntellijProjectDirectoryScanner(project),
             ),
         )
 
@@ -89,7 +95,7 @@ internal class IntellijCompletionRegistry(
     private val loadStats: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot() },
     private val persistStats: (TerminalCommandCompletionStatsSnapshot) -> Unit = {},
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
-    private val directoryCompletionService: IntellijDirectoryCompletionService = IntellijDirectoryCompletionService(),
+    private val snapshotService: IntellijCompletionSnapshotService = IntellijCompletionSnapshotService(),
 ) : AutoCloseable {
     val commandSpecs: List<TerminalCommandSpec> = specs.toList()
     private val lock = Any()
@@ -122,20 +128,49 @@ internal class IntellijCompletionRegistry(
                 capacity = sessionMruCapacity,
                 commandSpecs = commandSpecs,
             )
-        val fileSystemProvider = directoryCompletionService.createProvider(notifier::notifyChanged)
-        val sources =
-            listOf(
-                TerminalCompletionSourceEntry(feedbackAware(mruSource), priority = SESSION_MRU_PRIORITY),
-                TerminalCompletionSourceEntry(feedbackAware(statsSource), priority = PERSISTENT_STATS_PRIORITY),
-                TerminalCompletionSourceEntry(specSource, priority = SPEC_PRIORITY),
-                TerminalCompletionSourceEntry(
-                    TerminalCompletionSources.path(
-                        fileSystemProvider = fileSystemProvider,
-                        commandSpecs = commandSpecs,
-                    ),
-                    priority = PATH_PRIORITY,
-                ),
+        val fileSystemProvider =
+            snapshotService.createDirectoryProvider(
+                onSnapshotChanged = notifier::notifyChanged,
+                scanner = context.directoryScanner,
             )
+        val gitBranchProvider =
+            context.gitBranchLoader?.let { loader ->
+                snapshotService.createGitBranchProvider(
+                    workingDirectoryUriProvider = context.workingDirectoryUriProvider,
+                    loader = loader,
+                    onSnapshotChanged = notifier::notifyChanged,
+                )
+            }
+        val sources =
+            buildList {
+                add(TerminalCompletionSourceEntry(feedbackAware(mruSource), priority = SESSION_MRU_PRIORITY))
+                add(TerminalCompletionSourceEntry(feedbackAware(statsSource), priority = PERSISTENT_STATS_PRIORITY))
+                add(TerminalCompletionSourceEntry(specSource, priority = SPEC_PRIORITY))
+                add(
+                    TerminalCompletionSourceEntry(
+                        TerminalCompletionSources.path(
+                            fileSystemProvider = fileSystemProvider,
+                            commandSpecs = commandSpecs,
+                        ),
+                        priority = PATH_PRIORITY,
+                    ),
+                )
+                if (gitBranchProvider != null) {
+                    add(
+                        TerminalCompletionSourceEntry(
+                            feedbackAware(
+                                TerminalCompletionSources.valueDomain(
+                                    domain = TerminalCompletionValueDomain.GIT_BRANCH,
+                                    sourceId = SOURCE_INTELLIJ_GIT_BRANCH,
+                                    valuesProvider = gitBranchProvider::values,
+                                    commandSpecs = commandSpecs,
+                                ),
+                            ),
+                            priority = DYNAMIC_DOMAIN_PRIORITY,
+                        ),
+                    )
+                }
+            }
         val provider =
             IntellijCompletionSuggestionProvider(
                 engine = TerminalCompletionEngines.fromSources(sources, commandSpecs),
@@ -147,7 +182,7 @@ internal class IntellijCompletionRegistry(
                     )
                 },
             )
-        val state = SessionState(mruSource, fileSystemProvider, notifier)
+        val state = SessionState(mruSource, fileSystemProvider, gitBranchProvider, notifier)
         val previous = synchronized(lock) { sessionStates.put(context.sessionId, state) }
         previous?.close()
         return IntellijCompletionSession(
@@ -238,7 +273,7 @@ internal class IntellijCompletionRegistry(
                 copy
             }
         states.forEach(SessionState::close)
-        directoryCompletionService.close()
+        snapshotService.close()
         statsExecutor.shutdown()
         val terminated =
             try {
@@ -255,12 +290,14 @@ internal class IntellijCompletionRegistry(
     private data class SessionState(
         val mruSource: TerminalSessionMruCompletionSource,
         val fileSystemProvider: IntellijAsyncFileSystemProvider,
+        val gitBranchProvider: IntellijGitBranchCompletionProvider?,
         val notifier: SessionSourceChangeNotifier,
     ) {
         fun close() {
             notifier.close()
             mruSource.clear()
             fileSystemProvider.close()
+            gitBranchProvider?.close()
         }
     }
 
@@ -268,9 +305,11 @@ internal class IntellijCompletionRegistry(
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
         private const val STATS_SHUTDOWN_TIMEOUT_SECONDS = 5L
         private const val PATH_PRIORITY = 125
+        private const val DYNAMIC_DOMAIN_PRIORITY = 150
         private const val SESSION_MRU_PRIORITY = 100
         private const val PERSISTENT_STATS_PRIORITY = 50
         private const val SPEC_PRIORITY = 0
+        private const val SOURCE_INTELLIJ_GIT_BRANCH = "intellij-git-branch"
 
         private fun SwingShellSuggestionFeedback.commandLineAfterSuggestion(): String? =
             suggestion.commandTextAfterReplacement(request)?.trim()?.takeIf(String::isNotEmpty)
@@ -300,6 +339,8 @@ internal data class IntellijCompletionSessionContext(
     val profileId: String,
     val workingDirectoryUriProvider: () -> String?,
     val shellCapabilities: TerminalShellCapabilities,
+    val gitBranchLoader: ((String?) -> List<TerminalCompletionDomainValue>)? = null,
+    val directoryScanner: IntellijDirectoryScanner = BoundedIntellijDirectoryScanner(),
 ) {
     init {
         require(sessionId.isNotBlank()) { "sessionId must not be blank" }

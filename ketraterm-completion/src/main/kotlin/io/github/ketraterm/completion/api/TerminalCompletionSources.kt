@@ -15,15 +15,13 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.model.TerminalCommandShapeStats
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
+import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.ranking.FeedbackAwareCompletionSource
 import io.github.ketraterm.completion.ranking.ShapeAwareCompletionSource
 import io.github.ketraterm.completion.source.CommandStatsCompletionSourceImpl
 import io.github.ketraterm.completion.source.PathCompletionSource
 import io.github.ketraterm.completion.source.SessionMruCompletionSourceImpl
+import io.github.ketraterm.completion.source.ValueDomainCompletionSource
 import io.github.ketraterm.completion.spec.SpecCompletionSource
 
 /**
@@ -139,6 +137,34 @@ object TerminalCompletionSources {
     ): TerminalCompletionSource =
         PathCompletionSource(
             fileSystemProvider = fileSystemProvider,
+            commandSpecs = commandSpecs,
+        )
+
+    /**
+     * Creates a pure source for one host-owned dynamic value domain.
+     *
+     * [valuesProvider] must return a bounded, ready in-memory snapshot and must
+     * never perform disk, network, shell, index, or UI work. Hosts should refresh
+     * snapshots asynchronously and notify their presentation layer separately.
+     *
+     * @param domain command-spec value domain served by this source.
+     * @param sourceId stable candidate-source id used by ranking feedback.
+     * @param valuesProvider supplier for the latest immutable value snapshot.
+     * @param commandSpecs command specs used to resolve the active value domain.
+     * @return context-aware dynamic value completion source.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun valueDomain(
+        domain: TerminalCompletionValueDomain,
+        sourceId: String,
+        valuesProvider: () -> List<TerminalCompletionDomainValue>,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    ): TerminalCompletionSource =
+        ValueDomainCompletionSource(
+            domain = domain,
+            sourceId = sourceId,
+            valuesProvider = valuesProvider,
             commandSpecs = commandSpecs,
         )
 }
