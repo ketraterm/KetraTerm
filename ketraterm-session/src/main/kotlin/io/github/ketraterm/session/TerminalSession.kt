@@ -24,6 +24,7 @@ import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.input.event.TerminalTextReplacementEvent
 import io.github.ketraterm.input.policy.PasteSanitizationPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
@@ -335,6 +336,18 @@ class TerminalSession(
      */
     override fun encodePaste(event: TerminalPasteEvent) {
         withInputLock { encodePaste(event) }
+    }
+
+    /**
+     * Encodes a complete text replacement under one outbound lock acquisition.
+     *
+     * Delete, Backspace, and paste bytes cannot interleave with keyboard input
+     * or parser/core responses from this session.
+     *
+     * @param event deletion counts and replacement text.
+     */
+    override fun encodeTextReplacement(event: TerminalTextReplacementEvent) {
+        withInputLock { encodeTextReplacement(event) }
     }
 
     /**

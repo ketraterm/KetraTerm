@@ -204,6 +204,52 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `text replacement writes delete backspace and paste in order`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector)
+
+        session.encodeTextReplacement(
+            TerminalTextReplacementEvent(
+                deleteAfterCursorCount = 1,
+                deleteBeforeCursorCount = 2,
+                replacementText = "status",
+            ),
+        )
+
+        assertArrayEquals("\u001B[3~\u007F\u007Fstatus".ascii(), connector.writtenBytes)
+        session.close()
+    }
+
+    @Test
+    fun `text replacement does not interleave with concurrent input`() {
+        lateinit var session: TerminalSession
+        val connector =
+            ReplacementInterleavingConnector {
+                Thread {
+                    it.countDown()
+                    session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
+                }.apply {
+                    name = "terminal-session-replacement-ordering-test"
+                    start()
+                }
+            }
+        session = createStartedSession(connector)
+
+        session.encodeTextReplacement(
+            TerminalTextReplacementEvent(
+                deleteAfterCursorCount = 1,
+                deleteBeforeCursorCount = 1,
+                replacementText = "status",
+            ),
+        )
+
+        assertTrue(connector.awaitTriggeredWriter(), "concurrent key writer was not started")
+        assertTrue(connector.awaitWrites(), "replacement and key writes did not complete")
+        assertArrayEquals("\u001B[3~\u007Fstatusa".ascii(), connector.writtenBytes)
+        session.close()
+    }
+
+    @Test
     fun `local close emits local lifecycle event once`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)
@@ -265,6 +311,7 @@ class TerminalSessionTest {
         val session = TerminalSession.create(terminal, connector)
 
         session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
+        session.encodeTextReplacement(TerminalTextReplacementEvent(1, 1, "text"))
 
         assertEquals("", connector.writtenBytes.asciiText())
         session.close()
@@ -1906,6 +1953,62 @@ class TerminalSessionTest {
 
         fun awaitWrites(count: Int): Boolean {
             require(count == 2) { "this fixture only waits for the two expected writes" }
+            val completed = writesDone.await(1, TimeUnit.SECONDS)
+            writerThread?.join(1000)
+            return completed
+        }
+    }
+
+    private class ReplacementInterleavingConnector(
+        private val startConcurrentWriter: (CountDownLatch) -> Thread,
+    ) : TerminalConnector {
+        private val writesDone = CountDownLatch(3)
+        private val triggeredWriter = CountDownLatch(1)
+        private val concurrentWriterAttempted = CountDownLatch(1)
+        private val bytes = ArrayList<Byte>()
+        private var writes = 0
+        private var writerThread: Thread? = null
+
+        val writtenBytes: ByteArray
+            get() = synchronized(bytes) { ByteArray(bytes.size) { index -> bytes[index] } }
+
+        override fun start(listener: TerminalConnectorListener) = Unit
+
+        override fun write(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) {
+            val currentWrite = synchronized(this) { ++writes }
+            if (currentWrite == 1) {
+                writerThread = startConcurrentWriter(concurrentWriterAttempted)
+                triggeredWriter.countDown()
+                check(concurrentWriterAttempted.await(1, TimeUnit.SECONDS)) {
+                    "concurrent writer did not attempt input"
+                }
+            }
+            synchronized(this.bytes) {
+                var index = 0
+                while (index < length) {
+                    this.bytes += bytes[offset + index]
+                    index++
+                }
+            }
+            writesDone.countDown()
+        }
+
+        override fun resize(
+            columns: Int,
+            rows: Int,
+        ) = Unit
+
+        override fun close() {
+            writerThread?.join(1000)
+        }
+
+        fun awaitTriggeredWriter(): Boolean = triggeredWriter.await(1, TimeUnit.SECONDS)
+
+        fun awaitWrites(): Boolean {
             val completed = writesDone.await(1, TimeUnit.SECONDS)
             writerThread?.join(1000)
             return completed

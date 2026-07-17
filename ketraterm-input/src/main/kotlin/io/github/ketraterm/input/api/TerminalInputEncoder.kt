@@ -38,6 +38,43 @@ interface TerminalInputEncoder {
     fun encodePaste(event: io.github.ketraterm.input.event.TerminalPasteEvent)
 
     /**
+     * Encodes one logical text replacement around the active cursor.
+     *
+     * The default implementation preserves compatibility for lightweight host
+     * adapters. Session-backed implementations should serialize the entire
+     * operation as one outbound unit, and production encoders may batch the
+     * repeated deletion sequences.
+     *
+     * @param event deletion counts and replacement text.
+     */
+    fun encodeTextReplacement(event: io.github.ketraterm.input.event.TerminalTextReplacementEvent) {
+        if (event.deleteAfterCursorCount > 0) {
+            val deleteEvent =
+                io.github.ketraterm.input.event.TerminalKeyEvent.key(
+                    io.github.ketraterm.input.event.TerminalKey.DELETE,
+                )
+            repeat(event.deleteAfterCursorCount) {
+                encodeKey(deleteEvent)
+            }
+        }
+        if (event.deleteBeforeCursorCount > 0) {
+            val backspaceEvent =
+                io.github.ketraterm.input.event.TerminalKeyEvent.key(
+                    io.github.ketraterm.input.event.TerminalKey.BACKSPACE,
+                )
+            repeat(event.deleteBeforeCursorCount) {
+                encodeKey(backspaceEvent)
+            }
+        }
+        if (event.replacementText.isNotEmpty()) {
+            encodePaste(
+                io.github.ketraterm.input.event
+                    .TerminalPasteEvent(event.replacementText),
+            )
+        }
+    }
+
+    /**
      * Encodes one focus transition event.
      *
      * @param event terminal focus transition.

@@ -16,10 +16,8 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.event.TerminalKey
-import io.github.ketraterm.input.event.TerminalKeyEvent
-import io.github.ketraterm.input.event.TerminalPasteEvent
-import java.text.BreakIterator
+import io.github.ketraterm.input.event.TerminalTextReplacementEvent
+import java.util.regex.Pattern
 
 /**
  * Host-provided shell suggestion shown by the reusable Swing terminal popup.
@@ -108,8 +106,8 @@ data class SwingShellSuggestionReplacement(
  * Returns the validated replacement plan for this suggestion and request.
  *
  * Replacement ranges are validated against the command text and request cursor.
- * Malformed UTF-16 cursor/range offsets return `null` instead of producing
- * partial surrogate pairs.
+ * Malformed UTF-16 offsets and offsets inside an extended grapheme cluster
+ * return `null` instead of producing partial user-perceived characters.
  *
  * @param request command-line request that produced this suggestion.
  * @return validated replacement plan, or `null` when the request/range is invalid.
@@ -121,14 +119,18 @@ fun SwingShellSuggestion.replacementFor(request: SwingShellSuggestionRequest): S
     if (replacementEndOffset > request.commandText.length) return null
     if (!request.commandText.isUtf16Boundary(replacementStartOffset)) return null
     if (!request.commandText.isUtf16Boundary(replacementEndOffset)) return null
-    val deleteBeforeCursorCount = countGraphemeClusters(request.commandText.substring(replacementStartOffset, request.cursorOffset))
-    val deleteAfterCursorCount = countGraphemeClusters(request.commandText.substring(request.cursorOffset, replacementEndOffset))
+    val deletionCounts =
+        request.commandText.graphemeDeletionCounts(
+            startOffset = replacementStartOffset,
+            cursorOffset = request.cursorOffset,
+            endOffset = replacementEndOffset,
+        ) ?: return null
     return SwingShellSuggestionReplacement(
         startOffset = replacementStartOffset,
         endOffset = replacementEndOffset,
         replacementText = replacementText,
-        deleteBeforeCursorCount = deleteBeforeCursorCount,
-        deleteAfterCursorCount = deleteAfterCursorCount,
+        deleteBeforeCursorCount = deletionCounts.beforeCursor,
+        deleteAfterCursorCount = deletionCounts.afterCursor,
     )
 }
 
@@ -335,7 +337,7 @@ fun interface SwingShellSuggestionHandler {
          * counts for generated Delete and Backspace events before pasting the
          * accepted suggestion replacement.
          *
-         * @param session active input encoder used to write backspaces and paste events.
+         * @param session active input encoder used to submit the replacement event.
          * @return standard replacement suggestion handler.
          */
         @JvmStatic
@@ -344,26 +346,48 @@ fun interface SwingShellSuggestionHandler {
                 val request = acceptance.request
                 val replacement = acceptance.suggestion.replacementFor(request) ?: return@SwingShellSuggestionHandler
 
-                repeat(replacement.deleteAfterCursorCount) {
-                    session.encodeKey(TerminalKeyEvent.key(TerminalKey.DELETE))
-                }
-                repeat(replacement.deleteBeforeCursorCount) {
-                    session.encodeKey(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
-                }
-                session.encodePaste(TerminalPasteEvent(replacement.replacementText))
+                session.encodeTextReplacement(
+                    TerminalTextReplacementEvent(
+                        deleteAfterCursorCount = replacement.deleteAfterCursorCount,
+                        deleteBeforeCursorCount = replacement.deleteBeforeCursorCount,
+                        replacementText = replacement.replacementText,
+                    ),
+                )
             }
     }
 }
 
-private fun countGraphemeClusters(text: String): Int {
-    if (text.isEmpty()) return 0
-    val iterator = BreakIterator.getCharacterInstance()
-    iterator.setText(text)
-    var count = 0
-    while (iterator.next() != BreakIterator.DONE) {
-        count++
+private data class GraphemeDeletionCounts(
+    val beforeCursor: Int,
+    val afterCursor: Int,
+)
+
+private fun String.graphemeDeletionCounts(
+    startOffset: Int,
+    cursorOffset: Int,
+    endOffset: Int,
+): GraphemeDeletionCounts? {
+    var beforeCursor = 0
+    var afterCursor = 0
+    var startIsBoundary = startOffset == 0
+    var cursorIsBoundary = cursorOffset == 0
+    var endIsBoundary = endOffset == 0
+    val matcher = EXTENDED_GRAPHEME_CLUSTER.matcher(this)
+    while (matcher.find()) {
+        val clusterStart = matcher.start()
+        val clusterEnd = matcher.end()
+        if (clusterStart == startOffset || clusterEnd == startOffset) startIsBoundary = true
+        if (clusterStart == cursorOffset || clusterEnd == cursorOffset) cursorIsBoundary = true
+        if (clusterStart == endOffset || clusterEnd == endOffset) endIsBoundary = true
+
+        when {
+            clusterStart >= startOffset && clusterEnd <= cursorOffset -> beforeCursor++
+            clusterStart >= cursorOffset && clusterEnd <= endOffset -> afterCursor++
+        }
+        if (clusterEnd >= endOffset) break
     }
-    return count
+    if (!startIsBoundary || !cursorIsBoundary || !endIsBoundary) return null
+    return GraphemeDeletionCounts(beforeCursor, afterCursor)
 }
 
 private fun String.isUtf16Boundary(offset: Int): Boolean {
@@ -372,3 +396,5 @@ private fun String.isUtf16Boundary(offset: Int): Boolean {
     val beforeLowSurrogate = offset < length && Character.isLowSurrogate(this[offset])
     return !afterHighSurrogate && !beforeLowSurrogate
 }
+
+private val EXTENDED_GRAPHEME_CLUSTER: Pattern = Pattern.compile("\\X")

@@ -308,6 +308,44 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
+    fun `default handler treats extended emoji sequences as single grapheme clusters`() {
+        val clusters = listOf("\uD83D\uDC69\u200D\uD83D\uDCBB", "\uD83C\uDDE6\uD83C\uDDF2", "\uD83D\uDC4D\uD83C\uDFFD")
+
+        for (cluster in clusters) {
+            val session = RecordingInputEncoder()
+            val handler = SwingShellSuggestionHandler.createDefault(session)
+            val request = request(commandText = cluster)
+            val suggestion = suggestion(replacementText = "$cluster accepted", commandText = cluster)
+
+            handler.onSuggestionAccepted(SwingShellSuggestionAcceptance(suggestion, 0, request))
+
+            assertEquals(1, session.keys.size, "cluster=$cluster")
+            assertEquals(TerminalKey.BACKSPACE, session.keys.single().key, "cluster=$cluster")
+            assertEquals(1, session.replacements.size, "cluster=$cluster")
+        }
+    }
+
+    @Test
+    fun `default handler rejects replacement range inside grapheme cluster`() {
+        val session = RecordingInputEncoder()
+        val handler = SwingShellSuggestionHandler.createDefault(session)
+        val commandText = "e\u0301"
+        val request = request(commandText = commandText)
+        val suggestion =
+            suggestion(
+                replacementText = "x",
+                startOffset = 1,
+                endOffset = commandText.length,
+            )
+
+        handler.onSuggestionAccepted(SwingShellSuggestionAcceptance(suggestion, 0, request))
+
+        assertTrue(session.replacements.isEmpty())
+        assertTrue(session.keys.isEmpty())
+        assertTrue(session.pastes.isEmpty())
+    }
+
+    @Test
     fun `default handler replaces token range`() {
         val session = RecordingInputEncoder()
         val handler = SwingShellSuggestionHandler.createDefault(session)
@@ -355,6 +393,14 @@ class SwingTerminalShellSuggestionTest {
         )
         assertEquals(1, session.pastes.size)
         assertEquals("checkout", session.pastes[0].text)
+        assertEquals(
+            TerminalTextReplacementEvent(
+                deleteAfterCursorCount = 1,
+                deleteBeforeCursorCount = 2,
+                replacementText = "checkout",
+            ),
+            session.replacements.single(),
+        )
     }
 
     @Test
@@ -382,6 +428,7 @@ class SwingTerminalShellSuggestionTest {
     private class RecordingInputEncoder : TerminalInputEncoder {
         val keys = ArrayList<TerminalKeyEvent>()
         val pastes = ArrayList<TerminalPasteEvent>()
+        val replacements = ArrayList<TerminalTextReplacementEvent>()
 
         override fun encodeKey(event: TerminalKeyEvent) {
             keys += event
@@ -389,6 +436,11 @@ class SwingTerminalShellSuggestionTest {
 
         override fun encodePaste(event: TerminalPasteEvent) {
             pastes += event
+        }
+
+        override fun encodeTextReplacement(event: TerminalTextReplacementEvent) {
+            replacements += event
+            super<TerminalInputEncoder>.encodeTextReplacement(event)
         }
 
         override fun encodeFocus(event: TerminalFocusEvent) = Unit
