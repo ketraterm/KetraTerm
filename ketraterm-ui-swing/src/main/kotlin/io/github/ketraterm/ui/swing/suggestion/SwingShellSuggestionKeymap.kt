@@ -45,7 +45,7 @@ enum class SwingShellSuggestionAction {
     /** Moves selection toward earlier suggestions by one visible page. */
     SELECT_PREVIOUS_PAGE,
 
-    /** Accepts the selected suggestion. */
+    /** Selects the first suggestion when none is selected, otherwise accepts the selected suggestion. */
     ACCEPT,
 
     /** Explicitly dismisses the selected suggestion. */
@@ -85,7 +85,7 @@ fun interface SwingShellSuggestionKeymap {
                     KeyEvent.VK_END -> SwingShellSuggestionAction.SELECT_LAST
                     KeyEvent.VK_PAGE_DOWN -> SwingShellSuggestionAction.SELECT_NEXT_PAGE
                     KeyEvent.VK_PAGE_UP -> SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE
-                    KeyEvent.VK_ENTER, KeyEvent.VK_TAB -> SwingShellSuggestionAction.ACCEPT
+                    KeyEvent.VK_TAB -> SwingShellSuggestionAction.ACCEPT
                     KeyEvent.VK_ESCAPE -> SwingShellSuggestionAction.DISMISS
                     else -> null
                 }

@@ -32,7 +32,7 @@ import javax.swing.SwingUtilities
 
 class SwingTerminalShellSuggestionTest {
     @Test
-    fun `public suggestion popup handles keyboard selection and host acceptance`() {
+    fun `public suggestion popup requires tab selection before tab acceptance`() {
         val accepted = ArrayList<SwingShellSuggestion>()
         val indexes = ArrayList<Int>()
         val requests = ArrayList<SwingShellSuggestionRequest>()
@@ -57,13 +57,13 @@ class SwingTerminalShellSuggestionTest {
             component.showShellSuggestions(request, suggestions)
 
             component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_DOWN)) }
-            component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_ENTER)) }
+            component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_TAB)) }
 
             assertFalse(component.currentShellSuggestionState().visible)
         }
 
-        assertEquals(listOf(suggestions[1]), accepted)
-        assertEquals(listOf(1), indexes)
+        assertEquals(listOf(suggestions[0]), accepted)
+        assertEquals(listOf(0), indexes)
         assertEquals(listOf(request), requests)
     }
 
@@ -103,7 +103,10 @@ class SwingTerminalShellSuggestionTest {
             assertEquals(5, state.anchorColumn)
             assertEquals(2, state.anchorRow)
 
-            component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_ENTER)) }
+            assertEquals(-1, state.selectedIndex)
+            component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_TAB)) }
+            component.keyListeners.forEach { listener -> listener.keyReleased(keyReleased(component, KeyEvent.VK_TAB)) }
+            component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_TAB)) }
         }
 
         val expectedRequest =
@@ -165,7 +168,8 @@ class SwingTerminalShellSuggestionTest {
 
             val state = component.currentShellSuggestionState()
             assertTrue(state.visible)
-            assertEquals("git status", state.selectedSuggestion?.replacementText)
+            assertEquals(-1, state.selectedIndex)
+            assertNull(state.selectedSuggestion)
         }
 
         assertEquals(
@@ -440,7 +444,7 @@ class SwingTerminalShellSuggestionTest {
 
         override fun encodeTextReplacement(event: TerminalTextReplacementEvent) {
             replacements += event
-            super<TerminalInputEncoder>.encodeTextReplacement(event)
+            super.encodeTextReplacement(event)
         }
 
         override fun encodeFocus(event: TerminalFocusEvent) = Unit
@@ -536,6 +540,19 @@ class SwingTerminalShellSuggestionTest {
         KeyEvent(
             component,
             KeyEvent.KEY_PRESSED,
+            System.currentTimeMillis(),
+            0,
+            keyCode,
+            KeyEvent.CHAR_UNDEFINED,
+        )
+
+    private fun keyReleased(
+        component: SwingTerminal,
+        keyCode: Int,
+    ): KeyEvent =
+        KeyEvent(
+            component,
+            KeyEvent.KEY_RELEASED,
             System.currentTimeMillis(),
             0,
             keyCode,

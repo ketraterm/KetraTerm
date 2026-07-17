@@ -58,17 +58,16 @@ class IntellijCompletionTriggerControllerTest {
     }
 
     @Test
-    fun `accepted command state is suppressed until command changes`() {
+    fun `completed directory path remains eligible for a refreshed popup`() {
         val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        var active = snapshot("git status")
+        var active = snapshot("cd A/")
         val controller = controller(RecordingScheduler(), { active }, requested::add)
-        controller.suppressNextTriggerFor(active.commandText, active.cursorOffset)
 
         controller.refreshNow()
-        active = snapshot("git statu")
+        active = snapshot("cd A/B")
         controller.refreshNow()
 
-        assertEquals(listOf(snapshot("git statu")), requested)
+        assertEquals(listOf(snapshot("cd A/"), snapshot("cd A/B")), requested)
     }
 
     @Test

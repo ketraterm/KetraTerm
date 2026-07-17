@@ -854,8 +854,7 @@ class SwingTerminal
             x: Int,
             y: Int,
         ): Boolean {
-            if (!SwingUtilities.isEventDispatchThread()) return false
-            return commandInteractionController.selectCommandOutputAt(x, y)
+            return SwingUtilities.isEventDispatchThread() && commandInteractionController.selectCommandOutputAt(x, y)
         }
 
         /**
@@ -869,8 +868,7 @@ class SwingTerminal
          * @return true when command output was selected.
          */
         fun selectCommandOutput(recordId: Int): Boolean {
-            if (!SwingUtilities.isEventDispatchThread()) return false
-            return commandInteractionController.selectCommandOutput(recordId)
+            return SwingUtilities.isEventDispatchThread() && commandInteractionController.selectCommandOutput(recordId)
         }
 
         /**
@@ -1257,13 +1255,14 @@ class SwingTerminal
          *
          * @param request command-line context that produced [suggestions].
          * @param suggestions suggestions to display.
-         * @param selectedIndex initially selected suggestion index.
+         * @param selectedIndex initially selected suggestion index, or `-1` to
+         * leave the popup passive until the user navigates it.
          */
         @JvmOverloads
         fun showShellSuggestions(
             request: SwingShellSuggestionRequest,
             suggestions: List<SwingShellSuggestion>,
-            selectedIndex: Int = 0,
+            selectedIndex: Int = -1,
         ) {
             val snapshot = suggestions.toList()
             runOnEdt(
@@ -1494,7 +1493,7 @@ class SwingTerminal
                     System.err.println("Shell suggestion provider failed: ${exception.message}")
                     emptyList()
                 }
-            shellSuggestionController.show(request, suggestions, selectedIndex = 0)
+            shellSuggestionController.show(request, suggestions, selectedIndex = -1)
         }
 
         /**
@@ -1539,11 +1538,7 @@ class SwingTerminal
                 uri = uri,
                 openAction = { openHyperlink(hyperlinkId) },
                 copyUriAction = {
-                    if (uri == null) {
-                        false
-                    } else {
-                        copyTextToClipboard(uri)
-                    }
+                    uri != null && copyTextToClipboard(uri)
                 },
             )
         }

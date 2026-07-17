@@ -27,6 +27,23 @@ import javax.swing.KeyStroke
 internal object KetraTermShellSuggestionKeymap : SwingShellSuggestionKeymap {
     override fun actionFor(event: KeyEvent): SwingShellSuggestionAction? {
         val modifiers = event.modifiersEx and RELEVANT_MODIFIERS
+        if (event.keyCode == KeyEvent.VK_ENTER) return null
+        when (event.keyCode) {
+            KeyEvent.VK_DOWN -> return if (modifiers == 0) SwingShellSuggestionAction.SELECT_NEXT else null
+            KeyEvent.VK_UP -> return if (modifiers == 0) SwingShellSuggestionAction.SELECT_PREVIOUS else null
+            KeyEvent.VK_HOME -> return if (modifiers == 0) SwingShellSuggestionAction.SELECT_FIRST else null
+            KeyEvent.VK_END -> return if (modifiers == 0) SwingShellSuggestionAction.SELECT_LAST else null
+            KeyEvent.VK_PAGE_DOWN -> return if (modifiers == 0) SwingShellSuggestionAction.SELECT_NEXT_PAGE else null
+            KeyEvent.VK_PAGE_UP -> return if (modifiers == 0) SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE else null
+            KeyEvent.VK_ESCAPE -> return if (modifiers == 0) SwingShellSuggestionAction.DISMISS else null
+        }
+        if (event.keyCode == KeyEvent.VK_TAB) {
+            return when (modifiers) {
+                0 -> SwingShellSuggestionAction.ACCEPT
+                InputEvent.SHIFT_DOWN_MASK -> SwingShellSuggestionAction.SELECT_PREVIOUS
+                else -> null
+            }
+        }
         val keyStroke = KeyStroke.getKeyStroke(event.keyCode, modifiers)
         val actionIds = KeymapManager.getInstance().activeKeymap.getActionIds(keyStroke)
         return actionFor(actionIds)
@@ -38,9 +55,6 @@ internal object KetraTermShellSuggestionKeymap : SwingShellSuggestionKeymap {
             when (actionId) {
                 IdeActions.ACTION_LOOKUP_DOWN -> return SwingShellSuggestionAction.SELECT_NEXT
                 IdeActions.ACTION_LOOKUP_UP -> return SwingShellSuggestionAction.SELECT_PREVIOUS
-                IdeActions.ACTION_CHOOSE_LOOKUP_ITEM,
-                IdeActions.ACTION_CHOOSE_LOOKUP_ITEM_REPLACE,
-                -> return SwingShellSuggestionAction.ACCEPT
                 IdeActions.ACTION_EDITOR_ESCAPE -> return SwingShellSuggestionAction.DISMISS
             }
         }

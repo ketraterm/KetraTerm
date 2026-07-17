@@ -20,6 +20,9 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.awt.Canvas
+import java.awt.event.InputEvent
+import java.awt.event.KeyEvent
 
 class KetraTermShellSuggestionKeymapTest {
     @Test
@@ -35,14 +38,48 @@ class KetraTermShellSuggestionKeymapTest {
     }
 
     @Test
-    fun `both IntelliJ lookup acceptance actions accept suggestions`() {
+    fun `unmodified navigation keys always control the visible popup`() {
+        val source = Canvas()
+
         assertEquals(
-            SwingShellSuggestionAction.ACCEPT,
-            KetraTermShellSuggestionKeymap.actionFor(arrayOf(IdeActions.ACTION_CHOOSE_LOOKUP_ITEM)),
+            SwingShellSuggestionAction.SELECT_NEXT,
+            action(source, KeyEvent.VK_DOWN),
+        )
+        assertEquals(
+            SwingShellSuggestionAction.SELECT_PREVIOUS,
+            action(source, KeyEvent.VK_UP),
+        )
+        assertEquals(
+            SwingShellSuggestionAction.SELECT_FIRST,
+            action(source, KeyEvent.VK_HOME),
+        )
+        assertEquals(
+            SwingShellSuggestionAction.SELECT_LAST,
+            action(source, KeyEvent.VK_END),
+        )
+        assertNull(action(source, KeyEvent.VK_DOWN, InputEvent.CTRL_DOWN_MASK))
+    }
+
+    @Test
+    fun `IntelliJ lookup acceptance actions do not claim terminal submission`() {
+        assertNull(KetraTermShellSuggestionKeymap.actionFor(arrayOf(IdeActions.ACTION_CHOOSE_LOOKUP_ITEM)))
+        assertNull(KetraTermShellSuggestionKeymap.actionFor(arrayOf(IdeActions.ACTION_CHOOSE_LOOKUP_ITEM_REPLACE)))
+    }
+
+    @Test
+    fun `enter always reaches the terminal while tab accepts a popup selection`() {
+        val source = Canvas()
+
+        assertNull(
+            KetraTermShellSuggestionKeymap.actionFor(
+                KeyEvent(source, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_ENTER, KeyEvent.CHAR_UNDEFINED),
+            ),
         )
         assertEquals(
             SwingShellSuggestionAction.ACCEPT,
-            KetraTermShellSuggestionKeymap.actionFor(arrayOf(IdeActions.ACTION_CHOOSE_LOOKUP_ITEM_REPLACE)),
+            KetraTermShellSuggestionKeymap.actionFor(
+                KeyEvent(source, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_TAB, KeyEvent.CHAR_UNDEFINED),
+            ),
         )
     }
 
@@ -54,4 +91,13 @@ class KetraTermShellSuggestionKeymapTest {
         )
         assertNull(KetraTermShellSuggestionKeymap.actionFor(arrayOf(IdeActions.ACTION_EDITOR_COPY)))
     }
+
+    private fun action(
+        source: Canvas,
+        keyCode: Int,
+        modifiers: Int = 0,
+    ): SwingShellSuggestionAction? =
+        KetraTermShellSuggestionKeymap.actionFor(
+            KeyEvent(source, KeyEvent.KEY_PRESSED, 0L, modifiers, keyCode, KeyEvent.CHAR_UNDEFINED),
+        )
 }

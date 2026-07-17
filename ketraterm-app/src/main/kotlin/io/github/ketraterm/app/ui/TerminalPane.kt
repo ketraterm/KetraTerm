@@ -27,10 +27,12 @@ import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuHandler
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
-import io.github.ketraterm.ui.swing.suggestion.*
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collect
 import javax.swing.JPanel
 
 /**
@@ -140,14 +142,6 @@ internal class TerminalPane private constructor(
             val defaultHandler = SwingShellSuggestionHandler.createDefault(tab.session)
             val shellSuggestionHandler =
                 SwingShellSuggestionHandler { acceptance ->
-                    val request = acceptance.request
-                    val replacement = acceptance.suggestion.replacementFor(request)
-                    if (replacement != null) {
-                        acceptance.suggestion.commandTextAfterReplacement(request)?.let { resultText ->
-                            val resultCursor = replacement.startOffset + replacement.replacementText.length
-                            completionTriggerController.suppressNextTriggerFor(resultText, resultCursor)
-                        }
-                    }
                     defaultHandler.onSuggestionAccepted(acceptance)
                 }
             val wrappedFeedbackHandler =

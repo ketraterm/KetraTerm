@@ -53,7 +53,7 @@ internal class SwingShellSuggestionController(
         }
         this.suggestions = retainVisibleSuggestions(suggestions)
         this.request = request
-        this.selectedIndex = selectedIndex.coerceIn(0, this.suggestions.lastIndex)
+        this.selectedIndex = selectedIndex.takeIf { it in this.suggestions.indices } ?: NO_SELECTION
         popup.update(this.suggestions, this.selectedIndex)
         popup.isVisible = true
         host.revalidate()
@@ -95,7 +95,7 @@ internal class SwingShellSuggestionController(
             SwingShellSuggestionAction.SELECT_LAST -> select(suggestions.lastIndex)
             SwingShellSuggestionAction.SELECT_NEXT_PAGE -> selectRelative(PAGE_STEP)
             SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE -> selectRelative(-PAGE_STEP)
-            SwingShellSuggestionAction.ACCEPT -> acceptSelected()
+            SwingShellSuggestionAction.ACCEPT -> selectFirstOrAccept()
             SwingShellSuggestionAction.DISMISS -> dismissSelected()
         }
 
@@ -109,16 +109,28 @@ internal class SwingShellSuggestionController(
                 selectedIndex = selectedIndex,
                 anchorColumn = request.anchorColumn,
                 anchorRow = request.anchorRow,
-                selectedSuggestion = suggestions[selectedIndex],
+                selectedSuggestion = suggestions.getOrNull(selectedIndex),
             )
         }
 
     private fun selectRelative(delta: Int): Boolean {
         if (suggestions.isEmpty()) return false
-        val current = if (selectedIndex in suggestions.indices) selectedIndex else 0
+        val current =
+            when {
+                selectedIndex in suggestions.indices -> selectedIndex
+                delta > 0 -> -1
+                else -> suggestions.size
+            }
         val next = (current + delta).coerceIn(0, suggestions.lastIndex)
         return select(next)
     }
+
+    private fun selectFirstOrAccept(): Boolean =
+        if (selectedIndex in suggestions.indices) {
+            acceptSelected()
+        } else {
+            select(0)
+        }
 
     private fun select(index: Int): Boolean {
         if (index !in suggestions.indices) return false

@@ -25,13 +25,13 @@ class SwingShellSuggestionControllerTest {
     private val source = JPanel()
 
     @Test
-    fun `show publishes visible state with clamped selected index and anchor`() {
+    fun `show publishes visible state with explicit selection and anchor`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)
         val suggestions = suggestions(3)
         val request = request(anchorColumn = 7, anchorRow = 2)
 
-        val shown = controller.show(request, suggestions, selectedIndex = 99)
+        val shown = controller.show(request, suggestions, selectedIndex = 2)
         val state = controller.state()
 
         assertTrue(shown)
@@ -41,6 +41,16 @@ class SwingShellSuggestionControllerTest {
         assertEquals(7, state.anchorColumn)
         assertEquals(2, state.anchorRow)
         assertSame(suggestions[2], state.selectedSuggestion)
+    }
+
+    @Test
+    fun `show keeps popup passive when no valid initial selection is supplied`() {
+        val controller = SwingShellSuggestionController(RecordingSuggestionHost())
+
+        controller.show(request(), suggestions(3), selectedIndex = 99)
+
+        assertEquals(-1, controller.state().selectedIndex)
+        assertNull(controller.state().selectedSuggestion)
     }
 
     @Test
@@ -59,12 +69,12 @@ class SwingShellSuggestionControllerTest {
     fun `navigation keys update selected suggestion and consume event`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)
-        controller.show(request(), suggestions(3), selectedIndex = 0)
+        controller.show(request(), suggestions(3), selectedIndex = -1)
         val down = keyPressed(KeyEvent.VK_DOWN)
         val up = keyPressed(KeyEvent.VK_UP)
 
         assertTrue(controller.handleKeyPressed(down))
-        assertEquals(1, controller.state().selectedIndex)
+        assertEquals(0, controller.state().selectedIndex)
         assertTrue(down.isConsumed)
 
         assertTrue(controller.handleKeyPressed(up))
@@ -90,18 +100,19 @@ class SwingShellSuggestionControllerTest {
     }
 
     @Test
-    fun `show retains only visible suggestions so keyboard selection cannot move off popup`() {
+    fun `up from a passive popup selects the last visible suggestion`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)
 
-        controller.show(request(), suggestions(20), selectedIndex = 19)
+        controller.show(request(), suggestions(20), selectedIndex = -1)
+        controller.handleKeyPressed(keyPressed(KeyEvent.VK_UP))
 
         assertEquals(8, controller.state().count)
         assertEquals(7, controller.state().selectedIndex)
     }
 
     @Test
-    fun `enter accepts selected suggestion hides popup and notifies host`() {
+    fun `enter always passes through to the shell even when a suggestion is selected`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)
         val request = request(commandText = "git sw", cursorOffset = 6)
@@ -109,16 +120,38 @@ class SwingShellSuggestionControllerTest {
         controller.show(request, items, selectedIndex = 1)
         val enter = keyPressed(KeyEvent.VK_ENTER)
 
-        assertTrue(controller.handleKeyPressed(enter))
+        assertFalse(controller.handleKeyPressed(enter))
+
+        assertTrue(controller.state().visible)
+        assertTrue(host.acceptedSuggestions.isEmpty())
+        assertTrue(host.feedbackKinds.isEmpty())
+        assertFalse(enter.isConsumed)
+    }
+
+    @Test
+    fun `tab selects first suggestion before accepting it`() {
+        val host = RecordingSuggestionHost()
+        val controller = SwingShellSuggestionController(host)
+        val request = request(commandText = "cd ", cursorOffset = 3)
+        val items = suggestions(2, endOffset = request.commandText.length)
+        controller.show(request, items, selectedIndex = -1)
+
+        val firstTab = keyPressed(KeyEvent.VK_TAB)
+        assertTrue(controller.handleKeyPressed(firstTab))
+        assertEquals(0, controller.state().selectedIndex)
+        assertTrue(host.acceptedSuggestions.isEmpty())
+
+        val secondTab = keyPressed(KeyEvent.VK_TAB)
+        assertTrue(controller.handleKeyPressed(secondTab))
 
         assertFalse(controller.state().visible)
-        assertEquals(listOf(1), host.acceptedIndexes)
-        assertEquals(listOf(items[1]), host.acceptedSuggestions)
+        assertEquals(listOf(0), host.acceptedIndexes)
+        assertEquals(listOf(items[0]), host.acceptedSuggestions)
         assertEquals(listOf(request), host.acceptedRequests)
         assertEquals(listOf(SwingShellSuggestionFeedbackKind.ACCEPTED), host.feedbackKinds)
-        assertEquals(listOf(items[1]), host.feedbackSuggestions)
+        assertEquals(listOf(items[0]), host.feedbackSuggestions)
         assertEquals(1, host.focusRequests)
-        assertTrue(enter.isConsumed)
+        assertTrue(secondTab.isConsumed)
     }
 
     @Test

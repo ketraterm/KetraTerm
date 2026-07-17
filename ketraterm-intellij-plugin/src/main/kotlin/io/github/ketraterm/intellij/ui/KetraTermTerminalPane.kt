@@ -32,8 +32,6 @@ import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
-import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
-import io.github.ketraterm.ui.swing.suggestion.replacementFor
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.*
 import java.awt.Adjustable
@@ -277,14 +275,6 @@ internal class KetraTermTerminalPane private constructor(
             val defaultSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session)
             val suggestionHandler =
                 SwingShellSuggestionHandler { acceptance ->
-                    val request = acceptance.request
-                    val replacement = acceptance.suggestion.replacementFor(request)
-                    if (replacement != null) {
-                        acceptance.suggestion.commandTextAfterReplacement(request)?.let { resultText ->
-                            val resultCursor = replacement.startOffset + replacement.replacementText.length
-                            completionTriggerController.suppressNextTriggerFor(resultText, resultCursor)
-                        }
-                    }
                     defaultSuggestionHandler.onSuggestionAccepted(acceptance)
                 }
             val feedbackHandler =

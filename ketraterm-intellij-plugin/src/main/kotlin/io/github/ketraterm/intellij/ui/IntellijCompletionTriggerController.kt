@@ -39,8 +39,6 @@ internal class IntellijCompletionTriggerController(
     private val minimumNonWhitespaceCharacters: Int = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
 ) {
     private var lastRequestedSnapshotKey: SnapshotKey? = null
-    private var suppressedCommandText: String? = null
-    private var suppressedCursorOffset = -1
 
     init {
         require(debounceMillis >= 0) { "debounceMillis must be >= 0, was $debounceMillis" }
@@ -60,14 +58,6 @@ internal class IntellijCompletionTriggerController(
         }
     }
 
-    fun suppressNextTriggerFor(
-        commandText: String,
-        cursorOffset: Int,
-    ) {
-        suppressedCommandText = commandText
-        suppressedCursorOffset = cursorOffset
-    }
-
     fun invalidateLastRequest() {
         lastRequestedSnapshotKey = null
     }
@@ -83,10 +73,6 @@ internal class IntellijCompletionTriggerController(
             hideSuggestions()
             return
         }
-        if (snapshot.commandText == suppressedCommandText && snapshot.cursorOffset == suppressedCursorOffset) return
-        suppressedCommandText = null
-        suppressedCursorOffset = -1
-
         if (
             !TerminalCompletionTriggerEvaluator.shouldTrigger(
                 commandLine = snapshot.commandText,

@@ -317,7 +317,7 @@ class StandaloneCompletionTriggerControllerTest {
     }
 
     @Test
-    fun `refresh suppresses suggestions when next trigger is suppressed`() {
+    fun `completed directory path remains eligible for a refreshed popup`() {
         val requested = ArrayList<TerminalShellCommandLineSnapshot>()
         var activeSnapshot = snapshot("cd A/")
         val controller =
@@ -326,16 +326,13 @@ class StandaloneCompletionTriggerControllerTest {
                 requestSuggestions = { requested += it },
             )
 
-        controller.suppressNextTriggerFor("cd A/", 5)
         controller.refreshNow()
 
-        // Should be suppressed and not request suggestions
-        assertEquals(0, requested.size)
+        assertEquals(listOf(activeSnapshot), requested)
 
-        // As soon as command diverges, it should request suggestions normally
         activeSnapshot = snapshot("cd A/B")
         controller.refreshNow()
-        assertEquals(listOf(activeSnapshot), requested)
+        assertEquals(listOf(snapshot("cd A/"), activeSnapshot), requested)
     }
 
     private fun controller(
