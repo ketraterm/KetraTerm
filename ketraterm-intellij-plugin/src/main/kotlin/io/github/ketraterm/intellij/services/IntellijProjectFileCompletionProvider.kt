@@ -18,12 +18,10 @@ package io.github.ketraterm.intellij.services
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
-import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import java.nio.file.Path
-import java.util.*
 
 /**
  * Loads a bounded project-content snapshot for fuzzy path completion.
@@ -51,7 +49,7 @@ internal class IntellijProjectFileLoader(
         return ApplicationManager.getApplication().runReadAction<List<TerminalFuzzyPathEntry>> {
             if (project.isDisposed) return@runReadAction emptyList()
             val fileIndex = ProjectRootManager.getInstance(project).fileIndex
-            val retained = PriorityQueue(MAX_RETAINED_ENTRIES, ENTRY_ORDER.reversed())
+            val retained = BoundedSnapshotCollector(MAX_RETAINED_ENTRIES, ENTRY_ORDER)
             var visited = 0
             fileIndex.iterateContent { file ->
                 if (visited++ >= MAX_VISITED_ENTRIES) return@iterateContent false
@@ -59,15 +57,10 @@ internal class IntellijProjectFileLoader(
                 val filePath = runCatching(file::toNioPath).getOrNull() ?: return@iterateContent true
                 val path = relativePath(workingDirectory, filePath) ?: return@iterateContent true
                 val candidate = TerminalFuzzyPathEntry(path, file.isDirectory)
-                if (retained.size < MAX_RETAINED_ENTRIES) {
-                    retained += candidate
-                } else if (ENTRY_ORDER.compare(candidate, retained.peek()) < 0) {
-                    retained.remove()
-                    retained += candidate
-                }
+                retained.add(candidate)
                 true
             }
-            ArrayList(retained).apply { sortWith(ENTRY_ORDER) }
+            retained.toSortedList()
         }
     }
 
@@ -75,9 +68,7 @@ internal class IntellijProjectFileLoader(
         workingDirectory: Path,
         file: Path,
     ): String? {
-        val relative = runCatching { workingDirectory.relativize(file) }.getOrElse { file }
-        val value = relative.toString().replace('\\', '/').removeSuffix("/")
-        return value.takeIf(String::isNotEmpty)
+        return toRelativeCompletionPath(workingDirectory, file).takeIf(String::isNotEmpty)
     }
 
     private companion object {
@@ -94,24 +85,14 @@ internal class IntellijProjectFileLoader(
 internal class IntellijProjectFileProviderFactory(
     private val loader: (String?) -> List<TerminalFuzzyPathEntry>,
 ) : IntellijCompletionProviderFactory {
-    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration {
-        val snapshotProvider =
-            context.snapshotService.createValueProvider(
-                keyProvider = context.workingDirectoryUriProvider,
-                loader = loader,
-                onSnapshotChanged = context.onSnapshotChanged,
-            )
-        val source =
+    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
+        context.createSnapshotRegistration(PRIORITY, loader) { valuesProvider ->
             TerminalCompletionSources.fuzzyPath(
                 sourceId = SOURCE_ID,
-                entriesProvider = snapshotProvider::values,
+                entriesProvider = valuesProvider,
                 commandSpecs = context.commandSpecs,
             )
-        return IntellijCompletionProviderRegistration(
-            sourceEntry = TerminalCompletionSourceEntry(source = source, priority = PRIORITY),
-            resources = listOf(snapshotProvider),
-        )
-    }
+        }
 
     private companion object {
         private const val PRIORITY = 120

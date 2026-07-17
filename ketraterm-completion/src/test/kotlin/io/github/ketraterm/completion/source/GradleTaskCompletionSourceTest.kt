@@ -70,11 +70,32 @@ class GradleTaskCompletionSourceTest {
             listOf("test"),
             source.complete(request("./gradlew -p ./ te")).map { it.replacementText },
         )
+        assertEquals(
+            listOf("runIde"),
+            source.complete(request("./gradlew --project-dir=app runI")).map { it.replacementText },
+        )
+        assertEquals(
+            listOf("runIde"),
+            source.complete(request("./gradlew -p \"./app\" runI")).map { it.replacementText },
+        )
     }
 
     @Test
     fun `does not complete Gradle tasks while an option value is active`() {
         assertTrue(source.complete(request("./gradlew -p ap")).isEmpty())
+    }
+
+    @Test
+    fun `last project directory option wins without leaking tasks from another module`() {
+        assertEquals(
+            listOf("run"),
+            source.complete(request("./gradlew -p app --project-dir tools ru")).map { it.replacementText },
+        )
+    }
+
+    @Test
+    fun `does not activate for unrelated commands`() {
+        assertTrue(source.complete(request("npm run runI")).isEmpty())
     }
 
     private fun request(commandLine: String): TerminalCompletionRequest =

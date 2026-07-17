@@ -15,12 +15,8 @@
  */
 package io.github.ketraterm.intellij.services
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
-import git4idea.repo.GitRepositoryManager
-import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalCompletionSources
-import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 
@@ -34,14 +30,8 @@ internal class IntellijGitTagLoader(
      * @param workingDirectoryUri local `file` URI used to select a repository.
      * @return at most 2,048 tag values, or an empty list for unusable project, URI, or repository state.
      */
-    fun load(workingDirectoryUri: String?): List<TerminalCompletionDomainValue> {
-        if (project.isDisposed) return emptyList()
-        val workingDirectory = TerminalLocalFileUriResolver.resolve(workingDirectoryUri) ?: return emptyList()
-        return ApplicationManager.getApplication().runReadAction<List<TerminalCompletionDomainValue>> {
-            if (project.isDisposed) return@runReadAction emptyList()
-            val repository =
-                selectIntellijGitRepository(GitRepositoryManager.getInstance(project).repositories, workingDirectory)
-                    ?: return@runReadAction emptyList()
+    fun load(workingDirectoryUri: String?): List<TerminalCompletionDomainValue> =
+        loadIntellijGitRepositorySnapshot(project, workingDirectoryUri) { repository, _ ->
             repository.tagHolder.getTags().keys
                 .asSequence()
                 .map { tag -> TerminalCompletionDomainValue(tag.name, detail = "tag") }
@@ -49,7 +39,6 @@ internal class IntellijGitTagLoader(
                 .take(MAX_TAGS)
                 .toList()
         }
-    }
 
     private companion object {
         private const val MAX_TAGS = 2_048
@@ -63,26 +52,16 @@ internal class IntellijGitTagLoader(
 internal class IntellijGitTagProviderFactory(
     private val loader: (String?) -> List<TerminalCompletionDomainValue>,
 ) : IntellijCompletionProviderFactory {
-    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration {
-        val snapshotProvider =
-            context.snapshotService.createValueProvider(
-                keyProvider = context.workingDirectoryUriProvider,
-                loader = loader,
-                onSnapshotChanged = context.onSnapshotChanged,
-            )
-        val source =
+    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
+        context.createSnapshotRegistration(PRIORITY, loader) { valuesProvider ->
             TerminalCompletionSources.valueDomain(
                 domain = TerminalCompletionValueDomain.GIT_BRANCH,
                 sourceId = SOURCE_ID,
-                valuesProvider = snapshotProvider::values,
+                valuesProvider = valuesProvider,
                 allowedCommandNames = ALLOWED_COMMAND_NAMES,
                 commandSpecs = context.commandSpecs,
             )
-        return IntellijCompletionProviderRegistration(
-            sourceEntry = TerminalCompletionSourceEntry(source = source, priority = PRIORITY),
-            resources = listOf(snapshotProvider),
-        )
-    }
+        }
 
     private companion object {
         private const val PRIORITY = 140

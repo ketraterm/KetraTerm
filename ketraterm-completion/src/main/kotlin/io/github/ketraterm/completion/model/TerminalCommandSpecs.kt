@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.completion.model
 
+import io.github.ketraterm.completion.internal.GradleCompletionSyntax
+
 /**
  * Curated static command specs useful as a bootstrap source before richer
  * imported corpora and host context providers are available.
@@ -211,7 +213,7 @@ object TerminalCommandSpecs {
     @JvmStatic
     fun gradle(): TerminalCommandSpec =
         TerminalCommandSpec(
-            name = "gradle",
+            name = GradleCompletionSyntax.COMMAND_NAME,
             description = "build automation",
             aliases = listOf("./gradlew", "gradlew"),
             repeatableSubcommands = true,
@@ -239,7 +241,7 @@ object TerminalCommandSpecs {
                     TerminalOptionSpec(listOf("--scan"), "create a build scan"),
                     TerminalOptionSpec(listOf("--offline"), "build without network access"),
                     TerminalOptionSpec(
-                        names = listOf("--project-dir", "-p"),
+                        names = GradleCompletionSyntax.PROJECT_DIRECTORY_OPTION_NAMES,
                         description = "use the specified project directory",
                         requiresValue = true,
                         valuePathKind = TerminalPathArgumentKind.DIRECTORY,

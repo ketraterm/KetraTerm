@@ -32,6 +32,8 @@ class FuzzyPathCompletionSourceTest {
                     TerminalFuzzyPathEntry("src/main/.generated/Hidden.kt", isDirectory = false),
                     TerminalFuzzyPathEntry("src/test/kotlin/FuzzyTargetTest.kt", isDirectory = false),
                     TerminalFuzzyPathEntry("notes/My File.txt", isDirectory = false),
+                    TerminalFuzzyPathEntry("../shared/NearbySibling.kt", isDirectory = false),
+                    TerminalFuzzyPathEntry("../.private/NearbySecret.kt", isDirectory = false),
                 )
             },
         )
@@ -92,6 +94,19 @@ class FuzzyPathCompletionSourceTest {
         assertEquals(
             listOf("src/main/.generated/Hidden.kt"),
             source.complete(request("cat src/main/.g")).map(TerminalCompletionCandidate::replacementText),
+        )
+    }
+
+    @Test
+    fun `parent navigation segments are not treated as hidden directories`() {
+        assertEquals(
+            listOf("../shared/NearbySibling.kt"),
+            source.complete(request("cat NbySib")).map(TerminalCompletionCandidate::replacementText),
+        )
+        assertTrue(source.complete(request("cat NbySec")).isEmpty())
+        assertEquals(
+            listOf("../.private/NearbySecret.kt"),
+            source.complete(request("cat ../.p")).map(TerminalCompletionCandidate::replacementText),
         )
     }
 

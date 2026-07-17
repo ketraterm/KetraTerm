@@ -20,6 +20,7 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalGradleTask
 import io.github.ketraterm.completion.commandline.*
+import io.github.ketraterm.completion.internal.GradleCompletionSyntax
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 
@@ -61,7 +62,9 @@ internal class GradleTaskCompletionSource(
                 lineContext = commandLineContext,
                 commandSpecs = commandSpecs,
             )
-        if (context.command?.name != GRADLE_COMMAND || context.activePosition != TerminalCompletionActivePosition.SUBCOMMAND) {
+        if (context.command?.name != GradleCompletionSyntax.COMMAND_NAME ||
+            context.activePosition != TerminalCompletionActivePosition.SUBCOMMAND
+        ) {
             return emptyList()
         }
 
@@ -74,11 +77,14 @@ internal class GradleTaskCompletionSource(
         val emitted = HashSet<String>()
         for ((index, task) in tasks.withIndex()) {
             val replacement = replacementFor(task, prefix, projectDirectory) ?: continue
-            if (!replacement.startsWith(prefix, ignoreCase = true) || replacement.equals(
+            if (!replacement.startsWith(prefix, ignoreCase = true) ||
+                replacement.equals(
                     prefix,
-                    ignoreCase = true
+                    ignoreCase = true,
                 )
-            ) continue
+            ) {
+                continue
+            }
             if (!emitted.add(replacement)) continue
             val encodedReplacement =
                 ShellReplacementText.encode(
@@ -122,12 +128,12 @@ internal class GradleTaskCompletionSource(
         while (index < context.commandLineContext.activeTokenIndex) {
             val token = tokens[index].text
             when {
-                token == PROJECT_DIRECTORY_OPTION_SHORT || token == PROJECT_DIRECTORY_OPTION_LONG -> {
+                token in GradleCompletionSyntax.PROJECT_DIRECTORY_OPTION_NAMES -> {
                     val value = tokens.getOrNull(++index)?.text ?: return selectedDirectory
                     selectedDirectory = normalizeProjectDirectory(value)
                 }
 
-                token.startsWith("$PROJECT_DIRECTORY_OPTION_LONG=") -> {
+                token.startsWith("${GradleCompletionSyntax.PROJECT_DIRECTORY_OPTION_LONG}=") -> {
                     selectedDirectory = normalizeProjectDirectory(token.substringAfter('='))
                 }
             }
@@ -160,8 +166,5 @@ internal class GradleTaskCompletionSource(
 
     private companion object {
         private const val BASE_SCORE = 300
-        private const val GRADLE_COMMAND = "gradle"
-        private const val PROJECT_DIRECTORY_OPTION_SHORT = "-p"
-        private const val PROJECT_DIRECTORY_OPTION_LONG = "--project-dir"
     }
 }

@@ -15,16 +15,11 @@
  */
 package io.github.ketraterm.intellij.services
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.ChangeListManager
-import git4idea.repo.GitRepositoryManager
-import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
-import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import java.nio.file.Path
-import java.util.*
 
 /**
  * Loads changed and unversioned paths tracked by IntelliJ for the Git repository containing a terminal directory.
@@ -45,16 +40,10 @@ internal class IntellijGitStatusPathLoader(
      * @param workingDirectoryUri local `file` URI used to select and relativize a repository.
      * @return at most 2,048 changed paths, or an empty list for unusable project, URI, or repository state.
      */
-    fun load(workingDirectoryUri: String?): List<TerminalFuzzyPathEntry> {
-        if (project.isDisposed) return emptyList()
-        val workingDirectory = TerminalLocalFileUriResolver.resolve(workingDirectoryUri) ?: return emptyList()
-        return ApplicationManager.getApplication().runReadAction<List<TerminalFuzzyPathEntry>> {
-            if (project.isDisposed) return@runReadAction emptyList()
-            val repository =
-                selectIntellijGitRepository(GitRepositoryManager.getInstance(project).repositories, workingDirectory)
-                    ?: return@runReadAction emptyList()
+    fun load(workingDirectoryUri: String?): List<TerminalFuzzyPathEntry> =
+        loadIntellijGitRepositorySnapshot(project, workingDirectoryUri) { repository, workingDirectory ->
             val repositoryRoot = repository.root.toNioPath()
-            val retained = PriorityQueue(MAX_RETAINED_PATHS, ENTRY_ORDER.reversed())
+            val retained = BoundedSnapshotCollector(MAX_RETAINED_PATHS, ENTRY_ORDER)
             var visited = 0
             val changeListManager = ChangeListManager.getInstance(project)
             fun retain(
@@ -65,12 +54,7 @@ internal class IntellijGitStatusPathLoader(
                 if (!path.startsWith(repositoryRoot)) return
                 val relativePath = relativePath(workingDirectory, path) ?: return
                 val entry = TerminalFuzzyPathEntry(relativePath, isDirectory = isDirectory, detail = detail)
-                if (retained.size < MAX_RETAINED_PATHS) {
-                    retained += entry
-                } else if (ENTRY_ORDER.compare(entry, retained.peek()) < 0) {
-                    retained.remove()
-                    retained += entry
-                }
+                retained.add(entry)
             }
             for (change in changeListManager.allChanges) {
                 if (visited++ >= MAX_VISITED_CHANGES) break
@@ -83,17 +67,14 @@ internal class IntellijGitStatusPathLoader(
                 val path = runCatching { Path.of(filePath.path) }.getOrNull() ?: continue
                 retain(path, isDirectory = false, detail = "untracked file")
             }
-            ArrayList(retained).apply { sortWith(ENTRY_ORDER) }
+            retained.toSortedList()
         }
-    }
 
     private fun relativePath(
         workingDirectory: Path,
         file: Path,
     ): String? {
-        val relative = runCatching { workingDirectory.relativize(file) }.getOrElse { file }
-        val value = relative.toString().replace('\\', '/').removeSuffix("/")
-        return value.takeIf(String::isNotEmpty)
+        return toRelativeCompletionPath(workingDirectory, file).takeIf(String::isNotEmpty)
     }
 
     private companion object {
@@ -109,26 +90,16 @@ internal class IntellijGitStatusPathLoader(
 internal class IntellijGitStatusPathProviderFactory(
     private val loader: (String?) -> List<TerminalFuzzyPathEntry>,
 ) : IntellijCompletionProviderFactory {
-    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration {
-        val snapshotProvider =
-            context.snapshotService.createValueProvider(
-                keyProvider = context.workingDirectoryUriProvider,
-                loader = loader,
-                onSnapshotChanged = context.onSnapshotChanged,
-            )
-        val source =
+    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
+        context.createSnapshotRegistration(PRIORITY, loader) { valuesProvider ->
             TerminalCompletionSources.fuzzyPath(
                 sourceId = SOURCE_ID,
-                entriesProvider = snapshotProvider::values,
+                entriesProvider = valuesProvider,
                 requiresNonEmptyPrefix = false,
                 allowedCommandNames = ALLOWED_COMMAND_NAMES,
                 commandSpecs = context.commandSpecs,
             )
-        return IntellijCompletionProviderRegistration(
-            sourceEntry = TerminalCompletionSourceEntry(source = source, priority = PRIORITY),
-            resources = listOf(snapshotProvider),
-        )
-    }
+        }
 
     private companion object {
         private const val PRIORITY = 150

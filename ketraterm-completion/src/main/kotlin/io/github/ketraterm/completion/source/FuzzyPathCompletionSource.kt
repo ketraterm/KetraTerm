@@ -31,8 +31,8 @@ import io.github.ketraterm.completion.model.TerminalPathArgumentKind
  *
  * The host supplies a ready snapshot whose entries are already relative to the
  * request working directory. This source never indexes files or performs I/O.
- * It complements direct directory completion by requiring a non-empty prefix,
- * so an empty `cd ` remains a concise current-directory listing.
+ * It normally complements direct directory completion by requiring a non-empty
+ * prefix, while small context-specific providers may opt into empty-prefix matching.
  */
 internal class FuzzyPathCompletionSource(
     private val sourceId: String,
@@ -196,8 +196,13 @@ internal class FuzzyPathCompletionSource(
     private fun String.hasHiddenSegment(): Boolean {
         var segmentStart = 0
         while (segmentStart < length) {
-            if (this[segmentStart] == '.') return true
             val separator = indexOf('/', segmentStart)
+            val segmentEnd = if (separator < 0) length else separator
+            val segmentLength = segmentEnd - segmentStart
+            val isNavigationSegment =
+                segmentLength == 1 ||
+                        (segmentLength == 2 && this[segmentStart + 1] == '.')
+            if (this[segmentStart] == '.' && !isNavigationSegment) return true
             if (separator < 0) return false
             segmentStart = separator + 1
         }

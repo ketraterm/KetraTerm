@@ -17,15 +17,12 @@ package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.io.FileUtil
-import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalGradleTask
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import org.jetbrains.plugins.gradle.util.GradleTaskData
 import org.jetbrains.plugins.gradle.util.getGradleTasks
 import java.nio.file.Path
-import java.util.*
 
 /**
  * Loads a bounded Gradle-task snapshot from IntelliJ's imported external-system model.
@@ -49,25 +46,20 @@ internal class IntellijGradleTaskLoader(
         val workingDirectory = TerminalLocalFileUriResolver.resolve(workingDirectoryUri) ?: return emptyList()
         return ApplicationManager.getApplication().runReadAction<List<TerminalGradleTask>> {
             if (project.isDisposed) return@runReadAction emptyList()
-            val retained = PriorityQueue(MAX_RETAINED_TASKS, TASK_ORDER.reversed())
+            val retained = BoundedSnapshotCollector(MAX_RETAINED_TASKS, TASK_ORDER)
             var visited = 0
             for (tasksByModule in getGradleTasks(project).values) {
                 for ((_, tasks) in tasksByModule.entrySet()) {
                     for (task in tasks) {
                         if (visited++ >= MAX_VISITED_TASKS) break
                         val entry = task.toCompletionTask(workingDirectory) ?: continue
-                        if (retained.size < MAX_RETAINED_TASKS) {
-                            retained += entry
-                        } else if (TASK_ORDER.compare(entry, retained.peek()) < 0) {
-                            retained.remove()
-                            retained += entry
-                        }
+                        retained.add(entry)
                     }
                     if (visited >= MAX_VISITED_TASKS) break
                 }
                 if (visited >= MAX_VISITED_TASKS) break
             }
-            ArrayList(retained).apply { sortWith(TASK_ORDER) }
+            retained.toSortedList()
         }
     }
 
@@ -88,8 +80,7 @@ internal class IntellijGradleTaskLoader(
         workingDirectory: Path,
         projectDirectory: Path,
     ): String {
-        val path = runCatching { workingDirectory.relativize(projectDirectory) }.getOrElse { projectDirectory }
-        return FileUtil.toSystemIndependentName(path.toString()).removeSuffix("/").ifBlank { "." }
+        return toRelativeCompletionPath(workingDirectory, projectDirectory).ifBlank { "." }
     }
 
     private companion object {
@@ -106,24 +97,14 @@ internal class IntellijGradleTaskLoader(
 internal class IntellijGradleTaskProviderFactory(
     private val loader: (String?) -> List<TerminalGradleTask>,
 ) : IntellijCompletionProviderFactory {
-    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration {
-        val snapshotProvider =
-            context.snapshotService.createValueProvider(
-                keyProvider = context.workingDirectoryUriProvider,
-                loader = loader,
-                onSnapshotChanged = context.onSnapshotChanged,
-            )
-        val source =
+    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
+        context.createSnapshotRegistration(PRIORITY, loader) { valuesProvider ->
             TerminalCompletionSources.gradleTask(
                 sourceId = SOURCE_ID,
-                tasksProvider = snapshotProvider::values,
+                tasksProvider = valuesProvider,
                 commandSpecs = context.commandSpecs,
             )
-        return IntellijCompletionProviderRegistration(
-            sourceEntry = TerminalCompletionSourceEntry(source = source, priority = PRIORITY),
-            resources = listOf(snapshotProvider),
-        )
-    }
+        }
 
     private companion object {
         private const val PRIORITY = 150

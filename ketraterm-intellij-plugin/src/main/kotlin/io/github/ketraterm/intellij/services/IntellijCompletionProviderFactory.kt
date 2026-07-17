@@ -15,11 +15,9 @@
  */
 package io.github.ketraterm.intellij.services
 
+import io.github.ketraterm.completion.api.TerminalCompletionSource
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
-import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
-import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 
 /** Factory for one optional IntelliJ completion source and its lifecycle. */
 internal fun interface IntellijCompletionProviderFactory {
@@ -57,36 +55,30 @@ internal data class IntellijCompletionProviderRegistration(
     val resources: List<AutoCloseable> = emptyList(),
 )
 
-/** Adds local Git branch values without coupling the registry to Git4Idea. */
-internal class IntellijGitBranchProviderFactory(
-    private val loader: (String?) -> List<TerminalCompletionDomainValue>,
-) : IntellijCompletionProviderFactory {
-    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration {
-        val snapshotProvider =
-            context.snapshotService.createValueProvider(
-                keyProvider = context.workingDirectoryUriProvider,
-                loader = loader,
-                onSnapshotChanged = context.onSnapshotChanged,
-            )
-        val source =
-            TerminalCompletionSources.valueDomain(
-                domain = TerminalCompletionValueDomain.GIT_BRANCH,
-                sourceId = SOURCE_ID,
-                valuesProvider = snapshotProvider::values,
-                commandSpecs = context.commandSpecs,
-            )
-        return IntellijCompletionProviderRegistration(
-            sourceEntry =
-                TerminalCompletionSourceEntry(
-                    source = source,
-                    priority = PRIORITY,
-                ),
+/**
+ * Creates the standard registration for one keyed asynchronous snapshot source.
+ *
+ * Keeping provider creation and resource ownership together prevents factories
+ * from publishing a source without also closing its backing snapshot.
+ */
+internal fun <V> IntellijCompletionProviderContext.createSnapshotRegistration(
+    priority: Int,
+    loader: (String?) -> List<V>,
+    sourceFactory: (valuesProvider: () -> List<V>) -> TerminalCompletionSource,
+): IntellijCompletionProviderRegistration {
+    val snapshotProvider =
+        snapshotService.createValueProvider(
+            keyProvider = workingDirectoryUriProvider,
+            loader = loader,
+            onSnapshotChanged = onSnapshotChanged,
+        )
+    return try {
+        IntellijCompletionProviderRegistration(
+            sourceEntry = TerminalCompletionSourceEntry(sourceFactory(snapshotProvider::values), priority),
             resources = listOf(snapshotProvider),
         )
-    }
-
-    private companion object {
-        private const val PRIORITY = 150
-        private const val SOURCE_ID = "intellij-git-branch"
+    } catch (failure: Throwable) {
+        runCatching(snapshotProvider::close).exceptionOrNull()?.let(failure::addSuppressed)
+        throw failure
     }
 }

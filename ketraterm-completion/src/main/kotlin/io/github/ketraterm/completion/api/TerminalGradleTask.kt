@@ -38,6 +38,7 @@ constructor(
     init {
         require(path.startsWith(':') && path.length > 1) { "path must be a non-root Gradle task path, was $path" }
         require(path.none(Char::isWhitespace)) { "path must not contain whitespace, was $path" }
+        require(!path.endsWith(':') && "::" !in path) { "path must not contain empty Gradle path segments, was $path" }
         require(projectDirectory?.isNotBlank() != false) { "projectDirectory must not be blank" }
     }
 }

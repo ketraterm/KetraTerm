@@ -23,6 +23,27 @@ import kotlin.test.fail
 
 class TerminalValueSnapshotProviderTest {
     @Test
+    fun `initial request is non-blocking and publishes one ready snapshot`() {
+        val scheduler = RecordingScheduler()
+        var publications = 0
+        val provider =
+            TerminalValueSnapshotProvider(
+                keyProvider = { "first" },
+                scheduler = scheduler,
+                loader = { key -> listOf("$key-value") },
+                onSnapshotChanged = { publications++ },
+                snapshotTtlNanos = Long.MAX_VALUE,
+            )
+
+        assertTrue(provider.values().isEmpty())
+        assertEquals(1, scheduler.pendingCount)
+        scheduler.runNext()
+
+        assertEquals(1, publications)
+        assertEquals(listOf("first-value"), provider.values())
+    }
+
+    @Test
     fun `key change rejects stale publication`() {
         val scheduler = RecordingScheduler()
         var key = "first"
@@ -110,6 +131,27 @@ class TerminalValueSnapshotProviderTest {
 
         assertEquals(listOf("value-2"), provider.values())
         assertEquals(2, loads)
+    }
+
+    @Test
+    fun `closed provider discards an in-flight result`() {
+        val scheduler = RecordingScheduler()
+        var publications = 0
+        val provider =
+            TerminalValueSnapshotProvider(
+                keyProvider = { "key" },
+                scheduler = scheduler,
+                loader = { listOf("value") },
+                onSnapshotChanged = { publications++ },
+                snapshotTtlNanos = Long.MAX_VALUE,
+            )
+
+        provider.values()
+        provider.close()
+        scheduler.runNext()
+
+        assertEquals(0, publications)
+        assertTrue(provider.values().isEmpty())
     }
 
     private class RecordingScheduler : TerminalCompletionLoadScheduler {
