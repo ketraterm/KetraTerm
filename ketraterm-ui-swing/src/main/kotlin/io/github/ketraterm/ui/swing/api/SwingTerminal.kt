@@ -853,9 +853,7 @@ class SwingTerminal
         fun selectCommandOutputAt(
             x: Int,
             y: Int,
-        ): Boolean {
-            return SwingUtilities.isEventDispatchThread() && commandInteractionController.selectCommandOutputAt(x, y)
-        }
+        ): Boolean = SwingUtilities.isEventDispatchThread() && commandInteractionController.selectCommandOutputAt(x, y)
 
         /**
          * Selects command output for [recordId].
@@ -867,9 +865,8 @@ class SwingTerminal
          * @param recordId retained command record id.
          * @return true when command output was selected.
          */
-        fun selectCommandOutput(recordId: Int): Boolean {
-            return SwingUtilities.isEventDispatchThread() && commandInteractionController.selectCommandOutput(recordId)
-        }
+        fun selectCommandOutput(recordId: Int): Boolean =
+            SwingUtilities.isEventDispatchThread() && commandInteractionController.selectCommandOutput(recordId)
 
         /**
          * Returns all currently retained output for [recordId].

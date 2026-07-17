@@ -49,6 +49,10 @@ in implementation packages and must stay `internal`.
 shell quoting policy, and emits domain-tagged argument candidates. Its snapshot supplier is a pure ready-state read and
 must never perform host I/O.
 
+`TerminalCompletionSources.fuzzyPath(...)` adapts a bounded immutable host path snapshot for context-aware fuzzy path
+completion. Hosts own indexing and asynchronous refresh; the shared source retains path-kind filtering, explicit
+replacement ranges, and shell-safe quoting.
+
 `TerminalCompletionContextResolver` is the shared internal command-line context
 resolver. Sources and ranking decorators should use it instead of independently
 guessing command position, subcommand position, option-name position,
@@ -220,9 +224,10 @@ local and `localhost` file URIs, explicit home paths,
 Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses
 project-aware VFS directory snapshots for paths inside project content and bounded local scanning elsewhere. Its first
 dynamic value provider reads local branches from the Git4Idea repository that contains the terminal working directory
-and publishes generation-safe, failure-retryable snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Remote
-refs, changelists,
-whole-project fuzzy paths, SDKs, and run configurations remain follow-up work.
+and publishes generation-safe, failure-retryable snapshots for `git switch`, `checkout`, `merge`, and `rebase`.
+Whole-project fuzzy paths use a separate bounded VFS snapshot source and only activate in declared or explicitly
+path-like terminal positions; direct directory completion remains higher priority for immediate children. Remote refs,
+changelists, SDKs, and run configurations remain follow-up work.
 
 IntelliJ dynamic providers are composed through additive provider factories. Each factory returns one prioritized source
 plus the closeable snapshot resources owned by that source. Adding a new value domain therefore does not require another

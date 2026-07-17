@@ -42,7 +42,8 @@ class TerminalDirectoryCompletionTest {
             assertNotNull(publications.poll(5, TimeUnit.SECONDS))
             assertEquals(
                 listOf("child/"),
-                source.complete(completionRequest("cd ", workingDirectoryUri)).map { it.replacementText })
+                source.complete(completionRequest("cd ", workingDirectoryUri)).map { it.replacementText },
+            )
 
             assertTrue(source.complete(completionRequest("cd ../", workingDirectoryUri)).isEmpty())
             assertNotNull(publications.poll(5, TimeUnit.SECONDS))

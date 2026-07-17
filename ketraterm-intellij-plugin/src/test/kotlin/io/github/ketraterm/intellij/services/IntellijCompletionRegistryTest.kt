@@ -103,6 +103,43 @@ class IntellijCompletionRegistryTest {
     }
 
     @Test
+    fun `project fuzzy path snapshot refreshes the owning session provider`() {
+        val registry = IntellijCompletionRegistry()
+        try {
+            val changed = CountDownLatch(1)
+            val session =
+                registry.openSession(
+                    context("project-files").copy(
+                        workingDirectoryUriProvider = { "file:///project" },
+                        providerFactories =
+                            listOf(
+                                IntellijProjectFileProviderFactory {
+                                    listOf(TerminalFuzzyPathEntry("src/main/FuzzyTarget.kt", isDirectory = false))
+                                },
+                            ),
+                    ),
+                )
+            session.onSourceChanged(changed::countDown)
+
+            session.provider.suggestions(request("cat FzT"))
+            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            var suggestions = session.provider.suggestions(request("cat FzT"))
+            while (suggestions.none { it.source == "intellij-project-file" } && System.nanoTime() < deadline) {
+                Thread.sleep(5)
+                suggestions = session.provider.suggestions(request("cat FzT"))
+            }
+
+            val suggestion = suggestions.single { it.source == "intellij-project-file" }
+            assertEquals("src/main/FuzzyTarget.kt", suggestion.replacementText)
+            assertEquals("project file", suggestion.detail)
+            assertEquals("PATH", suggestion.kind)
+        } finally {
+            registry.close()
+        }
+    }
+
+    @Test
     fun `successful commands feed only their owning session MRU`() {
         val registry = IntellijCompletionRegistry(specs = emptyList())
         try {

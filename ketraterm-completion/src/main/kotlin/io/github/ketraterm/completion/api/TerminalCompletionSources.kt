@@ -18,10 +18,7 @@ package io.github.ketraterm.completion.api
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.ranking.FeedbackAwareCompletionSource
 import io.github.ketraterm.completion.ranking.ShapeAwareCompletionSource
-import io.github.ketraterm.completion.source.CommandStatsCompletionSourceImpl
-import io.github.ketraterm.completion.source.PathCompletionSource
-import io.github.ketraterm.completion.source.SessionMruCompletionSourceImpl
-import io.github.ketraterm.completion.source.ValueDomainCompletionSource
+import io.github.ketraterm.completion.source.*
 import io.github.ketraterm.completion.spec.SpecCompletionSource
 
 /** Factories for dependency-free, host-composable completion sources. */
@@ -139,6 +136,35 @@ object TerminalCompletionSources {
             fileSystemProvider = fileSystemProvider,
             commandSpecs = commandSpecs,
         )
+
+    /**
+     * Creates a pure source for bounded host-indexed paths using fuzzy matching.
+     *
+     * [entriesProvider] must return a ready immutable snapshot whose paths are
+     * relative to the request's current directory. Hosts own indexing and
+     * asynchronous refresh; this source only resolves terminal path context,
+     * replacement ranges, path-kind filtering, and shell quoting.
+     *
+     * @param sourceId stable candidate-source id used by ranking feedback.
+     * @param entriesProvider supplier for the latest bounded indexed-path snapshot.
+     * @param commandSpecs command specs whose path metadata controls activation.
+     * @return context-aware fuzzy path completion source.
+     * @throws IllegalArgumentException if [sourceId] is blank.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun fuzzyPath(
+        sourceId: String,
+        entriesProvider: () -> List<TerminalFuzzyPathEntry>,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    ): TerminalCompletionSource {
+        require(sourceId.isNotBlank()) { "sourceId must not be blank" }
+        return FuzzyPathCompletionSource(
+            sourceId = sourceId,
+            entriesProvider = entriesProvider,
+            commandSpecs = commandSpecs,
+        )
+    }
 
     /**
      * Creates a pure source for one host-owned dynamic value domain.

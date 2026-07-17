@@ -286,6 +286,7 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCompletionTriggerEvaluator",
                 "TerminalDirectoryListingRequest",
                 "TerminalFileEntry",
+                "TerminalFuzzyPathEntry",
                 "TerminalFileSystemProvider",
                 "TerminalShellQuotingPolicy",
                 "TerminalShellSyntax",
@@ -298,6 +299,7 @@ internal class TerminalCompletionArchitectureTest {
                 "fromSpecs",
                 "sessionMru",
                 "path",
+                "fuzzyPath",
                 "valueDomain",
             )
         private val PUBLIC_COMPLETION_ENGINE_FACTORIES =
@@ -338,7 +340,15 @@ internal class TerminalCompletionArchitectureTest {
                         ),
                 "api/TerminalCompletionSource.kt" to setOf("complete"),
                 "api/TerminalCompletionSources.kt" to
-                        setOf("commandStats", "feedbackAware", "fromSpecs", "sessionMru", "path", "valueDomain"),
+                        setOf(
+                            "commandStats",
+                            "feedbackAware",
+                            "fromSpecs",
+                            "sessionMru",
+                            "path",
+                            "fuzzyPath",
+                            "valueDomain"
+                        ),
                 "api/TerminalSessionMruCompletionSource.kt" to setOf("recordSuccessfulCommand", "clear"),
                 "api/TerminalCompletionTriggerEvaluator.kt" to setOf("shouldTrigger", "isLiveTrigger"),
                 "api/TerminalFileSystemProvider.kt" to setOf("listDirectory"),
