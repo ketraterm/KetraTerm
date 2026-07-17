@@ -74,29 +74,18 @@ internal class PathCompletionSource(
 
         // Slashes normalized to forward slashes for URL path resolution
         val normalizedPrefix = prefix.replace('\\', '/')
-        val lastSlashIndex = normalizedPrefix.lastIndexOf('/')
-        val directoryPortion = if (lastSlashIndex >= 0) normalizedPrefix.substring(0, lastSlashIndex + 1) else ""
-        val filePrefix = if (lastSlashIndex >= 0) normalizedPrefix.substring(lastSlashIndex + 1) else normalizedPrefix
-
-        val baseUri =
-            try {
-                val normalizedDir = if (workingDir.endsWith("/")) workingDir else "$workingDir/"
-                java.net.URI(normalizedDir)
-            } catch (_: Exception) {
-                return emptyList()
-            }
-
-        val resolvedUri =
-            try {
-                baseUri.resolve(directoryPortion)
-            } catch (_: Exception) {
-                return emptyList()
-            }
-
-        val resolvedUriString = canonicalizeDirectoryUri(resolvedUri.toString())
+        val pathParts = splitPathPrefix(normalizedPrefix) ?: return emptyList()
+        val directoryPortion = pathParts.directoryPrefix
+        val filePrefix = pathParts.entryNamePrefix
         val entries =
             try {
-                fileSystemProvider.listDirectory(resolvedUriString)
+                fileSystemProvider.listDirectory(
+                    TerminalDirectoryListingRequest(
+                        workingDirectoryUri = workingDir,
+                        directoryPrefix = directoryPortion,
+                        entryNamePrefix = filePrefix,
+                    ),
+                )
             } catch (_: Exception) {
                 return emptyList()
             }
@@ -265,6 +254,20 @@ internal class PathCompletionSource(
             prefix.contains("/") ||
             prefix.contains("\\")
 
+    private fun splitPathPrefix(prefix: String): PathParts? {
+        if (prefix == "~") return PathParts(directoryPrefix = "~/", entryNamePrefix = "")
+        if (prefix.startsWith("~") && !prefix.startsWith("~/")) return null
+        val lastSlashIndex = prefix.lastIndexOf('/')
+        return if (lastSlashIndex >= 0) {
+            PathParts(
+                directoryPrefix = prefix.substring(0, lastSlashIndex + 1),
+                entryNamePrefix = prefix.substring(lastSlashIndex + 1),
+            )
+        } else {
+            PathParts(directoryPrefix = "", entryNamePrefix = prefix)
+        }
+    }
+
     private fun matchesPrefix(
         value: String,
         prefix: String,
@@ -305,6 +308,11 @@ internal class PathCompletionSource(
         private const val AT = '@'
         private const val HASH = '#'
     }
+
+    private data class PathParts(
+        val directoryPrefix: String,
+        val entryNamePrefix: String,
+    )
 
     private fun TerminalPathArgumentKind.accepts(entry: TerminalFileEntry): Boolean =
         when (this) {

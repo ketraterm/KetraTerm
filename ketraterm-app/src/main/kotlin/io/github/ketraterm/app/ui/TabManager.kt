@@ -217,17 +217,20 @@ internal class TabManager(
                 return false
             }
 
-        val pane =
+        var pane: TerminalPane? = null
+        val suggestionProvider =
+            completionRegistry.createProvider(
+                sessionId = workspaceTab.id,
+                profileId = workspaceTab.profile.id,
+                workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
+                shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
+                onPathSnapshotChanged = { pane?.completionSourceSnapshotChanged() },
+            )
+        val createdPane =
             TerminalPane.create(
                 tab = workspaceTab,
                 settings = settings,
-                suggestionProvider =
-                    completionRegistry.createProvider(
-                        sessionId = workspaceTab.id,
-                        profileId = workspaceTab.profile.id,
-                        workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
-                        shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
-                    ),
+                suggestionProvider = suggestionProvider,
                 commandSpecs = completionRegistry.commandSpecs,
                 shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
                 suggestionFeedbackHandler =
@@ -238,10 +241,11 @@ internal class TabManager(
             ) { p, x, y ->
                 showPaneContextMenu(p, p.terminal, x, y)
             }
-        panes += pane
+        pane = createdPane
+        panes += createdPane
 
-        val tabId = pane.tab.id
-        val leaf = LeafNode(pane)
+        val tabId = createdPane.tab.id
+        val leaf = LeafNode(createdPane)
         tabRoots[tabId] = leaf
 
         val container =
@@ -287,6 +291,7 @@ internal class TabManager(
         for (tabId in tabIds) {
             closeTab(tabId)
         }
+        completionRegistry.close()
         workspace.close()
         commandCompletionStatsStore?.close()
         commandCompletionStatsStore = null
@@ -377,17 +382,20 @@ internal class TabManager(
                 showStartError(profile, exception)
                 return
             }
-        val newPane =
+        var newPane: TerminalPane? = null
+        val suggestionProvider =
+            completionRegistry.createProvider(
+                sessionId = workspaceTab.id,
+                profileId = workspaceTab.profile.id,
+                workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
+                shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
+                onPathSnapshotChanged = { newPane?.completionSourceSnapshotChanged() },
+            )
+        val createdPane =
             TerminalPane.create(
                 tab = workspaceTab,
                 settings = settings,
-                suggestionProvider =
-                    completionRegistry.createProvider(
-                        sessionId = workspaceTab.id,
-                        profileId = workspaceTab.profile.id,
-                        workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
-                        shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
-                    ),
+                suggestionProvider = suggestionProvider,
                 commandSpecs = completionRegistry.commandSpecs,
                 shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
                 suggestionFeedbackHandler =
@@ -398,10 +406,11 @@ internal class TabManager(
             ) { p, x, y ->
                 showPaneContextMenu(p, p.terminal, x, y)
             }
+        newPane = createdPane
 
-        panes += newPane
+        panes += createdPane
 
-        val newRoot = splitNodeInTree(root, pane, newPane, isVertical)
+        val newRoot = splitNodeInTree(root, pane, createdPane, isVertical)
         tabRoots[tabId] = newRoot
 
         val container = tabContainers[tabId] ?: return
@@ -410,7 +419,7 @@ internal class TabManager(
         container.revalidate()
         container.repaint()
 
-        newPane.requestFocus()
+        createdPane.requestFocus()
         updateFrameTitle()
     }
 

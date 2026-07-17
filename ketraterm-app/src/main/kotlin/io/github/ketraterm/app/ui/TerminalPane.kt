@@ -60,6 +60,11 @@ internal class TerminalPane private constructor(
         }
     }
 
+    /** Re-evaluates the latest command after a background completion snapshot is published. */
+    fun completionSourceSnapshotChanged() {
+        completionTriggerController.sourceSnapshotChanged()
+    }
+
     fun close() {
         tab.session.removeDirtyListener(completionDirtyListener)
         completionTriggerController.cancelAndHide()

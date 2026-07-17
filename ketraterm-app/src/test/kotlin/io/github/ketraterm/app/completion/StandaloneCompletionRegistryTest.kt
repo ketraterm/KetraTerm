@@ -20,6 +20,8 @@ import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -58,11 +60,13 @@ class StandaloneCompletionRegistryTest {
             Files.createDirectory(directory.resolve(".hidden"))
             Files.writeString(directory.resolve("README.md"), "not a directory")
             val registry = registry(specs = TerminalCommandSpecs.defaults())
+            val snapshotReady = CountDownLatch(1)
             val provider =
                 registry.createProvider(
                     sessionId = "session-1",
                     profileId = "pwsh",
                     workingDirectoryUriProvider = { directory.toUri().toString() },
+                    onPathSnapshotChanged = snapshotReady::countDown,
                 )
             registry.recordSuccessfulCommand(
                 sessionId = "session-1",
@@ -71,6 +75,8 @@ class StandaloneCompletionRegistryTest {
                 workingDirectoryUri = directory.toUri().toString(),
             )
 
+            assertTrue(provider.suggestions(request("cd ")).none { it.source == "path" })
+            assertTrue(snapshotReady.await(5, TimeUnit.SECONDS))
             val suggestions = provider.suggestions(request("cd "))
 
             assertEquals("alpha/", suggestions.first().replacementText)
@@ -78,6 +84,7 @@ class StandaloneCompletionRegistryTest {
             assertTrue(suggestions.none { it.replacementText == ".hidden/" })
             assertTrue(suggestions.none { it.replacementText == "README.md" })
             assertTrue(suggestions.any { it.replacementText == "cd remembered" && it.source == "mru" })
+            registry.close()
         } finally {
             directory.toFile().deleteRecursively()
         }

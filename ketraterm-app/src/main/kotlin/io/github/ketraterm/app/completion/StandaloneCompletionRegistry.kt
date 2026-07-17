@@ -38,7 +38,7 @@ internal class StandaloneCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     private val persistentStatsSource: TerminalCommandStatsCompletionSource? = null,
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
-) {
+) : AutoCloseable {
     init {
         require(sessionMruCapacity > 0) { "sessionMruCapacity must be > 0, was $sessionMruCapacity" }
     }
@@ -53,7 +53,8 @@ internal class StandaloneCompletionRegistry(
                 specs = commandSpecs,
                 shapeStatsProvider = shapeStatsProvider,
             ).let(::feedbackAware)
-    private val sessionMruSources = HashMap<String, TerminalSessionMruCompletionSource>()
+    private val directoryCompletionService = StandaloneDirectoryCompletionService()
+    private val sessionStates = HashMap<String, SessionCompletionState>()
 
     /**
      * Creates a standalone Swing suggestion provider for one terminal session.
@@ -65,6 +66,8 @@ internal class StandaloneCompletionRegistry(
      * @param sessionId stable workspace tab/session id.
      * @param profileId stable standalone profile id for this session.
      * @param shellCapabilities shell lexical and replacement rules selected from the profile.
+     * @param onPathSnapshotChanged callback invoked when a background path
+     * snapshot for the latest request becomes ready.
      * @param workingDirectoryUriProvider supplier for the latest current-working-directory URI.
      * @return standalone Swing suggestion provider for the session.
      */
@@ -72,6 +75,7 @@ internal class StandaloneCompletionRegistry(
         sessionId: String,
         profileId: String? = null,
         shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
+        onPathSnapshotChanged: () -> Unit = {},
         workingDirectoryUriProvider: () -> String? = { null },
     ): StandaloneCompletionSuggestionProvider {
         require(sessionId.isNotBlank()) { "sessionId must not be blank" }
@@ -80,9 +84,12 @@ internal class StandaloneCompletionRegistry(
                 capacity = sessionMruCapacity,
                 commandSpecs = commandSpecs,
             )
-        synchronized(lock) {
-            sessionMruSources[sessionId] = mruSource
-        }
+        val fileSystemProvider = directoryCompletionService.createProvider(onPathSnapshotChanged)
+        val previous =
+            synchronized(lock) {
+                sessionStates.put(sessionId, SessionCompletionState(mruSource, fileSystemProvider))
+            }
+        previous?.close()
         val rankedMruSource = feedbackAware(mruSource)
         val sources =
             ArrayList<TerminalCompletionSourceEntry>(COMPOSED_SOURCE_CAPACITY).apply {
@@ -94,7 +101,7 @@ internal class StandaloneCompletionRegistry(
                 add(
                     TerminalCompletionSourceEntry(
                         TerminalCompletionSources.path(
-                            fileSystemProvider = StandaloneFileSystemProvider,
+                            fileSystemProvider = fileSystemProvider,
                             commandSpecs = commandSpecs,
                         ),
                         priority = PATH_PRIORITY,
@@ -136,7 +143,7 @@ internal class StandaloneCompletionRegistry(
     ) {
         val source =
             synchronized(lock) {
-                sessionMruSources[sessionId]
+                sessionStates[sessionId]?.mruSource
             } ?: return
         source.recordSuccessfulCommand(
             commandLine = commandLine,
@@ -151,11 +158,23 @@ internal class StandaloneCompletionRegistry(
      * @param sessionId workspace tab/session id to remove.
      */
     fun removeSession(sessionId: String) {
-        val source =
+        val state =
             synchronized(lock) {
-                sessionMruSources.remove(sessionId)
+                sessionStates.remove(sessionId)
             }
-        source?.clear()
+        state?.close()
+    }
+
+    /** Releases every session snapshot and stops background directory workers. */
+    override fun close() {
+        val states =
+            synchronized(lock) {
+                val copy = sessionStates.values.toList()
+                sessionStates.clear()
+                copy
+            }
+        states.forEach(SessionCompletionState::close)
+        directoryCompletionService.close()
     }
 
     private fun feedbackAware(source: TerminalCompletionSource): TerminalCompletionSource {
@@ -165,32 +184,13 @@ internal class StandaloneCompletionRegistry(
         }
     }
 
-    private object StandaloneFileSystemProvider : TerminalFileSystemProvider {
-        override fun listDirectory(directoryUri: String): List<TerminalFileEntry> {
-            return try {
-                val uri = java.net.URI(directoryUri)
-                val path =
-                    java.nio.file.Paths
-                        .get(uri)
-                if (!java.nio.file.Files
-                        .isDirectory(path)
-                ) {
-                    return emptyList()
-                }
-
-                java.nio.file.Files.newDirectoryStream(path).use { stream ->
-                    stream.map { child ->
-                        TerminalFileEntry(
-                            name = child.fileName.toString(),
-                            isDirectory =
-                                java.nio.file.Files
-                                    .isDirectory(child),
-                        )
-                    }
-                }
-            } catch (_: Exception) {
-                emptyList()
-            }
+    private data class SessionCompletionState(
+        val mruSource: TerminalSessionMruCompletionSource,
+        val fileSystemProvider: StandaloneAsyncFileSystemProvider,
+    ) {
+        fun close() {
+            mruSource.clear()
+            fileSystemProvider.close()
         }
     }
 

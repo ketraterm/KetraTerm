@@ -366,6 +366,75 @@ class PathCompletionSourceTest {
     }
 
     @Test
+    fun `delegates home directory expansion to host and preserves tilde replacement`() {
+        var captured: TerminalDirectoryListingRequest? = null
+        val source =
+            PathCompletionSource(
+                TerminalFileSystemProvider { request ->
+                    captured = request
+                    listOf(TerminalFileEntry("Documents", isDirectory = true))
+                },
+            )
+
+        val candidates = source.complete(request("cd ~", "file:///project"))
+
+        assertEquals("~/", captured?.directoryPrefix)
+        assertEquals("", captured?.entryNamePrefix)
+        assertEquals("~/Documents/", candidates.single().replacementText)
+    }
+
+    @Test
+    fun `delegates Windows drive path without interpreting drive letter as URI scheme`() {
+        var captured: TerminalDirectoryListingRequest? = null
+        val source =
+            PathCompletionSource(
+                TerminalFileSystemProvider { request ->
+                    captured = request
+                    listOf(TerminalFileEntry("Gagik", isDirectory = true))
+                },
+            )
+
+        val candidates =
+            source.complete(
+                request(
+                    "cd C:\\Users\\Ga",
+                    "file:///C:/workspace",
+                    shellCapabilities = TerminalShellCapabilities.POWERSHELL,
+                ),
+            )
+
+        assertEquals("C:/Users/", captured?.directoryPrefix)
+        assertEquals("Ga", captured?.entryNamePrefix)
+        assertEquals("C:\\Users\\Gagik\\", candidates.single().replacementText)
+    }
+
+    @Test
+    fun `delegates UNC path explicitly and preserves working directory authority`() {
+        var captured: TerminalDirectoryListingRequest? = null
+        val source =
+            PathCompletionSource(
+                TerminalFileSystemProvider { request ->
+                    captured = request
+                    listOf(TerminalFileEntry("Docs", isDirectory = true))
+                },
+            )
+
+        val candidates =
+            source.complete(
+                request(
+                    "cd \\\\server\\share\\Do",
+                    "file://remote.example/workspace",
+                    shellCapabilities = TerminalShellCapabilities.POWERSHELL,
+                ),
+            )
+
+        assertEquals("file://remote.example/workspace", captured?.workingDirectoryUri)
+        assertEquals("//server/share/", captured?.directoryPrefix)
+        assertEquals("Do", captured?.entryNamePrefix)
+        assertEquals("\\\\server\\share\\Docs\\", candidates.single().replacementText)
+    }
+
+    @Test
     fun `suppresses path completion when prefix is an option flag`() {
         val request = request("git -", "file:///project")
         val candidates = source.complete(request)
@@ -427,10 +496,13 @@ class PathCompletionSourceTest {
             uri: String,
             entries: List<TerminalFileEntry>,
         ) {
-            directories[canonicalizeDirectoryUri(uri)] = entries
+            directories[java.net.URI(uri).normalize().path.removeSuffix("/")] = entries
         }
 
-        override fun listDirectory(directoryUri: String): List<TerminalFileEntry> =
-            directories[canonicalizeDirectoryUri(directoryUri)] ?: emptyList()
+        override fun listDirectory(request: TerminalDirectoryListingRequest): List<TerminalFileEntry> {
+            val base = java.net.URI(request.workingDirectoryUri.removeSuffix("/") + "/")
+            val key = base.resolve(request.directoryPrefix).normalize().path.removeSuffix("/")
+            return directories[key].orEmpty()
+        }
     }
 }

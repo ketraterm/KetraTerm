@@ -32,34 +32,54 @@ data class TerminalFileEntry(
 }
 
 /**
- * Host-implemented file system provider for sandbox-aware path completion.
+ * Host-resolved directory-listing request used by path completion.
  *
- * Since the completions module stays pure and I/O-free, hosts must implement
- * this interface to resolve local or remote folder paths safely.
+ * The completion engine deliberately keeps [directoryPrefix] lexical. The
+ * host owns interpreting drive roots, UNC paths, home-directory prefixes, and
+ * the authority of [workingDirectoryUri] for its actual file-system context.
+ * Implementations may return a previously published immutable snapshot and
+ * refresh it asynchronously.
+ *
+ * @property workingDirectoryUri absolute host-reported working-directory URI.
+ * @property directoryPrefix typed path portion ending at the final separator;
+ * forward slashes are used as a transport-neutral separator. An empty value
+ * addresses the working directory and `~/` addresses the host user's home.
+ * @property entryNamePrefix typed base-name prefix after the final separator.
  */
-fun interface TerminalFileSystemProvider {
-    /**
-     * Lists child entries within the folder specified by [directoryUri].
-     *
-     * @param directoryUri absolute directory URI (e.g., "file:///home/user/src/").
-     * @return list of directory children, or an empty list if directory is missing
-     * or cannot be read.
-     */
-    fun listDirectory(directoryUri: String): List<TerminalFileEntry>
+data class TerminalDirectoryListingRequest(
+    val workingDirectoryUri: String,
+    val directoryPrefix: String,
+    val entryNamePrefix: String,
+) {
+    init {
+        require(workingDirectoryUri.isNotBlank()) { "workingDirectoryUri must not be blank" }
+        require(directoryPrefix.isEmpty() || directoryPrefix.endsWith('/')) {
+            "directoryPrefix must be empty or end with '/', was $directoryPrefix"
+        }
+        require(!entryNamePrefix.contains('/')) { "entryNamePrefix must not contain '/'" }
+        require(!entryNamePrefix.contains('\\')) { "entryNamePrefix must not contain '\\'" }
+    }
 }
 
 /**
- * Canonicalizes a URI string to a standard file path scheme representation.
+ * Host-implemented file system provider for sandbox-aware path completion.
+ *
+ * Since the completions module stays pure and I/O-free, hosts must implement
+ * this interface to resolve folder paths safely. In particular, the host must
+ * reject working-directory authorities it cannot prove are local rather than
+ * silently converting remote OSC 7 locations into local paths.
  */
-fun canonicalizeDirectoryUri(uriStr: String): String =
-    try {
-        val uri = java.net.URI(uriStr)
-        val scheme = uri.scheme
-        if (scheme != null && scheme.equals("file", ignoreCase = true)) {
-            "file:" + (uri.path ?: "")
-        } else {
-            uri.toString()
-        }
-    } catch (_: Exception) {
-        uriStr
-    }
+fun interface TerminalFileSystemProvider {
+    /**
+     * Returns matching children for [request].
+     *
+     * This method is part of the synchronous completion hot path. Implementations
+     * must return promptly from bounded in-memory state; filesystem or network I/O
+     * belongs in host-owned background work.
+     *
+     * @param request lexical path request and host working-directory context.
+     * @return immutable ready snapshot of matching children, or an empty list
+     * while unavailable, unreadable, unsupported, or still loading.
+     */
+    fun listDirectory(request: TerminalDirectoryListingRequest): List<TerminalFileEntry>
+}

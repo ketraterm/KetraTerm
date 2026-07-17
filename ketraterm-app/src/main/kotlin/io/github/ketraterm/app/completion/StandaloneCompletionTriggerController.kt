@@ -170,6 +170,20 @@ internal class StandaloneCompletionTriggerController(
         lastRequestedSnapshotKey = null
     }
 
+    /**
+     * Refreshes from the latest command state after a background source
+     * publishes a new immutable snapshot.
+     *
+     * Calls may originate on a provider worker. The scheduler marshals the
+     * invalidation and refresh onto the EDT and coalesces adjacent publications.
+     */
+    fun sourceSnapshotChanged() {
+        scheduler.restart(0) {
+            lastRequestedSnapshotKey = null
+            refreshNow()
+        }
+    }
+
     private fun TerminalShellCommandLineSnapshot.nonWhitespaceCount(): Int {
         var count = 0
         var index = 0
