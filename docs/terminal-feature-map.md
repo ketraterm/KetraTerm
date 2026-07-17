@@ -148,7 +148,9 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   changes later tokens to positional arguments, suppressing option, option-value, and subcommand completion.
   Whole-command history is suppressed after an operator because it cannot safely replace a segment-local range.
   Gradle-style repeatable task lists keep suggesting unused sibling tasks after existing tasks, so `./gradlew clean bu`
-  can suggest `build`. Dynamic value domains such as Git branches, Docker contexts, Kubernetes namespaces, npm scripts,
+  can suggest `build`. IntelliJ augments those bootstrap tasks from its imported Gradle model, including canonical
+  `:module:task` paths and short task names scoped by `-p`/`--project-dir`. Dynamic value domains such as Git branches,
+  Docker contexts, Kubernetes namespaces, npm scripts,
   AWS profiles/regions, and IDE run configurations are modeled and ranked by the shared engine but supplied by
   standalone/plugin-owned providers. The reusable Swing acceptance handler supports explicit UTF-16 replacement ranges
   by deleting suffix text, backspacing prefix text, and pasting the selected replacement through the input/session

@@ -197,8 +197,10 @@ style through the normal path replacement policy.
 Task-style CLIs that accept several sibling command values on one line should
 set `TerminalCommandSpec.repeatableSubcommands`. Gradle is the built-in example:
 after `./gradlew clean bu`, the context remains attached to the root Gradle
-task set and the spec source can suggest `build` while omitting already-used
-tasks such as `clean`.
+task set and the spec source can suggest `build` while omitting already-used tasks such as `clean`. A host may add a
+ready Gradle-task snapshot source for the same context. It completes imported root tasks, canonical module tasks such as
+`:app:run`, and short names after `-p app` or `--project-dir app`; `-p`
+uses a project directory, not a Gradle colon path.
 
 `TerminalOptionSpec.exclusiveGroupIds` models mutually exclusive option sets
 without coupling one option to another option name. Once a completed option
@@ -232,7 +234,9 @@ suggestions for `git switch`. Tags use the same bounded, repository-selected Git
 `checkout`, `merge`, and `rebase`; `git switch` remains local-branch-only.
 Whole-project fuzzy paths use a separate bounded VFS snapshot source and only activate in declared or explicitly
 path-like terminal positions; direct directory completion remains higher priority for immediate children. Changelists,
-SDKs, and run configurations remain follow-up work. A separate Git status snapshot supplies changed and
+SDKs, and run configurations remain follow-up work. IntelliJ also reads its already-imported Gradle external-system
+model into a bounded task snapshot; it never starts Gradle from a completion request. A separate Git status snapshot
+supplies changed and
 untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Git process.
 
 IntelliJ dynamic providers are composed through additive provider factories. Each factory returns one prioritized source

@@ -178,6 +178,33 @@ object TerminalCompletionSources {
     }
 
     /**
+     * Creates a pure source for host-indexed Gradle task snapshots.
+     *
+     * The source understands Gradle's canonical `:project:task` notation and
+     * scopes short task names after `-p` or `--project-dir`. [tasksProvider]
+     * must return a bounded ready snapshot and must never start Gradle, read
+     * the filesystem, or access an IDE model on the completion thread.
+     *
+     * @param sourceId stable candidate-source id used by ranking feedback.
+     * @param tasksProvider supplier for the latest immutable Gradle task snapshot.
+     * @param commandSpecs command specs used to resolve Gradle command context.
+     * @return context-aware Gradle task completion source.
+     * @throws IllegalArgumentException if [sourceId] is blank.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun gradleTask(
+        sourceId: String,
+        tasksProvider: () -> List<TerminalGradleTask>,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    ): TerminalCompletionSource =
+        GradleTaskCompletionSource(
+            sourceId = sourceId,
+            tasksProvider = tasksProvider,
+            commandSpecs = commandSpecs,
+        )
+
+    /**
      * Creates a pure source for one host-owned dynamic value domain.
      *
      * [valuesProvider] must return a bounded, ready in-memory snapshot and must

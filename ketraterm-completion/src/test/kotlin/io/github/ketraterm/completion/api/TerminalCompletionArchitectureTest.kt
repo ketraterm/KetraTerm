@@ -287,6 +287,7 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalDirectoryListingRequest",
                 "TerminalFileEntry",
                 "TerminalFuzzyPathEntry",
+                "TerminalGradleTask",
                 "TerminalFileSystemProvider",
                 "TerminalShellQuotingPolicy",
                 "TerminalShellSyntax",
@@ -300,6 +301,7 @@ internal class TerminalCompletionArchitectureTest {
                 "sessionMru",
                 "path",
                 "fuzzyPath",
+                "gradleTask",
                 "valueDomain",
             )
         private val PUBLIC_COMPLETION_ENGINE_FACTORIES =
@@ -347,6 +349,7 @@ internal class TerminalCompletionArchitectureTest {
                             "sessionMru",
                             "path",
                             "fuzzyPath",
+                            "gradleTask",
                             "valueDomain",
                         ),
                 "api/TerminalSessionMruCompletionSource.kt" to setOf("recordSuccessfulCommand", "clear"),

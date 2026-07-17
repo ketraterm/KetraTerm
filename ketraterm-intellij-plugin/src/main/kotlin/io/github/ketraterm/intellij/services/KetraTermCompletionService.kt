@@ -80,6 +80,7 @@ internal class KetraTermCompletionService : Disposable {
                         IntellijGitRemoteBranchProviderFactory(IntellijGitRemoteBranchLoader(project)::load),
                         IntellijGitTagProviderFactory(IntellijGitTagLoader(project)::load),
                         IntellijGitStatusPathProviderFactory(IntellijGitStatusPathLoader(project)::load),
+                        IntellijGradleTaskProviderFactory(IntellijGradleTaskLoader(project)::load),
                         IntellijProjectFileProviderFactory(IntellijProjectFileLoader(project)::load),
                     ),
                 directoryScanner = IntellijProjectDirectoryScanner(project),

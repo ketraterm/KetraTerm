@@ -90,6 +90,7 @@ dependencies {
     intellijPlatform {
         intellijIdea(intellijIdeaVersion)
         bundledPlugin("Git4Idea")
+        bundledPlugin("org.jetbrains.plugins.gradle")
         testFramework(TestFrameworkType.Platform)
 
         // Add plugin dependencies for compilation here, for example:

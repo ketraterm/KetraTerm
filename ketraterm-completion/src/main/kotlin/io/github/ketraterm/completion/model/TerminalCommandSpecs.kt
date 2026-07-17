@@ -238,6 +238,12 @@ object TerminalCommandSpecs {
                     TerminalOptionSpec(listOf("--debug", "-d"), "set log level to debug"),
                     TerminalOptionSpec(listOf("--scan"), "create a build scan"),
                     TerminalOptionSpec(listOf("--offline"), "build without network access"),
+                    TerminalOptionSpec(
+                        names = listOf("--project-dir", "-p"),
+                        description = "use the specified project directory",
+                        requiresValue = true,
+                        valuePathKind = TerminalPathArgumentKind.DIRECTORY,
+                    ),
                 ),
         )
 

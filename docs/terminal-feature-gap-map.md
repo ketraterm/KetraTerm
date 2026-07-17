@@ -181,6 +181,9 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe Git status path snapshots from its
   change-list model for changed and untracked paths in the selected repository. The provider is active for `git add`,
   `restore`, `rm`, and `diff`, and never starts a Git process.
+- `DONE(completion/provider/intellij)`: IntelliJ publishes a bounded imported-Gradle task snapshot for `gradle`,
+  `gradlew`, and `./gradlew`. It completes root tasks, canonical `:module:task` paths, and short task names after
+  `-p` or `--project-dir`; it reads the IDE model and never invokes Gradle during completion.
 - `TODO(completion/provider)`: implement remaining standalone and IntelliJ dynamic providers for declared value domains,
   such as Kubernetes namespaces for `kubectl --namespace`, Docker contexts for
   `docker --context`, npm scripts, AWS profiles/regions, and IDE run configurations.

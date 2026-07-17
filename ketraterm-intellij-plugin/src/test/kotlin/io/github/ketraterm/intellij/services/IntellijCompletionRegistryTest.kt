@@ -182,6 +182,55 @@ class IntellijCompletionRegistryTest {
     }
 
     @Test
+    fun `Gradle task snapshot supports qualified tasks and project directory task names`() {
+        val registry = IntellijCompletionRegistry()
+        try {
+            val changed = CountDownLatch(1)
+            val session =
+                registry.openSession(
+                    context("gradle-task").copy(
+                        workingDirectoryUriProvider = { "file:///project" },
+                        providerFactories =
+                            listOf(
+                                IntellijGradleTaskProviderFactory {
+                                    listOf(
+                                        TerminalGradleTask(":test", "run root tests", projectDirectory = "."),
+                                        TerminalGradleTask(
+                                            ":app:runIde",
+                                            "launch IDE sandbox",
+                                            projectDirectory = "app"
+                                        ),
+                                    )
+                                },
+                            ),
+                    ),
+                )
+            session.onSourceChanged(changed::countDown)
+
+            session.provider.suggestions(request("./gradlew :app:runI"))
+            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            var suggestions = session.provider.suggestions(request("./gradlew :app:runI"))
+            while (suggestions.none { it.source == "intellij-gradle-task" } && System.nanoTime() < deadline) {
+                Thread.sleep(5)
+                suggestions = session.provider.suggestions(request("./gradlew :app:runI"))
+            }
+
+            val qualified = suggestions.single { it.source == "intellij-gradle-task" }
+            assertEquals(":app:runIde", qualified.replacementText)
+            assertEquals("launch IDE sandbox", qualified.detail)
+            assertEquals(
+                listOf("runIde"),
+                session.provider.suggestions(request("./gradlew -p app runI"))
+                    .filter { it.source == "intellij-gradle-task" }
+                    .map { it.replacementText },
+            )
+        } finally {
+            registry.close()
+        }
+    }
+
+    @Test
     fun `project fuzzy path snapshot refreshes the owning session provider`() {
         val registry = IntellijCompletionRegistry()
         try {
