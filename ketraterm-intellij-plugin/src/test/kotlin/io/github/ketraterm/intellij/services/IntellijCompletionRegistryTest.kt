@@ -30,6 +30,7 @@ import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
+/** Integration tests for IntelliJ completion source composition and lifecycle. */
 class IntellijCompletionRegistryTest {
     @Test
     fun `git branch snapshot refreshes the owning session provider`() {

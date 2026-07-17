@@ -27,6 +27,19 @@ import java.util.*
 /**
  * Uses IntelliJ's project-aware VFS snapshot for directories in project
  * content, falling back to bounded local scanning outside the project.
+ *
+ * VFS access and project-content checks run under an IntelliJ read action.
+ * Only direct children already represented by the VFS are inspected; this
+ * adapter does not refresh the VFS or perform filesystem I/O while in the read
+ * action.
+ *
+ * @property project project whose content index constrains VFS suggestions.
+ * @property fallback scanner used for directories outside indexed project content.
+ * @property virtualFileResolver resolver for an existing VFS directory snapshot.
+ * @property maxVisitedEntries positive cap on inspected VFS children.
+ * @property maxMatchingEntries positive cap on retained matching children.
+ * @throws IllegalArgumentException if [maxVisitedEntries] or
+ * [maxMatchingEntries] is not positive.
  */
 internal class IntellijProjectDirectoryScanner(
     private val project: Project,
@@ -40,6 +53,15 @@ internal class IntellijProjectDirectoryScanner(
         require(maxMatchingEntries > 0) { "maxMatchingEntries must be > 0, was $maxMatchingEntries" }
     }
 
+    /**
+     * Reads a bounded project-content snapshot or delegates to [fallback].
+     *
+     * @param directory normalized absolute local directory.
+     * @param entryNamePrefix case-insensitive direct-child name prefix.
+     * @return deterministically ordered entries; an empty list for a disposed
+     * project or an indexed non-directory; otherwise [fallback]'s result when
+     * no applicable project-content snapshot exists.
+     */
     override fun scan(
         directory: Path,
         entryNamePrefix: String,

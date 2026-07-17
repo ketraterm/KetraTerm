@@ -19,7 +19,9 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import io.github.ketraterm.completion.api.TerminalFileEntry
 import java.nio.file.Path
 
+/** IntelliJ fixture tests for project-aware VFS directory snapshots. */
 class IntellijProjectDirectoryScannerTest : BasePlatformTestCase() {
+    /** Verifies filtering and ordering from project content without fallback I/O. */
     fun testProjectContentUsesFilteredVfsSnapshot() {
         val directory = myFixture.tempDirFixture.findOrCreateDir("completion")
         myFixture.tempDirFixture.createFile("completion/Alpha.kt")

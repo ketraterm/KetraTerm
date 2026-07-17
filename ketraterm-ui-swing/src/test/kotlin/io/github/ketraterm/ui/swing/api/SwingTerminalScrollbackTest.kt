@@ -47,6 +47,7 @@ import javax.swing.JComponent
 import javax.swing.RepaintManager
 import javax.swing.SwingUtilities
 
+/** Rendering, viewport, and EDT coalescing tests for Swing terminal scrollback. */
 class SwingTerminalScrollbackTest {
     @Test
     fun `equal render requests schedule at most one pending EDT repaint`() {

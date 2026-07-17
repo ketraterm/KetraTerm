@@ -36,7 +36,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-/** Application-level owner of IntelliJ completion learning and session sources. */
+/**
+ * Application-level owner of IntelliJ completion learning and session sources.
+ *
+ * The service owns persistent statistics and one [IntellijCompletionRegistry].
+ * IntelliJ disposal closes all session providers before closing persistence.
+ */
 @Service(Service.Level.APP)
 internal class KetraTermCompletionService : Disposable {
     private val statsStore =
@@ -49,6 +54,14 @@ internal class KetraTermCompletionService : Disposable {
             persistStats = statsStore::persist,
         )
 
+    /**
+     * Creates completion resources bound to one terminal workspace tab.
+     *
+     * @param project IntelliJ project used for project-aware VFS and Git snapshots.
+     * @param tab terminal tab providing identity, profile, and working-directory state.
+     * @return session resources that the owning terminal pane must close.
+     * @throws IllegalStateException if application-level completion has been disposed.
+     */
     fun openSession(
         project: Project,
         tab: TerminalWorkspaceTab,
@@ -64,6 +77,14 @@ internal class KetraTermCompletionService : Disposable {
             ),
         )
 
+    /**
+     * Records one shell-integration command completion for MRU and learned ranking.
+     *
+     * Privacy policy is applied before any command is persisted.
+     *
+     * @param tab terminal tab that executed the command.
+     * @param metadata trusted shell-integration command lifecycle metadata.
+     */
     fun recordFinishedCommand(
         tab: TerminalWorkspaceTab,
         metadata: TerminalShellIntegrationCommandMetadata,
@@ -75,6 +96,7 @@ internal class KetraTermCompletionService : Disposable {
         )
     }
 
+    /** Closes session sources, background workers, and the statistics store. */
     override fun dispose() {
         try {
             registry.close()
@@ -84,11 +106,31 @@ internal class KetraTermCompletionService : Disposable {
     }
 
     companion object {
+        /**
+         * Returns the application service instance.
+         *
+         * @return IntelliJ-managed completion service.
+         */
         fun getInstance(): KetraTermCompletionService = service()
     }
 }
 
-/** Plugin-owned composition of shared completion sources and learned statistics. */
+/**
+ * Plugin-owned composition of shared completion sources and learned statistics.
+ *
+ * Statistics mutations and persistence are serialized on a dedicated executor;
+ * directory and domain snapshots are delegated to [snapshotService]. Session
+ * registration is synchronized and replacing an existing session id closes its
+ * previous resources.
+ *
+ * @param specs immutable command specifications shared by every session.
+ * @property statsSource bounded learned-statistics source.
+ * @property loadStats startup snapshot loader executed on the statistics worker.
+ * @property persistStats snapshot writer executed after statistics mutations.
+ * @property sessionMruCapacity positive per-session MRU capacity.
+ * @property snapshotService application-owned asynchronous snapshot scheduler.
+ * @throws IllegalArgumentException if [sessionMruCapacity] is not positive.
+ */
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     private val statsSource: TerminalCommandStatsCompletionSource = TerminalCompletionSources.commandStats(commandSpecs = specs),
@@ -97,6 +139,7 @@ internal class IntellijCompletionRegistry(
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
     private val snapshotService: IntellijCompletionSnapshotService = IntellijCompletionSnapshotService(),
 ) : AutoCloseable {
+    /** Defensive immutable copy of the command specifications used by sessions. */
     val commandSpecs: List<TerminalCommandSpec> = specs.toList()
     private val lock = Any()
     private val closed = AtomicBoolean()
@@ -120,6 +163,13 @@ internal class IntellijCompletionRegistry(
         }
     }
 
+    /**
+     * Creates and registers all completion sources for one terminal session.
+     *
+     * @param context host capabilities and snapshot adapters for the session.
+     * @return closeable session-facing provider and feedback resources.
+     * @throws IllegalStateException if this registry is closed.
+     */
     fun openSession(context: IntellijCompletionSessionContext): IntellijCompletionSession {
         check(!closed.get()) { "IntelliJ completion registry is closed" }
         val notifier = SessionSourceChangeNotifier()
@@ -195,6 +245,13 @@ internal class IntellijCompletionRegistry(
         )
     }
 
+    /**
+     * Updates session MRU state and queues privacy-filtered persistent learning.
+     *
+     * @param sessionId terminal session that produced the command.
+     * @param profileId stable terminal profile identifier used for ranking context.
+     * @param metadata trusted shell-integration lifecycle metadata.
+     */
     fun recordFinishedCommand(
         sessionId: String,
         profileId: String,
@@ -264,6 +321,12 @@ internal class IntellijCompletionRegistry(
     private fun feedbackAware(source: TerminalCompletionSource): TerminalCompletionSource =
         TerminalCompletionSources.feedbackAware(source, statsSource::feedbackSnapshot)
 
+    /**
+     * Closes sessions and snapshot workers, then drains queued statistics work.
+     *
+     * Closing is idempotent. Interruption while awaiting the statistics worker
+     * is restored on the calling thread before pending work is cancelled.
+     */
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         val states =
@@ -287,12 +350,14 @@ internal class IntellijCompletionRegistry(
         }
     }
 
+    /** Session resources retained by the registry until replacement or closure. */
     private data class SessionState(
         val mruSource: TerminalSessionMruCompletionSource,
         val fileSystemProvider: IntellijAsyncFileSystemProvider,
         val gitBranchProvider: IntellijGitBranchCompletionProvider?,
         val notifier: SessionSourceChangeNotifier,
     ) {
+        /** Closes notification and dynamic providers and clears session learning. */
         fun close() {
             notifier.close()
             mruSource.clear()
@@ -333,7 +398,17 @@ internal class IntellijCompletionRegistry(
     }
 }
 
-/** Host context used to create one testable IntelliJ completion session. */
+/**
+ * Host context used to create one testable IntelliJ completion session.
+ *
+ * @property sessionId non-blank stable workspace-session identifier.
+ * @property profileId non-blank stable terminal profile identifier.
+ * @property workingDirectoryUriProvider thread-safe supplier for the latest URI.
+ * @property shellCapabilities shell syntax and quoting capabilities.
+ * @property gitBranchLoader optional blocking Git snapshot loader.
+ * @property directoryScanner blocking bounded directory snapshot scanner.
+ * @throws IllegalArgumentException if [sessionId] or [profileId] is blank.
+ */
 internal data class IntellijCompletionSessionContext(
     val sessionId: String,
     val profileId: String,
@@ -348,7 +423,16 @@ internal data class IntellijCompletionSessionContext(
     }
 }
 
-/** Session-owned completion resources consumed by one IntelliJ terminal pane. */
+/**
+ * Session-owned completion resources consumed by one IntelliJ terminal pane.
+ *
+ * @property provider popup-facing suggestion provider.
+ * @property feedbackHandler acceptance and dismissal learning handler.
+ * @property commandSpecs immutable command specifications used for triggering.
+ * @property shellCapabilities shell syntax and quoting capabilities.
+ * @property notifier thread-safe bridge for asynchronously published snapshots.
+ * @property closeAction registry callback that removes and closes this session.
+ */
 internal class IntellijCompletionSession(
     val provider: SwingShellSuggestionProvider,
     val feedbackHandler: SwingShellSuggestionFeedbackHandler,
@@ -359,6 +443,14 @@ internal class IntellijCompletionSession(
 ) : AutoCloseable {
     private val closed = AtomicBoolean()
 
+    /**
+     * Replaces the callback notified when an asynchronous source publishes.
+     *
+     * The callback may run on a completion worker and must perform any required
+     * Swing-thread handoff. Passing `null` detaches the current callback.
+     *
+     * @param listener replacement callback, or `null` to detach.
+     */
     fun onSourceChanged(listener: (() -> Unit)?) {
         if (closed.get()) {
             notifier.listener.set(null)
@@ -367,6 +459,7 @@ internal class IntellijCompletionSession(
         }
     }
 
+    /** Detaches notifications and releases registry-owned resources idempotently. */
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         notifier.listener.set(null)
@@ -374,14 +467,18 @@ internal class IntellijCompletionSession(
     }
 }
 
+/** Thread-safe, closeable single-listener notification bridge. */
 internal class SessionSourceChangeNotifier {
+    /** Current source-change callback, atomically replaceable by the owning pane. */
     val listener = AtomicReference<(() -> Unit)?>(null)
     private val closed = AtomicBoolean()
 
+    /** Invokes the current listener on the calling thread unless closed. */
     fun notifyChanged() {
         if (!closed.get()) listener.get()?.invoke()
     }
 
+    /** Permanently suppresses notifications and releases the current listener. */
     fun close() {
         closed.set(true)
         listener.set(null)

@@ -17,8 +17,23 @@ package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.TerminalShellQuotingPolicy
 
-/** Shared shell-safe replacement policy for path and dynamic-domain values. */
+/**
+ * Encodes literal completion values for insertion into the active shell token.
+ *
+ * This helper is pure and shared by path and dynamic-domain sources so both
+ * features apply identical quoting and escaping rules.
+ */
 internal object ShellReplacementText {
+    /**
+     * Encodes [value] for the current quote context and shell policy.
+     *
+     * @param value literal, unescaped value supplied by a completion provider.
+     * @param activeTokenQuote quote character opening the active token, or the
+     * NUL character when the token is unquoted.
+     * @param policy shell-specific quoting and escaping policy.
+     * @return replacement-safe text, or `null` when [policy] cannot represent
+     * [value] safely in the current quote context.
+     */
     fun encode(
         value: String,
         activeTokenQuote: Char,

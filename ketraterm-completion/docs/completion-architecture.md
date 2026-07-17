@@ -199,12 +199,14 @@ Standalone and IntelliJ completion providers are expected to differ internally.
 The standalone app uses session-local, immutable directory snapshots fed by a
 window-owned coroutine service with a bounded channel and two IO workers.
 Enumeration has visit, result, and elapsed-time caps; caches have capacity and
-expiry bounds; request generations prevent stale work from refreshing the
-popup. The app resolves local and `localhost` file URIs, explicit home paths,
+expiry bounds; request generations prevent stale work from refreshing the popup. A failed load clears only its matching
+in-flight generation, retains any previous ready snapshot, and can be retried by the next request. The app resolves
+local and `localhost` file URIs, explicit home paths,
 Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses
 project-aware VFS directory snapshots for paths inside project content and bounded local scanning elsewhere. Its first
 dynamic value provider reads local branches from the Git4Idea repository that contains the terminal working directory
-and publishes generation-safe snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Remote refs, changelists,
+and publishes generation-safe, failure-retryable snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Remote
+refs, changelists,
 whole-project fuzzy paths, SDKs, and run configurations remain follow-up work.
 
 Both hosts should map their data into the shared request/candidate/source

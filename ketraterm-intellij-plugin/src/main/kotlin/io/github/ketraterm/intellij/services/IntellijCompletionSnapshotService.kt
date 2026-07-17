@@ -19,7 +19,15 @@ import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 
-/** Application-scoped owner of bounded IntelliJ completion snapshot work. */
+/**
+ * Application-scoped owner of bounded IntelliJ completion snapshot work.
+ *
+ * Two IO workers consume a bounded, non-blocking queue shared by all terminal
+ * completion sessions. Submission rejects work when the queue is full instead
+ * of blocking the Swing event-dispatch thread. Provider failures are isolated
+ * so one failed load cannot terminate a worker. Closing this owner cancels
+ * queued and active work and is safe to repeat.
+ */
 internal class IntellijCompletionSnapshotService : AutoCloseable {
     private val scope =
         CoroutineScope(
@@ -46,6 +54,15 @@ internal class IntellijCompletionSnapshotService : AutoCloseable {
         }
     }
 
+    /**
+     * Creates a session-owned asynchronous directory snapshot provider.
+     *
+     * @param onSnapshotChanged callback invoked on a snapshot worker after a
+     * new active snapshot is published; the callback must arrange any required
+     * Swing-thread handoff.
+     * @param scanner blocking directory scanner executed only by snapshot workers.
+     * @return provider that must be closed with its terminal session.
+     */
     fun createDirectoryProvider(
         onSnapshotChanged: () -> Unit,
         scanner: IntellijDirectoryScanner = BoundedIntellijDirectoryScanner(),
@@ -56,6 +73,17 @@ internal class IntellijCompletionSnapshotService : AutoCloseable {
             scanner = scanner,
         )
 
+    /**
+     * Creates a session-owned asynchronous Git-branch snapshot provider.
+     *
+     * @param workingDirectoryUriProvider thread-safe supplier for the session's
+     * latest working-directory URI.
+     * @param loader blocking branch loader executed only by snapshot workers.
+     * @param onSnapshotChanged callback invoked on a snapshot worker after a
+     * new active snapshot is published; the callback must arrange any required
+     * Swing-thread handoff.
+     * @return provider that must be closed with its terminal session.
+     */
     fun createGitBranchProvider(
         workingDirectoryUriProvider: () -> String?,
         loader: (String?) -> List<TerminalCompletionDomainValue>,
@@ -68,6 +96,7 @@ internal class IntellijCompletionSnapshotService : AutoCloseable {
             onSnapshotChanged = onSnapshotChanged,
         )
 
+    /** Cancels shared snapshot work and releases worker resources idempotently. */
     override fun close() {
         workQueue.close()
         scope.cancel()

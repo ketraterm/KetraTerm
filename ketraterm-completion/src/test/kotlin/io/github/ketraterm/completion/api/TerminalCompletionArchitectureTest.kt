@@ -22,6 +22,7 @@ import kotlin.io.path.invariantSeparatorsPathString
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
+/** Enforces the completion module's public package and visibility boundaries. */
 internal class TerminalCompletionArchitectureTest {
     @Test
     fun `implementation packages expose no public top-level declarations`() {

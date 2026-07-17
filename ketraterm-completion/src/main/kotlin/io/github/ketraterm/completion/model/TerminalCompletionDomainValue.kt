@@ -26,6 +26,8 @@ package io.github.ketraterm.completion.model
  * @property displayText popup label, independent from inserted text.
  * @property detail optional host-owned description.
  * @property scoreAdjustment bounded host relevance adjustment within a source.
+ * @throws IllegalArgumentException if [value] or [displayText] is blank, or if
+ * [scoreAdjustment] is outside [MIN_SCORE_ADJUSTMENT] through [MAX_SCORE_ADJUSTMENT].
  */
 data class TerminalCompletionDomainValue
 @JvmOverloads

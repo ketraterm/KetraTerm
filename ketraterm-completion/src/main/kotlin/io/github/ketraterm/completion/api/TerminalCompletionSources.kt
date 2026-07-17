@@ -24,9 +24,7 @@ import io.github.ketraterm.completion.source.SessionMruCompletionSourceImpl
 import io.github.ketraterm.completion.source.ValueDomainCompletionSource
 import io.github.ketraterm.completion.spec.SpecCompletionSource
 
-/**
- * Factories for dependency-free completion sources.
- */
+/** Factories for dependency-free, host-composable completion sources. */
 object TerminalCompletionSources {
     /**
      * Creates a deterministic source backed by static command specs.
@@ -69,6 +67,7 @@ object TerminalCompletionSources {
      * excluded from observed-token learning because specs are authoritative for
      * those commands.
      * @return mutable session MRU completion source.
+     * @throws IllegalArgumentException if [capacity] is not positive.
      */
     @JvmStatic
     @JvmOverloads
@@ -91,6 +90,7 @@ object TerminalCompletionSources {
      * @param commandSpecs command specifications used to classify
      * privacy-preserving command-family shapes.
      * @return mutable command stats completion source.
+     * @throws IllegalArgumentException if [capacity] is not positive.
      */
     @JvmStatic
     @JvmOverloads
@@ -152,6 +152,8 @@ object TerminalCompletionSources {
      * @param valuesProvider supplier for the latest immutable value snapshot.
      * @param commandSpecs command specs used to resolve the active value domain.
      * @return context-aware dynamic value completion source.
+     * @throws IllegalArgumentException if [domain] is
+     * [TerminalCompletionValueDomain.NONE] or [sourceId] is blank.
      */
     @JvmStatic
     @JvmOverloads

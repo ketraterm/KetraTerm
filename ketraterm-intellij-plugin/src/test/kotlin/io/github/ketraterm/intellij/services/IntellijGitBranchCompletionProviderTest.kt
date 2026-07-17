@@ -21,7 +21,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Generation, failure, and lifecycle tests for asynchronous Git branch snapshots. */
 class IntellijGitBranchCompletionProviderTest {
+    /** Verifies that the initial request is non-blocking and publishes one snapshot. */
     @Test
     fun `publishes immutable ready snapshot after background load`() {
         val scheduler = RecordingScheduler()
@@ -38,6 +40,7 @@ class IntellijGitBranchCompletionProviderTest {
         assertEquals(listOf("first-branch"), provider.values().map { it.value })
     }
 
+    /** Verifies that directory changes reject results from older generations. */
     @Test
     fun `working directory change rejects stale branch publication`() {
         val scheduler = RecordingScheduler()
@@ -63,6 +66,7 @@ class IntellijGitBranchCompletionProviderTest {
         assertEquals("second-branch", provider.values().single().value)
     }
 
+    /** Verifies that closure prevents an already queued result from publishing. */
     @Test
     fun `closed provider discards in-flight results`() {
         val scheduler = RecordingScheduler()
@@ -75,6 +79,31 @@ class IntellijGitBranchCompletionProviderTest {
 
         assertEquals(0, publications)
         assertTrue(provider.values().isEmpty())
+    }
+
+    /** Verifies that a throwing loader clears in-flight state and permits retry. */
+    @Test
+    fun `failed load can be retried`() {
+        val scheduler = RecordingScheduler()
+        var attempts = 0
+        val provider =
+            provider(scheduler, {}) {
+                attempts++
+                if (attempts == 1) error("load failed")
+                listOf(TerminalCompletionDomainValue("recovered"))
+            }
+
+        provider.values()
+        try {
+            scheduler.runNext()
+            throw AssertionError("Expected the first load to fail")
+        } catch (expectedFailure: IllegalStateException) {
+            assertEquals("load failed", expectedFailure.message)
+        }
+
+        assertTrue(provider.values().isEmpty())
+        scheduler.runNext()
+        assertEquals("recovered", provider.values().single().value)
     }
 
     private fun provider(
@@ -90,6 +119,7 @@ class IntellijGitBranchCompletionProviderTest {
             snapshotTtlNanos = Long.MAX_VALUE,
         )
 
+    /** Deterministic FIFO scheduler used to control snapshot publication in tests. */
     private class RecordingScheduler : IntellijCompletionLoadScheduler {
         private val tasks = ArrayDeque<suspend () -> Unit>()
 

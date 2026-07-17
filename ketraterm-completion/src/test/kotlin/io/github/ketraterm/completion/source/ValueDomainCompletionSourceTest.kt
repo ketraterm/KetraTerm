@@ -25,6 +25,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+/** Context, quoting, and replacement tests for host-published value domains. */
 class ValueDomainCompletionSourceTest {
     private val source =
         TerminalCompletionSources.valueDomain(
@@ -38,6 +39,7 @@ class ValueDomainCompletionSourceTest {
             },
         )
 
+    /** Verifies domain gating and candidate metadata in a matching command context. */
     @Test
     fun `returns domain values only in matching command context`() {
         val candidate = source.complete(request("git switch fe")).single()
@@ -52,12 +54,14 @@ class ValueDomainCompletionSourceTest {
         assertTrue(source.complete(request("git status fe")).isEmpty())
     }
 
+    /** Verifies branch-domain activation for merge and rebase commands. */
     @Test
     fun `supports merge and rebase branch contexts`() {
         assertEquals("feature/terminal", source.complete(request("git merge fe")).single().replacementText)
         assertEquals("feature/terminal", source.complete(request("git rebase fe")).single().replacementText)
     }
 
+    /** Verifies that host values pass through shell-specific safe replacement encoding. */
     @Test
     fun `escapes host values through the request shell policy`() {
         val specialSource =
@@ -75,6 +79,7 @@ class ValueDomainCompletionSourceTest {
         )
     }
 
+    /** Verifies that exact values are not suggested as no-op replacements. */
     @Test
     fun `does not return an already complete value`() {
         assertTrue(source.complete(request("git switch feature/terminal")).isEmpty())
