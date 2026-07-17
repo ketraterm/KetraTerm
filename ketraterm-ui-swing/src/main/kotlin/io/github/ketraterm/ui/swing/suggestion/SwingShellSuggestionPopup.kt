@@ -15,10 +15,15 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
-import java.awt.*
+import java.awt.Color
+import java.awt.Dimension
+import java.awt.Graphics
+import java.awt.Graphics2D
+import java.awt.RenderingHints
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import java.util.*
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import kotlin.math.min
@@ -34,6 +39,7 @@ internal class SwingShellSuggestionPopup(
 ) : JComponent() {
     private var suggestions: List<SwingShellSuggestion> = emptyList()
     private var selectedIndex: Int = NO_SELECTION
+    private val preparedLayout = SwingShellSuggestionPopupLayout()
 
     init {
         isOpaque = false
@@ -58,32 +64,53 @@ internal class SwingShellSuggestionPopup(
                 }
             },
         )
+        addComponentListener(
+            object : ComponentAdapter() {
+                override fun componentResized(event: ComponentEvent) {
+                    prepareLayout()
+                }
+            },
+        )
+        addPropertyChangeListener("font") {
+            prepareLayout()
+        }
     }
 
     fun update(
         suggestions: List<SwingShellSuggestion>,
         selectedIndex: Int,
     ) {
-        this.suggestions = suggestions
+        if (this.suggestions != suggestions) {
+            this.suggestions = suggestions
+            prepareLayout()
+            revalidate()
+        }
         this.selectedIndex = selectedIndex
-        revalidate()
         repaint()
     }
 
     override fun getPreferredSize(): Dimension {
         if (suggestions.isEmpty()) return Dimension(0, 0)
-        val rows = min(suggestions.size, MAX_VISIBLE_ROWS)
+        val rows = min(suggestions.size, POPUP_MAX_VISIBLE_ROWS)
         return Dimension(DEFAULT_WIDTH, VERTICAL_PADDING * 2 + rows * ROW_HEIGHT)
     }
 
     override fun paintComponent(graphics: Graphics) {
-        val g = graphics.create() as Graphics2D
+        val g = graphics as? Graphics2D ?: return
+        val previousColor = g.color
+        val previousFont = g.font
+        val previousAntialiasing = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             paintChrome(g)
             paintRows(g)
         } finally {
-            g.dispose()
+            g.color = previousColor
+            g.font = previousFont
+            g.setRenderingHint(
+                RenderingHints.KEY_ANTIALIASING,
+                previousAntialiasing ?: RenderingHints.VALUE_ANTIALIAS_DEFAULT,
+            )
         }
     }
 
@@ -95,51 +122,34 @@ internal class SwingShellSuggestionPopup(
     }
 
     private fun paintRows(g: Graphics2D) {
-        val textFont = font ?: g.font
-        g.font = textFont
-        val metrics = g.fontMetrics
-        val detailFont = textFont.deriveFont(Font.PLAIN, (textFont.size2D - 1f).coerceAtLeast(MIN_DETAIL_FONT_SIZE))
-        val detailMetrics = g.getFontMetrics(detailFont)
-        val sourceFont = textFont.deriveFont(Font.BOLD, SOURCE_FONT_SIZE)
-        val sourceMetrics = g.getFontMetrics(sourceFont)
-        val count = min(suggestions.size, MAX_VISIBLE_ROWS)
+        val count = preparedLayout.rowCount
         var index = 0
         while (index < count) {
             val top = VERTICAL_PADDING + index * ROW_HEIGHT
-            val suggestion = suggestions[index]
+            val row = preparedLayout.row(index)
             if (index == selectedIndex) {
                 g.color = SELECTED_BACKGROUND
-                g.fillRoundRect(ROW_INSET, top + 2, width - ROW_INSET * 2, ROW_HEIGHT - 4, 8, 8)
+                g.fillRoundRect(POPUP_ROW_INSET, top + 2, width - POPUP_ROW_INSET * 2, ROW_HEIGHT - 4, 8, 8)
             }
 
             val markerColor = MARKER_COLORS[index % MARKER_COLORS.size]
             g.color = markerColor
-            g.fillRoundRect(ROW_INSET + 2, top + 8, MARKER_SIZE, MARKER_SIZE, MARKER_SIZE, MARKER_SIZE)
+            g.fillRoundRect(POPUP_ROW_INSET + 2, top + 8, MARKER_SIZE, MARKER_SIZE, MARKER_SIZE, MARKER_SIZE)
 
-            val textX = ROW_INSET + 18
-            val rightLimit = width - ROW_INSET
-            val source = suggestion.source.trim()
-            val sourceWidth =
-                if (source.isEmpty()) {
-                    0
-                } else {
-                    sourceMetrics.stringWidth(source.uppercase(Locale.ROOT)) + SOURCE_HORIZONTAL_PADDING * 2
-                }
-            val textLimit = rightLimit - sourceWidth - if (sourceWidth == 0) 0 else SOURCE_GAP
-
-            g.font = textFont
+            val textX = POPUP_ROW_INSET + POPUP_TEXT_LEFT_OFFSET
+            val rightLimit = width - POPUP_ROW_INSET
+            g.font = preparedLayout.textFont
             g.color = TEXT
-            g.drawString(ellipsize(suggestion.displayText, metrics, textLimit - textX), textX, top + 18)
+            g.drawString(row.displayText, textX, top + 18)
 
-            val detail = suggestion.detail.trim()
-            if (detail.isNotEmpty()) {
-                g.font = detailFont
+            if (row.detail.isNotEmpty()) {
+                g.font = preparedLayout.detailFont
                 g.color = DETAIL
-                g.drawString(ellipsize(detail, detailMetrics, textLimit - textX), textX, top + 34)
+                g.drawString(row.detail, textX, top + 34)
             }
 
-            if (sourceWidth > 0) {
-                paintSource(g, source, rightLimit - sourceWidth, top + 10, sourceWidth, sourceFont)
+            if (row.sourceWidth > 0) {
+                paintSource(g, row, rightLimit - row.sourceWidth, top + 10)
             }
             index++
         }
@@ -147,61 +157,41 @@ internal class SwingShellSuggestionPopup(
 
     private fun paintSource(
         g: Graphics2D,
-        source: String,
+        row: SwingShellSuggestionPopupRow,
         x: Int,
         y: Int,
-        sourceWidth: Int,
-        sourceFont: Font,
     ) {
-        val label = source.uppercase(Locale.ROOT)
         g.color = SOURCE_BACKGROUND
-        g.fillRoundRect(x, y, sourceWidth, SOURCE_HEIGHT, SOURCE_ARC, SOURCE_ARC)
-        g.font = sourceFont
+        g.fillRoundRect(x, y, row.sourceWidth, SOURCE_HEIGHT, SOURCE_ARC, SOURCE_ARC)
+        g.font = preparedLayout.sourceFont
         g.color = SOURCE_TEXT
-        g.drawString(label, x + SOURCE_HORIZONTAL_PADDING, y + SOURCE_BASELINE)
+        g.drawString(row.sourceLabel, x + POPUP_SOURCE_HORIZONTAL_PADDING, y + SOURCE_BASELINE)
+    }
+
+    private fun prepareLayout() {
+        preparedLayout.prepare(
+            component = this,
+            suggestions = suggestions,
+            availableWidth = if (width > 0) width else DEFAULT_WIDTH,
+        )
     }
 
     private fun rowAt(y: Int): Int {
         if (y < VERTICAL_PADDING) return NO_SELECTION
         val row = (y - VERTICAL_PADDING) / ROW_HEIGHT
-        return if (row in suggestions.indices && row < MAX_VISIBLE_ROWS) row else NO_SELECTION
-    }
-
-    private fun ellipsize(
-        text: String,
-        metrics: FontMetrics,
-        maxWidth: Int,
-    ): String {
-        if (maxWidth <= 0) return ""
-        if (metrics.stringWidth(text) <= maxWidth) return text
-
-        var end = text.length
-        while (end > 0) {
-            val candidate = text.substring(0, end) + ELLIPSIS
-            if (metrics.stringWidth(candidate) <= maxWidth) return candidate
-            end--
-        }
-        return ""
+        return if (row in suggestions.indices && row < POPUP_MAX_VISIBLE_ROWS) row else NO_SELECTION
     }
 
     private companion object {
         private const val NO_SELECTION = -1
-        private const val MAX_VISIBLE_ROWS = 8
         private const val DEFAULT_WIDTH = 440
         private const val ROW_HEIGHT = 44
-        private const val ROW_INSET = 8
         private const val VERTICAL_PADDING = 8
         private const val ARC = 14
         private const val MARKER_SIZE = 8
         private const val SOURCE_HEIGHT = 18
         private const val SOURCE_BASELINE = 13
         private const val SOURCE_ARC = 8
-        private const val SOURCE_FONT_SIZE = 10f
-        private const val SOURCE_HORIZONTAL_PADDING = 7
-        private const val SOURCE_GAP = 10
-        private const val MIN_DETAIL_FONT_SIZE = 10f
-        private const val ELLIPSIS = "..."
-
         private val BACKGROUND = Color(0xF21F2329.toInt(), true)
         private val BORDER = Color(0x663F4752, true)
         private val SELECTED_BACKGROUND = Color(0x384DA3FF, true)
