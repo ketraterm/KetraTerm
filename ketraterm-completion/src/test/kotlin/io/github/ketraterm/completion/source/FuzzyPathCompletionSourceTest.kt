@@ -61,6 +61,31 @@ class FuzzyPathCompletionSourceTest {
     }
 
     @Test
+    fun `can opt into an empty prefix for a small context-specific path snapshot`() {
+        val statusSource =
+            TerminalCompletionSources.fuzzyPath(
+                sourceId = "git-status-path",
+                entriesProvider = { listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false)) },
+                requiresNonEmptyPrefix = false,
+                allowedCommandNames = setOf("add", "restore", "rm", "diff"),
+            )
+
+        assertEquals(
+            listOf("src/Changed.kt"),
+            statusSource.complete(request("git add ")).map(TerminalCompletionCandidate::replacementText),
+        )
+        assertEquals(
+            listOf("src/Changed.kt"),
+            statusSource.complete(request("git restore ")).map(TerminalCompletionCandidate::replacementText),
+        )
+        assertEquals(
+            listOf("src/Changed.kt"),
+            statusSource.complete(request("git rm ")).map(TerminalCompletionCandidate::replacementText),
+        )
+        assertTrue(statusSource.complete(request("cd ")).isEmpty())
+    }
+
+    @Test
     fun `hides nested dot directories until the active path component starts with a dot`() {
         assertTrue(source.complete(request("cat Hidden")).isEmpty())
 

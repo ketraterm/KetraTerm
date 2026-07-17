@@ -146,6 +146,16 @@ object TerminalCommandSpecs {
                         description = "add file contents to the index",
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                     ),
+                    TerminalCommandSpec(
+                        name = "restore",
+                        description = "restore working tree files",
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                    TerminalCommandSpec(
+                        name = "rm",
+                        description = "remove files from the working tree and index",
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
                     TerminalCommandSpec("commit", "record changes to the repository"),
                     TerminalCommandSpec(
                         name = "checkout",

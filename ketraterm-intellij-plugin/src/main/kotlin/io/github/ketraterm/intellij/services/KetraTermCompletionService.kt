@@ -77,6 +77,7 @@ internal class KetraTermCompletionService : Disposable {
                 providerFactories =
                     listOf(
                         IntellijGitBranchProviderFactory(IntellijGitBranchLoader(project)::load),
+                        IntellijGitStatusPathProviderFactory(IntellijGitStatusPathLoader(project)::load),
                         IntellijProjectFileProviderFactory(IntellijProjectFileLoader(project)::load),
                     ),
                 directoryScanner = IntellijProjectDirectoryScanner(project),

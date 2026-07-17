@@ -17,12 +17,10 @@ package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
-import git4idea.repo.GitRepository
 import git4idea.repo.GitRepositoryManager
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import io.github.ketraterm.completion.host.TerminalValueSnapshotProvider
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
-import java.nio.file.Path
 
 /**
  * Reads local Git branches from the repository containing a terminal directory.
@@ -52,7 +50,8 @@ internal class IntellijGitBranchLoader(
         val workingDirectory = TerminalLocalFileUriResolver.resolve(workingDirectoryUri) ?: return emptyList()
         return ApplicationManager.getApplication().runReadAction<List<TerminalCompletionDomainValue>> {
             if (project.isDisposed) return@runReadAction emptyList()
-            val repository = selectRepository(GitRepositoryManager.getInstance(project).repositories, workingDirectory)
+            val repository =
+                selectIntellijGitRepository(GitRepositoryManager.getInstance(project).repositories, workingDirectory)
                 ?: return@runReadAction emptyList()
             val currentBranchName = repository.currentBranch?.name
             repository.branches.localBranches
@@ -76,14 +75,6 @@ internal class IntellijGitBranchLoader(
             compareBy<TerminalCompletionDomainValue, String>(String.CASE_INSENSITIVE_ORDER) { it.value }
                 .thenBy { it.value }
 
-        private fun selectRepository(
-            repositories: List<GitRepository>,
-            workingDirectory: Path,
-        ): GitRepository? =
-            repositories
-                .asSequence()
-                .filter { repository -> workingDirectory.startsWith(repository.root.toNioPath()) }
-                .maxByOrNull { repository -> repository.root.path.length }
     }
 }
 

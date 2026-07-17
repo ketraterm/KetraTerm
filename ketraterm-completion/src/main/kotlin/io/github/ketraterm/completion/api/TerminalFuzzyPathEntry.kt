@@ -25,14 +25,17 @@ package io.github.ketraterm.completion.api
  *
  * @property path non-empty lexical path without a trailing separator.
  * @property isDirectory whether this entry represents a directory.
+ * @property detail optional host-owned concise description shown beside the path.
  */
 data class TerminalFuzzyPathEntry(
     val path: String,
     val isDirectory: Boolean,
+    val detail: String? = null,
 ) {
     init {
         require(path.isNotBlank()) { "path must not be blank" }
         require(!path.endsWith('/')) { "path must not end with '/', was $path" }
         require(!path.endsWith('\\')) { "path must not end with '\\', was $path" }
+        require(detail.isNullOrBlank() || !detail.contains('\n')) { "detail must be a single line" }
     }
 }

@@ -153,8 +153,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(host)`: richer font measurement policy for native shaping backends, fallback run metrics, and backend painter integrations beyond the current Java2D/Swing script-run shaping path.
 - `DONE(host)`: custom line spacing/height metrics in the renderer.
 - `DONE(host/ui)`: scrollback controls, selection behavior while scrolled, scroll-on-output policy, and resize offset retention.
-- `TODO(host/ui)`: Fig-style spec corpus import and dynamic host providers for Git status paths,
-  Docker contexts, Kubernetes namespaces, IDE run configurations, and IntelliJ-native popup styling remain host-owned
+- `TODO(host/ui)`: Fig-style spec corpus import and dynamic host providers for Docker contexts, Kubernetes namespaces,
+  IDE run configurations, and IntelliJ-native popup styling remain host-owned
   follow-up work. IntelliJ now has a plugin-owned shared-engine adapter with profile/current-directory context,
   coroutine-debounced live refresh, active-keymap acceptance, session MRU, privacy-filtered application-level
   exact/shape/feedback learning, and bounded off-EDT path snapshots with stale-generation rejection. The reusable Swing
@@ -174,8 +174,11 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe project-content fuzzy path snapshots
   for declared or explicitly path-like completion positions. Direct directory completion stays higher priority for
   concise immediate-child results.
+- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe Git status path snapshots from its
+  change-list model for changed and untracked paths in the selected repository. The provider is active for `git add`,
+  `restore`, `rm`, and `diff`, and never starts a Git process.
 - `TODO(completion/provider)`: implement remaining standalone and IntelliJ dynamic providers for declared value domains,
-  such as remote Git refs/status paths, Kubernetes namespaces for `kubectl --namespace`, Docker contexts for
+  such as remote Git refs, Kubernetes namespaces for `kubectl --namespace`, Docker contexts for
   `docker --context`, npm scripts, AWS profiles/regions, and IDE run configurations.
   Providers must remain host-owned and feed domain-tagged candidates into the shared engine.
 - `TODO(completion/policy)`: add tested lexical and quoting capability sets for Command Prompt, Fish, Nushell, and other shell dialects. Until a host provides a complete capability contract, use `TerminalShellCapabilities.PLAIN`; do not infer dialect behavior from command text.

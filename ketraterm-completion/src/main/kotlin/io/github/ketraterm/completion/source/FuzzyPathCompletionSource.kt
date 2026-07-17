@@ -37,6 +37,8 @@ import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 internal class FuzzyPathCompletionSource(
     private val sourceId: String,
     private val entriesProvider: () -> List<TerminalFuzzyPathEntry>,
+    private val requiresNonEmptyPrefix: Boolean,
+    private val allowedCommandNames: Set<String>,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
 ) : ContextAwareCompletionSource {
     private val commandSpecs = commandSpecs.toList()
@@ -47,7 +49,7 @@ internal class FuzzyPathCompletionSource(
             TerminalCommandLineTokenizer.parse(
                 request.commandLine,
                 request.cursorOffset,
-                request.shellCapabilities.syntax
+                request.shellCapabilities.syntax,
             ),
         )
 
@@ -62,8 +64,13 @@ internal class FuzzyPathCompletionSource(
                 lineContext = commandLineContext,
                 commandSpecs = commandSpecs,
             )
+        if (allowedCommandNames.isNotEmpty() && context.currentCommand?.name !in allowedCommandNames) {
+            return emptyList()
+        }
         val prefix = context.activePrefix
-        if (!allowsPathCompletion(context.activePosition, context.expectedPathKind, prefix) || prefix.isEmpty()) {
+        if (!allowsPathCompletion(context.activePosition, context.expectedPathKind, prefix) ||
+            (requiresNonEmptyPrefix && prefix.isEmpty())
+        ) {
             return emptyList()
         }
 
@@ -88,7 +95,7 @@ internal class FuzzyPathCompletionSource(
                     replacementStartOffset = context.replacementStartOffset,
                     replacementEndOffset = context.replacementEndOffset,
                     displayText = entry.path + if (entry.isDirectory) "/" else "",
-                    detail = if (entry.isDirectory) "project directory" else "project file",
+                    detail = entry.detail ?: if (entry.isDirectory) "project directory" else "project file",
                     source = sourceId,
                     kind = TerminalCompletionCandidateKind.PATH,
                     score = FUZZY_PATH_BASE_SCORE + fuzzyScore - orderIndex++,

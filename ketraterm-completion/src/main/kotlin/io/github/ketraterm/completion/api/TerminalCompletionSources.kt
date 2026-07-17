@@ -147,6 +147,12 @@ object TerminalCompletionSources {
      *
      * @param sourceId stable candidate-source id used by ranking feedback.
      * @param entriesProvider supplier for the latest bounded indexed-path snapshot.
+     * @param requiresNonEmptyPrefix whether this source waits for explicit path
+     * text before matching. Use `false` only for small, context-specific
+     * snapshots such as changed Git paths.
+     * @param allowedCommandNames optional canonical command/subcommand names to
+     * which this source is restricted. An empty set permits every valid path
+     * position.
      * @param commandSpecs command specs whose path metadata controls activation.
      * @return context-aware fuzzy path completion source.
      * @throws IllegalArgumentException if [sourceId] is blank.
@@ -156,12 +162,17 @@ object TerminalCompletionSources {
     fun fuzzyPath(
         sourceId: String,
         entriesProvider: () -> List<TerminalFuzzyPathEntry>,
+        requiresNonEmptyPrefix: Boolean = true,
+        allowedCommandNames: Set<String> = emptySet(),
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     ): TerminalCompletionSource {
         require(sourceId.isNotBlank()) { "sourceId must not be blank" }
+        require(allowedCommandNames.none(String::isBlank)) { "allowedCommandNames must not contain blank values" }
         return FuzzyPathCompletionSource(
             sourceId = sourceId,
             entriesProvider = entriesProvider,
+            requiresNonEmptyPrefix = requiresNonEmptyPrefix,
+            allowedCommandNames = allowedCommandNames.toSet(),
             commandSpecs = commandSpecs,
         )
     }

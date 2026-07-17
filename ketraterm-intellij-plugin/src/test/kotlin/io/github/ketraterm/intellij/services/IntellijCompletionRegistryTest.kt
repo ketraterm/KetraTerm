@@ -140,6 +140,49 @@ class IntellijCompletionRegistryTest {
     }
 
     @Test
+    fun `git status paths refresh the owning session provider for an empty add argument`() {
+        val registry = IntellijCompletionRegistry()
+        try {
+            val changed = CountDownLatch(1)
+            val session =
+                registry.openSession(
+                    context("git-status-path").copy(
+                        workingDirectoryUriProvider = { "file:///project" },
+                        providerFactories =
+                            listOf(
+                                IntellijGitStatusPathProviderFactory {
+                                    listOf(
+                                        TerminalFuzzyPathEntry(
+                                            "src/Changed.kt",
+                                            isDirectory = false,
+                                            detail = "changed file",
+                                        ),
+                                    )
+                                },
+                            ),
+                    ),
+                )
+            session.onSourceChanged(changed::countDown)
+
+            session.provider.suggestions(request("git add "))
+            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            var suggestions = session.provider.suggestions(request("git add "))
+            while (suggestions.none { it.source == "intellij-git-status-path" } && System.nanoTime() < deadline) {
+                Thread.sleep(5)
+                suggestions = session.provider.suggestions(request("git add "))
+            }
+
+            val suggestion = suggestions.single { it.source == "intellij-git-status-path" }
+            assertEquals("src/Changed.kt", suggestion.replacementText)
+            assertEquals("changed file", suggestion.detail)
+            assertEquals("PATH", suggestion.kind)
+        } finally {
+            registry.close()
+        }
+    }
+
+    @Test
     fun `successful commands feed only their owning session MRU`() {
         val registry = IntellijCompletionRegistry(specs = emptyList())
         try {

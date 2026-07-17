@@ -51,7 +51,8 @@ must never perform host I/O.
 
 `TerminalCompletionSources.fuzzyPath(...)` adapts a bounded immutable host path snapshot for context-aware fuzzy path
 completion. Hosts own indexing and asynchronous refresh; the shared source retains path-kind filtering, explicit
-replacement ranges, and shell-safe quoting.
+replacement ranges, and shell-safe quoting. It requires typed path text by default; a small, context-specific provider
+such as Git status paths may opt in to empty-prefix suggestions.
 
 `TerminalCompletionContextResolver` is the shared internal command-line context
 resolver. Sources and ranking decorators should use it instead of independently
@@ -227,7 +228,8 @@ dynamic value provider reads local branches from the Git4Idea repository that co
 and publishes generation-safe, failure-retryable snapshots for `git switch`, `checkout`, `merge`, and `rebase`.
 Whole-project fuzzy paths use a separate bounded VFS snapshot source and only activate in declared or explicitly
 path-like terminal positions; direct directory completion remains higher priority for immediate children. Remote refs,
-changelists, SDKs, and run configurations remain follow-up work.
+changelists, SDKs, and run configurations remain follow-up work. A separate Git status snapshot supplies changed and
+untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Git process.
 
 IntelliJ dynamic providers are composed through additive provider factories. Each factory returns one prioritized source
 plus the closeable snapshot resources owned by that source. Adding a new value domain therefore does not require another

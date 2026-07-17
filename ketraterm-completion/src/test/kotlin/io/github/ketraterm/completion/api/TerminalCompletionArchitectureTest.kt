@@ -347,7 +347,7 @@ internal class TerminalCompletionArchitectureTest {
                             "sessionMru",
                             "path",
                             "fuzzyPath",
-                            "valueDomain"
+                            "valueDomain",
                         ),
                 "api/TerminalSessionMruCompletionSource.kt" to setOf("recordSuccessfulCommand", "clear"),
                 "api/TerminalCompletionTriggerEvaluator.kt" to setOf("shouldTrigger", "isLiveTrigger"),
