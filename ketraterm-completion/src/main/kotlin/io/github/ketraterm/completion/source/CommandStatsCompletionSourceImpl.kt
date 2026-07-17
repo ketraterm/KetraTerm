@@ -24,6 +24,8 @@ import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.ranking.ExactCommandStatsCandidateBuilder
+import io.github.ketraterm.completion.ranking.indexedFeedbackRankingSnapshot
+import io.github.ketraterm.completion.ranking.indexedShapeRankingSnapshot
 import io.github.ketraterm.completion.stats.CommandCompletionStatsIndex
 import io.github.ketraterm.completion.stats.CommandShapeStatsIndex
 import io.github.ketraterm.completion.stats.CompletionFeedbackStatsIndex
@@ -52,6 +54,8 @@ internal class CommandStatsCompletionSourceImpl(
     private val commandStats = CommandCompletionStatsIndex(capacity)
     private val shapeStats = CommandShapeStatsIndex(capacity, commandSpecs)
     private val feedbackStats = CompletionFeedbackStatsIndex(capacity)
+    private var publishedShapeStats: List<TerminalCommandShapeStats> = indexedShapeRankingSnapshot(emptyList())
+    private var publishedFeedbackStats: List<TerminalCompletionFeedbackStats> = indexedFeedbackRankingSnapshot(emptyList())
 
     /**
      * Replaces every stats family from one host-loaded snapshot.
@@ -66,6 +70,7 @@ internal class CommandStatsCompletionSourceImpl(
             commandStats.replaceAll(snapshot.commandStats)
             shapeStats.replaceAll(snapshot.shapeStats)
             feedbackStats.replaceAll(snapshot.feedbackStats)
+            publishLearnedSnapshots()
         }
     }
 
@@ -86,7 +91,7 @@ internal class CommandStatsCompletionSourceImpl(
      */
     override fun shapeSnapshot(): List<TerminalCommandShapeStats> =
         synchronized(lock) {
-            shapeStats.snapshot()
+            publishedShapeStats
         }
 
     /**
@@ -96,7 +101,7 @@ internal class CommandStatsCompletionSourceImpl(
      */
     override fun feedbackSnapshot(): List<TerminalCompletionFeedbackStats> =
         synchronized(lock) {
-            feedbackStats.snapshot()
+            publishedFeedbackStats
         }
 
     /**
@@ -108,8 +113,8 @@ internal class CommandStatsCompletionSourceImpl(
         synchronized(lock) {
             TerminalCommandCompletionStatsSnapshot(
                 commandStats = commandStats.snapshot(),
-                shapeStats = shapeStats.snapshot(),
-                feedbackStats = feedbackStats.snapshot(),
+                shapeStats = publishedShapeStats,
+                feedbackStats = publishedFeedbackStats,
             )
         }
 
@@ -147,6 +152,7 @@ internal class CommandStatsCompletionSourceImpl(
                 workingDirectoryUri = workingDirectoryUri,
                 usedAtEpochMillis = usedAtEpochMillis,
             )
+            publishedShapeStats = indexedShapeRankingSnapshot(shapeStats.snapshot())
         }
     }
 
@@ -192,7 +198,13 @@ internal class CommandStatsCompletionSourceImpl(
                     feedbackAtEpochMillis = feedbackAtEpochMillis,
                 )
             }
+            publishLearnedSnapshots()
         }
+    }
+
+    private fun publishLearnedSnapshots() {
+        publishedShapeStats = indexedShapeRankingSnapshot(shapeStats.snapshot())
+        publishedFeedbackStats = indexedFeedbackRankingSnapshot(feedbackStats.snapshot())
     }
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =

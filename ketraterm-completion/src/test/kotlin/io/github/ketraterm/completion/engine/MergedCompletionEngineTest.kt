@@ -93,6 +93,36 @@ class MergedCompletionEngineTest {
     }
 
     @Test
+    fun `large provider result preserves exact deterministic ordering`() {
+        val candidates =
+            ArrayList<TerminalCompletionCandidate>(1_024).apply {
+                var index = 0
+                while (index < 1_024) {
+                    add(
+                        candidate(
+                            replacement = "candidate-$index",
+                            display = "display-${1_024 - index}",
+                            score = (index * 37) % 101,
+                        ),
+                    )
+                    index++
+                }
+            }
+        val engine = TerminalCompletionEngines.fromSources(TerminalCompletionSource { candidates })
+
+        val actual = engine.complete(request(maxCandidates = 8))
+        val expected =
+            candidates
+                .sortedWith(
+                    compareByDescending<TerminalCompletionCandidate> { it.score }
+                        .thenBy { it.displayText }
+                        .thenBy { it.replacementText },
+                ).take(8)
+
+        assertEquals(expected, actual)
+    }
+
+    @Test
     fun `equal ranking falls back to display text for deterministic order`() {
         val engine =
             TerminalCompletionEngines.fromSources(

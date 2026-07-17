@@ -33,6 +33,7 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
     }
 
     private val entries = ArrayList<Row>(capacity)
+    private var publishedSnapshot: List<Row> = emptyList()
 
     fun replaceAll(records: List<Row>) {
         val compacted = ArrayList<Row>(minOf(records.size, capacity))
@@ -49,9 +50,10 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
         compacted.sortWith(order)
         entries.clear()
         entries.addAll(compacted.take(capacity))
+        publishSnapshot()
     }
 
-    fun snapshot(): List<Row> = entries.toList()
+    fun snapshot(): List<Row> = publishedSnapshot
 
     fun rawRows(): List<Row> = entries
 
@@ -68,6 +70,11 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
             entries += update(initialRow())
         }
         entries.sortWith(order)
+        publishSnapshot()
+    }
+
+    private fun publishSnapshot() {
+        publishedSnapshot = entries.toList()
     }
 
     private fun List<Row>.indexOfKey(

@@ -48,6 +48,13 @@ internal class ShapeAwareCompletionSource(
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
 ) : ContextAwareCompletionSource {
     private val commandSpecs = commandSpecs.toList()
+    private val indexLock = Any()
+
+    @Volatile
+    private var indexedRecords: List<TerminalCommandShapeStats>? = null
+
+    @Volatile
+    private var snapshotIndex: ShapeRankingSnapshotIndex = ShapeRankingSnapshotIndex.EMPTY
 
     /**
      * Returns delegated candidates with learned shape score adjustments.
@@ -67,8 +74,8 @@ internal class ShapeAwareCompletionSource(
     ): List<TerminalCompletionCandidate> {
         val candidates = delegate.complete(request, commandLineContext)
         if (candidates.isEmpty()) return candidates
-        val shapeStats = shapeStatsProvider()
-        if (shapeStats.isEmpty()) return candidates
+        val shapeIndex = indexFor(shapeStatsProvider())
+        if (shapeIndex.isEmpty) return candidates
 
         val adjusted = ArrayList<TerminalCompletionCandidate>(candidates.size)
         for (candidate in candidates) {
@@ -77,13 +84,28 @@ internal class ShapeAwareCompletionSource(
                 if (shape == null) {
                     0
                 } else {
-                    shapeStats.adjustmentFor(shape, request)
+                    shapeIndex.adjustmentFor(shape, request)
                 }
             adjusted += candidate.copy(score = candidate.score + adjustment)
         }
-        return adjusted
-            .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-            .take(request.maxCandidates)
+        adjusted.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
+        return if (adjusted.size <= request.maxCandidates) {
+            adjusted
+        } else {
+            adjusted.subList(0, request.maxCandidates).toList()
+        }
+    }
+
+    private fun indexFor(records: List<TerminalCommandShapeStats>): ShapeRankingSnapshotIndex {
+        if (records is IndexedShapeRankingSnapshot) return records.rankingIndex
+        if (records === indexedRecords) return snapshotIndex
+        return synchronized(indexLock) {
+            if (records !== indexedRecords) {
+                snapshotIndex = ShapeRankingSnapshotIndex.from(records)
+                indexedRecords = records
+            }
+            snapshotIndex
+        }
     }
 
     private fun shapeAfterCandidate(
@@ -96,12 +118,12 @@ internal class ShapeAwareCompletionSource(
             ?.shape
     }
 
-    private fun List<TerminalCommandShapeStats>.adjustmentFor(
+    private fun ShapeRankingSnapshotIndex.adjustmentFor(
         shape: TerminalCommandLineShape,
         request: TerminalCompletionRequest,
     ): Int =
         TerminalCompletionScoreAdjustment.bestMatchingAdjustment(
-            records = this,
+            records = familyRows(shape),
             specificity = {
                 if (it.shape.matchesCandidateShape(shape)) {
                     it.contextSpecificity(request)

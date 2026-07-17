@@ -17,8 +17,29 @@ package io.github.ketraterm.completion.internal
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class BoundedStatsRowIndexTest {
+    @Test
+    fun `snapshot identity remains stable until rows change`() {
+        val index = rowIndex(capacity = 2)
+        index.replaceAll(listOf(Row(key = "a", value = "first", timestamp = 1)))
+
+        val first = index.snapshot()
+
+        assertTrue(first === index.snapshot())
+
+        index.mutate(
+            key = "a",
+            initialRow = { Row(key = "a", value = "unused", timestamp = 0) },
+            update = { it.copy(value = "second", timestamp = 2) },
+        )
+
+        assertTrue(first !== index.snapshot())
+        assertEquals("first", first.single().value)
+        assertEquals("second", index.snapshot().single().value)
+    }
+
     @Test
     fun `replace all keeps newest duplicate and sorts retained rows`() {
         val index = rowIndex(capacity = 4)

@@ -206,6 +206,13 @@ contracts and let the shared engine merge, deduplicate, and rank candidates.
 `ketraterm-completion` must stay pure: it should not shell out to Git, read IDE
 indexes, watch files, or block on host I/O.
 
+Learned statistics publish immutable list snapshots for persistence together
+with internal ranking indexes built at mutation time. Repeated completion
+requests therefore reuse direct source/kind/position/context feedback lookup
+and executable-family shape lookup instead of copying or scanning all retained
+rows. External snapshot suppliers retain the same public list contract and are
+indexed lazily once per stable list identity.
+
 The standalone host currently maps PowerShell to `POWERSHELL`, its tested
 POSIX-profile categories to `POSIX`, and Command Prompt, Fish, Nushell, and
 unknown profiles to `PLAIN`. Native shell completion callbacks and dialect
@@ -232,3 +239,9 @@ shared ranking keeps common terminal semantics such as paths over MRU for `cd `
 and option names after `-`. Future dynamic providers can extend the same model
 with provider-specific data, for example Git branches for `git switch`, without
 embedding standalone process calls or IDE service lookups in the shared engine.
+
+Candidate ordering remains deterministic. Completion candidate sets are
+deliberately small, so decorators and the merged engine use auditable standard
+collection sorting and deduplication rather than custom allocation-free data
+structures. Benchmarks track learned-ranking and hostile-provider costs so a
+more specialized selector is introduced only if measurements justify it.

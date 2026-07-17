@@ -42,6 +42,14 @@ internal class FeedbackAwareCompletionSource(
     private val delegate: TerminalCompletionSource,
     private val feedbackStatsProvider: () -> List<TerminalCompletionFeedbackStats>,
 ) : ContextAwareCompletionSource {
+    private val indexLock = Any()
+
+    @Volatile
+    private var indexedRecords: List<TerminalCompletionFeedbackStats>? = null
+
+    @Volatile
+    private var snapshotIndex: FeedbackRankingSnapshotIndex = FeedbackRankingSnapshotIndex.EMPTY
+
     /**
      * Returns delegated candidates with source-specific feedback adjustments.
      *
@@ -60,48 +68,51 @@ internal class FeedbackAwareCompletionSource(
     ): List<TerminalCompletionCandidate> {
         val candidates = delegate.complete(request, commandLineContext)
         if (candidates.isEmpty()) return candidates
-        val feedbackStats = feedbackStatsProvider()
-        if (feedbackStats.isEmpty()) return candidates
+        val feedbackIndex = indexFor(feedbackStatsProvider())
+        if (feedbackIndex.isEmpty) return candidates
 
         val adjusted = ArrayList<TerminalCompletionCandidate>(candidates.size)
         for (candidate in candidates) {
-            adjusted += candidate.copy(score = candidate.score + feedbackStats.adjustmentFor(candidate, request))
+            adjusted += candidate.copy(score = candidate.score + feedbackIndex.adjustmentFor(candidate, request))
         }
-        return adjusted
-            .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-            .take(request.maxCandidates)
+        adjusted.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
+        return if (adjusted.size <= request.maxCandidates) {
+            adjusted
+        } else {
+            adjusted.subList(0, request.maxCandidates).toList()
+        }
     }
 
-    private fun List<TerminalCompletionFeedbackStats>.adjustmentFor(
+    private fun indexFor(records: List<TerminalCompletionFeedbackStats>): FeedbackRankingSnapshotIndex {
+        if (records is IndexedFeedbackRankingSnapshot) return records.rankingIndex
+        if (records === indexedRecords) return snapshotIndex
+        return synchronized(indexLock) {
+            if (records !== indexedRecords) {
+                snapshotIndex = FeedbackRankingSnapshotIndex.from(records)
+                indexedRecords = records
+            }
+            snapshotIndex
+        }
+    }
+
+    private fun FeedbackRankingSnapshotIndex.adjustmentFor(
         candidate: TerminalCompletionCandidate,
         request: TerminalCompletionRequest,
     ): Int {
         val tokenPosition = TerminalCompletionTokenPosition.fromCandidateKind(candidate.kind)
+        val rows =
+            matchingRows(
+                source = candidate.source,
+                candidateKind = candidate.kind,
+                tokenPosition = tokenPosition,
+                profileId = request.profileId,
+                workingDirectoryUri = request.workingDirectoryUri,
+            )
         return TerminalCompletionScoreAdjustment.bestMatchingAdjustment(
-            records = this,
-            specificity = { it.specificityFor(candidate, tokenPosition, request) },
+            records = rows,
+            specificity = { 0 },
             adjustment = { it.scoreAdjustment(request) },
         )
-    }
-
-    private fun TerminalCompletionFeedbackStats.specificityFor(
-        candidate: TerminalCompletionCandidate,
-        tokenPosition: TerminalCompletionTokenPosition,
-        request: TerminalCompletionRequest,
-    ): Int {
-        if (source != candidate.source) return -1
-        if (candidateKind != candidate.kind) return -1
-        if (this.tokenPosition != tokenPosition) return -1
-        var specificity = SOURCE_KIND_POSITION_SPECIFICITY
-        if (profileId != null) {
-            if (profileId != request.profileId) return -1
-            specificity += PROFILE_SPECIFICITY
-        }
-        if (workingDirectoryUri != null) {
-            if (workingDirectoryUri != request.workingDirectoryUri) return -1
-            specificity += WORKING_DIRECTORY_SPECIFICITY
-        }
-        return specificity
     }
 
     private fun TerminalCompletionFeedbackStats.scoreAdjustment(request: TerminalCompletionRequest): Int =
@@ -120,9 +131,6 @@ internal class FeedbackAwareCompletionSource(
         private const val DISMISSED_COUNT_PENALTY = 22
         private const val PROFILE_MATCH_BOOST = 8
         private const val WORKING_DIRECTORY_MATCH_BOOST = 12
-        private const val SOURCE_KIND_POSITION_SPECIFICITY = 1
-        private const val PROFILE_SPECIFICITY = 2
-        private const val WORKING_DIRECTORY_SPECIFICITY = 3
         private const val MAX_COUNTER_SCORE_UNITS = 12
         private const val MIN_SCORE_ADJUSTMENT = -160
         private const val MAX_SCORE_ADJUSTMENT = 160
