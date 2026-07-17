@@ -26,6 +26,8 @@ include(
     ":ketraterm-protocol",
     ":ketraterm-input",
     ":ketraterm-completion",
+    ":ketraterm-completion-host",
+    ":ketraterm-completion-persistence",
     ":ketraterm-host",
     ":ketraterm-pty",
     ":ketraterm-transport-api",

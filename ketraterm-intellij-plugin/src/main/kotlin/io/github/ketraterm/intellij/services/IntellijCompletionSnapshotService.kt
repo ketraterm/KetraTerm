@@ -15,9 +15,8 @@
  */
 package io.github.ketraterm.intellij.services
 
-import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
+import io.github.ketraterm.completion.host.TerminalCompletionSnapshotService
+import io.github.ketraterm.completion.host.TerminalValueSnapshotProvider
 
 /**
  * Application-scoped owner of bounded IntelliJ completion snapshot work.
@@ -29,30 +28,7 @@ import kotlinx.coroutines.channels.Channel
  * queued and active work and is safe to repeat.
  */
 internal class IntellijCompletionSnapshotService : AutoCloseable {
-    private val scope =
-        CoroutineScope(
-            SupervisorJob() +
-                    Dispatchers.IO.limitedParallelism(WORKER_COUNT) +
-                    CoroutineName("intellij-completion-snapshots"),
-        )
-    private val workQueue = Channel<suspend () -> Unit>(WORK_QUEUE_CAPACITY)
-    private val scheduler = IntellijCompletionLoadScheduler { work -> workQueue.trySend(work).isSuccess }
-
-    init {
-        repeat(WORKER_COUNT) { workerIndex ->
-            scope.launch(CoroutineName("intellij-completion-snapshot-worker-$workerIndex")) {
-                for (work in workQueue) {
-                    try {
-                        work()
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (_: RuntimeException) {
-                        // A provider failure must not terminate the shared worker.
-                    }
-                }
-            }
-        }
-    }
+    private val delegate = TerminalCompletionSnapshotService(coroutineName = "intellij-completion-snapshots")
 
     /**
      * Creates a session-owned asynchronous directory snapshot provider.
@@ -67,43 +43,34 @@ internal class IntellijCompletionSnapshotService : AutoCloseable {
         onSnapshotChanged: () -> Unit,
         scanner: IntellijDirectoryScanner = BoundedIntellijDirectoryScanner(),
     ): IntellijAsyncFileSystemProvider =
-        IntellijAsyncFileSystemProvider(
-            scheduler = scheduler,
+        delegate.createDirectoryProvider(
             onSnapshotChanged = onSnapshotChanged,
             scanner = scanner,
         )
 
     /**
-     * Creates a session-owned asynchronous Git-branch snapshot provider.
+     * Creates a session-owned asynchronous keyed-value snapshot provider.
      *
-     * @param workingDirectoryUriProvider thread-safe supplier for the session's
-     * latest working-directory URI.
-     * @param loader blocking branch loader executed only by snapshot workers.
+     * @param keyProvider thread-safe supplier for the current provider key.
+     * @param loader blocking bounded loader executed only by snapshot workers.
      * @param onSnapshotChanged callback invoked on a snapshot worker after a
      * new active snapshot is published; the callback must arrange any required
      * Swing-thread handoff.
      * @return provider that must be closed with its terminal session.
      */
-    fun createGitBranchProvider(
-        workingDirectoryUriProvider: () -> String?,
-        loader: (String?) -> List<TerminalCompletionDomainValue>,
+    fun <K, V> createValueProvider(
+        keyProvider: () -> K,
+        loader: (K) -> List<V>,
         onSnapshotChanged: () -> Unit,
-    ): IntellijGitBranchCompletionProvider =
-        IntellijGitBranchCompletionProvider(
-            workingDirectoryUriProvider = workingDirectoryUriProvider,
-            scheduler = scheduler,
+    ): TerminalValueSnapshotProvider<K, V> =
+        delegate.createValueProvider(
+            keyProvider = keyProvider,
             loader = loader,
             onSnapshotChanged = onSnapshotChanged,
         )
 
     /** Cancels shared snapshot work and releases worker resources idempotently. */
     override fun close() {
-        workQueue.close()
-        scope.cancel()
-    }
-
-    private companion object {
-        private const val WORKER_COUNT = 2
-        private const val WORK_QUEUE_CAPACITY = 32
+        delegate.close()
     }
 }

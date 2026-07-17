@@ -14,6 +14,7 @@ This module may:
 - provide native Swing/AWT host services such as clipboard, dispatch, hyperlink
   policy, theme settings, and scrollbars.
 - adapt external Swing scrollbars through `SwingTerminal` viewport APIs.
+- compose standalone completion sources, persistence settings, and lifecycle.
 
 ## Boundary
 
@@ -24,6 +25,7 @@ This module must not:
 - mutate terminal core internals.
 - encode input bytes directly.
 - introduce IntelliJ Platform dependencies.
+- move reusable completion snapshots or Swing vocabulary adapters into the app.
 
 Reusable UI fixes discovered while building the standalone app belong in
 `ketraterm-ui-swing`.

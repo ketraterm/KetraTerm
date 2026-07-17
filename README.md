@@ -90,12 +90,16 @@ KetraTerm is composed of strict, decoupled Gradle modules:
 * **`:ketraterm-core`**: Headless text grid storage, circular scrollback buffers, and resizing reflow.
 * **`:ketraterm-host`**: Semantic translation adapter connecting the parser to core state.
 * **`:ketraterm-input`**: Keyboard/mouse event models and host-bound ANSI encoders.
+* **`:ketraterm-completion`**: Dependency-free command completion models, parsing, ranking, and learning indexes.
+* **`:ketraterm-completion-host`**: Bounded asynchronous snapshot and local path-provider infrastructure.
+* **`:ketraterm-completion-persistence`**: Optional sanitized local-file storage for completion learning.
 * **`:ketraterm-render-api`**: Dependency-free visual frame contracts.
 * **`:ketraterm-render-cache`**: Double/triple-buffered publication cache.
 * **`:ketraterm-transport-api`**: Duplex I/O connector interfaces.
 * **`:ketraterm-session`**: Thread synchronization, lock controls, and event loop.
 * **`:ketraterm-pty`**: Local native process Pty4J launcher and stream pump.
 * **`:ketraterm-ui-swing`**: Reusable desktop `JComponent` painter and mouse interaction adapters.
+* **`:ketraterm-ui-swing-host`**: Optional host chrome, actions, and completion-to-Swing adapters.
 * **`:ketraterm-workspace`**: Headless tab/profile workspace layer used by product hosts.
 * **`:ketraterm-app`**: Standalone desktop application host.
 * **`:ketraterm-testkit`**: In-memory connector mocks and simulation tools.

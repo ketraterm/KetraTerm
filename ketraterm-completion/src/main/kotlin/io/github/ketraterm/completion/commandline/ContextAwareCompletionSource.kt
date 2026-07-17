@@ -27,6 +27,17 @@ internal interface ContextAwareCompletionSource : TerminalCompletionSource {
     ): List<TerminalCompletionCandidate>
 }
 
+/**
+ * Internal fast path for sources that accept a bounded candidate surplus before final ranking.
+ */
+internal interface CandidateCollectingCompletionSource : ContextAwareCompletionSource {
+    fun collectCandidates(
+        request: TerminalCompletionRequest,
+        commandLineContext: TerminalCommandLineContext,
+        collectionLimit: Int,
+    ): List<TerminalCompletionCandidate>
+}
+
 internal fun TerminalCompletionSource.complete(
     request: TerminalCompletionRequest,
     commandLineContext: TerminalCommandLineContext,
@@ -34,4 +45,22 @@ internal fun TerminalCompletionSource.complete(
     when (this) {
         is ContextAwareCompletionSource -> complete(request, commandLineContext)
         else -> complete(request)
+    }
+
+internal fun TerminalCompletionSource.collectCandidates(
+    request: TerminalCompletionRequest,
+    commandLineContext: TerminalCommandLineContext,
+    collectionLimit: Int,
+): List<TerminalCompletionCandidate> =
+    when (this) {
+        is CandidateCollectingCompletionSource -> collectCandidates(request, commandLineContext, collectionLimit)
+        else -> {
+            val collectionRequest =
+                if (request.maxCandidates == collectionLimit) {
+                    request
+                } else {
+                    request.copy(maxCandidates = collectionLimit)
+                }
+            complete(collectionRequest, commandLineContext)
+        }
     }

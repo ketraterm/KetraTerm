@@ -20,6 +20,12 @@ The project is split into strict layers:
   APIs.
 - `ketraterm-input`: host-bound input encoding for keyboard, paste, focus, and
   future mouse reports.
+- `ketraterm-completion`: dependency-free command-line completion models, parsing, ranking, and bounded in-memory
+  learning.
+- `ketraterm-completion-host`: host-neutral asynchronous snapshot, local-path, and bounded directory-scanning support
+  for completion providers.
+- `ketraterm-completion-persistence`: optional sanitized, versioned local-file persistence for completion-learning
+  snapshots.
 - `ketraterm-render-api`: dependency-free primitive render frame, cursor, cell,
   cluster, and attribute vocabulary.
 - `ketraterm-render-cache`: renderer-side cache that copies primitive render
@@ -31,6 +37,8 @@ The project is split into strict layers:
 - `ketraterm-ui-swing`: reusable Swing terminal UI component, painting,
   selection, input event handling, clipboard/font/settings abstractions, and
   viewport/scrollbar model.
+- `ketraterm-ui-swing-host`: optional reusable Swing host chrome, action bindings, and completion request/feedback
+  vocabulary adapters.
 - `ketraterm-app`: standalone Swing desktop application hosting the reusable UI
   component, managing tab states, window framing, and PTY processes.
 - `ketraterm-testkit`: reusable public test fakes for connector/session tests.
@@ -50,6 +58,8 @@ Keep these boundaries intact:
   internals.
 - Input encodes. It reads stable input-facing mode state and writes host-bound
   bytes without parsing terminal output or touching grid/cursor internals.
+- Completion evaluates. Its engine stays dependency-free and performs no host I/O; asynchronous host support and
+  optional disk persistence live in their dedicated completion modules.
 - Render API exposes primitive frame contracts only. It must not depend on UI,
   Swing, PTY, parser, host, or core internals.
 - Render cache copies render frame data for consumers. It must not choose host
@@ -65,6 +75,8 @@ Keep these boundaries intact:
   SSH, tests, or another transport.
   It may use `ketraterm-input` event vocabulary but must send encoded intent
   through `TerminalSession` rather than writing host bytes directly.
+- Swing host support adapts host-neutral actions and completion vocabulary. It must not choose product completion
+  sources, priorities, persistence, or keymaps.
 - Swing demo hosts. It may start PTY sessions and create windows, but reusable
   rendering and input behavior still belong in `ketraterm-ui-swing`.
 - PTY hosts. It starts local pseudo-terminal processes and exposes them through

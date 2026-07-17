@@ -20,6 +20,8 @@ import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSource
 import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
+import io.github.ketraterm.completion.internal.TerminalCompletionCollectionBudget
+import io.github.ketraterm.completion.internal.boundedTo
 import io.github.ketraterm.completion.internal.commandLineAfterCandidate
 import io.github.ketraterm.completion.model.TerminalCommandLineShape
 import io.github.ketraterm.completion.model.TerminalCommandShapeStats
@@ -31,11 +33,12 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
  * command-shape affinity.
  *
  * The decorator does not create candidates by itself. It asks [delegate] for a
- * bounded candidate list, projects each candidate onto the command line that
- * would result after replacement, derives a privacy-preserving
+ * bounded candidate surplus, projects each candidate onto the command line
+ * that would result after replacement, derives a privacy-preserving
  * [TerminalCommandLineShape], and applies a bounded boost or penalty from
  * [shapeStatsProvider]. Exact command history remains a stronger source; this
- * wrapper only reorders candidates produced by the decorated source.
+ * wrapper only reorders candidates produced by the decorated source. The
+ * request's final candidate limit is applied after that adjustment.
  *
  * @param delegate source whose candidates should be shape-ranked.
  * @param shapeStatsProvider supplier for the latest shape stats snapshot.
@@ -46,7 +49,7 @@ internal class ShapeAwareCompletionSource(
     private val delegate: TerminalCompletionSource,
     private val shapeStatsProvider: () -> List<TerminalCommandShapeStats>,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-) : ContextAwareCompletionSource {
+) : CandidateCollectingCompletionSource {
     private val commandSpecs = commandSpecs.toList()
     private val indexLock = Any()
 
@@ -71,8 +74,22 @@ internal class ShapeAwareCompletionSource(
     override fun complete(
         request: TerminalCompletionRequest,
         commandLineContext: TerminalCommandLineContext,
+    ): List<TerminalCompletionCandidate> =
+        collectCandidates(
+            request = request,
+            commandLineContext = commandLineContext,
+            collectionLimit = TerminalCompletionCollectionBudget.forFinalLimit(request.maxCandidates),
+        ).boundedTo(request.maxCandidates)
+
+    override fun collectCandidates(
+        request: TerminalCompletionRequest,
+        commandLineContext: TerminalCommandLineContext,
+        collectionLimit: Int,
     ): List<TerminalCompletionCandidate> {
-        val candidates = delegate.complete(request, commandLineContext)
+        val candidates =
+            delegate
+                .collectCandidates(request, commandLineContext, collectionLimit)
+                .boundedTo(collectionLimit)
         if (candidates.isEmpty()) return candidates
         val shapeIndex = indexFor(shapeStatsProvider())
         if (shapeIndex.isEmpty) return candidates
@@ -89,11 +106,7 @@ internal class ShapeAwareCompletionSource(
             adjusted += candidate.copy(score = candidate.score + adjustment)
         }
         adjusted.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-        return if (adjusted.size <= request.maxCandidates) {
-            adjusted
-        } else {
-            adjusted.subList(0, request.maxCandidates).toList()
-        }
+        return adjusted.boundedTo(collectionLimit)
     }
 
     private fun indexFor(records: List<TerminalCommandShapeStats>): ShapeRankingSnapshotIndex {

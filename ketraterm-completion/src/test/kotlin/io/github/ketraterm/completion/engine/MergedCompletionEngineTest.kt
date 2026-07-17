@@ -93,6 +93,47 @@ class MergedCompletionEngineTest {
     }
 
     @Test
+    fun `collects bounded surplus before context ranking applies final maximum`() {
+        val rawCandidates =
+            buildList {
+                repeat(8) { index ->
+                    add(
+                        candidate(
+                            replacement = "git remembered-${index + 1}",
+                            source = "mixed",
+                            kind = TerminalCompletionCandidateKind.HISTORY,
+                            score = 1_000 - index,
+                        ),
+                    )
+                }
+                add(
+                    candidate(
+                        replacement = "status",
+                        start = 4,
+                        end = 5,
+                        source = "mixed",
+                        kind = TerminalCompletionCandidateKind.SUBCOMMAND,
+                        score = 900,
+                    ),
+                )
+            }
+        var collectionLimit = 0
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                TerminalCompletionSource { request ->
+                    collectionLimit = request.maxCandidates
+                    rawCandidates.take(request.maxCandidates)
+                },
+            )
+
+        val candidates = engine.complete(request(commandLine = "git s", maxCandidates = 8))
+
+        assertEquals(32, collectionLimit)
+        assertEquals(8, candidates.size)
+        assertEquals("status", candidates.first().replacementText)
+    }
+
+    @Test
     fun `large provider result preserves exact deterministic ordering`() {
         val candidates =
             ArrayList<TerminalCompletionCandidate>(1_024).apply {

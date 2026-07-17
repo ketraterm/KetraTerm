@@ -44,6 +44,11 @@ jobs:
         run: |
           ./gradlew test "-Djava.awt.headless=true"
 
+      - name: Run IntelliJ Plugin Tests (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run ./gradlew -p ketraterm-intellij-plugin test "-Djava.awt.headless=true"
+
       - name: Upload Test Results
         if: failure()
         uses: actions/upload-artifact@v4

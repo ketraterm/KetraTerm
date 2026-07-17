@@ -13,25 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.workspace.persistence
+package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
- * Single-worker queue that coalesces pending completion stats snapshots.
+ * Single-worker queue that coalesces pending completion-statistics snapshots.
  *
  * At most one drain task is scheduled at a time. If producers enqueue multiple
- * snapshots while a write is pending or in progress, only the newest pending
- * snapshot is retained. A snapshot that is already being written is allowed to
- * finish; coalescing applies to queued work, not to the active filesystem write.
+ * snapshots while a write is pending or active, only the newest pending
+ * snapshot is retained. A snapshot already being written is allowed to finish.
  *
  * @param writeSnapshot blocking writer invoked on the queue worker.
  * @param threadName daemon worker thread name.
  * @param closeTimeoutSeconds maximum time to wait for worker shutdown.
  */
-class CommandCompletionStatsWriteQueue(
+internal class CompletionStatsWriteQueue(
     private val writeSnapshot: (TerminalCommandCompletionStatsSnapshot) -> Unit,
     threadName: String = DEFAULT_THREAD_NAME,
     private val closeTimeoutSeconds: Long = DEFAULT_CLOSE_TIMEOUT_SECONDS,
@@ -48,9 +47,8 @@ class CommandCompletionStatsWriteQueue(
     /**
      * Queues [snapshot] for eventual writing.
      *
-     * When the queue already has pending work, [snapshot] replaces the older
-     * pending snapshot. Calls made after [close] are ignored deliberately so
-     * shutdown racing with late UI feedback cannot throw on the Swing thread.
+     * Calls after [close] are ignored so shutdown racing with late host
+     * feedback cannot throw on a UI thread.
      *
      * @param snapshot complete sanitized snapshot to write.
      */
@@ -69,9 +67,7 @@ class CommandCompletionStatsWriteQueue(
         if (shouldSchedule) worker.execute(::drainPendingSnapshots)
     }
 
-    /**
-     * Writes all snapshots that are pending before this call returns.
-     */
+    /** Writes all snapshots that are pending before this call returns. */
     fun flush() {
         val future =
             synchronized(lock) {
@@ -84,9 +80,7 @@ class CommandCompletionStatsWriteQueue(
         future?.get()
     }
 
-    /**
-     * Flushes the newest pending snapshot and stops accepting writes.
-     */
+    /** Flushes the newest pending snapshot and stops accepting writes. */
     override fun close() {
         val future =
             synchronized(lock) {

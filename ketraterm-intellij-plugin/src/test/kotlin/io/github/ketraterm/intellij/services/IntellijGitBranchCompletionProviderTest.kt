@@ -48,7 +48,7 @@ class IntellijGitBranchCompletionProviderTest {
         var publications = 0
         val provider =
             IntellijGitBranchCompletionProvider(
-                workingDirectoryUriProvider = { key },
+                keyProvider = { key },
                 scheduler = scheduler,
                 loader = { value -> listOf(TerminalCompletionDomainValue("$value-branch")) },
                 onSnapshotChanged = { publications++ },
@@ -112,7 +112,7 @@ class IntellijGitBranchCompletionProviderTest {
         loader: (String?) -> List<TerminalCompletionDomainValue>,
     ): IntellijGitBranchCompletionProvider =
         IntellijGitBranchCompletionProvider(
-            workingDirectoryUriProvider = { "first" },
+            keyProvider = { "first" },
             scheduler = scheduler,
             loader = loader,
             onSnapshotChanged = onSnapshotChanged,

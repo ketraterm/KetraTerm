@@ -18,11 +18,13 @@ package io.github.ketraterm.completion.ranking
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSource
-import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
+import io.github.ketraterm.completion.commandline.CandidateCollectingCompletionSource
 import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
-import io.github.ketraterm.completion.commandline.complete
+import io.github.ketraterm.completion.commandline.collectCandidates
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
+import io.github.ketraterm.completion.internal.TerminalCompletionCollectionBudget
+import io.github.ketraterm.completion.internal.boundedTo
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
 import io.github.ketraterm.completion.model.TerminalCompletionTokenPosition
 
@@ -30,9 +32,10 @@ import io.github.ketraterm.completion.model.TerminalCompletionTokenPosition
  * Completion source decorator that adjusts scores from source-specific feedback.
  *
  * The decorator does not create candidates. It only applies bounded boosts or
- * penalties to candidates returned by [delegate] when persisted
+ * penalties to a bounded candidate surplus returned by [delegate] when persisted
  * [TerminalCompletionFeedbackStats] match the candidate source, kind, token
- * position, profile, and working directory.
+ * position, profile, and working directory. The request's final candidate
+ * limit is applied after that adjustment.
  *
  * @param delegate source whose candidates should be feedback-ranked.
  * @param feedbackStatsProvider supplier for the latest source-specific
@@ -41,7 +44,7 @@ import io.github.ketraterm.completion.model.TerminalCompletionTokenPosition
 internal class FeedbackAwareCompletionSource(
     private val delegate: TerminalCompletionSource,
     private val feedbackStatsProvider: () -> List<TerminalCompletionFeedbackStats>,
-) : ContextAwareCompletionSource {
+) : CandidateCollectingCompletionSource {
     private val indexLock = Any()
 
     @Volatile
@@ -65,8 +68,22 @@ internal class FeedbackAwareCompletionSource(
     override fun complete(
         request: TerminalCompletionRequest,
         commandLineContext: TerminalCommandLineContext,
+    ): List<TerminalCompletionCandidate> =
+        collectCandidates(
+            request = request,
+            commandLineContext = commandLineContext,
+            collectionLimit = TerminalCompletionCollectionBudget.forFinalLimit(request.maxCandidates),
+        ).boundedTo(request.maxCandidates)
+
+    override fun collectCandidates(
+        request: TerminalCompletionRequest,
+        commandLineContext: TerminalCommandLineContext,
+        collectionLimit: Int,
     ): List<TerminalCompletionCandidate> {
-        val candidates = delegate.complete(request, commandLineContext)
+        val candidates =
+            delegate
+                .collectCandidates(request, commandLineContext, collectionLimit)
+                .boundedTo(collectionLimit)
         if (candidates.isEmpty()) return candidates
         val feedbackIndex = indexFor(feedbackStatsProvider())
         if (feedbackIndex.isEmpty) return candidates
@@ -76,11 +93,7 @@ internal class FeedbackAwareCompletionSource(
             adjusted += candidate.copy(score = candidate.score + feedbackIndex.adjustmentFor(candidate, request))
         }
         adjusted.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-        return if (adjusted.size <= request.maxCandidates) {
-            adjusted
-        } else {
-            adjusted.subList(0, request.maxCandidates).toList()
-        }
+        return adjusted.boundedTo(collectionLimit)
     }
 
     private fun indexFor(records: List<TerminalCompletionFeedbackStats>): FeedbackRankingSnapshotIndex {

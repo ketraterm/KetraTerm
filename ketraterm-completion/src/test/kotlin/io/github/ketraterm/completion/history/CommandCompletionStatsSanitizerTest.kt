@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.history
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
+import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
 import io.github.ketraterm.completion.model.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,7 +29,7 @@ class CommandCompletionStatsSanitizerTest {
         val privateByKeyword = commandStats("docker login --password hunter2")
 
         val sanitized =
-            CommandCompletionStatsSanitizer.sanitize(
+            TerminalCompletionPersistencePolicy.sanitizeSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     commandStats = listOf(safe, privateByWhitespace, privateByKeyword),
                 ),
@@ -44,7 +45,7 @@ class CommandCompletionStatsSanitizerTest {
         val sensitiveOption = shapeStats("curl --authorization bearer")
 
         val sanitized =
-            CommandCompletionStatsSanitizer.sanitize(
+            TerminalCompletionPersistencePolicy.sanitizeSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     shapeStats = listOf(safe, sensitiveExecutable, sensitiveOption),
                 ),
@@ -68,7 +69,7 @@ class CommandCompletionStatsSanitizerTest {
             )
 
         val sanitized =
-            CommandCompletionStatsSanitizer.sanitize(
+            TerminalCompletionPersistencePolicy.sanitizeSnapshot(
                 TerminalCommandCompletionStatsSnapshot(feedbackStats = listOf(feedback)),
             )
 
@@ -90,7 +91,7 @@ class CommandCompletionStatsSanitizerTest {
             )
 
         val sanitized =
-            CommandCompletionStatsSanitizer.sanitize(
+            TerminalCompletionPersistencePolicy.sanitizeSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     commandStats = listOf(safeCommand, privateCommand),
                     shapeStats = listOf(safeShape, privateShape),

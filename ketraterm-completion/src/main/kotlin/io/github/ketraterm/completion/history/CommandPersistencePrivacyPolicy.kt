@@ -15,10 +15,10 @@
  */
 package io.github.ketraterm.completion.history
 
-import io.github.ketraterm.completion.history.CommandPersistencePrivacyDecisionLocation.*
-import io.github.ketraterm.completion.history.CommandPersistencePrivacyPolicy.allowsCommand
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandShapeStats
+import io.github.ketraterm.completion.model.TerminalCompletionPersistenceDecision
+import io.github.ketraterm.completion.model.TerminalCompletionPersistenceDecisionLocation.*
 
 /**
  * Host-owned privacy gate for persisted command learning data.
@@ -28,7 +28,7 @@ import io.github.ketraterm.completion.model.TerminalCommandShapeStats
  * structural command shapes are persisted, preserving shell ignorespace
  * behavior and avoiding common credential-bearing commands.
  */
-object CommandPersistencePrivacyPolicy {
+internal object CommandPersistencePrivacyPolicy {
     /**
      * Returns whether [command] may be learned or written to disk.
      *
@@ -47,18 +47,18 @@ object CommandPersistencePrivacyPolicy {
      * @param command full command line captured from shell integration or popup feedback.
      * @return auditable privacy decision explaining allow/reject outcome.
      */
-    fun evaluateCommand(command: String): CommandPersistencePrivacyDecision {
+    fun evaluateCommand(command: String): TerminalCompletionPersistenceDecision {
         if (command.isBlank() || command.indexOf('\n') >= 0 || command.indexOf('\r') >= 0) {
-            return CommandPersistencePrivacyDecision.BLANK_OR_MULTILINE
+            return TerminalCompletionPersistenceDecision.BLANK_OR_MULTILINE
         }
         if (command.startsWith(" ") || command.startsWith("\t")) {
-            return CommandPersistencePrivacyDecision.IGNORES_SPACE
+            return TerminalCompletionPersistenceDecision.IGNORES_SPACE
         }
         val keyword = findSensitiveKeyword(command)
         return if (keyword == null) {
-            CommandPersistencePrivacyDecision.ALLOWED
+            TerminalCompletionPersistenceDecision.ALLOWED
         } else {
-            CommandPersistencePrivacyDecision.sensitiveKeyword(keyword, COMMAND_TEXT)
+            TerminalCompletionPersistenceDecision.sensitiveKeyword(keyword, COMMAND_TEXT)
         }
     }
 
@@ -76,7 +76,7 @@ object CommandPersistencePrivacyPolicy {
      * @param record aggregate exact command stats row.
      * @return auditable privacy decision for [record].
      */
-    fun evaluateCommandStats(record: TerminalCommandCompletionStats): CommandPersistencePrivacyDecision =
+    fun evaluateCommandStats(record: TerminalCommandCompletionStats): TerminalCompletionPersistenceDecision =
         evaluateCommand(record.commandLine)
 
     /**
@@ -98,21 +98,21 @@ object CommandPersistencePrivacyPolicy {
      * @param record aggregate command-shape stats row.
      * @return auditable privacy decision for [record].
      */
-    fun evaluateShapeStats(record: TerminalCommandShapeStats): CommandPersistencePrivacyDecision {
+    fun evaluateShapeStats(record: TerminalCommandShapeStats): TerminalCompletionPersistenceDecision {
         findSensitiveKeyword(record.shape.executable)?.let {
-            return CommandPersistencePrivacyDecision.sensitiveKeyword(it, SHAPE_EXECUTABLE)
+            return TerminalCompletionPersistenceDecision.sensitiveKeyword(it, SHAPE_EXECUTABLE)
         }
         for (subcommand in record.shape.subcommands) {
             findSensitiveKeyword(subcommand)?.let {
-                return CommandPersistencePrivacyDecision.sensitiveKeyword(it, SHAPE_SUBCOMMAND)
+                return TerminalCompletionPersistenceDecision.sensitiveKeyword(it, SHAPE_SUBCOMMAND)
             }
         }
         for (optionName in record.shape.optionNames) {
             findSensitiveKeyword(optionName)?.let {
-                return CommandPersistencePrivacyDecision.sensitiveKeyword(it, SHAPE_OPTION_NAME)
+                return TerminalCompletionPersistenceDecision.sensitiveKeyword(it, SHAPE_OPTION_NAME)
             }
         }
-        return CommandPersistencePrivacyDecision.ALLOWED
+        return TerminalCompletionPersistenceDecision.ALLOWED
     }
 
     private fun findSensitiveKeyword(text: String): String? {

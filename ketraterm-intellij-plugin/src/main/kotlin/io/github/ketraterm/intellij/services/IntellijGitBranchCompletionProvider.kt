@@ -19,11 +19,10 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import git4idea.repo.GitRepository
 import git4idea.repo.GitRepositoryManager
+import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
+import io.github.ketraterm.completion.host.TerminalValueSnapshotProvider
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
-import java.net.URI
 import java.nio.file.Path
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Reads local Git branches from the repository containing a terminal directory.
@@ -50,7 +49,7 @@ internal class IntellijGitBranchLoader(
      */
     fun load(workingDirectoryUri: String?): List<TerminalCompletionDomainValue> {
         if (project.isDisposed) return emptyList()
-        val workingDirectory = workingDirectoryUri.toLocalPath() ?: return emptyList()
+        val workingDirectory = TerminalLocalFileUriResolver.resolve(workingDirectoryUri) ?: return emptyList()
         return ApplicationManager.getApplication().runReadAction<List<TerminalCompletionDomainValue>> {
             if (project.isDisposed) return@runReadAction emptyList()
             val repository = selectRepository(GitRepositoryManager.getInstance(project).repositories, workingDirectory)
@@ -85,147 +84,9 @@ internal class IntellijGitBranchLoader(
                 .asSequence()
                 .filter { repository -> workingDirectory.startsWith(repository.root.toNioPath()) }
                 .maxByOrNull { repository -> repository.root.path.length }
-
-        private fun String?.toLocalPath(): Path? {
-            if (this == null) return null
-            return try {
-                val uri = URI(this)
-                if (!uri.scheme.equals("file", ignoreCase = true)) return null
-                val authority = uri.authority
-                if (!authority.isNullOrEmpty() && !authority.equals("localhost", ignoreCase = true)) return null
-                Path.of(URI("file", null, uri.path ?: return null, null)).toAbsolutePath().normalize()
-            } catch (_: Exception) {
-                null
-            }
-        }
     }
 }
 
-/**
- * Session-local, generation-safe Git branch snapshot read by the shared engine.
- *
- * [values] never blocks on Git or filesystem work. It returns the latest ready
- * immutable snapshot and schedules refresh work through [scheduler]. Directory
- * changes advance a generation so stale loads cannot publish. Failed loads
- * clear their in-flight marker, retain the last ready snapshot, and may be
- * retried by the next request. Callbacks run on the scheduler's worker thread.
- *
- * @property workingDirectoryUriProvider thread-safe supplier for the current
- * terminal working-directory URI.
- * @property scheduler bounded asynchronous work scheduler.
- * @property loader blocking host loader that returns a bounded branch snapshot.
- * @property onSnapshotChanged callback invoked after publishing the active generation.
- * @property nanoTime monotonic clock used only for snapshot expiry.
- * @property snapshotTtlNanos positive lifetime of a ready snapshot.
- * @throws IllegalArgumentException if [snapshotTtlNanos] is not positive.
- */
-internal class IntellijGitBranchCompletionProvider(
-    private val workingDirectoryUriProvider: () -> String?,
-    private val scheduler: IntellijCompletionLoadScheduler,
-    private val loader: (String?) -> List<TerminalCompletionDomainValue>,
-    private val onSnapshotChanged: () -> Unit,
-    private val nanoTime: () -> Long = System::nanoTime,
-    private val snapshotTtlNanos: Long = TimeUnit.SECONDS.toNanos(DEFAULT_SNAPSHOT_TTL_SECONDS),
-) : AutoCloseable {
-    private val lock = Any()
-    private val closed = AtomicBoolean()
-    private var key: String? = null
-    private var snapshot = emptyList<TerminalCompletionDomainValue>()
-    private var createdAtNanos = 0L
-    private var hasSnapshot = false
-    private var generation = 0L
-    private var inFlightGeneration = NO_GENERATION
-
-    init {
-        require(snapshotTtlNanos > 0L) { "snapshotTtlNanos must be > 0, was $snapshotTtlNanos" }
-    }
-
-    /**
-     * Returns the latest ready branch snapshot and starts refresh work if needed.
-     *
-     * @return immutable ready snapshot, or an empty list before the first
-     * successful load and after closure.
-     */
-    fun values(): List<TerminalCompletionDomainValue> {
-        if (closed.get()) return emptyList()
-        val requestedKey = workingDirectoryUriProvider()
-        val now = nanoTime()
-        var loadGeneration = NO_GENERATION
-        synchronized(lock) {
-            if (requestedKey != key) {
-                key = requestedKey
-                snapshot = emptyList()
-                createdAtNanos = 0L
-                hasSnapshot = false
-                generation++
-                inFlightGeneration = NO_GENERATION
-            }
-            if (hasSnapshot && now - createdAtNanos < snapshotTtlNanos) return snapshot
-            if (inFlightGeneration == NO_GENERATION) {
-                inFlightGeneration = generation
-                loadGeneration = generation
-            }
-        }
-        if (loadGeneration != NO_GENERATION) submitLoad(requestedKey, loadGeneration)
-        return synchronized(lock) { snapshot }
-    }
-
-    private fun submitLoad(
-        requestedKey: String?,
-        requestedGeneration: Long,
-    ) {
-        val accepted =
-            scheduler.schedule {
-                try {
-                    val loaded = loader(requestedKey).toList()
-                    var publish = false
-                    synchronized(lock) {
-                        if (inFlightGeneration == requestedGeneration) inFlightGeneration = NO_GENERATION
-                        if (!closed.get() && generation == requestedGeneration && key == requestedKey) {
-                            snapshot = loaded
-                            createdAtNanos = nanoTime()
-                            hasSnapshot = true
-                            publish = true
-                        }
-                    }
-                    if (publish) {
-                        try {
-                            onSnapshotChanged()
-                        } catch (_: RuntimeException) {
-                            // The owning pane may close while publication is in flight.
-                        }
-                    }
-                } finally {
-                    synchronized(lock) {
-                        if (inFlightGeneration == requestedGeneration) inFlightGeneration = NO_GENERATION
-                    }
-                }
-            }
-        if (!accepted) {
-            synchronized(lock) {
-                if (inFlightGeneration == requestedGeneration) inFlightGeneration = NO_GENERATION
-            }
-        }
-    }
-
-    /**
-     * Invalidates pending generations and releases the retained snapshot.
-     *
-     * Closing is idempotent. Already-running loader work is not interrupted,
-     * but its result is prevented from publishing.
-     */
-    override fun close() {
-        if (!closed.compareAndSet(false, true)) return
-        synchronized(lock) {
-            generation++
-            inFlightGeneration = NO_GENERATION
-            snapshot = emptyList()
-            hasSnapshot = false
-        }
-    }
-
-    private companion object {
-        private const val DEFAULT_SNAPSHOT_TTL_SECONDS = 2L
-        private const val NO_GENERATION = -1L
-    }
-}
+/** IntelliJ-local name for the shared generation-safe Git value snapshot. */
+internal typealias IntellijGitBranchCompletionProvider =
+        TerminalValueSnapshotProvider<String?, TerminalCompletionDomainValue>

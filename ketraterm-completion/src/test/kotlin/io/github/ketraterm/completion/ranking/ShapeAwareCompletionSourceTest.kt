@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.completion.ranking
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalCompletionSource
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.GenericCommandLineShapeClassifier
 import io.github.ketraterm.completion.commandline.TerminalCommandLineClassifier
 import io.github.ketraterm.completion.model.TerminalCommandShapeStats
@@ -28,6 +25,31 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ShapeAwareCompletionSourceTest {
+    @Test
+    fun `shape ranking can promote ninth raw spec candidate into eight candidate result`() {
+        val specs =
+            buildList {
+                repeat(8) { index -> add(TerminalCommandSpec("command-${index + 1}")) }
+                add(TerminalCommandSpec("target"))
+            }
+        val source =
+            TerminalCompletionSources.fromSpecs(specs) {
+                listOf(shapeStats(commandLine = "target", acceptedCount = 1))
+            }
+
+        val candidates =
+            source.complete(
+                TerminalCompletionRequest(
+                    commandLine = "",
+                    cursorOffset = 0,
+                    maxCandidates = 8,
+                ),
+            )
+
+        assertEquals(8, candidates.size)
+        assertEquals("target", candidates.first().replacementText)
+    }
+
     @Test
     fun `accepted matching shape boosts candidate above otherwise higher score candidate`() {
         val source =

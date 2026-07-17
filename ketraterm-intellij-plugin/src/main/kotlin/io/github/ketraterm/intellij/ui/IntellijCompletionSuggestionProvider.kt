@@ -15,53 +15,11 @@
  */
 package io.github.ketraterm.intellij.ui
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionEngine
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import io.github.ketraterm.ui.swing.host.SwingCompletionContext
+import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 
-/** IntelliJ-owned adapter from the shared completion engine to Swing suggestions. */
-internal class IntellijCompletionSuggestionProvider(
-    private val engine: TerminalCompletionEngine,
-    private val contextProvider: () -> IntellijCompletionContext,
-) : SwingShellSuggestionProvider {
-    override fun suggestions(request: SwingShellSuggestionRequest): List<SwingShellSuggestion> {
-        val context = contextProvider()
-        val completionRequest =
-            try {
-                TerminalCompletionRequest(
-                    commandLine = request.commandText,
-                    cursorOffset = request.cursorOffset,
-                    workingDirectoryUri = context.workingDirectoryUri,
-                    profileId = context.profileId,
-                    shellCapabilities = context.shellCapabilities,
-                )
-            } catch (_: IllegalArgumentException) {
-                return emptyList()
-            }
-        return engine.complete(completionRequest).map { candidate -> candidate.toSwingSuggestion() }
-    }
+/** IntelliJ-local name for the shared completion-to-Swing adapter. */
+internal typealias IntellijCompletionSuggestionProvider = SwingCompletionSuggestionProvider
 
-    private companion object {
-        private fun TerminalCompletionCandidate.toSwingSuggestion(): SwingShellSuggestion =
-            SwingShellSuggestion(
-                replacementText = replacementText,
-                replacementStartOffset = replacementStartOffset,
-                replacementEndOffset = replacementEndOffset,
-                source = source,
-                kind = kind.name,
-                displayText = displayText,
-                detail = detail,
-            )
-    }
-}
-
-/** Immutable IntelliJ-owned context attached to one completion request. */
-internal data class IntellijCompletionContext(
-    val profileId: String,
-    val workingDirectoryUri: String?,
-    val shellCapabilities: TerminalShellCapabilities,
-)
+/** IntelliJ-local name for shared host-owned completion request metadata. */
+internal typealias IntellijCompletionContext = SwingCompletionContext

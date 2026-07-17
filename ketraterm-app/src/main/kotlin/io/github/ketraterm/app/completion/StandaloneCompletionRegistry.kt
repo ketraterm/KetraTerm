@@ -93,18 +93,23 @@ internal class StandaloneCompletionRegistry(
         val rankedMruSource = feedbackAware(mruSource)
         val sources =
             ArrayList<TerminalCompletionSourceEntry>(COMPOSED_SOURCE_CAPACITY).apply {
-                add(TerminalCompletionSourceEntry(rankedMruSource, priority = SESSION_MRU_PRIORITY))
+                add(TerminalCompletionSourceEntry(rankedMruSource, priority = SESSION_MRU_SOURCE_PRIORITY))
                 persistentStatsSource?.let { source ->
-                    add(TerminalCompletionSourceEntry(feedbackAware(source), priority = PERSISTENT_STATS_PRIORITY))
+                    add(
+                        TerminalCompletionSourceEntry(
+                            feedbackAware(source),
+                            priority = PERSISTENT_STATS_SOURCE_PRIORITY
+                        )
+                    )
                 }
-                add(TerminalCompletionSourceEntry(specSource, priority = SPEC_PRIORITY))
+                add(TerminalCompletionSourceEntry(specSource, priority = SPEC_SOURCE_PRIORITY))
                 add(
                     TerminalCompletionSourceEntry(
                         TerminalCompletionSources.path(
                             fileSystemProvider = fileSystemProvider,
                             commandSpecs = commandSpecs,
                         ),
-                        priority = PATH_PRIORITY,
+                        priority = PATH_SOURCE_PRIORITY,
                     ),
                 )
             }
@@ -197,9 +202,9 @@ internal class StandaloneCompletionRegistry(
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
         private const val COMPOSED_SOURCE_CAPACITY = 4
-        private const val PATH_PRIORITY = 125
-        private const val SESSION_MRU_PRIORITY = 100
-        private const val PERSISTENT_STATS_PRIORITY = 50
-        private const val SPEC_PRIORITY = 0
+        private const val PATH_SOURCE_PRIORITY = 125
+        private const val SESSION_MRU_SOURCE_PRIORITY = 100
+        private const val PERSISTENT_STATS_SOURCE_PRIORITY = 50
+        private const val SPEC_SOURCE_PRIORITY = 0
     }
 }

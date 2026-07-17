@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.workspace.persistence
+package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
@@ -23,14 +23,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class CommandCompletionStatsWriteQueueTest {
+internal class CompletionStatsWriteQueueTest {
     @Test
     fun `coalesces pending snapshots while a write is active`() {
         val started = CountDownLatch(1)
         val release = CountDownLatch(1)
         val written = mutableListOf<TerminalCommandCompletionStatsSnapshot>()
         val queue =
-            CommandCompletionStatsWriteQueue(
+            CompletionStatsWriteQueue(
                 writeSnapshot = { snapshot ->
                     synchronized(written) {
                         written += snapshot
@@ -57,7 +57,7 @@ class CommandCompletionStatsWriteQueueTest {
     fun `flush writes latest queued snapshot`() {
         val written = mutableListOf<TerminalCommandCompletionStatsSnapshot>()
         val queue =
-            CommandCompletionStatsWriteQueue(
+            CompletionStatsWriteQueue(
                 writeSnapshot = { snapshot -> written += snapshot },
                 threadName = "ketraterm-test-command-stats",
             )
@@ -73,7 +73,7 @@ class CommandCompletionStatsWriteQueueTest {
     fun `close writes latest queued snapshot`() {
         val written = mutableListOf<TerminalCommandCompletionStatsSnapshot>()
         val queue =
-            CommandCompletionStatsWriteQueue(
+            CompletionStatsWriteQueue(
                 writeSnapshot = { snapshot -> written += snapshot },
                 threadName = "ketraterm-test-command-stats",
             )
@@ -88,7 +88,7 @@ class CommandCompletionStatsWriteQueueTest {
     fun `enqueue after close is ignored`() {
         val written = mutableListOf<TerminalCommandCompletionStatsSnapshot>()
         val queue =
-            CommandCompletionStatsWriteQueue(
+            CompletionStatsWriteQueue(
                 writeSnapshot = { snapshot -> written += snapshot },
                 threadName = "ketraterm-test-command-stats",
             )

@@ -15,20 +15,17 @@
  */
 package io.github.ketraterm.app.ui
 
-import io.github.ketraterm.app.completion.StandaloneCompletionFeedbackRecorder
 import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
+import io.github.ketraterm.app.completion.StandaloneCompletionStatisticsCoordinator
 import io.github.ketraterm.app.completion.completionShellCapabilities
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.completion.api.TerminalCompletionSources
-import io.github.ketraterm.completion.history.CommandPersistencePrivacyPolicy
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.workspace.*
-import io.github.ketraterm.workspace.persistence.CommandCompletionStatsStore
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
@@ -62,18 +59,17 @@ internal class TabManager(
     private val tabContainers = HashMap<String, JPanel>()
     private val completionSpecs = TerminalCommandSpecs.defaults()
     private val commandCompletionStatsSource = TerminalCompletionSources.commandStats(commandSpecs = completionSpecs)
-    private val completionFeedbackRecorder =
-        StandaloneCompletionFeedbackRecorder(
+    private val completionStatistics =
+        StandaloneCompletionStatisticsCoordinator(
             statsSource = commandCompletionStatsSource,
-            persistSnapshot = { snapshot -> commandCompletionStatsStore?.persist(snapshot) },
+            initialPersistencePath =
+                settings.commandCompletionStatsPath.takeIf { settings.persistentSuggestionLearningEnabled },
         )
     private val completionRegistry =
         StandaloneCompletionRegistry(
             specs = completionSpecs,
             persistentStatsSource = commandCompletionStatsSource,
         )
-    private var commandCompletionStatsStore: CommandCompletionStatsStore? = createCommandCompletionStatsStoreIfEnabled()
-
     val selectedPane: TerminalPane?
         get() = tabBar.selectedId()?.let { getActivePane(it) }
 
@@ -236,7 +232,7 @@ internal class TabManager(
                 commandSpecs = completionRegistry.commandSpecs,
                 shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
                 suggestionFeedbackHandler =
-                    completionFeedbackRecorder.createHandler(
+                    completionStatistics.createFeedbackHandler(
                         profileId = workspaceTab.profile.id,
                         workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
                     ),
@@ -321,8 +317,7 @@ internal class TabManager(
         }
         completionRegistry.close()
         workspace.close()
-        commandCompletionStatsStore?.close()
-        commandCompletionStatsStore = null
+        completionStatistics.close()
     }
 
     /** Propagates a settings reload to all live panes and the workspace. */
@@ -427,7 +422,7 @@ internal class TabManager(
                 commandSpecs = completionRegistry.commandSpecs,
                 shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
                 suggestionFeedbackHandler =
-                    completionFeedbackRecorder.createHandler(
+                    completionStatistics.createFeedbackHandler(
                         profileId = workspaceTab.profile.id,
                         workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
                     ),
@@ -734,8 +729,7 @@ internal class TabManager(
                         .hasRunningCommand()
                 } ?: 0
             }
-        if (liveProcessCount == 0) return true
-        return closeConfirmation.confirmClose(
+        return liveProcessCount == 0 || closeConfirmation.confirmClose(
             TerminalCloseRequest(
                 displayName = Chrome.APP_TITLE,
                 liveProcessCount = liveProcessCount,
@@ -801,15 +795,14 @@ internal class TabManager(
             val state = tab.session.shellIntegrationState
             val metadata = state.commandMetadata(state.latestCommandRecordId()) ?: return
             val command = metadata.commandText
-            if (command != null && CommandPersistencePrivacyPolicy.allowsCommand(command)) {
-                commandCompletionStatsSource.recordCommandResult(
+            if (command != null) {
+                completionStatistics.recordFinishedCommand(
                     commandLine = command,
                     successful = metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
                     profileId = tab.profile.id,
                     workingDirectoryUri = metadata.workingDirectoryUri,
                     usedAtEpochMillis = metadata.finishedAtEpochMillis ?: System.currentTimeMillis(),
                 )
-                commandCompletionStatsStore?.persist(commandCompletionStatsSource.snapshotAll())
             }
             if (metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED) {
                 command?.let {
@@ -1016,43 +1009,10 @@ internal class TabManager(
     }
 
     private fun reconcileCommandPersistenceStores() {
-        if (settings.persistentSuggestionLearningEnabled) {
-            if (commandCompletionStatsStore == null) {
-                commandCompletionStatsStore =
-                    CommandCompletionStatsStore(settings.commandCompletionStatsPath).also { store ->
-                        val loaded = store.loadSnapshot()
-                        commandCompletionStatsSource.replaceSnapshot(
-                            mergeCompletionStatsSnapshots(
-                                loaded,
-                                commandCompletionStatsSource.snapshotAll(),
-                            ),
-                        )
-                    }
-            }
-        } else {
-            commandCompletionStatsStore?.close()
-            commandCompletionStatsStore = null
-        }
-    }
-
-    private fun createCommandCompletionStatsStoreIfEnabled(): CommandCompletionStatsStore? =
-        if (settings.persistentSuggestionLearningEnabled) {
-            CommandCompletionStatsStore(settings.commandCompletionStatsPath).also { store ->
-                commandCompletionStatsSource.replaceSnapshot(store.loadSnapshot())
-            }
-        } else {
-            null
-        }
-
-    private fun mergeCompletionStatsSnapshots(
-        first: TerminalCommandCompletionStatsSnapshot,
-        second: TerminalCommandCompletionStatsSnapshot,
-    ): TerminalCommandCompletionStatsSnapshot =
-        TerminalCommandCompletionStatsSnapshot(
-            commandStats = first.commandStats + second.commandStats,
-            shapeStats = first.shapeStats + second.shapeStats,
-            feedbackStats = first.feedbackStats + second.feedbackStats,
+        completionStatistics.setPersistencePath(
+            settings.commandCompletionStatsPath.takeIf { settings.persistentSuggestionLearningEnabled },
         )
+    }
 
     private companion object {
         private const val INITIAL_TAB_CAPACITY = 4

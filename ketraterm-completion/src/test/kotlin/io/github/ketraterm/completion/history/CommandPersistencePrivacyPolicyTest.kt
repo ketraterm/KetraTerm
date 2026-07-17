@@ -15,66 +15,65 @@
  */
 package io.github.ketraterm.completion.history
 
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandLineShape
-import io.github.ketraterm.completion.model.TerminalCommandShapeStats
+import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
+import io.github.ketraterm.completion.model.*
 import kotlin.test.*
 
 class CommandPersistencePrivacyPolicyTest {
     @Test
     fun `allows safe command text`() {
-        val decision = CommandPersistencePrivacyPolicy.evaluateCommand("git status")
+        val decision = TerminalCompletionPersistencePolicy.evaluateCommand("git status")
 
-        assertEquals(CommandPersistencePrivacyDecision.ALLOWED, decision)
+        assertEquals(TerminalCompletionPersistenceDecision.ALLOWED, decision)
         assertTrue(decision.isAllowed)
-        assertTrue(CommandPersistencePrivacyPolicy.allowsCommand("git status"))
+        assertTrue(TerminalCompletionPersistencePolicy.allowsCommand("git status"))
     }
 
     @Test
     fun `rejects blank and multiline command text`() {
-        val blankDecision = CommandPersistencePrivacyPolicy.evaluateCommand("   ")
-        val multilineDecision = CommandPersistencePrivacyPolicy.evaluateCommand("git status\ngit log")
+        val blankDecision = TerminalCompletionPersistencePolicy.evaluateCommand("   ")
+        val multilineDecision = TerminalCompletionPersistencePolicy.evaluateCommand("git status\ngit log")
 
-        assertEquals(CommandPersistencePrivacyDecision.BLANK_OR_MULTILINE, blankDecision)
-        assertEquals(CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT, blankDecision.location)
-        assertEquals(CommandPersistencePrivacyDecision.BLANK_OR_MULTILINE, multilineDecision)
-        assertEquals(CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT, multilineDecision.location)
-        assertFalse(CommandPersistencePrivacyPolicy.allowsCommand("git status\rgit log"))
+        assertEquals(TerminalCompletionPersistenceDecision.BLANK_OR_MULTILINE, blankDecision)
+        assertEquals(TerminalCompletionPersistenceDecisionLocation.COMMAND_TEXT, blankDecision.location)
+        assertEquals(TerminalCompletionPersistenceDecision.BLANK_OR_MULTILINE, multilineDecision)
+        assertEquals(TerminalCompletionPersistenceDecisionLocation.COMMAND_TEXT, multilineDecision.location)
+        assertFalse(TerminalCompletionPersistencePolicy.allowsCommand("git status\rgit log"))
     }
 
     @Test
     fun `rejects leading space and tab with ignorespace reason`() {
-        val leadingSpaceDecision = CommandPersistencePrivacyPolicy.evaluateCommand(" git status")
-        val leadingTabDecision = CommandPersistencePrivacyPolicy.evaluateCommand("\tgit status")
+        val leadingSpaceDecision = TerminalCompletionPersistencePolicy.evaluateCommand(" git status")
+        val leadingTabDecision = TerminalCompletionPersistencePolicy.evaluateCommand("\tgit status")
 
-        assertEquals(CommandPersistencePrivacyDecision.IGNORES_SPACE, leadingSpaceDecision)
-        assertEquals(CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT, leadingSpaceDecision.location)
-        assertEquals(CommandPersistencePrivacyDecision.IGNORES_SPACE, leadingTabDecision)
-        assertEquals(CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT, leadingTabDecision.location)
+        assertEquals(TerminalCompletionPersistenceDecision.IGNORES_SPACE, leadingSpaceDecision)
+        assertEquals(TerminalCompletionPersistenceDecisionLocation.COMMAND_TEXT, leadingSpaceDecision.location)
+        assertEquals(TerminalCompletionPersistenceDecision.IGNORES_SPACE, leadingTabDecision)
+        assertEquals(TerminalCompletionPersistenceDecisionLocation.COMMAND_TEXT, leadingTabDecision.location)
     }
 
     @Test
     fun `rejects sensitive command keyword with matched text`() {
-        val decision = CommandPersistencePrivacyPolicy.evaluateCommand("docker login --password hunter2")
+        val decision = TerminalCompletionPersistencePolicy.evaluateCommand("docker login --password hunter2")
 
-        assertEquals(CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD, decision.kind)
+        assertEquals(TerminalCompletionPersistenceDecisionKind.SENSITIVE_KEYWORD, decision.kind)
         assertEquals("password", decision.matchedText)
-        assertEquals(CommandPersistencePrivacyDecisionLocation.COMMAND_TEXT, decision.location)
+        assertEquals(TerminalCompletionPersistenceDecisionLocation.COMMAND_TEXT, decision.location)
         assertFalse(decision.isAllowed)
     }
 
     @Test
     fun `rejects blank sensitive decision matched text`() {
         assertFailsWith<IllegalArgumentException> {
-            CommandPersistencePrivacyDecision.sensitiveKeyword(" ")
+            TerminalCompletionPersistenceDecision.sensitiveKeyword(" ")
         }
     }
 
     @Test
     fun `rejects sensitive decision without location`() {
         assertFailsWith<IllegalArgumentException> {
-            CommandPersistencePrivacyDecision(
-                kind = CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD,
+            TerminalCompletionPersistenceDecision(
+                kind = TerminalCompletionPersistenceDecisionKind.SENSITIVE_KEYWORD,
                 matchedText = "token",
             )
         }
@@ -82,46 +81,46 @@ class CommandPersistencePrivacyPolicyTest {
 
     @Test
     fun `evaluates exact command stats with command text decision`() {
-        val decision = CommandPersistencePrivacyPolicy.evaluateCommandStats(commandStats(" export TOKEN=123"))
+        val decision = TerminalCompletionPersistencePolicy.evaluateCommandStats(commandStats(" export TOKEN=123"))
 
-        assertEquals(CommandPersistencePrivacyDecision.IGNORES_SPACE, decision)
-        assertFalse(CommandPersistencePrivacyPolicy.allowsCommandStats(commandStats("docker login --password hunter2")))
+        assertEquals(TerminalCompletionPersistenceDecision.IGNORES_SPACE, decision)
+        assertFalse(TerminalCompletionPersistencePolicy.allowsCommandStats(commandStats("docker login --password hunter2")))
     }
 
     @Test
     fun `allows safe shape stats`() {
-        val decision = CommandPersistencePrivacyPolicy.evaluateShapeStats(shapeStats("git status"))
+        val decision = TerminalCompletionPersistencePolicy.evaluateShapeStats(shapeStats("git status"))
 
-        assertEquals(CommandPersistencePrivacyDecision.ALLOWED, decision)
-        assertTrue(CommandPersistencePrivacyPolicy.allowsShapeStats(shapeStats("git status")))
+        assertEquals(TerminalCompletionPersistenceDecision.ALLOWED, decision)
+        assertTrue(TerminalCompletionPersistencePolicy.allowsShapeStats(shapeStats("git status")))
     }
 
     @Test
     fun `rejects sensitive shape executable`() {
-        val decision = CommandPersistencePrivacyPolicy.evaluateShapeStats(shapeStats("secret-tool list"))
+        val decision = TerminalCompletionPersistencePolicy.evaluateShapeStats(shapeStats("secret-tool list"))
 
-        assertEquals(CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD, decision.kind)
+        assertEquals(TerminalCompletionPersistenceDecisionKind.SENSITIVE_KEYWORD, decision.kind)
         assertEquals("secret", decision.matchedText)
-        assertEquals(CommandPersistencePrivacyDecisionLocation.SHAPE_EXECUTABLE, decision.location)
+        assertEquals(TerminalCompletionPersistenceDecisionLocation.SHAPE_EXECUTABLE, decision.location)
     }
 
     @Test
     fun `rejects sensitive shape subcommand`() {
-        val decision = CommandPersistencePrivacyPolicy.evaluateShapeStats(shapeStats("git secret list"))
+        val decision = TerminalCompletionPersistencePolicy.evaluateShapeStats(shapeStats("git secret list"))
 
-        assertEquals(CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD, decision.kind)
+        assertEquals(TerminalCompletionPersistenceDecisionKind.SENSITIVE_KEYWORD, decision.kind)
         assertEquals("secret", decision.matchedText)
-        assertEquals(CommandPersistencePrivacyDecisionLocation.SHAPE_SUBCOMMAND, decision.location)
+        assertEquals(TerminalCompletionPersistenceDecisionLocation.SHAPE_SUBCOMMAND, decision.location)
     }
 
     @Test
     fun `rejects sensitive shape option`() {
-        val decision = CommandPersistencePrivacyPolicy.evaluateShapeStats(shapeStats("curl --authorization bearer"))
+        val decision = TerminalCompletionPersistencePolicy.evaluateShapeStats(shapeStats("curl --authorization bearer"))
 
-        assertEquals(CommandPersistencePrivacyDecisionKind.SENSITIVE_KEYWORD, decision.kind)
+        assertEquals(TerminalCompletionPersistenceDecisionKind.SENSITIVE_KEYWORD, decision.kind)
         assertEquals("authorization", decision.matchedText)
-        assertEquals(CommandPersistencePrivacyDecisionLocation.SHAPE_OPTION_NAME, decision.location)
-        assertFalse(CommandPersistencePrivacyPolicy.allowsShapeStats(shapeStats("curl --authorization bearer")))
+        assertEquals(TerminalCompletionPersistenceDecisionLocation.SHAPE_OPTION_NAME, decision.location)
+        assertFalse(TerminalCompletionPersistencePolicy.allowsShapeStats(shapeStats("curl --authorization bearer")))
     }
 
     private fun commandStats(commandLine: String): TerminalCommandCompletionStats =

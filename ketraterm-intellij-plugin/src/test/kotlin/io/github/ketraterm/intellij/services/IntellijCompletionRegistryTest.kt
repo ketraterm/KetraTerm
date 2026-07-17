@@ -15,8 +15,7 @@
  */
 package io.github.ketraterm.intellij.services
 
-import io.github.ketraterm.completion.api.TerminalCompletionSources
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
@@ -24,14 +23,47 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /** Integration tests for IntelliJ completion source composition and lifecycle. */
 class IntellijCompletionRegistryTest {
+    @Test
+    fun `additional provider factory composes source and closes its resources`() {
+        var resourceClosed = false
+        val factory =
+            IntellijCompletionProviderFactory {
+                IntellijCompletionProviderRegistration(
+                    sourceEntry =
+                        TerminalCompletionSourceEntry(
+                            source = { request ->
+                                listOf(
+                                    TerminalCompletionCandidate(
+                                        replacementText = "custom",
+                                        replacementStartOffset = 0,
+                                        replacementEndOffset = request.cursorOffset,
+                                        source = "custom-provider",
+                                        kind = TerminalCompletionCandidateKind.COMMAND,
+                                    ),
+                                )
+                            },
+                            priority = 500,
+                        ),
+                    resources = listOf(AutoCloseable { resourceClosed = true }),
+                )
+            }
+        val registry = IntellijCompletionRegistry(specs = emptyList())
+        val session = registry.openSession(context("custom").copy(providerFactories = listOf(factory)))
+
+        assertEquals("custom", session.provider.suggestions(request("cu")).single().replacementText)
+
+        session.close()
+        assertTrue(resourceClosed)
+        registry.close()
+    }
+
     @Test
     fun `git branch snapshot refreshes the owning session provider`() {
         val registry = IntellijCompletionRegistry()
@@ -40,11 +72,14 @@ class IntellijCompletionRegistryTest {
             val session =
                 registry.openSession(
                     context("first").copy(
-                        gitBranchLoader = {
+                        providerFactories =
                             listOf(
-                                TerminalCompletionDomainValue("feature/terminal", detail = "local branch"),
-                            )
-                        },
+                                IntellijGitBranchProviderFactory {
+                                    listOf(
+                                        TerminalCompletionDomainValue("feature/terminal", detail = "local branch"),
+                                    )
+                                },
+                            ),
                     ),
                 )
             session.onSourceChanged(changed::countDown)
@@ -138,6 +173,62 @@ class IntellijCompletionRegistryTest {
             assertEquals(1, statsSource.feedbackSnapshot().single().acceptedCount)
         } finally {
             registry.close()
+        }
+    }
+
+    @Test
+    fun `failed provider composition closes resources created by earlier factories`() {
+        var resourceClosed = false
+        val successfulFactory =
+            IntellijCompletionProviderFactory {
+                IntellijCompletionProviderRegistration(
+                    sourceEntry = TerminalCompletionSourceEntry(source = { emptyList() }, priority = 1),
+                    resources = listOf(AutoCloseable { resourceClosed = true }),
+                )
+            }
+        val failingFactory = IntellijCompletionProviderFactory { error("factory failed") }
+        val registry = IntellijCompletionRegistry(specs = emptyList())
+        try {
+            assertThrows(IllegalStateException::class.java) {
+                registry.openSession(
+                    context("failed").copy(providerFactories = listOf(successfulFactory, failingFactory)),
+                )
+            }
+            assertTrue(resourceClosed)
+        } finally {
+            registry.close()
+        }
+    }
+
+    @Test
+    fun `one provider close failure does not skip later resources`() {
+        val closed = ArrayList<String>()
+        val factory =
+            IntellijCompletionProviderFactory {
+                IntellijCompletionProviderRegistration(
+                    sourceEntry = TerminalCompletionSourceEntry(source = { emptyList() }, priority = 1),
+                    resources =
+                        listOf(
+                            AutoCloseable {
+                                closed += "throwing"
+                                error("close failed")
+                            },
+                            AutoCloseable { closed += "following" },
+                        ),
+                )
+            }
+        val registry = IntellijCompletionRegistry(specs = emptyList())
+        val session = registry.openSession(context("close-failure").copy(providerFactories = listOf(factory)))
+
+        assertThrows(IllegalStateException::class.java, session::close)
+        assertEquals(listOf("throwing", "following"), closed)
+        registry.close()
+    }
+
+    @Test
+    fun `invalid session capacity is rejected before registry resources are started`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            IntellijCompletionRegistry(sessionMruCapacity = 0)
         }
     }
 

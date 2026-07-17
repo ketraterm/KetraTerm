@@ -37,6 +37,7 @@ This build may:
   services to `ketraterm-ui-swing` host interfaces.
 - choose project-aware launch profiles and working directories.
 - coordinate IDE disposal with workspace/session shutdown.
+- provide project-aware completion loaders and compose additive provider factories.
 - configure plugin verification, sandbox runs, signing, and publishing.
 
 ## Boundary
@@ -52,11 +53,14 @@ This build must not:
 - require the root KetraTerm Gradle build to apply IntelliJ Platform plugins.
 - duplicate standalone app chrome, settings, or tab-management behavior unless
   the behavior is IDE-specific.
+- duplicate reusable completion snapshot, persistence, or Swing adapter logic.
 
 Reusable fixes discovered while building the plugin belong in the owning
 module: rendering and input in `ketraterm-ui-swing`, workspace state in
-`ketraterm-workspace`, session synchronization in `ketraterm-session`, and local PTY
-lifecycle in `ketraterm-pty`.
+`ketraterm-workspace`, session synchronization in `ketraterm-session`, and local PTY lifecycle in `ketraterm-pty`.
+Completion parsing/ranking belongs in
+`ketraterm-completion`, snapshot machinery in `ketraterm-completion-host`, persistence in
+`ketraterm-completion-persistence`, and Swing vocabulary adaptation in `ketraterm-ui-swing-host`.
 
 ## Package Layout
 

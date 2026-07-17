@@ -28,8 +28,13 @@ or construct:
 - `TerminalCommandCompletionStats`
 - `TerminalCommandShapeStats` and `TerminalCommandLineShape`
 - `TerminalCompletionFeedbackStats` and feedback vocabulary
+- `TerminalCompletionPersistenceDecision` and its reason/location vocabulary
 - `TerminalCommandCompletionStatsSnapshot`
 - `TerminalCommandCompletionStatsSnapshotCodec`
+
+`TerminalCompletionPersistencePolicy` is the reviewed host-facing privacy facade. It evaluates exact commands and
+structural statistics and sanitizes a complete snapshot before a host crosses a storage boundary. Its keyword matching
+and filtering implementation remains internal.
 
 Model constructors expose durable host-owned fields only. Derived matching keys,
 such as normalized command text and normalized command-shape keys, are computed
@@ -66,6 +71,7 @@ workspace, Swing UI, or future plugin code:
 
 - `commandline`
 - `engine`
+- `history`
 - `internal`
 - `ranking`
 - `source`
@@ -77,9 +83,16 @@ decision explicitly promotes a type into `api` or `model`.
 
 ## Host Ownership
 
-Hosts are responsible for privacy filtering and disk persistence. Completion
-sources accept compact stats snapshots and live feedback events, but they never
-read files, scan raw shell history, spawn shells, or talk to UI frameworks.
+Hosts are responsible for applying `TerminalCompletionPersistencePolicy` to authoritative command records and for
+choosing whether and where persistence is enabled. Completion sources accept compact stats snapshots and live feedback
+events, but they never read files, scan raw shell history, spawn shells, or talk to UI frameworks.
+
+Optional disk I/O belongs to the separately published
+`ketraterm-completion-persistence` module. Its
+`TerminalCompletionStatsStore` sanitizes again at the storage boundary, applies byte/line/row bounds before decoding or
+encoding, serializes through the shared versioned codec, and coalesces atomic file replacements on a private worker.
+Product hosts own the destination path, load scheduling, diagnostics, and store lifecycle. Completion persistence is not
+a workspace responsibility.
 
 The standalone app and IntelliJ plugin should compose completion sources through
 `TerminalCompletionSources` and `TerminalCompletionEngines`, then adapt returned
@@ -195,9 +208,11 @@ scalar positional fields remain the fallback for compact specs.
 
 ## Host Dynamic Providers
 
-Standalone and IntelliJ completion providers are expected to differ internally.
-The standalone app uses session-local, immutable directory snapshots fed by a
-window-owned coroutine service with a bounded channel and two IO workers.
+Reusable ready-snapshot, local-path, and bounded directory-scanning machinery belongs to `ketraterm-completion-host`; it
+may perform bounded host work but does not parse, rank, or prioritize completion candidates. Standalone and IntelliJ
+share its generation and failure semantics while retaining only their environment-specific loaders and scanners. The
+standalone app uses session-local, immutable directory snapshots fed by a window-owned instance of the shared coroutine
+service with a bounded channel and two IO workers.
 Enumeration has visit, result, and elapsed-time caps; caches have capacity and
 expiry bounds; request generations prevent stale work from refreshing the popup. A failed load clears only its matching
 in-flight generation, retains any previous ready snapshot, and can be retried by the next request. The app resolves
@@ -208,6 +223,16 @@ dynamic value provider reads local branches from the Git4Idea repository that co
 and publishes generation-safe, failure-retryable snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Remote
 refs, changelists,
 whole-project fuzzy paths, SDKs, and run configurations remain follow-up work.
+
+IntelliJ dynamic providers are composed through additive provider factories. Each factory returns one prioritized source
+plus the closeable snapshot resources owned by that source. Adding a new value domain therefore does not require another
+field or close branch in the central session registry. The registry owns session composition; a separate statistics
+coordinator owns privacy filtering, serialized learning mutations, persistence, and shutdown. Standalone uses the same
+coordinator split so completion files are never loaded on the Swing event-dispatch thread.
+
+The engine-to-Swing request/candidate bridge and Swing-feedback-to-statistics mapping live in `ketraterm-ui-swing-host`.
+Product hosts inject context, privacy, scheduling, and persistence policy instead of copying the vocabulary conversion
+logic.
 
 Both hosts should map their data into the shared request/candidate/source
 contracts and let the shared engine merge, deduplicate, and rank candidates.
@@ -253,3 +278,9 @@ deliberately small, so decorators and the merged engine use auditable standard
 collection sorting and deduplication rather than custom allocation-free data
 structures. Benchmarks track learned-ranking and hostile-provider costs so a
 more specialized selector is introduced only if measurements justify it.
+
+Source collection and final presentation limits are deliberately distinct. The engine requests a bounded surplus from
+collecting sources, shape and feedback decorators rerank that shared surplus without multiplying nested budgets, and the
+merged engine applies `request.maxCandidates` only after context ranking and deduplication. The collection budget is
+four times the visible limit with an absolute surplus cap of 256 and overflow-safe arithmetic; learned ranking can
+therefore promote a candidate that began just outside the visible result without permitting unbounded host work.

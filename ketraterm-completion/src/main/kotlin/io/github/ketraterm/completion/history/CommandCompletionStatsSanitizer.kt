@@ -26,7 +26,7 @@ import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapsh
  * contract because they contain provider/source metadata and UX counters, not
  * raw command arguments.
  */
-object CommandCompletionStatsSanitizer {
+internal object CommandCompletionStatsSanitizer {
     /**
      * Returns a snapshot safe enough for local persisted suggestion learning.
      *

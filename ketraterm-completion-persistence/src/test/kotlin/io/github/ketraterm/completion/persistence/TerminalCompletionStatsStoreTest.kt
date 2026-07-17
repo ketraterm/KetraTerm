@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.workspace.persistence
+package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.model.*
@@ -24,8 +24,9 @@ import java.nio.file.Path
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
-class CommandCompletionStatsStoreTest {
+internal class TerminalCompletionStatsStoreTest {
     @Test
     fun `persists versioned compact stats and reloads unicode text`(
         @TempDir directory: Path,
@@ -44,12 +45,12 @@ class CommandCompletionStatsStoreTest {
                 lastUsedEpochMillis = 1_234L,
             )
 
-        CommandCompletionStatsStore(path).use { store ->
+        TerminalCompletionStatsStore(path).use { store ->
             store.persist(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(record)))
             store.flush()
         }
 
-        CommandCompletionStatsStore(path).use { reloaded ->
+        TerminalCompletionStatsStore(path).use { reloaded ->
             assertEquals(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(record)), reloaded.loadSnapshot())
         }
         assertEquals(false, Files.readString(path).contains(record.commandLine))
@@ -79,13 +80,16 @@ class CommandCompletionStatsStoreTest {
                 lastUsedEpochMillis = 500,
             )
 
-        CommandCompletionStatsStore(path).use { store ->
+        TerminalCompletionStatsStore(path).use { store ->
             store.persist(TerminalCommandCompletionStatsSnapshot(shapeStats = listOf(shapeRecord)))
             store.flush()
         }
 
-        CommandCompletionStatsStore(path).use { reloaded ->
-            assertEquals(TerminalCommandCompletionStatsSnapshot(shapeStats = listOf(shapeRecord)), reloaded.loadSnapshot())
+        TerminalCompletionStatsStore(path).use { reloaded ->
+            assertEquals(
+                TerminalCommandCompletionStatsSnapshot(shapeStats = listOf(shapeRecord)),
+                reloaded.loadSnapshot()
+            )
         }
         val persisted = Files.readString(path)
         assertEquals(false, persisted.contains("secret-branch"))
@@ -108,13 +112,16 @@ class CommandCompletionStatsStoreTest {
                 lastUsedEpochMillis = 900,
             )
 
-        CommandCompletionStatsStore(path).use { store ->
+        TerminalCompletionStatsStore(path).use { store ->
             store.persist(TerminalCommandCompletionStatsSnapshot(feedbackStats = listOf(feedbackRecord)))
             store.flush()
         }
 
-        CommandCompletionStatsStore(path).use { reloaded ->
-            assertEquals(TerminalCommandCompletionStatsSnapshot(feedbackStats = listOf(feedbackRecord)), reloaded.loadSnapshot())
+        TerminalCompletionStatsStore(path).use { reloaded ->
+            assertEquals(
+                TerminalCommandCompletionStatsSnapshot(feedbackStats = listOf(feedbackRecord)),
+                reloaded.loadSnapshot()
+            )
         }
     }
 
@@ -127,12 +134,20 @@ class CommandCompletionStatsStoreTest {
         val privateByWhitespace = stats(commandLine = " export SECRET_TOKEN=123")
         val privateByKeyword = stats(commandLine = "docker login --password hunter2")
 
-        CommandCompletionStatsStore(path).use { store ->
-            store.persist(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(safe, privateByWhitespace, privateByKeyword)))
+        TerminalCompletionStatsStore(path).use { store ->
+            store.persist(
+                TerminalCommandCompletionStatsSnapshot(
+                    commandStats = listOf(
+                        safe,
+                        privateByWhitespace,
+                        privateByKeyword
+                    )
+                )
+            )
             store.flush()
         }
 
-        CommandCompletionStatsStore(path).use { reloaded ->
+        TerminalCompletionStatsStore(path).use { reloaded ->
             assertEquals(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(safe)), reloaded.loadSnapshot())
         }
         val persisted = Files.readString(path)
@@ -148,14 +163,14 @@ class CommandCompletionStatsStoreTest {
         val first = stats(commandLine = "git status")
         val second = stats(commandLine = "npm test")
 
-        CommandCompletionStatsStore(path).use { store ->
+        TerminalCompletionStatsStore(path).use { store ->
             store.persist(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(first)))
             store.flush()
             store.persist(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(second)))
             store.flush()
         }
 
-        CommandCompletionStatsStore(path).use { reloaded ->
+        TerminalCompletionStatsStore(path).use { reloaded ->
             assertEquals(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(second)), reloaded.loadSnapshot())
         }
     }
@@ -167,11 +182,11 @@ class CommandCompletionStatsStoreTest {
         val path = directory.resolve("completion-stats.tsv")
         val record = stats(commandLine = "git status")
 
-        CommandCompletionStatsStore(path).use { store ->
+        TerminalCompletionStatsStore(path).use { store ->
             store.persist(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(record)))
         }
 
-        CommandCompletionStatsStore(path).use { reloaded ->
+        TerminalCompletionStatsStore(path).use { reloaded ->
             assertEquals(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(record)), reloaded.loadSnapshot())
         }
     }
@@ -183,15 +198,68 @@ class CommandCompletionStatsStoreTest {
         val path = directory.resolve("completion-stats.tsv")
         val first = stats(commandLine = "git status")
         val afterClose = stats(commandLine = "npm test")
-        val store = CommandCompletionStatsStore(path)
+        val store = TerminalCompletionStatsStore(path)
         store.persist(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(first)))
         store.close()
 
         store.persist(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(afterClose)))
         store.flush()
 
-        CommandCompletionStatsStore(path).use { reloaded ->
+        TerminalCompletionStatsStore(path).use { reloaded ->
             assertEquals(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(first)), reloaded.loadSnapshot())
+        }
+    }
+
+    @Test
+    fun `exposes codec versioned file name`() {
+        assertEquals("command-completion-stats-v1.tsv", TerminalCompletionStatsStore.currentFileName())
+    }
+
+    @Test
+    fun `rejects a persisted file beyond the storage byte budget`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("completion-stats.tsv")
+        Files.write(path, ByteArray(5 * 1024 * 1024) { 'x'.code.toByte() })
+
+        TerminalCompletionStatsStore(path).use { store ->
+            assertEquals(TerminalCommandCompletionStatsSnapshot(), store.loadSnapshot())
+        }
+    }
+
+    @Test
+    fun `omits oversized outgoing rows before encoding`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("completion-stats.tsv")
+        val safe = stats(commandLine = "git status")
+        val oversized = stats(commandLine = "x".repeat(20_000))
+
+        TerminalCompletionStatsStore(path).use { store ->
+            store.persist(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(safe, oversized)))
+            store.flush()
+        }
+
+        TerminalCompletionStatsStore(path).use { store ->
+            assertEquals(listOf(safe), store.loadSnapshot().commandStats)
+        }
+        assertTrue(Files.size(path) < 5 * 1024 * 1024)
+    }
+
+    @Test
+    fun `caps outgoing rows per statistics family`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("completion-stats.tsv")
+        val rows = List(2_100) { index -> stats(commandLine = "command-$index") }
+
+        TerminalCompletionStatsStore(path).use { store ->
+            store.persist(TerminalCommandCompletionStatsSnapshot(commandStats = rows))
+            store.flush()
+        }
+
+        TerminalCompletionStatsStore(path).use { store ->
+            assertEquals(2_048, store.loadSnapshot().commandStats.size)
         }
     }
 

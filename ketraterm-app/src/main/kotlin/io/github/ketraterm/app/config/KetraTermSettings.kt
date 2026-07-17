@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.app.config
 
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshotCodec
+import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
 import io.github.ketraterm.host.*
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
@@ -216,7 +216,7 @@ internal class KetraTermSettings(
 
     /** Path for the compact persisted command-completion stats index. */
     val commandCompletionStatsPath: Path
-        get() = configManager.configPath.resolveSibling(TerminalCommandCompletionStatsSnapshotCodec.currentFileName())
+        get() = configManager.configPath.resolveSibling(TerminalCompletionStatsStore.currentFileName())
 
     fun current(): SwingSettings {
         val resolvedFamily = SwingSettings.resolveFontFamily(config.fontFamily)

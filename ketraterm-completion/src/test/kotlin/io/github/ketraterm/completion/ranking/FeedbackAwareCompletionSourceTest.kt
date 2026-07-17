@@ -27,6 +27,64 @@ import kotlin.test.assertTrue
 
 class FeedbackAwareCompletionSourceTest {
     @Test
+    fun `feedback ranking can promote ninth bounded delegate candidate into eight candidate result`() {
+        val rawCandidates =
+            buildList {
+                repeat(8) { index ->
+                    add(candidate("candidate-${index + 1}", score = 320 - index))
+                }
+                add(
+                    candidate(
+                        replacementText = "src/main",
+                        score = 300,
+                        source = "path",
+                        kind = TerminalCompletionCandidateKind.PATH,
+                    ),
+                )
+            }
+        val source =
+            FeedbackAwareCompletionSource(
+                delegate = TerminalCompletionSource { request -> rawCandidates.take(request.maxCandidates) },
+                feedbackStatsProvider = {
+                    listOf(
+                        feedbackStats(
+                            source = "path",
+                            candidateKind = TerminalCompletionCandidateKind.PATH,
+                            acceptedCount = 2,
+                        ),
+                    )
+                },
+            )
+
+        val candidates = source.complete(request("git s"))
+
+        assertEquals(8, candidates.size)
+        assertEquals("src/main", candidates.first().replacementText)
+    }
+
+    @Test
+    fun `nested ranking decorators reuse one collection budget`() {
+        var delegateLimit = 0
+        val source =
+            FeedbackAwareCompletionSource(
+                delegate =
+                    ShapeAwareCompletionSource(
+                        delegate =
+                            TerminalCompletionSource { request ->
+                                delegateLimit = request.maxCandidates
+                                emptyList()
+                            },
+                        shapeStatsProvider = { emptyList() },
+                    ),
+                feedbackStatsProvider = { emptyList() },
+            )
+
+        source.complete(request("git s"))
+
+        assertEquals(32, delegateLimit)
+    }
+
+    @Test
     fun `accepted matching feedback boosts candidate above otherwise higher score candidate`() {
         val source =
             FeedbackAwareCompletionSource(

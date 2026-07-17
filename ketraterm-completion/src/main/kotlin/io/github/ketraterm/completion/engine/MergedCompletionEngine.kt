@@ -22,7 +22,8 @@ import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
-import io.github.ketraterm.completion.commandline.complete
+import io.github.ketraterm.completion.commandline.collectCandidates
+import io.github.ketraterm.completion.internal.TerminalCompletionCollectionBudget
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.ranking.TerminalCompletionRankingContext
@@ -51,10 +52,11 @@ internal class MergedCompletionEngine(
             )
         if (completionContext.activePosition == TerminalCompletionActivePosition.OPERATOR) return emptyList()
         val rankingContext = TerminalCompletionRankingContext(completionContext)
+        val collectionLimit = TerminalCompletionCollectionBudget.forFinalLimit(request.maxCandidates)
         val deduplicated = LinkedHashMap<CandidateKey, RankedCandidate>()
         for (sourceIndex in sources.indices) {
             val entry = sources[sourceIndex]
-            val candidates = entry.source.complete(request, commandLineContext)
+            val candidates = entry.source.collectCandidates(request, commandLineContext, collectionLimit)
             for (candidateIndex in candidates.indices) {
                 val candidate = candidates[candidateIndex]
                 val ranked =

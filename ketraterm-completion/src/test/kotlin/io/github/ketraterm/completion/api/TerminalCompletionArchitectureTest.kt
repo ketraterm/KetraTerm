@@ -155,8 +155,8 @@ internal class TerminalCompletionArchitectureTest {
     @Test
     fun `external modules import only completion api or model packages`() {
         val violations =
-            EXTERNAL_MODULES.flatMap { moduleName ->
-                kotlinFiles(repositoryRoot.resolve(moduleName)).flatMap { file ->
+            externalModuleSourceRoots.flatMap { sourceRoot ->
+                kotlinFiles(sourceRoot).flatMap { file ->
                     file
                         .readSourceLines()
                         .mapIndexedNotNull { index, line ->
@@ -227,19 +227,26 @@ internal class TerminalCompletionArchitectureTest {
             listOf(
                 "commandline",
                 "engine",
+                "history",
                 "internal",
                 "ranking",
                 "source",
                 "spec",
                 "stats",
             )
-        private val EXTERNAL_MODULES =
-            listOf(
-                "ketraterm-app",
-                "ketraterm-intellij-plugin",
-                "ketraterm-ui-swing",
-                "ketraterm-workspace",
-            )
+        private val externalModuleSourceRoots: List<Path> =
+            Files
+                .list(repositoryRoot)
+                .use { paths ->
+                    paths
+                        .filter(Files::isDirectory)
+                        .filter { path -> path.fileName.toString().startsWith("ketraterm-") }
+                        .filter { path -> path.fileName.toString() != "ketraterm-completion" }
+                        .map { path -> path.resolve("src") }
+                        .filter(Files::isDirectory)
+                        .sorted()
+                        .toList()
+                }
         private val PUBLIC_MODEL_DECLARATIONS =
             setOf(
                 "TerminalCommandCompletionStats",
@@ -253,6 +260,9 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCompletionFeedbackContext",
                 "TerminalCompletionFeedbackKind",
                 "TerminalCompletionFeedbackStats",
+                "TerminalCompletionPersistenceDecision",
+                "TerminalCompletionPersistenceDecisionKind",
+                "TerminalCompletionPersistenceDecisionLocation",
                 "TerminalCompletionDomainValue",
                 "TerminalCompletionTokenPosition",
                 "TerminalCompletionValueDomain",
@@ -267,6 +277,7 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCompletionCandidateKind",
                 "TerminalCompletionEngine",
                 "TerminalCompletionEngines",
+                "TerminalCompletionPersistencePolicy",
                 "TerminalCompletionRequest",
                 "TerminalCompletionSource",
                 "TerminalCompletionSourceEntry",
@@ -296,6 +307,7 @@ internal class TerminalCompletionArchitectureTest {
         private val PUBLIC_MODEL_MEMBER_FUNCTIONS =
             mapOf(
                 "model/TerminalCommandCompletionStatsSnapshotCodec.kt" to setOf("currentFileName", "decode", "encode"),
+                "model/TerminalCompletionPersistenceDecision.kt" to setOf("sensitiveKeyword"),
                 "model/TerminalCommandSpecs.kt" to
                     setOf("defaults", "docker", "git", "gradle", "npm", "cargo", "kubectl", "gh", "pip", "go", "aws", "ketra"),
                 "model/TerminalCompletionFeedbackStats.kt" to setOf("fromCandidateKind"),
@@ -314,6 +326,16 @@ internal class TerminalCompletionArchitectureTest {
                     ),
                 "api/TerminalCompletionEngine.kt" to setOf("complete"),
                 "api/TerminalCompletionEngines.kt" to setOf("fromSources"),
+                "api/TerminalCompletionPersistencePolicy.kt" to
+                        setOf(
+                            "allowsCommand",
+                            "evaluateCommand",
+                            "allowsCommandStats",
+                            "evaluateCommandStats",
+                            "allowsShapeStats",
+                            "evaluateShapeStats",
+                            "sanitizeSnapshot",
+                        ),
                 "api/TerminalCompletionSource.kt" to setOf("complete"),
                 "api/TerminalCompletionSources.kt" to
                         setOf("commandStats", "feedbackAware", "fromSpecs", "sessionMru", "path", "valueDomain"),
@@ -326,6 +348,6 @@ internal class TerminalCompletionArchitectureTest {
             Regex("""^(data class|enum class|fun interface|sealed interface|class|fun|interface|object)\s+([A-Za-z0-9_]+).*""")
         private val PUBLIC_MEMBER_FUNCTION = Regex("""^\s+(?!private |internal )fun\s+([A-Za-z0-9_]+)\(.*""")
         private val IMPLEMENTATION_IMPORT =
-            Regex("""import io\.github\.ketraterm\.completion\.(commandline|engine|internal|ranking|source|spec|stats)(\.|$).*""")
+            Regex("""import io\.github\.ketraterm\.completion\.(commandline|engine|history|internal|ranking|source|spec|stats)(\.|$).*""")
     }
 }

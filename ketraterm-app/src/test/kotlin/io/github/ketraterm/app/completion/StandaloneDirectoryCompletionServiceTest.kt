@@ -20,10 +20,7 @@ import io.github.ketraterm.completion.api.TerminalFileEntry
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class StandaloneDirectoryCompletionServiceTest {
     @Test
@@ -155,6 +152,69 @@ class StandaloneDirectoryCompletionServiceTest {
         assertTrue(provider.listDirectory(request()).isEmpty())
 
         assertEquals(2, attempts)
+    }
+
+    @Test
+    fun `failed scan can be retried`() {
+        val scheduler = RecordingLoadScheduler()
+        var attempts = 0
+        val expected = listOf(TerminalFileEntry("recovered", isDirectory = true))
+        val provider =
+            provider(scheduler, onSnapshotChanged = {}) { _, _ ->
+                attempts++
+                if (attempts == 1) error("scan failed")
+                expected
+            }
+
+        provider.listDirectory(request())
+        try {
+            scheduler.runNext()
+            fail("Expected the first scan to fail")
+        } catch (expectedFailure: IllegalStateException) {
+            assertEquals("scan failed", expectedFailure.message)
+        }
+
+        assertTrue(provider.listDirectory(request()).isEmpty())
+        scheduler.runNext()
+
+        assertEquals(expected, provider.listDirectory(request()))
+    }
+
+    @Test
+    fun `completed load cleanup does not clear a newer generation`() {
+        val scheduler = RecordingLoadScheduler()
+        var clock = 0L
+        var publications = 0
+        lateinit var provider: StandaloneAsyncFileSystemProvider
+        provider =
+            StandaloneAsyncFileSystemProvider(
+                scheduler = scheduler,
+                onSnapshotChanged = {
+                    publications++
+                    if (publications == 1) {
+                        clock = 2L
+                        provider.listDirectory(request(entryNamePrefix = "b"))
+                        provider.listDirectory(request(entryNamePrefix = "a"))
+                    }
+                },
+                resolver = StandalonePathResolver(homeDirectory = null, windows = false),
+                scanner =
+                    StandaloneDirectoryScanner { _, prefix ->
+                        listOf(TerminalFileEntry(prefix, isDirectory = true))
+                    },
+                nanoTime = { clock },
+                snapshotTtlNanos = 1L,
+            )
+
+        provider.listDirectory(request(entryNamePrefix = "a"))
+        scheduler.runNext()
+        assertEquals(2, scheduler.size)
+
+        scheduler.runNext()
+        scheduler.runNext()
+
+        assertEquals(2, publications)
+        assertEquals("a", provider.listDirectory(request(entryNamePrefix = "a")).single().name)
     }
 
     @Test

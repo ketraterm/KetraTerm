@@ -127,10 +127,11 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   command/subcommand/option/value/argument positions, spec-backed evaluation, spec-aware command-line classification,
   context-aware live trigger policy, context-aware merged ranking for command/subcommand/option/value/path/domain
   positions, privacy-preserving argument shape categories, source-specific accepted/dismissed feedback stats, bounded
-  shape-aware and feedback-aware ranking decorators, a bounded in-memory session MRU source, command-aware path
+  shape-aware and feedback-aware ranking decorators, bounded surplus collection before final presentation truncation, a
+  bounded in-memory session MRU source, command-aware path
   completion, quote-preserving and shell-escaped path replacement for active tokens, and a small curated bootstrap spec
-  set for common developer CLIs and shell path commands. The standalone and IntelliJ hosts wire that engine through
-  product-owned Swing suggestion adapters, map authoritative profile categories to supported POSIX, PowerShell, or
+  set for common developer CLIs and shell path commands. The standalone and IntelliJ hosts wire that engine through a
+  shared optional Swing-host adapter, map authoritative profile categories to supported POSIX, PowerShell, or
   conservative plain capabilities, pass profile/current-directory context into requests, persist compact exact
   command/shape/source-feedback stats instead of scanning raw history, and feed successful OSC 133 command metadata into
   per-session MRU sources. For unknown executables, session MRU also learns bounded in-memory observed tokens without
@@ -158,7 +159,16 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   service's bounded coroutine workers, is keyed by the terminal working directory, rejects stale generations, and never
   runs from the shared engine or Swing EDT. Failed loads release their matching in-flight generation and may be retried
   without publishing partial or stale state. IntelliJ path completion reads VFS children filtered by project content
-  inside project roots and retains the bounded local scanner for terminal directories outside the project.
+  inside project roots and retains the bounded local scanner for terminal directories outside the project. Dynamic
+  sources are additive factory registrations whose closeable snapshots are released with their session; completion
+  statistics execution and persistence are isolated from source/session composition.
+- **Shared Completion Host Support**: `ketraterm-completion-host` owns the bounded worker queue, generation-safe
+  directory and keyed-value snapshots, authority-preserving local path resolution, and bounded local scanning. Each
+  product host retains source composition and priority policy. `ketraterm-completion-persistence` owns sanitized
+  versioned local-file storage with byte, line, and row bounds; standalone loads it on a serialized statistics worker.
+  `ketraterm-ui-swing-host`
+  owns the reusable engine/feedback vocabulary adapters. The pure completion engine, product-specific loaders, UI
+  presentation, source composition, and persistence policy remain in their responsible layers.
 - **Fixed-Grid Smooth Swing Viewport**: One allocation-conscious row-scrolling engine serves notched mouse wheels, precise trackpads, Shift+Page Up/Down keyboard paging, selection-drag autoscroll, programmatic navigation, and standalone/IntelliJ scrollbars. The reusable Swing terminal defaults to zero top padding so smooth row animation can enter and leave through the top edge without clipping, while preserving a compact right edge for natural wrapping, a stable bottom spacer, and the left shell-integration decoration gutter. Alternate-screen rendering suppresses prompt decorations and uses symmetric left/right insets equal to the bottom spacer, then resizes the terminal grid to the newly available columns so full-screen TUIs avoid fake right slack. Optional host padding is treated consistently as an explicit visual inset on all four edges. Precise device deltas accumulate without moving content until they emit whole rows; every destination and resting viewport is therefore row-aligned. Animation retains a fractional visual position only while easing between integer destinations, with line-based render-cache addressing through an integer anchor and one overscan row clipped to the terminal grid. A fractional component height is covered by a separate render-only row, so a 10.9-row viewport requests 11 rows at rest and up to 12 during animation without changing the 10-row terminal grid. The Swing cache reserves both transient rows and reuses its primitive planes while overscan toggles, avoiding animation-loop storage allocation. Scrollbar dragging remains continuous at the thumb while every position maps immediately to an integer terminal top row, so content has no drag lag and release is already aligned. Allocation-free primitive viewport notifications keep the thumb synchronized on every animation frame; full snapshot objects remain event-level only. Sub-row animation frames update translated geometry without rereading the render cache or rebuilding shell/search projections until the integer render mapping changes. Hit testing, repaint bounds, command anchors, and terminal-pixel mouse coordinates consume the same translated geometry. Shell-integration prompt dots remain zero-layout decorations and never change row pitch, visible row count, scroll range, mouse coordinates, or PTY dimensions.
 - **Host Path Snapshot Providers**: Path interpretation remains host-owned. Standalone and IntelliJ resolve local and
   `localhost` OSC 7 file URIs, explicit home paths, Windows drive roots, and Windows UNC roots while rejecting non-local

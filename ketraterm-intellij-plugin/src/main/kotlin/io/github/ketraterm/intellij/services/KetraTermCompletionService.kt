@@ -21,18 +21,17 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.history.CommandPersistencePrivacyPolicy
-import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
 import io.github.ketraterm.intellij.ui.IntellijCompletionContext
 import io.github.ketraterm.intellij.ui.IntellijCompletionSuggestionProvider
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
-import io.github.ketraterm.ui.swing.suggestion.*
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
-import io.github.ketraterm.workspace.persistence.CommandCompletionStatsStore
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -45,8 +44,11 @@ import java.util.concurrent.atomic.AtomicReference
 @Service(Service.Level.APP)
 internal class KetraTermCompletionService : Disposable {
     private val statsStore =
-        CommandCompletionStatsStore(
-            PathManager.getSystemDir().resolve("ketraterm").resolve("completion-stats-v1.tsv"),
+        TerminalCompletionStatsStore(
+            PathManager
+                .getSystemDir()
+                .resolve("ketraterm")
+                .resolve(TerminalCompletionStatsStore.currentFileName()),
         )
     private val registry =
         IntellijCompletionRegistry(
@@ -72,7 +74,10 @@ internal class KetraTermCompletionService : Disposable {
                 profileId = tab.profile.id,
                 workingDirectoryUriProvider = { tab.currentWorkingDirectoryUri },
                 shellCapabilities = tab.profile.kind.intellijCompletionShellCapabilities(),
-                gitBranchLoader = IntellijGitBranchLoader(project)::load,
+                providerFactories =
+                    listOf(
+                        IntellijGitBranchProviderFactory(IntellijGitBranchLoader(project)::load),
+                    ),
                 directoryScanner = IntellijProjectDirectoryScanner(project),
             ),
         )
@@ -124,44 +129,44 @@ internal class KetraTermCompletionService : Disposable {
  * previous resources.
  *
  * @param specs immutable command specifications shared by every session.
- * @property statsSource bounded learned-statistics source.
- * @property loadStats startup snapshot loader executed on the statistics worker.
- * @property persistStats snapshot writer executed after statistics mutations.
- * @property sessionMruCapacity positive per-session MRU capacity.
- * @property snapshotService application-owned asynchronous snapshot scheduler.
+ * @param statsSource bounded learned-statistics source.
+ * @param loadStats startup snapshot loader executed on the statistics worker.
+ * @param persistStats snapshot writer executed after statistics mutations.
+ * @param sessionMruCapacity positive per-session MRU capacity.
+ * @param snapshotService optional application-owned asynchronous snapshot scheduler.
  * @throws IllegalArgumentException if [sessionMruCapacity] is not positive.
  */
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     private val statsSource: TerminalCommandStatsCompletionSource = TerminalCompletionSources.commandStats(commandSpecs = specs),
-    private val loadStats: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot() },
-    private val persistStats: (TerminalCommandCompletionStatsSnapshot) -> Unit = {},
+    loadStats: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot() },
+    persistStats: (TerminalCommandCompletionStatsSnapshot) -> Unit = {},
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
-    private val snapshotService: IntellijCompletionSnapshotService = IntellijCompletionSnapshotService(),
+    snapshotService: IntellijCompletionSnapshotService? = null,
 ) : AutoCloseable {
+    init {
+        require(sessionMruCapacity > 0) { "sessionMruCapacity must be > 0, was $sessionMruCapacity" }
+    }
+
     /** Defensive immutable copy of the command specifications used by sessions. */
     val commandSpecs: List<TerminalCommandSpec> = specs.toList()
     private val lock = Any()
     private val closed = AtomicBoolean()
-    private val statsExecutor: ExecutorService =
-        Executors.newSingleThreadExecutor { runnable ->
-            Thread(runnable, "intellij-completion-stats").apply { isDaemon = true }
-        }
     private val sessionStates = HashMap<String, SessionState>()
+    private val snapshotService = snapshotService ?: IntellijCompletionSnapshotService()
+    private val statistics =
+        IntellijCompletionStatisticsCoordinator(
+            statsSource = statsSource,
+            loadStats = loadStats,
+            persistStats = persistStats,
+            onStatsChanged = ::notifyAllSourcesChanged,
+        )
     private val specSource =
         TerminalCompletionSources
             .fromSpecs(
                 specs = commandSpecs,
                 shapeStatsProvider = statsSource::shapeSnapshot,
-            ).let(::feedbackAware)
-
-    init {
-        require(sessionMruCapacity > 0) { "sessionMruCapacity must be > 0, was $sessionMruCapacity" }
-        statsExecutor.execute {
-            statsSource.replaceSnapshot(loadStats())
-            notifyAllSourcesChanged()
-        }
-    }
+            ).let(statistics::feedbackAware)
 
     /**
      * Creates and registers all completion sources for one terminal session.
@@ -171,78 +176,98 @@ internal class IntellijCompletionRegistry(
      * @throws IllegalStateException if this registry is closed.
      */
     fun openSession(context: IntellijCompletionSessionContext): IntellijCompletionSession {
-        check(!closed.get()) { "IntelliJ completion registry is closed" }
+        val opened =
+            synchronized(lock) {
+                check(!closed.get()) { "IntelliJ completion registry is closed" }
+                createSession(context)
+            }
+        try {
+            opened.previous?.close()
+        } catch (failure: Throwable) {
+            runCatching(opened.session::close).exceptionOrNull()?.let(failure::addSuppressed)
+            throw failure
+        }
+        return opened.session
+    }
+
+    private fun createSession(context: IntellijCompletionSessionContext): OpenedSession {
         val notifier = SessionSourceChangeNotifier()
         val mruSource =
             TerminalCompletionSources.sessionMru(
                 capacity = sessionMruCapacity,
                 commandSpecs = commandSpecs,
             )
-        val fileSystemProvider =
-            snapshotService.createDirectoryProvider(
-                onSnapshotChanged = notifier::notifyChanged,
-                scanner = context.directoryScanner,
-            )
-        val gitBranchProvider =
-            context.gitBranchLoader?.let { loader ->
-                snapshotService.createGitBranchProvider(
+        val resources = ArrayList<AutoCloseable>()
+        try {
+            val fileSystemProvider =
+                snapshotService.createDirectoryProvider(
+                    onSnapshotChanged = notifier::notifyChanged,
+                    scanner = context.directoryScanner,
+                )
+            resources += fileSystemProvider
+            val providerContext =
+                IntellijCompletionProviderContext(
+                    commandSpecs = commandSpecs,
                     workingDirectoryUriProvider = context.workingDirectoryUriProvider,
-                    loader = loader,
+                    snapshotService = snapshotService,
                     onSnapshotChanged = notifier::notifyChanged,
                 )
-            }
-        val sources =
-            buildList {
-                add(TerminalCompletionSourceEntry(feedbackAware(mruSource), priority = SESSION_MRU_PRIORITY))
-                add(TerminalCompletionSourceEntry(feedbackAware(statsSource), priority = PERSISTENT_STATS_PRIORITY))
-                add(TerminalCompletionSourceEntry(specSource, priority = SPEC_PRIORITY))
-                add(
-                    TerminalCompletionSourceEntry(
-                        TerminalCompletionSources.path(
-                            fileSystemProvider = fileSystemProvider,
-                            commandSpecs = commandSpecs,
-                        ),
-                        priority = PATH_PRIORITY,
-                    ),
-                )
-                if (gitBranchProvider != null) {
+            val dynamicRegistrations =
+                context.providerFactories.mapNotNull { factory ->
+                    factory.create(providerContext)?.also { registration -> resources.addAll(registration.resources) }
+                }
+            val sources =
+                buildList {
                     add(
                         TerminalCompletionSourceEntry(
-                            feedbackAware(
-                                TerminalCompletionSources.valueDomain(
-                                    domain = TerminalCompletionValueDomain.GIT_BRANCH,
-                                    sourceId = SOURCE_INTELLIJ_GIT_BRANCH,
-                                    valuesProvider = gitBranchProvider::values,
-                                    commandSpecs = commandSpecs,
-                                ),
+                            statistics.feedbackAware(mruSource),
+                            priority = SESSION_MRU_SOURCE_PRIORITY
+                        )
+                    )
+                    add(
+                        TerminalCompletionSourceEntry(
+                            statistics.feedbackAware(statsSource),
+                            priority = PERSISTENT_STATS_SOURCE_PRIORITY
+                        )
+                    )
+                    add(TerminalCompletionSourceEntry(specSource, priority = SPEC_SOURCE_PRIORITY))
+                    add(
+                        TerminalCompletionSourceEntry(
+                            TerminalCompletionSources.path(
+                                fileSystemProvider = fileSystemProvider,
+                                commandSpecs = commandSpecs,
                             ),
-                            priority = DYNAMIC_DOMAIN_PRIORITY,
+                            priority = PATH_SOURCE_PRIORITY,
                         ),
                     )
+                    dynamicRegistrations.mapTo(this) { registration ->
+                        registration.sourceEntry.copy(
+                            source = statistics.feedbackAware(registration.sourceEntry.source),
+                        )
+                    }
                 }
-            }
-        val provider =
-            IntellijCompletionSuggestionProvider(
-                engine = TerminalCompletionEngines.fromSources(sources, commandSpecs),
-                contextProvider = {
-                    IntellijCompletionContext(
-                        profileId = context.profileId,
-                        workingDirectoryUri = context.workingDirectoryUriProvider(),
-                        shellCapabilities = context.shellCapabilities,
-                    )
-                },
-            )
-        val state = SessionState(mruSource, fileSystemProvider, gitBranchProvider, notifier)
-        val previous = synchronized(lock) { sessionStates.put(context.sessionId, state) }
-        previous?.close()
-        return IntellijCompletionSession(
-            provider = provider,
-            feedbackHandler = createFeedbackHandler(context),
-            commandSpecs = commandSpecs,
-            shellCapabilities = context.shellCapabilities,
-            notifier = notifier,
-            closeAction = { removeSession(context.sessionId, state) },
-        )
+            val provider =
+                IntellijCompletionSuggestionProvider(
+                    engine = TerminalCompletionEngines.fromSources(sources, commandSpecs),
+                    contextProvider = { context.swingContext() },
+                )
+            val state = SessionState(mruSource, resources.toList(), notifier)
+            val session =
+                IntellijCompletionSession(
+                    provider = provider,
+                    feedbackHandler = statistics.createFeedbackHandler(context::swingContext),
+                    commandSpecs = commandSpecs,
+                    shellCapabilities = context.shellCapabilities,
+                    notifier = notifier,
+                    closeAction = { removeSession(context.sessionId, state) },
+                )
+            return OpenedSession(session, sessionStates.put(context.sessionId, state))
+        } catch (failure: Throwable) {
+            notifier.close()
+            mruSource.clear()
+            closeCompletionResources(resources.asReversed(), failure)
+            throw failure
+        }
     }
 
     /**
@@ -263,43 +288,7 @@ internal class IntellijCompletionRegistry(
             synchronized(lock) { sessionStates[sessionId]?.mruSource }
                 ?.recordSuccessfulCommand(command, profileId, metadata.workingDirectoryUri)
         }
-        if (!CommandPersistencePrivacyPolicy.allowsCommand(command)) return
-        executeStatsMutation {
-            statsSource.recordCommandResult(
-                commandLine = command,
-                successful = successful,
-                profileId = profileId,
-                workingDirectoryUri = metadata.workingDirectoryUri,
-                usedAtEpochMillis = metadata.finishedAtEpochMillis ?: System.currentTimeMillis(),
-            )
-        }
-    }
-
-    private fun createFeedbackHandler(context: IntellijCompletionSessionContext): SwingShellSuggestionFeedbackHandler =
-        SwingShellSuggestionFeedbackHandler { feedback ->
-            val commandLine = feedback.commandLineAfterSuggestion() ?: return@SwingShellSuggestionFeedbackHandler
-            if (!CommandPersistencePrivacyPolicy.allowsCommand(commandLine)) return@SwingShellSuggestionFeedbackHandler
-            executeStatsMutation {
-                statsSource.recordSuggestionFeedback(
-                    commandLine = commandLine,
-                    feedback = feedback.kind.toCompletionFeedbackKind(),
-                    profileId = context.profileId,
-                    workingDirectoryUri = context.workingDirectoryUriProvider(),
-                    feedbackAtEpochMillis = System.currentTimeMillis(),
-                    context = feedback.completionContext(),
-                )
-            }
-        }
-
-    private fun executeStatsMutation(mutation: () -> Unit) {
-        if (closed.get()) return
-        runCatching {
-            statsExecutor.execute {
-                mutation()
-                persistStats(statsSource.snapshotAll())
-                notifyAllSourcesChanged()
-            }
-        }
+        statistics.recordFinishedCommand(profileId, metadata)
     }
 
     private fun notifyAllSourcesChanged() {
@@ -318,9 +307,6 @@ internal class IntellijCompletionRegistry(
         removed?.close()
     }
 
-    private fun feedbackAware(source: TerminalCompletionSource): TerminalCompletionSource =
-        TerminalCompletionSources.feedbackAware(source, statsSource::feedbackSnapshot)
-
     /**
      * Closes sessions and snapshot workers, then drains queued statistics work.
      *
@@ -328,73 +314,41 @@ internal class IntellijCompletionRegistry(
      * is restored on the calling thread before pending work is cancelled.
      */
     override fun close() {
-        if (!closed.compareAndSet(false, true)) return
         val states =
             synchronized(lock) {
+                if (!closed.compareAndSet(false, true)) return
                 val copy = sessionStates.values.toList()
                 sessionStates.clear()
                 copy
             }
-        states.forEach(SessionState::close)
-        snapshotService.close()
-        statsExecutor.shutdown()
-        val terminated =
-            try {
-                statsExecutor.awaitTermination(STATS_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                false
-            }
-        if (!terminated) {
-            statsExecutor.shutdownNow()
-        }
+        closeCompletionResources(states + snapshotService + statistics)?.let { failure -> throw failure }
     }
 
     /** Session resources retained by the registry until replacement or closure. */
+    private data class OpenedSession(
+        val session: IntellijCompletionSession,
+        val previous: SessionState?,
+    )
+
     private data class SessionState(
         val mruSource: TerminalSessionMruCompletionSource,
-        val fileSystemProvider: IntellijAsyncFileSystemProvider,
-        val gitBranchProvider: IntellijGitBranchCompletionProvider?,
+        val resources: List<AutoCloseable>,
         val notifier: SessionSourceChangeNotifier,
-    ) {
+    ) : AutoCloseable {
         /** Closes notification and dynamic providers and clears session learning. */
-        fun close() {
+        override fun close() {
             notifier.close()
             mruSource.clear()
-            fileSystemProvider.close()
-            gitBranchProvider?.close()
+            closeCompletionResources(resources)?.let { failure -> throw failure }
         }
     }
 
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
-        private const val STATS_SHUTDOWN_TIMEOUT_SECONDS = 5L
-        private const val PATH_PRIORITY = 125
-        private const val DYNAMIC_DOMAIN_PRIORITY = 150
-        private const val SESSION_MRU_PRIORITY = 100
-        private const val PERSISTENT_STATS_PRIORITY = 50
-        private const val SPEC_PRIORITY = 0
-        private const val SOURCE_INTELLIJ_GIT_BRANCH = "intellij-git-branch"
-
-        private fun SwingShellSuggestionFeedback.commandLineAfterSuggestion(): String? =
-            suggestion.commandTextAfterReplacement(request)?.trim()?.takeIf(String::isNotEmpty)
-
-        private fun SwingShellSuggestionFeedbackKind.toCompletionFeedbackKind(): TerminalCompletionFeedbackKind =
-            when (this) {
-                SwingShellSuggestionFeedbackKind.ACCEPTED -> TerminalCompletionFeedbackKind.ACCEPTED
-                SwingShellSuggestionFeedbackKind.DISMISSED -> TerminalCompletionFeedbackKind.DISMISSED
-            }
-
-        private fun SwingShellSuggestionFeedback.completionContext(): TerminalCompletionFeedbackContext? {
-            val source = suggestion.source.takeIf(String::isNotBlank) ?: return null
-            val candidateKind =
-                runCatching { TerminalCompletionCandidateKind.valueOf(suggestion.kind) }.getOrNull() ?: return null
-            return TerminalCompletionFeedbackContext(
-                source = source,
-                candidateKind = candidateKind,
-                tokenPosition = TerminalCompletionTokenPosition.fromCandidateKind(candidateKind),
-            )
-        }
+        private const val PATH_SOURCE_PRIORITY = 125
+        private const val SESSION_MRU_SOURCE_PRIORITY = 100
+        private const val PERSISTENT_STATS_SOURCE_PRIORITY = 50
+        private const val SPEC_SOURCE_PRIORITY = 0
     }
 }
 
@@ -405,7 +359,7 @@ internal class IntellijCompletionRegistry(
  * @property profileId non-blank stable terminal profile identifier.
  * @property workingDirectoryUriProvider thread-safe supplier for the latest URI.
  * @property shellCapabilities shell syntax and quoting capabilities.
- * @property gitBranchLoader optional blocking Git snapshot loader.
+ * @property providerFactories additive dynamic provider factories.
  * @property directoryScanner blocking bounded directory snapshot scanner.
  * @throws IllegalArgumentException if [sessionId] or [profileId] is blank.
  */
@@ -414,13 +368,20 @@ internal data class IntellijCompletionSessionContext(
     val profileId: String,
     val workingDirectoryUriProvider: () -> String?,
     val shellCapabilities: TerminalShellCapabilities,
-    val gitBranchLoader: ((String?) -> List<TerminalCompletionDomainValue>)? = null,
+    val providerFactories: List<IntellijCompletionProviderFactory> = emptyList(),
     val directoryScanner: IntellijDirectoryScanner = BoundedIntellijDirectoryScanner(),
 ) {
     init {
         require(sessionId.isNotBlank()) { "sessionId must not be blank" }
         require(profileId.isNotBlank()) { "profileId must not be blank" }
     }
+
+    fun swingContext(): IntellijCompletionContext =
+        IntellijCompletionContext(
+            profileId = profileId,
+            workingDirectoryUri = workingDirectoryUriProvider(),
+            shellCapabilities = shellCapabilities,
+        )
 }
 
 /**
@@ -452,35 +413,63 @@ internal class IntellijCompletionSession(
      * @param listener replacement callback, or `null` to detach.
      */
     fun onSourceChanged(listener: (() -> Unit)?) {
-        if (closed.get()) {
-            notifier.listener.set(null)
-        } else {
-            notifier.listener.set(listener)
-        }
+        notifier.replaceListener(if (closed.get()) null else listener)
     }
 
     /** Detaches notifications and releases registry-owned resources idempotently. */
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
-        notifier.listener.set(null)
+        notifier.replaceListener(null)
         closeAction()
     }
 }
 
 /** Thread-safe, closeable single-listener notification bridge. */
 internal class SessionSourceChangeNotifier {
-    /** Current source-change callback, atomically replaceable by the owning pane. */
-    val listener = AtomicReference<(() -> Unit)?>(null)
+    private val listener = AtomicReference<(() -> Unit)?>(null)
     private val closed = AtomicBoolean()
+
+    /** Replaces the source-change callback unless this notifier is closed. */
+    fun replaceListener(replacement: (() -> Unit)?) {
+        synchronized(this) {
+            listener.set(if (closed.get()) null else replacement)
+        }
+    }
 
     /** Invokes the current listener on the calling thread unless closed. */
     fun notifyChanged() {
-        if (!closed.get()) listener.get()?.invoke()
+        val current = if (closed.get()) null else listener.get()
+        try {
+            current?.invoke()
+        } catch (_: RuntimeException) {
+            // One disposed or faulty UI listener must not suppress other sessions.
+        }
     }
 
     /** Permanently suppresses notifications and releases the current listener. */
     fun close() {
-        closed.set(true)
-        listener.set(null)
+        synchronized(this) {
+            closed.set(true)
+            listener.set(null)
+        }
     }
+}
+
+private fun closeCompletionResources(
+    resources: Iterable<AutoCloseable>,
+    initialFailure: Throwable? = null,
+): Throwable? {
+    var failure = initialFailure
+    for (resource in resources) {
+        try {
+            resource.close()
+        } catch (closeFailure: Throwable) {
+            if (failure == null) {
+                failure = closeFailure
+            } else if (failure !== closeFailure) {
+                failure.addSuppressed(closeFailure)
+            }
+        }
+    }
+    return failure
 }

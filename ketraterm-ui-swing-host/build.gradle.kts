@@ -20,6 +20,7 @@ plugins {
 }
 
 dependencies {
+    api(project(":ketraterm-completion"))
     api(project(":ketraterm-ui-swing"))
 
     testImplementation(kotlin("test"))
