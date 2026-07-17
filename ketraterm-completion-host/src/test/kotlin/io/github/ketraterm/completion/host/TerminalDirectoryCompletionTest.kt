@@ -15,13 +15,51 @@
  */
 package io.github.ketraterm.completion.host
 
-import io.github.ketraterm.completion.api.TerminalDirectoryListingRequest
-import io.github.ketraterm.completion.api.TerminalFileEntry
+import io.github.ketraterm.completion.api.*
 import kotlinx.coroutines.runBlocking
+import java.net.URI
+import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import kotlin.test.*
 
 class TerminalDirectoryCompletionTest {
+    @Test
+    fun `localhost shell URI completes cd current and parent directories through asynchronous provider`() {
+        val root = Files.createTempDirectory("ketraterm-path-completion")
+        val workingDirectory = Files.createDirectory(root.resolve("working"))
+        val child = Files.createDirectory(workingDirectory.resolve("child"))
+        val sibling = Files.createDirectory(root.resolve("sibling"))
+        val publications = LinkedBlockingQueue<Unit>()
+        val service = TerminalCompletionSnapshotService(workerCount = 1, queueCapacity = 2)
+        val provider = service.createDirectoryProvider(onSnapshotChanged = { publications.offer(Unit) })
+        val source = TerminalCompletionSources.path(provider)
+        val workingDirectoryUri = URI("file", "localhost", workingDirectory.toUri().path, null).toASCIIString()
+
+        try {
+            assertTrue(source.complete(completionRequest("cd ", workingDirectoryUri)).isEmpty())
+            assertNotNull(publications.poll(5, TimeUnit.SECONDS))
+            assertEquals(
+                listOf("child/"),
+                source.complete(completionRequest("cd ", workingDirectoryUri)).map { it.replacementText })
+
+            assertTrue(source.complete(completionRequest("cd ../", workingDirectoryUri)).isEmpty())
+            assertNotNull(publications.poll(5, TimeUnit.SECONDS))
+            assertEquals(
+                listOf("../sibling/", "../working/"),
+                source.complete(completionRequest("cd ../", workingDirectoryUri)).map { it.replacementText },
+            )
+        } finally {
+            provider.close()
+            service.close()
+            Files.deleteIfExists(child)
+            Files.deleteIfExists(workingDirectory)
+            Files.deleteIfExists(sibling)
+            Files.deleteIfExists(root)
+        }
+    }
+
     @Test
     fun `remote authority is rejected without local reinterpretation`() {
         val resolver = TerminalCompletionPathResolver(homeDirectory = null, windows = false)
@@ -97,6 +135,17 @@ class TerminalDirectoryCompletionTest {
         entryNamePrefix: String = "",
     ): TerminalDirectoryListingRequest =
         TerminalDirectoryListingRequest(workingDirectoryUri, directoryPrefix, entryNamePrefix)
+
+    private fun completionRequest(
+        commandLine: String,
+        workingDirectoryUri: String,
+    ): TerminalCompletionRequest =
+        TerminalCompletionRequest(
+            commandLine = commandLine,
+            cursorOffset = commandLine.length,
+            workingDirectoryUri = workingDirectoryUri,
+            shellCapabilities = TerminalShellCapabilities.POSIX,
+        )
 
     private class RecordingScheduler : TerminalCompletionLoadScheduler {
         private val tasks = ArrayDeque<suspend () -> Unit>()

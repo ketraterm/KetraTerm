@@ -44,7 +44,7 @@ class TerminalShellIntegrationBootstrapTest {
         assertTrue(script.contains("function global:PSConsoleHostReadLine"))
         assertTrue(script.contains("]133;"))
         assertTrue(script.contains("]7;"))
-        assertTrue(script.contains("[System.UriBuilder]::new('file', [Environment]::MachineName)"))
+        assertTrue(script.contains("[System.UriBuilder]::new('file', 'localhost')"))
         assertTrue(script.contains("Provider.Name -ne 'FileSystem'"))
         assertTrue(script.contains("'D;' + ${'$'}exitCode"))
         assertFalse(script.contains('"'))
@@ -145,6 +145,8 @@ class TerminalShellIntegrationBootstrapTest {
         assertTrue(promptCommand.contains("__ketraterm_prompt_command"))
         assertTrue(promptCommand.contains("]133;"))
         assertTrue(promptCommand.contains("__ketraterm_osc7"))
+        assertTrue(promptCommand.contains("KetraTerm_OSC7_AUTHORITY"))
+        assertEquals("localhost", integrated.environment["KetraTerm_OSC7_AUTHORITY"])
         assertTrue(promptCommand.contains("'%%%02X'"))
         assertTrue(promptCommand.endsWith("history -a"))
     }
@@ -197,6 +199,7 @@ class TerminalShellIntegrationBootstrapTest {
         assertEquals(profile.command, integrated.command)
         assertEquals(originalZdotdir.toString(), integrated.environment.getValue("KetraTerm_ORIGINAL_ZDOTDIR"))
         assertEquals(zshDirectory.toString(), integrated.environment.getValue("ZDOTDIR"))
+        assertEquals("localhost", integrated.environment["KetraTerm_OSC7_AUTHORITY"])
         assertTrue(zshDirectory.resolve(".zshenv").exists())
         assertTrue(zshDirectory.resolve(".zprofile").exists())
         assertTrue(zshDirectory.resolve(".zshrc").readText().contains("__ketraterm_zsh_preexec"))
@@ -240,6 +243,7 @@ class TerminalShellIntegrationBootstrapTest {
         assertTrue(integrated.command.last().contains("]133;"))
         assertTrue(integrated.command.last().contains("__ketraterm_osc7"))
         assertTrue(integrated.command.last().contains("string escape --style=url"))
+        assertEquals("localhost", integrated.environment["KetraTerm_OSC7_AUTHORITY"])
     }
 
     @Test
@@ -287,6 +291,7 @@ class TerminalShellIntegrationBootstrapTest {
         assertEquals(profile.command, integrated.command)
         assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("]133;"))
         assertEquals("EXISTING/u:PROMPT_COMMAND/u", integrated.environment["WSLENV"])
+        assertNull(integrated.environment["KetraTerm_OSC7_AUTHORITY"])
     }
 
     @Test
@@ -306,6 +311,7 @@ class TerminalShellIntegrationBootstrapTest {
         assertEquals(profile.command, integrated.command)
         assertEquals(tempDir.resolve("zsh").toString(), integrated.environment["ZDOTDIR"])
         assertEquals("KetraTerm_ORIGINAL_ZDOTDIR/up:ZDOTDIR/up", integrated.environment["WSLENV"])
+        assertNull(integrated.environment["KetraTerm_OSC7_AUTHORITY"])
         assertTrue(tempDir.resolve("zsh/.zshrc").toFile().isFile)
     }
 
@@ -330,6 +336,7 @@ class TerminalShellIntegrationBootstrapTest {
 
         assertEquals(listOf("wsl.exe", "-e", "fish", "-l", "--init-command"), integrated.command.dropLast(1))
         assertTrue(integrated.command.last().contains("]133;"))
+        assertNull(integrated.environment["KetraTerm_OSC7_AUTHORITY"])
         assertSame(defaultShell, TerminalShellIntegrationBootstrap.apply(defaultShell, enabled = true))
     }
 

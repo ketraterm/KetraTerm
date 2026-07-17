@@ -107,7 +107,7 @@ internal object TerminalShellIntegrationBootstrap {
             }
         if (integrated === shellProfile) return profile
 
-        var environment = integrated.environment
+        var environment = integrated.environment - OSC7_AUTHORITY_ENVIRONMENT_VARIABLE
         environment =
             when (shellName) {
                 "bash", "bash.exe" -> environment.withWslEnvironmentExport("PROMPT_COMMAND/u")
@@ -172,6 +172,7 @@ internal object TerminalShellIntegrationBootstrap {
             profile.environment +
                 mapOf(
                     "PROMPT_COMMAND" to joinedShellCommands(BASH_PROMPT_COMMAND, promptCommand),
+                    OSC7_AUTHORITY_ENVIRONMENT_VARIABLE to LOCAL_OSC7_AUTHORITY,
                 )
         return profile.copy(environment = environment)
     }
@@ -196,6 +197,7 @@ internal object TerminalShellIntegrationBootstrap {
                 mapOf(
                     "KetraTerm_ORIGINAL_ZDOTDIR" to originalZdotdir,
                     "ZDOTDIR" to zshDirectory.toString(),
+                    OSC7_AUTHORITY_ENVIRONMENT_VARIABLE to LOCAL_OSC7_AUTHORITY,
                 )
         return profile.copy(environment = environment)
     }
@@ -208,7 +210,10 @@ internal object TerminalShellIntegrationBootstrap {
         next += command
         next += "--init-command"
         next += FISH_INIT_COMMAND
-        return profile.copy(command = next)
+        return profile.copy(
+            command = next,
+            environment = profile.environment + (OSC7_AUTHORITY_ENVIRONMENT_VARIABLE to LOCAL_OSC7_AUTHORITY),
+        )
     }
 
     private fun encodedPowerShellScript(): String = Base64.getEncoder().encodeToString(POWERSHELL_SCRIPT.toByteArray(Charsets.UTF_16LE))
@@ -365,7 +370,7 @@ internal object TerminalShellIntegrationBootstrap {
             __ketraterm_command_started=0
             __ketraterm_in_prompt=0
             __ketraterm_osc133() { printf '\033]133;%s\a' "${'$'}1"; }
-            __ketraterm_hostname=${'$'}{HOSTNAME:-${'$'}(hostname 2>/dev/null)}
+            __ketraterm_hostname=${'$'}{KetraTerm_OSC7_AUTHORITY:-${'$'}{HOSTNAME:-${'$'}(hostname 2>/dev/null)}}
             [[ -n "${'$'}__ketraterm_hostname" ]] || __ketraterm_hostname=localhost
             __ketraterm_encode_uri_path() {
                 local LC_ALL=C __ketraterm_value=${'$'}1 __ketraterm_encoded= __ketraterm_char __ketraterm_hex __ketraterm_index
@@ -424,7 +429,10 @@ internal object TerminalShellIntegrationBootstrap {
             function __ketraterm_osc133 --argument-names marker
                 printf '\e]133;%s\a' "${'$'}marker"
             end
-            set -g __ketraterm_fish_hostname (hostname 2>/dev/null)
+            set -g __ketraterm_fish_hostname "${'$'}KetraTerm_OSC7_AUTHORITY"
+            if test -z "${'$'}__ketraterm_fish_hostname"
+                set -g __ketraterm_fish_hostname (hostname 2>/dev/null)
+            end
             if test -z "${'$'}__ketraterm_fish_hostname"
                 set -g __ketraterm_fish_hostname localhost
             end
@@ -467,7 +475,7 @@ internal object TerminalShellIntegrationBootstrap {
             function __ketraterm_osc133() {
                 printf '\033]133;%s\a' "${'$'}1"
             }
-            typeset -g __ketraterm_zsh_hostname=${'$'}{HOST:-${'$'}(hostname 2>/dev/null)}
+            typeset -g __ketraterm_zsh_hostname=${'$'}{KetraTerm_OSC7_AUTHORITY:-${'$'}{HOST:-${'$'}(hostname 2>/dev/null)}}
             [[ -n "${'$'}__ketraterm_zsh_hostname" ]] || __ketraterm_zsh_hostname=localhost
             function __ketraterm_zsh_encode_uri_path() {
                 local LC_ALL=C value=${'$'}1 encoded='' char hex
@@ -524,7 +532,7 @@ internal object TerminalShellIntegrationBootstrap {
                     if (${'$'}location.Provider.Name -ne 'FileSystem') {
                         return
                     }
-                    ${'$'}builder = [System.UriBuilder]::new('file', [Environment]::MachineName)
+                    ${'$'}builder = [System.UriBuilder]::new('file', 'localhost')
                     ${'$'}builder.Path = ${'$'}location.Path
                     [Console]::Write(([string][char]27) + ']7;' + ${'$'}builder.Uri.AbsoluteUri + ([string][char]7))
                 } catch {
@@ -587,6 +595,9 @@ internal object TerminalShellIntegrationBootstrap {
         } catch (_: Exception) {
             "0.1.0"
         }
+
+    private const val OSC7_AUTHORITY_ENVIRONMENT_VARIABLE = "KetraTerm_OSC7_AUTHORITY"
+    private const val LOCAL_OSC7_AUTHORITY = "localhost"
 
     private fun writeWrapperScripts(directory: Path) {
         try {
