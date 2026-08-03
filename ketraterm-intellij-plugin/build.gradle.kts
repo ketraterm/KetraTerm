@@ -15,6 +15,7 @@
  */
 
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
 import java.util.zip.ZipFile
 
 plugins {
@@ -141,6 +142,11 @@ intellijPlatform {
 
 kotlin {
     jvmToolchain(21)
+    compilerOptions {
+        // Avoid compatibility bridges for inherited IntelliJ Kotlin interface defaults.
+        // The plugin has no public Kotlin interface ABI to preserve.
+        jvmDefault.set(JvmDefaultMode.NO_COMPATIBILITY)
+    }
 }
 
 val pluginDistributionArchives =
