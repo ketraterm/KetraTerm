@@ -32,7 +32,7 @@ internal class IntellijGitTagLoader(
      */
     fun load(workingDirectoryUri: String?): List<TerminalCompletionDomainValue> =
         loadIntellijGitRepositorySnapshot(project, workingDirectoryUri) { repository, _ ->
-            repository.tagHolder.getTags().keys
+            repository.tagsHolder.state.value.tagsToCommitHashes.keys
                 .asSequence()
                 .map { tag -> TerminalCompletionDomainValue(tag.name, detail = "tag") }
                 .sortedWith(TAG_ORDER)

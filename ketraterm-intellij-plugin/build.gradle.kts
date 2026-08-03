@@ -91,6 +91,11 @@ dependencies {
         intellijIdea(intellijIdeaVersion)
         bundledPlugin("Git4Idea")
         bundledPlugin("org.jetbrains.plugins.gradle")
+        // Since 2026.2, the Git and Gradle bundled plugins expose these APIs
+        // from separately resolved platform modules rather than the plugin JARs.
+        bundledModule("intellij.platform.vcs.dvcs")
+        bundledModule("intellij.platform.vcs.dvcs.impl")
+        bundledModule("intellij.gradle")
         testFramework(TestFrameworkType.Platform)
 
         // Add plugin dependencies for compilation here, for example:
