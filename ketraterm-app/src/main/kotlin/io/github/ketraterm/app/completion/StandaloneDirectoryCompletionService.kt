@@ -19,7 +19,14 @@ import io.github.ketraterm.completion.host.*
 
 /** Window-scoped owner of shared bounded completion snapshot workers. */
 internal class StandaloneDirectoryCompletionService : AutoCloseable {
-    private val delegate = TerminalCompletionSnapshotService(coroutineName = "directory-completion")
+    private val logger = System.getLogger(StandaloneDirectoryCompletionService::class.java.name)
+    private val delegate =
+        TerminalCompletionSnapshotService(
+            coroutineName = "directory-completion",
+            onBackgroundFailure = { failure ->
+                logger.log(System.Logger.Level.WARNING, "Standalone completion snapshot work failed", failure)
+            },
+        )
 
     /** Creates a session-owned asynchronous filesystem provider. */
     fun createProvider(onSnapshotChanged: () -> Unit): StandaloneAsyncFileSystemProvider =

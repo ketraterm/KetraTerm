@@ -222,7 +222,11 @@ share its generation and failure semantics while retaining only their environmen
 standalone app uses session-local, immutable directory snapshots fed by a window-owned instance of the shared coroutine
 service with a bounded channel and two IO workers.
 Enumeration has visit, result, and elapsed-time caps; caches have capacity and
-expiry bounds; request generations prevent stale work from refreshing the popup. A failed load clears only its matching
+expiry bounds; request generations prevent stale work from refreshing the popup. The defaults (two IO workers, a 32-item
+submission queue, 32 cached directory snapshots, a two-second snapshot lifetime, 8,192 visited entries, 256 matches, and
+a 50 ms scan budget) are an explicit desktop baseline covered by JMH directory-scan benchmarks; change them only with
+representative local and remote-filesystem measurements. Closing discards in-flight results and scanner loops observe
+thread interruption, but blocking filesystem calls remain best-effort cancellable. A failed load clears only its matching
 in-flight generation, retains any previous ready snapshot, and can be retried by the next request. The app resolves
 local and `localhost` file URIs, explicit home paths,
 Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses

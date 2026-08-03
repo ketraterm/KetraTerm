@@ -119,36 +119,36 @@ internal object ShellReplacementText {
 
     private fun Char.needsPosixUnquotedEscape(): Boolean =
         isShellWhitespace() ||
-                this == SINGLE_QUOTE ||
-                this == DOUBLE_QUOTE ||
-                this == BACKSLASH ||
-                this == DOLLAR ||
-                this == BACKTICK ||
-                this == SEMICOLON ||
-                this == AMPERSAND ||
-                this == LEFT_PAREN ||
-                this == RIGHT_PAREN
+            this == SINGLE_QUOTE ||
+            this == DOUBLE_QUOTE ||
+            this == BACKSLASH ||
+            this == DOLLAR ||
+            this == BACKTICK ||
+            this == SEMICOLON ||
+            this == AMPERSAND ||
+            this == LEFT_PAREN ||
+            this == RIGHT_PAREN
 
     private fun Char.needsPowerShellUnquotedEscape(): Boolean =
         isShellWhitespace() ||
-                this == BACKTICK ||
-                this == DOLLAR ||
-                this == SINGLE_QUOTE ||
-                this == DOUBLE_QUOTE ||
-                this == LEFT_PAREN ||
-                this == RIGHT_PAREN ||
-                this == LEFT_BRACE ||
-                this == RIGHT_BRACE ||
-                this == LEFT_BRACKET ||
-                this == RIGHT_BRACKET ||
-                this == LESS_THAN ||
-                this == GREATER_THAN ||
-                this == PIPE ||
-                this == AMPERSAND ||
-                this == SEMICOLON ||
-                this == COMMA ||
-                this == AT ||
-                this == HASH
+            this == BACKTICK ||
+            this == DOLLAR ||
+            this == SINGLE_QUOTE ||
+            this == DOUBLE_QUOTE ||
+            this == LEFT_PAREN ||
+            this == RIGHT_PAREN ||
+            this == LEFT_BRACE ||
+            this == RIGHT_BRACE ||
+            this == LEFT_BRACKET ||
+            this == RIGHT_BRACKET ||
+            this == LESS_THAN ||
+            this == GREATER_THAN ||
+            this == PIPE ||
+            this == AMPERSAND ||
+            this == SEMICOLON ||
+            this == COMMA ||
+            this == AT ||
+            this == HASH
 
     private fun Char.isShellWhitespace(): Boolean = this == ' ' || this == '\t' || this == '\r' || this == '\n'
 

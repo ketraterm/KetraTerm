@@ -15,6 +15,9 @@
  */
 package io.github.ketraterm.completion.model
 
+import io.github.ketraterm.completion.model.TerminalCompletionDomainValue.Companion.MAX_SCORE_ADJUSTMENT
+import io.github.ketraterm.completion.model.TerminalCompletionDomainValue.Companion.MIN_SCORE_ADJUSTMENT
+
 /**
  * Immutable host-provided value for one dynamic completion domain.
  *
@@ -30,26 +33,26 @@ package io.github.ketraterm.completion.model
  * [scoreAdjustment] is outside [MIN_SCORE_ADJUSTMENT] through [MAX_SCORE_ADJUSTMENT].
  */
 data class TerminalCompletionDomainValue
-@JvmOverloads
-constructor(
-    val value: String,
-    val displayText: String = value,
-    val detail: String = "",
-    val scoreAdjustment: Int = 0,
-) {
-    init {
-        require(value.isNotBlank()) { "value must not be blank" }
-        require(displayText.isNotBlank()) { "displayText must not be blank" }
-        require(scoreAdjustment in MIN_SCORE_ADJUSTMENT..MAX_SCORE_ADJUSTMENT) {
-            "scoreAdjustment must be in $MIN_SCORE_ADJUSTMENT..$MAX_SCORE_ADJUSTMENT, was $scoreAdjustment"
+    @JvmOverloads
+    constructor(
+        val value: String,
+        val displayText: String = value,
+        val detail: String = "",
+        val scoreAdjustment: Int = 0,
+    ) {
+        init {
+            require(value.isNotBlank()) { "value must not be blank" }
+            require(displayText.isNotBlank()) { "displayText must not be blank" }
+            require(scoreAdjustment in MIN_SCORE_ADJUSTMENT..MAX_SCORE_ADJUSTMENT) {
+                "scoreAdjustment must be in $MIN_SCORE_ADJUSTMENT..$MAX_SCORE_ADJUSTMENT, was $scoreAdjustment"
+            }
+        }
+
+        companion object {
+            /** Minimum host relevance adjustment accepted by the shared engine. */
+            const val MIN_SCORE_ADJUSTMENT: Int = -1_000
+
+            /** Maximum host relevance adjustment accepted by the shared engine. */
+            const val MAX_SCORE_ADJUSTMENT: Int = 1_000
         }
     }
-
-    companion object {
-        /** Minimum host relevance adjustment accepted by the shared engine. */
-        const val MIN_SCORE_ADJUSTMENT: Int = -1_000
-
-        /** Maximum host relevance adjustment accepted by the shared engine. */
-        const val MAX_SCORE_ADJUSTMENT: Int = 1_000
-    }
-}

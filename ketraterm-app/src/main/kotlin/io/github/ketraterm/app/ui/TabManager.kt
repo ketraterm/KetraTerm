@@ -485,13 +485,12 @@ internal class TabManager(
         val allPanes = root.allPanes()
 
         if (allPanes.size <= 1) {
-            val closed =
-                if (openReplacementWhenLastPane) {
-                    closeTabWithoutUserPrompt(tabId)
-                } else {
-                    closeTab(tabId)
-                }
-            if (closed && openReplacementWhenLastPane && tabRoots.isEmpty()) {
+            if (openReplacementWhenLastPane) {
+                closeTabWithoutUserPrompt(tabId)
+            } else if (!closeTab(tabId)) {
+                return
+            }
+            if (openReplacementWhenLastPane && tabRoots.isEmpty()) {
                 openTab(defaultProfileProvider())
             }
             return
@@ -701,10 +700,9 @@ internal class TabManager(
         (tabContentPanel.layout as CardLayout).show(tabContentPanel, tabId)
     }
 
-    private fun closeTabWithoutUserPrompt(id: String): Boolean {
-        val root = tabRoots[id] ?: return true
+    private fun closeTabWithoutUserPrompt(id: String) {
+        val root = tabRoots[id] ?: return
         closeTabWithoutConfirmation(id, root)
-        return true
     }
 
     private fun confirmClose(root: SplitNode): Boolean = confirmClose(root.allPanes())
@@ -730,12 +728,12 @@ internal class TabManager(
                 } ?: 0
             }
         return liveProcessCount == 0 ||
-                closeConfirmation.confirmClose(
-                    TerminalCloseRequest(
-                        displayName = Chrome.APP_TITLE,
-                        liveProcessCount = liveProcessCount,
-                    ),
-                )
+            closeConfirmation.confirmClose(
+                TerminalCloseRequest(
+                    displayName = Chrome.APP_TITLE,
+                    liveProcessCount = liveProcessCount,
+                ),
+            )
     }
 
     private fun closeDisplayName(panesToClose: List<TerminalPane>): String {

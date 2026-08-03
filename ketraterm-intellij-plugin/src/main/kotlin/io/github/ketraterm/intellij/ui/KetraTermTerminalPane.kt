@@ -33,7 +33,9 @@ import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.awt.Adjustable
 import java.awt.BorderLayout
 import javax.swing.JPanel
@@ -228,15 +230,10 @@ internal class KetraTermTerminalPane private constructor(
         fun create(
             project: Project,
             tab: TerminalWorkspaceTab,
+            completionScope: CoroutineScope,
             hostActions: KetraTermTerminalPaneHostActions = KetraTermTerminalPaneHostActions.NONE,
         ): KetraTermTerminalPane {
             val completionSession = KetraTermCompletionService.getInstance().openSession(project, tab)
-            val completionScope =
-                CoroutineScope(
-                    SupervisorJob() +
-                            Dispatchers.Default +
-                            CoroutineName("intellij-completion-${tab.id}"),
-                )
             return try {
                 createBound(project, tab, hostActions, completionSession, completionScope)
             } catch (failure: Throwable) {

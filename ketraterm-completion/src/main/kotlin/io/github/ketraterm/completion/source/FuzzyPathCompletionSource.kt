@@ -163,17 +163,17 @@ internal class FuzzyPathCompletionSource(
 
     private fun isPathLike(prefix: String): Boolean =
         prefix.startsWith("/") ||
-                prefix.startsWith("\\") ||
-                prefix.startsWith(".") ||
-                prefix.startsWith("~") ||
-                prefix.contains("/") ||
-                prefix.contains("\\")
+            prefix.startsWith("\\") ||
+            prefix.startsWith(".") ||
+            prefix.startsWith("~") ||
+            prefix.contains("/") ||
+            prefix.contains("\\")
 
     private fun TerminalPathArgumentKind.accepts(entry: TerminalFuzzyPathEntry): Boolean =
         when (this) {
             TerminalPathArgumentKind.NONE,
             TerminalPathArgumentKind.FILE_OR_DIRECTORY,
-                -> true
+            -> true
 
             TerminalPathArgumentKind.DIRECTORY -> entry.isDirectory
             TerminalPathArgumentKind.FILE -> !entry.isDirectory
@@ -186,11 +186,11 @@ internal class FuzzyPathCompletionSource(
         val hidden = path.hasHiddenSegment()
         val activeNamePrefix = prefix.substringAfterLast('/').substringAfterLast('\\')
         return !hidden ||
-                when (this) {
-                    TerminalHiddenPathPolicy.DEFAULT -> activeNamePrefix.startsWith(".")
-                    TerminalHiddenPathPolicy.INCLUDE -> true
-                    TerminalHiddenPathPolicy.EXCLUDE -> false
-                }
+            when (this) {
+                TerminalHiddenPathPolicy.DEFAULT -> activeNamePrefix.startsWith(".")
+                TerminalHiddenPathPolicy.INCLUDE -> true
+                TerminalHiddenPathPolicy.EXCLUDE -> false
+            }
     }
 
     private fun String.hasHiddenSegment(): Boolean {
@@ -201,7 +201,7 @@ internal class FuzzyPathCompletionSource(
             val segmentLength = segmentEnd - segmentStart
             val isNavigationSegment =
                 segmentLength == 1 ||
-                        (segmentLength == 2 && this[segmentStart + 1] == '.')
+                    (segmentLength == 2 && this[segmentStart + 1] == '.')
             if (this[segmentStart] == '.' && !isNavigationSegment) return true
             if (separator < 0) return false
             segmentStart = separator + 1

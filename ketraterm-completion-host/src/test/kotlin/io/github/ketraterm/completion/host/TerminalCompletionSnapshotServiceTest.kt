@@ -20,6 +20,7 @@ import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -35,8 +36,26 @@ class TerminalCompletionSnapshotServiceTest {
         assertWorkerSurvives(IOException("provider load failed"))
     }
 
-    private fun assertWorkerSurvives(firstFailure: Exception) {
-        val service = TerminalCompletionSnapshotService(workerCount = 1, queueCapacity = 2)
+    @Test
+    fun `checked provider failure is reported without terminating shared worker`() {
+        val failure = IOException("provider load failed")
+        val reported = AtomicReference<Throwable?>()
+
+        assertWorkerSurvives(failure) { reported.set(it) }
+
+        assertEquals(failure, reported.get())
+    }
+
+    private fun assertWorkerSurvives(
+        firstFailure: Exception,
+        onBackgroundFailure: (Throwable) -> Unit = {},
+    ) {
+        val service =
+            TerminalCompletionSnapshotService(
+                workerCount = 1,
+                queueCapacity = 2,
+                onBackgroundFailure = onBackgroundFailure,
+            )
         val attempts = AtomicInteger()
         val firstAttempt = CountDownLatch(1)
         val published = CountDownLatch(1)

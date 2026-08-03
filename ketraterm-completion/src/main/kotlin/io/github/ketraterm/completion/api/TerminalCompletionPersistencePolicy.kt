@@ -44,8 +44,7 @@ object TerminalCompletionPersistencePolicy {
      * @param command full command line captured by an authoritative host integration.
      * @return auditable privacy decision explaining the allow or reject result.
      */
-    fun evaluateCommand(command: String): TerminalCompletionPersistenceDecision =
-        CommandPersistencePrivacyPolicy.evaluateCommand(command)
+    fun evaluateCommand(command: String): TerminalCompletionPersistenceDecision = CommandPersistencePrivacyPolicy.evaluateCommand(command)
 
     /**
      * Returns whether an exact command-statistics row may be persisted.
@@ -53,8 +52,7 @@ object TerminalCompletionPersistencePolicy {
      * @param record aggregate exact command-statistics row.
      * @return `true` when [record] is safe enough for local persistence.
      */
-    fun allowsCommandStats(record: TerminalCommandCompletionStats): Boolean =
-        CommandPersistencePrivacyPolicy.allowsCommandStats(record)
+    fun allowsCommandStats(record: TerminalCommandCompletionStats): Boolean = CommandPersistencePrivacyPolicy.allowsCommandStats(record)
 
     /**
      * Evaluates whether an exact command-statistics row may be persisted.
@@ -71,8 +69,7 @@ object TerminalCompletionPersistencePolicy {
      * @param record aggregate structural command-shape row.
      * @return `true` when [record] is safe enough for local persistence.
      */
-    fun allowsShapeStats(record: TerminalCommandShapeStats): Boolean =
-        CommandPersistencePrivacyPolicy.allowsShapeStats(record)
+    fun allowsShapeStats(record: TerminalCommandShapeStats): Boolean = CommandPersistencePrivacyPolicy.allowsShapeStats(record)
 
     /**
      * Evaluates whether a structural shape-statistics row may be persisted.

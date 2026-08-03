@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.intellij.services
 
+import com.intellij.openapi.diagnostic.Logger
 import io.github.ketraterm.completion.host.TerminalCompletionSnapshotService
 import io.github.ketraterm.completion.host.TerminalValueSnapshotProvider
 
@@ -28,7 +29,13 @@ import io.github.ketraterm.completion.host.TerminalValueSnapshotProvider
  * queued and active work and is safe to repeat.
  */
 internal class IntellijCompletionSnapshotService : AutoCloseable {
-    private val delegate = TerminalCompletionSnapshotService(coroutineName = "intellij-completion-snapshots")
+    private val delegate =
+        TerminalCompletionSnapshotService(
+            coroutineName = "intellij-completion-snapshots",
+            onBackgroundFailure = { failure ->
+                LOG.warn("IntelliJ completion snapshot work failed", failure)
+            },
+        )
 
     /**
      * Creates a session-owned asynchronous directory snapshot provider.
@@ -72,5 +79,9 @@ internal class IntellijCompletionSnapshotService : AutoCloseable {
     /** Cancels shared snapshot work and releases worker resources idempotently. */
     override fun close() {
         delegate.close()
+    }
+
+    private companion object {
+        private val LOG = Logger.getInstance(IntellijCompletionSnapshotService::class.java)
     }
 }

@@ -37,175 +37,186 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @param onSnapshotChanged callback invoked after the active snapshot publishes.
  * @param resolver pure authority-preserving path resolver.
  * @param scanner blocking bounded scanner invoked only by scheduled work.
+ * @param onBackgroundFailure diagnostic callback for a failed publication callback.
  * @param nanoTime monotonic clock used for expiry.
  * @param snapshotTtlNanos positive lifetime of ready snapshots.
  * @param snapshotCapacity positive maximum retained ready snapshots.
  */
 class TerminalAsyncFileSystemProvider
-@JvmOverloads
-constructor(
-    private val scheduler: TerminalCompletionLoadScheduler,
-    private val onSnapshotChanged: () -> Unit,
-    private val resolver: TerminalCompletionPathResolver = TerminalCompletionPathResolver(),
-    private val scanner: TerminalDirectoryScanner = TerminalBoundedDirectoryScanner(),
-    private val nanoTime: () -> Long = System::nanoTime,
-    private val snapshotTtlNanos: Long = TimeUnit.SECONDS.toNanos(DEFAULT_SNAPSHOT_TTL_SECONDS),
-    private val snapshotCapacity: Int = DEFAULT_SNAPSHOT_CAPACITY,
-) : TerminalFileSystemProvider,
-    AutoCloseable {
-    private val lock = Any()
-    private val closed = AtomicBoolean()
-    private val snapshots = LinkedHashMap<QueryKey, ReadySnapshot>(snapshotCapacity, LOAD_FACTOR, true)
-    private val inFlightLoads = HashMap<QueryKey, InFlightLoad>()
-    private var activeKey: QueryKey? = null
-    private var activeGeneration = 0L
+    @JvmOverloads
+    constructor(
+        private val scheduler: TerminalCompletionLoadScheduler,
+        private val onSnapshotChanged: () -> Unit,
+        private val resolver: TerminalCompletionPathResolver = TerminalCompletionPathResolver(),
+        private val scanner: TerminalDirectoryScanner = TerminalBoundedDirectoryScanner(),
+        private val onBackgroundFailure: (Throwable) -> Unit = {},
+        private val nanoTime: () -> Long = System::nanoTime,
+        private val snapshotTtlNanos: Long = TimeUnit.SECONDS.toNanos(DEFAULT_SNAPSHOT_TTL_SECONDS),
+        private val snapshotCapacity: Int = DEFAULT_SNAPSHOT_CAPACITY,
+    ) : TerminalFileSystemProvider,
+        AutoCloseable {
+        private val lock = Any()
+        private val closed = AtomicBoolean()
+        private val snapshots = LinkedHashMap<QueryKey, ReadySnapshot>(snapshotCapacity, LOAD_FACTOR, true)
+        private val inFlightLoads = HashMap<QueryKey, InFlightLoad>()
+        private var activeKey: QueryKey? = null
+        private var activeGeneration = 0L
 
-    init {
-        require(snapshotTtlNanos > 0L) { "snapshotTtlNanos must be > 0, was $snapshotTtlNanos" }
-        require(snapshotCapacity > 0) { "snapshotCapacity must be > 0, was $snapshotCapacity" }
-    }
-
-    /**
-     * Returns a ready snapshot or schedules a background load on a cache miss.
-     *
-     * @param request lexical path request from the pure completion engine.
-     * @return immutable ready entries, or an empty list while unavailable.
-     */
-    override fun listDirectory(request: TerminalDirectoryListingRequest): List<TerminalFileEntry> {
-        if (closed.get()) return emptyList()
-        val directory = resolver.resolve(request) ?: return activateUnsupportedRequest(request)
-        val key = QueryKey(directory, request.entryNamePrefix.lowercase(Locale.ROOT))
-        val now = nanoTime()
-        var generation = 0L
-        var loadToSubmit: InFlightLoad? = null
-        synchronized(lock) {
-            if (key != activeKey) {
-                activeKey = key
-                activeGeneration++
-            }
-            generation = activeGeneration
-            val ready = snapshots[key]
-            if (ready != null && now - ready.createdAtNanos < snapshotTtlNanos) return ready.entries
-            if (ready != null) snapshots.remove(key)
-            val inFlight = inFlightLoads[key]
-            if (inFlight == null) {
-                val load = InFlightLoad(generation)
-                inFlightLoads[key] = load
-                loadToSubmit = load
-            } else {
-                inFlight.acceptedGeneration = generation
-            }
+        init {
+            require(snapshotTtlNanos > 0L) { "snapshotTtlNanos must be > 0, was $snapshotTtlNanos" }
+            require(snapshotCapacity > 0) { "snapshotCapacity must be > 0, was $snapshotCapacity" }
         }
-        loadToSubmit?.let { load -> submitLoad(key, request.entryNamePrefix, load) }
-        return emptyList()
-    }
 
-    private fun activateUnsupportedRequest(request: TerminalDirectoryListingRequest): List<TerminalFileEntry> {
-        val key = QueryKey.UNSUPPORTED.copy(entryNamePrefix = request.directoryPrefix + request.entryNamePrefix)
-        synchronized(lock) {
-            if (key != activeKey) {
-                activeKey = key
-                activeGeneration++
-            }
-        }
-        return emptyList()
-    }
-
-    private fun submitLoad(
-        key: QueryKey,
-        entryNamePrefix: String,
-        load: InFlightLoad,
-    ) {
-        val accepted =
-            scheduler.schedule {
-                try {
-                    val shouldScan =
-                        synchronized(lock) {
-                            val ownsSlot = inFlightLoads[key] === load
-                            if (closed.get() || activeKey != key || !ownsSlot) {
-                                if (ownsSlot) inFlightLoads.remove(key)
-                                false
-                            } else {
-                                true
-                            }
-                        }
-                    if (!shouldScan) return@schedule
-                    val entries = scanner.scan(key.directory, entryNamePrefix).toList()
-                    var publish = false
-                    synchronized(lock) {
-                        if (inFlightLoads[key] === load) {
-                            inFlightLoads.remove(key)
-                            if (!closed.get()) {
-                                snapshots[key] = ReadySnapshot(entries, nanoTime())
-                                trimSnapshots()
-                                publish = activeKey == key && activeGeneration == load.acceptedGeneration
-                            }
-                        }
-                    }
-                    if (publish) notifySnapshotChanged()
-                } finally {
-                    synchronized(lock) {
-                        if (inFlightLoads[key] === load) inFlightLoads.remove(key)
-                    }
+        /**
+         * Returns a ready snapshot or schedules a background load on a cache miss.
+         *
+         * @param request lexical path request from the pure completion engine.
+         * @return immutable ready entries, or an empty list while unavailable.
+         */
+        override fun listDirectory(request: TerminalDirectoryListingRequest): List<TerminalFileEntry> {
+            if (closed.get()) return emptyList()
+            val directory = resolver.resolve(request) ?: return activateUnsupportedRequest(request)
+            val key = QueryKey(directory, request.entryNamePrefix.lowercase(Locale.ROOT))
+            val now = nanoTime()
+            var generation: Long
+            var loadToSubmit: InFlightLoad? = null
+            synchronized(lock) {
+                if (key != activeKey) {
+                    activeKey = key
+                    activeGeneration++
+                }
+                generation = activeGeneration
+                val ready = snapshots[key]
+                if (ready != null && now - ready.createdAtNanos < snapshotTtlNanos) return ready.entries
+                if (ready != null) snapshots.remove(key)
+                val inFlight = inFlightLoads[key]
+                if (inFlight == null) {
+                    val load = InFlightLoad(generation)
+                    inFlightLoads[key] = load
+                    loadToSubmit = load
+                } else {
+                    inFlight.acceptedGeneration = generation
                 }
             }
-        if (!accepted) {
+            loadToSubmit?.let { load -> submitLoad(key, request.entryNamePrefix, load) }
+            return emptyList()
+        }
+
+        private fun activateUnsupportedRequest(request: TerminalDirectoryListingRequest): List<TerminalFileEntry> {
+            val key = QueryKey.UNSUPPORTED.copy(entryNamePrefix = request.directoryPrefix + request.entryNamePrefix)
             synchronized(lock) {
-                if (inFlightLoads[key] === load) inFlightLoads.remove(key)
+                if (key != activeKey) {
+                    activeKey = key
+                    activeGeneration++
+                }
+            }
+            return emptyList()
+        }
+
+        private fun submitLoad(
+            key: QueryKey,
+            entryNamePrefix: String,
+            load: InFlightLoad,
+        ) {
+            val accepted =
+                scheduler.schedule {
+                    try {
+                        val shouldScan =
+                            synchronized(lock) {
+                                val ownsSlot = inFlightLoads[key] === load
+                                if (closed.get() || activeKey != key || !ownsSlot) {
+                                    if (ownsSlot) inFlightLoads.remove(key)
+                                    false
+                                } else {
+                                    true
+                                }
+                            }
+                        if (!shouldScan) return@schedule
+                        val entries = scanner.scan(key.directory, entryNamePrefix).toList()
+                        var publish = false
+                        synchronized(lock) {
+                            if (inFlightLoads[key] === load) {
+                                inFlightLoads.remove(key)
+                                if (!closed.get()) {
+                                    snapshots[key] = ReadySnapshot(entries, nanoTime())
+                                    trimSnapshots()
+                                    publish = activeKey == key && activeGeneration == load.acceptedGeneration
+                                }
+                            }
+                        }
+                        if (publish) notifySnapshotChanged()
+                    } finally {
+                        synchronized(lock) {
+                            if (inFlightLoads[key] === load) inFlightLoads.remove(key)
+                        }
+                    }
+                }
+            if (!accepted) {
+                synchronized(lock) {
+                    if (inFlightLoads[key] === load) inFlightLoads.remove(key)
+                }
             }
         }
-    }
 
-    private fun notifySnapshotChanged() {
-        try {
-            onSnapshotChanged()
-        } catch (_: RuntimeException) {
-            // The owning UI may close while publication is in flight.
+        private fun notifySnapshotChanged() {
+            try {
+                onSnapshotChanged()
+            } catch (failure: RuntimeException) {
+                // The owning UI may close while publication is in flight.
+                reportBackgroundFailure(failure)
+            }
+        }
+
+        private fun reportBackgroundFailure(failure: Throwable) {
+            try {
+                onBackgroundFailure(failure)
+            } catch (_: RuntimeException) {
+                // A diagnostics sink must not affect completion publication.
+            }
+        }
+
+        private fun trimSnapshots() {
+            while (snapshots.size > snapshotCapacity) {
+                val iterator = snapshots.entries.iterator()
+                iterator.next()
+                iterator.remove()
+            }
+        }
+
+        /** Invalidates generations and releases retained snapshots idempotently. */
+        override fun close() {
+            if (!closed.compareAndSet(false, true)) return
+            synchronized(lock) {
+                activeKey = null
+                inFlightLoads.clear()
+                snapshots.clear()
+            }
+        }
+
+        private data class QueryKey(
+            val directory: Path,
+            val entryNamePrefix: String,
+        ) {
+            companion object {
+                val UNSUPPORTED = QueryKey(Path.of("."), "")
+            }
+        }
+
+        private data class ReadySnapshot(
+            val entries: List<TerminalFileEntry>,
+            val createdAtNanos: Long,
+        )
+
+        private class InFlightLoad(
+            var acceptedGeneration: Long,
+        )
+
+        private companion object {
+            private const val DEFAULT_SNAPSHOT_CAPACITY = 32
+            private const val DEFAULT_SNAPSHOT_TTL_SECONDS = 2L
+            private const val LOAD_FACTOR = 0.75f
         }
     }
-
-    private fun trimSnapshots() {
-        while (snapshots.size > snapshotCapacity) {
-            val iterator = snapshots.entries.iterator()
-            iterator.next()
-            iterator.remove()
-        }
-    }
-
-    /** Invalidates generations and releases retained snapshots idempotently. */
-    override fun close() {
-        if (!closed.compareAndSet(false, true)) return
-        synchronized(lock) {
-            activeKey = null
-            inFlightLoads.clear()
-            snapshots.clear()
-        }
-    }
-
-    private data class QueryKey(
-        val directory: Path,
-        val entryNamePrefix: String,
-    ) {
-        companion object {
-            val UNSUPPORTED = QueryKey(Path.of("."), "")
-        }
-    }
-
-    private data class ReadySnapshot(
-        val entries: List<TerminalFileEntry>,
-        val createdAtNanos: Long,
-    )
-
-    private class InFlightLoad(
-        var acceptedGeneration: Long,
-    )
-
-    private companion object {
-        private const val DEFAULT_SNAPSHOT_CAPACITY = 32
-        private const val DEFAULT_SNAPSHOT_TTL_SECONDS = 2L
-        private const val LOAD_FACTOR = 0.75f
-    }
-}
 
 /**
  * Resolves lexical completion paths without filesystem access or authority loss.
@@ -214,37 +225,41 @@ constructor(
  * @param windows whether Windows drive and UNC syntax is accepted.
  */
 class TerminalCompletionPathResolver
-@JvmOverloads
-constructor(
-    private val homeDirectory: Path? = System.getProperty("user.home")?.takeIf(String::isNotBlank)?.let(Path::of),
-    private val windows: Boolean = FileSystems.getDefault().separator == "\\",
-) {
-    /**
-     * Resolves [request] into a normalized absolute local directory.
-     *
-     * @return local path, or `null` for malformed, remote, or unsupported input.
-     */
-    fun resolve(request: TerminalDirectoryListingRequest): Path? {
-        val workingDirectory = TerminalLocalFileUriResolver.resolve(request.workingDirectoryUri) ?: return null
-        val prefix = request.directoryPrefix
-        val resolved =
-            when {
-                prefix == "~/" -> homeDirectory
-                prefix.startsWith("~/") -> homeDirectory?.resolve(prefix.substring(2))
-                prefix.hasWindowsDriveRoot() -> if (windows) Path.of(prefix.replace('/', '\\')) else null
-                prefix.startsWith("//") -> if (windows) Path.of(prefix.replace('/', '\\')) else null
-                prefix.startsWith('/') -> Path.of(prefix)
-                prefix.isEmpty() -> workingDirectory
-                else -> workingDirectory.resolve(prefix)
-            } ?: return null
-        return resolved.toAbsolutePath().normalize()
+    @JvmOverloads
+    constructor(
+        private val homeDirectory: Path? = System.getProperty("user.home")?.takeIf(String::isNotBlank)?.let(Path::of),
+        private val windows: Boolean = FileSystems.getDefault().separator == "\\",
+    ) {
+        /**
+         * Resolves [request] into a normalized absolute local directory.
+         *
+         * @return local path, or `null` for malformed, remote, or unsupported input.
+         */
+        fun resolve(request: TerminalDirectoryListingRequest): Path? {
+            val workingDirectory = TerminalLocalFileUriResolver.resolve(request.workingDirectoryUri) ?: return null
+            val prefix = request.directoryPrefix
+            val resolved =
+                when {
+                    prefix == "~/" -> homeDirectory
+                    prefix.startsWith("~/") -> homeDirectory?.resolve(prefix.substring(2))
+                    prefix.hasWindowsDriveRoot() -> if (windows) Path.of(prefix.replace('/', '\\')) else null
+                    prefix.startsWith("//") -> if (windows) Path.of(prefix.replace('/', '\\')) else null
+                    prefix.startsWith('/') -> Path.of(prefix)
+                    prefix.isEmpty() -> workingDirectory
+                    else -> workingDirectory.resolve(prefix)
+                } ?: return null
+            return resolved.toAbsolutePath().normalize()
+        }
+
+        private fun String.hasWindowsDriveRoot(): Boolean = length >= 3 && this[0].isLetter() && this[1] == ':' && this[2] == '/'
     }
 
-    private fun String.hasWindowsDriveRoot(): Boolean =
-        length >= 3 && this[0].isLetter() && this[1] == ':' && this[2] == '/'
-}
-
-/** Blocking directory scan contract invoked only by host snapshot workers. */
+/**
+ * Blocking directory scan contract invoked only by host snapshot workers.
+ *
+ * Closing a provider prevents an in-flight result from publishing, but filesystem operations are only best-effort
+ * cancellable: an operating-system directory operation may complete after its provider or service has closed.
+ */
 fun interface TerminalDirectoryScanner {
     /**
      * Scans direct children beginning with [entryNamePrefix].
@@ -266,65 +281,82 @@ fun interface TerminalDirectoryScanner {
  * @param maxMatchingEntries positive cap on retained matches.
  * @param scanBudgetNanos positive best-effort monotonic scan budget.
  * @param nanoTime monotonic clock used to enforce the budget.
+ * @param onFailure diagnostic callback for a directory-level scan failure.
  */
 class TerminalBoundedDirectoryScanner
-@JvmOverloads
-constructor(
-    private val maxVisitedEntries: Int = DEFAULT_MAX_VISITED_ENTRIES,
-    private val maxMatchingEntries: Int = DEFAULT_MAX_MATCHING_ENTRIES,
-    private val scanBudgetNanos: Long = TimeUnit.MILLISECONDS.toNanos(DEFAULT_SCAN_BUDGET_MILLIS),
-    private val nanoTime: () -> Long = System::nanoTime,
-) : TerminalDirectoryScanner {
-    init {
-        require(maxVisitedEntries > 0) { "maxVisitedEntries must be > 0, was $maxVisitedEntries" }
-        require(maxMatchingEntries > 0) { "maxMatchingEntries must be > 0, was $maxMatchingEntries" }
-        require(scanBudgetNanos > 0L) { "scanBudgetNanos must be > 0, was $scanBudgetNanos" }
-    }
+    @JvmOverloads
+    constructor(
+        private val maxVisitedEntries: Int = DEFAULT_MAX_VISITED_ENTRIES,
+        private val maxMatchingEntries: Int = DEFAULT_MAX_MATCHING_ENTRIES,
+        private val scanBudgetNanos: Long = TimeUnit.MILLISECONDS.toNanos(DEFAULT_SCAN_BUDGET_MILLIS),
+        private val nanoTime: () -> Long = System::nanoTime,
+        private val onFailure: (Throwable) -> Unit = {},
+    ) : TerminalDirectoryScanner {
+        init {
+            require(maxVisitedEntries > 0) { "maxVisitedEntries must be > 0, was $maxVisitedEntries" }
+            require(maxMatchingEntries > 0) { "maxMatchingEntries must be > 0, was $maxMatchingEntries" }
+            require(scanBudgetNanos > 0L) { "scanBudgetNanos must be > 0, was $scanBudgetNanos" }
+        }
 
-    /** Returns a bounded deterministic snapshot or an empty list on failure. */
-    override fun scan(
-        directory: Path,
-        entryNamePrefix: String,
-    ): List<TerminalFileEntry> {
-        val startedAt = nanoTime()
-        val entries = PriorityQueue(maxMatchingEntries, ENTRY_ORDER.reversed())
-        try {
-            if (!Files.isDirectory(directory)) return emptyList()
-            Files.newDirectoryStream(directory).use { stream ->
-                var visited = 0
-                val iterator = stream.iterator()
-                while (visited < maxVisitedEntries && nanoTime() - startedAt < scanBudgetNanos && iterator.hasNext()) {
-                    val child = iterator.next()
-                    visited++
-                    val name = child.fileName?.toString() ?: continue
-                    if (!name.startsWith(entryNamePrefix, ignoreCase = true)) continue
-                    val attributes =
-                        try {
-                            Files.readAttributes(child, BasicFileAttributes::class.java)
-                        } catch (_: Exception) {
-                            continue
+        /** Returns a bounded deterministic snapshot or an empty list on failure. */
+        override fun scan(
+            directory: Path,
+            entryNamePrefix: String,
+        ): List<TerminalFileEntry> {
+            val startedAt = nanoTime()
+            val entries = PriorityQueue(maxMatchingEntries, ENTRY_ORDER.reversed())
+            try {
+                if (!Files.isDirectory(directory)) return emptyList()
+                Files.newDirectoryStream(directory).use { stream ->
+                    var visited = 0
+                    val iterator = stream.iterator()
+                    while (
+                        !Thread.currentThread().isInterrupted &&
+                        visited < maxVisitedEntries &&
+                        nanoTime() - startedAt < scanBudgetNanos &&
+                        iterator.hasNext()
+                    ) {
+                        val child = iterator.next()
+                        visited++
+                        val name = child.fileName?.toString() ?: continue
+                        if (!name.startsWith(entryNamePrefix, ignoreCase = true)) continue
+                        val attributes =
+                            try {
+                                Files.readAttributes(child, BasicFileAttributes::class.java)
+                            } catch (_: Exception) {
+                                continue
+                            }
+                        val entry = TerminalFileEntry(name, attributes.isDirectory)
+                        if (entries.size < maxMatchingEntries) {
+                            entries += entry
+                        } else if (ENTRY_ORDER.compare(entry, entries.peek()) < 0) {
+                            entries.remove()
+                            entries += entry
                         }
-                    val entry = TerminalFileEntry(name, attributes.isDirectory)
-                    if (entries.size < maxMatchingEntries) {
-                        entries += entry
-                    } else if (ENTRY_ORDER.compare(entry, entries.peek()) < 0) {
-                        entries.remove()
-                        entries += entry
                     }
                 }
+            } catch (failure: Exception) {
+                reportFailure(failure)
+                return emptyList()
             }
-        } catch (_: Exception) {
-            return emptyList()
+            if (Thread.currentThread().isInterrupted) return emptyList()
+            return ArrayList(entries).apply { sortWith(ENTRY_ORDER) }
         }
-        return ArrayList(entries).apply { sortWith(ENTRY_ORDER) }
-    }
 
-    private companion object {
-        private const val DEFAULT_MAX_VISITED_ENTRIES = 8_192
-        private const val DEFAULT_MAX_MATCHING_ENTRIES = 256
-        private const val DEFAULT_SCAN_BUDGET_MILLIS = 50L
-        private val ENTRY_ORDER =
-            compareBy<TerminalFileEntry, String>(String.CASE_INSENSITIVE_ORDER) { it.name }
-                .thenBy { it.name }
+        private fun reportFailure(failure: Throwable) {
+            try {
+                onFailure(failure)
+            } catch (_: RuntimeException) {
+                // A diagnostics sink must not turn a failed completion scan into a caller failure.
+            }
+        }
+
+        private companion object {
+            private const val DEFAULT_MAX_VISITED_ENTRIES = 8_192
+            private const val DEFAULT_MAX_MATCHING_ENTRIES = 256
+            private const val DEFAULT_SCAN_BUDGET_MILLIS = 50L
+            private val ENTRY_ORDER =
+                compareBy<TerminalFileEntry, String>(String.CASE_INSENSITIVE_ORDER) { it.name }
+                    .thenBy { it.name }
+        }
     }
-}

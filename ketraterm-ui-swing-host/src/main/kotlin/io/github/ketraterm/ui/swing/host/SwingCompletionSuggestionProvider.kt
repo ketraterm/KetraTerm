@@ -76,15 +76,15 @@ class SwingCompletionSuggestionProvider(
  * @property shellCapabilities explicit shell lexical and replacement policy.
  */
 data class SwingCompletionContext
-@JvmOverloads
-constructor(
-    val profileId: String? = null,
-    val workingDirectoryUri: String? = null,
-    val shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
-) {
-    companion object {
-        /** Empty context for hosts without profile or directory metadata. */
-        @JvmField
-        val EMPTY: SwingCompletionContext = SwingCompletionContext()
+    @JvmOverloads
+    constructor(
+        val profileId: String? = null,
+        val workingDirectoryUri: String? = null,
+        val shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
+    ) {
+        companion object {
+            /** Empty context for hosts without profile or directory metadata. */
+            @JvmField
+            val EMPTY: SwingCompletionContext = SwingCompletionContext()
+        }
     }
-}

@@ -111,6 +111,44 @@ class TerminalDirectoryCompletionTest {
         assertEquals("a", provider.listDirectory(request(entryNamePrefix = "a")).single().name)
     }
 
+    @Test
+    fun `closing during a scan prevents result publication`() {
+        val scheduler = RecordingScheduler()
+        var publications = 0
+        lateinit var provider: TerminalAsyncFileSystemProvider
+        provider =
+            provider(scheduler, onSnapshotChanged = { publications++ }) { _, _ ->
+                provider.close()
+                listOf(TerminalFileEntry("late", isDirectory = false))
+            }
+
+        provider.listDirectory(request())
+        scheduler.runNext()
+
+        assertEquals(0, publications)
+        assertTrue(provider.listDirectory(request()).isEmpty())
+    }
+
+    @Test
+    fun `directory scanner retains only the best bounded matches`() {
+        val directory = Files.createTempDirectory("ketraterm-directory-scan")
+        val names = listOf("zeta", "alpha", "gamma", "beta")
+        try {
+            names.forEach { name -> Files.createFile(directory.resolve(name)) }
+            val scanner =
+                TerminalBoundedDirectoryScanner(
+                    maxVisitedEntries = names.size,
+                    maxMatchingEntries = 2,
+                    scanBudgetNanos = TimeUnit.SECONDS.toNanos(1),
+                )
+
+            assertEquals(listOf("alpha", "beta"), scanner.scan(directory, "").map(TerminalFileEntry::name))
+        } finally {
+            names.forEach { name -> Files.deleteIfExists(directory.resolve(name)) }
+            Files.deleteIfExists(directory)
+        }
+    }
+
     private fun provider(
         scheduler: TerminalCompletionLoadScheduler,
         onSnapshotChanged: () -> Unit = {},
@@ -134,8 +172,7 @@ class TerminalDirectoryCompletionTest {
                 .toString(),
         directoryPrefix: String = "",
         entryNamePrefix: String = "",
-    ): TerminalDirectoryListingRequest =
-        TerminalDirectoryListingRequest(workingDirectoryUri, directoryPrefix, entryNamePrefix)
+    ): TerminalDirectoryListingRequest = TerminalDirectoryListingRequest(workingDirectoryUri, directoryPrefix, entryNamePrefix)
 
     private fun completionRequest(
         commandLine: String,

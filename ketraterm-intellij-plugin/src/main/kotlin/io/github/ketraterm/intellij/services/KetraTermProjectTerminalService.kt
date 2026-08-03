@@ -38,6 +38,10 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.workspace.*
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import java.awt.BorderLayout
 import java.awt.Component
 import java.util.concurrent.atomic.AtomicInteger
@@ -56,6 +60,7 @@ import javax.swing.SwingUtilities
 @Service(Service.Level.PROJECT)
 class KetraTermProjectTerminalService(
     private val project: Project,
+    private val coroutineScope: CoroutineScope,
 ) : Disposable {
     private val contentsByTabId = LinkedHashMap<String, Content>()
     private val pendingTabsById = LinkedHashMap<String, PendingTerminalTab>()
@@ -167,7 +172,6 @@ class KetraTermProjectTerminalService(
             )
 
         content.isCloseable = true
-        @Suppress("UsePropertyAccessSyntax")
         content.setDisposer(PendingTerminalTabDisposable(pendingId))
 
         pendingTabsById[pendingId] = PendingTerminalTab(content, container)
@@ -304,6 +308,7 @@ class KetraTermProjectTerminalService(
             KetraTermTerminalPane.create(
                 project = project,
                 tab = workspaceTab,
+                completionScope = createCompletionScope(workspaceTab.id),
                 hostActions =
                     KetraTermTerminalPaneHostActions(
                         openNewTabAction = ::openDefaultTabFromContextMenu,
@@ -315,7 +320,6 @@ class KetraTermProjectTerminalService(
         replaceContent(pendingTab.container, pane.component)
         pendingTab.content.displayName = workspaceTab.title
         pendingTab.content.preferredFocusableComponent = pane.terminal
-        @Suppress("UsePropertyAccessSyntax")
         pendingTab.content.setDisposer(TerminalTabDisposable(workspaceTab.id))
         installCloseQueryListener(pendingTab.content, workspaceTab)
         contentsByTabId[workspaceTab.id] = pendingTab.content
@@ -343,6 +347,15 @@ class KetraTermProjectTerminalService(
         container.add(component, BorderLayout.CENTER)
         container.revalidate()
         container.repaint()
+    }
+
+    private fun createCompletionScope(tabId: String): CoroutineScope {
+        val parentJob = coroutineScope.coroutineContext[Job]
+        return CoroutineScope(
+            coroutineScope.coroutineContext +
+                    SupervisorJob(parentJob) +
+                    CoroutineName("ketraterm-completion-$tabId"),
+        )
     }
 
     private fun openDefaultTabFromContextMenu(): Boolean {

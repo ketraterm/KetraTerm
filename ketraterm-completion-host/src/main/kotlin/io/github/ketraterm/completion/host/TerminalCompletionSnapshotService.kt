@@ -44,100 +44,114 @@ fun interface TerminalCompletionLoadScheduler {
  * @param workerCount positive number of concurrent snapshot workers.
  * @param queueCapacity positive number of queued operations accepted without blocking.
  * @param coroutineName diagnostic worker-name prefix.
+ * @param onBackgroundFailure diagnostic callback for a failed provider load or publication callback.
  */
 class TerminalCompletionSnapshotService
-@JvmOverloads
-constructor(
-    workerCount: Int = DEFAULT_WORKER_COUNT,
-    queueCapacity: Int = DEFAULT_QUEUE_CAPACITY,
-    coroutineName: String = DEFAULT_COROUTINE_NAME,
-) : AutoCloseable {
-    private val validatedWorkerCount = workerCount.also { require(it > 0) { "workerCount must be > 0, was $it" } }
-    private val validatedQueueCapacity =
-        queueCapacity.also { require(it > 0) { "queueCapacity must be > 0, was $it" } }
-    private val validatedCoroutineName =
-        coroutineName.also { require(it.isNotBlank()) { "coroutineName must not be blank" } }
-    private val job = SupervisorJob()
-    private val scope =
-        CoroutineScope(
-            job +
+    @JvmOverloads
+    constructor(
+        workerCount: Int = DEFAULT_WORKER_COUNT,
+        queueCapacity: Int = DEFAULT_QUEUE_CAPACITY,
+        coroutineName: String = DEFAULT_COROUTINE_NAME,
+        private val onBackgroundFailure: (Throwable) -> Unit = {},
+    ) : AutoCloseable {
+        private val validatedWorkerCount = workerCount.also { require(it > 0) { "workerCount must be > 0, was $it" } }
+        private val validatedQueueCapacity =
+            queueCapacity.also { require(it > 0) { "queueCapacity must be > 0, was $it" } }
+        private val validatedCoroutineName =
+            coroutineName.also { require(it.isNotBlank()) { "coroutineName must not be blank" } }
+        private val job = SupervisorJob()
+        private val scope =
+            CoroutineScope(
+                job +
                     Dispatchers.IO.limitedParallelism(validatedWorkerCount) +
                     CoroutineName(validatedCoroutineName),
-        )
-    private val workQueue = Channel<suspend () -> Unit>(validatedQueueCapacity)
-    private val scheduler = TerminalCompletionLoadScheduler { work -> workQueue.trySend(work).isSuccess }
+            )
+        private val workQueue = Channel<suspend () -> Unit>(validatedQueueCapacity)
+        private val scheduler = TerminalCompletionLoadScheduler { work -> workQueue.trySend(work).isSuccess }
 
-    init {
-        repeat(validatedWorkerCount) { workerIndex ->
-            scope.launch(CoroutineName("$validatedCoroutineName-worker-$workerIndex")) {
-                for (work in workQueue) {
-                    try {
-                        work()
-                    } catch (cancellation: CancellationException) {
-                        // A provider may cancel only its own load. Stop the
-                        // worker only when the service job was cancelled.
-                        currentCoroutineContext().ensureActive()
-                    } catch (_: Exception) {
-                        // One provider failure must not terminate a shared worker.
+        init {
+            repeat(validatedWorkerCount) { workerIndex ->
+                scope.launch(CoroutineName("$validatedCoroutineName-worker-$workerIndex")) {
+                    for (work in workQueue) {
+                        try {
+                            work()
+                        } catch (_: CancellationException) {
+                            // A provider may cancel only its own load. Stop the
+                            // worker only when the service job was cancelled.
+                            currentCoroutineContext().ensureActive()
+                        } catch (failure: Exception) {
+                            // One provider failure must not terminate a shared worker.
+                            reportBackgroundFailure(failure)
+                        }
                     }
                 }
             }
         }
+
+        /**
+         * Creates a session-owned asynchronous directory provider.
+         *
+         * @param onSnapshotChanged callback invoked on a worker after publication.
+         * @param resolver pure local path resolver.
+         * @param scanner optional blocking bounded directory scanner run only by workers; omitted uses the diagnostic-aware
+         * default scanner.
+         * @return provider that the owning session must close.
+         */
+        @JvmOverloads
+        fun createDirectoryProvider(
+            onSnapshotChanged: () -> Unit,
+            resolver: TerminalCompletionPathResolver = TerminalCompletionPathResolver(),
+            scanner: TerminalDirectoryScanner? = null,
+        ): TerminalAsyncFileSystemProvider =
+            TerminalAsyncFileSystemProvider(
+                scheduler = scheduler,
+                onSnapshotChanged = onSnapshotChanged,
+                resolver = resolver,
+                scanner = scanner ?: TerminalBoundedDirectoryScanner { failure -> reportBackgroundFailure(failure) },
+                onBackgroundFailure = ::reportBackgroundFailure,
+            )
+
+        /**
+         * Creates a session-owned asynchronous value snapshot provider.
+         *
+         * @param keyProvider thread-safe supplier for the current snapshot key.
+         * @param loader blocking bounded loader invoked only by workers.
+         * @param onSnapshotChanged callback invoked on a worker after publication.
+         * @return provider that the owning session must close.
+         */
+        fun <K, V> createValueProvider(
+            keyProvider: () -> K,
+            loader: (K) -> List<V>,
+            onSnapshotChanged: () -> Unit,
+        ): TerminalValueSnapshotProvider<K, V> =
+            TerminalValueSnapshotProvider(
+                keyProvider = keyProvider,
+                scheduler = scheduler,
+                loader = loader,
+                onSnapshotChanged = onSnapshotChanged,
+                onBackgroundFailure = ::reportBackgroundFailure,
+            )
+
+        /** Cancels queued and active work and releases worker resources. */
+        override fun close() {
+            // Pass the nullable cause explicitly: an embedding host may provide
+            // a compatible coroutines runtime without newer
+            // compiler-generated default-argument bridge methods.
+            workQueue.close(null)
+            job.cancel(CancellationException("Completion snapshot service closed"))
+        }
+
+        private fun reportBackgroundFailure(failure: Throwable) {
+            try {
+                onBackgroundFailure(failure)
+            } catch (_: RuntimeException) {
+                // A diagnostics sink must not prevent other completion providers from running.
+            }
+        }
+
+        private companion object {
+            private const val DEFAULT_WORKER_COUNT = 2
+            private const val DEFAULT_QUEUE_CAPACITY = 32
+            private const val DEFAULT_COROUTINE_NAME = "completion-snapshots"
+        }
     }
-
-    /**
-     * Creates a session-owned asynchronous directory provider.
-     *
-     * @param onSnapshotChanged callback invoked on a worker after publication.
-     * @param resolver pure local path resolver.
-     * @param scanner blocking bounded directory scanner run only by workers.
-     * @return provider that the owning session must close.
-     */
-    @JvmOverloads
-    fun createDirectoryProvider(
-        onSnapshotChanged: () -> Unit,
-        resolver: TerminalCompletionPathResolver = TerminalCompletionPathResolver(),
-        scanner: TerminalDirectoryScanner = TerminalBoundedDirectoryScanner(),
-    ): TerminalAsyncFileSystemProvider =
-        TerminalAsyncFileSystemProvider(
-            scheduler = scheduler,
-            onSnapshotChanged = onSnapshotChanged,
-            resolver = resolver,
-            scanner = scanner,
-        )
-
-    /**
-     * Creates a session-owned asynchronous value snapshot provider.
-     *
-     * @param keyProvider thread-safe supplier for the current snapshot key.
-     * @param loader blocking bounded loader invoked only by workers.
-     * @param onSnapshotChanged callback invoked on a worker after publication.
-     * @return provider that the owning session must close.
-     */
-    fun <K, V> createValueProvider(
-        keyProvider: () -> K,
-        loader: (K) -> List<V>,
-        onSnapshotChanged: () -> Unit,
-    ): TerminalValueSnapshotProvider<K, V> =
-        TerminalValueSnapshotProvider(
-            keyProvider = keyProvider,
-            scheduler = scheduler,
-            loader = loader,
-            onSnapshotChanged = onSnapshotChanged,
-        )
-
-    /** Cancels queued and active work and releases worker resources. */
-    override fun close() {
-        // Pass the nullable cause explicitly: an embedding host may provide
-        // a compatible coroutines runtime without newer
-        // compiler-generated default-argument bridge methods.
-        workQueue.close(null)
-        job.cancel(CancellationException("Completion snapshot service closed"))
-    }
-
-    private companion object {
-        private const val DEFAULT_WORKER_COUNT = 2
-        private const val DEFAULT_QUEUE_CAPACITY = 32
-        private const val DEFAULT_COROUTINE_NAME = "completion-snapshots"
-    }
-}

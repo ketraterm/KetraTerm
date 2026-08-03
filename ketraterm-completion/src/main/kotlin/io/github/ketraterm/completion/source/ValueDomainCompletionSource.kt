@@ -137,13 +137,13 @@ internal class ValueDomainCompletionSource(
             prefix: String,
         ): Boolean =
             prefix.isEmpty() ||
-                    (
-                            value.startsWith(prefix, ignoreCase = true) &&
-                                    !value.equals(
-                                        prefix,
-                                        ignoreCase = true,
-                                    )
-                            )
+                (
+                    value.startsWith(prefix, ignoreCase = true) &&
+                        !value.equals(
+                            prefix,
+                            ignoreCase = true,
+                        )
+                )
 
         private fun score(
             value: TerminalCompletionDomainValue,
