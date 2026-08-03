@@ -96,6 +96,7 @@ dependencies {
         bundledModule("intellij.platform.vcs.dvcs")
         bundledModule("intellij.platform.vcs.dvcs.impl")
         bundledModule("intellij.gradle")
+        bundledModule("intellij.gradle.settings")
         testFramework(TestFrameworkType.Platform)
 
         // Add plugin dependencies for compilation here, for example:
