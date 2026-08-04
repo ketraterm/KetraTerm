@@ -43,16 +43,21 @@ internal class TerminalCompletionOutcomeKeyResolver(
                 context.expectedPathKind != TerminalPathArgumentKind.NONE
         val targetTokenIndex = context.commandLineContext.activeTokenIndex
         val learnedKey = learnedKey(commandLine, request.shellCapabilities.syntax, targetTokenIndex, pathAware) ?: return null
-        val classification = TerminalCommandLineClassifier.classify(commandLine, commandSpecs, request.shellCapabilities.syntax)
+        val classification =
+            TerminalCommandLineClassifier.classify(
+                commandLine,
+                commandSpecs,
+                request.shellCapabilities.syntax,
+            ) ?: return null
         val family =
             classification
-                ?.shape
-                ?.let { shape ->
+                .shape
+                .let { shape ->
                     buildList(1 + shape.subcommands.size) {
                         add(shape.executable)
                         addAll(shape.subcommands)
                     }
-                }.orEmpty()
+                }
         val valueDomain =
             candidate.valueDomain.takeUnless { it == TerminalCompletionValueDomain.NONE }
                 ?: context.expectedValueDomain
@@ -68,7 +73,7 @@ internal class TerminalCompletionOutcomeKeyResolver(
                 ),
             learnedKey = learnedKey,
             commandLine = commandLine,
-            shape = classification?.shape,
+            shape = classification.shape,
         )
     }
 

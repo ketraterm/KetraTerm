@@ -535,6 +535,80 @@ class GlobalEvidenceFusionCompletionEngineTest {
     }
 
     @Test
+    fun `multiline projected commands use fallback grouping`() {
+        val commandLine = "git s"
+        val candidates =
+            engine(
+                listOf(
+                    entry(
+                        source(
+                            candidate(
+                                "git status\ngit log",
+                                0,
+                                commandLine.length,
+                                "whole-line",
+                                TerminalCompletionCandidateKind.HISTORY,
+                            ),
+                        ),
+                        0,
+                    ),
+                    entry(
+                        source(
+                            candidate(
+                                "status\ngit log",
+                                4,
+                                commandLine.length,
+                                "token",
+                                TerminalCompletionCandidateKind.SUBCOMMAND,
+                            ),
+                        ),
+                        0,
+                    ),
+                ),
+            ).complete(request(commandLine))
+
+        assertEquals(2, candidates.size)
+        assertTrue(candidates.map { it.source }.containsAll(listOf("whole-line", "token")))
+    }
+
+    @Test
+    fun `assignment-only projected commands use fallback grouping`() {
+        val commandLine = "FOO=F"
+        val candidates =
+            engine(
+                listOf(
+                    entry(
+                        source(
+                            candidate(
+                                "FOO=bar",
+                                0,
+                                commandLine.length,
+                                "whole-line",
+                                TerminalCompletionCandidateKind.HISTORY,
+                            ),
+                        ),
+                        0,
+                    ),
+                    entry(
+                        source(
+                            candidate(
+                                "bar",
+                                4,
+                                commandLine.length,
+                                "token",
+                                TerminalCompletionCandidateKind.ARGUMENT,
+                            ),
+                        ),
+                        0,
+                    ),
+                ),
+            ).complete(request(commandLine))
+
+        assertEquals(2, candidates.size)
+        assertTrue(candidates.map { it.source }.containsAll(listOf("whole-line", "token")))
+    }
+
+    @Test
     fun `maximum counters future timestamps and extreme priorities remain bounded`() {
         val snapshot =
             TerminalCommandCompletionStatsSnapshot(
