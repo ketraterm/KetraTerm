@@ -17,8 +17,6 @@ package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
-import io.github.ketraterm.completion.api.TerminalCompletionSource
-import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
@@ -66,10 +64,6 @@ internal class IntellijCompletionStatisticsCoordinator(
             onStatsChanged()
         }
     }
-
-    /** Wraps [source] with the current source-specific feedback index. */
-    fun feedbackAware(source: TerminalCompletionSource): TerminalCompletionSource =
-        TerminalCompletionSources.feedbackAware(source, statsSource::feedbackSnapshot)
 
     /** Creates a shared Swing feedback handler for one live session context. */
     fun createFeedbackHandler(contextProvider: () -> SwingCompletionContext): SwingShellSuggestionFeedbackHandler =

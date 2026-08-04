@@ -95,7 +95,7 @@ internal class IntellijProjectFileProviderFactory(
         }
 
     private companion object {
-        private const val PRIORITY = 120
+        private const val PRIORITY = 10
         private const val SOURCE_ID = "intellij-project-file"
     }
 }

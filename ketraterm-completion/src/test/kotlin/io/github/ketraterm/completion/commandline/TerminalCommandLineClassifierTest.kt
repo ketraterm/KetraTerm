@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.commandline
 
+import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import kotlin.test.*
 
@@ -130,6 +131,22 @@ class TerminalCommandLineClassifierTest {
         assertEquals(listOf("deploy"), classification.shape.subcommands)
         assertEquals(1, classification.shape.positionalArgumentCount)
         assertFalse(classification.shape.normalizedShapeKey.contains("prod", ignoreCase = true))
+    }
+
+    @Test
+    fun `generic fallback honors PowerShell escaping`() {
+        val classification =
+            assertNotNull(
+                TerminalCommandLineClassifier.classify(
+                    "Get-Item `| Where-Object",
+                    TerminalCommandSpecs.defaults(),
+                    TerminalShellSyntax.POWERSHELL,
+                ),
+            )
+
+        assertEquals("get-item", classification.shape.executable)
+        assertEquals(listOf("|"), classification.shape.subcommands)
+        assertEquals(1, classification.shape.positionalArgumentCount)
     }
 
     @Test

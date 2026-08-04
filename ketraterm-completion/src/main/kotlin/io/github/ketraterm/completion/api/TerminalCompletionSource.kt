@@ -37,8 +37,8 @@ fun interface TerminalCompletionSource {
  * Source registration consumed by merged completion engines.
  *
  * @property source completion source to query.
- * @property priority source-level ranking priority. Larger values rank ahead of
- * lower-priority sources before candidate score is considered.
+ * @property priority small cold-start prior added to this source's reciprocal-rank
+ * contribution. The merged engine clamps values to `[-20, 20]`.
  */
 data class TerminalCompletionSourceEntry
     @JvmOverloads

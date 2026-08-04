@@ -15,9 +15,10 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.model.*
-import io.github.ketraterm.completion.ranking.FeedbackAwareCompletionSource
-import io.github.ketraterm.completion.ranking.ShapeAwareCompletionSource
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.source.*
 import io.github.ketraterm.completion.spec.SpecCompletionSource
 
@@ -26,33 +27,11 @@ object TerminalCompletionSources {
     /**
      * Creates a deterministic source backed by static command specs.
      *
-     * When [shapeStatsProvider] is present, spec candidates are adjusted by
-     * privacy-preserving command-shape learning before they are returned. Hosts
-     * should not compose that ranking decorator directly; command-shape learning
-     * is part of the static-spec source behavior.
-     *
      * @param specs top-level command specs.
-     * @param shapeStatsProvider optional supplier for the latest command-shape
-     * stats snapshot used to rank static candidates.
      * @return completion source that evaluates [specs] without shell I/O.
      */
     @JvmStatic
-    @JvmOverloads
-    fun fromSpecs(
-        specs: List<TerminalCommandSpec>,
-        shapeStatsProvider: (() -> List<TerminalCommandShapeStats>)? = null,
-    ): TerminalCompletionSource {
-        val source = SpecCompletionSource(specs)
-        return if (shapeStatsProvider == null) {
-            source
-        } else {
-            ShapeAwareCompletionSource(
-                delegate = source,
-                shapeStatsProvider = shapeStatsProvider,
-                commandSpecs = specs,
-            )
-        }
-    }
+    fun fromSpecs(specs: List<TerminalCommandSpec>): TerminalCompletionSource = SpecCompletionSource(specs)
 
     /**
      * Creates a bounded in-memory source for commands observed in the current
@@ -98,24 +77,6 @@ object TerminalCompletionSources {
         CommandStatsCompletionSourceImpl(
             capacity = capacity,
             commandSpecs = commandSpecs,
-        )
-
-    /**
-     * Wraps [source] with source-specific feedback score adjustment.
-     *
-     * @param source source whose candidates should be feedback-ranked.
-     * @param feedbackStatsProvider supplier for the latest source-specific
-     * feedback stats snapshot.
-     * @return source that returns the same candidates with adjusted scores.
-     */
-    @JvmStatic
-    fun feedbackAware(
-        source: TerminalCompletionSource,
-        feedbackStatsProvider: () -> List<TerminalCompletionFeedbackStats>,
-    ): TerminalCompletionSource =
-        FeedbackAwareCompletionSource(
-            delegate = source,
-            feedbackStatsProvider = feedbackStatsProvider,
         )
 
     /**

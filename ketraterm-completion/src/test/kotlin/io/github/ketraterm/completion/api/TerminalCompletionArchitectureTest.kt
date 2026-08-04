@@ -296,7 +296,6 @@ internal class TerminalCompletionArchitectureTest {
         private val PUBLIC_COMPLETION_SOURCE_FACTORIES =
             setOf(
                 "commandStats",
-                "feedbackAware",
                 "fromSpecs",
                 "sessionMru",
                 "path",
@@ -344,7 +343,6 @@ internal class TerminalCompletionArchitectureTest {
                 "api/TerminalCompletionSources.kt" to
                     setOf(
                         "commandStats",
-                        "feedbackAware",
                         "fromSpecs",
                         "sessionMru",
                         "path",

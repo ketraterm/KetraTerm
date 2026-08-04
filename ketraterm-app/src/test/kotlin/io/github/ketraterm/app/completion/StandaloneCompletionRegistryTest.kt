@@ -19,6 +19,7 @@ import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -135,16 +136,14 @@ class StandaloneCompletionRegistryTest {
             workingDirectoryUri = "file:///repo",
         )
 
-        val suggestions = provider.suggestions(request("git s"))
+        val request = request("git s")
+        val suggestions = provider.suggestions(request)
+        val outcomes = suggestions.mapNotNull { it.commandTextAfterReplacement(request) }
 
-        assertEquals("status", suggestions[0].replacementText)
+        assertEquals("git status", outcomes[0])
         assertEquals("spec", suggestions[0].source)
-        assertTrue(suggestions.indexOfFirst { it.replacementText == "git switch main" && it.source == "mru" } > 0)
-        assertTrue(suggestions.indexOfFirst { it.replacementText == "git show --stat" && it.source == "stats" } > 0)
-        assertTrue(
-            suggestions.indexOfFirst { it.replacementText == "git switch main" && it.source == "mru" } <
-                suggestions.indexOfFirst { it.replacementText == "git show --stat" && it.source == "stats" },
-        )
+        assertTrue("git switch main" in outcomes)
+        assertTrue("git show --stat" in outcomes)
     }
 
     @Test
@@ -247,11 +246,12 @@ class StandaloneCompletionRegistryTest {
             workingDirectoryUri = "file:///other",
         )
 
-        val suggestions = provider.suggestions(request("git s"))
+        val request = request("git s")
+        val suggestions = provider.suggestions(request)
 
         assertEquals(
-            listOf("git switch main", "git status"),
-            suggestions.filter { it.source == "mru" }.map { it.replacementText },
+            listOf("git switch", "git status"),
+            suggestions.mapNotNull { it.commandTextAfterReplacement(request) }.take(2),
         )
     }
 
@@ -280,9 +280,10 @@ class StandaloneCompletionRegistryTest {
 
         workingDirectoryUri = "file:///other"
 
-        val suggestions = provider.suggestions(request("git s"))
+        val request = request("git s")
+        val suggestions = provider.suggestions(request)
 
-        assertEquals("git status", suggestions.first { it.source == "mru" }.replacementText)
+        assertEquals("git status", suggestions.first().commandTextAfterReplacement(request))
     }
 
     @Test

@@ -166,12 +166,7 @@ internal class IntellijCompletionRegistry(
             persistStats = persistStats,
             onStatsChanged = ::notifyAllSourcesChanged,
         )
-    private val specSource =
-        TerminalCompletionSources
-            .fromSpecs(
-                specs = commandSpecs,
-                shapeStatsProvider = statsSource::shapeSnapshot,
-            ).let(statistics::feedbackAware)
+    private val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
 
     /**
      * Creates and registers all completion sources for one terminal session.
@@ -225,13 +220,13 @@ internal class IntellijCompletionRegistry(
                 buildList {
                     add(
                         TerminalCompletionSourceEntry(
-                            statistics.feedbackAware(mruSource),
+                            mruSource,
                             priority = SESSION_MRU_SOURCE_PRIORITY
                         )
                     )
                     add(
                         TerminalCompletionSourceEntry(
-                            statistics.feedbackAware(statsSource),
+                            statsSource,
                             priority = PERSISTENT_STATS_SOURCE_PRIORITY
                         )
                     )
@@ -245,15 +240,16 @@ internal class IntellijCompletionRegistry(
                             priority = PATH_SOURCE_PRIORITY,
                         ),
                     )
-                    dynamicRegistrations.mapTo(this) { registration ->
-                        registration.sourceEntry.copy(
-                            source = statistics.feedbackAware(registration.sourceEntry.source),
-                        )
-                    }
+                    dynamicRegistrations.mapTo(this, IntellijCompletionProviderRegistration::sourceEntry)
                 }
             val provider =
                 IntellijCompletionSuggestionProvider(
-                    engine = TerminalCompletionEngines.fromSources(sources, commandSpecs),
+                    engine =
+                        TerminalCompletionEngines.fromSources(
+                            sources = sources,
+                            commandSpecs = commandSpecs,
+                            learnedStatsProvider = statsSource::snapshotAll,
+                        ),
                     contextProvider = { context.swingContext() },
                 )
             val state = SessionState(mruSource, resources.toList(), notifier)
@@ -350,9 +346,9 @@ internal class IntellijCompletionRegistry(
 
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
-        private const val PATH_SOURCE_PRIORITY = 125
-        private const val SESSION_MRU_SOURCE_PRIORITY = 100
-        private const val PERSISTENT_STATS_SOURCE_PRIORITY = 50
+        private const val PATH_SOURCE_PRIORITY = 12
+        private const val SESSION_MRU_SOURCE_PRIORITY = 8
+        private const val PERSISTENT_STATS_SOURCE_PRIORITY = 6
         private const val SPEC_SOURCE_PRIORITY = 0
     }
 }

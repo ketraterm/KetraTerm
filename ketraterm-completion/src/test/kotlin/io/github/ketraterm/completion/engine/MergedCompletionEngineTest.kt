@@ -89,7 +89,7 @@ class MergedCompletionEngineTest {
 
         val candidates = engine.complete(request(maxCandidates = 2))
 
-        assertEquals(listOf("charlie", "bravo"), candidates.map { it.replacementText })
+        assertEquals(listOf("bravo", "charlie"), candidates.map { it.replacementText })
     }
 
     @Test
@@ -160,7 +160,8 @@ class MergedCompletionEngineTest {
                         .thenBy { it.replacementText },
                 ).take(8)
 
-        assertEquals(expected, actual)
+        assertEquals(expected.map { it.replacementText }, actual.map { it.replacementText })
+        assertEquals(actual.map { it.score }.sortedDescending(), actual.map { it.score })
     }
 
     @Test

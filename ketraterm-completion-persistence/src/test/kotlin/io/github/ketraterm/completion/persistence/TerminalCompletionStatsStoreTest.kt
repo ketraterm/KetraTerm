@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.completion.persistence
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.*
 import org.junit.jupiter.api.io.TempDir
 import java.nio.charset.StandardCharsets
@@ -27,6 +27,56 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 internal class TerminalCompletionStatsStoreTest {
+    @Test
+    fun `version one snapshot drives global ranking after round trip`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("completion-stats.tsv")
+        val snapshot =
+            TerminalCommandCompletionStatsSnapshot(
+                commandStats =
+                    listOf(
+                        stats(
+                            commandLine = "cd build",
+                            profileId = "bash",
+                            workingDirectoryUri = "file:///repo",
+                            acceptedCount = 8,
+                        ),
+                    ),
+            )
+        TerminalCompletionStatsStore(path).use { store ->
+            store.persist(snapshot)
+            store.flush()
+        }
+        val loaded = TerminalCompletionStatsStore(path).use(TerminalCompletionStatsStore::loadSnapshot)
+        val pathSource =
+            TerminalCompletionSource {
+                listOf(
+                    TerminalCompletionCandidate("cache/", 3, 3, "path", TerminalCompletionCandidateKind.PATH, score = 100),
+                    TerminalCompletionCandidate("build/", 3, 3, "path", TerminalCompletionCandidateKind.PATH, score = 1),
+                )
+            }
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                sources = listOf(TerminalCompletionSourceEntry(pathSource, 12)),
+                learnedStatsProvider = { loaded },
+            )
+
+        val ranked =
+            engine.complete(
+                TerminalCompletionRequest(
+                    commandLine = "cd ",
+                    cursorOffset = 3,
+                    profileId = "bash",
+                    workingDirectoryUri = "file:///repo",
+                    shellCapabilities = TerminalShellCapabilities.POSIX,
+                ),
+            )
+
+        assertEquals("build/", ranked.first().replacementText)
+        assertEquals("command-completion-stats-v1.tsv", TerminalCompletionStatsStore.currentFileName())
+    }
+
     @Test
     fun `persists versioned compact stats and reloads unicode text`(
         @TempDir directory: Path,

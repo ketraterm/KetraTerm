@@ -24,16 +24,20 @@ import io.github.ketraterm.completion.commandline.TerminalCompletionActivePositi
 import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
 import io.github.ketraterm.completion.commandline.collectCandidates
 import io.github.ketraterm.completion.internal.TerminalCompletionCollectionBudget
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.completion.ranking.TerminalCompletionRankingContext
+import io.github.ketraterm.completion.ranking.GlobalCompletionRanker
 
 internal class MergedCompletionEngine(
     sources: List<TerminalCompletionSourceEntry>,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    learnedStatsProvider: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot.EMPTY },
+    clockEpochMillis: () -> Long = System::currentTimeMillis,
 ) : TerminalCompletionEngine {
     private val sources = sources.toList()
     private val commandSpecs = commandSpecs.toList()
+    private val ranker = GlobalCompletionRanker(this.commandSpecs, learnedStatsProvider, clockEpochMillis)
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
         if (sources.isEmpty()) return emptyList()
@@ -51,67 +55,15 @@ internal class MergedCompletionEngine(
                 commandSpecs = commandSpecs,
             )
         if (completionContext.activePosition == TerminalCompletionActivePosition.OPERATOR) return emptyList()
-        val rankingContext = TerminalCompletionRankingContext(completionContext)
         val collectionLimit = TerminalCompletionCollectionBudget.forFinalLimit(request.maxCandidates)
-        val deduplicated = LinkedHashMap<CandidateKey, RankedCandidate>()
+        val collected = ArrayList<GlobalCompletionRanker.SourceCandidates>(sources.size)
         for (sourceIndex in sources.indices) {
             val entry = sources[sourceIndex]
             val candidates = entry.source.collectCandidates(request, commandLineContext, collectionLimit)
-            for (candidateIndex in candidates.indices) {
-                val candidate = candidates[candidateIndex]
-                val ranked =
-                    RankedCandidate(
-                        candidate = candidate,
-                        sourcePriority = entry.priority,
-                        contextPriorityAdjustment = rankingContext.priorityAdjustment(candidate),
-                        sourceIndex = sourceIndex,
-                        candidateIndex = candidateIndex,
-                    )
-                val key = CandidateKey(candidate)
-                val existing = deduplicated[key]
-                if (existing == null || RANKING.compare(ranked, existing) < 0) {
-                    deduplicated[key] = ranked
-                }
+            if (candidates.isNotEmpty()) {
+                collected += GlobalCompletionRanker.SourceCandidates(sourceIndex, entry.priority, candidates)
             }
         }
-
-        if (deduplicated.isEmpty()) return emptyList()
-        return deduplicated.values
-            .sortedWith(RANKING)
-            .take(request.maxCandidates)
-            .map { it.candidate }
-    }
-
-    private data class CandidateKey(
-        val replacementText: String,
-        val replacementStartOffset: Int,
-        val replacementEndOffset: Int,
-    ) {
-        constructor(candidate: TerminalCompletionCandidate) : this(
-            replacementText = candidate.replacementText,
-            replacementStartOffset = candidate.replacementStartOffset,
-            replacementEndOffset = candidate.replacementEndOffset,
-        )
-    }
-
-    private data class RankedCandidate(
-        val candidate: TerminalCompletionCandidate,
-        val sourcePriority: Int,
-        val contextPriorityAdjustment: Int,
-        val sourceIndex: Int,
-        val candidateIndex: Int,
-    ) {
-        val effectiveSourcePriority: Int = sourcePriority + contextPriorityAdjustment
-    }
-
-    private companion object {
-        private val RANKING =
-            compareByDescending<RankedCandidate> { it.effectiveSourcePriority }
-                .thenByDescending { it.candidate.score }
-                .thenBy { it.candidate.displayText }
-                .thenBy { it.candidate.replacementText }
-                .thenByDescending { it.sourcePriority }
-                .thenBy { it.sourceIndex }
-                .thenBy { it.candidateIndex }
+        return ranker.rank(request, completionContext, collected)
     }
 }

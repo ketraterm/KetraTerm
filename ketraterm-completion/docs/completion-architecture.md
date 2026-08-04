@@ -14,9 +14,10 @@ External modules should import only:
 
 The `api` package exposes host-facing engines, source factories, request and
 candidate contracts, and mutable learning-source interfaces. Factory methods
-are intentionally narrow: hosts may create spec, session-MRU, stats, and
-feedback-aware sources, then merge prioritized sources into an engine. Ranking
-decorators that are specific to one source type remain implementation details.
+are intentionally narrow: hosts create spec, session-MRU, stats, path, and
+host-snapshot sources, then give the merged engine one immutable learned-stats
+supplier. Learning is applied once by the global ranker, never by nested
+source decorators.
 
 The `model` package contains durable public data models that hosts may persist
 or construct:
@@ -56,7 +57,7 @@ replacement ranges, and shell-safe quoting. It requires typed path text by defau
 such as Git status paths may opt in to empty-prefix suggestions.
 
 `TerminalCompletionContextResolver` is the shared internal command-line context
-resolver. Sources and ranking decorators should use it instead of independently
+resolver. Sources and the global ranker should use it instead of independently
 guessing command position, subcommand position, option-name position,
 option-value position, positional-argument position, active option metadata,
 expected path kind, expected dynamic value domain, repeatable subcommand source,
@@ -254,7 +255,8 @@ Product hosts inject context, privacy, scheduling, and persistence policy instea
 logic.
 
 Both hosts should map their data into the shared request/candidate/source
-contracts and let the shared engine merge, deduplicate, and rank candidates.
+contracts and let the shared engine resolve outcomes, fuse provider evidence,
+deduplicate, and rank candidates.
 `ketraterm-completion` must stay pure: it should not shell out to Git, read IDE
 indexes, watch files, or block on host I/O.
 
@@ -273,33 +275,35 @@ replacement ranges and never be called from the shared completion hot path.
 
 ## Ranking Policy
 
-The merged engine keeps ranking deterministic while applying a small
-source-aware context adjustment before candidate score and stable text
-tie-breakers. `TerminalCompletionRankingContext` consumes
-`TerminalCompletionContext` so command position prefers command candidates,
-subcommand position prefers subcommands, option-name position prefers options,
-option-value position prefers static value candidates, domain-matching dynamic
-value candidates, or paths when the active option declares path metadata, and
-path-taking positional arguments prefer path candidates over whole-command
-history. Domain-matching dynamic argument candidates receive the strongest
-context boost, so a host-owned Git branch provider can outrank generic paths and
-whole-command history for `git switch <branch>`.
+The merged engine ranks each provider locally, projects every candidate onto the
+command it would produce, and groups source-independent outcomes. Shell quoting
+is tokenized away for comparison. Declared path values additionally ignore only
+a redundant trailing separator, allowing `cd build`, `cd build/`, and a safely
+quoted equivalent to share evidence without resolving `..`, symlinks,
+authorities, environment variables, or filesystem case.
 
-This base policy is intentionally host-neutral. Standalone and IntelliJ
-providers should still choose source priority for their own data quality, while
-shared ranking keeps common terminal semantics such as paths over MRU for `cd `
-and option names after `-`. Future dynamic providers can extend the same model
-with provider-specific data, for example Git branches for `git switch`, without
-embedding standalone process calls or IDE service lookups in the shared engine.
+Provider support uses reciprocal-rank fusion. Candidate scores are meaningful
+only within their producing source; an MRU score is never compared numerically
+with a path or specification score. Each distinct source entry contributes its
+best local rank for an outcome, a source prior clamped to `[-20, 20]`, and its
+context-specific provider feedback. Duplicate candidates from the same source
+do not multiply support.
 
-Candidate ordering remains deterministic. Completion candidate sets are
-deliberately small, so decorators and the merged engine use auditable standard
-collection sorting and deduplication rather than custom allocation-free data
-structures. Benchmarks track learned-ranking and hostile-provider costs so a
-more specialized selector is introduced only if measurements justify it.
+`TerminalCompletionRankingContext` supplies the strongest semantic adjustment
+among contributors. Exact outcome statistics then add bounded usage,
+success/failure, accepted/dismissed, recency, profile, and working-directory
+evidence. Command-shape evidence supplies a weaker fallback for outcomes with
+no exact history. Feedback ratios use smoothing so one event cannot overwhelm
+strong command semantics. Only explicit dismissal is negative; passive popup
+closure is neutral.
 
-Source collection and final presentation limits are deliberately distinct. The engine requests a bounded surplus from
-collecting sources, shape and feedback decorators rerank that shared surplus without multiplying nested budgets, and the
-merged engine applies `request.maxCandidates` only after context ranking and deduplication. The collection budget is
-four times the visible limit with an absolute surplus cap of 256 and overflow-safe arithmetic; learned ranking can
-therefore promote a candidate that began just outside the visible result without permitting unbounded host work.
+The selected representative favors semantic fit, a narrow replacement range,
+the bounded prior, local rank, and stable declaration order. Returned candidate
+scores are the fused global score. Ordering and all tie-breakers are deterministic.
+
+Source collection and final presentation limits remain distinct. The engine
+requests a bounded surplus from every collecting source and applies
+`request.maxCandidates` only after outcome fusion. The collection budget is
+four times the visible limit with an absolute surplus cap of 256 and
+overflow-safe arithmetic, so learned evidence can promote an initially hidden
+candidate without permitting unbounded host work.

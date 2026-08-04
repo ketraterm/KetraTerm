@@ -16,7 +16,10 @@
 package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
@@ -41,11 +44,50 @@ open class TerminalCompletionBenchmark {
 
     private lateinit var chainedRequest: TerminalCompletionRequest
     private lateinit var unclosedQuoteRequest: TerminalCompletionRequest
+    private lateinit var fusionRequest: TerminalCompletionRequest
+    private lateinit var coldStartFusionEngine: TerminalCompletionEngine
+    private lateinit var learnedFusionEngine: TerminalCompletionEngine
+    private lateinit var duplicateFusionEngine: TerminalCompletionEngine
+    private lateinit var hostileFusionEngine: TerminalCompletionEngine
 
     @Setup(Level.Trial)
     open fun setUp() {
         chainedRequest = requestFor("git status && ", "git sw")
         unclosedQuoteRequest = requestFor("git status && cd ", "\"Idea Pro")
+        fusionRequest =
+            TerminalCompletionRequest(
+                commandLine = "git switch ma",
+                cursorOffset = "git switch ma".length,
+                maxCandidates = 8,
+                profileId = "benchmark",
+                workingDirectoryUri = "file:///repo",
+                shellCapabilities = TerminalShellCapabilities.POSIX,
+            )
+        val realisticSources = List(8) { sourceIndex -> sourceEntry(sourceIndex, 32, duplicateMain = true) }
+        coldStartFusionEngine = TerminalCompletionEngines.fromSources(realisticSources, commandSpecs)
+        val learnedSnapshot =
+            TerminalCommandCompletionStatsSnapshot(
+                commandStats =
+                    List(2_048) { index ->
+                        TerminalCommandCompletionStats(
+                            commandLine = if (index == 0) "git switch main" else "git switch branch-$index",
+                            profileId = "benchmark",
+                            workingDirectoryUri = "file:///repo",
+                            useCount = index % 20,
+                            successCount = index % 17,
+                            acceptedCount = index % 7,
+                            lastUsedEpochMillis = 2_000_000_000_000L - index,
+                        )
+                    },
+            )
+        learnedFusionEngine =
+            TerminalCompletionEngines.fromSources(
+                realisticSources,
+                commandSpecs,
+                learnedStatsProvider = { learnedSnapshot },
+            )
+        duplicateFusionEngine = TerminalCompletionEngines.fromSources(List(8) { sourceEntry(it, 32, duplicateMain = true) }, commandSpecs)
+        hostileFusionEngine = TerminalCompletionEngines.fromSources(List(10) { sourceEntry(it, 256, duplicateMain = false) }, commandSpecs)
     }
 
     @Benchmark
@@ -57,6 +99,50 @@ open class TerminalCompletionBenchmark {
     open fun completeUnclosedQuote(blackhole: Blackhole) {
         blackhole.consume(engine.complete(unclosedQuoteRequest))
     }
+
+    @Benchmark
+    open fun completeColdStartFusion(blackhole: Blackhole) {
+        blackhole.consume(coldStartFusionEngine.complete(fusionRequest))
+    }
+
+    @Benchmark
+    open fun completeLearnedFusion(blackhole: Blackhole) {
+        blackhole.consume(learnedFusionEngine.complete(fusionRequest))
+    }
+
+    @Benchmark
+    open fun completeDuplicateHeavyFusion(blackhole: Blackhole) {
+        blackhole.consume(duplicateFusionEngine.complete(fusionRequest))
+    }
+
+    @Benchmark
+    open fun completeHostileFusion(blackhole: Blackhole) {
+        blackhole.consume(hostileFusionEngine.complete(fusionRequest))
+    }
+
+    private fun sourceEntry(
+        sourceIndex: Int,
+        count: Int,
+        duplicateMain: Boolean,
+    ): TerminalCompletionSourceEntry =
+        TerminalCompletionSourceEntry(
+            source =
+                TerminalCompletionSource {
+                    List(count) { candidateIndex ->
+                        val value = if (duplicateMain && candidateIndex == 0) "main" else "match-$sourceIndex-$candidateIndex"
+                        TerminalCompletionCandidate(
+                            replacementText = value,
+                            replacementStartOffset = 11,
+                            replacementEndOffset = 13,
+                            source = "benchmark-$sourceIndex",
+                            kind = TerminalCompletionCandidateKind.ARGUMENT,
+                            score = count - candidateIndex,
+                            valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                        )
+                    }
+                },
+            priority = sourceIndex.coerceAtMost(15),
+        )
 
     private fun requestFor(
         prefix: String,

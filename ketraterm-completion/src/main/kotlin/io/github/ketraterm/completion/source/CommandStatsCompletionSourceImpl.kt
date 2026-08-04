@@ -56,6 +56,7 @@ internal class CommandStatsCompletionSourceImpl(
     private val feedbackStats = CompletionFeedbackStatsIndex(capacity)
     private var publishedShapeStats: List<TerminalCommandShapeStats> = indexedShapeRankingSnapshot(emptyList())
     private var publishedFeedbackStats: List<TerminalCompletionFeedbackStats> = indexedFeedbackRankingSnapshot(emptyList())
+    private var publishedSnapshot: TerminalCommandCompletionStatsSnapshot = TerminalCommandCompletionStatsSnapshot.EMPTY
 
     /**
      * Replaces every stats family from one host-loaded snapshot.
@@ -81,7 +82,7 @@ internal class CommandStatsCompletionSourceImpl(
      */
     override fun snapshot(): List<TerminalCommandCompletionStats> =
         synchronized(lock) {
-            commandStats.snapshot()
+            publishedSnapshot.commandStats
         }
 
     /**
@@ -111,11 +112,7 @@ internal class CommandStatsCompletionSourceImpl(
      */
     override fun snapshotAll(): TerminalCommandCompletionStatsSnapshot =
         synchronized(lock) {
-            TerminalCommandCompletionStatsSnapshot(
-                commandStats = commandStats.snapshot(),
-                shapeStats = publishedShapeStats,
-                feedbackStats = publishedFeedbackStats,
-            )
+            publishedSnapshot
         }
 
     /**
@@ -152,7 +149,7 @@ internal class CommandStatsCompletionSourceImpl(
                 workingDirectoryUri = workingDirectoryUri,
                 usedAtEpochMillis = usedAtEpochMillis,
             )
-            publishedShapeStats = indexedShapeRankingSnapshot(shapeStats.snapshot())
+            publishLearnedSnapshots()
         }
     }
 
@@ -205,6 +202,12 @@ internal class CommandStatsCompletionSourceImpl(
     private fun publishLearnedSnapshots() {
         publishedShapeStats = indexedShapeRankingSnapshot(shapeStats.snapshot())
         publishedFeedbackStats = indexedFeedbackRankingSnapshot(feedbackStats.snapshot())
+        publishedSnapshot =
+            TerminalCommandCompletionStatsSnapshot(
+                commandStats = commandStats.snapshot(),
+                shapeStats = publishedShapeStats,
+                feedbackStats = publishedFeedbackStats,
+            )
     }
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =

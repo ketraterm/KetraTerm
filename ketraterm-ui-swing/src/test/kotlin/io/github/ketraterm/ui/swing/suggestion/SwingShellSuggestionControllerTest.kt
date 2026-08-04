@@ -182,6 +182,31 @@ class SwingShellSuggestionControllerTest {
         controller.reloadSettings()
 
         assertFalse(controller.state().visible)
+        assertTrue(host.feedbackKinds.isEmpty())
+    }
+
+    @Test
+    fun `passive hide with a selected suggestion records no dismissal`() {
+        val host = RecordingSuggestionHost()
+        val controller = SwingShellSuggestionController(host)
+        controller.show(request(), suggestions(2), selectedIndex = 0)
+
+        controller.hide()
+
+        assertFalse(controller.state().visible)
+        assertTrue(host.feedbackKinds.isEmpty())
+    }
+
+    @Test
+    fun `provider refresh replaces suggestions without negative feedback`() {
+        val host = RecordingSuggestionHost()
+        val controller = SwingShellSuggestionController(host)
+        controller.show(request(), suggestions(2), selectedIndex = 0)
+
+        controller.show(request(commandText = "g"), suggestions(1), selectedIndex = -1)
+
+        assertTrue(controller.state().visible)
+        assertTrue(host.feedbackKinds.isEmpty())
     }
 
     private fun suggestions(

@@ -141,7 +141,7 @@ internal class IntellijGradleTaskProviderFactory(
         }
 
     private companion object {
-        private const val PRIORITY = 150
+        private const val PRIORITY = 15
         private const val SOURCE_ID = "intellij-gradle-task"
     }
 }

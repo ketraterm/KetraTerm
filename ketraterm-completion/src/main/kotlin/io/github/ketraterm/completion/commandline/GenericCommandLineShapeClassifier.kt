@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.commandline
 
+import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.internal.hasTerminalCompletionLineBreak
 import io.github.ketraterm.completion.model.TerminalCommandLineShape
 
@@ -25,9 +26,12 @@ import io.github.ketraterm.completion.model.TerminalCommandLineShape
  * and aggregate argument counts without retaining raw positional argument text.
  */
 internal object GenericCommandLineShapeClassifier {
-    fun classify(commandLine: String): TerminalCommandLineShape? {
+    fun classify(
+        commandLine: String,
+        shellSyntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
+    ): TerminalCommandLineShape? {
         if (commandLine.isBlank() || commandLine.hasTerminalCompletionLineBreak()) return null
-        val tokens = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length).tokens
+        val tokens = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length, shellSyntax).tokens
         var tokenIndex = tokens.firstCommandTokenIndex()
         if (tokenIndex >= tokens.size) return null
 

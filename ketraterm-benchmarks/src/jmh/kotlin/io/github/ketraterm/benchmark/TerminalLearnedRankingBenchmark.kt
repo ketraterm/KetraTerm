@@ -15,32 +15,9 @@
  */
 package io.github.ketraterm.benchmark
 
-import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionEngine
-import io.github.ketraterm.completion.api.TerminalCompletionEngines
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalCompletionSource
-import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
-import io.github.ketraterm.completion.api.TerminalCompletionSources
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
-import io.github.ketraterm.completion.model.TerminalCommandLineShape
-import io.github.ketraterm.completion.model.TerminalCommandShapeStats
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
-import io.github.ketraterm.completion.model.TerminalCompletionTokenPosition
-import org.openjdk.jmh.annotations.Benchmark
-import org.openjdk.jmh.annotations.BenchmarkMode
-import org.openjdk.jmh.annotations.Fork
-import org.openjdk.jmh.annotations.Measurement
-import org.openjdk.jmh.annotations.Mode
-import org.openjdk.jmh.annotations.OutputTimeUnit
-import org.openjdk.jmh.annotations.Scope
-import org.openjdk.jmh.annotations.Setup
-import org.openjdk.jmh.annotations.State
-import org.openjdk.jmh.annotations.Warmup
+import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.*
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
 
@@ -63,18 +40,12 @@ open class TerminalLearnedRankingBenchmark {
         val commandSpecs = TerminalCommandSpecs.defaults()
         statsSource = TerminalCompletionSources.commandStats(capacity = STATS_CAPACITY, commandSpecs = commandSpecs)
         statsSource.replaceSnapshot(fullLearnedSnapshot())
-        val shapeAwareSpecs =
-            TerminalCompletionSources.fromSpecs(commandSpecs) {
-                statsSource.shapeSnapshot()
-            }
-        val learnedSource =
-            TerminalCompletionSources.feedbackAware(shapeAwareSpecs) {
-                statsSource.feedbackSnapshot()
-            }
+        val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
         learnedEngine =
             TerminalCompletionEngines.fromSources(
-                sources = listOf(TerminalCompletionSourceEntry(learnedSource)),
+                sources = listOf(TerminalCompletionSourceEntry(specSource)),
                 commandSpecs = commandSpecs,
+                learnedStatsProvider = statsSource::snapshotAll,
             )
         learnedRequest =
             TerminalCompletionRequest(
@@ -118,6 +89,7 @@ open class TerminalLearnedRankingBenchmark {
     open fun readPublishedLearnedSnapshots(blackhole: Blackhole) {
         blackhole.consume(statsSource.shapeSnapshot())
         blackhole.consume(statsSource.feedbackSnapshot())
+        blackhole.consume(statsSource.snapshotAll())
     }
 
     private fun fullLearnedSnapshot(): TerminalCommandCompletionStatsSnapshot {

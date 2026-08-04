@@ -54,7 +54,9 @@ enum class TerminalCompletionCandidateKind {
  * @property kind semantic candidate category.
  * @property displayText primary text shown in suggestion UI.
  * @property detail optional secondary text explaining the candidate.
- * @property score deterministic ranking score; larger values are better.
+ * @property score source-local relevance before merging and the final fused
+ * ranking score after the merged engine returns the candidate; larger values
+ * are better in either scope.
  * @property valueDomain dynamic value domain for argument candidates supplied by
  * host-owned providers.
  */

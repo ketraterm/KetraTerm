@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.commandline
 
+import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.internal.hasTerminalCompletionLineBreak
 import io.github.ketraterm.completion.model.TerminalCommandLineShape
 import io.github.ketraterm.completion.model.TerminalCommandSpec
@@ -43,15 +44,16 @@ internal object TerminalCommandLineClassifier {
     fun classify(
         commandLine: String,
         specs: List<TerminalCommandSpec>,
+        shellSyntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
     ): TerminalCommandLineClassification? {
         if (commandLine.isBlank() || commandLine.hasTerminalCompletionLineBreak()) return null
-        val tokens = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length).tokens
+        val tokens = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length, shellSyntax).tokens
         var tokenIndex = tokens.firstCommandTokenIndex()
         if (tokenIndex >= tokens.size) return null
 
         val executableToken = normalizeTerminalCommandToken(tokens[tokenIndex].text)
         if (executableToken.isBlank()) return null
-        val rootSpec = CommandSpecResolver.findSpec(specs, executableToken) ?: return classifyWithoutSpec(commandLine)
+        val rootSpec = CommandSpecResolver.findSpec(specs, executableToken) ?: return classifyWithoutSpec(commandLine, shellSyntax)
 
         tokenIndex++
         var currentSpec = rootSpec
@@ -140,8 +142,11 @@ internal object TerminalCommandLineClassifier {
                 .firstOrNull { it.repeatableSubcommands }
                 ?.let { repeatableSource -> CommandSpecResolver.findSpec(repeatableSource.subcommands, normalizedToken) }
 
-    private fun classifyWithoutSpec(commandLine: String): TerminalCommandLineClassification? {
-        val shape = GenericCommandLineShapeClassifier.classify(commandLine) ?: return null
+    private fun classifyWithoutSpec(
+        commandLine: String,
+        shellSyntax: TerminalShellSyntax,
+    ): TerminalCommandLineClassification? {
+        val shape = GenericCommandLineShapeClassifier.classify(commandLine, shellSyntax) ?: return null
         val arguments =
             buildList(shape.positionalArgumentCount + shape.optionValueCount) {
                 repeat(shape.optionValueCount) {

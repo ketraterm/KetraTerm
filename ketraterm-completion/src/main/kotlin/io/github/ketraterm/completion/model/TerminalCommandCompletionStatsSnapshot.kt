@@ -32,4 +32,10 @@ data class TerminalCommandCompletionStatsSnapshot(
     val commandStats: List<TerminalCommandCompletionStats> = emptyList(),
     val shapeStats: List<TerminalCommandShapeStats> = emptyList(),
     val feedbackStats: List<TerminalCompletionFeedbackStats> = emptyList(),
-)
+) {
+    companion object {
+        /** Shared empty learned-statistics snapshot. */
+        @JvmField
+        val EMPTY = TerminalCommandCompletionStatsSnapshot()
+    }
+}

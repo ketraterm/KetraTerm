@@ -24,8 +24,8 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
  *
  * The registry owns host-specific source composition. It creates one
  * [StandaloneCompletionSuggestionProvider] per terminal session, pairs that
- * provider with a session-scoped MRU source, and merges the MRU source ahead of
- * shared static specs. It deliberately lives in `ketraterm-app`; plugin
+ * provider with a session-scoped MRU source, then globally fuses every source
+ * with shared learned evidence. It deliberately lives in `ketraterm-app`; plugin
  * integration should build its own host registry over the shared
  * `ketraterm-completion` sources.
  *
@@ -46,13 +46,7 @@ internal class StandaloneCompletionRegistry(
     /** Immutable command specs shared by standalone completion integration. */
     val commandSpecs = specs.toList()
     private val lock = Any()
-    private val shapeStatsProvider = persistentStatsSource?.let { source -> { source.shapeSnapshot() } }
-    private val specSource =
-        TerminalCompletionSources
-            .fromSpecs(
-                specs = commandSpecs,
-                shapeStatsProvider = shapeStatsProvider,
-            ).let(::feedbackAware)
+    private val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
     private val directoryCompletionService = StandaloneDirectoryCompletionService()
     private val sessionStates = HashMap<String, SessionCompletionState>()
 
@@ -90,14 +84,13 @@ internal class StandaloneCompletionRegistry(
                 sessionStates.put(sessionId, SessionCompletionState(mruSource, fileSystemProvider))
             }
         previous?.close()
-        val rankedMruSource = feedbackAware(mruSource)
         val sources =
             ArrayList<TerminalCompletionSourceEntry>(COMPOSED_SOURCE_CAPACITY).apply {
-                add(TerminalCompletionSourceEntry(rankedMruSource, priority = SESSION_MRU_SOURCE_PRIORITY))
+                add(TerminalCompletionSourceEntry(mruSource, priority = SESSION_MRU_SOURCE_PRIORITY))
                 persistentStatsSource?.let { source ->
                     add(
                         TerminalCompletionSourceEntry(
-                            feedbackAware(source),
+                            source,
                             priority = PERSISTENT_STATS_SOURCE_PRIORITY,
                         ),
                     )
@@ -118,6 +111,9 @@ internal class StandaloneCompletionRegistry(
                 TerminalCompletionEngines.fromSources(
                     sources = sources,
                     commandSpecs = commandSpecs,
+                    learnedStatsProvider =
+                        persistentStatsSource?.let { it::snapshotAll }
+                            ?: { io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot.EMPTY },
                 ),
             contextProvider = {
                 StandaloneCompletionSuggestionContext(
@@ -182,13 +178,6 @@ internal class StandaloneCompletionRegistry(
         directoryCompletionService.close()
     }
 
-    private fun feedbackAware(source: TerminalCompletionSource): TerminalCompletionSource {
-        val statsSource = persistentStatsSource ?: return source
-        return TerminalCompletionSources.feedbackAware(source) {
-            statsSource.feedbackSnapshot()
-        }
-    }
-
     private data class SessionCompletionState(
         val mruSource: TerminalSessionMruCompletionSource,
         val fileSystemProvider: StandaloneAsyncFileSystemProvider,
@@ -202,9 +191,9 @@ internal class StandaloneCompletionRegistry(
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
         private const val COMPOSED_SOURCE_CAPACITY = 4
-        private const val PATH_SOURCE_PRIORITY = 125
-        private const val SESSION_MRU_SOURCE_PRIORITY = 100
-        private const val PERSISTENT_STATS_SOURCE_PRIORITY = 50
+        private const val PATH_SOURCE_PRIORITY = 12
+        private const val SESSION_MRU_SOURCE_PRIORITY = 8
+        private const val PERSISTENT_STATS_SOURCE_PRIORITY = 6
         private const val SPEC_SOURCE_PRIORITY = 0
     }
 }

@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.api
 
 import io.github.ketraterm.completion.engine.MergedCompletionEngine
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 
@@ -26,14 +27,14 @@ object TerminalCompletionEngines {
     /**
      * Creates a deterministic merged engine from prioritized completion sources.
      *
-     * Candidates are deduplicated by replacement range and replacement text.
-     * Ranking combines source priority with command-line context derived from
-     * [commandSpecs], then applies candidate score and stable text tie-breakers
-     * before [TerminalCompletionRequest.maxCandidates] is applied.
+     * Provider-local ranks are fused by projected command outcome with bounded
+     * source priors, command-line context, and learned statistics.
      *
      * @param sources prioritized source registrations.
      * @param commandSpecs command specs used to classify the active command-line
      * position for ranking.
+     * @param learnedStatsProvider supplier for the latest immutable learned
+     * statistics snapshot. It must perform no host I/O.
      * @return merged completion engine.
      */
     @JvmStatic
@@ -41,6 +42,7 @@ object TerminalCompletionEngines {
     fun fromSources(
         sources: List<TerminalCompletionSourceEntry>,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+        learnedStatsProvider: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot.EMPTY },
     ): TerminalCompletionEngine =
         if (sources.isEmpty()) {
             TerminalCompletionEngine.NONE
@@ -48,6 +50,7 @@ object TerminalCompletionEngines {
             MergedCompletionEngine(
                 sources = sources,
                 commandSpecs = commandSpecs,
+                learnedStatsProvider = learnedStatsProvider,
             )
         }
 

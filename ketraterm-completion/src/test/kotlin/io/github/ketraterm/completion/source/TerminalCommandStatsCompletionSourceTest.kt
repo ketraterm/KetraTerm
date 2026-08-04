@@ -20,11 +20,23 @@ import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class TerminalCommandStatsCompletionSourceTest {
+    @Test
+    fun `complete snapshot identity remains stable until mutation`() {
+        val source = TerminalCompletionSources.commandStats()
+
+        val before = source.snapshotAll()
+        assertSame(before, source.snapshotAll())
+
+        source.recordCommandResult("git status", true, null, null, 1)
+
+        val after = source.snapshotAll()
+        assertNotSame(before, after)
+        assertSame(after, source.snapshotAll())
+    }
+
     @Test
     fun `successful command result creates full-line history candidate`() {
         val source = TerminalCompletionSources.commandStats()

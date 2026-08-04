@@ -16,7 +16,7 @@
 package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
+import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
@@ -30,6 +30,55 @@ import java.util.concurrent.TimeUnit
 
 /** Integration tests for IntelliJ completion source composition and lifecycle. */
 class IntellijCompletionRegistryTest {
+    @Test
+    fun `shared evidence orders static specs identically to standalone`() {
+        val snapshot =
+            TerminalCommandCompletionStatsSnapshot(
+                shapeStats =
+                    listOf(
+                        TerminalCommandShapeStats(
+                            shape = TerminalCommandLineShape("git", listOf("switch"), positionalArgumentCount = 1),
+                            profileId = "bash",
+                            workingDirectoryUri = "file:///repo",
+                            acceptedCount = 4,
+                        ),
+                        TerminalCommandShapeStats(
+                            shape = TerminalCommandLineShape("git", listOf("status")),
+                            profileId = "bash",
+                            workingDirectoryUri = "file:///repo",
+                            dismissedCount = 4,
+                        ),
+                    ),
+            )
+        val statsSource = TerminalCompletionSources.commandStats()
+        statsSource.replaceSnapshot(snapshot)
+        val registry =
+            IntellijCompletionRegistry(
+                specs =
+                    listOf(
+                        TerminalCommandSpec(
+                            name = "git",
+                            subcommands = listOf(TerminalCommandSpec("status"), TerminalCommandSpec("switch")),
+                        ),
+                    ),
+                statsSource = statsSource,
+                loadStats = { snapshot },
+            )
+        try {
+            val session =
+                registry.openSession(
+                    context("parity").copy(workingDirectoryUriProvider = { "file:///repo" }),
+                )
+
+            val suggestions = session.provider.suggestions(request("git "))
+
+            assertEquals("switch", suggestions.first().replacementText)
+            assertEquals("spec", suggestions.first().source)
+        } finally {
+            registry.close()
+        }
+    }
+
     @Test
     fun `additional provider factory composes source and closes its resources`() {
         var resourceClosed = false

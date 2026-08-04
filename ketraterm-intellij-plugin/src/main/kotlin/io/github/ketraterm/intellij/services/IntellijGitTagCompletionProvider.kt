@@ -64,7 +64,7 @@ internal class IntellijGitTagProviderFactory(
         }
 
     private companion object {
-        private const val PRIORITY = 140
+        private const val PRIORITY = 13
         private const val SOURCE_ID = "intellij-git-tag"
         private val ALLOWED_COMMAND_NAMES = setOf("checkout", "merge", "rebase")
     }

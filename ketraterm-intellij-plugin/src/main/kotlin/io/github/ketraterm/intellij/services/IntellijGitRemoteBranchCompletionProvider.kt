@@ -64,7 +64,7 @@ internal class IntellijGitRemoteBranchProviderFactory(
         }
 
     private companion object {
-        private const val PRIORITY = 145
+        private const val PRIORITY = 14
         private const val SOURCE_ID = "intellij-git-remote-branch"
         private val ALLOWED_COMMAND_NAMES = setOf("checkout", "merge", "rebase")
     }

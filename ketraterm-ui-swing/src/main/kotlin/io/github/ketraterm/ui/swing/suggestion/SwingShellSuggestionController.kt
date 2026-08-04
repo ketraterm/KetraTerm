@@ -21,9 +21,6 @@ import java.awt.event.KeyEvent
 internal class SwingShellSuggestionController(
     private val host: SwingShellSuggestionHost,
 ) {
-    // TODO(completion-feedback): Distinguish passive popup closure reasons
-    // such as typing, focus loss, provider refresh, and settings changes from
-    // explicit Escape dismissal before feeding negative ranking signals.
     private var suggestions: List<SwingShellSuggestion> = emptyList()
     private var selectedIndex: Int = NO_SELECTION
     private var request: SwingShellSuggestionRequest = SwingShellSuggestionRequest.EMPTY
