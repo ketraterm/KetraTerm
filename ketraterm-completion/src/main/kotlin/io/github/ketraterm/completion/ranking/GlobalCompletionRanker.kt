@@ -16,11 +16,22 @@
 package io.github.ketraterm.completion.ranking
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
+import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.commandline.TerminalCompletionContext
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+
+/** One source's bounded candidate surplus plus stable composition metadata. */
+internal data class CompletionSourceCandidates(
+    val sourceIndex: Int,
+    val priority: Int,
+    val candidates: List<TerminalCompletionCandidate>,
+)
 
 /**
  * Deterministic global evidence-fusion ranker for one merged completion engine.
@@ -42,8 +53,7 @@ internal class GlobalCompletionRanker(
         context: TerminalCompletionContext,
         sourceCandidates: List<CompletionSourceCandidates>,
     ): List<TerminalCompletionCandidate> {
-        val rankingContext = TerminalCompletionRankingContext(context)
-        val aggregates = groupByOutcome(request, context, sourceCandidates, rankingContext)
+        val aggregates = groupByOutcome(request, context, sourceCandidates)
         if (aggregates.isEmpty()) return emptyList()
 
         val learnedIndex = learnedIndexCache.indexFor(learnedStatsProvider(), request.shellCapabilities.syntax)
@@ -59,7 +69,6 @@ internal class GlobalCompletionRanker(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
         sourceCandidates: List<CompletionSourceCandidates>,
-        rankingContext: TerminalCompletionRankingContext,
     ): Map<Any, MutableOutcomeAggregate> {
         val aggregates = LinkedHashMap<Any, MutableOutcomeAggregate>()
         for (sourceResult in sourceCandidates) {
@@ -76,8 +85,8 @@ internal class GlobalCompletionRanker(
                         sourceIndex = sourceResult.sourceIndex,
                         candidateIndex = candidateIndex,
                         localRank = candidateIndex + 1,
-                        sourcePrior = GlobalFusionScoring.sourcePrior(sourceResult.priority),
-                        contextAdjustment = rankingContext.priorityAdjustment(candidate),
+                        sourcePrior = sourceResult.priority.coerceIn(MIN_SOURCE_PRIOR, MAX_SOURCE_PRIOR),
+                        contextAdjustment = semanticAdjustment(context, candidate),
                     )
                 bestByOutcome.putIfAbsent(key, contribution)
             }
@@ -104,7 +113,7 @@ internal class GlobalCompletionRanker(
             var score = 0L
             var strongestContext = Int.MIN_VALUE
             for (contribution in contributions) {
-                score += GlobalFusionScoring.reciprocalRank(contribution.localRank)
+                score += reciprocalRank(contribution.localRank)
                 score += contribution.sourcePrior
                 score += learnedIndex.providerAdjustment(contribution.candidate, request)
                 strongestContext = maxOf(strongestContext, contribution.contextAdjustment)
@@ -162,6 +171,69 @@ internal class GlobalCompletionRanker(
     }
 
     private companion object {
+        private fun reciprocalRank(localRank: Int): Long = RECIPROCAL_RANK_SCALE / (RECIPROCAL_RANK_OFFSET + localRank)
+
+        private fun semanticAdjustment(
+            context: TerminalCompletionContext,
+            candidate: TerminalCompletionCandidate,
+        ): Int =
+            when (context.activePosition) {
+                TerminalCompletionActivePosition.OPERATOR -> 0
+                TerminalCompletionActivePosition.COMMAND ->
+                    when (candidate.kind) {
+                        TerminalCompletionCandidateKind.COMMAND -> STRONG_CONTEXT_BOOST
+                        TerminalCompletionCandidateKind.PATH -> WEAK_CONTEXT_BOOST
+                        TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
+                        else -> 0
+                    }
+                TerminalCompletionActivePosition.SUBCOMMAND ->
+                    when (candidate.kind) {
+                        TerminalCompletionCandidateKind.SUBCOMMAND -> STRONG_CONTEXT_BOOST
+                        TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
+                        TerminalCompletionCandidateKind.PATH -> PATH_CONTEXT_PENALTY
+                        else -> 0
+                    }
+                TerminalCompletionActivePosition.OPTION_NAME ->
+                    when (candidate.kind) {
+                        TerminalCompletionCandidateKind.OPTION -> STRONG_CONTEXT_BOOST
+                        TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
+                        TerminalCompletionCandidateKind.PATH -> PATH_CONTEXT_PENALTY
+                        else -> 0
+                    }
+                TerminalCompletionActivePosition.OPTION_VALUE -> optionValueAdjustment(context, candidate)
+                TerminalCompletionActivePosition.POSITIONAL_ARGUMENT -> positionalAdjustment(context, candidate)
+            }
+
+        private fun optionValueAdjustment(
+            context: TerminalCompletionContext,
+            candidate: TerminalCompletionCandidate,
+        ): Int =
+            when (candidate.kind) {
+                TerminalCompletionCandidateKind.ARGUMENT ->
+                    if (candidate.matchesExpectedDomain(context)) DOMAIN_CONTEXT_BOOST else STRONG_CONTEXT_BOOST
+                TerminalCompletionCandidateKind.PATH ->
+                    if (context.expectedPathKind == TerminalPathArgumentKind.NONE) PATH_CONTEXT_PENALTY else STRONG_CONTEXT_BOOST
+                TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
+                else -> 0
+            }
+
+        private fun positionalAdjustment(
+            context: TerminalCompletionContext,
+            candidate: TerminalCompletionCandidate,
+        ): Int =
+            when (candidate.kind) {
+                TerminalCompletionCandidateKind.ARGUMENT ->
+                    if (candidate.matchesExpectedDomain(context)) DOMAIN_CONTEXT_BOOST else MEDIUM_CONTEXT_BOOST
+                TerminalCompletionCandidateKind.PATH ->
+                    if (context.expectedPathKind == TerminalPathArgumentKind.NONE) 0 else STRONG_CONTEXT_BOOST
+                TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
+                TerminalCompletionCandidateKind.SUBCOMMAND -> PATH_CONTEXT_PENALTY
+                else -> 0
+            }
+
+        private fun TerminalCompletionCandidate.matchesExpectedDomain(context: TerminalCompletionContext): Boolean =
+            context.expectedValueDomain != TerminalCompletionValueDomain.NONE && valueDomain == context.expectedValueDomain
+
         private val REPRESENTATIVE_ORDER =
             compareByDescending<RankedContribution> { it.contextAdjustment }
                 .thenBy { it.replacementLength }
@@ -178,5 +250,16 @@ internal class GlobalCompletionRanker(
                 .thenBy { it.candidate.replacementText }
                 .thenBy { it.sourceIndex }
                 .thenBy { it.candidateIndex }
+
+        private const val MIN_SOURCE_PRIOR = -20
+        private const val MAX_SOURCE_PRIOR = 20
+        private const val RECIPROCAL_RANK_SCALE = 10_000L
+        private const val RECIPROCAL_RANK_OFFSET = 60L
+        private const val DOMAIN_CONTEXT_BOOST = 320
+        private const val STRONG_CONTEXT_BOOST = 160
+        private const val MEDIUM_CONTEXT_BOOST = 80
+        private const val WEAK_CONTEXT_BOOST = 40
+        private const val HISTORY_CONTEXT_PENALTY = -40
+        private const val PATH_CONTEXT_PENALTY = -80
     }
 }

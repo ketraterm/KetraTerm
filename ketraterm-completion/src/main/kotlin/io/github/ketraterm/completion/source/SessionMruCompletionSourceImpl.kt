@@ -18,7 +18,10 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalSessionMruCompletionSource
-import io.github.ketraterm.completion.commandline.*
+import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
+import io.github.ketraterm.completion.commandline.TerminalCommandLineCursorRegion
+import io.github.ketraterm.completion.commandline.TerminalCompletionContext
+import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
@@ -44,7 +47,7 @@ internal class SessionMruCompletionSourceImpl(
     private val lock = Any()
     private val commandHistory: SessionCommandHistory
     private val observedTokens: SessionObservedTokenIndex
-    private val commandSpecs = commandSpecs.toList()
+    override val commandSpecs = commandSpecs.toList()
     private val learnedHistoryIndexCache = LearnedHistoryCandidateIndexCache()
     private var nextSequence = 1L
 
@@ -75,27 +78,19 @@ internal class SessionMruCompletionSourceImpl(
     }
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(
-            request,
-            TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset, request.shellCapabilities.syntax),
-        )
+        complete(request, request.resolveCompletionContext(commandSpecs))
 
     override fun complete(
         request: TerminalCompletionRequest,
-        commandLineContext: TerminalCommandLineContext,
+        context: TerminalCompletionContext,
     ): List<TerminalCompletionCandidate> {
+        val commandLineContext = context.commandLineContext
         if (commandLineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) return emptyList()
         if (commandLineContext.precededByOperator) return emptyList()
-        val completionContext =
-            TerminalCompletionContextResolver.resolve(
-                commandLine = request.commandLine,
-                lineContext = commandLineContext,
-                commandSpecs = commandSpecs,
-            )
         val candidates =
             synchronized(lock) {
                 buildList {
-                    commandHistory.appendCandidates(request, completionContext, this)
+                    commandHistory.appendCandidates(request, context, this)
                     observedTokens.appendCandidates(request, commandLineContext, this)
                 }
             }.toMutableList()
@@ -103,7 +98,7 @@ internal class SessionMruCompletionSourceImpl(
         PersistedHistoryCandidateBuilder.appendCandidates(
             request = request,
             lineContext = commandLineContext,
-            completionContext = completionContext,
+            completionContext = context,
             index = learnedHistoryIndexCache.indexFor(learnedSnapshot, request.shellCapabilities.syntax),
             nowEpochMillis = clockEpochMillis().coerceAtLeast(0L),
             destination = candidates,

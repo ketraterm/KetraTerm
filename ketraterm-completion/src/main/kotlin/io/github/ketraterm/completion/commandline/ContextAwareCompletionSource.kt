@@ -18,12 +18,15 @@ package io.github.ketraterm.completion.commandline
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSource
+import io.github.ketraterm.completion.model.TerminalCommandSpec
 
 /** Internal fast path for sources that can consume a shared lexical context. */
 internal interface ContextAwareCompletionSource : TerminalCompletionSource {
+    val commandSpecs: List<TerminalCommandSpec>
+
     fun complete(
         request: TerminalCompletionRequest,
-        commandLineContext: TerminalCommandLineContext,
+        context: TerminalCompletionContext,
     ): List<TerminalCompletionCandidate>
 }
 
@@ -33,27 +36,27 @@ internal interface ContextAwareCompletionSource : TerminalCompletionSource {
 internal interface CandidateCollectingCompletionSource : ContextAwareCompletionSource {
     fun collectCandidates(
         request: TerminalCompletionRequest,
-        commandLineContext: TerminalCommandLineContext,
+        context: TerminalCompletionContext,
         collectionLimit: Int,
     ): List<TerminalCompletionCandidate>
 }
 
 internal fun TerminalCompletionSource.complete(
     request: TerminalCompletionRequest,
-    commandLineContext: TerminalCommandLineContext,
+    context: TerminalCompletionContext,
 ): List<TerminalCompletionCandidate> =
     when (this) {
-        is ContextAwareCompletionSource -> complete(request, commandLineContext)
+        is ContextAwareCompletionSource -> complete(request, context)
         else -> complete(request)
     }
 
 internal fun TerminalCompletionSource.collectCandidates(
     request: TerminalCompletionRequest,
-    commandLineContext: TerminalCommandLineContext,
+    context: TerminalCompletionContext,
     collectionLimit: Int,
 ): List<TerminalCompletionCandidate> =
     when (this) {
-        is CandidateCollectingCompletionSource -> collectCandidates(request, commandLineContext, collectionLimit)
+        is CandidateCollectingCompletionSource -> collectCandidates(request, context, collectionLimit)
         else -> {
             val collectionRequest =
                 if (request.maxCandidates == collectionLimit) {
@@ -61,6 +64,14 @@ internal fun TerminalCompletionSource.collectCandidates(
                 } else {
                     request.copy(maxCandidates = collectionLimit)
                 }
-            complete(collectionRequest, commandLineContext)
+            complete(collectionRequest, context)
         }
     }
+
+internal fun TerminalCompletionRequest.resolveCompletionContext(commandSpecs: List<TerminalCommandSpec>): TerminalCompletionContext {
+    val lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset, shellCapabilities.syntax)
+    return TerminalCompletionContextResolver.resolve(commandLine, lineContext, commandSpecs)
+}
+
+internal val TerminalCompletionSource.contextCommandSpecs: List<TerminalCommandSpec>?
+    get() = (this as? ContextAwareCompletionSource)?.commandSpecs

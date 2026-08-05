@@ -19,7 +19,10 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
-import io.github.ketraterm.completion.commandline.*
+import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
+import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
+import io.github.ketraterm.completion.commandline.TerminalCompletionContext
+import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -41,29 +44,16 @@ internal class FuzzyPathCompletionSource(
     private val allowedCommandNames: Set<String>,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
 ) : ContextAwareCompletionSource {
-    private val commandSpecs = commandSpecs.toList()
+    override val commandSpecs = commandSpecs.toList()
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(
-            request,
-            TerminalCommandLineTokenizer.parse(
-                request.commandLine,
-                request.cursorOffset,
-                request.shellCapabilities.syntax,
-            ),
-        )
+        complete(request, request.resolveCompletionContext(commandSpecs))
 
     override fun complete(
         request: TerminalCompletionRequest,
-        commandLineContext: TerminalCommandLineContext,
+        context: TerminalCompletionContext,
     ): List<TerminalCompletionCandidate> {
         if (request.workingDirectoryUri == null) return emptyList()
-        val context =
-            TerminalCompletionContextResolver.resolve(
-                commandLine = request.commandLine,
-                lineContext = commandLineContext,
-                commandSpecs = commandSpecs,
-            )
         if (allowedCommandNames.isNotEmpty() && context.currentCommand?.name !in allowedCommandNames) {
             return emptyList()
         }

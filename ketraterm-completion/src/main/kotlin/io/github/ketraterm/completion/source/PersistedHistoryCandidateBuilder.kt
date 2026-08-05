@@ -23,7 +23,6 @@ import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
 import io.github.ketraterm.completion.internal.isRelativeCdCommand
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.ranking.LearnedEvidenceScoring
-import io.github.ketraterm.completion.ranking.TerminalCompletionScoreAdjustment
 
 /** Builds learned fallback candidates from persisted positive command evidence. */
 internal object PersistedHistoryCandidateBuilder {
@@ -63,22 +62,25 @@ internal object PersistedHistoryCandidateBuilder {
         request: TerminalCompletionRequest,
         nowEpochMillis: Long,
     ): Int {
-        val counterScore =
+        var score =
             BASE_SCORE.toLong() +
-                TerminalCompletionScoreAdjustment.counterContribution(SCORE_POLICY, useCount, USE_COUNT_SCORE) +
-                TerminalCompletionScoreAdjustment.counterContribution(SCORE_POLICY, successCount, SUCCESS_COUNT_SCORE) +
-                TerminalCompletionScoreAdjustment.counterContribution(SCORE_POLICY, failureCount, -FAILURE_COUNT_PENALTY) +
-                TerminalCompletionScoreAdjustment.counterContribution(SCORE_POLICY, acceptedCount, ACCEPTED_COUNT_SCORE) +
-                TerminalCompletionScoreAdjustment.counterContribution(SCORE_POLICY, dismissedCount, -DISMISSED_COUNT_PENALTY) +
+                counterScore(useCount, USE_COUNT_SCORE) +
+                counterScore(successCount, SUCCESS_COUNT_SCORE) +
+                counterScore(failureCount, -FAILURE_COUNT_PENALTY) +
+                counterScore(acceptedCount, ACCEPTED_COUNT_SCORE) +
+                counterScore(dismissedCount, -DISMISSED_COUNT_PENALTY) +
                 LearnedEvidenceScoring.recencyBoost(nowEpochMillis, lastUsedEpochMillis)
-        return TerminalCompletionScoreAdjustment.score(
-            policy = SCORE_POLICY,
-            request = request,
-            profileId = profileId,
-            workingDirectoryUri = workingDirectoryUri,
-            counterScore = counterScore,
-        )
+        if (profileId != null && profileId == request.profileId) score += PROFILE_MATCH_SCORE
+        if (workingDirectoryUri != null && workingDirectoryUri == request.workingDirectoryUri) {
+            score += WORKING_DIRECTORY_MATCH_SCORE
+        }
+        return score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
     }
+
+    private fun counterScore(
+        count: Int,
+        scorePerUnit: Int,
+    ): Long = minOf(count, MAX_COUNTER_SCORE_UNITS).toLong() * scorePerUnit.toLong()
 
     private const val SOURCE_MRU = "mru"
     private const val BASE_SCORE = 620
@@ -90,12 +92,4 @@ internal object PersistedHistoryCandidateBuilder {
     private const val MAX_COUNTER_SCORE_UNITS = 50
     private const val PROFILE_MATCH_SCORE = 50
     private const val WORKING_DIRECTORY_MATCH_SCORE = 80
-    private val SCORE_POLICY =
-        TerminalCompletionScoreAdjustment.Policy(
-            maxCounterScoreUnits = MAX_COUNTER_SCORE_UNITS,
-            minScoreAdjustment = Int.MIN_VALUE,
-            maxScoreAdjustment = Int.MAX_VALUE,
-            profileMatchBoost = PROFILE_MATCH_SCORE,
-            workingDirectoryMatchBoost = WORKING_DIRECTORY_MATCH_SCORE,
-        )
 }

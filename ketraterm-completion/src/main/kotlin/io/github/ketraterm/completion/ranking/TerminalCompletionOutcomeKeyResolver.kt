@@ -21,11 +21,9 @@ import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.commandline.TerminalCommandLineClassifier
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
-import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.commandline.TerminalCompletionContext
 import io.github.ketraterm.completion.internal.commandLineAfterCandidate
 import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 /** Resolves source-independent keys for candidate outcomes and learned commands. */
@@ -62,30 +60,9 @@ internal class TerminalCompletionOutcomeKeyResolver(
                 pathTokenIndex = projectedContext.activeTokenIndex,
                 pathAware = pathAware,
             ) ?: return null
-        val family =
-            classification
-                .shape
-                .let { shape ->
-                    buildList(1 + shape.subcommands.size) {
-                        add(shape.executable)
-                        addAll(shape.subcommands)
-                    }
-                }
-        val valueDomain =
-            candidate.valueDomain.takeUnless { it == TerminalCompletionValueDomain.NONE }
-                ?: context.expectedValueDomain
         return ResolvedCompletionOutcome(
-            groupKey =
-                CompletionOutcomeGroupKey(
-                    shellSyntax = request.shellCapabilities.syntax,
-                    tokens = learnedKey.tokens,
-                    commandFamily = family,
-                    activePosition = context.activePosition,
-                    valueDomain = valueDomain,
-                    pathTokenIndex = learnedKey.pathTokenIndex,
-                ),
+            groupKey = learnedKey.tokens,
             learnedKey = learnedKey,
-            commandLine = commandLine,
             shape = classification.shape,
         )
     }
@@ -141,19 +118,9 @@ internal class TerminalCompletionOutcomeKeyResolver(
 }
 
 internal data class ResolvedCompletionOutcome(
-    val groupKey: CompletionOutcomeGroupKey,
+    val groupKey: List<String>,
     val learnedKey: LearnedCompletionOutcomeKey,
-    val commandLine: String,
     val shape: io.github.ketraterm.completion.model.TerminalCommandLineShape?,
-)
-
-internal data class CompletionOutcomeGroupKey(
-    val shellSyntax: TerminalShellSyntax,
-    val tokens: List<String>,
-    val commandFamily: List<String>,
-    val activePosition: TerminalCompletionActivePosition,
-    val valueDomain: TerminalCompletionValueDomain,
-    val pathTokenIndex: Int,
 )
 
 internal data class LearnedCompletionOutcomeKey(

@@ -88,76 +88,35 @@ object TerminalCompletionTriggerEvaluator {
 
         val lastChar = commandLine.getOrNull(cursorOffset - 1) ?: return false
 
-        // 1. Hyphen option trigger (e.g. '-')
-        if (lastChar == '-') return true
+        if (lastChar == '-' || lastChar == '/' || lastChar == '\\' || lastChar == '$') return true
+        if (lastChar != '=' && lastChar != ' ') return false
+        val previousChar = commandLine.getOrNull(cursorOffset - 2)
+        if (lastChar == ' ' && (previousChar == null || previousChar == ' ')) return false
 
-        // 2. Attached option value trigger (e.g. '--output=')
-        if (lastChar == '=') {
-            return hasContextualValueCompletions(commandLine, lineContext, commandSpecs)
-        }
-
-        // 3. Path separator trigger (e.g. '/' or '\')
-        if (lastChar == '/' || lastChar == '\\') return true
-
-        // 4. Environment variable trigger (e.g. '$')
-        if (lastChar == '$') return true
-
-        // 5. Context-aware finished-word space trigger
-        if (lastChar == ' ') {
-            val prevChar = commandLine.getOrNull(cursorOffset - 2)
-            if (prevChar != null && prevChar != ' ') {
-                return isContextualSpaceTrigger(commandLine, lineContext, commandSpecs)
-            }
-        }
-
-        return false
-    }
-
-    private fun isContextualSpaceTrigger(
-        commandLine: String,
-        lineContext: TerminalCommandLineContext,
-        commandSpecs: List<TerminalCommandSpec>,
-    ): Boolean {
         val context =
             TerminalCompletionContextResolver.resolve(
                 commandLine = commandLine,
                 lineContext = lineContext,
                 commandSpecs = commandSpecs,
             )
+        if (lastChar == '=') {
+            return context.activePosition == TerminalCompletionActivePosition.OPTION_VALUE && context.hasValueCandidates()
+        }
         return when (context.activePosition) {
             TerminalCompletionActivePosition.OPERATOR -> false
             TerminalCompletionActivePosition.COMMAND -> false
             TerminalCompletionActivePosition.SUBCOMMAND -> context.subcommandCandidateSource != null
             TerminalCompletionActivePosition.OPTION_NAME -> false
-            TerminalCompletionActivePosition.OPTION_VALUE ->
-                context.staticValueCandidates.isNotEmpty() ||
-                    context.expectedPathKind != TerminalPathArgumentKind.NONE ||
-                    context.expectedValueDomain != TerminalCompletionValueDomain.NONE
-            TerminalCompletionActivePosition.POSITIONAL_ARGUMENT ->
-                context.staticValueCandidates.isNotEmpty() ||
-                    context.expectedPathKind != TerminalPathArgumentKind.NONE ||
-                    context.expectedValueDomain != TerminalCompletionValueDomain.NONE
+            TerminalCompletionActivePosition.OPTION_VALUE,
+            TerminalCompletionActivePosition.POSITIONAL_ARGUMENT,
+            -> context.hasValueCandidates()
         }
     }
 
-    private fun hasContextualValueCompletions(
-        commandLine: String,
-        lineContext: TerminalCommandLineContext,
-        commandSpecs: List<TerminalCommandSpec>,
-    ): Boolean {
-        val context =
-            TerminalCompletionContextResolver.resolve(
-                commandLine = commandLine,
-                lineContext = lineContext,
-                commandSpecs = commandSpecs,
-            )
-        return context.activePosition == TerminalCompletionActivePosition.OPTION_VALUE &&
-            (
-                context.staticValueCandidates.isNotEmpty() ||
-                    context.expectedPathKind != TerminalPathArgumentKind.NONE ||
-                    context.expectedValueDomain != TerminalCompletionValueDomain.NONE
-            )
-    }
+    private fun TerminalCompletionContext.hasValueCandidates(): Boolean =
+        staticValueCandidates.isNotEmpty() ||
+            expectedPathKind != TerminalPathArgumentKind.NONE ||
+            expectedValueDomain != TerminalCompletionValueDomain.NONE
 
     private fun nonWhitespaceCount(text: String): Int {
         var count = 0

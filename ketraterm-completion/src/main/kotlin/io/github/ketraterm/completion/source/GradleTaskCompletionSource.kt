@@ -19,7 +19,10 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalGradleTask
-import io.github.ketraterm.completion.commandline.*
+import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
+import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
+import io.github.ketraterm.completion.commandline.TerminalCompletionContext
+import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.GradleCompletionSyntax
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandSpec
@@ -36,32 +39,19 @@ internal class GradleTaskCompletionSource(
     private val tasksProvider: () -> List<TerminalGradleTask>,
     commandSpecs: List<TerminalCommandSpec>,
 ) : ContextAwareCompletionSource {
-    private val commandSpecs = commandSpecs.toList()
+    override val commandSpecs = commandSpecs.toList()
 
     init {
         require(sourceId.isNotBlank()) { "sourceId must not be blank" }
     }
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(
-            request,
-            TerminalCommandLineTokenizer.parse(
-                request.commandLine,
-                request.cursorOffset,
-                request.shellCapabilities.syntax,
-            ),
-        )
+        complete(request, request.resolveCompletionContext(commandSpecs))
 
     override fun complete(
         request: TerminalCompletionRequest,
-        commandLineContext: TerminalCommandLineContext,
+        context: TerminalCompletionContext,
     ): List<TerminalCompletionCandidate> {
-        val context =
-            TerminalCompletionContextResolver.resolve(
-                commandLine = request.commandLine,
-                lineContext = commandLineContext,
-                commandSpecs = commandSpecs,
-            )
         if (context.command?.name != GradleCompletionSyntax.COMMAND_NAME ||
             context.activePosition != TerminalCompletionActivePosition.SUBCOMMAND
         ) {

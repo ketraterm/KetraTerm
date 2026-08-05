@@ -18,8 +18,6 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.model.*
-import io.github.ketraterm.completion.ranking.indexedFeedbackRankingSnapshot
-import io.github.ketraterm.completion.ranking.indexedShapeRankingSnapshot
 import io.github.ketraterm.completion.stats.CommandCompletionStatsIndex
 import io.github.ketraterm.completion.stats.CommandShapeStatsIndex
 import io.github.ketraterm.completion.stats.CompletionFeedbackStatsIndex
@@ -48,8 +46,6 @@ internal class CommandStatsCompletionSourceImpl(
     private val commandStats = CommandCompletionStatsIndex(capacity)
     private val shapeStats = CommandShapeStatsIndex(capacity, commandSpecs)
     private val feedbackStats = CompletionFeedbackStatsIndex(capacity)
-    private var publishedShapeStats: List<TerminalCommandShapeStats> = indexedShapeRankingSnapshot(emptyList())
-    private var publishedFeedbackStats: List<TerminalCompletionFeedbackStats> = indexedFeedbackRankingSnapshot(emptyList())
     private var publishedSnapshot: TerminalCommandCompletionStatsSnapshot = TerminalCommandCompletionStatsSnapshot.EMPTY
 
     /**
@@ -86,7 +82,7 @@ internal class CommandStatsCompletionSourceImpl(
      */
     override fun shapeSnapshot(): List<TerminalCommandShapeStats> =
         synchronized(lock) {
-            publishedShapeStats
+            publishedSnapshot.shapeStats
         }
 
     /**
@@ -96,7 +92,7 @@ internal class CommandStatsCompletionSourceImpl(
      */
     override fun feedbackSnapshot(): List<TerminalCompletionFeedbackStats> =
         synchronized(lock) {
-            publishedFeedbackStats
+            publishedSnapshot.feedbackStats
         }
 
     /**
@@ -194,13 +190,11 @@ internal class CommandStatsCompletionSourceImpl(
     }
 
     private fun publishLearnedSnapshots() {
-        publishedShapeStats = indexedShapeRankingSnapshot(shapeStats.snapshot())
-        publishedFeedbackStats = indexedFeedbackRankingSnapshot(feedbackStats.snapshot())
         publishedSnapshot =
             TerminalCommandCompletionStatsSnapshot(
                 commandStats = commandStats.snapshot(),
-                shapeStats = publishedShapeStats,
-                feedbackStats = publishedFeedbackStats,
+                shapeStats = shapeStats.snapshot(),
+                feedbackStats = feedbackStats.snapshot(),
             )
     }
 

@@ -16,9 +16,14 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
+import io.github.ketraterm.completion.commandline.TerminalCompletionContext
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class MergedCompletionEngineTest {
@@ -470,6 +475,37 @@ class MergedCompletionEngineTest {
 
         assertTrue(candidates.isEmpty())
         assertEquals(0, sourceCalls)
+    }
+
+    @Test
+    fun `sources with the same command specs share one resolved context`() {
+        val contexts = ArrayList<TerminalCompletionContext>()
+        val specs = TerminalCommandSpecs.defaults()
+        val source =
+            object : ContextAwareCompletionSource {
+                override val commandSpecs: List<TerminalCommandSpec> = specs
+
+                override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
+                    error("Merged engine must use the resolved-context path")
+
+                override fun complete(
+                    request: TerminalCompletionRequest,
+                    context: TerminalCompletionContext,
+                ): List<TerminalCompletionCandidate> {
+                    contexts += context
+                    return emptyList()
+                }
+            }
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                sources = listOf(entry(source, 0), entry(source, 0)),
+                commandSpecs = specs,
+            )
+
+        engine.complete(request(commandLine = "git --", maxCandidates = 8))
+
+        assertEquals(2, contexts.size)
+        assertSame(contexts[0], contexts[1])
     }
 
     private fun entry(

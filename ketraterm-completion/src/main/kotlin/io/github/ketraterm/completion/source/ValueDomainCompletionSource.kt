@@ -19,9 +19,8 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
-import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
-import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
-import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
+import io.github.ketraterm.completion.commandline.TerminalCompletionContext
+import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
@@ -49,7 +48,7 @@ internal class ValueDomainCompletionSource(
     private val allowedCommandNames: Set<String>,
     commandSpecs: List<TerminalCommandSpec>,
 ) : ContextAwareCompletionSource {
-    private val commandSpecs = commandSpecs.toList()
+    override val commandSpecs = commandSpecs.toList()
 
     init {
         require(domain != TerminalCompletionValueDomain.NONE) { "domain must not be NONE" }
@@ -66,34 +65,21 @@ internal class ValueDomainCompletionSource(
      * cursor does not expect [domain].
      */
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(
-            request,
-            TerminalCommandLineTokenizer.parse(
-                request.commandLine,
-                request.cursorOffset,
-                request.shellCapabilities.syntax,
-            ),
-        )
+        complete(request, request.resolveCompletionContext(commandSpecs))
 
     /**
-     * Returns candidates using an already-tokenized command-line context.
+     * Returns candidates using the engine's already-resolved command context.
      *
      * @param request immutable completion request.
-     * @param commandLineContext tokenized context corresponding to [request].
+     * @param context resolved context corresponding to [request].
      * @return ranked candidates bounded by
      * [TerminalCompletionRequest.maxCandidates], or an empty list when the
      * cursor does not expect [domain].
      */
     override fun complete(
         request: TerminalCompletionRequest,
-        commandLineContext: TerminalCommandLineContext,
+        context: TerminalCompletionContext,
     ): List<TerminalCompletionCandidate> {
-        val context =
-            TerminalCompletionContextResolver.resolve(
-                commandLine = request.commandLine,
-                lineContext = commandLineContext,
-                commandSpecs = commandSpecs,
-            )
         if (context.expectedValueDomain != domain ||
             (allowedCommandNames.isNotEmpty() && context.currentCommand?.name !in allowedCommandNames)
         ) {

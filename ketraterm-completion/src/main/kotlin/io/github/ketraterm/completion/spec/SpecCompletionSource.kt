@@ -26,29 +26,20 @@ import io.github.ketraterm.completion.model.TerminalOptionSpec
 internal class SpecCompletionSource(
     specs: List<TerminalCommandSpec>,
 ) : ContextAwareCompletionSource {
-    private val specs = specs.toList()
+    override val commandSpecs = specs.toList()
 
     init {
         require(specs.none { it.name.isBlank() }) { "specs must not contain blank command names" }
     }
 
     override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(
-            request,
-            TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset, request.shellCapabilities.syntax),
-        )
+        complete(request, request.resolveCompletionContext(commandSpecs))
 
     override fun complete(
         request: TerminalCompletionRequest,
-        commandLineContext: TerminalCommandLineContext,
+        context: TerminalCompletionContext,
     ): List<TerminalCompletionCandidate> {
-        if (specs.isEmpty()) return emptyList()
-        val context =
-            TerminalCompletionContextResolver.resolve(
-                commandLine = request.commandLine,
-                lineContext = commandLineContext,
-                commandSpecs = specs,
-            )
+        if (commandSpecs.isEmpty()) return emptyList()
         val candidates =
             when (context.activePosition) {
                 TerminalCompletionActivePosition.OPERATOR -> emptyList()
@@ -64,7 +55,7 @@ internal class SpecCompletionSource(
     }
 
     private fun completeCommands(context: TerminalCommandLineContext): List<TerminalCompletionCandidate> =
-        specs
+        commandSpecs
             .asSequence()
             .filter { matchesCompletablePrefix(it.name, context.activePrefix) }
             .mapIndexed { orderIndex, spec ->

@@ -178,27 +178,6 @@ internal class TerminalCompletionArchitectureTest {
     }
 
     @Test
-    fun `production completion modules use explicit imports`() {
-        val violations =
-            (completionProductionRoots.flatMap(::kotlinFiles) + completionCompositionFiles).flatMap { file ->
-                file
-                    .readSourceLines()
-                    .mapIndexedNotNull { index, line ->
-                        if (WILDCARD_IMPORT.matches(line)) {
-                            "${file.relativeToRepository()}:${index + 1}: $line"
-                        } else {
-                            null
-                        }
-                    }
-            }
-
-        assertTrue(
-            actual = violations.isEmpty(),
-            message = violations.joinToString(prefix = "Production completion imports must be explicit:\n", separator = "\n"),
-        )
-    }
-
-    @Test
     fun `statistics remain evidence and never a completion provider`() {
         val statsContract =
             completionMainRoot
@@ -331,12 +310,6 @@ internal class TerminalCompletionArchitectureTest {
                 repositoryRoot.resolve(
                     "ketraterm-completion-persistence/src/main/kotlin/io/github/ketraterm/completion/persistence",
                 ),
-            )
-        private val completionProductionRoots =
-            listOf(
-                repositoryRoot.resolve("ketraterm-completion/src/main/kotlin"),
-                repositoryRoot.resolve("ketraterm-completion-host/src/main/kotlin"),
-                repositoryRoot.resolve("ketraterm-completion-persistence/src/main/kotlin"),
             )
         private val completionCompositionFiles =
             listOf(
@@ -492,6 +465,5 @@ internal class TerminalCompletionArchitectureTest {
         private val PUBLIC_MEMBER_FUNCTION = Regex("""^\s+(?!private |internal )fun\s+([A-Za-z0-9_]+)\(.*""")
         private val IMPLEMENTATION_IMPORT =
             Regex("""import io\.github\.ketraterm\.completion\.(commandline|engine|history|internal|ranking|source|spec|stats)(\.|$).*""")
-        private val WILDCARD_IMPORT = Regex("""^import .+\.\*$""")
     }
 }

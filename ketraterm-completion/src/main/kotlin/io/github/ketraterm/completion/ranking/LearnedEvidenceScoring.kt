@@ -15,6 +15,80 @@
  */
 package io.github.ketraterm.completion.ranking
 
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCommandShapeStats
+import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
+
+/** Saturating aggregate shared by exact, shape, and provider learning. */
+internal data class LearnedEvidenceCounts(
+    var useCount: Long = 0,
+    var successCount: Long = 0,
+    var failureCount: Long = 0,
+    var acceptedCount: Long = 0,
+    var dismissedCount: Long = 0,
+    var lastUsedEpochMillis: Long = 0,
+) {
+    private fun add(
+        useCount: Int,
+        successCount: Int,
+        failureCount: Int,
+        acceptedCount: Int,
+        dismissedCount: Int,
+        lastUsedEpochMillis: Long,
+    ) {
+        this.useCount = saturatedAdd(this.useCount, useCount.toLong())
+        this.successCount = saturatedAdd(this.successCount, successCount.toLong())
+        this.failureCount = saturatedAdd(this.failureCount, failureCount.toLong())
+        this.acceptedCount = saturatedAdd(this.acceptedCount, acceptedCount.toLong())
+        this.dismissedCount = saturatedAdd(this.dismissedCount, dismissedCount.toLong())
+        this.lastUsedEpochMillis = maxOf(this.lastUsedEpochMillis, lastUsedEpochMillis)
+    }
+
+    private fun addFeedback(row: TerminalCompletionFeedbackStats) {
+        acceptedCount = saturatedAdd(acceptedCount, row.acceptedCount.toLong())
+        dismissedCount = saturatedAdd(dismissedCount, row.dismissedCount.toLong())
+        lastUsedEpochMillis = maxOf(lastUsedEpochMillis, row.lastUsedEpochMillis)
+    }
+
+    companion object {
+        fun fromCommands(rows: List<TerminalCommandCompletionStats>): LearnedEvidenceCounts =
+            LearnedEvidenceCounts().also { counts ->
+                for (row in rows) {
+                    counts.add(
+                        row.useCount,
+                        row.successCount,
+                        row.failureCount,
+                        row.acceptedCount,
+                        row.dismissedCount,
+                        row.lastUsedEpochMillis,
+                    )
+                }
+            }
+
+        fun fromShapes(rows: List<TerminalCommandShapeStats>): LearnedEvidenceCounts =
+            LearnedEvidenceCounts().also { counts ->
+                for (row in rows) {
+                    counts.add(
+                        row.useCount,
+                        row.successCount,
+                        row.failureCount,
+                        row.acceptedCount,
+                        row.dismissedCount,
+                        row.lastUsedEpochMillis,
+                    )
+                }
+            }
+
+        fun fromFeedback(rows: List<TerminalCompletionFeedbackStats>): LearnedEvidenceCounts =
+            LearnedEvidenceCounts().also { counts -> rows.forEach(counts::addFeedback) }
+
+        private fun saturatedAdd(
+            left: Long,
+            right: Long,
+        ): Long = if (Long.MAX_VALUE - left < right) Long.MAX_VALUE else left + right
+    }
+}
+
 /** Documented numeric policy for exact, shape, provider, and recency learning. */
 internal object LearnedEvidenceScoring {
     fun exact(

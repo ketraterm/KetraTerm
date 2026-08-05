@@ -63,7 +63,8 @@ replacement ranges, and shell-safe quoting. It requires typed path text by defau
 such as Git status paths may opt in to empty-prefix suggestions.
 
 `TerminalCompletionContextResolver` is the shared internal command-line context
-resolver. Sources and the global ranker should use it instead of independently
+resolver. The merged engine resolves once per distinct command-spec set and passes
+that immutable context to every matching source and the global ranker instead of independently
 guessing command position, subcommand position, option-name position,
 option-value position, positional-argument position, active option metadata,
 expected path kind, expected dynamic value domain, repeatable subcommand source,
@@ -94,13 +95,11 @@ workspace, Swing UI, or future plugin code:
 Top-level declarations in those packages should be `internal` unless a product
 decision explicitly promotes a type into `api` or `model`.
 
-Implementation files follow responsibility boundaries rather than accumulating
-nested helpers in orchestration classes. Session MRU coordinates independent
+Implementation files follow the completion request directly. Session MRU coordinates independent
 bounded command-history and observed-token indexes, projects learned commands
-into the active replacement range, and recovers positive persisted commands as one learned fallback stream. Learned ranking separates
-snapshot identity caching, index construction, context selection, saturating
-counter aggregation, and numeric scoring policy. Global fusion owns only
-outcome grouping, representative selection, and deterministic final ordering.
+into the active replacement range, and recovers positive persisted commands as one learned fallback stream. One identity-cached
+learned-evidence index owns exact, shape, and provider lookups; one scoring policy owns bounded counter math. Global fusion owns
+outcome grouping, semantic relevance, representative selection, and deterministic final ordering.
 Public directory snapshot, path resolution, scan contracts, and bounded scan
 implementations each live in their matching file in `ketraterm-completion-host`.
 
@@ -288,12 +287,10 @@ deduplicate, and rank candidates.
 `ketraterm-completion` must stay pure: it should not shell out to Git, read IDE
 indexes, watch files, or block on host I/O.
 
-Learned statistics publish immutable list snapshots for persistence together
-with internal ranking indexes built at mutation time. Repeated completion
-requests therefore reuse direct source/kind/position/context feedback lookup
-and executable-family shape lookup instead of copying or scanning all retained
-rows. External snapshot suppliers retain the same public list contract and are
-indexed lazily once per stable list identity.
+Learned statistics publish one immutable snapshot instance after each mutation.
+The ranker builds one direct exact/shape/provider lookup per snapshot identity
+and shell syntax, then reuses it for subsequent requests. There are no indexed
+list wrappers or a second mutation-time ranking-index hierarchy.
 
 Positive persisted command rows also have a snapshot-identity and shell-syntax
 index. It groups rows by normalized tokens before the active position and
@@ -339,8 +336,8 @@ do not constitute a source entry, so the same command execution cannot gain a
 second provider vote merely because it exists in both MRU and persisted stats.
 Duplicate candidates from the same source do not multiply support.
 
-`TerminalCompletionRankingContext` supplies the strongest semantic adjustment
-among contributors. Exact outcome statistics then add bounded usage,
+The global ranker applies the strongest semantic adjustment among contributors.
+Exact outcome statistics then add bounded usage,
 success/failure, accepted/dismissed, recency, profile, and working-directory
 evidence. Command-shape evidence supplies a weaker fallback for outcomes with
 no exact history. Feedback ratios use smoothing so one event cannot overwhelm
