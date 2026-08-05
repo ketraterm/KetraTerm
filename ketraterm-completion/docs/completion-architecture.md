@@ -164,10 +164,12 @@ segments following an operator until segment-local history ownership is
 implemented; replacing across an operator boundary is never inferred.
 
 The exact shell option terminator `--` is a command-context boundary once the
-cursor has passed the complete token. Tokens after it remain positional: they do
+cursor has moved beyond the token, such as after a following space. While the
+cursor remains attached to `--`, it is a long-option prefix and may suggest
+options such as `--help`. Tokens after a passed terminator remain positional: they do
 not resolve as options, option values, or subcommands, and static spec option
 completion stops. An incomplete prefix such as `--v` remains an option prefix
-until the complete terminator token is entered.
+until the terminator token has been passed.
 
 Path completion is intentionally conservative. In command position it only
 returns candidates for explicitly path-like prefixes. In argument position it

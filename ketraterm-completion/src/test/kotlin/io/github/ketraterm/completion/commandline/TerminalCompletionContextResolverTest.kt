@@ -39,6 +39,41 @@ class TerminalCompletionContextResolverTest {
     }
 
     @Test
+    fun `active double dash remains an option prefix`() {
+        val context = resolve("git --")
+
+        assertEquals(TerminalCompletionActivePosition.OPTION_NAME, context.activePosition)
+        assertEquals(false, context.optionsTerminated)
+        assertEquals("--", context.activePrefix)
+    }
+
+    @Test
+    fun `double dash terminates options after the cursor passes its token`() {
+        val context = resolve("git -- ")
+
+        assertEquals(TerminalCompletionActivePosition.POSITIONAL_ARGUMENT, context.activePosition)
+        assertEquals(true, context.optionsTerminated)
+        assertEquals("", context.activePrefix)
+    }
+
+    @Test
+    fun `double dash at a mid-line cursor remains an option prefix`() {
+        val commandLine = "git -- status"
+        val context =
+            TerminalCompletionContextResolver.resolve(
+                commandLine = commandLine,
+                cursorOffset = "git --".length,
+                commandSpecs = specs,
+            )
+
+        assertEquals(TerminalCompletionActivePosition.OPTION_NAME, context.activePosition)
+        assertEquals(false, context.optionsTerminated)
+        assertEquals("--", context.activePrefix)
+        assertEquals(4, context.replacementStartOffset)
+        assertEquals(6, context.replacementEndOffset)
+    }
+
+    @Test
     fun `option terminator makes the active token positional`() {
         val context = resolve("git -- --help")
 

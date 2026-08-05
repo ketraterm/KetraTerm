@@ -64,6 +64,14 @@ class StandaloneCompletionSuggestionProviderTest {
     }
 
     @Test
+    fun `active double dash offers long options`() {
+        val suggestions = provider().suggestions(request("git --"))
+
+        assertEquals(listOf("--help"), suggestions.map { it.replacementText })
+        assertEquals(listOf("OPTION"), suggestions.map { it.kind })
+    }
+
+    @Test
     fun `passes standalone context to completion engine`() {
         val requests = ArrayList<TerminalCompletionRequest>()
         val provider =

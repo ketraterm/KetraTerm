@@ -49,7 +49,6 @@ object TerminalCompletionTriggerEvaluator {
     ): Boolean {
         val lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset, shellCapabilities.syntax)
         if (lineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) return false
-        if (lineContext.activePrefix == OPTION_TERMINATOR) return false
         if (isLiveTrigger(commandLine, cursorOffset, commandSpecs, lineContext)) return true
         return nonWhitespaceCount(lineContext.commandPrefix(commandLine)) >= minimumNonWhitespaceCharacters
     }
@@ -74,7 +73,6 @@ object TerminalCompletionTriggerEvaluator {
     ): Boolean {
         val lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset, shellCapabilities.syntax)
         if (lineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) return false
-        if (lineContext.activePrefix == OPTION_TERMINATOR) return false
         return isLiveTrigger(commandLine, cursorOffset, commandSpecs, lineContext)
     }
 
@@ -170,6 +168,4 @@ object TerminalCompletionTriggerEvaluator {
         }
         return count
     }
-
-    private const val OPTION_TERMINATOR = "--"
 }

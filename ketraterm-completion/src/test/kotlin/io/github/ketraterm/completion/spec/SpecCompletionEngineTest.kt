@@ -86,9 +86,17 @@ class SpecCompletionEngineTest {
     }
 
     @Test
-    fun `option terminator stops option completion`() {
-        assertTrue(engine().complete(request("git --")).isEmpty())
+    fun `active double dash suggests long options until cursor passes the token`() {
+        assertEquals(
+            listOf("--help", "--version"),
+            engine().complete(request("git --")).map { it.replacementText },
+        )
+        assertTrue(engine().complete(request("git -- ")).isEmpty())
         assertTrue(engine().complete(request("git -- --v")).isEmpty())
+
+        val midLineCandidates = engine().complete(request("git -- status", cursorOffset = "git --".length))
+        assertEquals(listOf("--help", "--version"), midLineCandidates.map { it.replacementText })
+        assertTrue(midLineCandidates.all { it.replacementStartOffset == 4 && it.replacementEndOffset == 6 })
     }
 
     @Test

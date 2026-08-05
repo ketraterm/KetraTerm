@@ -150,8 +150,8 @@ internal object TerminalCompletionContextResolver {
             )
         }
 
-        val optionsTerminated = lineContext.hasPassedOptionTerminator(commandTokenIndex)
         val resolvedCommandPath = resolveCommandPath(lineContext, commandTokenIndex, root)
+        val optionsTerminated = resolvedCommandPath.optionsTerminated
         val commandPath = resolvedCommandPath.commandPath
         val attachedOptionValue =
             if (optionsTerminated) {
@@ -292,6 +292,7 @@ internal object TerminalCompletionContextResolver {
             commandPath = commands,
             usedOptionExclusiveGroupIds = usedExclusiveGroupIds ?: emptySet(),
             positionalArgumentCountBeforeActive = positionalArgumentCount,
+            optionsTerminated = optionsTerminated,
         )
     }
 
@@ -381,6 +382,7 @@ internal object TerminalCompletionContextResolver {
         val commandPath: List<TerminalCommandSpec>,
         val usedOptionExclusiveGroupIds: Set<String>,
         val positionalArgumentCountBeforeActive: Int,
+        val optionsTerminated: Boolean,
     )
 }
 
@@ -389,17 +391,6 @@ private fun TerminalCommandSpec.positionalArgumentAt(position: Int): TerminalArg
     if (position < positionalArguments.size) return positionalArguments[position]
     val last = positionalArguments.last()
     return if (last.isVariadic) last else null
-}
-
-private fun TerminalCommandLineContext.hasPassedOptionTerminator(commandTokenIndex: Int): Boolean {
-    var index = commandTokenIndex + 1
-    while (index < tokens.size) {
-        val token = tokens[index]
-        if (token.startOffset >= cursorOffset) break
-        if (token.endOffset <= cursorOffset && token.text == TERMINAL_COMMAND_OPTION_TERMINATOR) return true
-        index++
-    }
-    return false
 }
 
 private fun String.isOptionNamePrefix(): Boolean = startsWith("-") && this != ""

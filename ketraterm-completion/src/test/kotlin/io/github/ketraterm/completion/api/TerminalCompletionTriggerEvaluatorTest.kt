@@ -31,8 +31,9 @@ class TerminalCompletionTriggerEvaluatorTest {
     fun `isLiveTrigger matches hyphen option prefix`() {
         assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("-", 1))
         assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("git -", 5))
-        assertFalse(TerminalCompletionTriggerEvaluator.isLiveTrigger("docker --", 9))
-        assertFalse(TerminalCompletionTriggerEvaluator.shouldTrigger("docker --", 9, minimumNonWhitespaceCharacters = 0))
+        assertTrue(TerminalCompletionTriggerEvaluator.isLiveTrigger("docker --", 9))
+        assertTrue(TerminalCompletionTriggerEvaluator.shouldTrigger("docker --", 9, minimumNonWhitespaceCharacters = 0))
+        assertFalse(TerminalCompletionTriggerEvaluator.isLiveTrigger("docker -- ", 10))
     }
 
     @Test
