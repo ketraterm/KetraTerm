@@ -45,6 +45,8 @@ fun interface TerminalCompletionLoadScheduler {
  * @param queueCapacity positive number of queued operations accepted without blocking.
  * @param coroutineName diagnostic worker-name prefix.
  * @param onBackgroundFailure diagnostic callback for a failed provider load or publication callback.
+ * @throws IllegalArgumentException if worker/queue capacity is not positive or
+ * [coroutineName] is blank.
  */
 class TerminalCompletionSnapshotService
     @JvmOverloads

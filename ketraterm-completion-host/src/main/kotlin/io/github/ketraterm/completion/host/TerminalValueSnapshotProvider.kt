@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @param onBackgroundFailure diagnostic callback for a failed publication callback.
  * @param nanoTime monotonic clock used for expiry.
  * @param snapshotTtlNanos positive lifetime of a ready snapshot.
+ * @throws IllegalArgumentException if [snapshotTtlNanos] is not positive.
  */
 class TerminalValueSnapshotProvider<K, V>
     @JvmOverloads
@@ -58,7 +59,11 @@ class TerminalValueSnapshotProvider<K, V>
             require(snapshotTtlNanos > 0L) { "snapshotTtlNanos must be > 0, was $snapshotTtlNanos" }
         }
 
-        /** Returns ready values and schedules a refresh when necessary. */
+        /**
+         * Returns ready values and schedules a refresh when necessary.
+         *
+         * @return the latest immutable snapshot, or an empty list before first publication or after closure.
+         */
         fun values(): List<V> {
             if (closed.get()) return emptyList()
             val requestedKey = keyProvider()

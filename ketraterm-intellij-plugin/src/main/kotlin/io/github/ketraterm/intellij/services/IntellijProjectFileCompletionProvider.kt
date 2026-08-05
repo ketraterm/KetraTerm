@@ -18,6 +18,7 @@ package io.github.ketraterm.intellij.services
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
+import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
@@ -86,7 +87,7 @@ internal class IntellijProjectFileProviderFactory(
     private val loader: (String?) -> List<TerminalFuzzyPathEntry>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
-        context.createSnapshotRegistration(PRIORITY, loader) { valuesProvider ->
+        context.createSnapshotRegistration(TerminalCompletionSourcePrior.PROJECT_FUZZY_PATH, loader) { valuesProvider ->
             TerminalCompletionSources.fuzzyPath(
                 sourceId = SOURCE_ID,
                 entriesProvider = valuesProvider,
@@ -95,7 +96,6 @@ internal class IntellijProjectFileProviderFactory(
         }
 
     private companion object {
-        private const val PRIORITY = 10
         private const val SOURCE_ID = "intellij-project-file"
     }
 }

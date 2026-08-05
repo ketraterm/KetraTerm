@@ -22,6 +22,7 @@ import com.intellij.openapi.externalSystem.model.task.TaskData
 import com.intellij.openapi.externalSystem.service.project.ProjectDataManager
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.project.Project
+import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalGradleTask
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
@@ -132,7 +133,7 @@ internal class IntellijGradleTaskProviderFactory(
     private val loader: (String?) -> List<TerminalGradleTask>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
-        context.createSnapshotRegistration(PRIORITY, loader) { valuesProvider ->
+        context.createSnapshotRegistration(TerminalCompletionSourcePrior.GRADLE_TASK, loader) { valuesProvider ->
             TerminalCompletionSources.gradleTask(
                 sourceId = SOURCE_ID,
                 tasksProvider = valuesProvider,
@@ -141,7 +142,6 @@ internal class IntellijGradleTaskProviderFactory(
         }
 
     private companion object {
-        private const val PRIORITY = 15
         private const val SOURCE_ID = "intellij-gradle-task"
     }
 }

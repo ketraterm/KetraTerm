@@ -17,6 +17,7 @@ package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.ChangeListManager
+import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
 import java.nio.file.Path
@@ -91,7 +92,7 @@ internal class IntellijGitStatusPathProviderFactory(
     private val loader: (String?) -> List<TerminalFuzzyPathEntry>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
-        context.createSnapshotRegistration(PRIORITY, loader) { valuesProvider ->
+        context.createSnapshotRegistration(TerminalCompletionSourcePrior.GIT_STATUS_PATH, loader) { valuesProvider ->
             TerminalCompletionSources.fuzzyPath(
                 sourceId = SOURCE_ID,
                 entriesProvider = valuesProvider,
@@ -102,7 +103,6 @@ internal class IntellijGitStatusPathProviderFactory(
         }
 
     private companion object {
-        private const val PRIORITY = 15
         private const val SOURCE_ID = "intellij-git-status-path"
         private val ALLOWED_COMMAND_NAMES = setOf("add", "restore", "rm", "diff")
     }

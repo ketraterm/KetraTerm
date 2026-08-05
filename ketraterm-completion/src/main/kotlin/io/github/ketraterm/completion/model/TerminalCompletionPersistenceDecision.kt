@@ -51,6 +51,8 @@ enum class TerminalCompletionPersistenceDecisionLocation {
  * @property kind reason category for the decision.
  * @property matchedText optional vocabulary fragment that caused rejection.
  * @property location optional field or metadata surface that produced the decision.
+ * @throws IllegalArgumentException if sensitive text or rejection location does
+ * not agree with [kind].
  */
 data class TerminalCompletionPersistenceDecision(
     val kind: TerminalCompletionPersistenceDecisionKind,

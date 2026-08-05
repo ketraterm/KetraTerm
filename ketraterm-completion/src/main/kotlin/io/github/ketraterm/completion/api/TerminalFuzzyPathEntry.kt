@@ -26,6 +26,8 @@ package io.github.ketraterm.completion.api
  * @property path non-empty lexical path without a trailing separator.
  * @property isDirectory whether this entry represents a directory.
  * @property detail optional host-owned concise description shown beside the path.
+ * @throws IllegalArgumentException if [path] is blank or separator-terminated,
+ * or [detail] contains a line break.
  */
 data class TerminalFuzzyPathEntry(
     val path: String,

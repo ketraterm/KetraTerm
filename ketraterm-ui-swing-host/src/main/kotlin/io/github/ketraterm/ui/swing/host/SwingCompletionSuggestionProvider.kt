@@ -36,7 +36,12 @@ class SwingCompletionSuggestionProvider(
     private val engine: TerminalCompletionEngine,
     private val contextProvider: () -> SwingCompletionContext = { SwingCompletionContext.EMPTY },
 ) : SwingShellSuggestionProvider {
-    /** Returns candidates adapted to the reusable Swing popup contract. */
+    /**
+     * Returns candidates adapted to the reusable Swing popup contract.
+     *
+     * @param request visible command text, cursor, and popup anchor supplied by Swing.
+     * @return ordered Swing suggestions, or an empty list when request conversion is invalid.
+     */
     override fun suggestions(request: SwingShellSuggestionRequest): List<SwingShellSuggestion> {
         val context = contextProvider()
         val completionRequest =

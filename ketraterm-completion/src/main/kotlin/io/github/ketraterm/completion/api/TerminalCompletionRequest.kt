@@ -116,6 +116,8 @@ data class TerminalShellCapabilities
  * @property profileId optional host profile id used by host-owned ranking data.
  * @property maxCandidates maximum number of candidates to return.
  * @property shellCapabilities resolved shell lexical and replacement policy.
+ * @throws IllegalArgumentException if [cursorOffset] is outside [commandLine],
+ * splits a UTF-16 surrogate pair, or [maxCandidates] is not positive.
  */
 data class TerminalCompletionRequest
     @JvmOverloads

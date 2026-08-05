@@ -36,6 +36,7 @@ import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
  * not stored in this model.
  * @property optionValueCount count of value tokens consumed by options that use
  * a separate argument.
+ * @throws IllegalArgumentException if tokens are blank or either count is negative.
  */
 data class TerminalCommandLineShape
     @JvmOverloads
@@ -103,6 +104,7 @@ private fun normalizedTerminalCommandShapeKey(
  * @property acceptedCount number of accepted suggestions with this shape.
  * @property dismissedCount number of explicitly dismissed suggestions with this shape.
  * @property lastUsedEpochMillis host timestamp for the newest represented event.
+ * @throws IllegalArgumentException if any counter or [lastUsedEpochMillis] is negative.
  */
 data class TerminalCommandShapeStats
     @JvmOverloads

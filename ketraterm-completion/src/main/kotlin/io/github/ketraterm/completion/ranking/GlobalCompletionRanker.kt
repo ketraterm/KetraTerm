@@ -22,7 +22,13 @@ import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORD
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 
-/** Deterministic global evidence-fusion ranker for one merged completion engine. */
+/**
+ * Deterministic global evidence-fusion ranker for one merged completion engine.
+ *
+ * This component groups projected outcomes, chooses representatives, and orders
+ * the fused results. Outcome resolution, context relevance, numeric policy, and
+ * learned evidence indexing are delegated to their owning collaborators.
+ */
 internal class GlobalCompletionRanker(
     commandSpecs: List<TerminalCommandSpec>,
     private val learnedStatsProvider: () -> TerminalCommandCompletionStatsSnapshot,
@@ -34,9 +40,27 @@ internal class GlobalCompletionRanker(
     fun rank(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
-        sourceCandidates: List<SourceCandidates>,
+        sourceCandidates: List<CompletionSourceCandidates>,
     ): List<TerminalCompletionCandidate> {
         val rankingContext = TerminalCompletionRankingContext(context)
+        val aggregates = groupByOutcome(request, context, sourceCandidates, rankingContext)
+        if (aggregates.isEmpty()) return emptyList()
+
+        val learnedIndex = learnedIndexCache.indexFor(learnedStatsProvider(), request.shellCapabilities.syntax)
+        val now = clockEpochMillis().coerceAtLeast(0L)
+        return aggregates.values
+            .map { aggregate -> aggregate.finish(request, learnedIndex, now) }
+            .sortedWith(FUSED_ORDER)
+            .take(request.maxCandidates)
+            .map(FusedCandidate::toPublicCandidate)
+    }
+
+    private fun groupByOutcome(
+        request: TerminalCompletionRequest,
+        context: TerminalCompletionContext,
+        sourceCandidates: List<CompletionSourceCandidates>,
+        rankingContext: TerminalCompletionRankingContext,
+    ): Map<Any, MutableOutcomeAggregate> {
         val aggregates = LinkedHashMap<Any, MutableOutcomeAggregate>()
         for (sourceResult in sourceCandidates) {
             val locallyRanked = sourceResult.candidates.sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
@@ -52,7 +76,7 @@ internal class GlobalCompletionRanker(
                         sourceIndex = sourceResult.sourceIndex,
                         candidateIndex = candidateIndex,
                         localRank = candidateIndex + 1,
-                        sourcePrior = sourceResult.priority.coerceIn(MIN_SOURCE_PRIOR, MAX_SOURCE_PRIOR),
+                        sourcePrior = GlobalFusionScoring.sourcePrior(sourceResult.priority),
                         contextAdjustment = rankingContext.priorityAdjustment(candidate),
                     )
                 bestByOutcome.putIfAbsent(key, contribution)
@@ -61,15 +85,7 @@ internal class GlobalCompletionRanker(
                 aggregates.getOrPut(key, ::MutableOutcomeAggregate).add(contribution)
             }
         }
-        if (aggregates.isEmpty()) return emptyList()
-
-        val learnedIndex = learnedIndexCache.indexFor(learnedStatsProvider(), request.shellCapabilities.syntax)
-        val now = clockEpochMillis().coerceAtLeast(0L)
-        return aggregates.values
-            .map { aggregate -> aggregate.finish(request, learnedIndex, now) }
-            .sortedWith(FUSED_ORDER)
-            .take(request.maxCandidates)
-            .map { it.candidate.copy(score = it.score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()) }
+        return aggregates
     }
 
     private class MutableOutcomeAggregate {
@@ -88,7 +104,7 @@ internal class GlobalCompletionRanker(
             var score = 0L
             var strongestContext = Int.MIN_VALUE
             for (contribution in contributions) {
-                score += RECIPROCAL_RANK_SCALE / (RECIPROCAL_RANK_OFFSET + contribution.localRank)
+                score += GlobalFusionScoring.reciprocalRank(contribution.localRank)
                 score += contribution.sourcePrior
                 score += learnedIndex.providerAdjustment(contribution.candidate, request)
                 strongestContext = maxOf(strongestContext, contribution.contextAdjustment)
@@ -140,20 +156,12 @@ internal class GlobalCompletionRanker(
         val bestLocalRank: Int,
         val sourceIndex: Int,
         val candidateIndex: Int,
-    )
-
-    internal data class SourceCandidates(
-        val sourceIndex: Int,
-        val priority: Int,
-        val candidates: List<TerminalCompletionCandidate>,
-    )
+    ) {
+        fun toPublicCandidate(): TerminalCompletionCandidate =
+            candidate.copy(score = score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt())
+    }
 
     private companion object {
-        private const val MIN_SOURCE_PRIOR = -20
-        private const val MAX_SOURCE_PRIOR = 20
-        private const val RECIPROCAL_RANK_SCALE = 10_000L
-        private const val RECIPROCAL_RANK_OFFSET = 60L
-
         private val REPRESENTATIVE_ORDER =
             compareByDescending<RankedContribution> { it.contextAdjustment }
                 .thenBy { it.replacementLength }

@@ -38,7 +38,7 @@ class LearnedCompletionEvidenceIndexTest {
                         stats("cd build/", lastUsedEpochMillis = NOW),
                     ),
             )
-        val index = LearnedCompletionEvidenceIndex.build(snapshot, TerminalShellSyntax.POSIX, resolver)
+        val index = LearnedCompletionEvidenceIndexBuilder.build(snapshot, TerminalShellSyntax.POSIX, resolver)
         val key = requireNotNull(resolver.learnedKey("cd build", TerminalShellSyntax.POSIX, 1, pathAware = true))
 
         assertEquals(192, index.exactAdjustment(key, request(), NOW))

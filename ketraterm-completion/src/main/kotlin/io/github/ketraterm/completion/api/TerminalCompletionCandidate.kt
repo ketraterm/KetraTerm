@@ -59,6 +59,8 @@ enum class TerminalCompletionCandidateKind {
  * are better in either scope.
  * @property valueDomain dynamic value domain for argument candidates supplied by
  * host-owned providers.
+ * @throws IllegalArgumentException if text/source fields are empty or replacement
+ * offsets do not form a nonnegative ordered range.
  */
 data class TerminalCompletionCandidate
     @JvmOverloads

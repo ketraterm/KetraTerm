@@ -23,7 +23,8 @@ import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
  *
  * The model stores compact counters instead of raw repeated history rows.
  * Hosts own persistence and import/export these values into
- * [TerminalCommandStatsCompletionSource]; this shared model performs no I/O.
+ * [io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource];
+ * this shared model performs no I/O.
  * The normalized matching key is derived from [commandLine] so callers cannot
  * persist contradictory command text and lookup state.
  *
@@ -40,6 +41,8 @@ import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
  * dismissed from a suggestion popup.
  * @property lastUsedEpochMillis host wall-clock timestamp for the newest
  * execution or feedback event represented by this row.
+ * @throws IllegalArgumentException if [commandLine] is blank or multiline, any
+ * counter is negative, or [lastUsedEpochMillis] is negative.
  */
 data class TerminalCommandCompletionStats
     @JvmOverloads

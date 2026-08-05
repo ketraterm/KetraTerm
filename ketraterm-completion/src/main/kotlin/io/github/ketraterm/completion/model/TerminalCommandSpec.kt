@@ -40,6 +40,7 @@ package io.github.ketraterm.completion.model
  * appear as sibling positional command values. This models task-style CLIs such
  * as Gradle, where `gradle clean build` is a sequence of tasks rather than
  * `build` being nested below `clean`.
+ * @throws IllegalArgumentException if [name] or any alias is blank.
  */
 data class TerminalCommandSpec
     @JvmOverloads
@@ -73,6 +74,7 @@ data class TerminalCommandSpec
  * @property valueCandidates bounded static values accepted by this argument.
  * @property valueDomain dynamic host-owned value domain accepted by this argument.
  * @property hiddenPathPolicy hidden-entry policy used when [pathKind] accepts a path.
+ * @throws IllegalArgumentException if [valueCandidates] contains a blank value.
  */
 data class TerminalArgumentSpec
     @JvmOverloads
@@ -109,6 +111,8 @@ data class TerminalArgumentSpec
  * @property exclusiveGroupIds identifiers of mutually exclusive option groups.
  * Options that share any identifier cannot be suggested together once one has
  * already been entered before the completion cursor.
+ * @throws IllegalArgumentException if names are empty, or names, values, or
+ * exclusive-group identifiers contain blank entries.
  */
 data class TerminalOptionSpec
     @JvmOverloads
@@ -172,6 +176,7 @@ enum class TerminalHiddenPathPolicy {
  * services, project indexes, or other host-owned data sources.
  *
  * @property id stable lowercase domain id.
+ * @throws IllegalArgumentException if [id] is blank or contains uppercase characters.
  */
 data class TerminalCompletionValueDomain(
     val id: String,
@@ -205,10 +210,6 @@ data class TerminalCompletionValueDomain(
         /** npm package script name. */
         @JvmField
         val NPM_SCRIPT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("npm.script")
-
-        /** Host IDE run configuration name. */
-        @JvmField
-        val IDE_RUN_CONFIGURATION: TerminalCompletionValueDomain = TerminalCompletionValueDomain("ide.run-configuration")
 
         /** AWS CLI profile name. */
         @JvmField

@@ -69,6 +69,13 @@ class TerminalDirectoryCompletionTest {
     }
 
     @Test
+    fun `malformed lexical path is rejected without escaping the resolver contract`() {
+        val resolver = TerminalCompletionPathResolver(homeDirectory = null, windows = false)
+
+        assertNull(resolver.resolve(request(directoryPrefix = "\u0000/")))
+    }
+
+    @Test
     fun `throwing scan clears its owned in-flight marker and permits retry`() {
         val scheduler = RecordingScheduler()
         var attempts = 0

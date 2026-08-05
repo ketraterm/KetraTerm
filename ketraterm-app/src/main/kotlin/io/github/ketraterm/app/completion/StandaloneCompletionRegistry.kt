@@ -86,23 +86,23 @@ internal class StandaloneCompletionRegistry(
         previous?.close()
         val sources =
             ArrayList<TerminalCompletionSourceEntry>(COMPOSED_SOURCE_CAPACITY).apply {
-                add(TerminalCompletionSourceEntry(mruSource, priority = SESSION_MRU_SOURCE_PRIORITY))
+                add(TerminalCompletionSourceEntry(mruSource, priority = TerminalCompletionSourcePrior.SESSION_MRU))
                 persistentStatsSource?.let { source ->
                     add(
                         TerminalCompletionSourceEntry(
                             source,
-                            priority = PERSISTENT_STATS_SOURCE_PRIORITY,
+                            priority = TerminalCompletionSourcePrior.PERSISTENT_STATISTICS,
                         ),
                     )
                 }
-                add(TerminalCompletionSourceEntry(specSource, priority = SPEC_SOURCE_PRIORITY))
+                add(TerminalCompletionSourceEntry(specSource, priority = TerminalCompletionSourcePrior.STATIC_SPECIFICATION))
                 add(
                     TerminalCompletionSourceEntry(
                         TerminalCompletionSources.path(
                             fileSystemProvider = fileSystemProvider,
                             commandSpecs = commandSpecs,
                         ),
-                        priority = PATH_SOURCE_PRIORITY,
+                        priority = TerminalCompletionSourcePrior.DIRECTORY_PATH,
                     ),
                 )
             }
@@ -191,9 +191,5 @@ internal class StandaloneCompletionRegistry(
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
         private const val COMPOSED_SOURCE_CAPACITY = 4
-        private const val PATH_SOURCE_PRIORITY = 12
-        private const val SESSION_MRU_SOURCE_PRIORITY = 8
-        private const val PERSISTENT_STATS_SOURCE_PRIORITY = 6
-        private const val SPEC_SOURCE_PRIORITY = 0
     }
 }

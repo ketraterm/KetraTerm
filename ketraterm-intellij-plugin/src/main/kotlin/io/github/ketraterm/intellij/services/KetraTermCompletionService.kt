@@ -221,23 +221,28 @@ internal class IntellijCompletionRegistry(
                     add(
                         TerminalCompletionSourceEntry(
                             mruSource,
-                            priority = SESSION_MRU_SOURCE_PRIORITY
+                            priority = TerminalCompletionSourcePrior.SESSION_MRU
                         )
                     )
                     add(
                         TerminalCompletionSourceEntry(
                             statsSource,
-                            priority = PERSISTENT_STATS_SOURCE_PRIORITY
+                            priority = TerminalCompletionSourcePrior.PERSISTENT_STATISTICS
                         )
                     )
-                    add(TerminalCompletionSourceEntry(specSource, priority = SPEC_SOURCE_PRIORITY))
+                    add(
+                        TerminalCompletionSourceEntry(
+                            specSource,
+                            priority = TerminalCompletionSourcePrior.STATIC_SPECIFICATION,
+                        ),
+                    )
                     add(
                         TerminalCompletionSourceEntry(
                             TerminalCompletionSources.path(
                                 fileSystemProvider = fileSystemProvider,
                                 commandSpecs = commandSpecs,
                             ),
-                            priority = PATH_SOURCE_PRIORITY,
+                            priority = TerminalCompletionSourcePrior.DIRECTORY_PATH,
                         ),
                     )
                     dynamicRegistrations.mapTo(this, IntellijCompletionProviderRegistration::sourceEntry)
@@ -346,10 +351,6 @@ internal class IntellijCompletionRegistry(
 
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
-        private const val PATH_SOURCE_PRIORITY = 12
-        private const val SESSION_MRU_SOURCE_PRIORITY = 8
-        private const val PERSISTENT_STATS_SOURCE_PRIORITY = 6
-        private const val SPEC_SOURCE_PRIORITY = 0
     }
 }
 

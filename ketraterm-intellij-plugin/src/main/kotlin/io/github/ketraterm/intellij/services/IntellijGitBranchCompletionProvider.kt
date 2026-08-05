@@ -16,6 +16,7 @@
 package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.project.Project
+import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
@@ -73,7 +74,7 @@ internal class IntellijGitBranchProviderFactory(
     private val loader: (String?) -> List<TerminalCompletionDomainValue>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
-        context.createSnapshotRegistration(PRIORITY, loader) { valuesProvider ->
+        context.createSnapshotRegistration(TerminalCompletionSourcePrior.LOCAL_GIT_BRANCH, loader) { valuesProvider ->
             TerminalCompletionSources.valueDomain(
                 domain = TerminalCompletionValueDomain.GIT_BRANCH,
                 sourceId = SOURCE_ID,
@@ -83,7 +84,6 @@ internal class IntellijGitBranchProviderFactory(
         }
 
     private companion object {
-        private const val PRIORITY = 15
         private const val SOURCE_ID = "intellij-git-branch"
     }
 }

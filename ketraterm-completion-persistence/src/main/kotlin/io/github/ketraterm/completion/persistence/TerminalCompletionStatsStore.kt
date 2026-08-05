@@ -83,12 +83,27 @@ class TerminalCompletionStatsStore
             writeQueue.enqueue(stableSnapshot)
         }
 
-        /** Waits until all writes queued before this call have completed. */
+        /**
+         * Waits until all writes queued before this call have completed.
+         *
+         * @throws InterruptedException if the waiting thread is interrupted.
+         * @throws java.util.concurrent.ExecutionException if the queue worker
+         * cannot execute the flush barrier.
+         */
         fun flush() {
             writeQueue.flush()
         }
 
-        /** Flushes the newest pending snapshot and stops the store worker. */
+        /**
+         * Flushes the newest pending snapshot and stops the store worker.
+         *
+         * Repeated calls are safe. No new snapshot is accepted after the first
+         * close begins.
+         *
+         * @throws InterruptedException if the waiting thread is interrupted.
+         * @throws java.util.concurrent.ExecutionException if the queue worker
+         * cannot execute its final flush barrier.
+         */
         override fun close() = writeQueue.close()
 
         private fun writeSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot) {

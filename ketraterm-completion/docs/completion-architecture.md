@@ -19,6 +19,11 @@ host-snapshot sources, then give the merged engine one immutable learned-stats
 supplier. Learning is applied once by the global ranker, never by nested
 source decorators.
 
+`TerminalCompletionSourcePrior` is the single reviewed cold-start policy for
+built-in source families. Standalone and IntelliJ composition use these named
+values instead of maintaining duplicated numeric constants. They remain small
+inputs to evidence fusion and never become a priority-first sorting layer.
+
 The `model` package contains durable public data models that hosts may persist
 or construct:
 
@@ -88,6 +93,15 @@ workspace, Swing UI, or future plugin code:
 Top-level declarations in those packages should be `internal` unless a product
 decision explicitly promotes a type into `api` or `model`.
 
+Implementation files follow responsibility boundaries rather than accumulating
+nested helpers in orchestration classes. Session MRU coordinates independent
+bounded command-history and observed-token indexes. Learned ranking separates
+snapshot identity caching, index construction, context selection, saturating
+counter aggregation, and numeric scoring policy. Global fusion owns only
+outcome grouping, representative selection, and deterministic final ordering.
+Public directory snapshot, path resolution, scan contracts, and bounded scan
+implementations each live in their matching file in `ketraterm-completion-host`.
+
 ## Host Ownership
 
 Hosts are responsible for applying `TerminalCompletionPersistencePolicy` to authoritative command records and for
@@ -108,6 +122,11 @@ candidates to their own UI presentation.
 The public API should not grow by convenience. New public functions must be
 durable host contracts, used by standalone/plugin integration, or explicitly
 documented persistence/model contracts.
+Architecture tests reject unreviewed public declarations, implementation
+package leaks, and public completion contracts without leading KDoc. Public
+constructors and methods must document parameters/properties, return values,
+observable failure behavior, ownership, threading, and I/O expectations where
+those concepts apply.
 
 ## Command-Line Context Policy
 

@@ -20,6 +20,7 @@ package io.github.ketraterm.completion.api
  *
  * @property name base name of the file or directory (e.g. "src" or "README.md").
  * @property isDirectory `true` if the entry represents a directory.
+ * @throws IllegalArgumentException if [name] is empty, `.` or `..`.
  */
 data class TerminalFileEntry(
     val name: String,
@@ -45,6 +46,8 @@ data class TerminalFileEntry(
  * forward slashes are used as a transport-neutral separator. An empty value
  * addresses the working directory and `~/` addresses the host user's home.
  * @property entryNamePrefix typed base-name prefix after the final separator.
+ * @throws IllegalArgumentException if the URI is blank, the directory prefix is
+ * not empty and separator-terminated, or the entry prefix contains a separator.
  */
 data class TerminalDirectoryListingRequest(
     val workingDirectoryUri: String,

@@ -27,8 +27,10 @@ import io.github.ketraterm.completion.internal.TerminalCompletionCollectionBudge
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.ranking.CompletionSourceCandidates
 import io.github.ketraterm.completion.ranking.GlobalCompletionRanker
 
+/** Coordinates bounded source collection and delegates deterministic fusion to [GlobalCompletionRanker]. */
 internal class MergedCompletionEngine(
     sources: List<TerminalCompletionSourceEntry>,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
@@ -56,12 +58,12 @@ internal class MergedCompletionEngine(
             )
         if (completionContext.activePosition == TerminalCompletionActivePosition.OPERATOR) return emptyList()
         val collectionLimit = TerminalCompletionCollectionBudget.forFinalLimit(request.maxCandidates)
-        val collected = ArrayList<GlobalCompletionRanker.SourceCandidates>(sources.size)
+        val collected = ArrayList<CompletionSourceCandidates>(sources.size)
         for (sourceIndex in sources.indices) {
             val entry = sources[sourceIndex]
             val candidates = entry.source.collectCandidates(request, commandLineContext, collectionLimit)
             if (candidates.isNotEmpty()) {
-                collected += GlobalCompletionRanker.SourceCandidates(sourceIndex, entry.priority, candidates)
+                collected += CompletionSourceCandidates(sourceIndex, entry.priority, candidates)
             }
         }
         return ranker.rank(request, completionContext, collected)

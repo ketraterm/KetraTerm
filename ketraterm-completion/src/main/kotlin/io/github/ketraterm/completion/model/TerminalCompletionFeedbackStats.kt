@@ -99,6 +99,7 @@ enum class TerminalCompletionTokenPosition {
  * @property source compact provider/source label from the candidate.
  * @property candidateKind semantic kind of candidate that received feedback.
  * @property tokenPosition classified command-line position of the candidate.
+ * @throws IllegalArgumentException if [source] is blank.
  */
 data class TerminalCompletionFeedbackContext
     @JvmOverloads
@@ -128,6 +129,8 @@ data class TerminalCompletionFeedbackContext
  * @property acceptedCount number of accepted suggestions for this context.
  * @property dismissedCount number of explicitly dismissed suggestions for this context.
  * @property lastUsedEpochMillis host timestamp for the newest represented event.
+ * @throws IllegalArgumentException if [source] is blank, a counter is negative,
+ * or [lastUsedEpochMillis] is negative.
  */
 data class TerminalCompletionFeedbackStats
     @JvmOverloads

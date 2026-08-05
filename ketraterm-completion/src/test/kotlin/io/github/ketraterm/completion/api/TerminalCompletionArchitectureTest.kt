@@ -153,6 +153,52 @@ internal class TerminalCompletionArchitectureTest {
     }
 
     @Test
+    fun `public completion contracts have KDoc`() {
+        val violations =
+            documentedCompletionRoots.flatMap { sourceRoot ->
+                kotlinFiles(sourceRoot).flatMap { file ->
+                    val lines = file.readSourceLines()
+                    lines.mapIndexedNotNull { index, line ->
+                        val isPublicContract =
+                            PUBLIC_TOP_LEVEL_DECLARATION.matches(line) ||
+                                PUBLIC_MEMBER_FUNCTION.matches(line)
+                        if (isPublicContract && !lines.hasLeadingKDoc(index)) {
+                            "${file.relativeToRepository()}:${index + 1}: $line"
+                        } else {
+                            null
+                        }
+                    }
+                }
+            }
+
+        assertTrue(
+            actual = violations.isEmpty(),
+            message = violations.joinToString(prefix = "Public completion contracts require KDoc:\n", separator = "\n"),
+        )
+    }
+
+    @Test
+    fun `production completion modules use explicit imports`() {
+        val violations =
+            (completionProductionRoots.flatMap(::kotlinFiles) + completionCompositionFiles).flatMap { file ->
+                file
+                    .readSourceLines()
+                    .mapIndexedNotNull { index, line ->
+                        if (WILDCARD_IMPORT.matches(line)) {
+                            "${file.relativeToRepository()}:${index + 1}: $line"
+                        } else {
+                            null
+                        }
+                    }
+            }
+
+        assertTrue(
+            actual = violations.isEmpty(),
+            message = violations.joinToString(prefix = "Production completion imports must be explicit:\n", separator = "\n"),
+        )
+    }
+
+    @Test
     fun `external modules import only completion api or model packages`() {
         val violations =
             externalModuleSourceRoots.flatMap { sourceRoot ->
@@ -196,6 +242,30 @@ internal class TerminalCompletionArchitectureTest {
 
     private fun Path.readSourceLines(): List<String> = Files.readAllLines(this)
 
+    private fun List<String>.hasLeadingKDoc(declarationIndex: Int): Boolean {
+        var index = declarationIndex - 1
+        while (index >= 0) {
+            val line = this[index].trim()
+            if (line.isEmpty() || line.startsWith("@")) {
+                index--
+            } else {
+                break
+            }
+        }
+        if (index < 0) return false
+        val lastDocumentationLine = this[index].trim()
+        if (lastDocumentationLine.startsWith("/**") && lastDocumentationLine.endsWith("*/")) return true
+        if (lastDocumentationLine != "*/") return false
+        while (index >= 0) {
+            when (this[index].trim()) {
+                "/**" -> return true
+                "/*" -> return false
+            }
+            index--
+        }
+        return false
+    }
+
     private fun Path.relativeToRepository(): String =
         repositoryRoot
             .relativize(this)
@@ -222,6 +292,38 @@ internal class TerminalCompletionArchitectureTest {
             }
         private val completionMainRoot: Path =
             repositoryRoot.resolve("ketraterm-completion/src/main/kotlin/io/github/ketraterm/completion")
+        private val documentedCompletionRoots =
+            listOf(
+                completionMainRoot.resolve("api"),
+                completionMainRoot.resolve("model"),
+                repositoryRoot.resolve(
+                    "ketraterm-completion-host/src/main/kotlin/io/github/ketraterm/completion/host",
+                ),
+                repositoryRoot.resolve(
+                    "ketraterm-completion-persistence/src/main/kotlin/io/github/ketraterm/completion/persistence",
+                ),
+            )
+        private val completionProductionRoots =
+            listOf(
+                repositoryRoot.resolve("ketraterm-completion/src/main/kotlin"),
+                repositoryRoot.resolve("ketraterm-completion-host/src/main/kotlin"),
+                repositoryRoot.resolve("ketraterm-completion-persistence/src/main/kotlin"),
+            )
+        private val completionCompositionFiles =
+            listOf(
+                repositoryRoot.resolve(
+                    "ketraterm-app/src/main/kotlin/io/github/ketraterm/app/completion/StandaloneCompletionRegistry.kt",
+                ),
+                repositoryRoot.resolve(
+                    "ketraterm-app/src/main/kotlin/io/github/ketraterm/app/completion/StandaloneDirectoryCompletionService.kt",
+                ),
+                repositoryRoot.resolve(
+                    "ketraterm-intellij-plugin/src/main/kotlin/io/github/ketraterm/intellij/services/IntellijDirectoryCompletion.kt",
+                ),
+                repositoryRoot.resolve(
+                    "ketraterm-intellij-plugin/src/main/kotlin/io/github/ketraterm/intellij/services/KetraTermCompletionService.kt",
+                ),
+            )
 
         private val IMPLEMENTATION_PACKAGES =
             listOf(
@@ -281,6 +383,7 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCompletionRequest",
                 "TerminalCompletionSource",
                 "TerminalCompletionSourceEntry",
+                "TerminalCompletionSourcePrior",
                 "TerminalCompletionSources",
                 "TerminalSessionMruCompletionSource",
                 "TerminalCompletionTriggerEvaluator",
@@ -360,5 +463,6 @@ internal class TerminalCompletionArchitectureTest {
         private val PUBLIC_MEMBER_FUNCTION = Regex("""^\s+(?!private |internal )fun\s+([A-Za-z0-9_]+)\(.*""")
         private val IMPLEMENTATION_IMPORT =
             Regex("""import io\.github\.ketraterm\.completion\.(commandline|engine|history|internal|ranking|source|spec|stats)(\.|$).*""")
+        private val WILDCARD_IMPORT = Regex("""^import .+\.\*$""")
     }
 }

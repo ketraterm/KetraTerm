@@ -18,10 +18,7 @@ package io.github.ketraterm.completion.host
 import io.github.ketraterm.completion.api.TerminalDirectoryListingRequest
 import io.github.ketraterm.completion.api.TerminalFileEntry
 import io.github.ketraterm.completion.api.TerminalFileSystemProvider
-import java.nio.file.FileSystems
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.attribute.BasicFileAttributes
 import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -41,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @param nanoTime monotonic clock used for expiry.
  * @param snapshotTtlNanos positive lifetime of ready snapshots.
  * @param snapshotCapacity positive maximum retained ready snapshots.
+ * @throws IllegalArgumentException if snapshot lifetime or capacity is not positive.
  */
 class TerminalAsyncFileSystemProvider
     @JvmOverloads
@@ -162,7 +160,6 @@ class TerminalAsyncFileSystemProvider
             try {
                 onSnapshotChanged()
             } catch (failure: RuntimeException) {
-                // The owning UI may close while publication is in flight.
                 reportBackgroundFailure(failure)
             }
         }
@@ -215,148 +212,5 @@ class TerminalAsyncFileSystemProvider
             private const val DEFAULT_SNAPSHOT_CAPACITY = 32
             private const val DEFAULT_SNAPSHOT_TTL_SECONDS = 2L
             private const val LOAD_FACTOR = 0.75f
-        }
-    }
-
-/**
- * Resolves lexical completion paths without filesystem access or authority loss.
- *
- * @param homeDirectory explicit local home used for tilde expansion.
- * @param windows whether Windows drive and UNC syntax is accepted.
- */
-class TerminalCompletionPathResolver
-    @JvmOverloads
-    constructor(
-        private val homeDirectory: Path? = System.getProperty("user.home")?.takeIf(String::isNotBlank)?.let(Path::of),
-        private val windows: Boolean = FileSystems.getDefault().separator == "\\",
-    ) {
-        /**
-         * Resolves [request] into a normalized absolute local directory.
-         *
-         * @return local path, or `null` for malformed, remote, or unsupported input.
-         */
-        fun resolve(request: TerminalDirectoryListingRequest): Path? {
-            val workingDirectory = TerminalLocalFileUriResolver.resolve(request.workingDirectoryUri) ?: return null
-            val prefix = request.directoryPrefix
-            val resolved =
-                when {
-                    prefix == "~/" -> homeDirectory
-                    prefix.startsWith("~/") -> homeDirectory?.resolve(prefix.substring(2))
-                    prefix.hasWindowsDriveRoot() -> if (windows) Path.of(prefix.replace('/', '\\')) else null
-                    prefix.startsWith("//") -> if (windows) Path.of(prefix.replace('/', '\\')) else null
-                    prefix.startsWith('/') -> Path.of(prefix)
-                    prefix.isEmpty() -> workingDirectory
-                    else -> workingDirectory.resolve(prefix)
-                } ?: return null
-            return resolved.toAbsolutePath().normalize()
-        }
-
-        private fun String.hasWindowsDriveRoot(): Boolean = length >= 3 && this[0].isLetter() && this[1] == ':' && this[2] == '/'
-    }
-
-/**
- * Blocking directory scan contract invoked only by host snapshot workers.
- *
- * Closing a provider prevents an in-flight result from publishing, but filesystem operations are only best-effort
- * cancellable: an operating-system directory operation may complete after its provider or service has closed.
- */
-fun interface TerminalDirectoryScanner {
-    /**
-     * Scans direct children beginning with [entryNamePrefix].
-     *
-     * @param directory normalized absolute local directory.
-     * @param entryNamePrefix case-insensitive child-name prefix.
-     * @return bounded deterministically ordered entries.
-     */
-    fun scan(
-        directory: Path,
-        entryNamePrefix: String,
-    ): List<TerminalFileEntry>
-}
-
-/**
- * Best-effort time-, visit-, and result-bounded local directory scanner.
- *
- * @param maxVisitedEntries positive cap on inspected direct children.
- * @param maxMatchingEntries positive cap on retained matches.
- * @param scanBudgetNanos positive best-effort monotonic scan budget.
- * @param nanoTime monotonic clock used to enforce the budget.
- * @param onFailure diagnostic callback for a directory-level scan failure.
- */
-class TerminalBoundedDirectoryScanner
-    @JvmOverloads
-    constructor(
-        private val maxVisitedEntries: Int = DEFAULT_MAX_VISITED_ENTRIES,
-        private val maxMatchingEntries: Int = DEFAULT_MAX_MATCHING_ENTRIES,
-        private val scanBudgetNanos: Long = TimeUnit.MILLISECONDS.toNanos(DEFAULT_SCAN_BUDGET_MILLIS),
-        private val nanoTime: () -> Long = System::nanoTime,
-        private val onFailure: (Throwable) -> Unit = {},
-    ) : TerminalDirectoryScanner {
-        init {
-            require(maxVisitedEntries > 0) { "maxVisitedEntries must be > 0, was $maxVisitedEntries" }
-            require(maxMatchingEntries > 0) { "maxMatchingEntries must be > 0, was $maxMatchingEntries" }
-            require(scanBudgetNanos > 0L) { "scanBudgetNanos must be > 0, was $scanBudgetNanos" }
-        }
-
-        /** Returns a bounded deterministic snapshot or an empty list on failure. */
-        override fun scan(
-            directory: Path,
-            entryNamePrefix: String,
-        ): List<TerminalFileEntry> {
-            val startedAt = nanoTime()
-            val entries = PriorityQueue(maxMatchingEntries, ENTRY_ORDER.reversed())
-            try {
-                if (!Files.isDirectory(directory)) return emptyList()
-                Files.newDirectoryStream(directory).use { stream ->
-                    var visited = 0
-                    val iterator = stream.iterator()
-                    while (
-                        !Thread.currentThread().isInterrupted &&
-                        visited < maxVisitedEntries &&
-                        nanoTime() - startedAt < scanBudgetNanos &&
-                        iterator.hasNext()
-                    ) {
-                        val child = iterator.next()
-                        visited++
-                        val name = child.fileName?.toString() ?: continue
-                        if (!name.startsWith(entryNamePrefix, ignoreCase = true)) continue
-                        val attributes =
-                            try {
-                                Files.readAttributes(child, BasicFileAttributes::class.java)
-                            } catch (_: Exception) {
-                                continue
-                            }
-                        val entry = TerminalFileEntry(name, attributes.isDirectory)
-                        if (entries.size < maxMatchingEntries) {
-                            entries += entry
-                        } else if (ENTRY_ORDER.compare(entry, entries.peek()) < 0) {
-                            entries.remove()
-                            entries += entry
-                        }
-                    }
-                }
-            } catch (failure: Exception) {
-                reportFailure(failure)
-                return emptyList()
-            }
-            if (Thread.currentThread().isInterrupted) return emptyList()
-            return ArrayList(entries).apply { sortWith(ENTRY_ORDER) }
-        }
-
-        private fun reportFailure(failure: Throwable) {
-            try {
-                onFailure(failure)
-            } catch (_: RuntimeException) {
-                // A diagnostics sink must not turn a failed completion scan into a caller failure.
-            }
-        }
-
-        private companion object {
-            private const val DEFAULT_MAX_VISITED_ENTRIES = 8_192
-            private const val DEFAULT_MAX_MATCHING_ENTRIES = 256
-            private const val DEFAULT_SCAN_BUDGET_MILLIS = 50L
-            private val ENTRY_ORDER =
-                compareBy<TerminalFileEntry, String>(String.CASE_INSENSITIVE_ORDER) { it.name }
-                    .thenBy { it.name }
         }
     }

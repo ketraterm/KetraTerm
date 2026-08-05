@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.history
 
+import io.github.ketraterm.completion.history.CommandPersistencePrivacyPolicy.allowsCommand
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandShapeStats
 import io.github.ketraterm.completion.model.TerminalCompletionPersistenceDecision

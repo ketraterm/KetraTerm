@@ -27,6 +27,8 @@ package io.github.ketraterm.completion.api
  * @property description optional task documentation from the imported Gradle model.
  * @property projectDirectory optional normalized project directory relative to
  * the terminal working directory; the root project is represented by `.`.
+ * @throws IllegalArgumentException if [path] is not a canonical non-root Gradle
+ * task path or [projectDirectory] is present but blank.
  */
 data class TerminalGradleTask
     @JvmOverloads
