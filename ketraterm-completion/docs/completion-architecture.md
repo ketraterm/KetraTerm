@@ -293,11 +293,31 @@ and executable-family shape lookup instead of copying or scanning all retained
 rows. External snapshot suppliers retain the same public list contract and are
 indexed lazily once per stable list identity.
 
+Positive persisted command rows also have a snapshot-identity and shell-syntax
+index. It groups rows by normalized tokens before the active position and
+binary-searches the active-token prefix, so a hot request does not rescan the
+bounded 2,048-row snapshot. The index stores pre-tokenized command lines and is
+rebuilt only when the immutable snapshot identity or shell syntax changes.
+
 The standalone host currently maps PowerShell to `POWERSHELL`, its tested
 POSIX-profile categories to `POSIX`, and Command Prompt, Fish, Nushell, and
 unknown profiles to `PLAIN`. Native shell completion callbacks and dialect
 adapters remain host-owned future work; they must supply authoritative
 replacement ranges and never be called from the shared completion hot path.
+
+The compatibility contract is deliberately explicit:
+
+| Capability | POSIX | PowerShell | Plain fallback |
+| --- | --- | --- | --- |
+| Command separators | `;`, `&`, `&&`, `|`, `||` | `;`, `&&`, `|`, `||` | none inferred |
+| Escape outside single quotes | backslash | backtick | backslash tokenization only |
+| Quote recovery | single and double | single and double, including doubled quotes | conservative tokenization |
+| Safe unquoted path escaping | backslash | single-quoted literal | only values needing no dialect escape |
+| Native shell callbacks | host-owned, not invoked synchronously | host-owned, not invoked synchronously | unavailable |
+
+Command Prompt, Fish, Nushell, and unknown dialects remain on the plain
+fallback until each has a tested lexical and quoting contract. This avoids
+silently applying POSIX rules to incompatible shells.
 
 ## Ranking Policy
 
@@ -335,3 +355,19 @@ requests a bounded surplus from every collecting source and applies
 four times the visible limit with an absolute surplus cap of 256 and
 overflow-safe arithmetic, so learned evidence can promote an initially hidden
 candidate without permitting unbounded host work.
+
+## Ranking Calibration
+
+Ranking constants are policy, not universal truth. Changes to priors, smoothing,
+recency buckets, or evidence clamps must pass the deterministic representative
+replay in `CompletionRankingReplayTest`. The replay reports top-one rate,
+top-three rate, and mean reciprocal rank for accepted outcomes covering paths,
+Git branches, and imported Gradle tasks. New anonymized failure cases should be
+added before tuning a weight so calibration cannot optimize only one provider.
+
+Performance changes must also run `TerminalCompletionBenchmark`. The benchmark
+includes eight-provider fusion, 2,048 learned rows, duplicate-heavy evidence,
+hostile collection-cap input, and a real session-MRU lookup backed by the full
+persisted snapshot. The persisted-history case is prewarmed deliberately: it
+measures the normal snapshot-identity cache hit, while index construction stays
+bounded to snapshot mutation or first use for a new shell syntax.

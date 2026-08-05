@@ -90,6 +90,13 @@ class KetraTermIntellijSettingsTest {
     }
 
     @Test
+    fun `completion learning persistence is privacy preserving by default`() {
+        val state = KetraTermIntellijSettings.State()
+
+        assertFalse(state.completionLearningPersistenceEnabled)
+    }
+
+    @Test
     fun `scroll on output setting maps to swing settings`() {
         val enabled =
             KetraTermIntellijSettingsMapper.toSwingSettings(

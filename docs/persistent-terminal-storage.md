@@ -40,8 +40,8 @@ file to `config.toml.broken`, then writes clean defaults so the app can start.
 
 ### `command-completion-stats-v1.tsv`
 
-For standalone this is an opt-in compact suggestion-learning index; IntelliJ currently enables the same
-application-level index without a separate toggle. This is not raw shell history.
+For both standalone and IntelliJ this is an opt-in compact suggestion-learning
+index. This is not raw shell history.
 The file stores aggregate exact-command counters, privacy-preserving command
 shape counters, and source-specific suggestion feedback counters used by the
 completion engine:
@@ -71,8 +71,11 @@ Standalone persistent suggestion learning is disabled by default. It can be enab
 `config.toml`. KetraTerm does not store a raw command-history file. Older
 configs using `persistent_suggestion_learning_enabled` or
 `persistent_command_history_enabled` are accepted as load-only compatibility
-fallbacks, but new saves write only `suggestion_learning_persistence_enabled`. The IntelliJ application-level store is
-currently always enabled and lives in the IDE system directory described above.
+fallbacks, but new saves write only `suggestion_learning_persistence_enabled`.
+IntelliJ exposes **Remember learned suggestions across IDE restarts** and keeps
+it disabled by default. When disabled, session MRU and in-memory learning still
+work, but the plugin neither loads nor writes this file. Its enabled store lives
+in the IDE system directory described above.
 
 Before any exact command or shape row enters persistent learning, both hosts apply
 `TerminalCompletionPersistencePolicy`:

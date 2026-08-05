@@ -25,6 +25,7 @@ import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapsh
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
+import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.ui.IntellijCompletionContext
 import io.github.ketraterm.intellij.ui.IntellijCompletionSuggestionProvider
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
@@ -43,6 +44,7 @@ import java.util.concurrent.atomic.AtomicReference
  */
 @Service(Service.Level.APP)
 internal class KetraTermCompletionService : Disposable {
+    private val settings = KetraTermIntellijSettings.getInstance()
     private val statsStore =
         TerminalCompletionStatsStore(
             PathManager
@@ -54,7 +56,15 @@ internal class KetraTermCompletionService : Disposable {
         IntellijCompletionRegistry(
             loadStats = statsStore::loadSnapshot,
             persistStats = statsStore::persist,
+            persistenceEnabled = settings.completionLearningPersistenceEnabled(),
         )
+    private val settingsListener: () -> Unit = {
+        registry.setPersistenceEnabled(settings.completionLearningPersistenceEnabled())
+    }
+
+    init {
+        settings.addChangeListener(settingsListener)
+    }
 
     /**
      * Creates completion resources bound to one terminal workspace tab.
@@ -108,6 +118,7 @@ internal class KetraTermCompletionService : Disposable {
 
     /** Closes session sources, background workers, and the statistics store. */
     override fun dispose() {
+        settings.removeChangeListener(settingsListener)
         try {
             registry.close()
         } finally {
@@ -137,6 +148,7 @@ internal class KetraTermCompletionService : Disposable {
  * @param statsSource bounded learned-statistics source.
  * @param loadStats startup snapshot loader executed on the statistics worker.
  * @param persistStats snapshot writer executed after statistics mutations.
+ * @param persistenceEnabled whether disk-backed learning is initially enabled.
  * @param sessionMruCapacity positive per-session MRU capacity.
  * @param snapshotService optional application-owned asynchronous snapshot scheduler.
  * @throws IllegalArgumentException if [sessionMruCapacity] is not positive.
@@ -146,6 +158,7 @@ internal class IntellijCompletionRegistry(
     private val statsSource: TerminalCommandStatsCompletionSource = TerminalCompletionSources.commandStats(commandSpecs = specs),
     loadStats: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot() },
     persistStats: (TerminalCommandCompletionStatsSnapshot) -> Unit = {},
+    persistenceEnabled: Boolean = true,
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
     snapshotService: IntellijCompletionSnapshotService? = null,
 ) : AutoCloseable {
@@ -164,6 +177,7 @@ internal class IntellijCompletionRegistry(
             statsSource = statsSource,
             loadStats = loadStats,
             persistStats = persistStats,
+            initialPersistenceEnabled = persistenceEnabled,
             onStatsChanged = ::notifyAllSourcesChanged,
         )
     private val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
@@ -290,6 +304,15 @@ internal class IntellijCompletionRegistry(
                 ?.recordSuccessfulCommand(command, profileId, metadata.workingDirectoryUri)
         }
         statistics.recordFinishedCommand(profileId, metadata)
+    }
+
+    /**
+     * Changes whether the registry may read and write learned statistics on disk.
+     *
+     * @param enabled `true` to persist sanitized learning across IDE restarts.
+     */
+    fun setPersistenceEnabled(enabled: Boolean) {
+        statistics.setPersistenceEnabled(enabled)
     }
 
     private fun notifyAllSourcesChanged() {

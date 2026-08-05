@@ -47,6 +47,7 @@ open class TerminalCompletionBenchmark {
     private lateinit var fusionRequest: TerminalCompletionRequest
     private lateinit var coldStartFusionEngine: TerminalCompletionEngine
     private lateinit var learnedFusionEngine: TerminalCompletionEngine
+    private lateinit var indexedPersistedHistoryEngine: TerminalCompletionEngine
     private lateinit var duplicateFusionEngine: TerminalCompletionEngine
     private lateinit var hostileFusionEngine: TerminalCompletionEngine
 
@@ -86,6 +87,31 @@ open class TerminalCompletionBenchmark {
                 commandSpecs,
                 learnedStatsProvider = { learnedSnapshot },
             )
+        val persistedStatsSource = TerminalCompletionSources.commandStats(capacity = 2_048, commandSpecs = commandSpecs)
+        persistedStatsSource.replaceSnapshot(learnedSnapshot)
+        val sessionMru =
+            TerminalCompletionSources.sessionMru(
+                commandSpecs = commandSpecs,
+                learnedStatsProvider = persistedStatsSource::snapshotAll,
+            )
+        sessionMru.recordSuccessfulCommand(
+            commandLine = "git switch main",
+            profileId = "benchmark",
+            workingDirectoryUri = "file:///repo",
+        )
+        indexedPersistedHistoryEngine =
+            TerminalCompletionEngines.fromSources(
+                sources =
+                    listOf(
+                        TerminalCompletionSourceEntry(
+                            source = sessionMru,
+                            priority = TerminalCompletionSourcePrior.SESSION_MRU,
+                        ),
+                    ),
+                commandSpecs = commandSpecs,
+                learnedStatsProvider = persistedStatsSource::snapshotAll,
+            )
+        indexedPersistedHistoryEngine.complete(fusionRequest)
         duplicateFusionEngine = TerminalCompletionEngines.fromSources(List(8) { sourceEntry(it, 32, duplicateMain = true) }, commandSpecs)
         hostileFusionEngine = TerminalCompletionEngines.fromSources(List(10) { sourceEntry(it, 256, duplicateMain = false) }, commandSpecs)
     }
@@ -108,6 +134,12 @@ open class TerminalCompletionBenchmark {
     @Benchmark
     open fun completeLearnedFusion(blackhole: Blackhole) {
         blackhole.consume(learnedFusionEngine.complete(fusionRequest))
+    }
+
+    /** Measures hot indexed lookup across a full 2,048-row learned snapshot. */
+    @Benchmark
+    open fun completeIndexedPersistedHistory(blackhole: Blackhole) {
+        blackhole.consume(indexedPersistedHistoryEngine.complete(fusionRequest))
     }
 
     @Benchmark

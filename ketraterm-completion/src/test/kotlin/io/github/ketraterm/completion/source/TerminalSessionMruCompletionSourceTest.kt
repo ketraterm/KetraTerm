@@ -19,6 +19,8 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -284,6 +286,65 @@ class TerminalSessionMruCompletionSourceTest {
         assertEquals(listOf("mru"), candidates.map { it.source })
         assertEquals(listOf(TerminalCompletionCandidateKind.PATH), candidates.map { it.kind })
         assertEquals(listOf("learned directory"), candidates.map { it.detail })
+    }
+
+    @Test
+    fun `learned completion in the middle preserves following arguments`() {
+        val source = TerminalCompletionSources.sessionMru()
+        source.recordSuccessfulCommand("git switch main")
+        val commandLine = "git switch ma --detach"
+
+        val candidates =
+            source.complete(
+                TerminalCompletionRequest(
+                    commandLine = commandLine,
+                    cursorOffset = "git switch ma".length,
+                    shellCapabilities = TerminalShellCapabilities.POSIX,
+                ),
+            )
+
+        assertEquals(listOf("main"), candidates.map { it.replacementText })
+        assertEquals("git switch ".length, candidates.single().replacementStartOffset)
+        assertEquals("git switch ma".length, candidates.single().replacementEndOffset)
+        assertEquals(
+            "git switch main --detach",
+            commandLine.replaceRange(
+                candidates.single().replacementStartOffset,
+                candidates.single().replacementEndOffset,
+                candidates.single().replacementText,
+            ),
+        )
+    }
+
+    @Test
+    fun `persisted fallback recency uses age rather than absolute epoch`() {
+        val now = 2_000_000_000_000L
+        val snapshot =
+            TerminalCommandCompletionStatsSnapshot(
+                commandStats =
+                    listOf(
+                        TerminalCommandCompletionStats(
+                            commandLine = "tool a-old",
+                            successCount = 1,
+                            lastUsedEpochMillis = now - 31L * 24L * 60L * 60L * 1_000L,
+                        ),
+                        TerminalCommandCompletionStats(
+                            commandLine = "tool z-new",
+                            successCount = 1,
+                            lastUsedEpochMillis = now - 60L * 1_000L,
+                        ),
+                    ),
+            )
+        val source =
+            SessionMruCompletionSourceImpl(
+                commandSpecs = emptyList(),
+                learnedStatsProvider = { snapshot },
+                clockEpochMillis = { now },
+            )
+
+        val candidates = source.complete(request("tool "))
+
+        assertEquals(listOf("z-new", "a-old"), candidates.map { it.replacementText })
     }
 
     private fun request(

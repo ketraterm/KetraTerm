@@ -32,12 +32,20 @@ internal object LearnedCommandCandidateProjector {
         score: Int,
         detailPrefix: String,
     ): TerminalCompletionCandidate? {
-        val learnedLine =
-            TerminalCommandLineTokenizer.parse(
-                commandLine = learnedCommand,
-                cursorOffset = learnedCommand.length,
-                shellSyntax = request.shellCapabilities.syntax,
-            )
+        val learnedLine = TerminalCommandLineTokenizer.parse(learnedCommand, learnedCommand.length, request.shellCapabilities.syntax)
+        return project(request, requestLine, completionContext, learnedCommand, learnedLine, source, score, detailPrefix)
+    }
+
+    fun project(
+        request: TerminalCompletionRequest,
+        requestLine: TerminalCommandLineContext,
+        completionContext: TerminalCompletionContext,
+        learnedCommand: String,
+        learnedLine: TerminalCommandLineContext,
+        source: String,
+        score: Int,
+        detailPrefix: String,
+    ): TerminalCompletionCandidate? {
         val activeIndex = requestLine.activeTokenIndex
         val learnedToken = learnedLine.tokens.getOrNull(activeIndex) ?: return null
         if (!matchingPrefixTokens(requestLine, learnedLine, activeIndex)) return null
@@ -45,14 +53,27 @@ internal object LearnedCommandCandidateProjector {
 
         val replacementStartInLearned = replacementStartInLearnedCommand(requestLine, completionContext, learnedToken.startOffset)
         if (replacementStartInLearned !in learnedToken.startOffset..learnedLine.commandEndOffset) return null
-        val replacementText = learnedCommand.substring(replacementStartInLearned, learnedLine.commandEndOffset)
+        val preserveFollowingText = requestLine.hasFollowingCommandText(request.commandLine)
+        val learnedReplacementEnd = if (preserveFollowingText) learnedToken.endOffset else learnedLine.commandEndOffset
+        val replacementText = learnedCommand.substring(replacementStartInLearned, learnedReplacementEnd)
         if (replacementText.isBlank()) return null
+        val replacementEnd =
+            if (preserveFollowingText) {
+                completionContext.replacementEndOffset
+            } else {
+                maxOf(requestLine.commandEndOffset, completionContext.replacementEndOffset)
+            }
+        if (request.commandLine.replaceRange(completionContext.replacementStartOffset, replacementEnd, replacementText) ==
+            request.commandLine
+        ) {
+            return null
+        }
 
         val kind = semanticKind(completionContext)
         return TerminalCompletionCandidate(
             replacementText = replacementText,
             replacementStartOffset = completionContext.replacementStartOffset,
-            replacementEndOffset = maxOf(requestLine.commandEndOffset, completionContext.replacementEndOffset),
+            replacementEndOffset = replacementEnd,
             displayText = replacementText,
             detail = detail(detailPrefix, kind, completionContext.expectedPathKind),
             source = source,
@@ -60,6 +81,12 @@ internal object LearnedCommandCandidateProjector {
             score = score,
             valueDomain = completionContext.expectedValueDomain,
         )
+    }
+
+    private fun TerminalCommandLineContext.hasFollowingCommandText(commandLine: String): Boolean {
+        val activeToken = tokens.getOrNull(activeTokenIndex) ?: return false
+        if (activeToken.endOffset >= commandEndOffset) return false
+        return commandLine.substring(activeToken.endOffset, commandEndOffset).isNotBlank()
     }
 
     private fun matchingPrefixTokens(

@@ -83,6 +83,34 @@ class TerminalCommandLineTokenizerTest {
     }
 
     @Test
+    fun `plain syntax does not infer command separators`() {
+        val commandLine = "echo first && cd src"
+        val context =
+            TerminalCommandLineTokenizer.parse(
+                commandLine,
+                commandLine.length,
+                TerminalShellSyntax.PLAIN,
+            )
+
+        assertEquals(listOf("echo", "first", "&&", "cd", "src"), context.tokens.map { it.text })
+        assertEquals(false, context.precededByOperator)
+    }
+
+    @Test
+    fun `PowerShell treats invocation ampersand as syntax rather than a separator`() {
+        val commandLine = "& tool argument"
+        val context =
+            TerminalCommandLineTokenizer.parse(
+                commandLine,
+                commandLine.length,
+                TerminalShellSyntax.POWERSHELL,
+            )
+
+        assertEquals(listOf("&", "tool", "argument"), context.tokens.map { it.text })
+        assertEquals(false, context.precededByOperator)
+    }
+
+    @Test
     fun `unclosed quote retains latest completed segment without failing`() {
         val commandLine = "git status && cd \"Idea Pro"
         val context = parse(commandLine, commandLine.length)

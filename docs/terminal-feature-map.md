@@ -126,8 +126,8 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   capabilities, shell-word tokenization, a shared internal completion-context resolver for
   command/subcommand/option/value/argument positions, spec-backed evaluation, spec-aware command-line classification,
   context-aware live trigger policy, context-aware merged ranking for command/subcommand/option/value/path/domain
-  positions, privacy-preserving argument shape categories, source-specific accepted/dismissed feedback stats, bounded
-  shape-aware and feedback-aware ranking decorators, bounded surplus collection before final presentation truncation, a
+  positions, privacy-preserving argument shape categories, source-specific accepted/dismissed feedback stats, one
+  global evidence-fusion ranker, bounded surplus collection before final presentation truncation, a
   bounded in-memory session MRU source, command-aware path
   completion, quote-preserving and shell-escaped path replacement for active tokens, and a small curated bootstrap spec
   set for common developer CLIs and shell path commands. The standalone and IntelliJ hosts wire that engine through a
@@ -147,6 +147,9 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   resolve to that command segment, and unclosed quotes recover to the closest logical segment. The exact `--` terminator
   changes later tokens to positional arguments, suppressing option, option-value, and subcommand completion.
   Whole-command history is suppressed after an operator because it cannot safely replace a segment-local range.
+  Mid-command learned completion replaces only the active token and preserves following arguments. Positive persisted
+  commands use a reusable snapshot-identity/shell-syntax prefix index rather than a per-request history scan, and
+  recency is based on evidence age from one request clock snapshot.
   Gradle-style repeatable task lists keep suggesting unused sibling tasks after existing tasks, so `./gradlew clean bu`
   can suggest `build`. IntelliJ augments those bootstrap tasks from its imported Gradle model, including canonical
   `:module:task` paths and short task names scoped by `-p`/`--project-dir`. Dynamic value domains such as Git branches,
@@ -164,6 +167,8 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   inside project roots and retains the bounded local scanner for terminal directories outside the project. Dynamic
   sources are additive factory registrations whose closeable snapshots are released with their session; completion
   statistics execution and persistence are isolated from source/session composition.
+  IntelliJ completion persistence is an explicit, disabled-by-default setting; session-local MRU and in-memory
+  evidence remain active without disk access.
 - **Shared Completion Host Support**: `ketraterm-completion-host` owns the bounded worker queue, generation-safe
   directory and keyed-value snapshots, authority-preserving local path resolution, and bounded local scanning. Each
   product host retains source composition and priority policy. `ketraterm-completion-persistence` owns sanitized

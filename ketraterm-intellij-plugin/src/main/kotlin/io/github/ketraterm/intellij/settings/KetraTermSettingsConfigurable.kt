@@ -78,6 +78,8 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
     private val pasteOnMiddleClickCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.pasteOnMiddleClick"))
     private val overrideIdeShortcutsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.overrideIdeShortcuts"))
     private val shellSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
+    private val completionLearningPersistenceCheckBox =
+        JBCheckBox(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence"))
     private val scrollOnOutputCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.scrollOnOutput"))
 
     private val pasteSanitizationCombo = ComboBox(pasteSanitizationOptions())
@@ -193,6 +195,10 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
                         cell(shellSuggestionsCheckBox)
                     }
                     row {
+                        cell(completionLearningPersistenceCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence.comment"))
+                    }
+                    row {
                         cell(scrollOnOutputCheckBox)
                     }
                 }
@@ -264,6 +270,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
         pasteOnMiddleClickCheckBox.isSelected = normalized.pasteOnMiddleClick
         overrideIdeShortcutsCheckBox.isSelected = normalized.overrideIdeShortcuts
         shellSuggestionsCheckBox.isSelected = normalized.shellSuggestionsEnabled
+        completionLearningPersistenceCheckBox.isSelected = normalized.completionLearningPersistenceEnabled
         scrollOnOutputCheckBox.isSelected = normalized.scrollOnOutput
         pasteSanitizationCombo.selectedItem = pasteSanitizationOptions().firstOrNull { it.id == normalized.pasteSanitization }
         clipboardLocalWriteCombo.selectedItem = visiblePermissionOption(normalized.clipboardLocalWrite, "prompt")
@@ -290,6 +297,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
             pasteOnMiddleClick = pasteOnMiddleClickCheckBox.isSelected,
             overrideIdeShortcuts = overrideIdeShortcutsCheckBox.isSelected,
             shellSuggestionsEnabled = shellSuggestionsCheckBox.isSelected,
+            completionLearningPersistenceEnabled = completionLearningPersistenceCheckBox.isSelected,
             scrollbackLines = spinnerValue(scrollbackSpinner),
             lineHeight = spinnerDoubleValue(lineHeightSpinner).toFloat(),
             shellPath = selectedShellPath(),

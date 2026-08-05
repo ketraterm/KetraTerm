@@ -38,12 +38,14 @@ internal class SessionMruCompletionSourceImpl(
     capacity: Int = DEFAULT_CAPACITY,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     private val learnedStatsProvider: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot.EMPTY },
+    private val clockEpochMillis: () -> Long = System::currentTimeMillis,
 ) : TerminalSessionMruCompletionSource,
     ContextAwareCompletionSource {
     private val lock = Any()
     private val commandHistory: SessionCommandHistory
     private val observedTokens: SessionObservedTokenIndex
     private val commandSpecs = commandSpecs.toList()
+    private val learnedHistoryIndexCache = LearnedHistoryCandidateIndexCache()
     private var nextSequence = 1L
 
     init {
@@ -97,11 +99,13 @@ internal class SessionMruCompletionSourceImpl(
                     observedTokens.appendCandidates(request, commandLineContext, this)
                 }
             }.toMutableList()
+        val learnedSnapshot = learnedStatsProvider()
         PersistedHistoryCandidateBuilder.appendCandidates(
             request = request,
             lineContext = commandLineContext,
             completionContext = completionContext,
-            snapshot = learnedStatsProvider().commandStats,
+            index = learnedHistoryIndexCache.indexFor(learnedSnapshot, request.shellCapabilities.syntax),
+            nowEpochMillis = clockEpochMillis().coerceAtLeast(0L),
             destination = candidates,
         )
         return candidates

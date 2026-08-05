@@ -19,11 +19,10 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
 import io.github.ketraterm.completion.commandline.TerminalCompletionContext
-import io.github.ketraterm.completion.commandline.commandPrefix
 import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
 import io.github.ketraterm.completion.internal.isRelativeCdCommand
-import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.ranking.LearnedEvidenceScoring
 import io.github.ketraterm.completion.ranking.TerminalCompletionScoreAdjustment
 
 /** Builds learned fallback candidates from persisted positive command evidence. */
@@ -32,14 +31,12 @@ internal object PersistedHistoryCandidateBuilder {
         request: TerminalCompletionRequest,
         lineContext: TerminalCommandLineContext,
         completionContext: TerminalCompletionContext,
-        snapshot: List<TerminalCommandCompletionStats>,
+        index: LearnedHistoryCandidateIndex,
+        nowEpochMillis: Long,
         destination: MutableList<TerminalCompletionCandidate>,
     ) {
-        if (snapshot.isEmpty()) return
-        val normalizedPrefix = normalizeTerminalCommandLine(lineContext.commandPrefix(request.commandLine))
-        for (entry in snapshot) {
-            if (!entry.hasPositiveSuggestionSignal()) continue
-            if (!entry.normalizedCommandLine.startsWith(normalizedPrefix) || entry.normalizedCommandLine == normalizedPrefix) continue
+        for (indexed in index.matching(lineContext)) {
+            val entry = indexed.stats
             if (!entry.isValidFor(request)) continue
             LearnedCommandCandidateProjector
                 .project(
@@ -47,14 +44,13 @@ internal object PersistedHistoryCandidateBuilder {
                     requestLine = lineContext,
                     completionContext = completionContext,
                     learnedCommand = entry.commandLine,
+                    learnedLine = indexed.lineContext,
                     source = SOURCE_MRU,
-                    score = entry.localScore(request),
+                    score = entry.localScore(request, nowEpochMillis),
                     detailPrefix = "learned",
                 )?.let(destination::add)
         }
     }
-
-    private fun TerminalCommandCompletionStats.hasPositiveSuggestionSignal(): Boolean = successCount > 0 || acceptedCount > 0
 
     private fun TerminalCommandCompletionStats.isValidFor(request: TerminalCompletionRequest): Boolean {
         if (!isRelativeCdCommand(commandLine)) return true
@@ -63,7 +59,10 @@ internal object PersistedHistoryCandidateBuilder {
         return canonicalizeWorkingDirectoryUri(entryDirectory) == canonicalizeWorkingDirectoryUri(requestDirectory)
     }
 
-    private fun TerminalCommandCompletionStats.localScore(request: TerminalCompletionRequest): Int {
+    private fun TerminalCommandCompletionStats.localScore(
+        request: TerminalCompletionRequest,
+        nowEpochMillis: Long,
+    ): Int {
         val counterScore =
             BASE_SCORE.toLong() +
                 TerminalCompletionScoreAdjustment.counterContribution(SCORE_POLICY, useCount, USE_COUNT_SCORE) +
@@ -71,7 +70,7 @@ internal object PersistedHistoryCandidateBuilder {
                 TerminalCompletionScoreAdjustment.counterContribution(SCORE_POLICY, failureCount, -FAILURE_COUNT_PENALTY) +
                 TerminalCompletionScoreAdjustment.counterContribution(SCORE_POLICY, acceptedCount, ACCEPTED_COUNT_SCORE) +
                 TerminalCompletionScoreAdjustment.counterContribution(SCORE_POLICY, dismissedCount, -DISMISSED_COUNT_PENALTY) +
-                minOf(lastUsedEpochMillis / RECENCY_SCORE_BUCKET_MILLIS, MAX_RECENCY_SCORE)
+                LearnedEvidenceScoring.recencyBoost(nowEpochMillis, lastUsedEpochMillis)
         return TerminalCompletionScoreAdjustment.score(
             policy = SCORE_POLICY,
             request = request,
@@ -91,8 +90,6 @@ internal object PersistedHistoryCandidateBuilder {
     private const val MAX_COUNTER_SCORE_UNITS = 50
     private const val PROFILE_MATCH_SCORE = 50
     private const val WORKING_DIRECTORY_MATCH_SCORE = 80
-    private const val RECENCY_SCORE_BUCKET_MILLIS = 60_000L
-    private const val MAX_RECENCY_SCORE = 200L
     private val SCORE_POLICY =
         TerminalCompletionScoreAdjustment.Policy(
             maxCounterScoreUnits = MAX_COUNTER_SCORE_UNITS,

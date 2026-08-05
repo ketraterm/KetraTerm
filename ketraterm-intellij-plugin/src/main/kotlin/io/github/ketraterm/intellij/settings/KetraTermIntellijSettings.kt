@@ -74,6 +74,18 @@ class KetraTermIntellijSettings :
     fun overrideIdeShortcuts(): Boolean = KetraTermIntellijSettingsNormalizer.normalize(state).overrideIdeShortcuts
 
     /**
+     * Returns whether learned completion statistics may be stored on disk.
+     *
+     * Disabling persistence does not disable session-local MRU or in-memory
+     * ranking. It only prevents the IntelliJ host from reading or writing the
+     * learned completion snapshot.
+     *
+     * @return `true` when completion learning may cross IDE restarts.
+     */
+    fun completionLearningPersistenceEnabled(): Boolean =
+        KetraTermIntellijSettingsNormalizer.normalize(state).completionLearningPersistenceEnabled
+
+    /**
      * Replaces persisted IDE terminal settings with a normalized state.
      *
      * @param nextState new settings state produced by the IntelliJ settings UI.
@@ -183,6 +195,8 @@ class KetraTermIntellijSettings :
      * @property defaultTabName user-visible name for newly opened tabs.
      * @property shellSuggestionsEnabled whether host-provided shell suggestions
      * may appear in IDE-hosted terminals.
+     * @property completionLearningPersistenceEnabled whether sanitized learned
+     * completion statistics may be read from and written to local disk.
      */
     data class State(
         @JvmField val themeId: String = DEFAULT_THEME_ID,
@@ -205,6 +219,7 @@ class KetraTermIntellijSettings :
         @JvmField val environmentVariables: String = "",
         @JvmField val defaultTabName: String = "Local",
         @JvmField val shellSuggestionsEnabled: Boolean = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED,
+        @JvmField val completionLearningPersistenceEnabled: Boolean = false,
         @JvmField val pasteSanitization: String = "raw",
         @JvmField val clipboardLocalWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_LOCAL_WRITE.name.lowercase(Locale.ROOT),
         @JvmField val clipboardRemoteWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_REMOTE_WRITE.name.lowercase(Locale.ROOT),

@@ -38,15 +38,18 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @param statsSource bounded shared statistics index.
  * @param loadStats startup snapshot loader.
  * @param persistStats snapshot persistence callback.
+ * @param initialPersistenceEnabled whether disk-backed learning is initially enabled.
  * @param onStatsChanged callback invoked after loading or mutation.
  */
 internal class IntellijCompletionStatisticsCoordinator(
     val statsSource: TerminalCommandStatsCompletionSource,
-    loadStats: () -> TerminalCommandCompletionStatsSnapshot,
+    private val loadStats: () -> TerminalCommandCompletionStatsSnapshot,
     private val persistStats: (TerminalCommandCompletionStatsSnapshot) -> Unit,
+    initialPersistenceEnabled: Boolean,
     private val onStatsChanged: () -> Unit,
 ) : AutoCloseable {
     private val closed = AtomicBoolean()
+    private val persistenceEnabled = AtomicBoolean(initialPersistenceEnabled)
     private val executor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "intellij-completion-stats").apply { isDaemon = true }
@@ -59,8 +62,35 @@ internal class IntellijCompletionStatisticsCoordinator(
         )
 
     init {
-        executor.execute {
-            statsSource.replaceSnapshot(loadStats())
+        if (persistenceEnabled.get()) {
+            executor.execute {
+                if (!persistenceEnabled.get()) return@execute
+                statsSource.replaceSnapshot(loadStats())
+                onStatsChanged()
+            }
+        }
+    }
+
+    /**
+     * Enables or disables disk-backed learned completion statistics.
+     *
+     * Enabling loads the stored snapshot when no in-memory learning exists.
+     * Otherwise, current session learning is persisted and takes precedence.
+     * Disabling takes effect before already-queued mutations execute.
+     *
+     * @param enabled `true` to permit snapshot reads and writes.
+     */
+    fun setPersistenceEnabled(enabled: Boolean) {
+        if (!persistenceEnabled.compareAndSet(!enabled, enabled)) return
+        if (!enabled || closed.get()) return
+        execute {
+            if (!persistenceEnabled.get()) return@execute
+            val current = statsSource.snapshotAll()
+            if (current == TerminalCommandCompletionStatsSnapshot.EMPTY) {
+                statsSource.replaceSnapshot(loadStats())
+            } else {
+                persistStats(current)
+            }
             onStatsChanged()
         }
     }
@@ -88,14 +118,16 @@ internal class IntellijCompletionStatisticsCoordinator(
     }
 
     private fun executeMutation(mutation: () -> Unit) {
-        if (closed.get()) return
-        runCatching {
-            executor.execute {
-                mutation()
-                persistStats(statsSource.snapshotAll())
-                onStatsChanged()
-            }
+        execute {
+            mutation()
+            if (persistenceEnabled.get()) persistStats(statsSource.snapshotAll())
+            onStatsChanged()
         }
+    }
+
+    private fun execute(action: () -> Unit) {
+        if (closed.get()) return
+        runCatching { executor.execute(action) }
     }
 
     /** Drains queued mutations and closes the statistics worker idempotently. */

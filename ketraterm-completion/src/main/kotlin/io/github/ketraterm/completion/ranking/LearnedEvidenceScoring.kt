@@ -96,7 +96,7 @@ internal object LearnedEvidenceScoring {
         right: Long,
     ): Long = if (Long.MAX_VALUE - left < right) Long.MAX_VALUE else left + right
 
-    private fun recencyBoost(
+    fun recencyBoost(
         nowEpochMillis: Long,
         lastUsedEpochMillis: Long,
     ): Int {
