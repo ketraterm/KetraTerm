@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Raised the plugin runtime requirement to Java 25 and the minimum supported IntelliJ Platform build to 262 (2026.2). Earlier IDE builds and Java 21-24 runtimes are no longer supported.
 - Improved terminal rendering performance.
 
 ## [0.2.1] - 2026-07-14

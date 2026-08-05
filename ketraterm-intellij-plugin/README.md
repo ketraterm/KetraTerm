@@ -28,6 +28,10 @@ Current intent:
 
 ## Build
 
+KetraTerm and the IntelliJ 2026.2 plugin compile with JDK 25. This keeps the
+shared modules, standalone application, tests, benchmarks, and IDE-facing
+classes on one supported toolchain.
+
 From this directory:
 
 ```text

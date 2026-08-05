@@ -35,6 +35,7 @@ val pluginVersionProvider =
 val intellijIdeaVersion = providers.gradleProperty("intellijIdeaVersion")
 val pluginSinceBuild = providers.gradleProperty("pluginSinceBuild")
 val pluginPublishChannel = providers.gradleProperty("pluginPublishChannel")
+val pluginJavaVersion = 25
 val pluginDescription =
     """
     <p>KetraTerm is a fast, modern terminal for IntelliJ Platform IDEs, built for shells, command-line tools, and rich TUI applications that developers keep open all day.</p>
@@ -141,7 +142,7 @@ intellijPlatform {
 }
 
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(pluginJavaVersion)
     compilerOptions {
         // Avoid compatibility bridges for inherited IntelliJ Kotlin interface defaults.
         // The plugin has no public Kotlin interface ABI to preserve.

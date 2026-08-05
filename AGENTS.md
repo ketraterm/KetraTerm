@@ -1,6 +1,6 @@
 # Terminal Pipeline Agent Guide
 
-This repository is building a modern, secure terminal pipeline in Kotlin/JVM 21.
+This repository is building a modern, secure terminal pipeline in Kotlin/JVM 25.
 It is not chasing literal full xterm parity. The goal is a clean, fast,
 professional terminal architecture for contemporary shells and TUIs.
 

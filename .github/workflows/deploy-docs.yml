@@ -36,11 +36,11 @@ jobs:
             echo "RELEASE=false" >> "$GITHUB_ENV"
           fi
 
-      - name: Setup Java 21
+      - name: Setup Java 25
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '25'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4

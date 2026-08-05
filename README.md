@@ -1,6 +1,6 @@
 # KetraTerm Terminal
 
-**KetraTerm**  is a next-generation, high-performance, strictly modular terminal emulator library written in **Kotlin/JVM 21**.
+**KetraTerm**  is a next-generation, high-performance, strictly modular terminal emulator library written in **Kotlin/JVM 25**.
 
 Designed for embedding into IDEs, developer tools, and standalone desktop applications, KetraTerm provides a clean, fast, and modern terminal architecture. It rejects the bloated legacy compatibility of the 1980s (like printer passthroughs or Tektronix vector graphics) to focus on contemporary shells and text-user interfaces (TUIs).
 
@@ -113,7 +113,7 @@ KetraTerm is composed of strict, decoupled Gradle modules:
 ## Development & Verification
 
 ### Prerequisites
-* **JDK 21 or higher**
+* **JDK 25 or higher**
 * **Gradle 7.4+**
 
 ### Command Reference
