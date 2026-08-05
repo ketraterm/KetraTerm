@@ -111,11 +111,11 @@ internal class LearnedCompletionEvidenceIndex private constructor(
             for (row in snapshot.commandStats) {
                 val tokens = TerminalCommandLineTokenizer.parse(row.commandLine, row.commandLine.length, shellSyntax).tokens
                 if (tokens.isEmpty()) continue
-                outcomeResolver.learnedKey(row.commandLine, shellSyntax, NO_PATH_TOKEN, pathAware = false)?.let { key ->
+                outcomeResolver.learnedKey(tokens, NO_PATH_TOKEN, pathAware = false)?.let { key ->
                     exactRows.getOrPut(key, ::ArrayList).add(row)
                 }
                 for (tokenIndex in tokens.indices) {
-                    outcomeResolver.learnedKey(row.commandLine, shellSyntax, tokenIndex, pathAware = true)?.let { key ->
+                    outcomeResolver.learnedKey(tokens, tokenIndex, pathAware = true)?.let { key ->
                         exactRows.getOrPut(key, ::ArrayList).add(row)
                     }
                 }

@@ -18,6 +18,7 @@ package io.github.ketraterm.completion.ranking
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.api.TerminalShellSyntax
+import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -39,7 +40,8 @@ class LearnedCompletionEvidenceIndexTest {
                     ),
             )
         val index = LearnedCompletionEvidenceIndex.build(snapshot, TerminalShellSyntax.POSIX, resolver)
-        val key = requireNotNull(resolver.learnedKey("cd build", TerminalShellSyntax.POSIX, 1, pathAware = true))
+        val tokens = TerminalCommandLineTokenizer.parse("cd build", "cd build".length, TerminalShellSyntax.POSIX).tokens
+        val key = requireNotNull(resolver.learnedKey(tokens, 1, pathAware = true))
 
         assertEquals(192, index.exactAdjustment(key, request(), NOW))
     }

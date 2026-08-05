@@ -18,8 +18,8 @@ package io.github.ketraterm.completion.ranking
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.commandline.TerminalCommandLineClassifier
+import io.github.ketraterm.completion.commandline.TerminalCommandLineToken
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.TerminalCompletionContext
 import io.github.ketraterm.completion.internal.commandLineAfterCandidate
@@ -36,12 +36,6 @@ internal class TerminalCompletionOutcomeKeyResolver(
         context: TerminalCompletionContext,
     ): ResolvedCompletionOutcome? {
         val commandLine = request.commandLineAfterCandidate(candidate) ?: return null
-        val classification =
-            TerminalCommandLineClassifier.classify(
-                commandLine,
-                commandSpecs,
-                request.shellCapabilities.syntax,
-            ) ?: return null
         val pathAware =
             candidate.kind == TerminalCompletionCandidateKind.PATH ||
                 context.expectedPathKind != TerminalPathArgumentKind.NONE
@@ -53,10 +47,15 @@ internal class TerminalCompletionOutcomeKeyResolver(
                 projectedCursorOffset,
                 request.shellCapabilities.syntax,
             )
+        val classification =
+            TerminalCommandLineClassifier.classify(
+                commandLine,
+                projectedContext.tokens,
+                commandSpecs,
+            ) ?: return null
         val learnedKey =
             learnedKey(
-                commandLine = commandLine,
-                shellSyntax = request.shellCapabilities.syntax,
+                tokens = projectedContext.tokens,
                 pathTokenIndex = projectedContext.activeTokenIndex,
                 pathAware = pathAware,
             ) ?: return null
@@ -68,12 +67,10 @@ internal class TerminalCompletionOutcomeKeyResolver(
     }
 
     fun learnedKey(
-        commandLine: String,
-        shellSyntax: TerminalShellSyntax,
+        tokens: List<TerminalCommandLineToken>,
         pathTokenIndex: Int,
         pathAware: Boolean,
     ): LearnedCompletionOutcomeKey? {
-        val tokens = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length, shellSyntax).tokens
         if (tokens.isEmpty()) return null
         val normalizedPathIndex = if (pathAware && pathTokenIndex in tokens.indices) pathTokenIndex else NO_PATH_TOKEN
         return LearnedCompletionOutcomeKey(

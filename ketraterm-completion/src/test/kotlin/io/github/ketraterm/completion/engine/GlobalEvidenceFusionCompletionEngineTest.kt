@@ -645,6 +645,33 @@ class GlobalEvidenceFusionCompletionEngineTest {
     }
 
     @Test
+    fun `outcomes before an operator are grouped by their own command segment`() {
+        val commandLine = "git st && echo later"
+        val request =
+            TerminalCompletionRequest(
+                commandLine = commandLine,
+                cursorOffset = "git st".length,
+                maxCandidates = 8,
+                shellCapabilities = TerminalShellCapabilities.POSIX,
+            )
+        val candidates =
+            engine(
+                listOf(
+                    entry(
+                        source(
+                            candidate("status", 4, 6, "status", TerminalCompletionCandidateKind.SUBCOMMAND),
+                            candidate("log", 4, 6, "log", TerminalCompletionCandidateKind.SUBCOMMAND),
+                        ),
+                        0,
+                    ),
+                ),
+            ).complete(request)
+
+        assertEquals(2, candidates.size)
+        assertEquals(setOf("status", "log"), candidates.mapTo(mutableSetOf()) { it.replacementText })
+    }
+
+    @Test
     fun `invalid replacement ranges use stable fallback grouping`() {
         val malformed = candidate("status", 20, 30, "first", TerminalCompletionCandidateKind.SUBCOMMAND)
         val candidates =

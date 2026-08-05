@@ -31,6 +31,10 @@ internal fun classifyGenericCommandLineShape(
 ): TerminalCommandLineShape? {
     if (commandLine.isBlank() || commandLine.hasTerminalCompletionLineBreak()) return null
     val tokens = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length, shellSyntax).tokens
+    return classifyGenericCommandLineShape(tokens)
+}
+
+internal fun classifyGenericCommandLineShape(tokens: List<TerminalCommandLineToken>): TerminalCommandLineShape? {
     var tokenIndex = tokens.firstCommandTokenIndex()
     if (tokenIndex >= tokens.size) return null
 

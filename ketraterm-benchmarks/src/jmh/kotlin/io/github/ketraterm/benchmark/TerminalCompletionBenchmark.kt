@@ -45,6 +45,8 @@ open class TerminalCompletionBenchmark {
     private lateinit var chainedRequest: TerminalCompletionRequest
     private lateinit var unclosedQuoteRequest: TerminalCompletionRequest
     private lateinit var fusionRequest: TerminalCompletionRequest
+    private lateinit var realisticSources: List<TerminalCompletionSourceEntry>
+    private lateinit var learnedSnapshot: TerminalCommandCompletionStatsSnapshot
     private lateinit var coldStartFusionEngine: TerminalCompletionEngine
     private lateinit var learnedFusionEngine: TerminalCompletionEngine
     private lateinit var indexedPersistedHistoryEngine: TerminalCompletionEngine
@@ -64,9 +66,9 @@ open class TerminalCompletionBenchmark {
                 workingDirectoryUri = "file:///repo",
                 shellCapabilities = TerminalShellCapabilities.POSIX,
             )
-        val realisticSources = List(8) { sourceIndex -> sourceEntry(sourceIndex, 32, duplicateMain = true) }
+        realisticSources = List(8) { sourceIndex -> sourceEntry(sourceIndex, 32, duplicateMain = true) }
         coldStartFusionEngine = TerminalCompletionEngines.fromSources(realisticSources, commandSpecs)
-        val learnedSnapshot =
+        learnedSnapshot =
             TerminalCommandCompletionStatsSnapshot(
                 commandStats =
                     List(2_048) { index ->
@@ -134,6 +136,18 @@ open class TerminalCompletionBenchmark {
     @Benchmark
     open fun completeLearnedFusion(blackhole: Blackhole) {
         blackhole.consume(learnedFusionEngine.complete(fusionRequest))
+    }
+
+    /** Measures cold construction of the 2,048-row learned-evidence index and one ranked completion. */
+    @Benchmark
+    open fun buildLearnedIndexAndComplete(blackhole: Blackhole) {
+        val coldEngine =
+            TerminalCompletionEngines.fromSources(
+                sources = realisticSources,
+                commandSpecs = commandSpecs,
+                learnedStatsProvider = { learnedSnapshot },
+            )
+        blackhole.consume(coldEngine.complete(fusionRequest))
     }
 
     /** Measures hot indexed lookup across a full 2,048-row learned snapshot. */

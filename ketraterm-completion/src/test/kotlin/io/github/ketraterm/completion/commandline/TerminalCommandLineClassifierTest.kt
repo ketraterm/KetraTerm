@@ -150,6 +150,27 @@ class TerminalCommandLineClassifierTest {
     }
 
     @Test
+    fun `pretokenized classification matches direct classification`() {
+        val commandLine = "Get-Item `| Where-Object"
+        val tokens = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length, TerminalShellSyntax.POWERSHELL).tokens
+
+        val direct =
+            TerminalCommandLineClassifier.classify(
+                commandLine,
+                TerminalCommandSpecs.defaults(),
+                TerminalShellSyntax.POWERSHELL,
+            )
+        val pretokenized =
+            TerminalCommandLineClassifier.classify(
+                commandLine,
+                tokens,
+                TerminalCommandSpecs.defaults(),
+            )
+
+        assertEquals(direct, pretokenized)
+    }
+
+    @Test
     fun `rejects blank multiline and assignment only commands`() {
         assertNull(TerminalCommandLineClassifier.classify("   ", TerminalCommandSpecs.defaults()))
         assertNull(TerminalCommandLineClassifier.classify("git status\ngit log", TerminalCommandSpecs.defaults()))

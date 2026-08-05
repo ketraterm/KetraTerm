@@ -49,12 +49,39 @@ internal object TerminalCommandLineClassifier {
     ): TerminalCommandLineClassification? {
         if (commandLine.isBlank() || commandLine.hasTerminalCompletionLineBreak()) return null
         val tokens = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length, shellSyntax).tokens
+        return classify(tokens, specs)
+    }
+
+    /**
+     * Classifies an already-tokenized active command segment.
+     *
+     * [commandLine] is retained only for rejecting blank or multi-line projected
+     * outcomes. Reusing [tokens] avoids reparsing inside candidate ranking.
+     *
+     * @param commandLine projected command line used for input validation.
+     * @param tokens tokens from the active command segment containing the candidate.
+     * @param specs command specs used to recognize executable and subcommand paths.
+     * @return privacy-preserving classification, or `null` when no command exists.
+     */
+    fun classify(
+        commandLine: String,
+        tokens: List<TerminalCommandLineToken>,
+        specs: List<TerminalCommandSpec>,
+    ): TerminalCommandLineClassification? {
+        if (commandLine.isBlank() || commandLine.hasTerminalCompletionLineBreak()) return null
+        return classify(tokens, specs)
+    }
+
+    private fun classify(
+        tokens: List<TerminalCommandLineToken>,
+        specs: List<TerminalCommandSpec>,
+    ): TerminalCommandLineClassification? {
         var tokenIndex = tokens.firstCommandTokenIndex()
         if (tokenIndex >= tokens.size) return null
 
         val executableToken = normalizeTerminalCommandToken(tokens[tokenIndex].text)
         if (executableToken.isBlank()) return null
-        val rootSpec = findCommandSpec(specs, executableToken) ?: return classifyWithoutSpec(commandLine, shellSyntax)
+        val rootSpec = findCommandSpec(specs, executableToken) ?: return classifyWithoutSpec(tokens)
 
         tokenIndex++
         var currentSpec = rootSpec
@@ -143,11 +170,8 @@ internal object TerminalCommandLineClassifier {
                 .firstOrNull { it.repeatableSubcommands }
                 ?.let { repeatableSource -> findCommandSpec(repeatableSource.subcommands, normalizedToken) }
 
-    private fun classifyWithoutSpec(
-        commandLine: String,
-        shellSyntax: TerminalShellSyntax,
-    ): TerminalCommandLineClassification? {
-        val shape = classifyGenericCommandLineShape(commandLine, shellSyntax) ?: return null
+    private fun classifyWithoutSpec(tokens: List<TerminalCommandLineToken>): TerminalCommandLineClassification? {
+        val shape = classifyGenericCommandLineShape(tokens) ?: return null
         val arguments =
             buildList(shape.positionalArgumentCount + shape.optionValueCount) {
                 repeat(shape.optionValueCount) {
