@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.ranking
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
+import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
 import io.github.ketraterm.completion.model.TerminalCommandLineShape
 import io.github.ketraterm.completion.model.TerminalCommandShapeStats
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
@@ -124,11 +125,12 @@ private class FeedbackContextRows(
         profileId: String?,
         workingDirectoryUri: String?,
     ): List<TerminalCompletionFeedbackStats> {
-        if (profileId != null && workingDirectoryUri != null) {
-            byProfileAndDirectory[profileId]?.get(workingDirectoryUri)?.let { return it }
+        val directoryKey = workingDirectoryUri?.let(::canonicalizeWorkingDirectoryUri)
+        if (profileId != null && directoryKey != null) {
+            byProfileAndDirectory[profileId]?.get(directoryKey)?.let { return it }
         }
-        if (workingDirectoryUri != null) {
-            byDirectory[workingDirectoryUri]?.let { return it }
+        if (directoryKey != null) {
+            byDirectory[directoryKey]?.let { return it }
         }
         if (profileId != null) {
             byProfile[profileId]?.let { return it }
@@ -146,7 +148,7 @@ private class MutableFeedbackContextRows {
 
     fun add(record: TerminalCompletionFeedbackStats) {
         val profileId = record.profileId
-        val workingDirectoryUri = record.workingDirectoryUri
+        val workingDirectoryUri = record.workingDirectoryUri?.let(::canonicalizeWorkingDirectoryUri)
         when {
             profileId != null && workingDirectoryUri != null ->
                 byProfileAndDirectory

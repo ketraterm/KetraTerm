@@ -19,10 +19,7 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import io.github.ketraterm.ui.swing.suggestion.*
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
@@ -72,8 +69,124 @@ class IntellijCompletionRegistryTest {
 
             val suggestions = session.provider.suggestions(request("git "))
 
-            assertEquals("switch", suggestions.first().replacementText)
-            assertEquals("spec", suggestions.first().source)
+            assertEquals(listOf("switch", "status"), suggestions.map { it.replacementText }.take(2))
+            assertTrue(suggestions.take(2).all { it.source == "spec" })
+        } finally {
+            registry.close()
+        }
+    }
+
+    @Test
+    fun `Gradle task evidence fuses with session MRU and persisted statistics`() {
+        val command = "./gradlew :app:test"
+        val snapshot =
+            TerminalCommandCompletionStatsSnapshot(
+                commandStats =
+                    listOf(
+                        TerminalCommandCompletionStats(
+                            commandLine = command,
+                            profileId = "bash",
+                            workingDirectoryUri = "file:///project",
+                            useCount = 8,
+                            successCount = 8,
+                            acceptedCount = 4,
+                            lastUsedEpochMillis = 2_000L,
+                        ),
+                    ),
+            )
+        val statsSource = TerminalCompletionSources.commandStats()
+        statsSource.replaceSnapshot(snapshot)
+        val registry = IntellijCompletionRegistry(statsSource = statsSource, loadStats = { snapshot })
+        try {
+            val changed = CountDownLatch(1)
+            val session =
+                registry.openSession(
+                    context("gradle-fusion").copy(
+                        workingDirectoryUriProvider = { "file:///project" },
+                        providerFactories =
+                            listOf(
+                                IntellijGradleTaskProviderFactory {
+                                    listOf(
+                                        TerminalGradleTask(":app:check", "unused sibling"),
+                                        TerminalGradleTask(":app:test", "learned task"),
+                                    )
+                                },
+                            ),
+                    ),
+                )
+            session.onSourceChanged(changed::countDown)
+            registry.recordFinishedCommand(
+                "gradle-fusion",
+                "bash",
+                successfulCommand(command, workingDirectoryUri = "file:///project"),
+            )
+            val request = request("./gradlew :app:")
+
+            session.provider.suggestions(request)
+            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
+            val suggestions = awaitSuggestions(session, request, "intellij-gradle-task")
+
+            assertEquals(command, suggestions.first().commandTextAfterReplacement(request))
+            assertEquals("intellij-gradle-task", suggestions.first().source)
+            assertEquals("./gradlew :app:check", suggestions[1].commandTextAfterReplacement(request))
+        } finally {
+            registry.close()
+        }
+    }
+
+    @Test
+    fun `Git branch evidence fuses with session MRU and persisted statistics`() {
+        val command = "git switch feature/terminal"
+        val snapshot =
+            TerminalCommandCompletionStatsSnapshot(
+                commandStats =
+                    listOf(
+                        TerminalCommandCompletionStats(
+                            commandLine = command,
+                            profileId = "bash",
+                            workingDirectoryUri = "file:///repo",
+                            useCount = 8,
+                            successCount = 8,
+                            acceptedCount = 4,
+                            lastUsedEpochMillis = 2_000L,
+                        ),
+                    ),
+            )
+        val statsSource = TerminalCompletionSources.commandStats()
+        statsSource.replaceSnapshot(snapshot)
+        val registry = IntellijCompletionRegistry(statsSource = statsSource, loadStats = { snapshot })
+        try {
+            val changed = CountDownLatch(1)
+            val session =
+                registry.openSession(
+                    context("git-fusion").copy(
+                        workingDirectoryUriProvider = { "file:///repo" },
+                        providerFactories =
+                            listOf(
+                                IntellijGitBranchProviderFactory {
+                                    listOf(
+                                        TerminalCompletionDomainValue("feature/aaa", detail = "unused branch"),
+                                        TerminalCompletionDomainValue("feature/terminal", detail = "learned branch"),
+                                    )
+                                },
+                            ),
+                    ),
+                )
+            session.onSourceChanged(changed::countDown)
+            registry.recordFinishedCommand(
+                "git-fusion",
+                "bash",
+                successfulCommand(command, workingDirectoryUri = "file:///repo"),
+            )
+            val request = request("git switch feature/")
+
+            session.provider.suggestions(request)
+            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
+            val suggestions = awaitSuggestions(session, request, "intellij-git-branch")
+
+            assertEquals(command, suggestions.first().commandTextAfterReplacement(request))
+            assertEquals("intellij-git-branch", suggestions.first().source)
+            assertEquals("git switch feature/aaa", suggestions[1].commandTextAfterReplacement(request))
         } finally {
             registry.close()
         }
@@ -500,12 +613,30 @@ class IntellijCompletionRegistryTest {
     private fun request(commandText: String): SwingShellSuggestionRequest =
         SwingShellSuggestionRequest(commandText, commandText.length, anchorColumn = 0, anchorRow = 0)
 
-    private fun successfulCommand(commandText: String): TerminalShellIntegrationCommandMetadata =
+    private fun awaitSuggestions(
+        session: IntellijCompletionSession,
+        request: SwingShellSuggestionRequest,
+        source: String,
+    ): List<SwingShellSuggestion> {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        var suggestions = session.provider.suggestions(request)
+        while (suggestions.none { it.source == source } && System.nanoTime() < deadline) {
+            Thread.sleep(5)
+            suggestions = session.provider.suggestions(request)
+        }
+        assertTrue("expected suggestions from $source", suggestions.any { it.source == source })
+        return suggestions
+    }
+
+    private fun successfulCommand(
+        commandText: String,
+        workingDirectoryUri: String? = null,
+    ): TerminalShellIntegrationCommandMetadata =
         TerminalShellIntegrationCommandMetadata(
             recordId = 1,
             lifecycle = TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
             commandText = commandText,
-            workingDirectoryUri = null,
+            workingDirectoryUri = workingDirectoryUri,
             exitCode = 0,
             startedAtEpochMillis = 1,
             finishedAtEpochMillis = 2,

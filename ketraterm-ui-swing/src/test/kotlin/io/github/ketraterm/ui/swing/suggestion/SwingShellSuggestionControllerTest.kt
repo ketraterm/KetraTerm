@@ -186,7 +186,7 @@ class SwingShellSuggestionControllerTest {
     }
 
     @Test
-    fun `passive hide with a selected suggestion records no dismissal`() {
+    fun `ordinary popup closure with a selected suggestion records no dismissal`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)
         controller.show(request(), suggestions(2), selectedIndex = 0)
@@ -198,7 +198,7 @@ class SwingShellSuggestionControllerTest {
     }
 
     @Test
-    fun `provider refresh replaces suggestions without negative feedback`() {
+    fun `popup replacement records no negative feedback`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)
         controller.show(request(), suggestions(2), selectedIndex = 0)
@@ -206,6 +206,40 @@ class SwingShellSuggestionControllerTest {
         controller.show(request(commandText = "g"), suggestions(1), selectedIndex = -1)
 
         assertTrue(controller.state().visible)
+        assertTrue(host.feedbackKinds.isEmpty())
+    }
+
+    @Test
+    fun `focus loss hides selected suggestion without negative feedback`() {
+        assertPassiveHideIsNeutral()
+    }
+
+    @Test
+    fun `timeout hides selected suggestion without negative feedback`() {
+        assertPassiveHideIsNeutral()
+    }
+
+    @Test
+    fun `continued typing replaces selected suggestion without negative feedback`() {
+        val host = RecordingSuggestionHost()
+        val controller = SwingShellSuggestionController(host)
+        controller.show(request(commandText = "git s"), suggestions(2, endOffset = 5), selectedIndex = 0)
+
+        controller.show(request(commandText = "git sw"), suggestions(1, endOffset = 6), selectedIndex = -1)
+
+        assertTrue(controller.state().visible)
+        assertEquals(-1, controller.state().selectedIndex)
+        assertTrue(host.feedbackKinds.isEmpty())
+    }
+
+    private fun assertPassiveHideIsNeutral() {
+        val host = RecordingSuggestionHost()
+        val controller = SwingShellSuggestionController(host)
+        controller.show(request(), suggestions(2), selectedIndex = 0)
+
+        controller.hide()
+
+        assertFalse(controller.state().visible)
         assertTrue(host.feedbackKinds.isEmpty())
     }
 

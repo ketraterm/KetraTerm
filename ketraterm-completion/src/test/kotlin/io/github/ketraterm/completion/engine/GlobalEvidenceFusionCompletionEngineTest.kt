@@ -400,6 +400,79 @@ class GlobalEvidenceFusionCompletionEngineTest {
     }
 
     @Test
+    fun `provider feedback uses only the most specific matching kind position profile and directory`() {
+        val snapshot =
+            TerminalCommandCompletionStatsSnapshot(
+                feedbackStats =
+                    listOf(
+                        feedback(source = "target", dismissedCount = 100),
+                        feedback(
+                            source = "target",
+                            profileId = "profile",
+                            workingDirectoryUri = "file:///repo",
+                            acceptedCount = 20,
+                        ),
+                        feedback(
+                            source = "target",
+                            candidateKind = TerminalCompletionCandidateKind.COMMAND,
+                            tokenPosition = TerminalCompletionTokenPosition.COMMAND,
+                            profileId = "profile",
+                            workingDirectoryUri = "file:///repo",
+                            dismissedCount = Int.MAX_VALUE,
+                        ),
+                        feedback(
+                            source = "target",
+                            tokenPosition = TerminalCompletionTokenPosition.OPTION,
+                            profileId = "profile",
+                            workingDirectoryUri = "file:///repo",
+                            dismissedCount = Int.MAX_VALUE,
+                        ),
+                        feedback(
+                            source = "target",
+                            profileId = "profile",
+                            workingDirectoryUri = "file:///other",
+                            dismissedCount = Int.MAX_VALUE,
+                        ),
+                    ),
+            )
+        val candidates =
+            engine(
+                sources =
+                    listOf(
+                        entry(
+                            source(
+                                candidate(
+                                    "maint",
+                                    11,
+                                    13,
+                                    "neutral",
+                                    TerminalCompletionCandidateKind.ARGUMENT,
+                                    domain = TerminalCompletionValueDomain.GIT_BRANCH,
+                                ),
+                            ),
+                            0,
+                        ),
+                        entry(
+                            source(
+                                candidate(
+                                    "main",
+                                    11,
+                                    13,
+                                    "target",
+                                    TerminalCompletionCandidateKind.ARGUMENT,
+                                    domain = TerminalCompletionValueDomain.GIT_BRANCH,
+                                ),
+                            ),
+                            0,
+                        ),
+                    ),
+                snapshot = snapshot,
+            ).complete(request("git switch ma"))
+
+        assertEquals("main", candidates.first().replacementText)
+    }
+
+    @Test
     fun `recent evidence receives a larger boost than old evidence`() {
         val snapshot =
             TerminalCommandCompletionStatsSnapshot(
@@ -688,6 +761,25 @@ class GlobalEvidenceFusionCompletionEngineTest {
             kind = TerminalCompletionCandidateKind.ARGUMENT,
             score = score,
             domain = TerminalCompletionValueDomain.GIT_BRANCH,
+        )
+
+    private fun feedback(
+        source: String,
+        candidateKind: TerminalCompletionCandidateKind = TerminalCompletionCandidateKind.ARGUMENT,
+        tokenPosition: TerminalCompletionTokenPosition = TerminalCompletionTokenPosition.ARGUMENT,
+        profileId: String? = null,
+        workingDirectoryUri: String? = null,
+        acceptedCount: Int = 0,
+        dismissedCount: Int = 0,
+    ): TerminalCompletionFeedbackStats =
+        TerminalCompletionFeedbackStats(
+            source = source,
+            candidateKind = candidateKind,
+            tokenPosition = tokenPosition,
+            profileId = profileId,
+            workingDirectoryUri = workingDirectoryUri,
+            acceptedCount = acceptedCount,
+            dismissedCount = dismissedCount,
         )
 
     private fun commandLineAfter(

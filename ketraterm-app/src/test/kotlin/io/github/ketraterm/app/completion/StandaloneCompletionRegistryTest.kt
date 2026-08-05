@@ -177,6 +177,12 @@ class StandaloneCompletionRegistryTest {
                             profileId = "bash",
                             workingDirectoryUri = "file:///repo",
                         ),
+                        shapeStats(
+                            commandLine = "git status",
+                            dismissedCount = 4,
+                            profileId = "bash",
+                            workingDirectoryUri = "file:///repo",
+                        ),
                     ),
             ),
         )
@@ -190,8 +196,8 @@ class StandaloneCompletionRegistryTest {
 
         val suggestions = provider.suggestions(request("git "))
 
-        assertEquals("switch", suggestions.first().replacementText)
-        assertEquals("spec", suggestions.first().source)
+        assertEquals(listOf("switch", "status"), suggestions.map { it.replacementText }.take(2))
+        assertTrue(suggestions.take(2).all { it.source == "spec" })
     }
 
     @Test
