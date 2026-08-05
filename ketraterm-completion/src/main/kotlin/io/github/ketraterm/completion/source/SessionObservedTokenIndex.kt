@@ -21,7 +21,7 @@ import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncrement
 import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.spec.CommandSpecResolver
+import io.github.ketraterm.completion.spec.findCommandSpec
 
 /** Bounded observed-token index for command families not covered by static specs. */
 internal class SessionObservedTokenIndex(
@@ -40,7 +40,7 @@ internal class SessionObservedTokenIndex(
         var tokenIndex = tokens.firstCommandTokenIndex()
         if (tokenIndex >= tokens.size) return
         val executable = normalizeTerminalCommandToken(tokens[tokenIndex].text)
-        if (executable.isBlank() || CommandSpecResolver.findSpec(commandSpecs, executable) != null) return
+        if (executable.isBlank() || findCommandSpec(commandSpecs, executable) != null) return
 
         val context = StringBuilder(executable)
         tokenIndex++
@@ -101,8 +101,8 @@ internal class SessionObservedTokenIndex(
                     entry.workingDirectoryUri == workingDirectoryUri
             }
         if (index >= 0) {
-            val entry = entries[index]
-            entries[index] =
+            val entry = entries.removeAt(index)
+            entries +=
                 entry.copy(
                     token = token,
                     useCount = saturatedCompletionCounterIncrement(entry.useCount),
@@ -110,7 +110,7 @@ internal class SessionObservedTokenIndex(
                 )
             return
         }
-        if (entries.size == capacity) entries.removeOldest()
+        if (entries.size == capacity) entries.removeAt(0)
         entries += Entry(context, token, token, profileId, workingDirectoryUri, useCount = 1, lastUsedSequence = sequence)
     }
 
@@ -138,7 +138,7 @@ internal class SessionObservedTokenIndex(
             detail = DETAIL,
             source = SOURCE_ID,
             kind = TerminalCompletionCandidateKind.ARGUMENT,
-            score = SessionCompletionRelevance.score(BASE_SCORE, useCount, lastUsedSequence, profileId, workingDirectoryUri, request),
+            score = sessionCompletionScore(BASE_SCORE, useCount, lastUsedSequence, profileId, workingDirectoryUri, request),
         )
 
     private fun StringBuilder.appendToken(token: String) {
@@ -152,14 +152,6 @@ internal class SessionObservedTokenIndex(
             length == SHORT_OPTION_LENGTH -> this
             else -> null
         }
-
-    private fun MutableList<Entry>.removeOldest() {
-        var oldestIndex = 0
-        for (index in 1 until size) {
-            if (this[index].lastUsedSequence < this[oldestIndex].lastUsedSequence) oldestIndex = index
-        }
-        removeAt(oldestIndex)
-    }
 
     private data class Entry(
         val context: String,

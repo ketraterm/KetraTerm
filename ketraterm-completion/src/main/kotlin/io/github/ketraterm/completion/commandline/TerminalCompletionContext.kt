@@ -36,21 +36,21 @@ internal data class AttachedOptionValue(
 
 internal data class TerminalCompletionContext(
     val commandLineContext: TerminalCommandLineContext,
-    val commandTokenIndex: Int,
-    val command: TerminalCommandSpec?,
-    val commandPath: List<TerminalCommandSpec>,
     val activePosition: TerminalCompletionActivePosition,
-    val activeOption: TerminalOptionSpec?,
-    val activePositionalArgument: TerminalArgumentSpec?,
-    val usedOptionExclusiveGroupIds: Set<String>,
-    val optionsTerminated: Boolean,
-    val expectedPathKind: TerminalPathArgumentKind,
-    val expectedHiddenPathPolicy: TerminalHiddenPathPolicy,
-    val expectedValueDomain: TerminalCompletionValueDomain,
-    val subcommandCandidateSource: TerminalCommandSpec?,
-    val staticValueCandidates: List<String>,
-    val activeTokenQuote: Char,
-    private val attachedOptionValue: AttachedOptionValue?,
+    val commandTokenIndex: Int = 0,
+    val command: TerminalCommandSpec? = null,
+    val commandPath: List<TerminalCommandSpec> = emptyList(),
+    val activeOption: TerminalOptionSpec? = null,
+    val activePositionalArgument: TerminalArgumentSpec? = null,
+    val usedOptionExclusiveGroupIds: Set<String> = emptySet(),
+    val optionsTerminated: Boolean = false,
+    val expectedPathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
+    val expectedHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
+    val expectedValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
+    val subcommandCandidateSource: TerminalCommandSpec? = null,
+    val staticValueCandidates: List<String> = emptyList(),
+    val activeTokenQuote: Char = NO_QUOTE,
+    private val attachedOptionValue: AttachedOptionValue? = null,
 ) {
     val activePrefix: String get() = attachedOptionValue?.prefix ?: commandLineContext.activePrefix
     val replacementStartOffset: Int get() = attachedOptionValue?.replacementStartOffset ?: commandLineContext.replacementStartOffset
@@ -79,21 +79,7 @@ internal object TerminalCompletionContextResolver {
         if (lineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) {
             return TerminalCompletionContext(
                 commandLineContext = lineContext,
-                commandTokenIndex = 0,
-                command = null,
-                commandPath = emptyList(),
                 activePosition = TerminalCompletionActivePosition.OPERATOR,
-                activeOption = null,
-                activePositionalArgument = null,
-                usedOptionExclusiveGroupIds = emptySet(),
-                optionsTerminated = false,
-                expectedPathKind = TerminalPathArgumentKind.NONE,
-                expectedHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
-                expectedValueDomain = TerminalCompletionValueDomain.NONE,
-                subcommandCandidateSource = null,
-                staticValueCandidates = emptyList(),
-                activeTokenQuote = NO_QUOTE,
-                attachedOptionValue = null,
             )
         }
         val commandTokenIndex = lineContext.tokens.firstCommandTokenIndex()
@@ -103,20 +89,9 @@ internal object TerminalCompletionContextResolver {
             return TerminalCompletionContext(
                 commandLineContext = lineContext,
                 commandTokenIndex = commandTokenIndex,
-                command = null,
-                commandPath = emptyList(),
                 activePosition = TerminalCompletionActivePosition.COMMAND,
-                activeOption = null,
-                activePositionalArgument = null,
-                usedOptionExclusiveGroupIds = emptySet(),
-                optionsTerminated = false,
                 expectedPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
-                expectedHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
-                expectedValueDomain = TerminalCompletionValueDomain.NONE,
-                subcommandCandidateSource = null,
-                staticValueCandidates = emptyList(),
                 activeTokenQuote = activeTokenQuote,
-                attachedOptionValue = null,
             )
         }
 
@@ -128,25 +103,13 @@ internal object TerminalCompletionContextResolver {
             return TerminalCompletionContext(
                 commandLineContext = lineContext,
                 commandTokenIndex = commandTokenIndex,
-                command = null,
-                commandPath = emptyList(),
                 activePosition =
                     if (lineContext.activePrefix.isOptionNamePrefix()) {
                         TerminalCompletionActivePosition.OPTION_NAME
                     } else {
                         TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
                     },
-                activeOption = null,
-                activePositionalArgument = null,
-                usedOptionExclusiveGroupIds = emptySet(),
-                optionsTerminated = false,
-                expectedPathKind = TerminalPathArgumentKind.NONE,
-                expectedHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
-                expectedValueDomain = TerminalCompletionValueDomain.NONE,
-                subcommandCandidateSource = null,
-                staticValueCandidates = emptyList(),
                 activeTokenQuote = activeTokenQuote,
-                attachedOptionValue = null,
             )
         }
 
@@ -373,7 +336,6 @@ internal object TerminalCompletionContextResolver {
         return if (quote == SINGLE_QUOTE || quote == DOUBLE_QUOTE) quote else NO_QUOTE
     }
 
-    private const val NO_QUOTE = '\u0000'
     private const val SINGLE_QUOTE = '\''
     private const val DOUBLE_QUOTE = '"'
     private const val OPTION_VALUE_SEPARATOR = '='
@@ -393,6 +355,8 @@ private fun TerminalCommandSpec.positionalArgumentAt(position: Int): TerminalArg
     return if (last.isVariadic) last else null
 }
 
-private fun String.isOptionNamePrefix(): Boolean = startsWith("-") && this != ""
+private fun String.isOptionNamePrefix(): Boolean = startsWith('-')
 
 private fun String.hasAttachedOptionValue(): Boolean = indexOf('=') > 1
+
+private const val NO_QUOTE = '\u0000'

@@ -52,21 +52,6 @@ internal class CompletionFeedbackStatsIndex(
         feedbackAtEpochMillis: Long,
     ) {
         if (feedbackAtEpochMillis < 0L) return
-        mutate(context, profileId, workingDirectoryUri) { previous ->
-            previous.copy(
-                acceptedCount = incrementAccepted(previous.acceptedCount, feedback),
-                dismissedCount = incrementDismissed(previous.dismissedCount, feedback),
-                lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
-            )
-        }
-    }
-
-    private fun mutate(
-        context: TerminalCompletionFeedbackContext,
-        profileId: String?,
-        workingDirectoryUri: String?,
-        update: (TerminalCompletionFeedbackStats) -> TerminalCompletionFeedbackStats,
-    ) {
         rows.mutate(
             key = context.key(profileId, workingDirectoryUri),
             initialRow = {
@@ -78,7 +63,13 @@ internal class CompletionFeedbackStatsIndex(
                     workingDirectoryUri = workingDirectoryUri,
                 )
             },
-            update = update,
+            update = { previous ->
+                previous.copy(
+                    acceptedCount = incrementAccepted(previous.acceptedCount, feedback),
+                    dismissedCount = incrementDismissed(previous.dismissedCount, feedback),
+                    lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
+                )
+            },
         )
     }
 

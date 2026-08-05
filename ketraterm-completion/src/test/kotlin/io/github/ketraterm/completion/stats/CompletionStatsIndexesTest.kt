@@ -16,7 +16,7 @@
 package io.github.ketraterm.completion.stats
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.commandline.GenericCommandLineShapeClassifier
+import io.github.ketraterm.completion.commandline.classifyGenericCommandLineShape
 import io.github.ketraterm.completion.model.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -205,7 +205,7 @@ class CompletionStatsIndexesTest {
         lastUsedEpochMillis: Long,
     ): TerminalCommandShapeStats =
         TerminalCommandShapeStats(
-            shape = requireNotNull(GenericCommandLineShapeClassifier.classify(commandLine)),
+            shape = requireNotNull(classifyGenericCommandLineShape(commandLine)),
             successCount = 1,
             lastUsedEpochMillis = lastUsedEpochMillis,
         )

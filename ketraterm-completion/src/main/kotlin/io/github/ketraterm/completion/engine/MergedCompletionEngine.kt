@@ -20,7 +20,7 @@ import io.github.ketraterm.completion.api.TerminalCompletionEngine
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.commandline.*
-import io.github.ketraterm.completion.internal.TerminalCompletionCollectionBudget
+import io.github.ketraterm.completion.internal.completionCollectionLimit
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -54,7 +54,7 @@ internal class MergedCompletionEngine(
                 commandSpecs = commandSpecs,
             )
         if (completionContext.activePosition == TerminalCompletionActivePosition.OPERATOR) return emptyList()
-        val collectionLimit = TerminalCompletionCollectionBudget.forFinalLimit(request.maxCandidates)
+        val collectionLimit = completionCollectionLimit(request.maxCandidates)
         val collected = ArrayList<CompletionSourceCandidates>(sources.size)
         var alternateContexts: MutableMap<List<TerminalCommandSpec>, TerminalCompletionContext>? = null
         for (sourceIndex in sources.indices) {

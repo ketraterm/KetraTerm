@@ -17,19 +17,17 @@ package io.github.ketraterm.completion.internal
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 
-internal object TerminalCompletionCollectionBudget {
-    private const val EXPANSION_FACTOR = 4L
-    private const val MAX_EXTRA_CANDIDATES = 256L
-
-    fun forFinalLimit(finalLimit: Int): Int {
-        require(finalLimit > 0) { "finalLimit must be > 0, was $finalLimit" }
-        val expandedLimit = finalLimit.toLong() * EXPANSION_FACTOR
-        val boundedLimit = finalLimit.toLong() + MAX_EXTRA_CANDIDATES
-        return minOf(expandedLimit, boundedLimit, Int.MAX_VALUE.toLong()).toInt()
-    }
+internal fun completionCollectionLimit(finalLimit: Int): Int {
+    require(finalLimit > 0) { "finalLimit must be > 0, was $finalLimit" }
+    val expandedLimit = finalLimit.toLong() * COLLECTION_EXPANSION_FACTOR
+    val boundedLimit = finalLimit.toLong() + MAX_EXTRA_CANDIDATES
+    return minOf(expandedLimit, boundedLimit, Int.MAX_VALUE.toLong()).toInt()
 }
 
 internal fun List<TerminalCompletionCandidate>.boundedTo(maxCandidates: Int): List<TerminalCompletionCandidate> {
     require(maxCandidates > 0) { "maxCandidates must be > 0, was $maxCandidates" }
     return if (size <= maxCandidates) this else subList(0, maxCandidates).toList()
 }
+
+private const val COLLECTION_EXPANSION_FACTOR = 4L
+private const val MAX_EXTRA_CANDIDATES = 256L

@@ -87,15 +87,13 @@ internal class SessionMruCompletionSourceImpl(
         val commandLineContext = context.commandLineContext
         if (commandLineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) return emptyList()
         if (commandLineContext.precededByOperator) return emptyList()
-        val candidates =
-            synchronized(lock) {
-                buildList {
-                    commandHistory.appendCandidates(request, context, this)
-                    observedTokens.appendCandidates(request, commandLineContext, this)
-                }
-            }.toMutableList()
+        val candidates = ArrayList<TerminalCompletionCandidate>()
+        synchronized(lock) {
+            commandHistory.appendCandidates(request, context, candidates)
+            observedTokens.appendCandidates(request, commandLineContext, candidates)
+        }
         val learnedSnapshot = learnedStatsProvider()
-        PersistedHistoryCandidateBuilder.appendCandidates(
+        appendPersistedHistoryCandidates(
             request = request,
             lineContext = commandLineContext,
             completionContext = context,
@@ -111,7 +109,7 @@ internal class SessionMruCompletionSourceImpl(
     /** Returns a monotonic session-local sequence while preserving bounded score arithmetic after overflow. */
     private fun nextSequenceLocked(): Long {
         val sequence = nextSequence
-        nextSequence = if (nextSequence == Long.MAX_VALUE) 1L else nextSequence + 1L
+        if (nextSequence < Long.MAX_VALUE) nextSequence++
         return sequence
     }
 

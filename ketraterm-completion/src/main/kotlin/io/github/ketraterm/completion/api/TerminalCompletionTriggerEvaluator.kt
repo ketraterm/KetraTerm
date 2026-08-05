@@ -50,7 +50,7 @@ object TerminalCompletionTriggerEvaluator {
         val lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset, shellCapabilities.syntax)
         if (lineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) return false
         if (isLiveTrigger(commandLine, cursorOffset, commandSpecs, lineContext)) return true
-        return nonWhitespaceCount(lineContext.commandPrefix(commandLine)) >= minimumNonWhitespaceCharacters
+        return lineContext.commandPrefix(commandLine).count { !it.isWhitespace() } >= minimumNonWhitespaceCharacters
     }
 
     /**
@@ -117,14 +117,4 @@ object TerminalCompletionTriggerEvaluator {
         staticValueCandidates.isNotEmpty() ||
             expectedPathKind != TerminalPathArgumentKind.NONE ||
             expectedValueDomain != TerminalCompletionValueDomain.NONE
-
-    private fun nonWhitespaceCount(text: String): Int {
-        var count = 0
-        var index = 0
-        while (index < text.length) {
-            if (!text[index].isWhitespace()) count++
-            index++
-        }
-        return count
-    }
 }

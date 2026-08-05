@@ -24,11 +24,11 @@ import java.util.*
 
 /** Immutable prefix-context index for positive persisted command rows. */
 internal class LearnedHistoryCandidateIndex private constructor(
-    private val buckets: Map<ContextKey, List<IndexedLearnedCommand>>,
+    private val buckets: Map<List<String>, List<IndexedLearnedCommand>>,
 ) {
     /** Returns only rows whose prior tokens and active-token prefix match [requestLine]. */
     fun matching(requestLine: TerminalCommandLineContext): List<IndexedLearnedCommand> {
-        val key = ContextKey.from(requestLine.tokens.take(requestLine.activeTokenIndex).map { it.text })
+        val key = requestLine.tokens.subList(0, requestLine.activeTokenIndex).map { it.text.lowercase(Locale.ROOT) }
         val bucket = buckets[key] ?: return emptyList()
         val prefix = requestLine.activePrefix.lowercase(Locale.ROOT)
         val start = bucket.lowerBound(prefix)
@@ -58,14 +58,14 @@ internal class LearnedHistoryCandidateIndex private constructor(
             snapshot: TerminalCommandCompletionStatsSnapshot,
             shellSyntax: TerminalShellSyntax,
         ): LearnedHistoryCandidateIndex {
-            val mutableBuckets = HashMap<ContextKey, MutableList<IndexedLearnedCommand>>()
+            val mutableBuckets = HashMap<List<String>, MutableList<IndexedLearnedCommand>>()
             snapshot.commandStats.forEachIndexed { snapshotRank, stats ->
                 if (!stats.hasPositiveSuggestionSignal()) return@forEachIndexed
                 val line = TerminalCommandLineTokenizer.parse(stats.commandLine, stats.commandLine.length, shellSyntax)
                 val indexedTokenCount = minOf(line.tokens.size, MAX_INDEXED_TOKEN_POSITIONS)
                 for (activeIndex in 0 until indexedTokenCount) {
                     val token = line.tokens[activeIndex]
-                    val key = ContextKey.from(line.tokens.take(activeIndex).map { it.text })
+                    val key = line.tokens.subList(0, activeIndex).map { it.text.lowercase(Locale.ROOT) }
                     mutableBuckets
                         .getOrPut(key, ::ArrayList)
                         .add(
@@ -87,14 +87,6 @@ internal class LearnedHistoryCandidateIndex private constructor(
         }
 
         private const val MAX_INDEXED_TOKEN_POSITIONS = 64
-    }
-
-    private data class ContextKey(
-        val priorTokens: List<String>,
-    ) {
-        companion object {
-            fun from(tokens: List<String>): ContextKey = ContextKey(tokens.map { token -> token.lowercase(Locale.ROOT) })
-        }
     }
 }
 

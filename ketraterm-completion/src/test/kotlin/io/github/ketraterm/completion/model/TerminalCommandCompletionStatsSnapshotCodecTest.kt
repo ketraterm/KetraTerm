@@ -16,7 +16,7 @@
 package io.github.ketraterm.completion.model
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.commandline.GenericCommandLineShapeClassifier
+import io.github.ketraterm.completion.commandline.classifyGenericCommandLineShape
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -49,7 +49,7 @@ class TerminalCommandCompletionStatsSnapshotCodecTest {
             )
         val shapeRecord =
             TerminalCommandShapeStats(
-                shape = GenericCommandLineShapeClassifier.classify("git log --stat main")!!,
+                shape = classifyGenericCommandLineShape("git log --stat main")!!,
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo",
                 useCount = 3,
@@ -198,7 +198,7 @@ class TerminalCommandCompletionStatsSnapshotCodecTest {
     fun `sensitive argument text is not written by shape rows`() {
         val shapeRecord =
             TerminalCommandShapeStats(
-                shape = GenericCommandLineShapeClassifier.classify("git log --stat secret-branch")!!,
+                shape = classifyGenericCommandLineShape("git log --stat secret-branch")!!,
                 lastUsedEpochMillis = 200,
             )
 

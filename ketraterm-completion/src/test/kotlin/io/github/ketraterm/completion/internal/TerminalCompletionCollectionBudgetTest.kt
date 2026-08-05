@@ -21,16 +21,16 @@ import kotlin.test.assertEquals
 class TerminalCompletionCollectionBudgetTest {
     @Test
     fun `small final limit receives bounded reranking surplus`() {
-        assertEquals(32, TerminalCompletionCollectionBudget.forFinalLimit(8))
+        assertEquals(32, completionCollectionLimit(8))
     }
 
     @Test
     fun `large final limit caps additional collection work`() {
-        assertEquals(1_256, TerminalCompletionCollectionBudget.forFinalLimit(1_000))
+        assertEquals(1_256, completionCollectionLimit(1_000))
     }
 
     @Test
     fun `maximum integer final limit does not overflow`() {
-        assertEquals(Int.MAX_VALUE, TerminalCompletionCollectionBudget.forFinalLimit(Int.MAX_VALUE))
+        assertEquals(Int.MAX_VALUE, completionCollectionLimit(Int.MAX_VALUE))
     }
 }

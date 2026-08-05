@@ -25,89 +25,87 @@ import io.github.ketraterm.completion.model.TerminalCommandLineShape
  * This classifier recognizes executable, a shallow subcommand, option names,
  * and aggregate argument counts without retaining raw positional argument text.
  */
-internal object GenericCommandLineShapeClassifier {
-    fun classify(
-        commandLine: String,
-        shellSyntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
-    ): TerminalCommandLineShape? {
-        if (commandLine.isBlank() || commandLine.hasTerminalCompletionLineBreak()) return null
-        val tokens = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length, shellSyntax).tokens
-        var tokenIndex = tokens.firstCommandTokenIndex()
-        if (tokenIndex >= tokens.size) return null
+internal fun classifyGenericCommandLineShape(
+    commandLine: String,
+    shellSyntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
+): TerminalCommandLineShape? {
+    if (commandLine.isBlank() || commandLine.hasTerminalCompletionLineBreak()) return null
+    val tokens = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length, shellSyntax).tokens
+    var tokenIndex = tokens.firstCommandTokenIndex()
+    if (tokenIndex >= tokens.size) return null
 
-        val executable = normalizeTerminalCommandToken(tokens[tokenIndex].text)
-        if (executable.isBlank()) return null
-        tokenIndex++
+    val executable = normalizeTerminalCommandToken(tokens[tokenIndex].text)
+    if (executable.isBlank()) return null
+    tokenIndex++
 
-        val subcommands = ArrayList<String>(TERMINAL_COMMAND_LIST_CAPACITY)
-        val optionNames = ArrayList<String>(TERMINAL_COMMAND_LIST_CAPACITY)
-        var positionalArgumentCount = 0
-        var optionValueCount = 0
-        var expectingOptionValue = false
-        var acceptingSubcommands = true
-        var optionsEnabled = true
+    val subcommands = ArrayList<String>(TERMINAL_COMMAND_LIST_CAPACITY)
+    val optionNames = ArrayList<String>(TERMINAL_COMMAND_LIST_CAPACITY)
+    var positionalArgumentCount = 0
+    var optionValueCount = 0
+    var expectingOptionValue = false
+    var acceptingSubcommands = true
+    var optionsEnabled = true
 
-        while (tokenIndex < tokens.size) {
-            val normalized = normalizeTerminalCommandToken(tokens[tokenIndex].text)
-            if (normalized.isBlank()) {
-                tokenIndex++
-                continue
-            }
-            if (expectingOptionValue) {
-                optionValueCount++
-                expectingOptionValue = false
-                acceptingSubcommands = false
-            } else if (normalized == TERMINAL_COMMAND_OPTION_TERMINATOR) {
-                acceptingSubcommands = false
-                optionsEnabled = false
-            } else if (optionsEnabled && normalized.isTerminalOptionToken()) {
-                val optionName = normalized.substringBefore("=")
-                optionNames.add(optionName)
-                if (!normalized.contains("=") && optionName.optionUsuallyRequiresValue()) {
-                    expectingOptionValue = true
-                }
-                acceptingSubcommands = false
-            } else if (acceptingSubcommands && subcommands.size < MAX_SUBCOMMAND_DEPTH) {
-                subcommands.add(normalized)
-            } else {
-                acceptingSubcommands = false
-                positionalArgumentCount++
-            }
+    while (tokenIndex < tokens.size) {
+        val normalized = normalizeTerminalCommandToken(tokens[tokenIndex].text)
+        if (normalized.isBlank()) {
             tokenIndex++
+            continue
         }
-
-        return TerminalCommandLineShape(
-            executable = executable,
-            subcommands = subcommands,
-            optionNames = optionNames.sorted(),
-            positionalArgumentCount = positionalArgumentCount,
-            optionValueCount = optionValueCount,
-        )
+        if (expectingOptionValue) {
+            optionValueCount++
+            expectingOptionValue = false
+            acceptingSubcommands = false
+        } else if (normalized == TERMINAL_COMMAND_OPTION_TERMINATOR) {
+            acceptingSubcommands = false
+            optionsEnabled = false
+        } else if (optionsEnabled && normalized.isTerminalOptionToken()) {
+            val optionName = normalized.substringBefore("=")
+            optionNames.add(optionName)
+            if (!normalized.contains("=") && optionName.optionUsuallyRequiresValue()) {
+                expectingOptionValue = true
+            }
+            acceptingSubcommands = false
+        } else if (acceptingSubcommands && subcommands.size < MAX_SUBCOMMAND_DEPTH) {
+            subcommands.add(normalized)
+        } else {
+            acceptingSubcommands = false
+            positionalArgumentCount++
+        }
+        tokenIndex++
     }
 
-    private fun String.optionUsuallyRequiresValue(): Boolean =
-        when (this) {
-            "-c", "-d", "-f", "-m", "-o", "-p", "-u" -> true
-            else -> startsWith("--") && !BOOLEAN_LONG_OPTIONS.contains(this)
-        }
-
-    private const val MAX_SUBCOMMAND_DEPTH = 1
-    private val BOOLEAN_LONG_OPTIONS =
-        setOf(
-            "--all",
-            "--amend",
-            "--debug",
-            "--dry-run",
-            "--force",
-            "--global",
-            "--help",
-            "--info",
-            "--json",
-            "--offline",
-            "--quiet",
-            "--stat",
-            "--verbose",
-            "--version",
-            "--watch",
-        )
+    return TerminalCommandLineShape(
+        executable = executable,
+        subcommands = subcommands,
+        optionNames = optionNames.sorted(),
+        positionalArgumentCount = positionalArgumentCount,
+        optionValueCount = optionValueCount,
+    )
 }
+
+private fun String.optionUsuallyRequiresValue(): Boolean =
+    when (this) {
+        "-c", "-d", "-f", "-m", "-o", "-p", "-u" -> true
+        else -> startsWith("--") && !BOOLEAN_LONG_OPTIONS.contains(this)
+    }
+
+private const val MAX_SUBCOMMAND_DEPTH = 1
+private val BOOLEAN_LONG_OPTIONS =
+    setOf(
+        "--all",
+        "--amend",
+        "--debug",
+        "--dry-run",
+        "--force",
+        "--global",
+        "--help",
+        "--info",
+        "--json",
+        "--offline",
+        "--quiet",
+        "--stat",
+        "--verbose",
+        "--version",
+        "--watch",
+    )

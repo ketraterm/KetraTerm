@@ -39,8 +39,8 @@ internal class SessionCommandHistory(
         val normalized = normalizeTerminalCommandLine(commandLine)
         val index = entries.indexOfFirst { it.normalizedCommandLine == normalized }
         if (index >= 0) {
-            val entry = entries[index]
-            entries[index] =
+            val entry = entries.removeAt(index)
+            entries +=
                 entry.copy(
                     commandLine = commandLine,
                     profileId = profileId,
@@ -50,7 +50,7 @@ internal class SessionCommandHistory(
                 )
             return
         }
-        if (entries.size == capacity) entries.removeOldest()
+        if (entries.size == capacity) entries.removeAt(0)
         entries +=
             Entry(
                 commandLine = commandLine,
@@ -72,24 +72,23 @@ internal class SessionCommandHistory(
         for (entry in entries) {
             if (!entry.normalizedCommandLine.startsWith(normalizedPrefix) || entry.normalizedCommandLine == normalizedPrefix) continue
             if (!entry.isValidFor(request)) continue
-            LearnedCommandCandidateProjector
-                .project(
-                    request = request,
-                    requestLine = lineContext,
-                    completionContext = context,
-                    learnedCommand = entry.commandLine,
-                    source = SOURCE_ID,
-                    score =
-                        SessionCompletionRelevance.score(
-                            BASE_SCORE,
-                            entry.useCount,
-                            entry.lastUsedSequence,
-                            entry.profileId,
-                            entry.workingDirectoryUri,
-                            request,
-                        ),
-                    detailPrefix = "recent",
-                )?.let(destination::add)
+            projectLearnedCommandCandidate(
+                request = request,
+                requestLine = lineContext,
+                completionContext = context,
+                learnedCommand = entry.commandLine,
+                source = SOURCE_ID,
+                score =
+                    sessionCompletionScore(
+                        BASE_SCORE,
+                        entry.useCount,
+                        entry.lastUsedSequence,
+                        entry.profileId,
+                        entry.workingDirectoryUri,
+                        request,
+                    ),
+                detailPrefix = "recent",
+            )?.let(destination::add)
         }
     }
 
@@ -100,14 +99,6 @@ internal class SessionCommandHistory(
         val entryDirectory = workingDirectoryUri ?: return true
         val requestDirectory = request.workingDirectoryUri ?: return true
         return canonicalizeWorkingDirectoryUri(entryDirectory) == canonicalizeWorkingDirectoryUri(requestDirectory)
-    }
-
-    private fun MutableList<Entry>.removeOldest() {
-        var oldestIndex = 0
-        for (index in 1 until size) {
-            if (this[index].lastUsedSequence < this[oldestIndex].lastUsedSequence) oldestIndex = index
-        }
-        removeAt(oldestIndex)
     }
 
     private data class Entry(

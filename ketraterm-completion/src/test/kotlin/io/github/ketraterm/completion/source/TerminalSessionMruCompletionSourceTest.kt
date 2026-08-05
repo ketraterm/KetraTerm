@@ -114,6 +114,19 @@ class TerminalSessionMruCompletionSourceTest {
     }
 
     @Test
+    fun `observing a token again protects it from capacity eviction`() {
+        val source = TerminalCompletionSources.sessionMru(capacity = 2)
+        source.recordSuccessfulCommand("abc de")
+        source.recordSuccessfulCommand("abc as")
+        source.recordSuccessfulCommand("abc de")
+        source.recordSuccessfulCommand("abc be")
+
+        val candidates = observedCandidates(source, request("abc "))
+
+        assertEquals(listOf("de", "be"), candidates.map { it.replacementText })
+    }
+
+    @Test
     fun `does not suggest the exact already typed command`() {
         val source = TerminalCompletionSources.sessionMru()
         source.recordSuccessfulCommand("git status")
@@ -155,6 +168,19 @@ class TerminalSessionMruCompletionSourceTest {
         val candidates = source.complete(request("git s"))
 
         assertEquals(listOf("stash", "switch main"), candidates.map { it.replacementText })
+    }
+
+    @Test
+    fun `using a command again protects it from capacity eviction`() {
+        val source = TerminalCompletionSources.sessionMru(capacity = 2)
+        source.recordSuccessfulCommand("git status")
+        source.recordSuccessfulCommand("git switch main")
+        source.recordSuccessfulCommand("git status")
+        source.recordSuccessfulCommand("git stash")
+
+        val candidates = source.complete(request("git s"))
+
+        assertEquals(listOf("status", "stash"), candidates.map { it.replacementText })
     }
 
     @Test
