@@ -129,6 +129,7 @@ class IntellijCompletionRegistryTest {
             assertEquals(command, suggestions.first().commandTextAfterReplacement(request))
             assertEquals("intellij-gradle-task", suggestions.first().source)
             assertEquals("./gradlew :app:check", suggestions[1].commandTextAfterReplacement(request))
+            assertTrue(suggestions.none { it.source == "stats" })
         } finally {
             registry.close()
         }
@@ -187,6 +188,7 @@ class IntellijCompletionRegistryTest {
             assertEquals(command, suggestions.first().commandTextAfterReplacement(request))
             assertEquals("intellij-git-branch", suggestions.first().source)
             assertEquals("git switch feature/aaa", suggestions[1].commandTextAfterReplacement(request))
+            assertTrue(suggestions.none { it.source == "stats" })
         } finally {
             registry.close()
         }

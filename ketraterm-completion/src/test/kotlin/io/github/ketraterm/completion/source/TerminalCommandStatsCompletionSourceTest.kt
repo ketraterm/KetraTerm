@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.completion.source
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalCompletionSources
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.*
 import kotlin.test.*
 
@@ -38,7 +35,7 @@ class TerminalCommandStatsCompletionSourceTest {
     }
 
     @Test
-    fun `successful command result creates full-line history candidate`() {
+    fun `successful command result supplies token-local learned history evidence`() {
         val source = TerminalCompletionSources.commandStats()
         source.recordCommandResult(
             commandLine = "git status",
@@ -48,12 +45,13 @@ class TerminalCommandStatsCompletionSourceTest {
             usedAtEpochMillis = 1_000,
         )
 
-        val candidates = source.complete(request("git s", profileId = "pwsh", workingDirectoryUri = "file:///repo"))
+        val candidates =
+            learnedHistory(source).complete(request("git s", profileId = "pwsh", workingDirectoryUri = "file:///repo"))
 
-        assertEquals(listOf("git status"), candidates.map { it.replacementText })
-        assertEquals("stats", candidates.single().source)
-        assertEquals(TerminalCompletionCandidateKind.HISTORY, candidates.single().kind)
-        assertEquals(0, candidates.single().replacementStartOffset)
+        assertEquals(listOf("status"), candidates.map { it.replacementText })
+        assertEquals("mru", candidates.single().source)
+        assertEquals(TerminalCompletionCandidateKind.SUBCOMMAND, candidates.single().kind)
+        assertEquals(4, candidates.single().replacementStartOffset)
         assertEquals(5, candidates.single().replacementEndOffset)
     }
 
@@ -113,9 +111,9 @@ class TerminalCommandStatsCompletionSourceTest {
             )
         }
 
-        val candidates = source.complete(request("git s"))
+        val candidates = learnedHistory(source).complete(request("git s"))
 
-        assertEquals(listOf("git switch main", "git status"), candidates.map { it.replacementText })
+        assertEquals(listOf("switch main", "status"), candidates.map { it.replacementText })
         assertTrue(candidates[0].score > candidates[1].score)
     }
 
@@ -144,9 +142,9 @@ class TerminalCommandStatsCompletionSourceTest {
             ),
         )
 
-        val candidates = source.complete(request("git "))
+        val candidates = learnedHistory(source).complete(request("git "))
 
-        assertEquals(listOf("git alpha", "git beta"), candidates.map { it.replacementText })
+        assertEquals(listOf("alpha", "beta"), candidates.map { it.replacementText })
         assertEquals(candidates[0].score, candidates[1].score)
     }
 
@@ -168,9 +166,9 @@ class TerminalCommandStatsCompletionSourceTest {
             usedAtEpochMillis = 100,
         )
 
-        val candidates = source.complete(request("npm ", profileId = "pwsh", workingDirectoryUri = "file:///repo-b"))
+        val candidates = learnedHistory(source).complete(request("npm ", profileId = "pwsh", workingDirectoryUri = "file:///repo-b"))
 
-        assertEquals(listOf("npm update", "npm test"), candidates.map { it.replacementText })
+        assertEquals(listOf("update", "test"), candidates.map { it.replacementText })
         assertTrue(candidates[0].score > candidates[1].score)
     }
 
@@ -179,7 +177,7 @@ class TerminalCommandStatsCompletionSourceTest {
         val source = TerminalCompletionSources.commandStats()
         source.recordCommandResult("git status", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 100)
 
-        assertTrue(source.complete(request("git status")).isEmpty())
+        assertTrue(learnedHistory(source).complete(request("git status")).isEmpty())
     }
 
     @Test
@@ -188,7 +186,7 @@ class TerminalCommandStatsCompletionSourceTest {
         source.recordCommandResult("git status", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 100)
 
         val candidates =
-            source.complete(
+            learnedHistory(source).complete(
                 request(
                     "echo ready && git s",
                     shellCapabilities = TerminalShellCapabilities.POSIX,
@@ -211,7 +209,7 @@ class TerminalCommandStatsCompletionSourceTest {
         )
 
         assertEquals(listOf("git switch main", "git status"), source.snapshot().map { it.commandLine })
-        assertTrue(source.complete(request("git s")).isEmpty())
+        assertTrue(learnedHistory(source).complete(request("git s")).isEmpty())
     }
 
     @Test
@@ -481,6 +479,9 @@ class TerminalCommandStatsCompletionSourceTest {
             workingDirectoryUri = workingDirectoryUri,
             shellCapabilities = shellCapabilities,
         )
+
+    private fun learnedHistory(source: TerminalCommandStatsCompletionSource) =
+        TerminalCompletionSources.sessionMru(learnedStatsProvider = source::snapshotAll)
 
     private fun stats(
         commandLine: String,

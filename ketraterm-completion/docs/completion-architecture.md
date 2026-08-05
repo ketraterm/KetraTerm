@@ -13,11 +13,12 @@ External modules should import only:
 - `io.github.ketraterm.completion.model`
 
 The `api` package exposes host-facing engines, source factories, request and
-candidate contracts, and mutable learning-source interfaces. Factory methods
-are intentionally narrow: hosts create spec, session-MRU, stats, path, and
-host-snapshot sources, then give the merged engine one immutable learned-stats
-supplier. Learning is applied once by the global ranker, never by nested
-source decorators.
+candidate contracts, a mutable session-history source, and a separate mutable
+statistics contract. Factory methods are intentionally narrow: hosts create
+spec, session-MRU, path, and host-snapshot sources, then give both the MRU
+source and merged engine one immutable learned-stats supplier. Statistics are
+ranking evidence and persisted fallback data; they are never composed as an
+independent candidate provider or ranking vote.
 
 `TerminalCompletionSourcePrior` is the single reviewed cold-start policy for
 built-in source families. Standalone and IntelliJ composition use these named
@@ -95,7 +96,8 @@ decision explicitly promotes a type into `api` or `model`.
 
 Implementation files follow responsibility boundaries rather than accumulating
 nested helpers in orchestration classes. Session MRU coordinates independent
-bounded command-history and observed-token indexes. Learned ranking separates
+bounded command-history and observed-token indexes, projects learned commands
+into the active replacement range, and recovers positive persisted commands as one learned fallback stream. Learned ranking separates
 snapshot identity caching, index construction, context selection, saturating
 counter aggregation, and numeric scoring policy. Global fusion owns only
 outcome grouping, representative selection, and deterministic final ordering.
@@ -105,8 +107,9 @@ implementations each live in their matching file in `ketraterm-completion-host`.
 ## Host Ownership
 
 Hosts are responsible for applying `TerminalCompletionPersistencePolicy` to authoritative command records and for
-choosing whether and where persistence is enabled. Completion sources accept compact stats snapshots and live feedback
-events, but they never read files, scan raw shell history, spawn shells, or talk to UI frameworks.
+choosing whether and where persistence is enabled. The statistics index accepts compact snapshots and live feedback
+events, but it is not a completion source and never contributes a second visible candidate. Completion components never
+read files, scan raw shell history, spawn shells, or talk to UI frameworks.
 
 Optional disk I/O belongs to the separately published
 `ketraterm-completion-persistence` module. Its
@@ -132,8 +135,12 @@ those concepts apply.
 
 Completion treats trailing space as a semantic boundary. With the cursor inside
 `cd`, sources complete the command token. With the cursor after `cd `, sources
-complete a new empty argument at the cursor while full-command MRU and stats
-sources may still match the normalized visible command prefix.
+complete a new empty argument at the cursor. Matching learned commands are
+projected to that argument, so `cd IdeaProjects/KetraTerm/` is presented and
+inserted as `IdeaProjects/KetraTerm/`; the executable is not repeated in the
+popup. A full command is retained only when the executable itself is active;
+history rows that cannot be projected safely into the active context are not
+offered.
 
 Session MRU also maintains a separate bounded, in-memory observed-token index
 for executables that have no static `TerminalCommandSpec`. Successful commands
@@ -152,9 +159,9 @@ segments. A cursor at the start of an operator belongs to the left segment; a
 cursor inside a multi-character operator is an `OPERATOR` region and returns no
 candidates; a cursor after the operator belongs to a new right segment.
 Unclosed quotes and incomplete command lines remain tokenizable and resolve to
-their closest logical segment. Whole-command MRU and exact-stats candidates are
-suppressed in segments following an operator because their full-line replacement
-range cannot safely express a segment-local completion.
+their closest logical segment. Learned-history candidates are suppressed in
+segments following an operator until segment-local history ownership is
+implemented; replacing across an operator boundary is never inferred.
 
 The exact shell option terminator `--` is a command-context boundary once the
 cursor has passed the complete token. Tokens after it remain positional: they do
@@ -303,10 +310,12 @@ authorities, environment variables, or filesystem case.
 
 Provider support uses reciprocal-rank fusion. Candidate scores are meaningful
 only within their producing source; an MRU score is never compared numerically
-with a path or specification score. Each distinct source entry contributes its
-best local rank for an outcome, a source prior clamped to `[-20, 20]`, and its
-context-specific provider feedback. Duplicate candidates from the same source
-do not multiply support.
+with a path or specification score. Each distinct semantic or learned source
+entry contributes its best local rank for an outcome, a source prior clamped to
+`[-20, 20]`, and its context-specific provider feedback. Persistent statistics
+do not constitute a source entry, so the same command execution cannot gain a
+second provider vote merely because it exists in both MRU and persisted stats.
+Duplicate candidates from the same source do not multiply support.
 
 `TerminalCompletionRankingContext` supplies the strongest semantic adjustment
 among contributors. Exact outcome statistics then add bounded usage,

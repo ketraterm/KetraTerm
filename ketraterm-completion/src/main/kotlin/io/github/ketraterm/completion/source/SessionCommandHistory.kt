@@ -16,12 +16,9 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
-import io.github.ketraterm.completion.commandline.commandEndOffset
+import io.github.ketraterm.completion.commandline.TerminalCompletionContext
 import io.github.ketraterm.completion.commandline.commandPrefix
-import io.github.ketraterm.completion.commandline.commandStartOffset
 import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
 import io.github.ketraterm.completion.internal.isRelativeCdCommand
 import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
@@ -67,14 +64,32 @@ internal class SessionCommandHistory(
 
     fun appendCandidates(
         request: TerminalCompletionRequest,
-        context: TerminalCommandLineContext,
+        context: TerminalCompletionContext,
         destination: MutableList<TerminalCompletionCandidate>,
     ) {
-        val normalizedPrefix = normalizeTerminalCommandLine(context.commandPrefix(request.commandLine))
+        val lineContext = context.commandLineContext
+        val normalizedPrefix = normalizeTerminalCommandLine(lineContext.commandPrefix(request.commandLine))
         for (entry in entries) {
             if (!entry.normalizedCommandLine.startsWith(normalizedPrefix) || entry.normalizedCommandLine == normalizedPrefix) continue
             if (!entry.isValidFor(request)) continue
-            destination += entry.toCandidate(request, context.commandStartOffset, context.commandEndOffset)
+            LearnedCommandCandidateProjector
+                .project(
+                    request = request,
+                    requestLine = lineContext,
+                    completionContext = context,
+                    learnedCommand = entry.commandLine,
+                    source = SOURCE_ID,
+                    score =
+                        SessionCompletionRelevance.score(
+                            BASE_SCORE,
+                            entry.useCount,
+                            entry.lastUsedSequence,
+                            entry.profileId,
+                            entry.workingDirectoryUri,
+                            request,
+                        ),
+                    detailPrefix = "recent",
+                )?.let(destination::add)
         }
     }
 
@@ -86,21 +101,6 @@ internal class SessionCommandHistory(
         val requestDirectory = request.workingDirectoryUri ?: return true
         return canonicalizeWorkingDirectoryUri(entryDirectory) == canonicalizeWorkingDirectoryUri(requestDirectory)
     }
-
-    private fun Entry.toCandidate(
-        request: TerminalCompletionRequest,
-        replacementStartOffset: Int,
-        replacementEndOffset: Int,
-    ): TerminalCompletionCandidate =
-        TerminalCompletionCandidate(
-            replacementText = commandLine,
-            replacementStartOffset = replacementStartOffset,
-            replacementEndOffset = replacementEndOffset,
-            displayText = commandLine,
-            source = SOURCE_ID,
-            kind = TerminalCompletionCandidateKind.HISTORY,
-            score = SessionCompletionRelevance.score(BASE_SCORE, useCount, lastUsedSequence, profileId, workingDirectoryUri, request),
-        )
 
     private fun MutableList<Entry>.removeOldest() {
         var oldestIndex = 0

@@ -16,14 +16,8 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
-import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
-import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.model.*
-import io.github.ketraterm.completion.ranking.ExactCommandStatsCandidateBuilder
 import io.github.ketraterm.completion.ranking.indexedFeedbackRankingSnapshot
 import io.github.ketraterm.completion.ranking.indexedShapeRankingSnapshot
 import io.github.ketraterm.completion.stats.CommandCompletionStatsIndex
@@ -31,11 +25,12 @@ import io.github.ketraterm.completion.stats.CommandShapeStatsIndex
 import io.github.ketraterm.completion.stats.CompletionFeedbackStatsIndex
 
 /**
- * Bounded in-memory completion source backed by aggregated command statistics.
+ * Bounded in-memory learning store backed by aggregated command statistics.
  *
  * Hosts feed this source from compact persisted metadata and live command or
- * suggestion feedback. The source never scans raw history, performs I/O, spawns
- * shells, or depends on UI frameworks. All public methods are thread-safe.
+ * suggestion feedback. The store never emits completion candidates, scans raw
+ * history, performs I/O, spawns shells, or depends on UI frameworks. All public
+ * methods are thread-safe.
  *
  * @param capacity maximum distinct command/profile/directory rows retained.
  * @param commandSpecs command specifications used to classify command-family
@@ -44,8 +39,7 @@ import io.github.ketraterm.completion.stats.CompletionFeedbackStatsIndex
 internal class CommandStatsCompletionSourceImpl(
     capacity: Int = DEFAULT_CAPACITY,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-) : TerminalCommandStatsCompletionSource,
-    ContextAwareCompletionSource {
+) : TerminalCommandStatsCompletionSource {
     init {
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
     }
@@ -209,20 +203,6 @@ internal class CommandStatsCompletionSourceImpl(
                 feedbackStats = publishedFeedbackStats,
             )
     }
-
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(
-            request,
-            TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset, request.shellCapabilities.syntax),
-        )
-
-    override fun complete(
-        request: TerminalCompletionRequest,
-        commandLineContext: TerminalCommandLineContext,
-    ): List<TerminalCompletionCandidate> =
-        synchronized(lock) {
-            ExactCommandStatsCandidateBuilder.complete(request, commandStats.rawRows(), commandLineContext)
-        }
 
     private companion object {
         private const val DEFAULT_CAPACITY = 2048

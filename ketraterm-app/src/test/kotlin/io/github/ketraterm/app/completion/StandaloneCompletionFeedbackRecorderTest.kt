@@ -127,7 +127,12 @@ class StandaloneCompletionFeedbackRecorderTest {
             ),
             source.snapshot(),
         )
-        assertTrue(source.complete(completionRequest("git s")).isEmpty())
+        assertTrue(
+            TerminalCompletionSources
+                .sessionMru(learnedStatsProvider = source::snapshotAll)
+                .complete(completionRequest("git s"))
+                .isEmpty(),
+        )
     }
 
     @Test

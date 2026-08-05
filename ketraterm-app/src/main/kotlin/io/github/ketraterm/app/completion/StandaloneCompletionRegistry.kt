@@ -30,7 +30,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
  * `ketraterm-completion` sources.
  *
  * @param specs static command specs shared by providers created from this registry.
- * @param persistentStatsSource optional cross-session indexed stats source
+ * @param persistentStatsSource optional cross-session indexed statistics store
  * loaded and maintained by the standalone host.
  * @param sessionMruCapacity maximum distinct commands retained per terminal session.
  */
@@ -77,6 +77,9 @@ internal class StandaloneCompletionRegistry(
             TerminalCompletionSources.sessionMru(
                 capacity = sessionMruCapacity,
                 commandSpecs = commandSpecs,
+                learnedStatsProvider =
+                    persistentStatsSource?.let { it::snapshotAll }
+                        ?: { io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot.EMPTY },
             )
         val fileSystemProvider = directoryCompletionService.createProvider(onPathSnapshotChanged)
         val previous =
@@ -87,14 +90,6 @@ internal class StandaloneCompletionRegistry(
         val sources =
             ArrayList<TerminalCompletionSourceEntry>(COMPOSED_SOURCE_CAPACITY).apply {
                 add(TerminalCompletionSourceEntry(mruSource, priority = TerminalCompletionSourcePrior.SESSION_MRU))
-                persistentStatsSource?.let { source ->
-                    add(
-                        TerminalCompletionSourceEntry(
-                            source,
-                            priority = TerminalCompletionSourcePrior.PERSISTENT_STATISTICS,
-                        ),
-                    )
-                }
                 add(TerminalCompletionSourceEntry(specSource, priority = TerminalCompletionSourcePrior.STATIC_SPECIFICATION))
                 add(
                     TerminalCompletionSourceEntry(
@@ -190,6 +185,6 @@ internal class StandaloneCompletionRegistry(
 
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
-        private const val COMPOSED_SOURCE_CAPACITY = 4
+        private const val COMPOSED_SOURCE_CAPACITY = 3
     }
 }

@@ -41,6 +41,59 @@ class GlobalEvidenceFusionCompletionEngineTest {
     }
 
     @Test
+    fun `full-command learned path variants use the projected path token when fusing`() {
+        val engine =
+            engine(
+                sources =
+                    listOf(
+                        entry(source(candidate("cd IdeaProjects/KetraTerm", 0, 2, "mru", TerminalCompletionCandidateKind.HISTORY)), 8),
+                        entry(source(candidate("cd IdeaProjects/KetraTerm/", 0, 2, "learned", TerminalCompletionCandidateKind.HISTORY)), 8),
+                    ),
+            )
+
+        val candidates = engine.complete(request("cd"))
+
+        assertEquals(1, candidates.size)
+        assertEquals("cd IdeaProjects/KetraTerm", candidates.single().replacementText)
+    }
+
+    @Test
+    fun `session and persisted copies produce one learned directory candidate`() {
+        val snapshot =
+            TerminalCommandCompletionStatsSnapshot(
+                commandStats =
+                    listOf(
+                        TerminalCommandCompletionStats(
+                            commandLine = "cd IdeaProjects/KetraTerm/",
+                            workingDirectoryUri = "file:///home",
+                            successCount = 4,
+                        ),
+                    ),
+            )
+        val learnedSource =
+            TerminalCompletionSources.sessionMru(
+                learnedStatsProvider = { snapshot },
+            )
+        learnedSource.recordSuccessfulCommand(
+            commandLine = "cd IdeaProjects/KetraTerm",
+            workingDirectoryUri = "file:///home",
+        )
+        val engine =
+            TerminalCompletionEngines.fromSources(
+                sources = listOf(entry(learnedSource, 8)),
+                commandSpecs = TerminalCommandSpecs.defaults(),
+                learnedStatsProvider = { snapshot },
+            )
+
+        val candidates = engine.complete(request("cd ", workingDirectoryUri = "file:///home"))
+
+        assertEquals(1, candidates.size)
+        assertEquals("IdeaProjects/KetraTerm", candidates.single().replacementText)
+        assertEquals("mru", candidates.single().source)
+        assertEquals(TerminalCompletionCandidateKind.PATH, candidates.single().kind)
+    }
+
+    @Test
     fun `same provider contributes only its best local rank to one outcome`() {
         val duplicateSource =
             source(

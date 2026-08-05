@@ -18,14 +18,16 @@ package io.github.ketraterm.completion.api
 import io.github.ketraterm.completion.model.*
 
 /**
- * Mutable completion source backed by compact aggregated command statistics.
+ * Mutable, bounded store for aggregated completion-learning statistics.
  *
  * This is the public host-facing learning contract. Hosts may load and persist
  * snapshots, record command lifecycle outcomes, and feed explicit popup
- * feedback. Implementations must stay dependency-free, bounded, thread-safe,
- * and must not scan raw shell history.
+ * feedback. The store does not emit candidates: hosts expose [snapshotAll] to
+ * the global ranker and learned-history source so one evidence set cannot appear
+ * as a second provider vote. Implementations must stay dependency-free,
+ * bounded, thread-safe, and must not scan raw shell history.
  */
-interface TerminalCommandStatsCompletionSource : TerminalCompletionSource {
+interface TerminalCommandStatsCompletionSource {
     /**
      * Replaces all retained statistics with [snapshot].
      *

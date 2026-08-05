@@ -25,17 +25,18 @@ import kotlin.test.assertTrue
 
 class TerminalSessionMruCompletionSourceTest {
     @Test
-    fun `suggests matching recent commands as full-line replacements`() {
+    fun `projects matching recent commands into the active completion range`() {
         val source = TerminalCompletionSources.sessionMru()
         source.recordSuccessfulCommand("git status")
         source.recordSuccessfulCommand("npm test")
 
         val candidates = source.complete(request("git s"))
 
-        assertEquals(listOf("git status"), candidates.map { it.replacementText })
-        assertEquals(TerminalCompletionCandidateKind.HISTORY, candidates.single().kind)
+        assertEquals(listOf("status"), candidates.map { it.replacementText })
+        assertEquals(TerminalCompletionCandidateKind.SUBCOMMAND, candidates.single().kind)
         assertEquals("mru", candidates.single().source)
-        assertEquals(0, candidates.single().replacementStartOffset)
+        assertEquals("recent command", candidates.single().detail)
+        assertEquals(4, candidates.single().replacementStartOffset)
         assertEquals(5, candidates.single().replacementEndOffset)
     }
 
@@ -46,7 +47,7 @@ class TerminalSessionMruCompletionSourceTest {
 
         val candidates = source.complete(request("git s"))
 
-        assertEquals(listOf("Git Status"), candidates.map { it.replacementText })
+        assertEquals(listOf("Status"), candidates.map { it.replacementText })
     }
 
     @Test
@@ -139,7 +140,7 @@ class TerminalSessionMruCompletionSourceTest {
 
         val candidates = source.complete(request("git s"))
 
-        assertEquals(listOf("git status", "git switch main"), candidates.map { it.replacementText })
+        assertEquals(listOf("status", "switch main"), candidates.map { it.replacementText })
     }
 
     @Test
@@ -151,7 +152,7 @@ class TerminalSessionMruCompletionSourceTest {
 
         val candidates = source.complete(request("git s"))
 
-        assertEquals(listOf("git stash", "git switch main"), candidates.map { it.replacementText })
+        assertEquals(listOf("stash", "switch main"), candidates.map { it.replacementText })
     }
 
     @Test
@@ -177,7 +178,7 @@ class TerminalSessionMruCompletionSourceTest {
                 ),
             )
 
-        assertEquals(listOf("git switch main", "git status"), candidates.map { it.replacementText })
+        assertEquals(listOf("switch main", "status"), candidates.map { it.replacementText })
     }
 
     @Test
@@ -251,7 +252,38 @@ class TerminalSessionMruCompletionSourceTest {
                 ),
             )
 
-        assertEquals(listOf("cd IdeaProjects/JvTerm/"), candidates.map { it.replacementText })
+        assertEquals(listOf("IdeaProjects/JvTerm/"), candidates.map { it.replacementText })
+        assertEquals(TerminalCompletionCandidateKind.PATH, candidates.single().kind)
+        assertEquals("recent directory", candidates.single().detail)
+        assertEquals(3, candidates.single().replacementStartOffset)
+        assertEquals(3, candidates.single().replacementEndOffset)
+    }
+
+    @Test
+    fun `persisted statistics recover one token-local learned fallback`() {
+        val stats = TerminalCompletionSources.commandStats()
+        stats.recordCommandResult(
+            commandLine = "cd IdeaProjects/KetraTerm/",
+            successful = true,
+            profileId = "pwsh",
+            workingDirectoryUri = "file:///C:/Users/gagik",
+            usedAtEpochMillis = 1_000,
+        )
+        val source = TerminalCompletionSources.sessionMru(learnedStatsProvider = stats::snapshotAll)
+
+        val candidates =
+            source.complete(
+                request(
+                    commandLine = "cd I",
+                    profileId = "pwsh",
+                    workingDirectoryUri = "file:///C:/Users/gagik",
+                ),
+            )
+
+        assertEquals(listOf("IdeaProjects/KetraTerm/"), candidates.map { it.replacementText })
+        assertEquals(listOf("mru"), candidates.map { it.source })
+        assertEquals(listOf(TerminalCompletionCandidateKind.PATH), candidates.map { it.kind })
+        assertEquals(listOf("learned directory"), candidates.map { it.detail })
     }
 
     private fun request(

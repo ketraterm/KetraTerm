@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
 
 class StandaloneCompletionRegistryTest {
     @Test
-    fun `static subcommand suggestions rank ahead of session MRU in subcommand position`() {
+    fun `session MRU competes as a semantic subcommand without full-line presentation`() {
         val registry = registry()
         val provider =
             registry.createProvider(
@@ -46,11 +46,12 @@ class StandaloneCompletionRegistryTest {
 
         val suggestions = provider.suggestions(request("git s"))
 
-        assertEquals("status", suggestions[0].replacementText)
-        assertEquals("spec", suggestions[0].source)
-        val mruSuggestion = suggestions.single { it.replacementText == "git switch main" && it.source == "mru" }
-        assertEquals(0, mruSuggestion.replacementStartOffset)
+        val mruSuggestion = suggestions.first()
+        assertEquals("switch main", mruSuggestion.replacementText)
+        assertEquals("mru", mruSuggestion.source)
+        assertEquals(4, mruSuggestion.replacementStartOffset)
         assertEquals(5, mruSuggestion.replacementEndOffset)
+        assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
     }
 
     @Test
@@ -84,7 +85,54 @@ class StandaloneCompletionRegistryTest {
             assertEquals("path", suggestions.first().source)
             assertTrue(suggestions.none { it.replacementText == ".hidden/" })
             assertTrue(suggestions.none { it.replacementText == "README.md" })
-            assertTrue(suggestions.any { it.replacementText == "cd remembered" && it.source == "mru" })
+            assertTrue(suggestions.any { it.replacementText == "remembered" && it.source == "mru" })
+            registry.close()
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `learned nested directory is token-local and outranks its unused parent path`() {
+        val directory = Files.createTempDirectory("ketraterm-learned-directory")
+        try {
+            Files.createDirectories(directory.resolve("IdeaProjects/KetraTerm"))
+            val persistentStats = TerminalCompletionSources.commandStats()
+            persistentStats.replaceSnapshot(
+                TerminalCommandCompletionStatsSnapshot(
+                    commandStats =
+                        listOf(
+                            TerminalCommandCompletionStats(
+                                commandLine = "cd IdeaProjects/KetraTerm/",
+                                profileId = "pwsh",
+                                workingDirectoryUri = directory.toUri().toString(),
+                                useCount = 8,
+                                successCount = 8,
+                                acceptedCount = 2,
+                                lastUsedEpochMillis = System.currentTimeMillis(),
+                            ),
+                        ),
+                ),
+            )
+            val snapshotReady = CountDownLatch(1)
+            val registry = registry(specs = TerminalCommandSpecs.defaults(), persistentStatsSource = persistentStats)
+            val provider =
+                registry.createProvider(
+                    sessionId = "learned-directory",
+                    profileId = "pwsh",
+                    workingDirectoryUriProvider = { directory.toUri().toString() },
+                    onPathSnapshotChanged = snapshotReady::countDown,
+                )
+
+            provider.suggestions(request("cd I"))
+            assertTrue(snapshotReady.await(5, TimeUnit.SECONDS))
+            val suggestions = provider.suggestions(request("cd I"))
+
+            assertEquals("IdeaProjects/KetraTerm/", suggestions.first().replacementText)
+            assertEquals("IdeaProjects/KetraTerm/", suggestions.first().displayText)
+            assertEquals("mru", suggestions.first().source)
+            assertEquals("cd IdeaProjects/KetraTerm/", suggestions.first().commandTextAfterReplacement(request("cd I")))
+            assertTrue(suggestions.none { it.source == "stats" })
             registry.close()
         } finally {
             directory.toFile().deleteRecursively()
@@ -113,7 +161,7 @@ class StandaloneCompletionRegistryTest {
     }
 
     @Test
-    fun `persistent stats suggestions rank below static subcommands and session MRU in subcommand position`() {
+    fun `persistent stats supply learned fallback without a standalone stats source`() {
         val persistentStats = TerminalCompletionSources.commandStats()
         persistentStats.recordCommandResult(
             commandLine = "git show --stat",
@@ -140,10 +188,11 @@ class StandaloneCompletionRegistryTest {
         val suggestions = provider.suggestions(request)
         val outcomes = suggestions.mapNotNull { it.commandTextAfterReplacement(request) }
 
-        assertEquals("git status", outcomes[0])
-        assertEquals("spec", suggestions[0].source)
         assertTrue("git switch main" in outcomes)
         assertTrue("git show --stat" in outcomes)
+        assertTrue("git status" in outcomes)
+        assertTrue(suggestions.none { it.source == "stats" })
+        assertEquals("mru", suggestions.single { it.commandTextAfterReplacement(request) == "git show --stat" }.source)
     }
 
     @Test
@@ -232,7 +281,7 @@ class StandaloneCompletionRegistryTest {
 
     @Test
     fun `provider context boosts matching session MRU commands`() {
-        val registry = registry(emptyList())
+        val registry = registry(listOf(TerminalCommandSpec("git")))
         val provider =
             registry.createProvider(
                 sessionId = "session-1",
@@ -256,8 +305,8 @@ class StandaloneCompletionRegistryTest {
         val suggestions = provider.suggestions(request)
 
         assertEquals(
-            listOf("git switch", "git status"),
-            suggestions.mapNotNull { it.commandTextAfterReplacement(request) }.take(2),
+            listOf("git switch main", "git status"),
+            suggestions.filter { it.source == "mru" }.mapNotNull { it.commandTextAfterReplacement(request) },
         )
     }
 

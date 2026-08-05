@@ -196,6 +196,7 @@ internal class IntellijCompletionRegistry(
             TerminalCompletionSources.sessionMru(
                 capacity = sessionMruCapacity,
                 commandSpecs = commandSpecs,
+                learnedStatsProvider = statsSource::snapshotAll,
             )
         val resources = ArrayList<AutoCloseable>()
         try {
@@ -222,12 +223,6 @@ internal class IntellijCompletionRegistry(
                         TerminalCompletionSourceEntry(
                             mruSource,
                             priority = TerminalCompletionSourcePrior.SESSION_MRU
-                        )
-                    )
-                    add(
-                        TerminalCompletionSourceEntry(
-                            statsSource,
-                            priority = TerminalCompletionSourcePrior.PERSISTENT_STATISTICS
                         )
                     )
                     add(

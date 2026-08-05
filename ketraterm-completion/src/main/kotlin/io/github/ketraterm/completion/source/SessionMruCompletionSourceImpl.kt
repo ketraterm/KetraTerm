@@ -18,37 +18,38 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalSessionMruCompletionSource
-import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
-import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
-import io.github.ketraterm.completion.commandline.TerminalCommandLineCursorRegion
-import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
+import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 
 /**
  * Thread-safe session source coordinating bounded command history and observed-token indexes.
  *
- * The two indexes intentionally retain independent capacities. Full command history
- * owns whole-line replacements, while observed-token learning serves only unknown
- * executable families. This coordinator owns synchronization and publication order;
- * neither index performs I/O or exposes mutable state.
+ * The two session indexes intentionally retain independent capacities. Command
+ * history and positive persisted rows are projected through one learned
+ * candidate stream, while observed-token learning serves only unknown executable
+ * families. This coordinator owns synchronization and publication order; no
+ * index performs I/O or exposes mutable state.
  */
 internal class SessionMruCompletionSourceImpl(
     capacity: Int = DEFAULT_CAPACITY,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    private val learnedStatsProvider: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot.EMPTY },
 ) : TerminalSessionMruCompletionSource,
     ContextAwareCompletionSource {
     private val lock = Any()
     private val commandHistory: SessionCommandHistory
     private val observedTokens: SessionObservedTokenIndex
+    private val commandSpecs = commandSpecs.toList()
     private var nextSequence = 1L
 
     init {
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
         commandHistory = SessionCommandHistory(capacity)
-        observedTokens = SessionObservedTokenIndex(capacity, commandSpecs.toList())
+        observedTokens = SessionObservedTokenIndex(capacity, this.commandSpecs)
     }
 
     override fun recordSuccessfulCommand(
@@ -83,13 +84,26 @@ internal class SessionMruCompletionSourceImpl(
     ): List<TerminalCompletionCandidate> {
         if (commandLineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) return emptyList()
         if (commandLineContext.precededByOperator) return emptyList()
+        val completionContext =
+            TerminalCompletionContextResolver.resolve(
+                commandLine = request.commandLine,
+                lineContext = commandLineContext,
+                commandSpecs = commandSpecs,
+            )
         val candidates =
             synchronized(lock) {
                 buildList {
-                    commandHistory.appendCandidates(request, commandLineContext, this)
+                    commandHistory.appendCandidates(request, completionContext, this)
                     observedTokens.appendCandidates(request, commandLineContext, this)
                 }
-            }
+            }.toMutableList()
+        PersistedHistoryCandidateBuilder.appendCandidates(
+            request = request,
+            lineContext = commandLineContext,
+            completionContext = completionContext,
+            snapshot = learnedStatsProvider().commandStats,
+            destination = candidates,
+        )
         return candidates
             .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
             .take(request.maxCandidates)

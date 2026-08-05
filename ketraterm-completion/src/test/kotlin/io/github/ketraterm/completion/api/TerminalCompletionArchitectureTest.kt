@@ -199,6 +199,35 @@ internal class TerminalCompletionArchitectureTest {
     }
 
     @Test
+    fun `statistics remain evidence and never a completion provider`() {
+        val statsContract =
+            completionMainRoot
+                .resolve("api/TerminalCommandStatsCompletionSource.kt")
+                .readSourceLines()
+                .joinToString("\n")
+        val compositionViolations =
+            completionCompositionFiles.filter { file ->
+                val source = file.readSourceLines().joinToString("\n")
+                source.contains("PERSISTENT_STATISTICS") ||
+                    Regex("TerminalCompletionSourceEntry\\s*\\(\\s*statsSource").containsMatchIn(source)
+            }
+
+        assertTrue(
+            actual = !statsContract.contains("interface TerminalCommandStatsCompletionSource : TerminalCompletionSource"),
+            message = "Command statistics must not implement TerminalCompletionSource",
+        )
+        assertTrue(
+            actual = compositionViolations.isEmpty(),
+            message =
+                compositionViolations.joinToString(
+                    prefix = "Hosts must pass statistics as evidence, not compose them as providers:\n",
+                    separator = "\n",
+                    transform = { file -> file.relativeToRepository() },
+                ),
+        )
+    }
+
+    @Test
     fun `external modules import only completion api or model packages`() {
         val violations =
             externalModuleSourceRoots.flatMap { sourceRoot ->

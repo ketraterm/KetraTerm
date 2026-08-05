@@ -16,12 +16,14 @@
 package io.github.ketraterm.completion.api
 
 /**
- * Mutable session-local completion source for commands observed in one live
- * terminal session.
+ * Mutable learned-history source for commands observed in one live terminal
+ * session and optional positive persisted command evidence.
  *
  * Hosts own the command lifecycle signal and feed this source only with trusted
- * successful commands. Implementations are in-memory, bounded, thread-safe, and
- * perform no persistence or shell I/O.
+ * successful commands. A host may supply immutable persisted statistics at
+ * construction time to recover unsupported commands across sessions without
+ * composing statistics as another provider. Implementations are in-memory,
+ * bounded, thread-safe, and perform no persistence or shell I/O.
  */
 interface TerminalSessionMruCompletionSource : TerminalCompletionSource {
     /**

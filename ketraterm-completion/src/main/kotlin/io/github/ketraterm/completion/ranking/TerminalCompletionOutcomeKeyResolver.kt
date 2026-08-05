@@ -38,16 +38,29 @@ internal class TerminalCompletionOutcomeKeyResolver(
         context: TerminalCompletionContext,
     ): ResolvedCompletionOutcome? {
         val commandLine = request.commandLineAfterCandidate(candidate) ?: return null
-        val pathAware =
-            candidate.kind == TerminalCompletionCandidateKind.PATH ||
-                context.expectedPathKind != TerminalPathArgumentKind.NONE
-        val targetTokenIndex = context.commandLineContext.activeTokenIndex
-        val learnedKey = learnedKey(commandLine, request.shellCapabilities.syntax, targetTokenIndex, pathAware) ?: return null
         val classification =
             TerminalCommandLineClassifier.classify(
                 commandLine,
                 commandSpecs,
                 request.shellCapabilities.syntax,
+            ) ?: return null
+        val pathAware =
+            candidate.kind == TerminalCompletionCandidateKind.PATH ||
+                context.expectedPathKind != TerminalPathArgumentKind.NONE
+        val projectedCursorOffset =
+            (candidate.replacementStartOffset + candidate.replacementText.length).coerceIn(0, commandLine.length)
+        val projectedContext =
+            TerminalCommandLineTokenizer.parse(
+                commandLine,
+                projectedCursorOffset,
+                request.shellCapabilities.syntax,
+            )
+        val learnedKey =
+            learnedKey(
+                commandLine = commandLine,
+                shellSyntax = request.shellCapabilities.syntax,
+                pathTokenIndex = projectedContext.activeTokenIndex,
+                pathAware = pathAware,
             ) ?: return null
         val family =
             classification
