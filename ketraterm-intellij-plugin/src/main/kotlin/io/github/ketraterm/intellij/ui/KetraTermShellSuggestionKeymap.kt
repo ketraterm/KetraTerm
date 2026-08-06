@@ -27,8 +27,8 @@ import javax.swing.KeyStroke
 internal object KetraTermShellSuggestionKeymap : SwingShellSuggestionKeymap {
     override fun actionFor(event: KeyEvent): SwingShellSuggestionAction? {
         val modifiers = event.modifiersEx and RELEVANT_MODIFIERS
-        if (event.keyCode == KeyEvent.VK_ENTER) return null
         when (event.keyCode) {
+            KeyEvent.VK_ENTER -> return if (modifiers == 0) SwingShellSuggestionAction.ACCEPT_SELECTED else null
             KeyEvent.VK_DOWN -> return if (modifiers == 0) SwingShellSuggestionAction.SELECT_NEXT else null
             KeyEvent.VK_UP -> return if (modifiers == 0) SwingShellSuggestionAction.SELECT_PREVIOUS else null
             KeyEvent.VK_HOME -> return if (modifiers == 0) SwingShellSuggestionAction.SELECT_FIRST else null

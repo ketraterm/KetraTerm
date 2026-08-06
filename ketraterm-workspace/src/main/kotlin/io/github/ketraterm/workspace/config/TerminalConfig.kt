@@ -73,6 +73,9 @@ private fun defaultFontFamily(): String {
  * @property desktopNotificationsEnabled whether desktop notifications are enabled.
  * @property shellSuggestionsEnabled whether host-provided shell suggestions may
  * be shown in the terminal UI.
+ * @property acceptSelectedSuggestionWithEnter whether Enter accepts an
+ * already-selected shell suggestion while leaving unselected Enter presses to
+ * the shell.
  * @property persistentSuggestionLearningEnabled whether supporting product hosts
  * persist compact command-completion learning metadata across application restarts.
  * @property clipboardLocalWrite OSC 52 write permission for local sessions.
@@ -104,6 +107,7 @@ data class TerminalConfig(
     val shellRequestWindowManipulation: Boolean = DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION,
     val desktopNotificationsEnabled: Boolean = DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED,
     val shellSuggestionsEnabled: Boolean = DEFAULT_SHELL_SUGGESTIONS_ENABLED,
+    val acceptSelectedSuggestionWithEnter: Boolean = DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
     val persistentSuggestionLearningEnabled: Boolean = DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED,
     val clipboardLocalWrite: TerminalClipboardPermission = DEFAULT_CLIPBOARD_LOCAL_WRITE,
     val clipboardRemoteWrite: TerminalClipboardPermission = DEFAULT_CLIPBOARD_REMOTE_WRITE,
@@ -172,6 +176,7 @@ data class TerminalConfig(
         const val DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION: Boolean = false
         const val DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED: Boolean = true
         const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
+        const val DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER: Boolean = true
         const val DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED: Boolean = false
         const val DEFAULT_SCROLL_ON_OUTPUT: Boolean = true
 

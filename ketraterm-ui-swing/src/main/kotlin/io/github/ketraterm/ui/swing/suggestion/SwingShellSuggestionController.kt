@@ -79,7 +79,11 @@ internal class SwingShellSuggestionController(
     fun handleKeyPressed(event: KeyEvent): Boolean {
         if (!popup.isVisible || suggestions.isEmpty()) return false
         val action = host.suggestionKeymap.actionFor(event) ?: return false
-        val handled = handleAction(action)
+        val enterAcceptanceDisabled =
+            action == SwingShellSuggestionAction.ACCEPT_SELECTED &&
+                event.keyCode == KeyEvent.VK_ENTER &&
+                !host.settings.acceptSelectedSuggestionWithEnter
+        val handled = !enterAcceptanceDisabled && handleAction(action)
         if (handled) event.consume()
         return handled
     }
@@ -93,6 +97,7 @@ internal class SwingShellSuggestionController(
             SwingShellSuggestionAction.SELECT_NEXT_PAGE -> selectRelative(PAGE_STEP)
             SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE -> selectRelative(-PAGE_STEP)
             SwingShellSuggestionAction.ACCEPT -> selectFirstOrAccept()
+            SwingShellSuggestionAction.ACCEPT_SELECTED -> acceptSelected()
             SwingShellSuggestionAction.DISMISS -> dismissSelected()
         }
 

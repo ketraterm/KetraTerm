@@ -51,6 +51,7 @@ internal class SettingsModel(
             shellRequestResizeWindow = settings.shellRequestResizeWindow,
             shellRequestWindowManipulation = settings.shellRequestWindowManipulation,
             shellSuggestionsEnabled = settings.shellSuggestionsEnabled,
+            acceptSelectedSuggestionWithEnter = settings.acceptSelectedSuggestionWithEnter,
             persistentSuggestionLearningEnabled = settings.persistentSuggestionLearningEnabled,
             clipboardLocalWrite = settings.clipboardLocalWrite,
             clipboardRemoteWrite = settings.clipboardRemoteWrite,
@@ -87,6 +88,7 @@ internal class SettingsModel(
         settings.shellRequestResizeWindow = uiState.shellRequestResizeWindow
         settings.shellRequestWindowManipulation = uiState.shellRequestWindowManipulation
         settings.shellSuggestionsEnabled = uiState.shellSuggestionsEnabled
+        settings.acceptSelectedSuggestionWithEnter = uiState.acceptSelectedSuggestionWithEnter
         settings.persistentSuggestionLearningEnabled = uiState.persistentSuggestionLearningEnabled
 
         settings.fontFamily = uiState.fontFamily
@@ -133,6 +135,7 @@ internal data class SettingsState(
     val shellRequestResizeWindow: Boolean,
     val shellRequestWindowManipulation: Boolean,
     val shellSuggestionsEnabled: Boolean,
+    val acceptSelectedSuggestionWithEnter: Boolean,
     val persistentSuggestionLearningEnabled: Boolean,
     val clipboardLocalWrite: TerminalClipboardPermission,
     val clipboardRemoteWrite: TerminalClipboardPermission,

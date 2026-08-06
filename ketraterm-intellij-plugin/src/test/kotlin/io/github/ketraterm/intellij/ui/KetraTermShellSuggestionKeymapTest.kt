@@ -67,10 +67,11 @@ class KetraTermShellSuggestionKeymapTest {
     }
 
     @Test
-    fun `enter always reaches the terminal while tab accepts a popup selection`() {
+    fun `enter accepts only a selected popup item while tab retains select or accept semantics`() {
         val source = Canvas()
 
-        assertNull(
+        assertEquals(
+            SwingShellSuggestionAction.ACCEPT_SELECTED,
             KetraTermShellSuggestionKeymap.actionFor(
                 KeyEvent(source, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_ENTER, KeyEvent.CHAR_UNDEFINED),
             ),
@@ -79,6 +80,18 @@ class KetraTermShellSuggestionKeymapTest {
             SwingShellSuggestionAction.ACCEPT,
             KetraTermShellSuggestionKeymap.actionFor(
                 KeyEvent(source, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_TAB, KeyEvent.CHAR_UNDEFINED),
+            ),
+        )
+        assertNull(
+            KetraTermShellSuggestionKeymap.actionFor(
+                KeyEvent(
+                    source,
+                    KeyEvent.KEY_PRESSED,
+                    0L,
+                    InputEvent.CTRL_DOWN_MASK,
+                    KeyEvent.VK_ENTER,
+                    KeyEvent.CHAR_UNDEFINED,
+                ),
             ),
         )
     }

@@ -129,6 +129,7 @@ class TerminalConfigTest {
         assertFalse(config.shellRequestResizeWindow)
         assertFalse(config.shellRequestWindowManipulation)
         assertTrue(config.shellSuggestionsEnabled)
+        assertTrue(config.acceptSelectedSuggestionWithEnter)
         assertFalse(config.persistentSuggestionLearningEnabled)
         assertEquals(TerminalClipboardPermission.PROMPT, config.clipboardLocalWrite)
         assertEquals(TerminalClipboardPermission.DENY, config.clipboardRemoteWrite)
@@ -165,6 +166,7 @@ class TerminalConfigTest {
                 shellRequestResizeWindow = true,
                 shellRequestWindowManipulation = true,
                 shellSuggestionsEnabled = false,
+                acceptSelectedSuggestionWithEnter = false,
                 persistentSuggestionLearningEnabled = true,
                 desktopNotificationsEnabled = false,
                 clipboardLocalWrite = TerminalClipboardPermission.ALLOW,
@@ -179,6 +181,7 @@ class TerminalConfigTest {
         assertTrue(Files.exists(configFile))
         assertTrue(Files.readString(configFile).contains("""paste_sanitization = "normalize-line-endings""""))
         assertTrue(Files.readString(configFile).contains("""shell_suggestions_enabled = false"""))
+        assertTrue(Files.readString(configFile).contains("""accept_selected_suggestion_with_enter = false"""))
         assertTrue(Files.readString(configFile).contains("""suggestion_learning_persistence_enabled = true"""))
         assertTrue(Files.readString(configFile).contains("""clipboard_local_write = "allow""""))
         assertTrue(Files.readString(configFile).contains("""clipboard_max_decoded_bytes = 500"""))

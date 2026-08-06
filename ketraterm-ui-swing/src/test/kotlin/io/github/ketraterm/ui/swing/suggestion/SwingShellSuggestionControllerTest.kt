@@ -112,7 +112,24 @@ class SwingShellSuggestionControllerTest {
     }
 
     @Test
-    fun `enter always passes through to the shell even when a suggestion is selected`() {
+    fun `enter passes through to the shell when no suggestion is selected`() {
+        val host = RecordingSuggestionHost()
+        val controller = SwingShellSuggestionController(host)
+        val request = request(commandText = "git sw", cursorOffset = 6)
+        val items = suggestions(2, endOffset = request.commandText.length)
+        controller.show(request, items, selectedIndex = -1)
+        val enter = keyPressed(KeyEvent.VK_ENTER)
+
+        assertFalse(controller.handleKeyPressed(enter))
+
+        assertTrue(controller.state().visible)
+        assertTrue(host.acceptedSuggestions.isEmpty())
+        assertTrue(host.feedbackKinds.isEmpty())
+        assertFalse(enter.isConsumed)
+    }
+
+    @Test
+    fun `enter accepts an already-selected suggestion`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)
         val request = request(commandText = "git sw", cursorOffset = 6)
@@ -120,9 +137,32 @@ class SwingShellSuggestionControllerTest {
         controller.show(request, items, selectedIndex = 1)
         val enter = keyPressed(KeyEvent.VK_ENTER)
 
+        assertTrue(controller.handleKeyPressed(enter))
+
+        assertFalse(controller.state().visible)
+        assertEquals(listOf(1), host.acceptedIndexes)
+        assertEquals(listOf(items[1]), host.acceptedSuggestions)
+        assertEquals(listOf(request), host.acceptedRequests)
+        assertEquals(listOf(SwingShellSuggestionFeedbackKind.ACCEPTED), host.feedbackKinds)
+        assertEquals(1, host.focusRequests)
+        assertTrue(enter.isConsumed)
+    }
+
+    @Test
+    fun `disabled enter acceptance passes through with a selected suggestion`() {
+        val host =
+            RecordingSuggestionHost(
+                settings = SwingSettings(acceptSelectedSuggestionWithEnter = false),
+            )
+        val controller = SwingShellSuggestionController(host)
+        val items = suggestions(2)
+        controller.show(request(), items, selectedIndex = 1)
+        val enter = keyPressed(KeyEvent.VK_ENTER)
+
         assertFalse(controller.handleKeyPressed(enter))
 
         assertTrue(controller.state().visible)
+        assertEquals(1, controller.state().selectedIndex)
         assertTrue(host.acceptedSuggestions.isEmpty())
         assertTrue(host.feedbackKinds.isEmpty())
         assertFalse(enter.isConsumed)

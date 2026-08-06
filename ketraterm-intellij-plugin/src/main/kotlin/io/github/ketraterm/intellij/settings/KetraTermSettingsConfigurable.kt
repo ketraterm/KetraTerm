@@ -78,6 +78,8 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
     private val pasteOnMiddleClickCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.pasteOnMiddleClick"))
     private val overrideIdeShortcutsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.overrideIdeShortcuts"))
     private val shellSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
+    private val acceptSelectedSuggestionWithEnterCheckBox =
+        JBCheckBox(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter"))
     private val completionLearningPersistenceCheckBox =
         JBCheckBox(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence"))
     private val scrollOnOutputCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.scrollOnOutput"))
@@ -195,6 +197,10 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
                         cell(shellSuggestionsCheckBox)
                     }
                     row {
+                        cell(acceptSelectedSuggestionWithEnterCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter.comment"))
+                    }
+                    row {
                         cell(completionLearningPersistenceCheckBox)
                             .comment(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence.comment"))
                     }
@@ -270,6 +276,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
         pasteOnMiddleClickCheckBox.isSelected = normalized.pasteOnMiddleClick
         overrideIdeShortcutsCheckBox.isSelected = normalized.overrideIdeShortcuts
         shellSuggestionsCheckBox.isSelected = normalized.shellSuggestionsEnabled
+        acceptSelectedSuggestionWithEnterCheckBox.isSelected = normalized.acceptSelectedSuggestionWithEnter
         completionLearningPersistenceCheckBox.isSelected = normalized.completionLearningPersistenceEnabled
         scrollOnOutputCheckBox.isSelected = normalized.scrollOnOutput
         pasteSanitizationCombo.selectedItem = pasteSanitizationOptions().firstOrNull { it.id == normalized.pasteSanitization }
@@ -297,6 +304,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
             pasteOnMiddleClick = pasteOnMiddleClickCheckBox.isSelected,
             overrideIdeShortcuts = overrideIdeShortcutsCheckBox.isSelected,
             shellSuggestionsEnabled = shellSuggestionsCheckBox.isSelected,
+            acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckBox.isSelected,
             completionLearningPersistenceEnabled = completionLearningPersistenceCheckBox.isSelected,
             scrollbackLines = spinnerValue(scrollbackSpinner),
             lineHeight = spinnerDoubleValue(lineHeightSpinner).toFloat(),

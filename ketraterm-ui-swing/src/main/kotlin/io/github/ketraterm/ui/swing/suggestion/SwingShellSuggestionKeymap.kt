@@ -48,6 +48,9 @@ enum class SwingShellSuggestionAction {
     /** Selects the first suggestion when none is selected, otherwise accepts the selected suggestion. */
     ACCEPT,
 
+    /** Accepts an already-selected suggestion without selecting a fallback item. */
+    ACCEPT_SELECTED,
+
     /** Explicitly dismisses the selected suggestion. */
     DISMISS,
 }
@@ -86,6 +89,7 @@ fun interface SwingShellSuggestionKeymap {
                     KeyEvent.VK_PAGE_DOWN -> SwingShellSuggestionAction.SELECT_NEXT_PAGE
                     KeyEvent.VK_PAGE_UP -> SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE
                     KeyEvent.VK_TAB -> SwingShellSuggestionAction.ACCEPT
+                    KeyEvent.VK_ENTER -> SwingShellSuggestionAction.ACCEPT_SELECTED
                     KeyEvent.VK_ESCAPE -> SwingShellSuggestionAction.DISMISS
                     else -> null
                 }

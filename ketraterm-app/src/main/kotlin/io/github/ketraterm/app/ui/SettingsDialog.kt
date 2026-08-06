@@ -191,6 +191,8 @@ internal class SettingsDialog(
         JCheckBox("Allow window manipulation from shell", settings.shellRequestWindowManipulation)
     private val shellSuggestionsCheckbox =
         JCheckBox("Show shell suggestions", settings.shellSuggestionsEnabled)
+    private val acceptSelectedSuggestionWithEnterCheckbox =
+        JCheckBox("Accept selected suggestion with Enter", settings.acceptSelectedSuggestionWithEnter)
     private val persistentSuggestionLearningCheckbox =
         JCheckBox("Persist suggestion learning", settings.persistentSuggestionLearningEnabled)
     private val scrollOnOutputCheckbox = JCheckBox("Scroll on output", settings.scrollOnOutput)
@@ -289,6 +291,7 @@ internal class SettingsDialog(
         registerChangeListener(shellRequestResizeWindowCheckbox, updateApplyState)
         registerChangeListener(shellRequestWindowManipulationCheckbox, updateApplyState)
         registerChangeListener(shellSuggestionsCheckbox, updateApplyState)
+        registerChangeListener(acceptSelectedSuggestionWithEnterCheckbox, updateApplyState)
         registerChangeListener(persistentSuggestionLearningCheckbox, updateApplyState)
         registerChangeListener(scrollOnOutputCheckbox, updateApplyState)
         registerChangeListener(cursorBlinkSpinner, updateApplyState)
@@ -516,6 +519,12 @@ internal class SettingsDialog(
             2,
             shellSuggestionsCheckbox,
             "Show host-provided shell suggestions when a provider is active.",
+        )
+        addCheckboxRow(
+            keyboardSection,
+            4,
+            acceptSelectedSuggestionWithEnterCheckbox,
+            "Insert the highlighted suggestion with Enter. With no selection, Enter runs the command normally.",
         )
         panel.add(keyboardSection)
 
@@ -758,6 +767,8 @@ internal class SettingsDialog(
         shellRequestResizeWindowCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_RESIZE_WINDOW
         shellRequestWindowManipulationCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
         shellSuggestionsCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED
+        acceptSelectedSuggestionWithEnterCheckbox.isSelected =
+            TerminalConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER
         persistentSuggestionLearningCheckbox.isSelected = TerminalConfig.DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED
         scrollOnOutputCheckbox.isSelected = TerminalConfig.DEFAULT_SCROLL_ON_OUTPUT
         cursorBlinkSpinner.value = TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS
@@ -831,6 +842,7 @@ internal class SettingsDialog(
             shellRequestResizeWindow = shellRequestResizeWindowCheckbox.isSelected,
             shellRequestWindowManipulation = shellRequestWindowManipulationCheckbox.isSelected,
             shellSuggestionsEnabled = shellSuggestionsCheckbox.isSelected,
+            acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckbox.isSelected,
             persistentSuggestionLearningEnabled = persistentSuggestionLearningCheckbox.isSelected,
             clipboardLocalWrite =
                 TerminalClipboardPermission.valueOf(

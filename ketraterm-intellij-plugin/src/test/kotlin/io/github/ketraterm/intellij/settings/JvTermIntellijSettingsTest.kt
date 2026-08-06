@@ -90,6 +90,24 @@ class KetraTermIntellijSettingsTest {
     }
 
     @Test
+    fun `enter suggestion acceptance defaults on and maps to swing settings`() {
+        val enabled =
+            KetraTermIntellijSettingsMapper.toSwingSettings(
+                KetraTermIntellijSettings.State(themeId = "nord"),
+            )
+        val disabled =
+            KetraTermIntellijSettingsMapper.toSwingSettings(
+                KetraTermIntellijSettings.State(
+                    themeId = "nord",
+                    acceptSelectedSuggestionWithEnter = false,
+                ),
+            )
+
+        assertTrue(enabled.acceptSelectedSuggestionWithEnter)
+        assertFalse(disabled.acceptSelectedSuggestionWithEnter)
+    }
+
+    @Test
     fun `completion learning persistence is privacy preserving by default`() {
         val state = KetraTermIntellijSettings.State()
 

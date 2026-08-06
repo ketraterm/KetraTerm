@@ -195,6 +195,8 @@ class KetraTermIntellijSettings :
      * @property defaultTabName user-visible name for newly opened tabs.
      * @property shellSuggestionsEnabled whether host-provided shell suggestions
      * may appear in IDE-hosted terminals.
+     * @property acceptSelectedSuggestionWithEnter whether Enter accepts an
+     * already-selected terminal suggestion and otherwise reaches the shell.
      * @property completionLearningPersistenceEnabled whether sanitized learned
      * completion statistics may be read from and written to local disk.
      */
@@ -219,6 +221,7 @@ class KetraTermIntellijSettings :
         @JvmField val environmentVariables: String = "",
         @JvmField val defaultTabName: String = "Local",
         @JvmField val shellSuggestionsEnabled: Boolean = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED,
+        @JvmField val acceptSelectedSuggestionWithEnter: Boolean = TerminalConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
         @JvmField val completionLearningPersistenceEnabled: Boolean = false,
         @JvmField val pasteSanitization: String = "raw",
         @JvmField val clipboardLocalWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_LOCAL_WRITE.name.lowercase(Locale.ROOT),
@@ -436,6 +439,7 @@ internal object KetraTermIntellijSettingsMapper {
             shellRequestResizeWindow = false,
             shellRequestWindowManipulation = false,
             shellSuggestionsEnabled = normalized.shellSuggestionsEnabled,
+            acceptSelectedSuggestionWithEnter = normalized.acceptSelectedSuggestionWithEnter,
             scrollOnOutput = normalized.scrollOnOutput,
         )
     }

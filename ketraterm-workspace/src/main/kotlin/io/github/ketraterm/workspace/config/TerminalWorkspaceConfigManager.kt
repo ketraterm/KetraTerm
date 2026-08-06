@@ -128,6 +128,9 @@ class TerminalWorkspaceConfigManager(
                 behavior["desktop_notifications_enabled"]?.toBooleanStrictOrNull() ?: default.desktopNotificationsEnabled
             val shellSuggestionsEnabled =
                 behavior["shell_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.shellSuggestionsEnabled
+            val acceptSelectedSuggestionWithEnter =
+                behavior["accept_selected_suggestion_with_enter"]?.toBooleanStrictOrNull()
+                    ?: default.acceptSelectedSuggestionWithEnter
             val persistentSuggestionLearningEnabled =
                 behavior[SUGGESTION_LEARNING_PERSISTENCE_KEY]?.toBooleanStrictOrNull()
                     ?: behavior["persistent_suggestion_learning_enabled"]?.toBooleanStrictOrNull()
@@ -203,6 +206,7 @@ class TerminalWorkspaceConfigManager(
                 shellRequestWindowManipulation = shellRequestWindowManipulation,
                 desktopNotificationsEnabled = desktopNotificationsEnabled,
                 shellSuggestionsEnabled = shellSuggestionsEnabled,
+                acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnter,
                 persistentSuggestionLearningEnabled = persistentSuggestionLearningEnabled,
                 clipboardLocalWrite = clipboardLocalWrite,
                 clipboardRemoteWrite = clipboardRemoteWrite,
@@ -304,6 +308,8 @@ class TerminalWorkspaceConfigManager(
         desktop_notifications_enabled = ${config.desktopNotificationsEnabled}
         # Whether host-provided shell suggestions may appear in the terminal UI
         shell_suggestions_enabled = ${config.shellSuggestionsEnabled}
+        # Whether Enter accepts an already-selected suggestion; with no selection Enter reaches the shell
+        accept_selected_suggestion_with_enter = ${config.acceptSelectedSuggestionWithEnter}
         # Persist compact suggestion-learning metadata (never raw terminal output) across application restarts
         $SUGGESTION_LEARNING_PERSISTENCE_KEY = ${config.persistentSuggestionLearningEnabled}
         # Automatically scroll to bottom when new process output arrives

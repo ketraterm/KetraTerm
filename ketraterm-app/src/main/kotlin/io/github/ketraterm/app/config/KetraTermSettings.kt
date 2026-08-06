@@ -172,6 +172,12 @@ internal class KetraTermSettings(
             updateConfig(config.copy(shellSuggestionsEnabled = value))
         }
 
+    var acceptSelectedSuggestionWithEnter: Boolean
+        get() = config.acceptSelectedSuggestionWithEnter
+        set(value) {
+            updateConfig(config.copy(acceptSelectedSuggestionWithEnter = value))
+        }
+
     var scrollOnOutput: Boolean
         get() = config.scrollOnOutput
         set(value) {
@@ -236,6 +242,7 @@ internal class KetraTermSettings(
             shellRequestResizeWindow = config.shellRequestResizeWindow,
             shellRequestWindowManipulation = config.shellRequestWindowManipulation,
             shellSuggestionsEnabled = config.shellSuggestionsEnabled,
+            acceptSelectedSuggestionWithEnter = config.acceptSelectedSuggestionWithEnter,
             scrollOnOutput = config.scrollOnOutput,
         )
     }
