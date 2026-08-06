@@ -59,4 +59,17 @@ class SwingTerminalHostShortcutMapTest {
         assertEquals(SwingTerminalHostAction.SCROLL_PAGE_UP, shortcuts.actionFor(KeyEvent.VK_PAGE_UP, InputEvent.SHIFT_DOWN_MASK))
         assertEquals(SwingTerminalHostAction.SCROLL_PAGE_DOWN, shortcuts.actionFor(KeyEvent.VK_PAGE_DOWN, InputEvent.SHIFT_DOWN_MASK))
     }
+
+    @Test
+    fun `manual suggestions use ctrl space on every platform`() {
+        for (osName in listOf("Windows 11", "Linux", "macOS")) {
+            val shortcuts = SwingTerminalHostShortcutMap.platformDefault(osName)
+
+            assertEquals(
+                SwingTerminalHostAction.REQUEST_SUGGESTIONS,
+                shortcuts.actionFor(KeyEvent.VK_SPACE, InputEvent.CTRL_DOWN_MASK),
+                osName,
+            )
+        }
+    }
 }

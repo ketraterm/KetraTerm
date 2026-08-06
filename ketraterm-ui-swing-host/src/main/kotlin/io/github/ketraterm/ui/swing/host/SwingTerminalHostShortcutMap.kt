@@ -38,6 +38,9 @@ enum class SwingTerminalHostAction {
     /** Open the host-owned terminal search UI. */
     OPEN_SEARCH,
 
+    /** Request suggestions for the active shell command line. */
+    REQUEST_SUGGESTIONS,
+
     /** Select all retained terminal text. */
     SELECT_ALL,
 
@@ -153,6 +156,8 @@ class SwingTerminalHostShortcutMap private constructor(
                 SwingTerminalHostShortcut(KeyEvent.VK_V, clipboardModifier)
             map[SwingTerminalHostAction.OPEN_SEARCH] =
                 SwingTerminalHostShortcut(KeyEvent.VK_F, menuModifier or InputEvent.SHIFT_DOWN_MASK)
+            map[SwingTerminalHostAction.REQUEST_SUGGESTIONS] =
+                SwingTerminalHostShortcut(KeyEvent.VK_SPACE, InputEvent.CTRL_DOWN_MASK)
             map[SwingTerminalHostAction.SCROLL_PAGE_UP] =
                 SwingTerminalHostShortcut(KeyEvent.VK_PAGE_UP, InputEvent.SHIFT_DOWN_MASK)
             map[SwingTerminalHostAction.SCROLL_PAGE_DOWN] =

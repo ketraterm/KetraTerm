@@ -1247,8 +1247,9 @@ class SwingTerminal
          * with the same [request] so host adapters can apply and learn from the
          * exact command-line replacement range that produced each suggestion.
          *
-         * If [SwingSettings.shellSuggestionsEnabled] is `false` or [suggestions]
-         * is empty, the current popup is hidden.
+         * This is an explicit display request, so it is independent of the
+         * automatic-popup setting. If [suggestions] is empty, the current popup
+         * is hidden.
          *
          * @param request command-line context that produced [suggestions].
          * @param suggestions suggestions to display.
@@ -1275,8 +1276,9 @@ class SwingTerminal
          * and shows the returned snapshot near a terminal-grid cell.
          *
          * Providers run on the Swing Event Dispatch Thread and should return a
-         * bounded, already-computed snapshot quickly. Empty provider results hide
-         * the current popup.
+         * bounded, already-computed snapshot quickly. This automatic request is
+         * ignored when [SwingSettings.shellSuggestionsEnabled] is `false`.
+         * Empty provider results hide the current popup.
          *
          * @param commandText visible command-line text known to the host.
          * @param cursorOffset UTF-16 cursor offset within [commandText].
@@ -1311,7 +1313,8 @@ class SwingTerminal
          * This method uses OSC 133 shell-integration marker state captured by
          * the session. It does not infer command text from key events or
          * persistent command history. When no trustworthy active command line is
-         * available, the current suggestion popup is hidden.
+         * available, the current suggestion popup is hidden. This explicit
+         * request remains available when automatic suggestions are disabled.
          */
         fun requestActiveShellSuggestions() {
             runOnEdt(
@@ -1329,7 +1332,7 @@ class SwingTerminal
                             anchorColumn = snapshot.cursorColumn,
                             anchorRow = snapshot.cursorRow,
                         )
-                    requestShellSuggestionsOnEdt(request)
+                    requestShellSuggestionsOnEdt(request, automatic = false)
                     doLayout()
                 },
             )
@@ -1478,8 +1481,11 @@ class SwingTerminal
             return true
         }
 
-        private fun requestShellSuggestionsOnEdt(request: SwingShellSuggestionRequest) {
-            if (!settings.shellSuggestionsEnabled) {
+        private fun requestShellSuggestionsOnEdt(
+            request: SwingShellSuggestionRequest,
+            automatic: Boolean = true,
+        ) {
+            if (automatic && !settings.shellSuggestionsEnabled) {
                 shellSuggestionController.hide()
                 return
             }

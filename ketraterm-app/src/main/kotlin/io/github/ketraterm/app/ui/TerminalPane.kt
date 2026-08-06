@@ -83,6 +83,10 @@ internal class TerminalPane private constructor(
 
     override fun clearScreen(): Boolean = terminal.clearScreen()
 
+    override fun requestShellSuggestions() {
+        terminal.requestActiveShellSuggestions()
+    }
+
     override fun openSearch() {
         searchBar.open()
     }

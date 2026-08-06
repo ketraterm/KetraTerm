@@ -32,6 +32,7 @@ internal object KetraTermTerminalActionIds {
     const val COPY_SELECTION = "KetraTerm.Terminal.CopySelection"
     const val PASTE_CLIPBOARD = "KetraTerm.Terminal.PasteClipboard"
     const val OPEN_SEARCH = "KetraTerm.Terminal.OpenSearch"
+    const val REQUEST_SUGGESTIONS = "KetraTerm.Terminal.RequestSuggestions"
     const val SELECT_ALL = "KetraTerm.Terminal.SelectAll"
     const val CLEAR_SCREEN = "KetraTerm.Terminal.ClearScreen"
     const val NEW_TAB = "KetraTerm.Terminal.NewTab"
@@ -98,6 +99,11 @@ class KetraTermPasteClipboardAction : KetraTermTerminalAction(SwingTerminalHostA
  * Opens the focused terminal pane's search overlay.
  */
 class KetraTermOpenSearchAction : KetraTermTerminalAction(SwingTerminalHostAction.OPEN_SEARCH)
+
+/**
+ * Requests suggestions for the active command line in the focused terminal.
+ */
+class KetraTermRequestSuggestionsAction : KetraTermTerminalAction(SwingTerminalHostAction.REQUEST_SUGGESTIONS)
 
 /**
  * Selects all retained text in the focused terminal.

@@ -96,6 +96,7 @@ internal class KetraTermTerminalPane private constructor(
         when (action) {
             SwingTerminalHostAction.COPY_SELECTION -> terminal.currentSelection() != null
             SwingTerminalHostAction.OPEN_SEARCH -> fromContextMenu || KetraTermIntellijSettings.getInstance().overrideIdeShortcuts()
+            SwingTerminalHostAction.REQUEST_SUGGESTIONS,
             SwingTerminalHostAction.SELECT_ALL,
             SwingTerminalHostAction.CLEAR_SCREEN,
             SwingTerminalHostAction.PASTE_CLIPBOARD,
@@ -116,6 +117,10 @@ internal class KetraTermTerminalPane private constructor(
             SwingTerminalHostAction.PASTE_CLIPBOARD -> terminal.pasteClipboardText()
             SwingTerminalHostAction.SELECT_ALL -> terminal.selectAll()
             SwingTerminalHostAction.CLEAR_SCREEN -> terminal.clearScreen()
+            SwingTerminalHostAction.REQUEST_SUGGESTIONS -> {
+                terminal.requestActiveShellSuggestions()
+                true
+            }
             SwingTerminalHostAction.OPEN_SEARCH -> {
                 openSearch()
                 true

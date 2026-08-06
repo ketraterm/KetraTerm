@@ -215,17 +215,52 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `disabled shell suggestions setting ignores public show requests`() {
+    fun `disabled automatic suggestions setting ignores automatic provider requests`() {
         val component =
             SwingTerminal(
                 settingsProvider = { SwingSettings(shellSuggestionsEnabled = false) },
+                hostServices =
+                    SwingHostServices(
+                        shellSuggestionProvider = SwingShellSuggestionProvider { suggestions(it.commandText) },
+                    ),
             )
 
         SwingUtilities.invokeAndWait {
-            component.showShellSuggestions(request(), suggestions())
+            component.requestShellSuggestions(commandText = "git s", cursorOffset = 5, anchorColumn = 5, anchorRow = 0)
 
             assertFalse(component.currentShellSuggestionState().visible)
         }
+    }
+
+    @Test
+    fun `manual active request works when automatic suggestions are disabled`() {
+        val connector = RecordingConnector()
+        val session = activeSuggestionSession(connector)
+        connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git s".utf8())
+        val providerRequests = ArrayList<SwingShellSuggestionRequest>()
+        val component =
+            SwingTerminal(
+                settingsProvider = { SwingSettings(shellSuggestionsEnabled = false) },
+                hostServices =
+                    SwingHostServices(
+                        shellSuggestionProvider =
+                            SwingShellSuggestionProvider { request ->
+                                providerRequests += request
+                                suggestions(request.commandText)
+                            },
+                    ),
+            )
+
+        SwingUtilities.invokeAndWait {
+            component.size = component.preferredGridSize(30, 4)
+            component.bind(session)
+            component.requestActiveShellSuggestions()
+
+            assertTrue(component.currentShellSuggestionState().visible)
+        }
+
+        assertEquals(1, providerRequests.size)
+        session.close()
     }
 
     @Test

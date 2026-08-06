@@ -195,6 +195,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
                     }
                     row {
                         cell(shellSuggestionsCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.shellSuggestions.comment"))
                     }
                     row {
                         cell(acceptSelectedSuggestionWithEnterCheckBox)

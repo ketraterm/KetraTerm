@@ -190,7 +190,7 @@ internal class SettingsDialog(
     private val shellRequestWindowManipulationCheckbox =
         JCheckBox("Allow window manipulation from shell", settings.shellRequestWindowManipulation)
     private val shellSuggestionsCheckbox =
-        JCheckBox("Show shell suggestions", settings.shellSuggestionsEnabled)
+        JCheckBox("Show shell suggestions automatically", settings.shellSuggestionsEnabled)
     private val acceptSelectedSuggestionWithEnterCheckbox =
         JCheckBox("Accept selected suggestion with Enter", settings.acceptSelectedSuggestionWithEnter)
     private val persistentSuggestionLearningCheckbox =
@@ -518,7 +518,7 @@ internal class SettingsDialog(
             keyboardSection,
             2,
             shellSuggestionsCheckbox,
-            "Show host-provided shell suggestions when a provider is active.",
+            "Show suggestions while typing. Ctrl+Space requests them manually when this is disabled.",
         )
         addCheckboxRow(
             keyboardSection,

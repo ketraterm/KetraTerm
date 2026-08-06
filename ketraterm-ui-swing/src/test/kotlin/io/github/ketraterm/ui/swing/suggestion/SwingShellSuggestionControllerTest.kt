@@ -54,15 +54,15 @@ class SwingShellSuggestionControllerTest {
     }
 
     @Test
-    fun `disabled settings hide popup and ignore incoming suggestions`() {
+    fun `explicit display is independent of automatic suggestion setting`() {
         val host = RecordingSuggestionHost(settings = SwingSettings(shellSuggestionsEnabled = false))
         val controller = SwingShellSuggestionController(host)
 
         val shown = controller.show(request(), suggestions(2), selectedIndex = 0)
 
-        assertFalse(shown)
-        assertFalse(controller.state().visible)
-        assertFalse(controller.popup.isVisible)
+        assertTrue(shown)
+        assertTrue(controller.state().visible)
+        assertTrue(controller.popup.isVisible)
     }
 
     @Test

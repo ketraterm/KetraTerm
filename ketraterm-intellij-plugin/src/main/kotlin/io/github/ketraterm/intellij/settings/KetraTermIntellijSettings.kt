@@ -194,7 +194,8 @@ class KetraTermIntellijSettings :
      * @property environmentVariables newline-separated `NAME=VALUE` environment entries.
      * @property defaultTabName user-visible name for newly opened tabs.
      * @property shellSuggestionsEnabled whether host-provided shell suggestions
-     * may appear in IDE-hosted terminals.
+     * may appear automatically. Explicit user requests remain available when
+     * disabled.
      * @property acceptSelectedSuggestionWithEnter whether Enter accepts an
      * already-selected terminal suggestion and otherwise reaches the shell.
      * @property completionLearningPersistenceEnabled whether sanitized learned

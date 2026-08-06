@@ -87,6 +87,7 @@ internal class KetraTermTerminalShortcutController(
                 KetraTermTerminalActionIds.COPY_SELECTION -> return SwingTerminalHostAction.COPY_SELECTION
                 KetraTermTerminalActionIds.PASTE_CLIPBOARD -> return SwingTerminalHostAction.PASTE_CLIPBOARD
                 KetraTermTerminalActionIds.OPEN_SEARCH -> return SwingTerminalHostAction.OPEN_SEARCH
+                KetraTermTerminalActionIds.REQUEST_SUGGESTIONS -> return SwingTerminalHostAction.REQUEST_SUGGESTIONS
                 KetraTermTerminalActionIds.SELECT_ALL -> return SwingTerminalHostAction.SELECT_ALL
                 KetraTermTerminalActionIds.CLEAR_SCREEN -> return SwingTerminalHostAction.CLEAR_SCREEN
                 KetraTermTerminalActionIds.SCROLL_PAGE_UP -> return SwingTerminalHostAction.SCROLL_PAGE_UP

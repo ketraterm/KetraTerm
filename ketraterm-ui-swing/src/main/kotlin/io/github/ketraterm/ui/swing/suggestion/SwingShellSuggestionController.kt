@@ -44,7 +44,7 @@ internal class SwingShellSuggestionController(
         suggestions: List<SwingShellSuggestion>,
         selectedIndex: Int,
     ): Boolean {
-        if (!host.settings.shellSuggestionsEnabled || suggestions.isEmpty()) {
+        if (suggestions.isEmpty()) {
             hide()
             return false
         }

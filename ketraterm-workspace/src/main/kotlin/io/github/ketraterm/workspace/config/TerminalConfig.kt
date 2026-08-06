@@ -72,7 +72,7 @@ private fun defaultFontFamily(): String {
  * @property shellRequestResizeWindow whether shell application window/grid resize requests are honored.
  * @property desktopNotificationsEnabled whether desktop notifications are enabled.
  * @property shellSuggestionsEnabled whether host-provided shell suggestions may
- * be shown in the terminal UI.
+ * appear automatically. Explicit user requests remain available when disabled.
  * @property acceptSelectedSuggestionWithEnter whether Enter accepts an
  * already-selected shell suggestion while leaving unselected Enter presses to
  * the shell.
