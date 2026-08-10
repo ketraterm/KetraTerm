@@ -72,7 +72,7 @@ internal class GlobalCompletionRanker(
     ): Map<Any, MutableOutcomeAggregate> {
         val aggregates = LinkedHashMap<Any, MutableOutcomeAggregate>()
         for (sourceResult in sourceCandidates) {
-            val locallyRanked = sourceResult.candidates.sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
+            val locallyRanked = sourceResult.candidates.sortedLocally()
             val bestByOutcome = LinkedHashMap<Any, RankedContribution>()
             for (candidateIndex in locallyRanked.indices) {
                 val candidate = locallyRanked[candidateIndex]
@@ -250,6 +250,18 @@ internal class GlobalCompletionRanker(
                 .thenBy { it.candidate.replacementText }
                 .thenBy { it.sourceIndex }
                 .thenBy { it.candidateIndex }
+
+        private fun List<TerminalCompletionCandidate>.sortedLocally(): List<TerminalCompletionCandidate> {
+            if (size <= 1) return this
+            var isSorted = true
+            for (i in 0 until size - 1) {
+                if (TERMINAL_COMPLETION_CANDIDATE_ORDER.compare(this[i], this[i + 1]) > 0) {
+                    isSorted = false
+                    break
+                }
+            }
+            return if (isSorted) this else sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
+        }
 
         private const val MIN_SOURCE_PRIOR = -20
         private const val MAX_SOURCE_PRIOR = 20

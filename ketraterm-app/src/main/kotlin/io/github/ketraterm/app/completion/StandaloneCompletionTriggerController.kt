@@ -63,7 +63,11 @@ internal class StandaloneCompletionTriggerController(
     private val shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
 ) {
     private val commandSpecs = commandSpecs.toList()
-    private var lastRequestedSnapshotKey: SnapshotKey? = null
+    private var lastRequestedCommandText: String? = null
+    private var lastRequestedCursorOffset: Int = -1
+    private var lastRequestedCursorColumn: Int = -1
+    private var lastRequestedCursorRow: Int = -1
+    private var lastRequestedRankingContextKey: String? = null
 
     init {
         require(debounceMillis >= 0) { "debounceMillis must be >= 0, was $debounceMillis" }
@@ -102,7 +106,7 @@ internal class StandaloneCompletionTriggerController(
         }
         val snapshot = activeCommandLine()
         if (snapshot == null) {
-            lastRequestedSnapshotKey = null
+            clearLastRequest()
             hideSuggestions()
             return
         }
@@ -115,13 +119,24 @@ internal class StandaloneCompletionTriggerController(
                 shellCapabilities = shellCapabilities,
             )
         if (!shouldTrigger) {
-            lastRequestedSnapshotKey = null
+            clearLastRequest()
             hideSuggestions()
             return
         }
-        val snapshotKey = snapshot.key()
-        if (snapshotKey == lastRequestedSnapshotKey) return
-        lastRequestedSnapshotKey = snapshotKey
+        val currentRankingContextKey = rankingContextKey()
+        if (snapshot.commandText == lastRequestedCommandText &&
+            snapshot.cursorOffset == lastRequestedCursorOffset &&
+            snapshot.cursorColumn == lastRequestedCursorColumn &&
+            snapshot.cursorRow == lastRequestedCursorRow &&
+            currentRankingContextKey == lastRequestedRankingContextKey
+        ) {
+            return
+        }
+        lastRequestedCommandText = snapshot.commandText
+        lastRequestedCursorOffset = snapshot.cursorOffset
+        lastRequestedCursorColumn = snapshot.cursorColumn
+        lastRequestedCursorRow = snapshot.cursorRow
+        lastRequestedRankingContextKey = currentRankingContextKey
         requestSuggestions(snapshot)
     }
 
@@ -130,7 +145,7 @@ internal class StandaloneCompletionTriggerController(
      */
     fun cancelAndHide() {
         scheduler.cancel()
-        lastRequestedSnapshotKey = null
+        clearLastRequest()
         hideSuggestions()
     }
 
@@ -141,7 +156,7 @@ internal class StandaloneCompletionTriggerController(
      * while the same command text remains visible.
      */
     fun invalidateLastRequest() {
-        lastRequestedSnapshotKey = null
+        clearLastRequest()
     }
 
     /**
@@ -153,9 +168,17 @@ internal class StandaloneCompletionTriggerController(
      */
     fun sourceSnapshotChanged() {
         scheduler.restart(0) {
-            lastRequestedSnapshotKey = null
+            clearLastRequest()
             refreshNow()
         }
+    }
+
+    private fun clearLastRequest() {
+        lastRequestedCommandText = null
+        lastRequestedCursorOffset = -1
+        lastRequestedCursorColumn = -1
+        lastRequestedCursorRow = -1
+        lastRequestedRankingContextKey = null
     }
 
     private fun TerminalShellCommandLineSnapshot.nonWhitespaceCount(): Int {
@@ -167,23 +190,6 @@ internal class StandaloneCompletionTriggerController(
         }
         return count
     }
-
-    private fun TerminalShellCommandLineSnapshot.key(): SnapshotKey =
-        SnapshotKey(
-            commandText = commandText,
-            cursorOffset = cursorOffset,
-            cursorColumn = cursorColumn,
-            cursorRow = cursorRow,
-            rankingContextKey = rankingContextKey(),
-        )
-
-    private data class SnapshotKey(
-        val commandText: String,
-        val cursorOffset: Int,
-        val cursorColumn: Int,
-        val cursorRow: Int,
-        val rankingContextKey: String?,
-    )
 
     private companion object {
         private const val DEFAULT_DEBOUNCE_MILLIS = 75
