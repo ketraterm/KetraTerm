@@ -297,6 +297,7 @@ internal class KetraTermTerminalPane private constructor(
                             shellSuggestionHandler = suggestionHandler,
                             shellSuggestionFeedbackHandler = feedbackHandler,
                             shellSuggestionKeymap = KetraTermShellSuggestionKeymap,
+                            shellSuggestionViewFactory = IntellijShellSuggestionViewFactory,
                             uiDispatcher = TerminalUiDispatcher { runnable ->
                                 ApplicationManager.getApplication().invokeLater(runnable)
                             },

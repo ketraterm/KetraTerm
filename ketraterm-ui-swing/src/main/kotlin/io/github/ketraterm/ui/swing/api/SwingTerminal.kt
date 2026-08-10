@@ -332,6 +332,7 @@ class SwingTerminal
 
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
                 },
+                hostServices.shellSuggestionViewFactory,
             )
         private val inputController =
             SwingTerminalInputController(
@@ -1102,6 +1103,7 @@ class SwingTerminal
             rowScroller.finish()
             selectionController.stopSelectionDrag()
             hyperlinkDiscoveryController.dispose()
+            shellSuggestionController.close()
             componentScope.cancel()
         }
 

@@ -17,15 +17,26 @@ package io.github.ketraterm.ui.swing.suggestion
 
 import java.awt.Font
 import java.awt.FontMetrics
-import java.util.Locale
+import java.util.*
 import javax.swing.JComponent
 import kotlin.math.min
 
 internal const val POPUP_MAX_VISIBLE_ROWS = 8
-internal const val POPUP_ROW_INSET = 8
-internal const val POPUP_TEXT_LEFT_OFFSET = 18
-internal const val POPUP_SOURCE_HORIZONTAL_PADDING = 7
-internal const val POPUP_SOURCE_GAP = 10
+internal const val POPUP_ROW_INSET = 12
+internal const val POPUP_TEXT_LEFT_OFFSET = 42
+internal const val POPUP_SOURCE_HORIZONTAL_PADDING = 8
+internal const val POPUP_SOURCE_GAP = 12
+internal const val POPUP_MIN_WIDTH = 380
+internal const val POPUP_MAX_WIDTH = 560
+
+/** Semantic accent role used by the standalone suggestion surface. */
+internal enum class SwingShellSuggestionAccentRole {
+    COMMAND,
+    PATH,
+    OPTION,
+    HISTORY,
+    OTHER,
+}
 
 /** Prepared, immutable row consumed directly by the popup paint loop. */
 internal data class SwingShellSuggestionPopupRow(
@@ -33,6 +44,7 @@ internal data class SwingShellSuggestionPopupRow(
     val detail: String,
     val sourceLabel: String,
     val sourceWidth: Int,
+    val accentRole: SwingShellSuggestionAccentRole,
 )
 
 /**
@@ -57,6 +69,9 @@ internal class SwingShellSuggestionPopupLayout {
     var sourceFont: Font = DEFAULT_SOURCE_FONT
         private set
 
+    var preferredWidth: Int = POPUP_MIN_WIDTH
+        private set
+
     fun prepare(
         component: JComponent,
         suggestions: List<SwingShellSuggestion>,
@@ -67,12 +82,14 @@ internal class SwingShellSuggestionPopupLayout {
         val detailMetrics = component.getFontMetrics(detailFont)
         val sourceMetrics = component.getFontMetrics(sourceFont)
         val count = min(suggestions.size, POPUP_MAX_VISIBLE_ROWS)
+        var naturalWidth = POPUP_MIN_WIDTH
         var index = 0
         while (index < count) {
             val suggestion = suggestions[index]
+            val formattedSource = formatSourceLabel(suggestion.source)
             val sourceLabel =
                 ellipsize(
-                    text = suggestion.source.trim().uppercase(Locale.ROOT),
+                    text = formattedSource,
                     metrics = sourceMetrics,
                     maxWidth =
                         min(
@@ -87,6 +104,20 @@ internal class SwingShellSuggestionPopupLayout {
                 } else {
                     sourceMetrics.stringWidth(sourceLabel) + POPUP_SOURCE_HORIZONTAL_PADDING * 2
                 }
+            val naturalTextWidth =
+                maxOf(
+                    textMetrics.stringWidth(suggestion.displayText),
+                    detailMetrics.stringWidth(suggestion.detail.trim()),
+                )
+            naturalWidth =
+                maxOf(
+                    naturalWidth,
+                    POPUP_ROW_INSET * 2 +
+                        POPUP_TEXT_LEFT_OFFSET +
+                        naturalTextWidth +
+                        sourceWidth +
+                        if (sourceWidth == 0) 0 else POPUP_SOURCE_GAP,
+                )
             val rightLimit = availableWidth - POPUP_ROW_INSET
             val textX = POPUP_ROW_INSET + POPUP_TEXT_LEFT_OFFSET
             val textLimit = rightLimit - sourceWidth - if (sourceWidth == 0) 0 else POPUP_SOURCE_GAP
@@ -97,6 +128,7 @@ internal class SwingShellSuggestionPopupLayout {
                     detail = ellipsize(suggestion.detail.trim(), detailMetrics, maxTextWidth),
                     sourceLabel = sourceLabel,
                     sourceWidth = sourceWidth,
+                    accentRole = accentRole(suggestion),
                 )
             index++
         }
@@ -105,6 +137,7 @@ internal class SwingShellSuggestionPopupLayout {
             index++
         }
         rowCount = count
+        preferredWidth = naturalWidth.coerceIn(POPUP_MIN_WIDTH, POPUP_MAX_WIDTH)
     }
 
     fun row(index: Int): SwingShellSuggestionPopupRow {
@@ -118,6 +151,35 @@ internal class SwingShellSuggestionPopupLayout {
         detailFont = candidate.deriveFont(Font.PLAIN, (candidate.size2D - 1f).coerceAtLeast(MIN_DETAIL_FONT_SIZE))
         sourceFont = candidate.deriveFont(Font.BOLD, SOURCE_FONT_SIZE)
     }
+
+    private fun accentRole(suggestion: SwingShellSuggestion): SwingShellSuggestionAccentRole {
+        val kind = suggestion.kind
+        val source = suggestion.source
+        return when {
+            kind.equals("PATH", ignoreCase = true) ||
+                source.contains("path", ignoreCase = true) ||
+                source.contains("file", ignoreCase = true) -> SwingShellSuggestionAccentRole.PATH
+            kind.equals("OPTION", ignoreCase = true) -> SwingShellSuggestionAccentRole.OPTION
+            source.contains("mru", ignoreCase = true) ||
+                source.contains("history", ignoreCase = true) ||
+                source.contains("stats", ignoreCase = true) -> SwingShellSuggestionAccentRole.HISTORY
+            kind.equals("COMMAND", ignoreCase = true) ||
+                kind.equals("SUBCOMMAND", ignoreCase = true) -> SwingShellSuggestionAccentRole.COMMAND
+            else -> SwingShellSuggestionAccentRole.OTHER
+        }
+    }
+
+    private fun formatSourceLabel(source: String): String =
+        when (source) {
+            "mru", "MRU" -> "MRU"
+            "history", "HISTORY" -> "HISTORY"
+            "spec", "SPEC" -> "SPEC"
+            "path", "PATH" -> "PATH"
+            "stats", "STATS" -> "STATS"
+            "git", "GIT" -> "GIT"
+            "gradle", "GRADLE" -> "GRADLE"
+            else -> source.trim().uppercase(Locale.ROOT)
+        }
 
     private fun ellipsize(
         text: String,

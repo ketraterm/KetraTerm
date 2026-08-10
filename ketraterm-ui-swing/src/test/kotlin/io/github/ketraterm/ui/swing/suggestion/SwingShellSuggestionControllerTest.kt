@@ -44,6 +44,27 @@ class SwingShellSuggestionControllerTest {
     }
 
     @Test
+    fun `host view factory receives the controller snapshot and selection`() {
+        lateinit var view: RecordingSuggestionView
+        val controller =
+            SwingShellSuggestionController(
+                host = RecordingSuggestionHost(),
+                viewFactory =
+                    SwingShellSuggestionViewFactory { listener ->
+                        RecordingSuggestionView(listener).also { view = it }
+                    },
+            )
+        val items = suggestions(3)
+
+        controller.show(request(), items, selectedIndex = -1)
+        view.listener.onSuggestionHovered(1)
+
+        assertEquals(items, view.suggestions)
+        assertEquals(1, view.selectedIndex)
+        assertEquals(1, controller.state().selectedIndex)
+    }
+
+    @Test
     fun `show keeps popup passive when no valid initial selection is supplied`() {
         val controller = SwingShellSuggestionController(RecordingSuggestionHost())
 
@@ -360,6 +381,24 @@ class SwingShellSuggestionControllerTest {
         override fun requestFocusInWindow(): Boolean {
             focusRequests++
             return true
+        }
+    }
+
+    private class RecordingSuggestionView(
+        val listener: SwingShellSuggestionViewListener,
+    ) : SwingShellSuggestionView {
+        override val component = JPanel()
+        var suggestions: List<SwingShellSuggestion> = emptyList()
+            private set
+        var selectedIndex: Int = -1
+            private set
+
+        override fun update(
+            suggestions: List<SwingShellSuggestion>,
+            selectedIndex: Int,
+        ) {
+            this.suggestions = suggestions
+            this.selectedIndex = selectedIndex
         }
     }
 }

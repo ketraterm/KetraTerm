@@ -20,14 +20,15 @@ import java.awt.event.KeyEvent
 
 internal class SwingShellSuggestionController(
     private val host: SwingShellSuggestionHost,
+    viewFactory: SwingShellSuggestionViewFactory = SwingShellSuggestionViewFactory.DEFAULT,
 ) {
     private var suggestions: List<SwingShellSuggestion> = emptyList()
     private var selectedIndex: Int = NO_SELECTION
     private var request: SwingShellSuggestionRequest = SwingShellSuggestionRequest.EMPTY
 
-    val popup: SwingShellSuggestionPopup =
-        SwingShellSuggestionPopup(
-            object : SwingShellSuggestionPopupListener {
+    private val view: SwingShellSuggestionView =
+        viewFactory.create(
+            object : SwingShellSuggestionViewListener {
                 override fun onSuggestionHovered(index: Int) {
                     select(index)
                 }
@@ -38,6 +39,8 @@ internal class SwingShellSuggestionController(
                 }
             },
         )
+
+    val popup get() = view.component
 
     fun show(
         request: SwingShellSuggestionRequest,
@@ -51,20 +54,20 @@ internal class SwingShellSuggestionController(
         this.suggestions = retainVisibleSuggestions(suggestions)
         this.request = request
         this.selectedIndex = selectedIndex.takeIf { it in this.suggestions.indices } ?: NO_SELECTION
-        popup.update(this.suggestions, this.selectedIndex)
-        popup.isVisible = true
+        view.update(this.suggestions, this.selectedIndex)
+        view.component.isVisible = true
         host.revalidate()
         host.repaint()
         return true
     }
 
     fun hide(): Boolean {
-        if (!popup.isVisible && suggestions.isEmpty()) return false
+        if (!view.component.isVisible && suggestions.isEmpty()) return false
         suggestions = emptyList()
         selectedIndex = NO_SELECTION
         request = SwingShellSuggestionRequest.EMPTY
-        popup.update(suggestions, selectedIndex)
-        popup.isVisible = false
+        view.update(suggestions, selectedIndex)
+        view.component.isVisible = false
         host.revalidate()
         host.repaint()
         return true
@@ -76,8 +79,13 @@ internal class SwingShellSuggestionController(
         }
     }
 
+    fun close() {
+        hide()
+        view.close()
+    }
+
     fun handleKeyPressed(event: KeyEvent): Boolean {
-        if (!popup.isVisible || suggestions.isEmpty()) return false
+        if (!view.component.isVisible || suggestions.isEmpty()) return false
         val action = host.suggestionKeymap.actionFor(event) ?: return false
         val enterAcceptanceDisabled =
             action == SwingShellSuggestionAction.ACCEPT_SELECTED &&
@@ -102,7 +110,7 @@ internal class SwingShellSuggestionController(
         }
 
     fun state(): SwingShellSuggestionState =
-        if (!popup.isVisible || suggestions.isEmpty()) {
+        if (!view.component.isVisible || suggestions.isEmpty()) {
             SwingShellSuggestionState.EMPTY
         } else {
             SwingShellSuggestionState(
@@ -138,7 +146,7 @@ internal class SwingShellSuggestionController(
         if (index !in suggestions.indices) return false
         if (selectedIndex == index) return true
         selectedIndex = index
-        popup.update(suggestions, selectedIndex)
+        view.update(suggestions, selectedIndex)
         host.repaint()
         return true
     }

@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertThrows
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Font
 import javax.swing.JPanel
@@ -105,17 +102,53 @@ class SwingShellSuggestionPopupLayoutTest {
         assertTrue(prepared.removeSuffix("...").hasValidSurrogatePairs())
     }
 
+    @Test
+    fun `preferred width adapts within bounded popup dimensions`() {
+        val component = JPanel().apply { font = Font(Font.MONOSPACED, Font.PLAIN, 13) }
+        val layout = SwingShellSuggestionPopupLayout()
+
+        layout.prepare(
+            component,
+            listOf(suggestion(displayText = "a-very-long-command-name-with-useful-context")),
+            availableWidth = POPUP_MAX_WIDTH,
+        )
+
+        assertTrue(layout.preferredWidth in POPUP_MIN_WIDTH..POPUP_MAX_WIDTH)
+        assertTrue(layout.preferredWidth > POPUP_MIN_WIDTH)
+    }
+
+    @Test
+    fun `accent roles follow candidate semantics instead of row position`() {
+        val component = JPanel()
+        val layout = SwingShellSuggestionPopupLayout()
+
+        layout.prepare(
+            component,
+            listOf(
+                suggestion(displayText = "build/", source = "path", kind = "PATH"),
+                suggestion(displayText = "--help", source = "spec", kind = "OPTION"),
+                suggestion(displayText = "git status", source = "mru", kind = "COMMAND"),
+            ),
+            availableWidth = POPUP_MAX_WIDTH,
+        )
+
+        assertEquals(SwingShellSuggestionAccentRole.PATH, layout.row(0).accentRole)
+        assertEquals(SwingShellSuggestionAccentRole.OPTION, layout.row(1).accentRole)
+        assertEquals(SwingShellSuggestionAccentRole.HISTORY, layout.row(2).accentRole)
+    }
+
     private fun suggestion(
         displayText: String,
         detail: String = "",
         source: String = "spec",
+        kind: String = "COMMAND",
     ): SwingShellSuggestion =
         SwingShellSuggestion(
             replacementText = displayText,
             replacementStartOffset = 0,
             replacementEndOffset = 0,
             source = source,
-            kind = "COMMAND",
+            kind = kind,
             displayText = displayText,
             detail = detail,
         )
