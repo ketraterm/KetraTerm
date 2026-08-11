@@ -68,13 +68,16 @@ internal fun <V> IntellijCompletionProviderContext.createSnapshotRegistration(
 ): IntellijCompletionProviderRegistration {
     val snapshotProvider =
         snapshotService.createValueProvider(
-            keyProvider = workingDirectoryUriProvider,
             loader = loader,
             onSnapshotChanged = onSnapshotChanged,
         )
     return try {
         IntellijCompletionProviderRegistration(
-            sourceEntry = TerminalCompletionSourceEntry(sourceFactory(snapshotProvider::values), priority),
+            sourceEntry =
+                TerminalCompletionSourceEntry(
+                    sourceFactory { snapshotProvider.values(workingDirectoryUriProvider()) },
+                    priority,
+                ),
             resources = listOf(snapshotProvider),
         )
     } catch (failure: Throwable) {

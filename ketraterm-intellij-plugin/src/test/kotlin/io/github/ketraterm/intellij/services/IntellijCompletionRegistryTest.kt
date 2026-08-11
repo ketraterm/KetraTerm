@@ -399,33 +399,74 @@ class IntellijCompletionRegistryTest {
         val registry = IntellijCompletionRegistry()
         try {
             val changed = CountDownLatch(1)
+            var loadedWorkingDirectoryUri: String? = null
+            var loadedPrefix: String? = null
             val session =
                 registry.openSession(
                     context("project-files").copy(
                         workingDirectoryUriProvider = { "file:///project" },
                         providerFactories =
                             listOf(
-                                IntellijProjectFileProviderFactory {
-                                    listOf(TerminalFuzzyPathEntry("src/main/FuzzyTarget.kt", isDirectory = false))
+                                IntellijProjectFileProviderFactory { workingDirectoryUri, prefix ->
+                                    loadedWorkingDirectoryUri = workingDirectoryUri
+                                    loadedPrefix = prefix
+                                    listOf(TerminalFuzzyPathEntry("settings.gradle.kts", isDirectory = false))
                                 },
                             ),
                     ),
                 )
             session.onSourceChanged(changed::countDown)
 
-            session.provider.suggestions(request("cat FzT"))
+            session.provider.suggestions(request("cat sgk"))
             assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            var suggestions = session.provider.suggestions(request("cat FzT"))
+            var suggestions = session.provider.suggestions(request("cat sgk"))
             while (suggestions.none { it.source == "intellij-project-file" } && System.nanoTime() < deadline) {
                 Thread.sleep(5)
-                suggestions = session.provider.suggestions(request("cat FzT"))
+                suggestions = session.provider.suggestions(request("cat sgk"))
             }
 
             val suggestion = suggestions.single { it.source == "intellij-project-file" }
-            assertEquals("src/main/FuzzyTarget.kt", suggestion.replacementText)
+            assertEquals("file:///project", loadedWorkingDirectoryUri)
+            assertEquals("sgk", loadedPrefix)
+            assertEquals("settings.gradle.kts", suggestion.replacementText)
             assertEquals("project file", suggestion.detail)
             assertEquals("PATH", suggestion.kind)
+        } finally {
+            registry.close()
+        }
+    }
+
+    @Test
+    fun `project fuzzy path snapshot works when workingDirectoryUriProvider returns null`() {
+        val registry = IntellijCompletionRegistry()
+        try {
+            val changed = CountDownLatch(1)
+            val session =
+                registry.openSession(
+                    context("project-files-null-uri").copy(
+                        workingDirectoryUriProvider = { null },
+                        providerFactories =
+                            listOf(
+                                IntellijProjectFileProviderFactory { _, _ ->
+                                    listOf(TerminalFuzzyPathEntry("src/main/NullUriTarget.kt", isDirectory = false))
+                                },
+                            ),
+                    ),
+                )
+            session.onSourceChanged(changed::countDown)
+
+            session.provider.suggestions(request("cat NullUri"))
+            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            var suggestions = session.provider.suggestions(request("cat NullUri"))
+            while (suggestions.none { it.source == "intellij-project-file" } && System.nanoTime() < deadline) {
+                Thread.sleep(5)
+                suggestions = session.provider.suggestions(request("cat NullUri"))
+            }
+
+            val suggestion = suggestions.single { it.source == "intellij-project-file" }
+            assertEquals("src/main/NullUriTarget.kt", suggestion.replacementText)
         } finally {
             registry.close()
         }

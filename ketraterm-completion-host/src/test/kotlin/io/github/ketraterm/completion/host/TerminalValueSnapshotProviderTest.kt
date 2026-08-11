@@ -27,45 +27,41 @@ class TerminalValueSnapshotProviderTest {
         val scheduler = RecordingScheduler()
         var publications = 0
         val provider =
-            TerminalValueSnapshotProvider(
-                keyProvider = { "first" },
+            TerminalValueSnapshotProvider<String, String>(
                 scheduler = scheduler,
                 loader = { key -> listOf("$key-value") },
                 onSnapshotChanged = { publications++ },
                 snapshotTtlNanos = Long.MAX_VALUE,
             )
 
-        assertTrue(provider.values().isEmpty())
+        assertTrue(provider.values("first").isEmpty())
         assertEquals(1, scheduler.pendingCount)
         scheduler.runNext()
 
         assertEquals(1, publications)
-        assertEquals(listOf("first-value"), provider.values())
+        assertEquals(listOf("first-value"), provider.values("first"))
     }
 
     @Test
     fun `key change rejects stale publication`() {
         val scheduler = RecordingScheduler()
-        var key = "first"
         var publications = 0
         val provider =
-            TerminalValueSnapshotProvider(
-                keyProvider = { key },
+            TerminalValueSnapshotProvider<String, String>(
                 scheduler = scheduler,
                 loader = { value -> listOf("$value-value") },
                 onSnapshotChanged = { publications++ },
                 snapshotTtlNanos = Long.MAX_VALUE,
             )
 
-        provider.values()
-        key = "second"
-        provider.values()
+        provider.values("first")
+        provider.values("second")
         scheduler.runNext()
         assertEquals(0, publications)
         scheduler.runNext()
 
         assertEquals(1, publications)
-        assertEquals("second-value", provider.values().single())
+        assertEquals("second-value", provider.values("second").single())
     }
 
     @Test
@@ -73,8 +69,7 @@ class TerminalValueSnapshotProviderTest {
         val scheduler = RecordingScheduler()
         var attempts = 0
         val provider =
-            TerminalValueSnapshotProvider(
-                keyProvider = { "key" },
+            TerminalValueSnapshotProvider<String, String>(
                 scheduler = scheduler,
                 loader = {
                     attempts++
@@ -85,17 +80,17 @@ class TerminalValueSnapshotProviderTest {
                 snapshotTtlNanos = Long.MAX_VALUE,
             )
 
-        provider.values()
+        provider.values("key")
         try {
             scheduler.runNext()
             fail("Expected the first load to fail")
         } catch (expectedFailure: IllegalStateException) {
             assertEquals("load failed", expectedFailure.message)
         }
-        assertTrue(provider.values().isEmpty())
+        assertTrue(provider.values("key").isEmpty())
         scheduler.runNext()
 
-        assertEquals("recovered", provider.values().single())
+        assertEquals("recovered", provider.values("key").single())
     }
 
     @Test
@@ -106,30 +101,29 @@ class TerminalValueSnapshotProviderTest {
         var publications = 0
         lateinit var provider: TerminalValueSnapshotProvider<String, String>
         provider =
-            TerminalValueSnapshotProvider(
-                keyProvider = { "key" },
+            TerminalValueSnapshotProvider<String, String>(
                 scheduler = scheduler,
                 loader = { listOf("value-${++loads}") },
                 onSnapshotChanged = {
                     publications++
                     if (publications == 1) {
                         now = 11L
-                        provider.values()
+                        provider.values("key")
                     }
                 },
                 nanoTime = { now },
                 snapshotTtlNanos = 10L,
             )
 
-        provider.values()
+        provider.values("key")
         scheduler.runNext()
         assertEquals(1, scheduler.pendingCount)
 
-        assertEquals(listOf("value-1"), provider.values())
+        assertEquals(listOf("value-1"), provider.values("key"))
         assertEquals(1, scheduler.pendingCount)
         scheduler.runNext()
 
-        assertEquals(listOf("value-2"), provider.values())
+        assertEquals(listOf("value-2"), provider.values("key"))
         assertEquals(2, loads)
     }
 
@@ -138,20 +132,19 @@ class TerminalValueSnapshotProviderTest {
         val scheduler = RecordingScheduler()
         var publications = 0
         val provider =
-            TerminalValueSnapshotProvider(
-                keyProvider = { "key" },
+            TerminalValueSnapshotProvider<String, String>(
                 scheduler = scheduler,
                 loader = { listOf("value") },
                 onSnapshotChanged = { publications++ },
                 snapshotTtlNanos = Long.MAX_VALUE,
             )
 
-        provider.values()
+        provider.values("key")
         provider.close()
         scheduler.runNext()
 
         assertEquals(0, publications)
-        assertTrue(provider.values().isEmpty())
+        assertTrue(provider.values("key").isEmpty())
     }
 
     private class RecordingScheduler : TerminalCompletionLoadScheduler {

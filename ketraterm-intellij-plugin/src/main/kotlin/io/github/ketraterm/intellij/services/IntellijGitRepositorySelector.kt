@@ -44,7 +44,10 @@ internal fun <T> loadIntellijGitRepositorySnapshot(
     loader: (repository: GitRepository, workingDirectory: Path) -> List<T>,
 ): List<T> {
     if (project.isDisposed) return emptyList()
-    val workingDirectory = TerminalLocalFileUriResolver.resolve(workingDirectoryUri) ?: return emptyList()
+    val workingDirectory =
+        TerminalLocalFileUriResolver.resolve(workingDirectoryUri)
+            ?: project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
+            ?: return emptyList()
     return ApplicationManager.getApplication().runReadAction<List<T>> {
         if (project.isDisposed) return@runReadAction emptyList()
         val repository =

@@ -60,8 +60,7 @@ class TerminalCompletionSnapshotServiceTest {
         val firstAttempt = CountDownLatch(1)
         val published = CountDownLatch(1)
         val provider =
-            service.createValueProvider(
-                keyProvider = { "key" },
+            service.createValueProvider<String, String>(
                 loader = {
                     if (attempts.incrementAndGet() == 1) {
                         firstAttempt.countDown()
@@ -72,17 +71,17 @@ class TerminalCompletionSnapshotServiceTest {
                 onSnapshotChanged = published::countDown,
             )
         try {
-            provider.values()
+            provider.values("key")
             assertTrue(firstAttempt.await(5, TimeUnit.SECONDS), "first provider load did not run")
 
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
             while (published.count != 0L && System.nanoTime() < deadline) {
-                provider.values()
+                provider.values("key")
                 Thread.sleep(5)
             }
 
             assertEquals(0L, published.count, "shared worker did not process the retry")
-            assertEquals(listOf("recovered"), provider.values())
+            assertEquals(listOf("recovered"), provider.values("key"))
         } finally {
             provider.close()
             service.close()

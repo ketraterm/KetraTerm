@@ -58,7 +58,6 @@ internal class IntellijCompletionSnapshotService : AutoCloseable {
     /**
      * Creates a session-owned asynchronous keyed-value snapshot provider.
      *
-     * @param keyProvider thread-safe supplier for the current provider key.
      * @param loader blocking bounded loader executed only by snapshot workers.
      * @param onSnapshotChanged callback invoked on a snapshot worker after a
      * new active snapshot is published; the callback must arrange any required
@@ -66,12 +65,10 @@ internal class IntellijCompletionSnapshotService : AutoCloseable {
      * @return provider that must be closed with its terminal session.
      */
     fun <K, V> createValueProvider(
-        keyProvider: () -> K,
         loader: (K) -> List<V>,
         onSnapshotChanged: () -> Unit,
     ): TerminalValueSnapshotProvider<K, V> =
         delegate.createValueProvider(
-            keyProvider = keyProvider,
             loader = loader,
             onSnapshotChanged = onSnapshotChanged,
         )

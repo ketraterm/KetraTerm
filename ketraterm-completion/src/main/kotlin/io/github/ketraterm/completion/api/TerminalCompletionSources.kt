@@ -107,12 +107,12 @@ object TerminalCompletionSources {
         )
 
     /**
-     * Creates a pure source for bounded host-indexed paths using fuzzy matching.
+     * Creates a pure source that fuzzy-matches a bounded path snapshot.
      *
      * [entriesProvider] must return a ready immutable snapshot whose paths are
      * relative to the request's current directory. Hosts own indexing and
-     * asynchronous refresh; this source only resolves terminal path context,
-     * replacement ranges, path-kind filtering, and shell quoting.
+     * asynchronous refresh. The snapshot is matched once by the shared
+     * dependency-free matcher before terminal path rules are applied.
      *
      * @param sourceId stable candidate-source id used by ranking feedback.
      * @param entriesProvider supplier for the latest bounded indexed-path snapshot.
@@ -131,6 +131,44 @@ object TerminalCompletionSources {
     fun fuzzyPath(
         sourceId: String,
         entriesProvider: () -> List<TerminalFuzzyPathEntry>,
+        requiresNonEmptyPrefix: Boolean = true,
+        allowedCommandNames: Set<String> = emptySet(),
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    ): TerminalCompletionSource {
+        require(sourceId.isNotBlank()) { "sourceId must not be blank" }
+        require(allowedCommandNames.none(String::isBlank)) { "allowedCommandNames must not contain blank values" }
+        return FuzzyPathCompletionSource(
+            sourceId = sourceId,
+            entriesProvider = SnapshotFuzzyPathProvider(entriesProvider),
+            requiresNonEmptyPrefix = requiresNonEmptyPrefix,
+            allowedCommandNames = allowedCommandNames.toSet(),
+            commandSpecs = commandSpecs,
+        )
+    }
+
+    /**
+     * Creates a pure source backed by a query-aware host fuzzy-path provider.
+     *
+     * Unlike the snapshot-supplier overload, this overload passes the decoded
+     * active path prefix to [entriesProvider]. This lets IDE hosts query their
+     * indexes asynchronously and apply bounds after matching instead of
+     * truncating an unrelated whole-project traversal. The provider owns the
+     * only fuzzy match and must return ready results in relevance order without
+     * blocking the completion thread.
+     *
+     * @param sourceId stable candidate-source id used by ranking feedback.
+     * @param entriesProvider ready query-aware path provider.
+     * @param requiresNonEmptyPrefix whether this source waits for explicit path text.
+     * @param allowedCommandNames optional canonical command/subcommand restriction.
+     * @param commandSpecs command specs whose path metadata controls activation.
+     * @return context-aware fuzzy path completion source.
+     * @throws IllegalArgumentException if [sourceId] is blank.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun fuzzyPath(
+        sourceId: String,
+        entriesProvider: TerminalFuzzyPathProvider,
         requiresNonEmptyPrefix: Boolean = true,
         allowedCommandNames: Set<String> = emptySet(),
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),

@@ -27,8 +27,10 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionView
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewFactory
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewListener
 import java.awt.*
+import java.awt.event.HierarchyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.beans.PropertyChangeListener
 import java.util.*
 import javax.swing.*
 import kotlin.math.min
@@ -89,6 +91,7 @@ internal class IntellijShellSuggestionView(
         selectedIndex: Int,
     ) {
         check(!closed) { "Suggestion view is closed" }
+        host.synchronizeAppearance()
         val visibleSuggestions = suggestions.take(MAX_VISIBLE_ROWS)
         if (this.suggestions != visibleSuggestions) {
             this.suggestions = visibleSuggestions
@@ -109,6 +112,7 @@ internal class IntellijShellSuggestionView(
         closed = true
         suggestionList.removeMouseListener(pointerAdapter)
         suggestionList.removeMouseMotionListener(pointerAdapter)
+        host.close()
         model.removeAllElements()
     }
 
@@ -150,13 +154,49 @@ internal class IntellijShellSuggestionView(
 }
 
 private class SuggestionSurface(
-    list: JList<SwingShellSuggestion>,
+    private val list: JList<SwingShellSuggestion>,
 ) : JPanel(BorderLayout()) {
+    private var appearanceParent: Component? = null
+    private val appearanceListener =
+        PropertyChangeListener { event ->
+            if (event.propertyName == "background" || event.propertyName == "foreground" || event.propertyName == "font") {
+                applyParentAppearance()
+            }
+        }
+
     init {
         isOpaque = false
         isFocusable = false
         border = JBUI.Borders.empty(JBUI.scale(SURFACE_INSET))
         add(list, BorderLayout.CENTER)
+        addHierarchyListener { event ->
+            if (event.changeFlags and HierarchyEvent.PARENT_CHANGED.toLong() != 0L) synchronizeAppearance()
+        }
+    }
+
+    fun synchronizeAppearance() {
+        val currentParent = parent
+        if (appearanceParent !== currentParent) {
+            appearanceParent?.removePropertyChangeListener(appearanceListener)
+            appearanceParent = currentParent
+            currentParent?.addPropertyChangeListener(appearanceListener)
+        }
+        applyParentAppearance()
+    }
+
+    fun close() {
+        appearanceParent?.removePropertyChangeListener(appearanceListener)
+        appearanceParent = null
+    }
+
+    private fun applyParentAppearance() {
+        val source = appearanceParent ?: return
+        background = source.background
+        foreground = source.foreground
+        font = source.font
+        list.background = source.background
+        list.foreground = source.foreground
+        list.font = source.font
     }
 
     override fun paintComponent(graphics: Graphics) {
@@ -167,7 +207,7 @@ private class SuggestionSurface(
             val arc = JBUI.scale(CORNER_ARC)
             if (width <= 0 || height <= 0) return
 
-            graphics2D.color = JBColor.namedColor("CompletionPopup.background", UIUtil.getListBackground())
+            graphics2D.color = background ?: JBColor.namedColor("CompletionPopup.background", UIUtil.getListBackground())
             graphics2D.fillRoundRect(0, 0, width - 1, height - 1, arc, arc)
             graphics2D.color = JBColor.border()
             graphics2D.drawRoundRect(0, 0, width - 1, height - 1, arc, arc)

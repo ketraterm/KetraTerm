@@ -41,3 +41,22 @@ data class TerminalFuzzyPathEntry(
         require(detail.isNullOrBlank() || !detail.contains('\n')) { "detail must be a single line" }
     }
 }
+
+/**
+ * Supplies ready fuzzy matches for the active terminal prefix.
+ *
+ * Entries must already match [entries]'s prefix and be ordered from most to
+ * least relevant. The shared completion source deliberately does not run a
+ * second fuzzy matcher; it only applies terminal path and quoting rules.
+ * Implementations must return immediately and perform no blocking I/O.
+ */
+fun interface TerminalFuzzyPathProvider {
+    /**
+     * Returns ready path entries matching [prefix] in descending relevance.
+     *
+     * @param prefix decoded active terminal path token.
+     * @return immutable bounded path snapshot, or an empty list while an
+     * asynchronous host query is pending.
+     */
+    fun entries(prefix: String): List<TerminalFuzzyPathEntry>
+}

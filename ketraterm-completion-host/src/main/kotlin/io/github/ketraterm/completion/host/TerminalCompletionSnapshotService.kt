@@ -116,18 +116,15 @@ class TerminalCompletionSnapshotService
         /**
          * Creates a session-owned asynchronous value snapshot provider.
          *
-         * @param keyProvider thread-safe supplier for the current snapshot key.
          * @param loader blocking bounded loader invoked only by workers.
          * @param onSnapshotChanged callback invoked on a worker after publication.
          * @return provider that the owning session must close.
          */
         fun <K, V> createValueProvider(
-            keyProvider: () -> K,
             loader: (K) -> List<V>,
             onSnapshotChanged: () -> Unit,
         ): TerminalValueSnapshotProvider<K, V> =
             TerminalValueSnapshotProvider(
-                keyProvider = keyProvider,
                 scheduler = scheduler,
                 loader = loader,
                 onSnapshotChanged = onSnapshotChanged,

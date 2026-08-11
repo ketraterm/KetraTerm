@@ -50,6 +50,25 @@ class FuzzyPathCompletionSourceTest {
     }
 
     @Test
+    fun `passes the active fuzzy prefix to a query-aware provider`() {
+        var requestedPrefix: String? = null
+        val queryAwareSource =
+            TerminalCompletionSources.fuzzyPath(
+                sourceId = "query-aware-project-file",
+                entriesProvider =
+                    TerminalFuzzyPathProvider { prefix ->
+                        requestedPrefix = prefix
+                        listOf(TerminalFuzzyPathEntry("settings.gradle.kts", isDirectory = false))
+                    },
+            )
+
+        val candidates = queryAwareSource.complete(request("cat sgk"))
+
+        assertEquals("sgk", requestedPrefix)
+        assertEquals(listOf("settings.gradle.kts"), candidates.map(TerminalCompletionCandidate::replacementText))
+    }
+
+    @Test
     fun `filters fuzzy results to directories for cd`() {
         val candidates = source.complete(request("cd rs"))
 

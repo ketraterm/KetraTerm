@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicBoolean
  * and schedules refresh work when the key changes or the snapshot expires.
  * Failed loads retain the previous ready snapshot and can be retried.
  *
- * @param keyProvider thread-safe supplier for the current snapshot key.
  * @param scheduler bounded non-blocking scheduler.
  * @param loader blocking bounded value loader invoked only by scheduled work.
  * @param onSnapshotChanged callback invoked after active publication.
@@ -37,7 +36,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 class TerminalValueSnapshotProvider<K, V>
     @JvmOverloads
     constructor(
-        private val keyProvider: () -> K,
         private val scheduler: TerminalCompletionLoadScheduler,
         private val loader: (K) -> List<V>,
         private val onSnapshotChanged: () -> Unit,
@@ -62,11 +60,11 @@ class TerminalValueSnapshotProvider<K, V>
         /**
          * Returns ready values and schedules a refresh when necessary.
          *
+         * @param requestedKey key whose latest snapshot is requested.
          * @return the latest immutable snapshot, or an empty list before first publication or after closure.
          */
-        fun values(): List<V> {
+        fun values(requestedKey: K): List<V> {
             if (closed.get()) return emptyList()
-            val requestedKey = keyProvider()
             val now = nanoTime()
             var loadToSubmit: InFlightLoad? = null
             synchronized(lock) {

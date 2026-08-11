@@ -57,10 +57,13 @@ shell quoting policy, and emits domain-tagged argument candidates. Its snapshot 
 must never perform host I/O. A provider may additionally restrict itself to canonical command/subcommand names when a
 value domain has command-specific validity.
 
-`TerminalCompletionSources.fuzzyPath(...)` adapts a bounded immutable host path snapshot for context-aware fuzzy path
-completion. Hosts own indexing and asynchronous refresh; the shared source retains path-kind filtering, explicit
-replacement ranges, and shell-safe quoting. It requires typed path text by default; a small, context-specific provider
-such as Git status paths may opt in to empty-prefix suggestions.
+`TerminalCompletionSources.fuzzyPath(...)` adapts either a bounded immutable host path snapshot or a ready query-aware
+`TerminalFuzzyPathProvider` for context-aware fuzzy path completion. Static snapshots use the shared dependency-free
+matcher once. Query-aware providers receive the decoded active prefix and return already matched, relevance-ordered
+entries; the source never repeats that match. Providers must return immediately and schedule host index work
+asynchronously. The shared source retains path-kind filtering, explicit replacement ranges, and shell-safe quoting. It
+requires typed path text by default; a small, context-specific provider such as Git status paths may opt in to
+empty-prefix suggestions.
 
 `TerminalCompletionContextResolver` is the shared internal command-line context
 resolver. The merged engine resolves once per distinct command-spec set and passes
@@ -271,9 +274,11 @@ and publishes generation-safe, failure-retryable snapshots for `git switch`, `ch
 branches are published through a separate snapshot for `checkout`, `merge`, and `rebase`, avoiding invalid remote
 suggestions for `git switch`. Tags use the same bounded, repository-selected Git4Idea snapshot and are available for
 `checkout`, `merge`, and `rebase`; `git switch` remains local-branch-only.
-Whole-project fuzzy paths use a separate bounded VFS snapshot source and only activate in declared or explicitly
-path-like terminal positions; direct directory completion remains higher priority for immediate children. Changelists,
-SDKs, and run configurations remain follow-up work. IntelliJ also reads its already-imported Gradle external-system
+Whole-project fuzzy paths use a prefix-keyed asynchronous `FilenameIndex` query. IntelliJ applies its native
+`MinusculeMatcher` before bounding filename and path results, avoiding arbitrary coverage loss in large projects; the
+shared source only applies terminal path semantics. Fuzzy paths activate only in declared or
+explicitly path-like terminal positions, while direct directory completion remains higher priority for immediate
+children. Changelists, SDKs, and run configurations remain follow-up work. IntelliJ also reads its already-imported Gradle external-system
 model into a bounded task snapshot; it never starts Gradle from a completion request. A separate Git status snapshot
 supplies changed and
 untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Git process.

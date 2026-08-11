@@ -394,6 +394,7 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalDirectoryListingRequest",
                 "TerminalFileEntry",
                 "TerminalFuzzyPathEntry",
+                "TerminalFuzzyPathProvider",
                 "TerminalGradleTask",
                 "TerminalFileSystemProvider",
                 "TerminalShellQuotingPolicy",
@@ -461,6 +462,7 @@ internal class TerminalCompletionArchitectureTest {
                 "api/TerminalCompletionTriggerEvaluator.kt" to setOf("shouldTrigger", "isLiveTrigger"),
                 "api/TerminalLiveCompletionTriggerState.kt" to setOf("evaluate", "invalidate"),
                 "api/TerminalFileSystemProvider.kt" to setOf("listDirectory"),
+                "api/TerminalFuzzyPathEntry.kt" to setOf("entries"),
             )
 
         private val PUBLIC_TOP_LEVEL_DECLARATION =
