@@ -274,9 +274,9 @@ and publishes generation-safe, failure-retryable snapshots for `git switch`, `ch
 branches are published through a separate snapshot for `checkout`, `merge`, and `rebase`, avoiding invalid remote
 suggestions for `git switch`. Tags use the same bounded, repository-selected Git4Idea snapshot and are available for
 `checkout`, `merge`, and `rebase`; `git switch` remains local-branch-only.
-Whole-project fuzzy paths use a prefix-keyed asynchronous `FilenameIndex` query. IntelliJ applies its native
-`MinusculeMatcher` before bounding filename and path results, avoiding arbitrary coverage loss in large projects; the
-shared source only applies terminal path semantics. Fuzzy paths activate only in declared or
+Whole-project fuzzy paths use a prefix-keyed asynchronous query through IntelliJ's Go to File model and item provider.
+IntelliJ owns indexed discovery, fuzzy matching, path qualification, and result ordering; the plugin only converts PSI
+items into shell-facing paths, while the shared source applies terminal path semantics. Fuzzy paths activate only in declared or
 explicitly path-like terminal positions, while direct directory completion remains higher priority for immediate
 children. Changelists, SDKs, and run configurations remain follow-up work. IntelliJ also reads its already-imported Gradle external-system
 model into a bounded task snapshot; it never starts Gradle from a completion request. A separate Git status snapshot

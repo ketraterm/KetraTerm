@@ -15,34 +15,38 @@
  */
 package io.github.ketraterm.intellij.services
 
+import com.intellij.ide.util.gotoByName.*
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.ProjectRootManager
-import com.intellij.psi.codeStyle.NameUtil
-import com.intellij.psi.search.FilenameIndex
+import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiFileSystemItem
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.util.Processor
-import com.intellij.util.text.matching.MatchingMode
+import com.intellij.util.indexing.FindSymbolParameters
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import java.nio.file.Path
 
 /**
- * Queries IntelliJ's project filename index for a bounded fuzzy path snapshot.
+ * Queries IntelliJ's Go to File engine for a bounded fuzzy path snapshot.
  *
- * Matching occurs before bounding, so large projects cannot hide relevant files
- * behind an arbitrary traversal cutoff. The result remains a shell-facing path
- * snapshot relative to the terminal working directory; shared completion still
- * owns path context, hidden-file policy, replacement ranges, and shell quoting.
+ * IntelliJ owns project discovery, fuzzy matching, path qualification, and result
+ * ordering. This adapter only converts PSI items into shell-facing paths relative
+ * to the terminal working directory. Shared completion still owns hidden-file
+ * policy, replacement ranges, and shell quoting.
  *
- * @property project project whose filename index is queried.
+ * @property project project whose Go to File provider is queried.
+ * @property filePathResolver converts native VFS files into local paths.
  */
 internal class IntellijProjectFileLoader(
     private val project: Project,
+    private val filePathResolver: (VirtualFile) -> Path? = { file -> runCatching(file::toNioPath).getOrNull() },
 ) {
     /**
-     * Returns bounded deterministic project paths matching [prefix].
+     * Returns IntelliJ-ranked project paths matching [prefix].
      *
      * @param workingDirectoryUri local `file` URI used to relativize project entries.
      * @param prefix decoded active terminal path token.
@@ -55,57 +59,42 @@ internal class IntellijProjectFileLoader(
     ): List<TerminalFuzzyPathEntry> {
         if (project.isDisposed) return emptyList()
         val normalizedPrefix = prefix.replace('\\', '/')
-        val fileNamePrefix = activeFileNamePrefix(normalizedPrefix)
-        if (fileNamePrefix.isEmpty()) return emptyList()
+        if (normalizedPrefix.substringAfterLast('/').isEmpty()) return emptyList()
         val workingDirectory =
             TerminalLocalFileUriResolver.resolve(workingDirectoryUri)
                 ?: project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
                 ?: return emptyList()
         return ApplicationManager.getApplication().runReadAction<List<TerminalFuzzyPathEntry>> {
             if (project.isDisposed) return@runReadAction emptyList()
-            val scope = GlobalSearchScope.projectScope(project)
-            val fileIndex = ProjectRootManager.getInstance(project).fileIndex
-            val fileNameMatcher = IntellijFuzzyMatcher(fileNamePrefix)
-            val pathMatcher = normalizedPrefix.takeIf { it.contains('/') }?.let(::IntellijFuzzyMatcher)
-            val matchedNames = BoundedSnapshotCollector(MAX_MATCHED_NAMES, FILE_NAME_MATCH_ORDER)
-            FilenameIndex.processAllFileNames(
-                Processor { fileName ->
-                    ProgressManager.checkCanceled()
-                    val score = fileNameMatcher.score(fileName) ?: return@Processor true
-                    matchedNames.add(FileNameMatch(fileName, score))
-                    true
-                },
-                scope,
-                null,
-            )
-
-            val retained = BoundedSnapshotCollector(MAX_RETAINED_ENTRIES, PATH_MATCH_ORDER)
-            for (nameMatch in matchedNames.toSortedList()) {
-                ProgressManager.checkCanceled()
-                FilenameIndex.processFilesByName(
-                    nameMatch.fileName,
-                    true,
-                    scope,
-                    Processor { file ->
-                        if (!fileIndex.isInContent(file) || fileIndex.isExcluded(file)) return@Processor true
-                        val filePath = runCatching(file::toNioPath).getOrNull() ?: return@Processor true
+            val model = GotoFileModel(project)
+            try {
+                val viewModel = IntellijProjectFileSearchViewModel(project, model)
+                val results = ArrayList<TerminalFuzzyPathEntry>(INITIAL_RESULT_CAPACITY)
+                val paths = HashSet<String>(INITIAL_RESULT_CAPACITY)
+                val indicator = ProgressManager.getInstance().progressIndicator ?: EmptyProgressIndicator()
+                val itemProvider = model.getItemProvider(null) as ChooseByNameInScopeItemProvider
+                val parameters = FindSymbolParameters.wrap(normalizedPrefix, GlobalSearchScope.projectScope(project))
+                itemProvider.filterElementsWithWeights(
+                    viewModel,
+                    parameters,
+                    indicator,
+                    Processor { descriptor ->
+                        ProgressManager.checkCanceled()
+                        val file = (descriptor.item as? PsiFileSystemItem)?.virtualFile ?: return@Processor true
+                        val filePath = filePathResolver(file) ?: return@Processor true
                         val path = relativePath(workingDirectory, filePath) ?: return@Processor true
-                        val score =
-                            if (pathMatcher == null) {
-                                nameMatch.score
-                            } else {
-                                pathMatcher.score(path) ?: return@Processor true
-                            }
-                        retained.add(PathMatch(TerminalFuzzyPathEntry(path, file.isDirectory), score))
-                        true
+                        if (paths.add(path)) {
+                            results.add(TerminalFuzzyPathEntry(path, file.isDirectory))
+                        }
+                        results.size < MAX_RETAINED_ENTRIES
                     },
                 )
+                results
+            } finally {
+                Disposer.dispose(model)
             }
-            retained.toSortedList().map(PathMatch::entry)
         }
     }
-
-    private fun activeFileNamePrefix(prefix: String): String = prefix.substring(prefix.lastIndexOf('/') + 1)
 
     private fun relativePath(
         workingDirectory: Path,
@@ -113,43 +102,27 @@ internal class IntellijProjectFileLoader(
     ): String? = toRelativeCompletionPath(workingDirectory, file).takeIf(String::isNotEmpty)
 
     private companion object {
-        private const val MAX_MATCHED_NAMES = 1_024
+        private const val INITIAL_RESULT_CAPACITY = 64
         private const val MAX_RETAINED_ENTRIES = 4_096
-        private val FILE_NAME_MATCH_ORDER =
-            compareByDescending<FileNameMatch> { it.score }
-                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.fileName }
-                .thenBy(FileNameMatch::fileName)
-        private val PATH_MATCH_ORDER =
-            compareByDescending<PathMatch> { it.score }
-                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.entry.path }
-                .thenBy { it.entry.path }
-                .thenBy { it.entry.isDirectory }
     }
-
-    private data class FileNameMatch(
-        val fileName: String,
-        val score: Int,
-    )
-
-    private data class PathMatch(
-        val entry: TerminalFuzzyPathEntry,
-        val score: Int,
-    )
 }
 
-/** IntelliJ-native fuzzy matcher retained once per asynchronous query. */
-internal class IntellijFuzzyMatcher(prefix: String) {
-    init {
-        require(prefix.isNotEmpty()) { "prefix must not be empty" }
-    }
+/** Minimal public-API equivalent of Search Everywhere's package-private view-model adapter. */
+private class IntellijProjectFileSearchViewModel(
+    private val project: Project,
+    private val model: ChooseByNameModel,
+) : ChooseByNameViewModel {
+    override fun getProject(): Project = project
 
-    private val matcher = NameUtil.buildMatcher("*$prefix", MatchingMode.IGNORE_CASE)
+    override fun getModel(): ChooseByNameModel = model
 
-    /** Returns IntelliJ's match degree for [fileName], or `null` when it does not match. */
-    fun score(fileName: String): Int? {
-        val fragments = matcher.match(fileName) ?: return null
-        return matcher.matchingDegree(fileName, false, fragments)
-    }
+    override fun isSearchInAnyPlace(): Boolean = model.useMiddleMatching()
+
+    override fun transformPattern(pattern: String): String = ChooseByNamePopup.getTransformedPattern(pattern, model)
+
+    override fun canShowListForEmptyPattern(): Boolean = false
+
+    override fun getMaximumListSizeLimit(): Int = 0
 }
 
 private data class ProjectPathQuery(

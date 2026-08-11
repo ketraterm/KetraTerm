@@ -24,6 +24,7 @@
     <description>KetraTerm terminal emulator integration for IntelliJ Platform IDEs.</description>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
     <depends>Git4Idea</depends>
     <depends>org.jetbrains.plugins.gradle</depends>
 
