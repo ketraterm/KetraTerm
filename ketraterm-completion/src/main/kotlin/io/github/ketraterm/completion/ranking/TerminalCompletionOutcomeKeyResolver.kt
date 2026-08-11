@@ -73,11 +73,15 @@ internal class TerminalCompletionOutcomeKeyResolver(
     ): LearnedCompletionOutcomeKey? {
         if (tokens.isEmpty()) return null
         val normalizedPathIndex = if (pathAware && pathTokenIndex in tokens.indices) pathTokenIndex else NO_PATH_TOKEN
+        val resultTokens = ArrayList<String>(tokens.size)
+        var index = 0
+        while (index < tokens.size) {
+            val tokenText = tokens[index].text
+            resultTokens += if (index == normalizedPathIndex) normalizePathToken(tokenText) else tokenText
+            index++
+        }
         return LearnedCompletionOutcomeKey(
-            tokens =
-                tokens.mapIndexed { index, token ->
-                    if (index == normalizedPathIndex) normalizePathToken(token.text) else token.text
-                },
+            tokens = resultTokens,
             pathTokenIndex = normalizedPathIndex,
         )
     }

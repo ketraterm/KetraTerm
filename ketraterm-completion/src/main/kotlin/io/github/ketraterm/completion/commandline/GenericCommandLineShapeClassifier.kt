@@ -35,13 +35,20 @@ internal fun classifyGenericCommandLineShape(
 }
 
 internal fun classifyGenericCommandLineShape(tokens: List<TerminalCommandLineToken>): TerminalCommandLineShape? {
-    var tokenIndex = tokens.firstCommandTokenIndex()
-    if (tokenIndex >= tokens.size) return null
+    val firstCommandIndex = tokens.firstCommandTokenIndex()
+    if (firstCommandIndex >= tokens.size) return null
 
-    val executable = normalizeTerminalCommandToken(tokens[tokenIndex].text)
+    val executable = normalizeTerminalCommandToken(tokens[firstCommandIndex].text)
     if (executable.isBlank()) return null
-    tokenIndex++
 
+    return accumulateShapeTokens(executable, tokens, firstCommandIndex + 1)
+}
+
+private fun accumulateShapeTokens(
+    executable: String,
+    tokens: List<TerminalCommandLineToken>,
+    startIndex: Int,
+): TerminalCommandLineShape {
     val subcommands = ArrayList<String>(TERMINAL_COMMAND_LIST_CAPACITY)
     val optionNames = ArrayList<String>(TERMINAL_COMMAND_LIST_CAPACITY)
     var positionalArgumentCount = 0
@@ -49,6 +56,7 @@ internal fun classifyGenericCommandLineShape(tokens: List<TerminalCommandLineTok
     var expectingOptionValue = false
     var acceptingSubcommands = true
     var optionsEnabled = true
+    var tokenIndex = startIndex
 
     while (tokenIndex < tokens.size) {
         val normalized = normalizeTerminalCommandToken(tokens[tokenIndex].text)

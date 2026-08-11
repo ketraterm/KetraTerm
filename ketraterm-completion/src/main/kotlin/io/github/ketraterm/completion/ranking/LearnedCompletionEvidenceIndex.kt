@@ -151,28 +151,27 @@ internal class LearnedCompletionEvidenceIndexCache(
     private val lock = Any()
 
     @Volatile
-    private var state = CacheState(snapshot = null, indexes = emptyMap())
+    private var cachedSnapshot: TerminalCommandCompletionStatsSnapshot? = null
+
+    @Volatile
+    private var cachedIndexes: Map<TerminalShellSyntax, LearnedCompletionEvidenceIndex> = emptyMap()
 
     fun indexFor(
         snapshot: TerminalCommandCompletionStatsSnapshot,
         shellSyntax: TerminalShellSyntax,
     ): LearnedCompletionEvidenceIndex {
-        val observed = state
-        if (snapshot === observed.snapshot) observed.indexes[shellSyntax]?.let { return it }
+        if (snapshot === cachedSnapshot) {
+            cachedIndexes[shellSyntax]?.let { return it }
+        }
         return synchronized(lock) {
-            val current = state
-            val indexes = if (snapshot === current.snapshot) current.indexes else emptyMap()
+            val indexes = if (snapshot === cachedSnapshot) cachedIndexes else emptyMap()
             indexes[shellSyntax]
                 ?: LearnedCompletionEvidenceIndex.build(snapshot, shellSyntax, outcomeResolver).also { built ->
-                    state = CacheState(snapshot, indexes + (shellSyntax to built))
+                    cachedSnapshot = snapshot
+                    cachedIndexes = indexes + (shellSyntax to built)
                 }
         }
     }
-
-    private data class CacheState(
-        val snapshot: TerminalCommandCompletionStatsSnapshot?,
-        val indexes: Map<TerminalShellSyntax, LearnedCompletionEvidenceIndex>,
-    )
 }
 
 private data class EvidenceContext(
