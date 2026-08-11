@@ -40,13 +40,13 @@ internal fun TerminalPathArgumentKind.acceptsPathEntry(isDirectory: Boolean): Bo
 internal fun TerminalHiddenPathPolicy.acceptsPath(
     path: String,
     activePrefix: String,
-): Boolean {
-    return !path.hasHiddenSegment() || when (this) {
-        TerminalHiddenPathPolicy.DEFAULT -> activePrefix.startsWithActiveDot()
-        TerminalHiddenPathPolicy.INCLUDE -> true
-        TerminalHiddenPathPolicy.EXCLUDE -> false
-    }
-}
+): Boolean =
+    !path.hasHiddenSegment() ||
+        when (this) {
+            TerminalHiddenPathPolicy.DEFAULT -> activePrefix.startsWithActiveDot()
+            TerminalHiddenPathPolicy.INCLUDE -> true
+            TerminalHiddenPathPolicy.EXCLUDE -> false
+        }
 
 private fun String.startsWithActiveDot(): Boolean {
     val slash = lastIndexOf('/')

@@ -55,13 +55,38 @@ internal object TerminalCommandLineTokenizer {
         cursorOffset: Int,
         shellSyntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
     ): TerminalCommandLineContext {
+        val bounds = locateSegmentBounds(commandLine, cursorOffset, shellSyntax)
+        if (bounds.cursorInOperator) {
+            return operatorContext(bounds.start, bounds.end, cursorOffset, bounds.precededByOperator)
+        }
+        return tokenizeSegment(
+            commandLine = commandLine,
+            cursorOffset = cursorOffset,
+            segmentStart = bounds.start,
+            segmentEnd = bounds.end,
+            precededByOperator = bounds.precededByOperator,
+            shellSyntax = shellSyntax,
+        )
+    }
+
+    private data class SegmentBounds(
+        val start: Int,
+        val end: Int,
+        val precededByOperator: Boolean,
+        val cursorInOperator: Boolean = false,
+    )
+
+    private fun locateSegmentBounds(
+        commandLine: String,
+        cursorOffset: Int,
+        shellSyntax: TerminalShellSyntax,
+    ): SegmentBounds {
         var index = 0
         var quote = NO_QUOTE
         var segmentStart = 0
         var segmentEnd = commandLine.length
         var precededByOperator = false
 
-        // Locate the active segment without materializing tokens from discarded segments.
         while (index < commandLine.length) {
             val ch = commandLine[index]
             if (quote == NO_QUOTE) {
@@ -74,7 +99,12 @@ internal object TerminalCommandLineTokenizer {
                             break
                         }
                         cursorOffset < operatorEnd ->
-                            return operatorContext(index, operatorEnd, cursorOffset, precededByOperator)
+                            return SegmentBounds(
+                                start = index,
+                                end = operatorEnd,
+                                precededByOperator = precededByOperator,
+                                cursorInOperator = true,
+                            )
                         else -> {
                             segmentStart = operatorEnd
                             precededByOperator = true
@@ -85,35 +115,43 @@ internal object TerminalCommandLineTokenizer {
                 }
             }
 
-            when {
-                quote == NO_QUOTE && (ch == SINGLE_QUOTE || ch == DOUBLE_QUOTE) -> {
-                    quote = ch
-                    index++
-                }
-                quote == ch && ShellLexicalRules.isDoubledQuote(commandLine, index, quote, shellSyntax) -> {
-                    index += 2
-                }
-                quote == ch -> {
-                    quote = NO_QUOTE
-                    index++
-                }
-                ShellLexicalRules.isEscapePair(commandLine, index, quote, shellSyntax) -> {
-                    index += 2
-                }
-                else -> {
-                    index++
-                }
-            }
+            quote = updateQuoteState(commandLine, index, quote, shellSyntax)
+            index += characterAdvance(commandLine, index, quote, shellSyntax)
         }
 
-        return tokenizeSegment(
-            commandLine = commandLine,
-            cursorOffset = cursorOffset,
-            segmentStart = segmentStart,
-            segmentEnd = segmentEnd,
+        return SegmentBounds(
+            start = segmentStart,
+            end = segmentEnd,
             precededByOperator = precededByOperator,
-            shellSyntax = shellSyntax,
         )
+    }
+
+    private fun updateQuoteState(
+        commandLine: String,
+        index: Int,
+        quote: Char,
+        shellSyntax: TerminalShellSyntax,
+    ): Char {
+        val ch = commandLine[index]
+        return when {
+            quote == NO_QUOTE && (ch == SINGLE_QUOTE || ch == DOUBLE_QUOTE) -> ch
+            quote == ch && !ShellLexicalRules.isDoubledQuote(commandLine, index, quote, shellSyntax) -> NO_QUOTE
+            else -> quote
+        }
+    }
+
+    private fun characterAdvance(
+        commandLine: String,
+        index: Int,
+        quote: Char,
+        shellSyntax: TerminalShellSyntax,
+    ): Int {
+        val ch = commandLine[index]
+        return when {
+            quote == ch && ShellLexicalRules.isDoubledQuote(commandLine, index, quote, shellSyntax) -> 2
+            ShellLexicalRules.isEscapePair(commandLine, index, quote, shellSyntax) -> 2
+            else -> 1
+        }
     }
 
     private fun tokenizeSegment(
@@ -124,6 +162,29 @@ internal object TerminalCommandLineTokenizer {
         precededByOperator: Boolean,
         shellSyntax: TerminalShellSyntax,
     ): TerminalCommandLineContext {
+        val (tokenList, activePrefix) = collectSegmentTokens(commandLine, cursorOffset, segmentStart, segmentEnd, shellSyntax)
+        return resolveCursorTokenContext(
+            tokenList = tokenList,
+            activePrefix = activePrefix,
+            cursorOffset = cursorOffset,
+            segmentStart = segmentStart,
+            segmentEnd = segmentEnd,
+            precededByOperator = precededByOperator,
+        )
+    }
+
+    private data class ParsedSegmentTokens(
+        val tokens: List<TerminalCommandLineToken>,
+        val activePrefix: String?,
+    )
+
+    private fun collectSegmentTokens(
+        commandLine: String,
+        cursorOffset: Int,
+        segmentStart: Int,
+        segmentEnd: Int,
+        shellSyntax: TerminalShellSyntax,
+    ): ParsedSegmentTokens {
         var tokens: MutableList<TerminalCommandLineToken>? = null
         var tokenBuilder: StringBuilder? = null
         var index = segmentStart
@@ -179,7 +240,17 @@ internal object TerminalCommandLineTokenizer {
         if (tokenStart != NO_OFFSET && cursorOffset == segmentEnd) activePrefix = tokenBuilder!!.toString()
         tokens = addToken(tokens, tokenBuilder, tokenStart, segmentEnd)
 
-        val tokenList = tokens ?: emptyList()
+        return ParsedSegmentTokens(tokens ?: emptyList(), activePrefix)
+    }
+
+    private fun resolveCursorTokenContext(
+        tokenList: List<TerminalCommandLineToken>,
+        activePrefix: String?,
+        cursorOffset: Int,
+        segmentStart: Int,
+        segmentEnd: Int,
+        precededByOperator: Boolean,
+    ): TerminalCommandLineContext {
         var tokenIndex = 0
         while (tokenIndex < tokenList.size) {
             val token = tokenList[tokenIndex]

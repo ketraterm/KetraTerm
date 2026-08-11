@@ -184,63 +184,67 @@ internal class GlobalCompletionRanker(
         private fun semanticAdjustment(
             context: TerminalCompletionContext,
             candidate: TerminalCompletionCandidate,
-        ): Int =
-            when (context.activePosition) {
+        ): Int {
+            val pos = context.activePosition
+            val kind = candidate.kind
+
+            return when (pos) {
                 TerminalCompletionActivePosition.OPERATOR -> 0
-                TerminalCompletionActivePosition.COMMAND ->
-                    when (candidate.kind) {
-                        TerminalCompletionCandidateKind.COMMAND -> STRONG_CONTEXT_BOOST
-                        TerminalCompletionCandidateKind.PATH -> WEAK_CONTEXT_BOOST
-                        TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
-                        else -> 0
-                    }
-                TerminalCompletionActivePosition.SUBCOMMAND ->
-                    when (candidate.kind) {
-                        TerminalCompletionCandidateKind.SUBCOMMAND -> STRONG_CONTEXT_BOOST
-                        TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
-                        TerminalCompletionCandidateKind.PATH -> PATH_CONTEXT_PENALTY
-                        else -> 0
-                    }
-                TerminalCompletionActivePosition.OPTION_NAME ->
-                    when (candidate.kind) {
-                        TerminalCompletionCandidateKind.OPTION -> STRONG_CONTEXT_BOOST
-                        TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
-                        TerminalCompletionCandidateKind.PATH -> PATH_CONTEXT_PENALTY
-                        else -> 0
-                    }
-                TerminalCompletionActivePosition.OPTION_VALUE -> optionValueAdjustment(context, candidate)
-                TerminalCompletionActivePosition.POSITIONAL_ARGUMENT -> positionalAdjustment(context, candidate)
-            }
+                TerminalCompletionActivePosition.COMMAND,
+                TerminalCompletionActivePosition.SUBCOMMAND,
+                TerminalCompletionActivePosition.OPTION_NAME,
+                -> STATIC_CONTEXT_BOOST_TABLE[pos.ordinal][kind.ordinal]
 
-        private fun optionValueAdjustment(
-            context: TerminalCompletionContext,
-            candidate: TerminalCompletionCandidate,
-        ): Int =
-            when (candidate.kind) {
-                TerminalCompletionCandidateKind.ARGUMENT ->
-                    if (candidate.matchesExpectedDomain(context)) DOMAIN_CONTEXT_BOOST else STRONG_CONTEXT_BOOST
-                TerminalCompletionCandidateKind.PATH ->
-                    if (context.expectedPathKind == TerminalPathArgumentKind.NONE) PATH_CONTEXT_PENALTY else STRONG_CONTEXT_BOOST
-                TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
-                else -> 0
-            }
+                TerminalCompletionActivePosition.OPTION_VALUE ->
+                    when (kind) {
+                        TerminalCompletionCandidateKind.ARGUMENT ->
+                            if (candidate.matchesExpectedDomain(context)) DOMAIN_CONTEXT_BOOST else STRONG_CONTEXT_BOOST
+                        TerminalCompletionCandidateKind.PATH ->
+                            if (context.expectedPathKind == TerminalPathArgumentKind.NONE) PATH_CONTEXT_PENALTY else STRONG_CONTEXT_BOOST
+                        TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
+                        else -> 0
+                    }
 
-        private fun positionalAdjustment(
-            context: TerminalCompletionContext,
-            candidate: TerminalCompletionCandidate,
-        ): Int =
-            when (candidate.kind) {
-                TerminalCompletionCandidateKind.ARGUMENT ->
-                    if (candidate.matchesExpectedDomain(context)) DOMAIN_CONTEXT_BOOST else MEDIUM_CONTEXT_BOOST
-                TerminalCompletionCandidateKind.PATH ->
-                    if (context.expectedPathKind == TerminalPathArgumentKind.NONE) 0 else STRONG_CONTEXT_BOOST
-                TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
-                TerminalCompletionCandidateKind.SUBCOMMAND -> PATH_CONTEXT_PENALTY
-                else -> 0
+                TerminalCompletionActivePosition.POSITIONAL_ARGUMENT ->
+                    when (kind) {
+                        TerminalCompletionCandidateKind.ARGUMENT ->
+                            if (candidate.matchesExpectedDomain(context)) DOMAIN_CONTEXT_BOOST else MEDIUM_CONTEXT_BOOST
+                        TerminalCompletionCandidateKind.PATH ->
+                            if (context.expectedPathKind == TerminalPathArgumentKind.NONE) 0 else STRONG_CONTEXT_BOOST
+                        TerminalCompletionCandidateKind.HISTORY -> HISTORY_CONTEXT_PENALTY
+                        TerminalCompletionCandidateKind.SUBCOMMAND -> PATH_CONTEXT_PENALTY
+                        else -> 0
+                    }
             }
+        }
 
         private fun TerminalCompletionCandidate.matchesExpectedDomain(context: TerminalCompletionContext): Boolean =
             context.expectedValueDomain != TerminalCompletionValueDomain.NONE && valueDomain == context.expectedValueDomain
+
+        private val STATIC_CONTEXT_BOOST_TABLE =
+            Array(TerminalCompletionActivePosition.entries.size) {
+                IntArray(TerminalCompletionCandidateKind.entries.size) { 0 }
+            }.apply {
+                this[TerminalCompletionActivePosition.COMMAND.ordinal][TerminalCompletionCandidateKind.COMMAND.ordinal] =
+                    STRONG_CONTEXT_BOOST
+                this[TerminalCompletionActivePosition.COMMAND.ordinal][TerminalCompletionCandidateKind.PATH.ordinal] = WEAK_CONTEXT_BOOST
+                this[TerminalCompletionActivePosition.COMMAND.ordinal][TerminalCompletionCandidateKind.HISTORY.ordinal] =
+                    HISTORY_CONTEXT_PENALTY
+
+                this[TerminalCompletionActivePosition.SUBCOMMAND.ordinal][TerminalCompletionCandidateKind.SUBCOMMAND.ordinal] =
+                    STRONG_CONTEXT_BOOST
+                this[TerminalCompletionActivePosition.SUBCOMMAND.ordinal][TerminalCompletionCandidateKind.HISTORY.ordinal] =
+                    HISTORY_CONTEXT_PENALTY
+                this[TerminalCompletionActivePosition.SUBCOMMAND.ordinal][TerminalCompletionCandidateKind.PATH.ordinal] =
+                    PATH_CONTEXT_PENALTY
+
+                this[TerminalCompletionActivePosition.OPTION_NAME.ordinal][TerminalCompletionCandidateKind.OPTION.ordinal] =
+                    STRONG_CONTEXT_BOOST
+                this[TerminalCompletionActivePosition.OPTION_NAME.ordinal][TerminalCompletionCandidateKind.HISTORY.ordinal] =
+                    HISTORY_CONTEXT_PENALTY
+                this[TerminalCompletionActivePosition.OPTION_NAME.ordinal][TerminalCompletionCandidateKind.PATH.ordinal] =
+                    PATH_CONTEXT_PENALTY
+            }
 
         private val REPRESENTATIVE_ORDER =
             compareByDescending<RankedContribution> { it.contextAdjustment }

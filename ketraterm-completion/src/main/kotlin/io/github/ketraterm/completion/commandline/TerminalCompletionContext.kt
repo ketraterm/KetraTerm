@@ -137,41 +137,19 @@ internal object TerminalCompletionContextResolver {
             }
         val usedOptionExclusiveGroupIds = resolvedCommandPath.usedOptionExclusiveGroupIds
         val subcommandCandidateSource = if (optionsTerminated) null else subcommandCandidateSource(commandPath)
+        val lastCommand = commandPath.last()
         val activePosition =
-            when {
-                optionsTerminated -> TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
-                activeOption != null -> TerminalCompletionActivePosition.OPTION_VALUE
-                lineContext.activePrefix.isOptionNamePrefix() -> TerminalCompletionActivePosition.OPTION_NAME
-                activePositionalArgument?.pathKind?.let { it != TerminalPathArgumentKind.NONE } == true ||
-                    commandPath.last().positionalArgumentPathKind != TerminalPathArgumentKind.NONE ->
-                    TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
-                subcommandCandidateSource != null -> TerminalCompletionActivePosition.SUBCOMMAND
-                else -> TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
-            }
-        val expectedPathKind =
-            if (activeOption != null && activeOption.valuePathKind != TerminalPathArgumentKind.NONE) {
-                activeOption.valuePathKind
-            } else if (activePositionalArgument != null) {
-                activePositionalArgument.pathKind
-            } else {
-                commandPath.last().positionalArgumentPathKind
-            }
-        val expectedValueDomain =
-            if (activeOption != null && activeOption.valueDomain != TerminalCompletionValueDomain.NONE) {
-                activeOption.valueDomain
-            } else if (activePositionalArgument != null) {
-                activePositionalArgument.valueDomain
-            } else {
-                commandPath.last().positionalArgumentValueDomain
-            }
-        val expectedHiddenPathPolicy =
-            if (activeOption != null && activeOption.valuePathKind != TerminalPathArgumentKind.NONE) {
-                activeOption.valueHiddenPathPolicy
-            } else if (activePositionalArgument != null) {
-                activePositionalArgument.hiddenPathPolicy
-            } else {
-                commandPath.last().positionalArgumentHiddenPathPolicy
-            }
+            determineActivePosition(
+                optionsTerminated = optionsTerminated,
+                activeOption = activeOption,
+                activePrefix = lineContext.activePrefix,
+                activePositionalArgument = activePositionalArgument,
+                lastCommand = lastCommand,
+                subcommandCandidateSource = subcommandCandidateSource,
+            )
+        val expectedPathKind = determineExpectedPathKind(activeOption, activePositionalArgument, lastCommand)
+        val expectedValueDomain = determineExpectedValueDomain(activeOption, activePositionalArgument, lastCommand)
+        val expectedHiddenPathPolicy = determineExpectedHiddenPathPolicy(activeOption, activePositionalArgument, lastCommand)
 
         return TerminalCompletionContext(
             commandLineContext = lineContext,
@@ -192,6 +170,64 @@ internal object TerminalCompletionContextResolver {
             attachedOptionValue = attachedOptionValue,
         )
     }
+
+    private fun determineActivePosition(
+        optionsTerminated: Boolean,
+        activeOption: TerminalOptionSpec?,
+        activePrefix: String,
+        activePositionalArgument: TerminalArgumentSpec?,
+        lastCommand: TerminalCommandSpec,
+        subcommandCandidateSource: TerminalCommandSpec?,
+    ): TerminalCompletionActivePosition =
+        when {
+            optionsTerminated -> TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
+            activeOption != null -> TerminalCompletionActivePosition.OPTION_VALUE
+            activePrefix.isOptionNamePrefix() -> TerminalCompletionActivePosition.OPTION_NAME
+            activePositionalArgument?.pathKind?.let { it != TerminalPathArgumentKind.NONE } == true ||
+                lastCommand.positionalArgumentPathKind != TerminalPathArgumentKind.NONE ->
+                TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
+            subcommandCandidateSource != null -> TerminalCompletionActivePosition.SUBCOMMAND
+            else -> TerminalCompletionActivePosition.POSITIONAL_ARGUMENT
+        }
+
+    private fun determineExpectedPathKind(
+        activeOption: TerminalOptionSpec?,
+        activePositionalArgument: TerminalArgumentSpec?,
+        lastCommand: TerminalCommandSpec,
+    ): TerminalPathArgumentKind =
+        if (activeOption != null && activeOption.valuePathKind != TerminalPathArgumentKind.NONE) {
+            activeOption.valuePathKind
+        } else if (activePositionalArgument != null) {
+            activePositionalArgument.pathKind
+        } else {
+            lastCommand.positionalArgumentPathKind
+        }
+
+    private fun determineExpectedValueDomain(
+        activeOption: TerminalOptionSpec?,
+        activePositionalArgument: TerminalArgumentSpec?,
+        lastCommand: TerminalCommandSpec,
+    ): TerminalCompletionValueDomain =
+        if (activeOption != null && activeOption.valueDomain != TerminalCompletionValueDomain.NONE) {
+            activeOption.valueDomain
+        } else if (activePositionalArgument != null) {
+            activePositionalArgument.valueDomain
+        } else {
+            lastCommand.positionalArgumentValueDomain
+        }
+
+    private fun determineExpectedHiddenPathPolicy(
+        activeOption: TerminalOptionSpec?,
+        activePositionalArgument: TerminalArgumentSpec?,
+        lastCommand: TerminalCommandSpec,
+    ): TerminalHiddenPathPolicy =
+        if (activeOption != null && activeOption.valuePathKind != TerminalPathArgumentKind.NONE) {
+            activeOption.valueHiddenPathPolicy
+        } else if (activePositionalArgument != null) {
+            activePositionalArgument.hiddenPathPolicy
+        } else {
+            lastCommand.positionalArgumentHiddenPathPolicy
+        }
 
     private fun subcommandCandidateSource(commandPath: List<TerminalCommandSpec>): TerminalCommandSpec? {
         val current = commandPath.last()
