@@ -1032,7 +1032,7 @@ class SwingTerminal
 
         private fun bindOnEdt(session: TerminalSession) {
             if (disposed) return
-            bindingJob?.cancel()
+            bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
             this.session = session
             updateMinimizedStateFromAncestor()
             applySettingsToSession(session, settings)
@@ -1074,7 +1074,7 @@ class SwingTerminal
         }
 
         private fun unbindOnEdt() {
-            bindingJob?.cancel()
+            bindingJob?.cancel(CancellationException("Terminal session unbound"))
             bindingJob = null
             session = null
             resetScrollbackState()
@@ -1104,7 +1104,7 @@ class SwingTerminal
             selectionController.stopSelectionDrag()
             hyperlinkDiscoveryController.dispose()
             shellSuggestionController.close()
-            componentScope.cancel()
+            componentScope.cancel(CancellationException("Swing terminal disposed"))
         }
 
         private fun reloadSettingsOnEdt() {

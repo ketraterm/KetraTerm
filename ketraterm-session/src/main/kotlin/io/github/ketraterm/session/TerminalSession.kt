@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Runtime terminal session that binds core, parser, input encoding, and a
@@ -438,7 +439,7 @@ class TerminalSession(
         val timeoutJob =
             sessionScope.launch(start = CoroutineStart.LAZY) {
                 try {
-                    delay(SYNCHRONIZED_OUTPUT_TIMEOUT_MS)
+                    delay(SYNCHRONIZED_OUTPUT_TIMEOUT_MS.milliseconds)
                     var changed = false
                     synchronized(mutationLock) {
                         if (terminal.getModeSnapshot().isSynchronizedOutput) {
@@ -455,12 +456,14 @@ class TerminalSession(
         if (synchronizedTimeoutJob.compareAndSet(null, timeoutJob)) {
             timeoutJob.start()
         } else {
-            timeoutJob.cancel()
+            timeoutJob.cancel(CancellationException("Synchronized output timeout superseded"))
         }
     }
 
     private fun cancelSynchronizedOutputTimeout() {
-        synchronizedTimeoutJob.getAndSet(null)?.cancel()
+        synchronizedTimeoutJob
+            .getAndSet(null)
+            ?.cancel(CancellationException("Synchronized output timeout cancelled"))
     }
 
     private suspend fun drainRenderRequests() {
@@ -500,7 +503,7 @@ class TerminalSession(
             // sampling the packed request and generation again. Explicit UI
             // requests interrupt the wait so scrolling and resizing stay
             // responsive. The last host invalidation becomes a trailing frame.
-            withTimeoutOrNull(RENDER_PUBLICATION_INTERVAL_MS) {
+            withTimeoutOrNull(RENDER_PUBLICATION_INTERVAL_MS.milliseconds) {
                 immediateRenderRequests.receiveCatching()
             }
         }
@@ -637,7 +640,7 @@ class TerminalSession(
         cancelSynchronizedOutputTimeout()
         renderRequests.close()
         immediateRenderRequests.close()
-        sessionScope.cancel()
+        sessionScope.cancel(CancellationException("Terminal session closed"))
         synchronized(mutationLock) {
             parser.endOfInput()
         }
