@@ -27,14 +27,11 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionView
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewFactory
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewListener
 import java.awt.*
-import java.awt.event.HierarchyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import java.beans.PropertyChangeListener
 import java.util.*
 import javax.swing.*
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 /** Creates the IDE-themed terminal suggestion surface. */
 internal object IntellijShellSuggestionViewFactory : SwingShellSuggestionViewFactory {
@@ -43,25 +40,18 @@ internal object IntellijShellSuggestionViewFactory : SwingShellSuggestionViewFac
 }
 
 /**
- * Compact IntelliJ host presentation for terminal suggestions.
+ * Native IntelliJ presentation for terminal suggestions.
  *
- * The view deliberately does not use IntelliJ's editor completion lookup: that
- * component requires a real editor, caret, and popup lifecycle. Instead, this
- * adapter uses stable IntelliJ Swing components and icons while preserving the
- * reusable terminal controller's ordering, navigation, acceptance, and
- * feedback behavior. Colors blend the current IDE lookup palette with the
- * terminal component's active foreground and background, and the item font is
- * inherited from the terminal.
+ * Employs standard IntelliJ [JBList] and [ColoredListCellRenderer] components,
+ * automatically acquiring IDE theme colors, fonts, selection highlights, and HiDPI scaling.
  */
 internal class IntellijShellSuggestionView(
     private val listener: SwingShellSuggestionViewListener,
 ) : SwingShellSuggestionView {
-    private var activePalette = SuggestionPalette.defaults()
     private val model = DefaultListModel<SwingShellSuggestion>()
     internal val suggestionList = JBList(model)
     private val host = SuggestionSurface(suggestionList)
     private var suggestions: List<SwingShellSuggestion> = emptyList()
-    private var terminalThemeSource: Component? = null
     private var closed = false
 
     private val pointerAdapter =
@@ -77,19 +67,9 @@ internal class IntellijShellSuggestionView(
             }
         }
 
-    private val terminalThemeListener =
-        PropertyChangeListener { event ->
-            if (event.propertyName in TERMINAL_THEME_PROPERTIES) refreshThemeOnEdt()
-        }
-
-    private val lookAndFeelListener =
-        PropertyChangeListener { event ->
-            if (event.propertyName == LOOK_AND_FEEL_PROPERTY) refreshThemeOnEdt()
-        }
-
     init {
         suggestionList.apply {
-            cellRenderer = SuggestionCellRenderer { activePalette }
+            cellRenderer = SuggestionCellRenderer()
             selectionMode = ListSelectionModel.SINGLE_SELECTION
             fixedCellHeight = JBUI.scale(ROW_HEIGHT)
             visibleRowCount = MAX_VISIBLE_ROWS
@@ -100,13 +80,6 @@ internal class IntellijShellSuggestionView(
             addMouseListener(pointerAdapter)
             addMouseMotionListener(pointerAdapter)
         }
-        host.addHierarchyListener { event ->
-            if (event.changeFlags and HierarchyEvent.PARENT_CHANGED.toLong() != 0L) {
-                bindTerminalThemeSource()
-            }
-        }
-        UIManager.addPropertyChangeListener(lookAndFeelListener)
-        refreshTheme()
     }
 
     override val component: JComponent get() = host
@@ -126,50 +99,17 @@ internal class IntellijShellSuggestionView(
         if (suggestionList.selectedIndex >= 0) {
             suggestionList.ensureIndexIsVisible(suggestionList.selectedIndex)
         }
-        refreshTheme()
+        updatePreferredSize()
+        host.revalidate()
+        host.repaint()
     }
 
     override fun close() {
         if (closed) return
         closed = true
-        UIManager.removePropertyChangeListener(lookAndFeelListener)
-        terminalThemeSource?.removePropertyChangeListener(terminalThemeListener)
-        terminalThemeSource = null
         suggestionList.removeMouseListener(pointerAdapter)
         suggestionList.removeMouseMotionListener(pointerAdapter)
         model.removeAllElements()
-    }
-
-    private fun bindTerminalThemeSource() {
-        val nextSource = host.parent
-        if (terminalThemeSource === nextSource) return
-        terminalThemeSource?.removePropertyChangeListener(terminalThemeListener)
-        terminalThemeSource = nextSource
-        nextSource?.addPropertyChangeListener(terminalThemeListener)
-        refreshTheme()
-    }
-
-    private fun refreshThemeOnEdt() {
-        if (SwingUtilities.isEventDispatchThread()) {
-            refreshTheme()
-        } else {
-            SwingUtilities.invokeLater {
-                if (!closed) refreshTheme()
-            }
-        }
-    }
-
-    private fun refreshTheme() {
-        if (closed) return
-        activePalette = resolvePalette(host.parent)
-        val terminalFont = host.parent?.font ?: UIUtil.getLabelFont()
-        suggestionList.font = terminalFont
-        suggestionList.background = activePalette.surface
-        suggestionList.foreground = activePalette.foreground
-        host.palette = activePalette
-        updatePreferredSize()
-        host.revalidate()
-        host.repaint()
     }
 
     private fun updatePreferredSize() {
@@ -201,21 +141,17 @@ internal class IntellijShellSuggestionView(
     private companion object {
         private const val MAX_VISIBLE_ROWS = 8
         private const val NO_SELECTION = -1
-        private const val ROW_HEIGHT = 30
+        private const val ROW_HEIGHT = 28
         private const val ROW_HORIZONTAL_INSET = 4
         private const val MIN_WIDTH = 300
         private const val MAX_WIDTH = 620
         private const val PARENT_HORIZONTAL_MARGIN = 24
-        private const val LOOK_AND_FEEL_PROPERTY = "lookAndFeel"
-        private val TERMINAL_THEME_PROPERTIES = setOf("background", "foreground", "font")
     }
 }
 
 private class SuggestionSurface(
     list: JList<SwingShellSuggestion>,
 ) : JPanel(BorderLayout()) {
-    var palette: SuggestionPalette = SuggestionPalette.defaults()
-
     init {
         isOpaque = false
         isFocusable = false
@@ -228,25 +164,13 @@ private class SuggestionSurface(
         val graphics2D = graphics.create() as Graphics2D
         try {
             graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            val shadowInset = JBUI.scale(SHADOW_INSET)
             val arc = JBUI.scale(CORNER_ARC)
-            val contentWidth = width - shadowInset * 2
-            val contentHeight = height - shadowInset * 2
-            if (contentWidth <= 0 || contentHeight <= 0) return
+            if (width <= 0 || height <= 0) return
 
-            graphics2D.color = palette.shadow
-            graphics2D.fillRoundRect(
-                shadowInset - 1,
-                shadowInset + 1,
-                contentWidth + 2,
-                contentHeight + 1,
-                arc,
-                arc,
-            )
-            graphics2D.color = palette.surface
-            graphics2D.fillRoundRect(shadowInset, shadowInset, contentWidth, contentHeight, arc, arc)
-            graphics2D.color = palette.border
-            graphics2D.drawRoundRect(shadowInset, shadowInset, contentWidth - 1, contentHeight - 1, arc, arc)
+            graphics2D.color = JBColor.namedColor("CompletionPopup.background", UIUtil.getListBackground())
+            graphics2D.fillRoundRect(0, 0, width - 1, height - 1, arc, arc)
+            graphics2D.color = JBColor.border()
+            graphics2D.drawRoundRect(0, 0, width - 1, height - 1, arc, arc)
         } finally {
             graphics2D.dispose()
         }
@@ -254,15 +178,11 @@ private class SuggestionSurface(
 
     private companion object {
         private const val SURFACE_INSET = 4
-        private const val SHADOW_INSET = 3
         private const val CORNER_ARC = 10
     }
 }
 
-private class SuggestionCellRenderer(
-    private val paletteProvider: () -> SuggestionPalette,
-) : ColoredListCellRenderer<SwingShellSuggestion>() {
-
+private class SuggestionCellRenderer : ColoredListCellRenderer<SwingShellSuggestion>() {
     init {
         isOpaque = true
         ipad = JBUI.insets(0, CELL_HORIZONTAL_INSET)
@@ -276,26 +196,21 @@ private class SuggestionCellRenderer(
         selected: Boolean,
         hasFocus: Boolean,
     ) {
-        val palette = paletteProvider()
-        val foreground = if (selected) palette.selectionForeground else palette.foreground
-        val muted = if (selected) palette.selectionMuted else palette.muted
-        background = if (selected) palette.selection else palette.surface
-        this.foreground = foreground
         font = list.font ?: UIUtil.getLabelFont()
         icon = iconFor(value)
 
-        append(value.displayText, textAttributes(foreground), true)
+        append(value.displayText, SimpleTextAttributes.REGULAR_ATTRIBUTES, true)
         val detail = value.detail.trim()
         if (detail.isNotEmpty()) {
-            append("  $detail", textAttributes(muted))
+            append("  $detail", SimpleTextAttributes.GRAYED_ATTRIBUTES)
         }
 
         val source = sourceLabel(value.source)
         if (source.isNotEmpty()) {
             val sourceWidth = getFontMetrics(font).stringWidth(source)
             val sourceStart = list.width - sourceWidth - JBUI.scale(SOURCE_RIGHT_INSET)
-            if (sourceStart > 0) appendTextPadding(sourceStart) else append("  ", textAttributes(muted))
-            append(source, textAttributes(muted))
+            if (sourceStart > 0) appendTextPadding(sourceStart) else append("  ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+            append(source, SimpleTextAttributes.GRAYED_ATTRIBUTES)
         }
 
         accessibleContext?.accessibleName =
@@ -312,83 +227,6 @@ private class SuggestionCellRenderer(
         private const val SOURCE_RIGHT_INSET = 12
     }
 }
-
-private fun textAttributes(color: Color): SimpleTextAttributes =
-    SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, color)
-
-private data class SuggestionPalette(
-    val surface: Color,
-    val foreground: Color,
-    val muted: Color,
-    val selection: Color,
-    val selectionForeground: Color,
-    val selectionMuted: Color,
-    val border: Color,
-    val shadow: Color,
-) {
-    companion object {
-        fun defaults(): SuggestionPalette = resolvePalette(null)
-    }
-}
-
-private fun resolvePalette(terminal: Component?): SuggestionPalette {
-    val terminalBackground = terminal?.background ?: UIUtil.getListBackground()
-    val terminalForeground = terminal?.foreground ?: UIUtil.getListForeground()
-    val ideSurface = namedColor("CompletionPopup.background", UIUtil.getListBackground())
-    val ideForeground = namedColor("CompletionPopup.foreground", UIUtil.getListForeground())
-    val ideMuted = namedColor("Label.infoForeground", JBColor.GRAY)
-    val ideSelection =
-        namedColor(
-            "CompletionPopup.selectionBackground",
-            UIManager.getColor("List.selectionBackground") ?: JBColor(0xDCEBFC, 0x2F65A7),
-        )
-    val ideSelectionForeground =
-        namedColor(
-            "CompletionPopup.selectionForeground",
-            UIManager.getColor("List.selectionForeground") ?: ideForeground,
-        )
-    val ideBorder =
-        namedColor(
-            "Component.borderColor",
-            UIManager.getColor("Separator.foreground") ?: blend(terminalBackground, terminalForeground, 0.25),
-        )
-    val surface = blend(terminalBackground, ideSurface, 0.28)
-    val foreground = blend(terminalForeground, ideForeground, 0.35)
-    val selection = blend(surface, ideSelection, 0.62)
-    val selectionForeground = blend(terminalForeground, ideSelectionForeground, 0.60)
-    return SuggestionPalette(
-        surface = surface,
-        foreground = foreground,
-        muted = blend(foreground, ideMuted, 0.55),
-        selection = selection,
-        selectionForeground = selectionForeground,
-        selectionMuted = blend(selectionForeground, selection, 0.38),
-        border = blend(surface, ideBorder, 0.55),
-        shadow = Color(0, 0, 0, if (isDark(surface)) 105 else 50),
-    )
-}
-
-private fun namedColor(
-    key: String,
-    fallback: Color,
-): Color = JBColor.namedColor(key, fallback)
-
-private fun blend(
-    base: Color,
-    overlay: Color,
-    overlayRatio: Double,
-): Color {
-    val ratio = overlayRatio.coerceIn(0.0, 1.0)
-    val baseRatio = 1.0 - ratio
-    return Color(
-        (base.red * baseRatio + overlay.red * ratio).roundToInt(),
-        (base.green * baseRatio + overlay.green * ratio).roundToInt(),
-        (base.blue * baseRatio + overlay.blue * ratio).roundToInt(),
-    )
-}
-
-private fun isDark(color: Color): Boolean =
-    color.red * 0.2126 + color.green * 0.7152 + color.blue * 0.0722 < 128.0
 
 private fun iconFor(suggestion: SwingShellSuggestion): Icon {
     val kind = suggestion.kind.uppercase(Locale.ROOT)
