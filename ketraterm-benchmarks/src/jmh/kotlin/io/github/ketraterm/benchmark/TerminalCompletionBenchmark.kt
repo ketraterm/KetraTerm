@@ -52,6 +52,8 @@ open class TerminalCompletionBenchmark {
     private lateinit var indexedPersistedHistoryEngine: TerminalCompletionEngine
     private lateinit var duplicateFusionEngine: TerminalCompletionEngine
     private lateinit var hostileFusionEngine: TerminalCompletionEngine
+    private lateinit var fuzzyPathEngine: TerminalCompletionEngine
+    private lateinit var fuzzyPathRequest: TerminalCompletionRequest
 
     @Setup(Level.Trial)
     open fun setUp() {
@@ -116,6 +118,36 @@ open class TerminalCompletionBenchmark {
         indexedPersistedHistoryEngine.complete(fusionRequest)
         duplicateFusionEngine = TerminalCompletionEngines.fromSources(List(8) { sourceEntry(it, 32, duplicateMain = true) }, commandSpecs)
         hostileFusionEngine = TerminalCompletionEngines.fromSources(List(10) { sourceEntry(it, 256, duplicateMain = false) }, commandSpecs)
+        val fuzzyPaths =
+            List(FUZZY_PATH_ENTRY_COUNT) { index ->
+                TerminalFuzzyPathEntry(
+                    path = "src/module-${index and 63}/GeneratedFile$index.kt",
+                    isDirectory = false,
+                )
+            }
+        fuzzyPathEngine =
+            TerminalCompletionEngines.fromSources(
+                sources =
+                    listOf(
+                        TerminalCompletionSourceEntry(
+                            TerminalCompletionSources.fuzzyPath(
+                                sourceId = "benchmark-project-path",
+                                entriesProvider = { fuzzyPaths },
+                                commandSpecs = commandSpecs,
+                            ),
+                        ),
+                    ),
+                commandSpecs = commandSpecs,
+            )
+        fuzzyPathRequest =
+            TerminalCompletionRequest(
+                commandLine = "git add GenF327",
+                cursorOffset = "git add GenF327".length,
+                maxCandidates = 8,
+                profileId = "benchmark",
+                workingDirectoryUri = "file:///repo",
+                shellCapabilities = TerminalShellCapabilities.POSIX,
+            )
     }
 
     @Benchmark
@@ -166,6 +198,12 @@ open class TerminalCompletionBenchmark {
         blackhole.consume(hostileFusionEngine.complete(fusionRequest))
     }
 
+    /** Measures allocation and throughput while scanning a realistic immutable project-path snapshot. */
+    @Benchmark
+    open fun completeFuzzyProjectPath(blackhole: Blackhole) {
+        blackhole.consume(fuzzyPathEngine.complete(fuzzyPathRequest))
+    }
+
     private fun sourceEntry(
         sourceIndex: Int,
         count: Int,
@@ -207,5 +245,9 @@ open class TerminalCompletionBenchmark {
             cursorOffset = commandLine.length,
             shellCapabilities = TerminalShellCapabilities.POSIX,
         )
+    }
+
+    private companion object {
+        private const val FUZZY_PATH_ENTRY_COUNT = 32_768
     }
 }

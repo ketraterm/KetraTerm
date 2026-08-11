@@ -58,11 +58,19 @@ internal class GlobalCompletionRanker(
 
         val learnedIndex = learnedIndexCache.indexFor(learnedStatsProvider(), request.shellCapabilities.syntax)
         val now = clockEpochMillis().coerceAtLeast(0L)
-        return aggregates.values
-            .map { aggregate -> aggregate.finish(request, learnedIndex, now) }
-            .sortedWith(FUSED_ORDER)
-            .take(request.maxCandidates)
-            .map(FusedCandidate::toPublicCandidate)
+        val fused = ArrayList<FusedCandidate>(aggregates.size)
+        for (aggregate in aggregates.values) {
+            fused += aggregate.finish(request, learnedIndex, now)
+        }
+        fused.sortWith(FUSED_ORDER)
+        val resultCount = minOf(fused.size, request.maxCandidates)
+        val result = ArrayList<TerminalCompletionCandidate>(resultCount)
+        var index = 0
+        while (index < resultCount) {
+            result += fused[index].toPublicCandidate()
+            index++
+        }
+        return result
     }
 
     private fun groupByOutcome(

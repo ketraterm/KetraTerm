@@ -25,6 +25,7 @@ import io.github.ketraterm.completion.commandline.TerminalCompletionContext
 import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.GradleCompletionSyntax
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
+import io.github.ketraterm.completion.internal.boundedTo
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 
 /**
@@ -94,7 +95,8 @@ internal class GradleTaskCompletionSource(
                     score = score(task, replacement, prefix, index),
                 )
         }
-        return candidates.sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER).take(request.maxCandidates)
+        candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
+        return candidates.boundedTo(request.maxCandidates)
     }
 
     private fun replacementFor(

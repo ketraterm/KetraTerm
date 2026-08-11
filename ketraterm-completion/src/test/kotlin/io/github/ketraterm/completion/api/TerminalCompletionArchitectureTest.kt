@@ -389,6 +389,8 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCompletionSources",
                 "TerminalSessionMruCompletionSource",
                 "TerminalCompletionTriggerEvaluator",
+                "TerminalLiveCompletionTriggerDecision",
+                "TerminalLiveCompletionTriggerState",
                 "TerminalDirectoryListingRequest",
                 "TerminalFileEntry",
                 "TerminalFuzzyPathEntry",
@@ -457,6 +459,7 @@ internal class TerminalCompletionArchitectureTest {
                     ),
                 "api/TerminalSessionMruCompletionSource.kt" to setOf("recordSuccessfulCommand", "clear"),
                 "api/TerminalCompletionTriggerEvaluator.kt" to setOf("shouldTrigger", "isLiveTrigger"),
+                "api/TerminalLiveCompletionTriggerState.kt" to setOf("evaluate", "invalidate"),
                 "api/TerminalFileSystemProvider.kt" to setOf("listDirectory"),
             )
 

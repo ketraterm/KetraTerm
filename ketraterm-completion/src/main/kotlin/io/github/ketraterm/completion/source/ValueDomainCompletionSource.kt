@@ -22,6 +22,7 @@ import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
 import io.github.ketraterm.completion.commandline.TerminalCompletionContext
 import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
+import io.github.ketraterm.completion.internal.boundedTo
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
@@ -112,7 +113,8 @@ internal class ValueDomainCompletionSource(
                     valueDomain = domain,
                 )
         }
-        return candidates.sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER).take(request.maxCandidates)
+        candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
+        return candidates.boundedTo(request.maxCandidates)
     }
 
     private companion object {

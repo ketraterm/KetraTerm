@@ -15,11 +15,9 @@
  */
 package io.github.ketraterm.ui.swing.host
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionEngine
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAccentRole
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 
@@ -69,6 +67,17 @@ class SwingCompletionSuggestionProvider(
                 kind = kind.name,
                 displayText = displayText,
                 detail = detail,
+                accentRole =
+                    when (kind) {
+                        TerminalCompletionCandidateKind.COMMAND,
+                        TerminalCompletionCandidateKind.SUBCOMMAND,
+                        -> SwingShellSuggestionAccentRole.COMMAND
+
+                        TerminalCompletionCandidateKind.PATH -> SwingShellSuggestionAccentRole.PATH
+                        TerminalCompletionCandidateKind.OPTION -> SwingShellSuggestionAccentRole.OPTION
+                        TerminalCompletionCandidateKind.HISTORY -> SwingShellSuggestionAccentRole.HISTORY
+                        else -> SwingShellSuggestionAccentRole.OTHER
+                    },
             )
     }
 }

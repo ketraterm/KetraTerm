@@ -33,6 +33,8 @@ import java.util.regex.Pattern
  * path context, or a short description.
  * @property source compact source label, such as `history`, `path`, or `git`.
  * @property kind compact semantic candidate kind label supplied by the host.
+ * @property accentRole stable visual category supplied by the host or derived
+ * from [kind] for generic providers.
  * @property replacementStartOffset inclusive UTF-16 start offset in the request
  * command text.
  * @property replacementEndOffset exclusive UTF-16 end offset in the request
@@ -48,6 +50,7 @@ data class SwingShellSuggestion
         val kind: String,
         val displayText: String = replacementText,
         val detail: String = "",
+        val accentRole: SwingShellSuggestionAccentRole = SwingShellSuggestionAccentRole.from(kind, source),
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }
@@ -63,6 +66,50 @@ data class SwingShellSuggestion
             }
         }
     }
+
+/**
+ * Stable presentation category for one shell suggestion.
+ *
+ * Hosts should provide this from their semantic completion vocabulary rather
+ * than making the popup infer visual meaning from source-label text.
+ */
+enum class SwingShellSuggestionAccentRole {
+    /** Command or subcommand completion. */
+    COMMAND,
+
+    /** Filesystem or project-path completion. */
+    PATH,
+
+    /** Command option-name completion. */
+    OPTION,
+
+    /** Session or persisted command-history completion. */
+    HISTORY,
+
+    /** A value that does not belong to another presentation category. */
+    OTHER,
+    ;
+
+    companion object {
+        /**
+         * Derives a conservative visual category for generic providers that do
+         * not expose a richer semantic completion vocabulary.
+         */
+        fun from(
+            kind: String,
+            source: String,
+        ): SwingShellSuggestionAccentRole =
+            when {
+                kind.equals("PATH", ignoreCase = true) -> PATH
+                kind.equals("OPTION", ignoreCase = true) -> OPTION
+                kind.equals("COMMAND", ignoreCase = true) || kind.equals("SUBCOMMAND", ignoreCase = true) -> COMMAND
+                source.equals("mru", ignoreCase = true) ||
+                    source.equals("history", ignoreCase = true) ||
+                    source.equals("stats", ignoreCase = true) -> HISTORY
+                else -> OTHER
+            }
+    }
+}
 
 /**
  * Validated command-line replacement plan for one shell suggestion.

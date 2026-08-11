@@ -71,6 +71,13 @@ expected path kind, expected dynamic value domain, repeatable subcommand source,
 static value candidates, context-aware live trigger state, replacement offsets,
 or active quote state from raw command text.
 
+`TerminalLiveCompletionTriggerState` is the shared pure host-facing state
+machine for debounced suggestion refreshes. It owns only eligibility and
+primitive request de-duplication; hosts retain their scheduler, EDT dispatch,
+and popup lifecycle. It avoids allocating a per-refresh snapshot key while
+still re-requesting when command text, cursor anchor, or ranking context
+changes.
+
 `TerminalShellCapabilities` is the single host-to-engine dialect contract. It
 contains `TerminalShellSyntax` for segment lexing and
 `TerminalShellQuotingPolicy` for replacement text. The shared engine never

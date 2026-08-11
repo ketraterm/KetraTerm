@@ -15,7 +15,8 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.api.TerminalCompletionTriggerEvaluator
+import io.github.ketraterm.completion.api.TerminalLiveCompletionTriggerDecision
+import io.github.ketraterm.completion.api.TerminalLiveCompletionTriggerState
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -62,18 +63,15 @@ internal class StandaloneCompletionTriggerController(
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     private val shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
 ) {
-    private val commandSpecs = commandSpecs.toList()
-    private var lastRequestedCommandText: String? = null
-    private var lastRequestedCursorOffset: Int = -1
-    private var lastRequestedCursorColumn: Int = -1
-    private var lastRequestedCursorRow: Int = -1
-    private var lastRequestedRankingContextKey: String? = null
+    private val triggerState =
+        TerminalLiveCompletionTriggerState(
+            minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
+            commandSpecs = commandSpecs,
+            shellCapabilities = shellCapabilities,
+        )
 
     init {
         require(debounceMillis >= 0) { "debounceMillis must be >= 0, was $debounceMillis" }
-        require(minimumNonWhitespaceCharacters >= 0) {
-            "minimumNonWhitespaceCharacters must be >= 0, was $minimumNonWhitespaceCharacters"
-        }
     }
 
     /**
@@ -105,39 +103,19 @@ internal class StandaloneCompletionTriggerController(
             return
         }
         val snapshot = activeCommandLine()
-        if (snapshot == null) {
-            clearLastRequest()
-            hideSuggestions()
-            return
-        }
-        val shouldTrigger =
-            TerminalCompletionTriggerEvaluator.shouldTrigger(
-                commandLine = snapshot.commandText,
-                cursorOffset = snapshot.cursorOffset,
-                minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
-                commandSpecs = commandSpecs,
-                shellCapabilities = shellCapabilities,
+        when (
+            triggerState.evaluate(
+                commandLine = snapshot?.commandText,
+                cursorOffset = snapshot?.cursorOffset ?: 0,
+                cursorColumn = snapshot?.cursorColumn ?: 0,
+                cursorRow = snapshot?.cursorRow ?: 0,
+                rankingContextKey = rankingContextKey(),
             )
-        if (!shouldTrigger) {
-            clearLastRequest()
-            hideSuggestions()
-            return
-        }
-        val currentRankingContextKey = rankingContextKey()
-        if (snapshot.commandText == lastRequestedCommandText &&
-            snapshot.cursorOffset == lastRequestedCursorOffset &&
-            snapshot.cursorColumn == lastRequestedCursorColumn &&
-            snapshot.cursorRow == lastRequestedCursorRow &&
-            currentRankingContextKey == lastRequestedRankingContextKey
         ) {
-            return
+            TerminalLiveCompletionTriggerDecision.HIDE -> hideSuggestions()
+            TerminalLiveCompletionTriggerDecision.KEEP -> Unit
+            TerminalLiveCompletionTriggerDecision.REQUEST -> requestSuggestions(checkNotNull(snapshot))
         }
-        lastRequestedCommandText = snapshot.commandText
-        lastRequestedCursorOffset = snapshot.cursorOffset
-        lastRequestedCursorColumn = snapshot.cursorColumn
-        lastRequestedCursorRow = snapshot.cursorRow
-        lastRequestedRankingContextKey = currentRankingContextKey
-        requestSuggestions(snapshot)
     }
 
     /**
@@ -145,7 +123,7 @@ internal class StandaloneCompletionTriggerController(
      */
     fun cancelAndHide() {
         scheduler.cancel()
-        clearLastRequest()
+        triggerState.invalidate()
         hideSuggestions()
     }
 
@@ -156,7 +134,7 @@ internal class StandaloneCompletionTriggerController(
      * while the same command text remains visible.
      */
     fun invalidateLastRequest() {
-        clearLastRequest()
+        triggerState.invalidate()
     }
 
     /**
@@ -168,27 +146,9 @@ internal class StandaloneCompletionTriggerController(
      */
     fun sourceSnapshotChanged() {
         scheduler.restart(0) {
-            clearLastRequest()
+            triggerState.invalidate()
             refreshNow()
         }
-    }
-
-    private fun clearLastRequest() {
-        lastRequestedCommandText = null
-        lastRequestedCursorOffset = -1
-        lastRequestedCursorColumn = -1
-        lastRequestedCursorRow = -1
-        lastRequestedRankingContextKey = null
-    }
-
-    private fun TerminalShellCommandLineSnapshot.nonWhitespaceCount(): Int {
-        var count = 0
-        var index = 0
-        while (index < commandText.length) {
-            if (!commandText[index].isWhitespace()) count++
-            index++
-        }
-        return count
     }
 
     private companion object {

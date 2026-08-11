@@ -45,6 +45,20 @@ internal object ShellReplacementText {
             else -> unquoted(value, policy)
         }
 
+    /** Returns whether [encode] can represent [value] without constructing the encoded result. */
+    fun canEncode(
+        value: String,
+        activeTokenQuote: Char,
+        policy: TerminalShellQuotingPolicy,
+    ): Boolean =
+        when (activeTokenQuote) {
+            SINGLE_QUOTE -> policy != TerminalShellQuotingPolicy.CONSERVATIVE || !value.contains(SINGLE_QUOTE)
+            DOUBLE_QUOTE ->
+                policy != TerminalShellQuotingPolicy.CONSERVATIVE ||
+                    value.none { it == DOUBLE_QUOTE || it == DOLLAR || it == BACKTICK }
+            else -> !needsEscaping(value, policy) || policy != TerminalShellQuotingPolicy.CONSERVATIVE
+        }
+
     private fun unquoted(
         value: String,
         policy: TerminalShellQuotingPolicy,

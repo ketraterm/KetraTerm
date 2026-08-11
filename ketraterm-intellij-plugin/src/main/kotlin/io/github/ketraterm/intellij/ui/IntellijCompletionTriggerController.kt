@@ -15,7 +15,8 @@
  */
 package io.github.ketraterm.intellij.ui
 
-import io.github.ketraterm.completion.api.TerminalCompletionTriggerEvaluator
+import io.github.ketraterm.completion.api.TerminalLiveCompletionTriggerDecision
+import io.github.ketraterm.completion.api.TerminalLiveCompletionTriggerState
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
@@ -38,13 +39,15 @@ internal class IntellijCompletionTriggerController(
     private val debounceMillis: Int = DEFAULT_DEBOUNCE_MILLIS,
     private val minimumNonWhitespaceCharacters: Int = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
 ) {
-    private var lastRequestedSnapshotKey: SnapshotKey? = null
+    private val triggerState =
+        TerminalLiveCompletionTriggerState(
+            minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
+            commandSpecs = commandSpecs,
+            shellCapabilities = shellCapabilities,
+        )
 
     init {
         require(debounceMillis >= 0) { "debounceMillis must be >= 0, was $debounceMillis" }
-        require(minimumNonWhitespaceCharacters >= 0) {
-            "minimumNonWhitespaceCharacters must be >= 0, was $minimumNonWhitespaceCharacters"
-        }
     }
 
     fun scheduleRefresh() {
@@ -53,13 +56,13 @@ internal class IntellijCompletionTriggerController(
 
     fun sourceSnapshotChanged() {
         scheduler.restart(0) {
-            lastRequestedSnapshotKey = null
+            triggerState.invalidate()
             refreshNow()
         }
     }
 
     fun invalidateLastRequest() {
-        lastRequestedSnapshotKey = null
+        triggerState.invalidate()
     }
 
     fun refreshNow() {
@@ -68,50 +71,26 @@ internal class IntellijCompletionTriggerController(
             return
         }
         val snapshot = activeCommandLine()
-        if (snapshot == null) {
-            lastRequestedSnapshotKey = null
-            hideSuggestions()
-            return
-        }
-        if (
-            !TerminalCompletionTriggerEvaluator.shouldTrigger(
-                commandLine = snapshot.commandText,
-                cursorOffset = snapshot.cursorOffset,
-                minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
-                commandSpecs = commandSpecs,
-                shellCapabilities = shellCapabilities,
-            )
-        ) {
-            lastRequestedSnapshotKey = null
-            hideSuggestions()
-            return
-        }
-        val key =
-            SnapshotKey(
-                commandText = snapshot.commandText,
-                cursorOffset = snapshot.cursorOffset,
-                cursorColumn = snapshot.cursorColumn,
-                cursorRow = snapshot.cursorRow,
+        when (
+            triggerState.evaluate(
+                commandLine = snapshot?.commandText,
+                cursorOffset = snapshot?.cursorOffset ?: 0,
+                cursorColumn = snapshot?.cursorColumn ?: 0,
+                cursorRow = snapshot?.cursorRow ?: 0,
                 rankingContextKey = rankingContextKey(),
             )
-        if (key == lastRequestedSnapshotKey) return
-        lastRequestedSnapshotKey = key
-        requestSuggestions(snapshot)
+        ) {
+            TerminalLiveCompletionTriggerDecision.HIDE -> hideSuggestions()
+            TerminalLiveCompletionTriggerDecision.KEEP -> Unit
+            TerminalLiveCompletionTriggerDecision.REQUEST -> requestSuggestions(checkNotNull(snapshot))
+        }
     }
 
     fun cancelAndHide() {
         scheduler.cancel()
-        lastRequestedSnapshotKey = null
+        triggerState.invalidate()
         hideSuggestions()
     }
-
-    private data class SnapshotKey(
-        val commandText: String,
-        val cursorOffset: Int,
-        val cursorColumn: Int,
-        val cursorRow: Int,
-        val rankingContextKey: String?,
-    )
 
     private companion object {
         private const val DEFAULT_DEBOUNCE_MILLIS = 75

@@ -29,15 +29,6 @@ internal const val POPUP_SOURCE_GAP = 12
 internal const val POPUP_MIN_WIDTH = 380
 internal const val POPUP_MAX_WIDTH = 560
 
-/** Semantic accent role used by the standalone suggestion surface. */
-internal enum class SwingShellSuggestionAccentRole {
-    COMMAND,
-    PATH,
-    OPTION,
-    HISTORY,
-    OTHER,
-}
-
 /** Prepared, immutable row consumed directly by the popup paint loop. */
 internal data class SwingShellSuggestionPopupRow(
     val displayText: String,
@@ -128,7 +119,7 @@ internal class SwingShellSuggestionPopupLayout {
                     detail = ellipsize(suggestion.detail.trim(), detailMetrics, maxTextWidth),
                     sourceLabel = sourceLabel,
                     sourceWidth = sourceWidth,
-                    accentRole = accentRole(suggestion),
+                    accentRole = suggestion.accentRole,
                 )
             index++
         }
@@ -150,23 +141,6 @@ internal class SwingShellSuggestionPopupLayout {
         textFont = candidate
         detailFont = candidate.deriveFont(Font.PLAIN, (candidate.size2D - 1f).coerceAtLeast(MIN_DETAIL_FONT_SIZE))
         sourceFont = candidate.deriveFont(Font.BOLD, SOURCE_FONT_SIZE)
-    }
-
-    private fun accentRole(suggestion: SwingShellSuggestion): SwingShellSuggestionAccentRole {
-        val kind = suggestion.kind
-        val source = suggestion.source
-        return when {
-            kind.equals("PATH", ignoreCase = true) ||
-                source.contains("path", ignoreCase = true) ||
-                source.contains("file", ignoreCase = true) -> SwingShellSuggestionAccentRole.PATH
-            kind.equals("OPTION", ignoreCase = true) -> SwingShellSuggestionAccentRole.OPTION
-            source.contains("mru", ignoreCase = true) ||
-                source.contains("history", ignoreCase = true) ||
-                source.contains("stats", ignoreCase = true) -> SwingShellSuggestionAccentRole.HISTORY
-            kind.equals("COMMAND", ignoreCase = true) ||
-                kind.equals("SUBCOMMAND", ignoreCase = true) -> SwingShellSuggestionAccentRole.COMMAND
-            else -> SwingShellSuggestionAccentRole.OTHER
-        }
     }
 
     private fun formatSourceLabel(source: String): String =

@@ -127,7 +127,7 @@ class SwingShellSuggestionPopupLayoutTest {
             listOf(
                 suggestion(displayText = "build/", source = "path", kind = "PATH"),
                 suggestion(displayText = "--help", source = "spec", kind = "OPTION"),
-                suggestion(displayText = "git status", source = "mru", kind = "COMMAND"),
+                suggestion(displayText = "git status", source = "mru", kind = "HISTORY"),
             ),
             availableWidth = POPUP_MAX_WIDTH,
         )

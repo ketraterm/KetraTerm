@@ -23,10 +23,9 @@ import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
 import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.commandline.TerminalCompletionContext
 import io.github.ketraterm.completion.commandline.resolveCompletionContext
-import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
+import io.github.ketraterm.completion.internal.BoundedCompletionCandidateCollector
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.completion.model.TerminalHiddenPathPolicy
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 /**
@@ -65,21 +64,26 @@ internal class FuzzyPathCompletionSource(
         }
 
         val pathSeparator = if (prefix.contains('\\')) '\\' else '/'
-        val candidates = ArrayList<TerminalCompletionCandidate>()
+        val candidates = BoundedCompletionCandidateCollector(request.maxCandidates)
         var orderIndex = 0
         for (entry in entriesProvider()) {
-            if (!context.expectedPathKind.accepts(entry)) continue
-            if (!context.expectedHiddenPathPolicy.accepts(entry.path, prefix)) continue
+            if (!context.expectedPathKind.acceptsPathEntry(entry.isDirectory)) continue
+            if (!context.expectedHiddenPathPolicy.acceptsPath(entry.path, prefix)) continue
             val fuzzyScore = fuzzyScore(entry.path, prefix) ?: continue
             val rawPath = if (pathSeparator == '\\') entry.path.replace('/', '\\') else entry.path
-            val rawReplacement = rawPath + if (entry.isDirectory) pathSeparator else ""
+            val rawReplacement = if (entry.isDirectory) rawPath + pathSeparator else rawPath
+            if (!ShellReplacementText.canEncode(rawReplacement, context.activeTokenQuote, request.shellCapabilities.quoting)) {
+                continue
+            }
+            val candidateScore = FUZZY_PATH_BASE_SCORE + fuzzyScore - orderIndex++
+            if (!candidates.shouldMaterialize(candidateScore)) continue
             val replacementText =
                 ShellReplacementText.encode(
                     value = rawReplacement,
                     activeTokenQuote = context.activeTokenQuote,
                     policy = request.shellCapabilities.quoting,
                 ) ?: continue
-            candidates +=
+            candidates.offer(
                 TerminalCompletionCandidate(
                     replacementText = replacementText,
                     replacementStartOffset = context.replacementStartOffset,
@@ -88,10 +92,11 @@ internal class FuzzyPathCompletionSource(
                     detail = entry.detail ?: if (entry.isDirectory) "project directory" else "project file",
                     source = sourceId,
                     kind = TerminalCompletionCandidateKind.PATH,
-                    score = FUZZY_PATH_BASE_SCORE + fuzzyScore - orderIndex++,
-                )
+                    score = candidateScore,
+                ),
+            )
         }
-        return candidates.sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER).take(request.maxCandidates)
+        return candidates.finish()
     }
 
     private fun allowsPathCompletion(
@@ -113,12 +118,13 @@ internal class FuzzyPathCompletionSource(
         prefix: String,
     ): Int? {
         val fileNameStart = path.lastIndexOf('/') + 1
-        val fileName = path.substring(fileNameStart)
+        val fileNameLength = path.length - fileNameStart
         return when {
-            fileName.startsWith(prefix, ignoreCase = true) -> EXACT_FILE_NAME_PREFIX_SCORE - fileName.length
+            path.regionMatches(fileNameStart, prefix, 0, prefix.length, ignoreCase = true) ->
+                EXACT_FILE_NAME_PREFIX_SCORE - fileNameLength
             path.startsWith(prefix, ignoreCase = true) -> EXACT_PATH_PREFIX_SCORE - path.length
             else -> {
-                val fileNameMatch = subsequenceScore(fileName, prefix)
+                val fileNameMatch = subsequenceScore(path, prefix, fileNameStart)
                 if (fileNameMatch >= 0) {
                     FILE_NAME_SUBSEQUENCE_SCORE + fileNameMatch
                 } else {
@@ -132,8 +138,9 @@ internal class FuzzyPathCompletionSource(
     private fun subsequenceScore(
         value: String,
         query: String,
+        startIndex: Int = 0,
     ): Int {
-        var valueIndex = 0
+        var valueIndex = startIndex
         var queryIndex = 0
         var firstMatch = -1
         var previousMatch = -1
@@ -148,55 +155,10 @@ internal class FuzzyPathCompletionSource(
             valueIndex++
         }
         if (queryIndex != query.length) return -1
-        return CONTIGUOUS_MATCH_SCORE - firstMatch - gaps * GAP_PENALTY - (value.length - query.length)
-    }
-
-    private fun isPathLike(prefix: String): Boolean =
-        prefix.startsWith("/") ||
-            prefix.startsWith("\\") ||
-            prefix.startsWith(".") ||
-            prefix.startsWith("~") ||
-            prefix.contains("/") ||
-            prefix.contains("\\")
-
-    private fun TerminalPathArgumentKind.accepts(entry: TerminalFuzzyPathEntry): Boolean =
-        when (this) {
-            TerminalPathArgumentKind.NONE,
-            TerminalPathArgumentKind.FILE_OR_DIRECTORY,
-            -> true
-
-            TerminalPathArgumentKind.DIRECTORY -> entry.isDirectory
-            TerminalPathArgumentKind.FILE -> !entry.isDirectory
-        }
-
-    private fun TerminalHiddenPathPolicy.accepts(
-        path: String,
-        prefix: String,
-    ): Boolean {
-        val hidden = path.hasHiddenSegment()
-        val activeNamePrefix = prefix.substringAfterLast('/').substringAfterLast('\\')
-        return !hidden ||
-            when (this) {
-                TerminalHiddenPathPolicy.DEFAULT -> activeNamePrefix.startsWith(".")
-                TerminalHiddenPathPolicy.INCLUDE -> true
-                TerminalHiddenPathPolicy.EXCLUDE -> false
-            }
-    }
-
-    private fun String.hasHiddenSegment(): Boolean {
-        var segmentStart = 0
-        while (segmentStart < length) {
-            val separator = indexOf('/', segmentStart)
-            val segmentEnd = if (separator < 0) length else separator
-            val segmentLength = segmentEnd - segmentStart
-            val isNavigationSegment =
-                segmentLength == 1 ||
-                    (segmentLength == 2 && this[segmentStart + 1] == '.')
-            if (this[segmentStart] == '.' && !isNavigationSegment) return true
-            if (separator < 0) return false
-            segmentStart = separator + 1
-        }
-        return false
+        return CONTIGUOUS_MATCH_SCORE -
+            (firstMatch - startIndex) -
+            gaps * GAP_PENALTY -
+            (value.length - startIndex - query.length)
     }
 
     private companion object {

@@ -21,9 +21,9 @@ import io.github.ketraterm.completion.commandline.TerminalCompletionActivePositi
 import io.github.ketraterm.completion.commandline.TerminalCompletionContext
 import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
+import io.github.ketraterm.completion.internal.boundedTo
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.completion.model.TerminalHiddenPathPolicy
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 /**
@@ -89,8 +89,8 @@ internal class PathCompletionSource(
         var orderIndex = 0
 
         for (entry in entries) {
-            if (!context.expectedPathKind.accepts(entry)) continue
-            if (!context.expectedHiddenPathPolicy.accepts(entry.name, filePrefix)) continue
+            if (!context.expectedPathKind.acceptsPathEntry(entry.isDirectory)) continue
+            if (!context.expectedHiddenPathPolicy.acceptsPath(entry.name, filePrefix)) continue
             if (matchesPrefix(entry.name, filePrefix)) {
                 val rawSuffix = if (entry.isDirectory) "$pathSeparator" else ""
                 val rawReplacement = directoryPortion + entry.name + rawSuffix
@@ -115,16 +115,9 @@ internal class PathCompletionSource(
             }
         }
 
-        return candidates.sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER).take(request.maxCandidates)
+        candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
+        return candidates.boundedTo(request.maxCandidates)
     }
-
-    private fun isPathLike(prefix: String): Boolean =
-        prefix.startsWith("/") ||
-            prefix.startsWith("\\") ||
-            prefix.startsWith(".") ||
-            prefix.startsWith("~") ||
-            prefix.contains("/") ||
-            prefix.contains("\\")
 
     private fun splitPathPrefix(prefix: String): PathParts? {
         if (prefix == "~") return PathParts(directoryPrefix = "~/", entryNamePrefix = "")
@@ -166,24 +159,4 @@ internal class PathCompletionSource(
         val directoryPrefix: String,
         val entryNamePrefix: String,
     )
-
-    private fun TerminalPathArgumentKind.accepts(entry: TerminalFileEntry): Boolean =
-        when (this) {
-            TerminalPathArgumentKind.NONE,
-            TerminalPathArgumentKind.FILE_OR_DIRECTORY,
-            -> true
-            TerminalPathArgumentKind.DIRECTORY -> entry.isDirectory
-            TerminalPathArgumentKind.FILE -> !entry.isDirectory
-        }
-
-    private fun TerminalHiddenPathPolicy.accepts(
-        entryName: String,
-        prefix: String,
-    ): Boolean =
-        !entryName.startsWith('.') ||
-            when (this) {
-                TerminalHiddenPathPolicy.DEFAULT -> prefix.isNotEmpty()
-                TerminalHiddenPathPolicy.INCLUDE -> true
-                TerminalHiddenPathPolicy.EXCLUDE -> false
-            }
 }

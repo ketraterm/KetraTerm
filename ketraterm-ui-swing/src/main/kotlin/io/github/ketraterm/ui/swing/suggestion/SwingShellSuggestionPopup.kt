@@ -116,7 +116,7 @@ internal class SwingShellSuggestionPopup(
     private fun paintChrome(g: Graphics2D) {
         var shadowInset = 0
         while (shadowInset < SURFACE_INSET) {
-            g.color = Color(0, 0, 0, SHADOW_ALPHA - shadowInset * SHADOW_ALPHA_STEP)
+            g.color = colors.shadowColors[shadowInset]
             g.drawRoundRect(
                 shadowInset,
                 shadowInset + 1,
@@ -255,8 +255,6 @@ internal class SwingShellSuggestionPopup(
         private const val SOURCE_HEIGHT = 18
         private const val SOURCE_BASELINE = 13
         private const val SOURCE_ARC = 8
-        private const val SHADOW_ALPHA = 36
-        private const val SHADOW_ALPHA_STEP = 7
         private val DEFAULT_PARENT_BACKGROUND = Color(0xFF101418.toInt(), true)
         private val DEFAULT_PARENT_FOREGROUND = Color(0xFFE5E7EB.toInt(), true)
     }
@@ -280,6 +278,7 @@ private data class PopupColors(
     val optionMarkerBackground: Color,
     val historyMarkerBackground: Color,
     val otherMarkerBackground: Color,
+    val shadowColors: Array<Color>,
 ) {
     fun accent(role: SwingShellSuggestionAccentRole): Color =
         when (role) {
@@ -333,10 +332,19 @@ private data class PopupColors(
                 optionMarkerBackground = withAlpha(optionAccent, MARKER_BACKGROUND_ALPHA),
                 historyMarkerBackground = withAlpha(historyAccent, MARKER_BACKGROUND_ALPHA),
                 otherMarkerBackground = withAlpha(otherAccent, MARKER_BACKGROUND_ALPHA),
+                shadowColors =
+                    arrayOf(
+                        Color(0, 0, 0, SHADOW_ALPHA),
+                        Color(0, 0, 0, SHADOW_ALPHA - SHADOW_ALPHA_STEP),
+                        Color(0, 0, 0, SHADOW_ALPHA - SHADOW_ALPHA_STEP * 2),
+                        Color(0, 0, 0, SHADOW_ALPHA - SHADOW_ALPHA_STEP * 3),
+                    ),
             )
         }
 
         private const val MARKER_BACKGROUND_ALPHA = 44
+        private const val SHADOW_ALPHA = 36
+        private const val SHADOW_ALPHA_STEP = 7
 
         private fun luminance(color: Color): Double = (color.red * 0.2126 + color.green * 0.7152 + color.blue * 0.0722) / 255.0
 
