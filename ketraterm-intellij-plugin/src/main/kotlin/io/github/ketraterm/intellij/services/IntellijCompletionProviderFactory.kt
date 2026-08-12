@@ -17,7 +17,6 @@ package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.TerminalCompletionSource
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
-import io.github.ketraterm.completion.host.TerminalCompletionSnapshotService
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 
 /** Factory for one optional IntelliJ completion source and its lifecycle. */
@@ -35,54 +34,32 @@ internal fun interface IntellijCompletionProviderFactory {
  *
  * @property commandSpecs immutable specs used by the owning engine.
  * @property workingDirectoryUriProvider supplier for current session directory.
- * @property snapshotService bounded asynchronous snapshot owner.
- * @property onSnapshotChanged source-publication notification callback.
  */
 internal data class IntellijCompletionProviderContext(
     val commandSpecs: List<TerminalCommandSpec>,
     val workingDirectoryUriProvider: () -> String?,
-    val snapshotService: TerminalCompletionSnapshotService,
-    val onSnapshotChanged: () -> Unit,
 )
 
 /**
- * One dynamically composed source plus resources closed with its session.
+ * One dynamically composed source.
  *
  * @property sourceEntry source and host-selected priority.
- * @property resources closeable provider snapshots owned by the registration.
  */
 internal data class IntellijCompletionProviderRegistration(
     val sourceEntry: TerminalCompletionSourceEntry,
-    val resources: List<AutoCloseable> = emptyList(),
 )
 
 /**
- * Creates the standard registration for one keyed asynchronous snapshot source.
- *
- * Keeping provider creation and resource ownership together prevents factories
- * from publishing a source without also closing its backing snapshot.
+ * Creates a registration whose provider loads values when completion runs.
  */
-internal fun <V> IntellijCompletionProviderContext.createSnapshotRegistration(
+internal fun <V> IntellijCompletionProviderContext.createSuspendingRegistration(
     priority: Int,
     loader: suspend (String?) -> List<V>,
-    sourceFactory: (valuesProvider: () -> List<V>) -> TerminalCompletionSource,
-): IntellijCompletionProviderRegistration {
-    val snapshotProvider =
-        snapshotService.createValueProvider(
-            loader = loader,
-            onSnapshotChanged = onSnapshotChanged,
-        )
-    return try {
-        IntellijCompletionProviderRegistration(
-            sourceEntry =
-                TerminalCompletionSourceEntry(
-                    sourceFactory { snapshotProvider.values(workingDirectoryUriProvider()) },
-                    priority,
-                ),
-            resources = listOf(snapshotProvider),
-        )
-    } catch (failure: Throwable) {
-        runCatching(snapshotProvider::close).exceptionOrNull()?.let(failure::addSuppressed)
-        throw failure
-    }
-}
+    sourceFactory: (valuesProvider: suspend () -> List<V>) -> TerminalCompletionSource,
+): IntellijCompletionProviderRegistration =
+    IntellijCompletionProviderRegistration(
+        TerminalCompletionSourceEntry(
+            sourceFactory { loader(workingDirectoryUriProvider()) },
+            priority,
+        ),
+    )

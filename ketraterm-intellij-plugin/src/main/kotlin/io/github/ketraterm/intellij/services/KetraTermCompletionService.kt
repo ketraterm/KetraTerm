@@ -19,15 +19,14 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner
-import io.github.ketraterm.completion.host.TerminalCompletionSnapshotService
 import io.github.ketraterm.completion.host.TerminalDirectoryScanner
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.ui.IntellijCompletionContext
@@ -38,8 +37,10 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandl
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Application-level owner of IntelliJ completion learning and session sources.
@@ -52,18 +53,21 @@ internal class KetraTermCompletionService(
     coroutineScope: CoroutineScope,
 ) : Disposable {
     private val settings = KetraTermIntellijSettings.getInstance()
-    private val statsStore =
-        TerminalCompletionStatsStore(
+    private val learningStore = TerminalCompletionSources.learningStore()
+    private val learningRepository =
+        TerminalCompletionLearningRepository(
+            learningStore = learningStore,
+            initialPersistencePath =
             PathManager
                 .getSystemDir()
                 .resolve("ketraterm")
                 .resolve(TerminalCompletionStatsStore.currentFileName()),
+            persistenceEnabled = settings.completionLearningPersistenceEnabled(),
         )
     private val registry =
         IntellijCompletionRegistry(
-            loadStats = statsStore::loadSnapshot,
-            persistStats = statsStore::persistBlocking,
-            persistenceEnabled = settings.completionLearningPersistenceEnabled(),
+            statsSource = learningStore,
+            learningRepository = learningRepository,
             coroutineScope = coroutineScope,
         )
     private val settingsListener: () -> Unit = {
@@ -124,14 +128,10 @@ internal class KetraTermCompletionService(
         )
     }
 
-    /** Closes session sources, background workers, and the statistics store. */
+    /** Closes session sources. */
     override fun dispose() {
         settings.removeChangeListener(settingsListener)
-        try {
-            registry.close()
-        } finally {
-            statsStore.close()
-        }
+        registry.close()
     }
 
     companion object {
@@ -147,16 +147,12 @@ internal class KetraTermCompletionService(
 /**
  * Plugin-owned composition of shared completion sources and learned statistics.
  *
- * Statistics mutations and persistence are serialized on a dedicated executor;
- * directory and domain snapshots are delegated to [snapshotService]. Session
- * registration is synchronized and replacing an existing session id closes its
- * previous resources.
+ * Session registration is synchronized and replacing an existing session id
+ * clears its previous session-local learning.
  *
  * @param specs immutable command specifications shared by every session.
  * @param statsSource bounded learned-statistics source.
- * @param loadStats startup snapshot loader executed on the statistics worker.
- * @param persistStats snapshot writer executed after statistics mutations.
- * @param persistenceEnabled whether disk-backed learning is initially enabled.
+ * @param learningRepository serialized learning and persistence owner.
  * @param sessionMruCapacity positive per-session MRU capacity.
  * @param coroutineScope host lifecycle scope that parents completion work, or
  * `null` for a registry-owned test scope.
@@ -165,9 +161,7 @@ internal class KetraTermCompletionService(
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     private val statsSource: TerminalCompletionLearningStore = TerminalCompletionSources.learningStore(commandSpecs = specs),
-    loadStats: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot() },
-    persistStats: (TerminalCommandCompletionStatsSnapshot) -> Unit = {},
-    persistenceEnabled: Boolean = true,
+    learningRepository: TerminalCompletionLearningRepository = TerminalCompletionLearningRepository(statsSource),
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
     coroutineScope: CoroutineScope? = null,
 ) : AutoCloseable {
@@ -180,20 +174,12 @@ internal class IntellijCompletionRegistry(
     private val lock = Any()
     private val closed = AtomicBoolean()
     private val sessionStates = HashMap<String, SessionState>()
-    private val snapshotService =
-        TerminalCompletionSnapshotService(
-            parentScope = coroutineScope,
-            onBackgroundFailure = { failure ->
-                LOG.warn("IntelliJ completion snapshot work failed", failure)
-            },
-        )
+    private val ownedScope = if (coroutineScope == null) CoroutineScope(SupervisorJob() + Dispatchers.Default) else null
+    private val completionScope = coroutineScope ?: requireNotNull(ownedScope)
     private val statistics =
         IntellijCompletionStatisticsCoordinator(
-            statsSource = statsSource,
-            loadStats = loadStats,
-            persistStats = persistStats,
-            initialPersistenceEnabled = persistenceEnabled,
-            onStatsChanged = ::notifyAllSourcesChanged,
+            repository = learningRepository,
+            coroutineScope = completionScope,
         )
     private val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
 
@@ -220,31 +206,22 @@ internal class IntellijCompletionRegistry(
     }
 
     private fun createSession(context: IntellijCompletionSessionContext): OpenedSession {
-        val notifier = SessionSourceChangeNotifier()
         val mruSource =
             TerminalCompletionSources.sessionMru(
                 capacity = sessionMruCapacity,
                 commandSpecs = commandSpecs,
                 learnedStatsProvider = statsSource::snapshotAll,
             )
-        val resources = ArrayList<AutoCloseable>()
         try {
-            val fileSystemProvider =
-                snapshotService.createDirectoryProvider(
-                    onSnapshotChanged = notifier::notifyChanged,
-                    scanner = context.directoryScanner,
-                )
-            resources += fileSystemProvider
+            val fileSystemProvider = TerminalLocalFileSystemProvider(scanner = context.directoryScanner)
             val providerContext =
                 IntellijCompletionProviderContext(
                     commandSpecs = commandSpecs,
                     workingDirectoryUriProvider = context.workingDirectoryUriProvider,
-                    snapshotService = snapshotService,
-                    onSnapshotChanged = notifier::notifyChanged,
                 )
             val dynamicRegistrations =
                 context.providerFactories.mapNotNull { factory ->
-                    factory.create(providerContext)?.also { registration -> resources.addAll(registration.resources) }
+                    factory.create(providerContext)
                 }
             val sources =
                 buildList {
@@ -264,7 +241,6 @@ internal class IntellijCompletionRegistry(
                         TerminalCompletionSourceEntry(
                             TerminalCompletionSources.path(
                                 fileSystemProvider = fileSystemProvider,
-                                commandSpecs = commandSpecs,
                             ),
                             priority = TerminalCompletionSourcePrior.DIRECTORY_PATH,
                         ),
@@ -281,21 +257,18 @@ internal class IntellijCompletionRegistry(
                         ),
                     contextProvider = { context.swingContext() },
                 )
-            val state = SessionState(mruSource, resources.toList(), notifier)
+            val state = SessionState(mruSource)
             val session =
                 IntellijCompletionSession(
                     provider = provider,
                     feedbackHandler = statistics.createFeedbackHandler(context::swingContext),
                     commandSpecs = commandSpecs,
                     shellCapabilities = context.shellCapabilities,
-                    notifier = notifier,
                     closeAction = { removeSession(context.sessionId, state) },
                 )
             return OpenedSession(session, sessionStates.put(context.sessionId, state))
         } catch (failure: Throwable) {
-            notifier.close()
             mruSource.clear()
-            closeCompletionResources(resources.asReversed(), failure)
             throw failure
         }
     }
@@ -330,11 +303,6 @@ internal class IntellijCompletionRegistry(
         statistics.setPersistenceEnabled(enabled)
     }
 
-    private fun notifyAllSourcesChanged() {
-        val notifiers = synchronized(lock) { sessionStates.values.map(SessionState::notifier) }
-        notifiers.forEach(SessionSourceChangeNotifier::notifyChanged)
-    }
-
     private fun removeSession(
         sessionId: String,
         expected: SessionState,
@@ -347,10 +315,7 @@ internal class IntellijCompletionRegistry(
     }
 
     /**
-     * Closes sessions and snapshot workers, then drains queued statistics work.
-     *
-     * Closing is idempotent. Interruption while awaiting the statistics worker
-     * is restored on the calling thread before pending work is cancelled.
+     * Clears sessions and releases learning resources. Closing is idempotent.
      */
     override fun close() {
         val states =
@@ -360,7 +325,9 @@ internal class IntellijCompletionRegistry(
                 sessionStates.clear()
                 copy
             }
-        closeCompletionResources(states + snapshotService + statistics)?.let { failure -> throw failure }
+        states.forEach(SessionState::close)
+        statistics.close()
+        ownedScope?.cancel()
     }
 
     /** Session resources retained by the registry until replacement or closure. */
@@ -371,20 +338,15 @@ internal class IntellijCompletionRegistry(
 
     private data class SessionState(
         val mruSource: TerminalSessionMruCompletionSource,
-        val resources: List<AutoCloseable>,
-        val notifier: SessionSourceChangeNotifier,
     ) : AutoCloseable {
-        /** Closes notification and dynamic providers and clears session learning. */
+        /** Clears session-local learning. */
         override fun close() {
-            notifier.close()
             mruSource.clear()
-            closeCompletionResources(resources)?.let { failure -> throw failure }
         }
     }
 
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
-        private val LOG = Logger.getInstance(IntellijCompletionRegistry::class.java)
     }
 }
 
@@ -427,7 +389,6 @@ internal data class IntellijCompletionSessionContext(
  * @property feedbackHandler acceptance and dismissal learning handler.
  * @property commandSpecs immutable command specifications used for triggering.
  * @property shellCapabilities shell syntax and quoting capabilities.
- * @property notifier thread-safe bridge for asynchronously published snapshots.
  * @property closeAction registry callback that removes and closes this session.
  */
 internal class IntellijCompletionSession(
@@ -435,59 +396,14 @@ internal class IntellijCompletionSession(
     val feedbackHandler: SwingShellSuggestionFeedbackHandler,
     val commandSpecs: List<TerminalCommandSpec>,
     val shellCapabilities: TerminalShellCapabilities,
-    private val notifier: SessionSourceChangeNotifier,
     private val closeAction: () -> Unit,
 ) : AutoCloseable {
     private val closed = AtomicBoolean()
 
-    /**
-     * Replaces the callback notified when an asynchronous source publishes.
-     *
-     * The callback may run on a completion worker and must perform any required
-     * Swing-thread handoff. Passing `null` detaches the current callback.
-     *
-     * @param listener replacement callback, or `null` to detach.
-     */
-    fun onSourceChanged(listener: (() -> Unit)?) {
-        notifier.replaceListener(if (closed.get()) null else listener)
-    }
-
-    /** Detaches notifications and releases registry-owned resources idempotently. */
+    /** Releases registry-owned resources idempotently. */
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
-        notifier.replaceListener(null)
         closeAction()
-    }
-}
-
-/** Thread-safe, closeable single-listener notification bridge. */
-internal class SessionSourceChangeNotifier {
-    private val listener = AtomicReference<(() -> Unit)?>(null)
-    private val closed = AtomicBoolean()
-
-    /** Replaces the source-change callback unless this notifier is closed. */
-    fun replaceListener(replacement: (() -> Unit)?) {
-        synchronized(this) {
-            listener.set(if (closed.get()) null else replacement)
-        }
-    }
-
-    /** Invokes the current listener on the calling thread unless closed. */
-    fun notifyChanged() {
-        val current = if (closed.get()) null else listener.get()
-        try {
-            current?.invoke()
-        } catch (_: RuntimeException) {
-            // One disposed or faulty UI listener must not suppress other sessions.
-        }
-    }
-
-    /** Permanently suppresses notifications and releases the current listener. */
-    fun close() {
-        synchronized(this) {
-            closed.set(true)
-            listener.set(null)
-        }
     }
 }
 

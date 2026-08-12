@@ -15,10 +15,10 @@
  */
 package io.github.ketraterm.completion.source
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.commandline.*
+import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
+import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
+import io.github.ketraterm.completion.commandline.commandEndOffset
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 /** Projects a learned full command into the request's active completion range. */
@@ -72,8 +72,7 @@ internal fun projectLearnedCommandCandidate(
 
 private fun TerminalCommandLineContext.hasFollowingCommandText(commandLine: String): Boolean {
     val activeToken = tokens.getOrNull(activeTokenIndex) ?: return false
-    if (activeToken.endOffset >= commandEndOffset) return false
-    return commandLine.substring(activeToken.endOffset, commandEndOffset).isNotBlank()
+    return activeToken.endOffset < commandEndOffset && commandLine.substring(activeToken.endOffset, commandEndOffset).isNotBlank()
 }
 
 private fun matchingPrefixTokens(

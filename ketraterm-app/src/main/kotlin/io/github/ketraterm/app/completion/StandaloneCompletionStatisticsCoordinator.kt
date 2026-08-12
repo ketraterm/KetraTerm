@@ -17,26 +17,29 @@ package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
-import io.github.ketraterm.completion.persistence.TerminalCompletionLearningWorker
-import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import java.nio.file.Path
 
 /**
  * Standalone owner of serialized completion learning and optional persistence.
  *
- * Disk loading, store replacement, mutations, and store shutdown all run on a
- * dedicated daemon worker, so constructing or reconfiguring the Swing window
- * never reads completion-learning files on the event-dispatch thread.
+ * The shared suspending repository serializes mutations and disk I/O. This
+ * adapter only launches infrequent UI events in the application's lifecycle
+ * scope.
  */
 internal class StandaloneCompletionStatisticsCoordinator(
     private val statsSource: TerminalCompletionLearningStore,
     initialPersistencePath: Path?,
+    private val coroutineScope: CoroutineScope,
 ) : AutoCloseable {
-    private val worker = TerminalCompletionLearningWorker("standalone-completion-stats")
-    private var storePath: Path? = null
-    private var store: TerminalCompletionStatsStore? = null
+    private val repository =
+        TerminalCompletionLearningRepository(
+            learningStore = statsSource,
+            initialPersistencePath = initialPersistencePath,
+        )
     private val feedbackRecorder =
         StandaloneCompletionFeedbackRecorder(
             statsSource = statsSource,
@@ -44,7 +47,7 @@ internal class StandaloneCompletionStatisticsCoordinator(
         )
 
     init {
-        setPersistencePath(initialPersistencePath)
+        coroutineScope.launch { repository.initialize() }
     }
 
     /** Creates a feedback handler whose mutations are serialized by this owner. */
@@ -62,64 +65,28 @@ internal class StandaloneCompletionStatisticsCoordinator(
         usedAtEpochMillis: Long,
     ) {
         if (!TerminalCompletionPersistencePolicy.allowsCommand(commandLine)) return
-        executeMutation {
-            statsSource.recordCommandResult(
-                commandLine = commandLine,
-                successful = successful,
-                profileId = profileId,
-                workingDirectoryUri = workingDirectoryUri,
-                usedAtEpochMillis = usedAtEpochMillis,
-            )
+        coroutineScope.launch {
+            repository.mutate {
+                recordCommandResult(
+                    commandLine = commandLine,
+                    successful = successful,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    usedAtEpochMillis = usedAtEpochMillis,
+                )
+            }
         }
     }
 
     /** Enables, switches, or disables the persistence store asynchronously. */
     fun setPersistencePath(path: Path?) {
-        execute {
-            if (path == storePath) return@execute
-            store?.close()
-            store = null
-            storePath = path
-            if (path != null) {
-                val replacement = TerminalCompletionStatsStore(path)
-                store = replacement
-                statsSource.replaceSnapshot(
-                    mergeSnapshots(replacement.loadSnapshot(), statsSource.snapshotAll()),
-                )
-                replacement.persistBlocking(statsSource.snapshotAll())
-            }
-        }
+        coroutineScope.launch { repository.setPersistencePath(path) }
     }
 
     private fun executeMutation(mutation: () -> Unit) {
-        execute {
-            mutation()
-            store?.persistBlocking(statsSource.snapshotAll())
-        }
+        coroutineScope.launch { repository.mutate { mutation() } }
     }
 
-    private fun execute(action: () -> Unit) {
-        worker.submit(action)
-    }
-
-    /** Drains queued learning, closes persistence, and stops the worker. */
-    override fun close() {
-        worker.close {
-            store?.close()
-            store = null
-            storePath = null
-        }
-    }
-
-    private companion object {
-        private fun mergeSnapshots(
-            loaded: TerminalCommandCompletionStatsSnapshot,
-            live: TerminalCommandCompletionStatsSnapshot,
-        ): TerminalCommandCompletionStatsSnapshot =
-            TerminalCommandCompletionStatsSnapshot(
-                commandStats = loaded.commandStats + live.commandStats,
-                shapeStats = loaded.shapeStats + live.shapeStats,
-                feedbackStats = loaded.feedbackStats + live.feedbackStats,
-            )
-    }
+    /** Has no private worker or persistence resource to close. */
+    override fun close() = Unit
 }

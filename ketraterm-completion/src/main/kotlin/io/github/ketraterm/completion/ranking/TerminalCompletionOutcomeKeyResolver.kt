@@ -17,11 +17,11 @@ package io.github.ketraterm.completion.ranking
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
+import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.commandline.TerminalCommandLineClassifier
 import io.github.ketraterm.completion.commandline.TerminalCommandLineToken
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
-import io.github.ketraterm.completion.commandline.TerminalCompletionContext
 import io.github.ketraterm.completion.internal.commandLineAfterCandidate
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind

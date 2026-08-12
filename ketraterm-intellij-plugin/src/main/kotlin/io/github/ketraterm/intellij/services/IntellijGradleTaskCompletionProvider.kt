@@ -133,11 +133,10 @@ internal class IntellijGradleTaskProviderFactory(
     private val loader: suspend (String?) -> List<TerminalGradleTask>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
-        context.createSnapshotRegistration(TerminalCompletionSourcePrior.GRADLE_TASK, loader) { valuesProvider ->
+        context.createSuspendingRegistration(TerminalCompletionSourcePrior.GRADLE_TASK, loader) { valuesProvider ->
             TerminalCompletionSources.gradleTask(
                 sourceId = SOURCE_ID,
                 tasksProvider = valuesProvider,
-                commandSpecs = context.commandSpecs,
             )
         }
 

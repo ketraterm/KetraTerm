@@ -58,5 +58,5 @@ fun interface TerminalFuzzyPathProvider {
      * @return immutable bounded path snapshot, or an empty list while an
      * asynchronous host query is pending.
      */
-    fun entries(prefix: String): List<TerminalFuzzyPathEntry>
+    suspend fun entries(prefix: String): List<TerminalFuzzyPathEntry>
 }

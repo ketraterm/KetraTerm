@@ -1,7 +1,7 @@
 # Terminal Completion Agent Guide
 
-`ketraterm-completion` owns dependency-free command-line completion models,
-tokenization, ranking, and static/spec-backed candidate evaluation.
+`ketraterm-completion` owns suspending command-line completion models,
+tokenization, structured source evaluation, ranking, and bounded learning.
 
 ## Public API Surface
 
@@ -23,7 +23,8 @@ This module may:
 - define completion request, candidate, source, and spec vocabulary.
 - tokenize command-line text for suggestion evaluation.
 - evaluate in-process command specs and bounded indexes.
-- expose deterministic pure APIs for Swing, standalone, and IntelliJ hosts.
+- evaluate independent suspending sources in one structured child scope.
+- expose deterministic APIs for Swing, standalone, and IntelliJ hosts.
 
 This module must not:
 
@@ -31,6 +32,7 @@ This module must not:
 - spawn shells or run subprocesses.
 - parse terminal output protocols.
 - perform disk or network I/O.
+- create unowned scopes or launch work inside individual sources.
 - own UI popup behavior or host settings.
 
 ## Testing

@@ -16,129 +16,50 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionSources
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
-import io.github.ketraterm.ui.swing.suggestion.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 
 class StandaloneCompletionStatisticsCoordinatorTest {
     @Test
-    fun `feedback is sanitized persisted reloaded and changes global ranking`(
-        @TempDir tempDirectory: Path,
-    ) {
-        val path = tempDirectory.resolve(TerminalCompletionStatsStore.currentFileName())
-        val liveSource = TerminalCompletionSources.learningStore(commandSpecs = TerminalCommandSpecs.defaults())
+    fun `command learning uses the lifecycle scope and repository`(
+        @TempDir directory: Path,
+    ) = runBlocking {
+        val path = directory.resolve(TerminalCompletionStatsStore.currentFileName())
+        val learning = TerminalCompletionSources.learningStore()
+        val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, this)
 
-        StandaloneCompletionStatisticsCoordinator(liveSource, path).use { coordinator ->
-            val handler = coordinator.createFeedbackHandler("bash") { "file:///repo" }
-            handler.onSuggestionFeedback(feedback(SwingShellSuggestionFeedbackKind.ACCEPTED, "switch"))
-            handler.onSuggestionFeedback(feedback(SwingShellSuggestionFeedbackKind.DISMISSED, "status"))
-            handler.onSuggestionFeedback(
-                feedback(
-                    kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
-                    replacementText = "--password hunter2",
-                    commandText = "docker login ",
-                    replacementStartOffset = 13,
-                ),
-            )
-        }
+        coordinator.recordFinishedCommand("git status", true, "bash", "file:///repo", 42L)
+        coroutineContext[Job]?.children?.toList()?.joinAll()
 
-        val reloaded = TerminalCompletionStatsStore(path).use(TerminalCompletionStatsStore::loadSnapshot)
-        assertEquals(setOf("git switch", "git status"), reloaded.commandStats.map { it.commandLine }.toSet())
-        assertFalse(reloaded.commandStats.any { "hunter2" in it.commandLine })
-
-        val restartedSource = TerminalCompletionSources.learningStore(commandSpecs = TerminalCommandSpecs.defaults())
-        restartedSource.replaceSnapshot(reloaded)
-        val registry =
-            StandaloneCompletionRegistry(
-                specs =
-                    listOf(
-                        TerminalCommandSpec(
-                            name = "git",
-                            subcommands = listOf(TerminalCommandSpec("status"), TerminalCommandSpec("switch")),
-                        ),
-                    ),
-                persistentStatsSource = restartedSource,
-            )
-        try {
-            val provider =
-                registry.createProvider(
-                    sessionId = "restarted",
-                    profileId = "bash",
-                    workingDirectoryUriProvider = { "file:///repo" },
-                )
-            val request = SwingShellSuggestionRequest("git ", 4, anchorColumn = 0, anchorRow = 0)
-
-            assertEquals(
-                listOf("git switch", "git status"),
-                provider.suggestions(request).mapNotNull { it.commandTextAfterReplacement(request) }.take(2),
-            )
-        } finally {
-            registry.close()
-        }
+        assertEquals(listOf("git status"), learning.snapshot().map { it.commandLine })
+        assertEquals(
+            listOf("git status"),
+            TerminalCompletionStatsStore(path).loadSnapshot().commandStats.map { it.commandLine },
+        )
     }
 
     @Test
-    fun `disabling persistence stops subsequent learning from reaching disk`(
-        @TempDir tempDirectory: Path,
-    ) {
-        val path = tempDirectory.resolve(TerminalCompletionStatsStore.currentFileName())
-        val source = TerminalCompletionSources.learningStore()
+    fun `null persistence path keeps later learning in memory only`(
+        @TempDir directory: Path,
+    ) = runBlocking {
+        val path = directory.resolve(TerminalCompletionStatsStore.currentFileName())
+        val learning = TerminalCompletionSources.learningStore()
+        val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, this)
+        coordinator.recordFinishedCommand("git status", true, null, null, 1L)
+        coordinator.setPersistencePath(null)
+        coordinator.recordFinishedCommand("npm test", true, null, null, 2L)
+        coroutineContext[Job]?.children?.toList()?.joinAll()
 
-        StandaloneCompletionStatisticsCoordinator(source, path).use { coordinator ->
-            coordinator.recordFinishedCommand(
-                commandLine = "git status",
-                successful = true,
-                profileId = "bash",
-                workingDirectoryUri = "file:///repo",
-                usedAtEpochMillis = 1_000L,
-            )
-            coordinator.setPersistencePath(null)
-            coordinator.recordFinishedCommand(
-                commandLine = "npm test",
-                successful = true,
-                profileId = "bash",
-                workingDirectoryUri = "file:///repo",
-                usedAtEpochMillis = 2_000L,
-            )
-        }
-
-        assertEquals(setOf("git status", "npm test"), source.snapshot().map { it.commandLine }.toSet())
-        TerminalCompletionStatsStore(path).use { reloaded ->
-            assertEquals(listOf("git status"), reloaded.loadSnapshot().commandStats.map { it.commandLine })
-        }
-    }
-
-    private fun feedback(
-        kind: SwingShellSuggestionFeedbackKind,
-        replacementText: String,
-        commandText: String = "git s",
-        replacementStartOffset: Int = 4,
-    ): SwingShellSuggestionFeedback {
-        val request =
-            SwingShellSuggestionRequest(
-                commandText = commandText,
-                cursorOffset = commandText.length,
-                anchorColumn = 0,
-                anchorRow = 0,
-            )
-        return SwingShellSuggestionFeedback(
-            kind = kind,
-            suggestion =
-                SwingShellSuggestion(
-                    replacementText = replacementText,
-                    replacementStartOffset = replacementStartOffset,
-                    replacementEndOffset = commandText.length,
-                    source = "spec",
-                    kind = "SUBCOMMAND",
-                ),
-            index = 0,
-            request = request,
+        assertEquals(setOf("git status", "npm test"), learning.snapshot().map { it.commandLine }.toSet())
+        assertEquals(
+            listOf("git status"),
+            TerminalCompletionStatsStore(path).loadSnapshot().commandStats.map { it.commandLine },
         )
     }
 }

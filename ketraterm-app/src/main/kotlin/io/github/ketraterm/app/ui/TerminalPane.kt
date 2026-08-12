@@ -68,11 +68,6 @@ internal class TerminalPane private constructor(
         }
     }
 
-    /** Re-evaluates the latest command after a background completion snapshot is published. */
-    fun completionSourceSnapshotChanged() {
-        completionTriggerController.sourceSnapshotChanged()
-    }
-
     override fun hasSelection(): Boolean = terminal.currentSelection() != null
 
     override fun copySelectionToClipboard(): Boolean = terminal.copySelectionToClipboard()

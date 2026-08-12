@@ -15,11 +15,7 @@
  */
 package io.github.ketraterm.completion.ranking
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
-import io.github.ketraterm.completion.commandline.TerminalCompletionContext
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec

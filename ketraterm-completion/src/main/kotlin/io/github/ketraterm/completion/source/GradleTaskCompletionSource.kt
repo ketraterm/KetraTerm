@@ -15,18 +15,10 @@
  */
 package io.github.ketraterm.completion.source
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalGradleTask
-import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
-import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
-import io.github.ketraterm.completion.commandline.TerminalCompletionContext
-import io.github.ketraterm.completion.commandline.resolveCompletionContext
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.GradleCompletionSyntax
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.boundedTo
-import io.github.ketraterm.completion.model.TerminalCommandSpec
 
 /**
  * Pure Gradle-task source backed by a bounded host-published task snapshot.
@@ -37,21 +29,16 @@ import io.github.ketraterm.completion.model.TerminalCommandSpec
  */
 internal class GradleTaskCompletionSource(
     private val sourceId: String,
-    private val tasksProvider: () -> List<TerminalGradleTask>,
-    commandSpecs: List<TerminalCommandSpec>,
-) : ContextAwareCompletionSource {
-    override val commandSpecs = commandSpecs.toList()
-
+    private val tasksProvider: suspend () -> List<TerminalGradleTask>,
+) : TerminalCompletionSource {
     init {
         require(sourceId.isNotBlank()) { "sourceId must not be blank" }
     }
 
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(request, request.resolveCompletionContext(commandSpecs))
-
-    override fun complete(
+    override suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
+        limit: Int,
     ): List<TerminalCompletionCandidate> {
         if (context.command?.name != GradleCompletionSyntax.COMMAND_NAME ||
             context.activePosition != TerminalCompletionActivePosition.SUBCOMMAND
@@ -64,7 +51,7 @@ internal class GradleTaskCompletionSource(
         val tasks = tasksProvider()
         if (tasks.isEmpty()) return emptyList()
 
-        val candidates = ArrayList<TerminalCompletionCandidate>(minOf(tasks.size, request.maxCandidates))
+        val candidates = ArrayList<TerminalCompletionCandidate>(minOf(tasks.size, limit))
         val emitted = HashSet<String>()
         for ((index, task) in tasks.withIndex()) {
             val replacement = replacementFor(task, prefix, projectDirectory) ?: continue
@@ -96,7 +83,7 @@ internal class GradleTaskCompletionSource(
                 )
         }
         candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-        return candidates.boundedTo(request.maxCandidates)
+        return candidates.boundedTo(limit)
     }
 
     private fun replacementFor(

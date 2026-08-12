@@ -33,7 +33,7 @@ fun interface TerminalCompletionEngine {
      * @param request command-line completion context.
      * @return ordered completion candidates.
      */
-    fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate>
+    suspend fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate>
 
     companion object {
         /**

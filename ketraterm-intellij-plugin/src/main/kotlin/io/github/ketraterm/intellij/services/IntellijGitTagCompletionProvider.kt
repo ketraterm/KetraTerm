@@ -54,13 +54,12 @@ internal class IntellijGitTagProviderFactory(
     private val loader: suspend (String?) -> List<TerminalCompletionDomainValue>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
-        context.createSnapshotRegistration(TerminalCompletionSourcePrior.GIT_TAG, loader) { valuesProvider ->
+        context.createSuspendingRegistration(TerminalCompletionSourcePrior.GIT_TAG, loader) { valuesProvider ->
             TerminalCompletionSources.valueDomain(
                 domain = TerminalCompletionValueDomain.GIT_BRANCH,
                 sourceId = SOURCE_ID,
                 valuesProvider = valuesProvider,
                 allowedCommandNames = ALLOWED_COMMAND_NAMES,
-                commandSpecs = context.commandSpecs,
             )
         }
 

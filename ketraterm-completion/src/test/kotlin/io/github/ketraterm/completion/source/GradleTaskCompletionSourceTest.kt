@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -36,67 +37,73 @@ class GradleTaskCompletionSourceTest {
         )
 
     @Test
-    fun `completes root tasks through the wrapper alias`() {
-        val candidates = source.complete(request("./gradlew te"))
+    fun `completes root tasks through the wrapper alias`() =
+        runBlocking {
+            val candidates = source.complete(request("./gradlew te"))
 
-        assertEquals(listOf("test"), candidates.map { it.replacementText })
-        assertEquals(listOf("run root tests"), candidates.map { it.detail })
-        assertTrue(candidates.all { it.kind == TerminalCompletionCandidateKind.SUBCOMMAND })
-    }
-
-    @Test
-    fun `completes fully qualified module tasks after another Gradle task`() {
-        assertEquals(
-            listOf(":app:run", ":app:runIde"),
-            source.complete(request("./gradlew test :app:ru")).map { it.replacementText },
-        )
-        assertEquals(
-            listOf(":app:run", ":app:runIde"),
-            source.complete(request("gradle test :app:ru")).map { it.replacementText },
-        )
-    }
+            assertEquals(listOf("test"), candidates.map { it.replacementText })
+            assertEquals(listOf("run root tests"), candidates.map { it.detail })
+            assertTrue(candidates.all { it.kind == TerminalCompletionCandidateKind.SUBCOMMAND })
+        }
 
     @Test
-    fun `scopes short task names after project directory options`() {
-        assertEquals(
-            listOf("runIde"),
-            source.complete(request("./gradlew -p ./app runI")).map { it.replacementText },
-        )
-        assertEquals(
-            listOf("run"),
-            source.complete(request("gradlew --project-dir tools ru")).map { it.replacementText },
-        )
-        assertEquals(
-            listOf("test"),
-            source.complete(request("./gradlew -p ./ te")).map { it.replacementText },
-        )
-        assertEquals(
-            listOf("runIde"),
-            source.complete(request("./gradlew --project-dir=app runI")).map { it.replacementText },
-        )
-        assertEquals(
-            listOf("runIde"),
-            source.complete(request("./gradlew -p \"./app\" runI")).map { it.replacementText },
-        )
-    }
+    fun `completes fully qualified module tasks after another Gradle task`() =
+        runBlocking {
+            assertEquals(
+                listOf(":app:run", ":app:runIde"),
+                source.complete(request("./gradlew test :app:ru")).map { it.replacementText },
+            )
+            assertEquals(
+                listOf(":app:run", ":app:runIde"),
+                source.complete(request("gradle test :app:ru")).map { it.replacementText },
+            )
+        }
 
     @Test
-    fun `does not complete Gradle tasks while an option value is active`() {
-        assertTrue(source.complete(request("./gradlew -p ap")).isEmpty())
-    }
+    fun `scopes short task names after project directory options`() =
+        runBlocking {
+            assertEquals(
+                listOf("runIde"),
+                source.complete(request("./gradlew -p ./app runI")).map { it.replacementText },
+            )
+            assertEquals(
+                listOf("run"),
+                source.complete(request("gradlew --project-dir tools ru")).map { it.replacementText },
+            )
+            assertEquals(
+                listOf("test"),
+                source.complete(request("./gradlew -p ./ te")).map { it.replacementText },
+            )
+            assertEquals(
+                listOf("runIde"),
+                source.complete(request("./gradlew --project-dir=app runI")).map { it.replacementText },
+            )
+            assertEquals(
+                listOf("runIde"),
+                source.complete(request("./gradlew -p \"./app\" runI")).map { it.replacementText },
+            )
+        }
 
     @Test
-    fun `last project directory option wins without leaking tasks from another module`() {
-        assertEquals(
-            listOf("run"),
-            source.complete(request("./gradlew -p app --project-dir tools ru")).map { it.replacementText },
-        )
-    }
+    fun `does not complete Gradle tasks while an option value is active`() =
+        runBlocking {
+            assertTrue(source.complete(request("./gradlew -p ap")).isEmpty())
+        }
 
     @Test
-    fun `does not activate for unrelated commands`() {
-        assertTrue(source.complete(request("npm run runI")).isEmpty())
-    }
+    fun `last project directory option wins without leaking tasks from another module`() =
+        runBlocking {
+            assertEquals(
+                listOf("run"),
+                source.complete(request("./gradlew -p app --project-dir tools ru")).map { it.replacementText },
+            )
+        }
+
+    @Test
+    fun `does not activate for unrelated commands`() =
+        runBlocking {
+            assertTrue(source.complete(request("npm run runI")).isEmpty())
+        }
 
     private fun request(commandLine: String): TerminalCompletionRequest =
         TerminalCompletionRequest(

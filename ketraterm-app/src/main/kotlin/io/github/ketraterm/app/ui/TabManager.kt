@@ -26,6 +26,7 @@ import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.workspace.*
+import kotlinx.coroutines.*
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
@@ -59,11 +60,14 @@ internal class TabManager(
     private val tabContainers = HashMap<String, JPanel>()
     private val completionSpecs = TerminalCommandSpecs.defaults()
     private val commandCompletionStatsSource = TerminalCompletionSources.learningStore(commandSpecs = completionSpecs)
+    private val completionLearningScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("standalone-completion-learning"))
     private val completionStatistics =
         StandaloneCompletionStatisticsCoordinator(
             statsSource = commandCompletionStatsSource,
             initialPersistencePath =
                 settings.commandCompletionStatsPath.takeIf { settings.persistentSuggestionLearningEnabled },
+            coroutineScope = completionLearningScope,
         )
     private val completionRegistry =
         StandaloneCompletionRegistry(
@@ -215,31 +219,7 @@ internal class TabManager(
                 return false
             }
 
-        var pane: TerminalPane? = null
-        val suggestionProvider =
-            completionRegistry.createProvider(
-                sessionId = workspaceTab.id,
-                profileId = workspaceTab.profile.id,
-                workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
-                shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
-                onPathSnapshotChanged = { pane?.completionSourceSnapshotChanged() },
-            )
-        val createdPane =
-            TerminalPane.create(
-                tab = workspaceTab,
-                settings = settings,
-                suggestionProvider = suggestionProvider,
-                commandSpecs = completionRegistry.commandSpecs,
-                shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
-                suggestionFeedbackHandler =
-                    completionStatistics.createFeedbackHandler(
-                        profileId = workspaceTab.profile.id,
-                        workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
-                    ),
-            ) { p, request ->
-                showPaneContextMenu(p, request)
-            }
-        pane = createdPane
+        val createdPane = createTerminalPane(workspaceTab)
         panes += createdPane
 
         val tabId = createdPane.tab.id
@@ -258,7 +238,7 @@ internal class TabManager(
         tabBar.addTab(TabEntry(id = tabId, title = workspaceTab.title, profileKind = profile.kind))
         showPane(tabId)
         updateFrameTitle()
-        pane.requestFocus()
+        createdPane.requestFocus()
         return true
     }
 
@@ -318,6 +298,7 @@ internal class TabManager(
         completionRegistry.close()
         workspace.close()
         completionStatistics.close()
+        completionLearningScope.cancel()
     }
 
     /** Propagates a settings reload to all live panes and the workspace. */
@@ -405,31 +386,7 @@ internal class TabManager(
                 showStartError(profile, exception)
                 return
             }
-        var newPane: TerminalPane? = null
-        val suggestionProvider =
-            completionRegistry.createProvider(
-                sessionId = workspaceTab.id,
-                profileId = workspaceTab.profile.id,
-                workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
-                shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
-                onPathSnapshotChanged = { newPane?.completionSourceSnapshotChanged() },
-            )
-        val createdPane =
-            TerminalPane.create(
-                tab = workspaceTab,
-                settings = settings,
-                suggestionProvider = suggestionProvider,
-                commandSpecs = completionRegistry.commandSpecs,
-                shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
-                suggestionFeedbackHandler =
-                    completionStatistics.createFeedbackHandler(
-                        profileId = workspaceTab.profile.id,
-                        workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
-                    ),
-            ) { p, request ->
-                showPaneContextMenu(p, request)
-            }
-        newPane = createdPane
+        val createdPane = createTerminalPane(workspaceTab)
 
         panes += createdPane
 
@@ -444,6 +401,32 @@ internal class TabManager(
 
         createdPane.requestFocus()
         updateFrameTitle()
+    }
+
+    private fun createTerminalPane(workspaceTab: TerminalWorkspaceTab): TerminalPane {
+        val workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri }
+        val shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities()
+        val suggestionProvider =
+            completionRegistry.createProvider(
+                sessionId = workspaceTab.id,
+                profileId = workspaceTab.profile.id,
+                workingDirectoryUriProvider = workingDirectoryUriProvider,
+                shellCapabilities = shellCapabilities,
+            )
+        return TerminalPane.create(
+            tab = workspaceTab,
+            settings = settings,
+            suggestionProvider = suggestionProvider,
+            commandSpecs = completionRegistry.commandSpecs,
+            shellCapabilities = shellCapabilities,
+            suggestionFeedbackHandler =
+                completionStatistics.createFeedbackHandler(
+                    profileId = workspaceTab.profile.id,
+                    workingDirectoryUriProvider = workingDirectoryUriProvider,
+                ),
+        ) { pane, request ->
+            showPaneContextMenu(pane, request)
+        }
     }
 
     private fun splitNodeInTree(

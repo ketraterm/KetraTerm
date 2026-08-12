@@ -19,119 +19,128 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalOptionSpec
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class StandaloneCompletionSuggestionProviderTest {
     @Test
-    fun `adapts completion candidates to swing suggestions with replacement ranges`() {
-        val provider = provider()
+    fun `adapts completion candidates to swing suggestions with replacement ranges`() =
+        runBlocking {
+            val provider = provider()
 
-        val suggestions = provider.suggestions(request("git c"))
+            val suggestions = provider.suggestions(request("git c"))
 
-        assertEquals(listOf("commit", "checkout"), suggestions.map { it.replacementText })
-        assertEquals(listOf(4, 4), suggestions.map { it.replacementStartOffset })
-        assertEquals(listOf(5, 5), suggestions.map { it.replacementEndOffset })
-        assertEquals(listOf("spec", "spec"), suggestions.map { it.source })
-        assertEquals(listOf("SUBCOMMAND", "SUBCOMMAND"), suggestions.map { it.kind })
-    }
-
-    @Test
-    fun `preserves candidate ranges that replace text after the cursor`() {
-        val provider = provider()
-
-        val suggestions = provider.suggestions(request("git che", cursorOffset = 6))
-
-        val suggestion = suggestions.single()
-        assertEquals("checkout", suggestion.replacementText)
-        assertEquals(4, suggestion.replacementStartOffset)
-        assertEquals(7, suggestion.replacementEndOffset)
-        assertEquals("spec", suggestion.source)
-        assertEquals("SUBCOMMAND", suggestion.kind)
-    }
+            assertEquals(listOf("commit", "checkout"), suggestions.map { it.replacementText })
+            assertEquals(listOf(4, 4), suggestions.map { it.replacementStartOffset })
+            assertEquals(listOf(5, 5), suggestions.map { it.replacementEndOffset })
+            assertEquals(listOf("spec", "spec"), suggestions.map { it.source })
+            assertEquals(listOf("SUBCOMMAND", "SUBCOMMAND"), suggestions.map { it.kind })
+        }
 
     @Test
-    fun `preserves option detail`() {
-        val provider = provider()
+    fun `preserves candidate ranges that replace text after the cursor`() =
+        runBlocking {
+            val provider = provider()
 
-        val suggestion = provider.suggestions(request("git --h")).single()
+            val suggestions = provider.suggestions(request("git che", cursorOffset = 6))
 
-        assertEquals("--help", suggestion.replacementText)
-        assertEquals("show help", suggestion.detail)
-        assertEquals(4, suggestion.replacementStartOffset)
-        assertEquals(7, suggestion.replacementEndOffset)
-    }
-
-    @Test
-    fun `active double dash offers long options`() {
-        val suggestions = provider().suggestions(request("git --"))
-
-        assertEquals(listOf("--help"), suggestions.map { it.replacementText })
-        assertEquals(listOf("OPTION"), suggestions.map { it.kind })
-    }
+            val suggestion = suggestions.single()
+            assertEquals("checkout", suggestion.replacementText)
+            assertEquals(4, suggestion.replacementStartOffset)
+            assertEquals(7, suggestion.replacementEndOffset)
+            assertEquals("spec", suggestion.source)
+            assertEquals("SUBCOMMAND", suggestion.kind)
+        }
 
     @Test
-    fun `passes standalone context to completion engine`() {
-        val requests = ArrayList<TerminalCompletionRequest>()
-        val provider =
-            StandaloneCompletionSuggestionProvider(
-                engine = { request ->
-                    requests += request
-                    listOf(
-                        TerminalCompletionCandidate(
-                            replacementText = "git status",
-                            replacementStartOffset = 0,
-                            replacementEndOffset = request.commandLine.length,
-                            source = "test",
-                            kind = TerminalCompletionCandidateKind.COMMAND,
+    fun `preserves option detail`() =
+        runBlocking {
+            val provider = provider()
+
+            val suggestion = provider.suggestions(request("git --h")).single()
+
+            assertEquals("--help", suggestion.replacementText)
+            assertEquals("show help", suggestion.detail)
+            assertEquals(4, suggestion.replacementStartOffset)
+            assertEquals(7, suggestion.replacementEndOffset)
+        }
+
+    @Test
+    fun `active double dash offers long options`() =
+        runBlocking {
+            val suggestions = provider().suggestions(request("git --"))
+
+            assertEquals(listOf("--help"), suggestions.map { it.replacementText })
+            assertEquals(listOf("OPTION"), suggestions.map { it.kind })
+        }
+
+    @Test
+    fun `passes standalone context to completion engine`() =
+        runBlocking {
+            val requests = ArrayList<TerminalCompletionRequest>()
+            val provider =
+                StandaloneCompletionSuggestionProvider(
+                    engine = { request ->
+                        requests += request
+                        listOf(
+                            TerminalCompletionCandidate(
+                                replacementText = "git status",
+                                replacementStartOffset = 0,
+                                replacementEndOffset = request.commandLine.length,
+                                source = "test",
+                                kind = TerminalCompletionCandidateKind.COMMAND,
+                            ),
+                        )
+                    },
+                    contextProvider = {
+                        StandaloneCompletionSuggestionContext(
+                            profileId = "bash",
+                            workingDirectoryUri = "file:///repo",
+                        )
+                    },
+                )
+
+            provider.suggestions(request("git"))
+
+            assertEquals("bash", requests.single().profileId)
+            assertEquals("file:///repo", requests.single().workingDirectoryUri)
+        }
+
+    @Test
+    fun `malformed cursor request returns no suggestions`() =
+        runBlocking {
+            val provider = provider()
+
+            val suggestions = provider.suggestions(request("a\uD83D\uDE02", cursorOffset = 2))
+
+            assertTrue(suggestions.isEmpty())
+        }
+
+    private fun provider(): StandaloneCompletionSuggestionProvider {
+        val specs =
+            listOf(
+                TerminalCommandSpec(
+                    name = "git",
+                    subcommands =
+                        listOf(
+                            TerminalCommandSpec("commit", "record changes"),
+                            TerminalCommandSpec("checkout", "switch branches"),
                         ),
-                    )
-                },
-                contextProvider = {
-                    StandaloneCompletionSuggestionContext(
-                        profileId = "bash",
-                        workingDirectoryUri = "file:///repo",
-                    )
-                },
-            )
-
-        provider.suggestions(request("git"))
-
-        assertEquals("bash", requests.single().profileId)
-        assertEquals("file:///repo", requests.single().workingDirectoryUri)
-    }
-
-    @Test
-    fun `malformed cursor request returns no suggestions`() {
-        val provider = provider()
-
-        val suggestions = provider.suggestions(request("a\uD83D\uDE02", cursorOffset = 2))
-
-        assertTrue(suggestions.isEmpty())
-    }
-
-    private fun provider(): StandaloneCompletionSuggestionProvider =
-        StandaloneCompletionSuggestionProvider(
-            TerminalCompletionEngines.fromSources(
-                TerminalCompletionSources.fromSpecs(
-                    listOf(
-                        TerminalCommandSpec(
-                            name = "git",
-                            subcommands =
-                                listOf(
-                                    TerminalCommandSpec("commit", "record changes"),
-                                    TerminalCommandSpec("checkout", "switch branches"),
-                                ),
-                            options =
-                                listOf(
-                                    TerminalOptionSpec(listOf("--help"), "show help"),
-                                ),
+                    options =
+                        listOf(
+                            TerminalOptionSpec(listOf("--help"), "show help"),
                         ),
-                    ),
                 ),
+            )
+        return StandaloneCompletionSuggestionProvider(
+            TerminalCompletionEngines.fromSources(
+                sources = listOf(TerminalCompletionSourceEntry(TerminalCompletionSources.fromSpecs(specs))),
+                commandSpecs = specs,
             ),
         )
+    }
 
     private fun request(
         commandText: String,

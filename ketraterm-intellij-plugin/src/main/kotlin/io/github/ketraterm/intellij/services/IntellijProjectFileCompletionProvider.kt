@@ -130,33 +130,21 @@ private class IntellijProjectFileSearchViewModel(
     override fun getMaximumListSizeLimit(): Int = 0
 }
 
-private data class ProjectPathQuery(
-    val workingDirectoryUri: String?,
-    val prefix: String,
-)
-
 /** Adds query-aware IntelliJ project fuzzy paths without leaking VFS APIs into the shared engine. */
 internal class IntellijProjectFileProviderFactory(
     private val loader: suspend (String?, String) -> List<TerminalFuzzyPathEntry>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration {
-        val snapshotProvider =
-            context.snapshotService.createValueProvider(
-                loader = { query: ProjectPathQuery -> loader(query.workingDirectoryUri, query.prefix) },
-                onSnapshotChanged = context.onSnapshotChanged,
-            )
         val source =
             TerminalCompletionSources.fuzzyPath(
                 sourceId = SOURCE_ID,
                 entriesProvider =
                     TerminalFuzzyPathProvider { prefix ->
-                        snapshotProvider.values(ProjectPathQuery(context.workingDirectoryUriProvider(), prefix))
+                        loader(context.workingDirectoryUriProvider(), prefix)
                     },
-                commandSpecs = context.commandSpecs,
             )
         return IntellijCompletionProviderRegistration(
             sourceEntry = TerminalCompletionSourceEntry(source, TerminalCompletionSourcePrior.PROJECT_FUZZY_PATH),
-            resources = listOf(snapshotProvider),
         )
     }
 

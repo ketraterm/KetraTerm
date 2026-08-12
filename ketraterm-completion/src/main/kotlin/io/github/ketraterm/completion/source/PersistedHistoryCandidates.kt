@@ -16,9 +16,9 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
+import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
-import io.github.ketraterm.completion.commandline.TerminalCompletionContext
 import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
 import io.github.ketraterm.completion.internal.isRelativeCdCommand
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats

@@ -19,49 +19,51 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /** Deterministic replay gate for representative interactive completion choices. */
 class CompletionRankingReplayTest {
     @Test
-    fun `representative learned choices retain perfect top one replay`() {
-        val cases =
-            listOf(
-                replayCase(
-                    commandLine = "git switch fe",
-                    expectedCommand = "git switch feature/terminal",
-                    domain = TerminalCompletionValueDomain.GIT_BRANCH,
-                    alternatives = listOf("feature/aaa", "feature/terminal"),
-                    learnedCommand = "git switch feature/terminal",
-                ),
-                replayCase(
-                    commandLine = "./gradlew :app:",
-                    expectedCommand = "./gradlew :app:test",
-                    domain = TerminalCompletionValueDomain.NONE,
-                    alternatives = listOf(":app:check", ":app:test"),
-                    learnedCommand = "./gradlew :app:test",
-                ),
-                replayCase(
-                    commandLine = "cd I",
-                    expectedCommand = "cd IdeaProjects/",
-                    domain = TerminalCompletionValueDomain.NONE,
-                    alternatives = listOf("IdeaSnapshots/", "IdeaProjects/"),
-                    learnedCommand = "cd IdeaProjects/",
-                    kind = TerminalCompletionCandidateKind.PATH,
-                ),
-            )
+    fun `representative learned choices retain perfect top one replay`() =
+        runBlocking {
+            val cases =
+                listOf(
+                    replayCase(
+                        commandLine = "git switch fe",
+                        expectedCommand = "git switch feature/terminal",
+                        domain = TerminalCompletionValueDomain.GIT_BRANCH,
+                        alternatives = listOf("feature/aaa", "feature/terminal"),
+                        learnedCommand = "git switch feature/terminal",
+                    ),
+                    replayCase(
+                        commandLine = "./gradlew :app:",
+                        expectedCommand = "./gradlew :app:test",
+                        domain = TerminalCompletionValueDomain.NONE,
+                        alternatives = listOf(":app:check", ":app:test"),
+                        learnedCommand = "./gradlew :app:test",
+                    ),
+                    replayCase(
+                        commandLine = "cd I",
+                        expectedCommand = "cd IdeaProjects/",
+                        domain = TerminalCompletionValueDomain.NONE,
+                        alternatives = listOf("IdeaSnapshots/", "IdeaProjects/"),
+                        learnedCommand = "cd IdeaProjects/",
+                        kind = TerminalCompletionCandidateKind.PATH,
+                    ),
+                )
 
-        val ranks = cases.map(ReplayCase::acceptedRank)
-        val metrics = ReplayMetrics.fromRanks(ranks)
+            val ranks = cases.map(ReplayCase::acceptedRank)
+            val metrics = ReplayMetrics.fromRanks(ranks)
 
-        assertEquals(listOf(1, 1, 1), ranks)
-        assertEquals(1.0, metrics.topOneRate)
-        assertEquals(1.0, metrics.topThreeRate)
-        assertEquals(1.0, metrics.meanReciprocalRank)
-    }
+            assertEquals(listOf(1, 1, 1), ranks)
+            assertEquals(1.0, metrics.topOneRate)
+            assertEquals(1.0, metrics.topThreeRate)
+            assertEquals(1.0, metrics.meanReciprocalRank)
+        }
 
-    private fun replayCase(
+    private suspend fun replayCase(
         commandLine: String,
         expectedCommand: String,
         domain: TerminalCompletionValueDomain,
@@ -71,7 +73,7 @@ class CompletionRankingReplayTest {
     ): ReplayCase {
         val activeStart = commandLine.indexOfLast { it == ' ' } + 1
         val source =
-            TerminalCompletionSource {
+            TerminalCompletionSource { _, _, _ ->
                 alternatives.mapIndexed { index, replacement ->
                     TerminalCompletionCandidate(
                         replacementText = replacement,

@@ -16,21 +16,27 @@
 package io.github.ketraterm.completion.api
 
 /**
- * Pure completion source contract for one bounded provider such as static
+ * Suspending completion source contract for one provider such as static
  * command specs, session MRU, indexed history, path completion, or IDE context.
  */
 fun interface TerminalCompletionSource {
     /**
-     * Returns candidates produced by this source for [request].
+     * Returns candidates produced by this source for [request] and [context].
      *
-     * Implementations must be deterministic for a stable source snapshot and
-     * must not perform shell I/O, UI work, disk I/O, or network I/O. Expensive
-     * sources should maintain ready in-memory indexes outside this callback.
+     * Implementations may suspend for bounded host I/O. Cancellation must stop
+     * obsolete work promptly. Sources do not launch child coroutines; the
+     * merged engine owns parallel collection.
      *
      * @param request command-line completion context.
+     * @param context parsed semantic context shared by the merged engine.
+     * @param limit maximum candidates this source may return.
      * @return ordered candidates from this source.
      */
-    fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate>
+    suspend fun complete(
+        request: TerminalCompletionRequest,
+        context: TerminalCompletionContext,
+        limit: Int,
+    ): List<TerminalCompletionCandidate>
 }
 
 /**

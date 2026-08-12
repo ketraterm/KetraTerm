@@ -216,7 +216,6 @@ internal class KetraTermTerminalPane private constructor(
      * Unbinds the pane from its session before the containing IDE tab is disposed.
      */
     fun close() {
-        completionSession.onSourceChanged(null)
         completionTriggerController.cancelAndHide()
         completionScope.cancel()
         completionSession.close()
@@ -310,7 +309,6 @@ internal class KetraTermTerminalPane private constructor(
             scrollbarAdapter.attach(terminal)
             terminal.bind(tab.session)
 
-            completionSession.onSourceChanged(completionTriggerController::sourceSnapshotChanged)
             completionScope.launch {
                 tab.session.renderGeneration.collect {
                     completionTriggerController.scheduleRefresh()

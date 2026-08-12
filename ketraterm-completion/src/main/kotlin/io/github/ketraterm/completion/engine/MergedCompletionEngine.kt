@@ -15,17 +15,18 @@
  */
 package io.github.ketraterm.completion.engine
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionEngine
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
-import io.github.ketraterm.completion.commandline.*
+import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
+import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
 import io.github.ketraterm.completion.internal.completionCollectionLimit
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.ranking.CompletionSourceCandidates
 import io.github.ketraterm.completion.ranking.GlobalCompletionRanker
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 /** Coordinates bounded source collection and delegates deterministic fusion to [GlobalCompletionRanker]. */
 internal class MergedCompletionEngine(
@@ -38,43 +39,33 @@ internal class MergedCompletionEngine(
     private val commandSpecs = commandSpecs.toList()
     private val ranker = GlobalCompletionRanker(this.commandSpecs, learnedStatsProvider, clockEpochMillis)
 
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> {
-        if (sources.isEmpty()) return emptyList()
+    override suspend fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
+        coroutineScope {
+            if (sources.isEmpty()) return@coroutineScope emptyList()
 
-        val commandLineContext =
-            TerminalCommandLineTokenizer.parse(
-                request.commandLine,
-                request.cursorOffset,
-                request.shellCapabilities.syntax,
-            )
-        val completionContext =
-            TerminalCompletionContextResolver.resolve(
-                commandLine = request.commandLine,
-                lineContext = commandLineContext,
-                commandSpecs = commandSpecs,
-            )
-        if (completionContext.activePosition == TerminalCompletionActivePosition.OPERATOR) return emptyList()
-        val collectionLimit = completionCollectionLimit(request.maxCandidates)
-        val collected = ArrayList<CompletionSourceCandidates>(sources.size)
-        var alternateContexts: MutableMap<List<TerminalCommandSpec>, TerminalCompletionContext>? = null
-        for (sourceIndex in sources.indices) {
-            val entry = sources[sourceIndex]
-            val sourceSpecs = entry.source.contextCommandSpecs
-            val sourceContext =
-                if (sourceSpecs == null || sourceSpecs == commandSpecs) {
-                    completionContext
-                } else {
-                    val contexts =
-                        alternateContexts ?: HashMap<List<TerminalCommandSpec>, TerminalCompletionContext>().also {
-                            alternateContexts = it
+            val commandLineContext =
+                TerminalCommandLineTokenizer.parse(
+                    request.commandLine,
+                    request.cursorOffset,
+                    request.shellCapabilities.syntax,
+                )
+            val completionContext =
+                TerminalCompletionContextResolver.resolve(
+                    commandLine = request.commandLine,
+                    lineContext = commandLineContext,
+                    commandSpecs = commandSpecs,
+                )
+            if (completionContext.activePosition == TerminalCompletionActivePosition.OPERATOR) return@coroutineScope emptyList()
+            val collectionLimit = completionCollectionLimit(request.maxCandidates)
+            val collected =
+                sources
+                    .mapIndexed { sourceIndex, entry ->
+                        async {
+                            val candidates = entry.source.complete(request, completionContext, collectionLimit)
+                            if (candidates.isEmpty()) null else CompletionSourceCandidates(sourceIndex, entry.priority, candidates)
                         }
-                    contexts.getOrPut(sourceSpecs) { request.resolveCompletionContext(sourceSpecs) }
-                }
-            val candidates = entry.source.collectCandidates(request, sourceContext, collectionLimit)
-            if (candidates.isNotEmpty()) {
-                collected += CompletionSourceCandidates(sourceIndex, entry.priority, candidates)
-            }
+                    }.awaitAll()
+                    .filterNotNull()
+            ranker.rank(request, completionContext, collected)
         }
-        return ranker.rank(request, completionContext, collected)
-    }
 }

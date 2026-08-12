@@ -24,7 +24,6 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Versioned local-file persistence for compact completion statistics.
@@ -33,7 +32,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * or raw repeated shell history. Loading is synchronous so a host can warm its
  * in-memory index deterministically; writes run on one daemon worker so command
  * lifecycle and UI input paths never perform disk I/O. Both loaded and outgoing
- * snapshots are filtered through [TerminalCompletionPersistencePolicy].
+ * snapshots are filtered through [TerminalCompletionPersistencePolicy]. The
+ * suspending repository owns serialization and the I/O dispatcher.
  *
  * @property path destination file for the versioned statistics index.
  * @property onFailure optional host diagnostics callback for failed I/O.
@@ -43,10 +43,7 @@ class TerminalCompletionStatsStore
     constructor(
         private val path: Path,
         private val onFailure: (Throwable) -> Unit = {},
-    ) : AutoCloseable {
-        private val closed = AtomicBoolean()
-        private val writeQueue = CompletionStatsWriteQueue(::writeSnapshot)
-
+    ) {
         /**
          * Loads exact command, structural shape, and source-specific feedback
          * statistics from disk.
@@ -72,58 +69,12 @@ class TerminalCompletionStatsStore
         }
 
         /**
-         * Queues a complete snapshot replacement.
-         *
-         * The snapshot is sanitized before it crosses the asynchronous write
-         * boundary. When several replacements are pending, the queue retains only
-         * the newest complete snapshot.
+         * Writes a complete snapshot replacement on the calling thread.
          *
          * @param snapshot compact statistics produced by the completion engine.
          */
         fun persist(snapshot: TerminalCommandCompletionStatsSnapshot) {
-            if (closed.get()) return
-            val stableSnapshot = boundedSnapshot(TerminalCompletionPersistencePolicy.sanitizeSnapshot(snapshot))
-            writeQueue.enqueue(stableSnapshot)
-        }
-
-        /**
-         * Writes [snapshot] on the calling thread.
-         *
-         * This is intended for hosts that already serialize learning and disk
-         * work on [TerminalCompletionLearningWorker]. UI and session threads
-         * should use [persist], which retains the store's coalescing queue.
-         * Calls after [close] are ignored.
-         *
-         * @param snapshot complete statistics snapshot to sanitize and write.
-         */
-        fun persistBlocking(snapshot: TerminalCommandCompletionStatsSnapshot) {
-            if (closed.get()) return
             writeSnapshot(boundedSnapshot(TerminalCompletionPersistencePolicy.sanitizeSnapshot(snapshot)))
-        }
-
-        /**
-         * Waits until all writes queued before this call have completed.
-         *
-         * @throws InterruptedException if the waiting thread is interrupted.
-         * @throws java.util.concurrent.ExecutionException if the queue worker
-         * cannot execute the flush barrier.
-         */
-        fun flush() {
-            writeQueue.flush()
-        }
-
-        /**
-         * Flushes the newest pending snapshot and stops the store worker.
-         *
-         * Repeated calls are safe. No new snapshot is accepted after the first
-         * close begins.
-         *
-         * @throws InterruptedException if the waiting thread is interrupted.
-         * @throws java.util.concurrent.ExecutionException if the queue worker
-         * cannot execute its final flush barrier.
-         */
-        override fun close() {
-            if (closed.compareAndSet(false, true)) writeQueue.close()
         }
 
         private fun writeSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot) {

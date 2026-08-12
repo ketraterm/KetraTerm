@@ -16,8 +16,7 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.host.TerminalAsyncFileSystemProvider
-import io.github.ketraterm.completion.host.TerminalCompletionSnapshotService
+import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 
@@ -49,11 +48,6 @@ internal class StandaloneCompletionRegistry(
     val commandSpecs = specs.toList()
     private val lock = Any()
     private val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
-    private val logger = System.getLogger(StandaloneCompletionRegistry::class.java.name)
-    private val snapshotService =
-        TerminalCompletionSnapshotService { failure ->
-            logger.log(System.Logger.Level.WARNING, "Standalone completion snapshot work failed", failure)
-        }
     private val sessionStates = HashMap<String, SessionCompletionState>()
 
     /**
@@ -66,8 +60,6 @@ internal class StandaloneCompletionRegistry(
      * @param sessionId stable workspace tab/session id.
      * @param profileId stable standalone profile id for this session.
      * @param shellCapabilities shell lexical and replacement rules selected from the profile.
-     * @param onPathSnapshotChanged callback invoked when a background path
-     * snapshot for the latest request becomes ready.
      * @param workingDirectoryUriProvider supplier for the latest current-working-directory URI.
      * @return standalone Swing suggestion provider for the session.
      */
@@ -75,7 +67,6 @@ internal class StandaloneCompletionRegistry(
         sessionId: String,
         profileId: String? = null,
         shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
-        onPathSnapshotChanged: () -> Unit = {},
         workingDirectoryUriProvider: () -> String? = { null },
     ): StandaloneCompletionSuggestionProvider {
         require(sessionId.isNotBlank()) { "sessionId must not be blank" }
@@ -87,10 +78,9 @@ internal class StandaloneCompletionRegistry(
                     persistentStatsSource?.let { it::snapshotAll }
                         ?: { io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot.EMPTY },
             )
-        val fileSystemProvider = snapshotService.createDirectoryProvider(onPathSnapshotChanged)
         val previous =
             synchronized(lock) {
-                sessionStates.put(sessionId, SessionCompletionState(mruSource, fileSystemProvider))
+                sessionStates.put(sessionId, SessionCompletionState(mruSource))
             }
         previous?.close()
         val sources =
@@ -100,8 +90,7 @@ internal class StandaloneCompletionRegistry(
                 add(
                     TerminalCompletionSourceEntry(
                         TerminalCompletionSources.path(
-                            fileSystemProvider = fileSystemProvider,
-                            commandSpecs = commandSpecs,
+                            fileSystemProvider = TerminalLocalFileSystemProvider(),
                         ),
                         priority = TerminalCompletionSourcePrior.DIRECTORY_PATH,
                     ),
@@ -176,16 +165,13 @@ internal class StandaloneCompletionRegistry(
                 copy
             }
         states.forEach(SessionCompletionState::close)
-        snapshotService.close()
     }
 
     private data class SessionCompletionState(
         val mruSource: TerminalSessionMruCompletionSource,
-        val fileSystemProvider: TerminalAsyncFileSystemProvider,
     ) {
         fun close() {
             mruSource.clear()
-            fileSystemProvider.close()
         }
     }
 

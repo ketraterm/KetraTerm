@@ -15,15 +15,9 @@
  */
 package io.github.ketraterm.completion.source
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
-import io.github.ketraterm.completion.commandline.TerminalCompletionContext
-import io.github.ketraterm.completion.commandline.resolveCompletionContext
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.boundedTo
-import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 
@@ -37,20 +31,15 @@ import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
  * @property domain command-spec value domain served by this source.
  * @property sourceId stable candidate-source identifier used by feedback ranking.
  * @property valuesProvider provider of the latest ready in-memory snapshot.
- * @param commandSpecs command specifications used to resolve argument context;
- * the list is defensively copied during construction.
  * @throws IllegalArgumentException if [domain] is
  * [TerminalCompletionValueDomain.NONE] or [sourceId] is blank.
  */
 internal class ValueDomainCompletionSource(
     private val domain: TerminalCompletionValueDomain,
     private val sourceId: String,
-    private val valuesProvider: () -> List<TerminalCompletionDomainValue>,
+    private val valuesProvider: suspend () -> List<TerminalCompletionDomainValue>,
     private val allowedCommandNames: Set<String>,
-    commandSpecs: List<TerminalCommandSpec>,
-) : ContextAwareCompletionSource {
-    override val commandSpecs = commandSpecs.toList()
-
+) : TerminalCompletionSource {
     init {
         require(domain != TerminalCompletionValueDomain.NONE) { "domain must not be NONE" }
         require(sourceId.isNotBlank()) { "sourceId must not be blank" }
@@ -58,28 +47,18 @@ internal class ValueDomainCompletionSource(
     }
 
     /**
-     * Resolves command context and returns candidates for this source's domain.
-     *
-     * @param request immutable completion request.
-     * @return ranked candidates bounded by
-     * [TerminalCompletionRequest.maxCandidates], or an empty list when the
-     * cursor does not expect [domain].
-     */
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(request, request.resolveCompletionContext(commandSpecs))
-
-    /**
      * Returns candidates using the engine's already-resolved command context.
      *
      * @param request immutable completion request.
      * @param context resolved context corresponding to [request].
-     * @return ranked candidates bounded by
-     * [TerminalCompletionRequest.maxCandidates], or an empty list when the
-     * cursor does not expect [domain].
+     * @param limit maximum candidates this source may return.
+     * @return candidates bounded by [limit], or an empty list when the cursor
+     * does not expect [domain].
      */
-    override fun complete(
+    override suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
+        limit: Int,
     ): List<TerminalCompletionCandidate> {
         if (context.expectedValueDomain != domain ||
             (allowedCommandNames.isNotEmpty() && context.currentCommand?.name !in allowedCommandNames)
@@ -90,7 +69,7 @@ internal class ValueDomainCompletionSource(
         val prefix = context.activePrefix
         val values = valuesProvider()
         if (values.isEmpty()) return emptyList()
-        val candidates = ArrayList<TerminalCompletionCandidate>(minOf(values.size, request.maxCandidates))
+        val candidates = ArrayList<TerminalCompletionCandidate>(minOf(values.size, limit))
         for (index in values.indices) {
             val value = values[index]
             if (!matchesCompletablePrefix(value.value, prefix)) continue
@@ -114,7 +93,7 @@ internal class ValueDomainCompletionSource(
                 )
         }
         candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-        return candidates.boundedTo(request.maxCandidates)
+        return candidates.boundedTo(limit)
     }
 
     private companion object {

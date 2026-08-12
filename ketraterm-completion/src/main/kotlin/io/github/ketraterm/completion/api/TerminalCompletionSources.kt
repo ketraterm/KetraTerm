@@ -91,20 +91,10 @@ object TerminalCompletionSources {
      * Creates a path autocomplete source backed by a host-provided file system lister.
      *
      * @param fileSystemProvider host-implemented directory lister.
-     * @param commandSpecs command specs whose path argument metadata controls
-     * bare argument path completion.
      * @return path completion source.
      */
     @JvmStatic
-    @JvmOverloads
-    fun path(
-        fileSystemProvider: TerminalFileSystemProvider,
-        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    ): TerminalCompletionSource =
-        PathCompletionSource(
-            fileSystemProvider = fileSystemProvider,
-            commandSpecs = commandSpecs,
-        )
+    fun path(fileSystemProvider: TerminalFileSystemProvider): TerminalCompletionSource = PathCompletionSource(fileSystemProvider)
 
     /**
      * Creates a pure source that fuzzy-matches a bounded path snapshot.
@@ -122,7 +112,6 @@ object TerminalCompletionSources {
      * @param allowedCommandNames optional canonical command/subcommand names to
      * which this source is restricted. An empty set permits every valid path
      * position.
-     * @param commandSpecs command specs whose path metadata controls activation.
      * @return context-aware fuzzy path completion source.
      * @throws IllegalArgumentException if [sourceId] is blank.
      */
@@ -130,10 +119,9 @@ object TerminalCompletionSources {
     @JvmOverloads
     fun fuzzyPath(
         sourceId: String,
-        entriesProvider: () -> List<TerminalFuzzyPathEntry>,
+        entriesProvider: suspend () -> List<TerminalFuzzyPathEntry>,
         requiresNonEmptyPrefix: Boolean = true,
         allowedCommandNames: Set<String> = emptySet(),
-        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     ): TerminalCompletionSource {
         require(sourceId.isNotBlank()) { "sourceId must not be blank" }
         require(allowedCommandNames.none(String::isBlank)) { "allowedCommandNames must not contain blank values" }
@@ -142,7 +130,6 @@ object TerminalCompletionSources {
             entriesProvider = SnapshotFuzzyPathProvider(entriesProvider),
             requiresNonEmptyPrefix = requiresNonEmptyPrefix,
             allowedCommandNames = allowedCommandNames.toSet(),
-            commandSpecs = commandSpecs,
         )
     }
 
@@ -160,7 +147,6 @@ object TerminalCompletionSources {
      * @param entriesProvider ready query-aware path provider.
      * @param requiresNonEmptyPrefix whether this source waits for explicit path text.
      * @param allowedCommandNames optional canonical command/subcommand restriction.
-     * @param commandSpecs command specs whose path metadata controls activation.
      * @return context-aware fuzzy path completion source.
      * @throws IllegalArgumentException if [sourceId] is blank.
      */
@@ -171,7 +157,6 @@ object TerminalCompletionSources {
         entriesProvider: TerminalFuzzyPathProvider,
         requiresNonEmptyPrefix: Boolean = true,
         allowedCommandNames: Set<String> = emptySet(),
-        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     ): TerminalCompletionSource {
         require(sourceId.isNotBlank()) { "sourceId must not be blank" }
         require(allowedCommandNames.none(String::isBlank)) { "allowedCommandNames must not contain blank values" }
@@ -180,7 +165,6 @@ object TerminalCompletionSources {
             entriesProvider = entriesProvider,
             requiresNonEmptyPrefix = requiresNonEmptyPrefix,
             allowedCommandNames = allowedCommandNames.toSet(),
-            commandSpecs = commandSpecs,
         )
     }
 
@@ -194,21 +178,17 @@ object TerminalCompletionSources {
      *
      * @param sourceId stable candidate-source id used by ranking feedback.
      * @param tasksProvider supplier for the latest immutable Gradle task snapshot.
-     * @param commandSpecs command specs used to resolve Gradle command context.
      * @return context-aware Gradle task completion source.
      * @throws IllegalArgumentException if [sourceId] is blank.
      */
     @JvmStatic
-    @JvmOverloads
     fun gradleTask(
         sourceId: String,
-        tasksProvider: () -> List<TerminalGradleTask>,
-        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+        tasksProvider: suspend () -> List<TerminalGradleTask>,
     ): TerminalCompletionSource =
         GradleTaskCompletionSource(
             sourceId = sourceId,
             tasksProvider = tasksProvider,
-            commandSpecs = commandSpecs,
         )
 
     /**
@@ -224,7 +204,6 @@ object TerminalCompletionSources {
      * @param allowedCommandNames optional canonical command/subcommand names to
      * which this source is restricted. An empty set permits every matching
      * value-domain position.
-     * @param commandSpecs command specs used to resolve the active value domain.
      * @return context-aware dynamic value completion source.
      * @throws IllegalArgumentException if [domain] is
      * [TerminalCompletionValueDomain.NONE] or [sourceId] is blank.
@@ -234,15 +213,13 @@ object TerminalCompletionSources {
     fun valueDomain(
         domain: TerminalCompletionValueDomain,
         sourceId: String,
-        valuesProvider: () -> List<TerminalCompletionDomainValue>,
+        valuesProvider: suspend () -> List<TerminalCompletionDomainValue>,
         allowedCommandNames: Set<String> = emptySet(),
-        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     ): TerminalCompletionSource =
         ValueDomainCompletionSource(
             domain = domain,
             sourceId = sourceId,
             valuesProvider = valuesProvider,
             allowedCommandNames = allowedCommandNames.toSet(),
-            commandSpecs = commandSpecs,
         )
 }

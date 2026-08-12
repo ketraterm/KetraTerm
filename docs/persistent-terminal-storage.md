@@ -56,10 +56,9 @@ F	<sourceBase64>	<candidateKind>	<tokenPosition>	<profileBase64>	<cwdBase64>	<ac
 Text fields are Base64URL-encoded without padding so tabs and Unicode text do not corrupt the TSV layout. The optional
 `ketraterm-completion-persistence`
 module owns this file through `TerminalCompletionStatsStore`; workspace state has no dependency on completion learning.
-Writes are offloaded to a single daemon worker and committed through atomic replacement when the filesystem supports it.
-Loads, rows, line sizes, and total file bytes are bounded before decoding or encoding. Standalone serializes loading and
-mutations on its own completion-statistics worker, so neither startup nor settings changes read this file on the Swing
-event-dispatch thread. Derived
+One suspending `TerminalCompletionLearningRepository` serializes learning and file replacement with a mutex and moves
+file access to `Dispatchers.IO`. Loads, rows, line sizes, and total file bytes are bounded before decoding or encoding,
+so neither startup nor settings changes read this file on the Swing event-dispatch thread. Derived
 matching keys, such as normalized command text and normalized command-shape
 keys, are recomputed by the completion models and are not stored as separate
 fields.

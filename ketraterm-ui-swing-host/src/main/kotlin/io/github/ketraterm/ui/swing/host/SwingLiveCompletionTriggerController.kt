@@ -71,14 +71,6 @@ class SwingLiveCompletionTriggerController
             scheduler.restart(debounceMillis, ::refreshNow)
         }
 
-        /** Invalidates ranking context and schedules an immediate refresh. */
-        fun sourceSnapshotChanged() {
-            scheduler.restart(0) {
-                triggerState.invalidate()
-                refreshNow()
-            }
-        }
-
         /** Allows the same visible command to be requested after context changes. */
         fun invalidateLastRequest() {
             triggerState.invalidate()

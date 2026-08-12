@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.completion.commandline
 
+import io.github.ketraterm.completion.api.TerminalCompletionActivePosition
+import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.model.*
 import kotlin.test.Test
 import kotlin.test.assertEquals

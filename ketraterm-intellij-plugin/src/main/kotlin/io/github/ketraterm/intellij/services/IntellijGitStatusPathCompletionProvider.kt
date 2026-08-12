@@ -92,13 +92,12 @@ internal class IntellijGitStatusPathProviderFactory(
     private val loader: suspend (String?) -> List<TerminalFuzzyPathEntry>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
-        context.createSnapshotRegistration(TerminalCompletionSourcePrior.GIT_STATUS_PATH, loader) { valuesProvider ->
+        context.createSuspendingRegistration(TerminalCompletionSourcePrior.GIT_STATUS_PATH, loader) { valuesProvider ->
             TerminalCompletionSources.fuzzyPath(
                 sourceId = SOURCE_ID,
                 entriesProvider = valuesProvider,
                 requiresNonEmptyPrefix = false,
                 allowedCommandNames = ALLOWED_COMMAND_NAMES,
-                commandSpecs = context.commandSpecs,
             )
         }
 

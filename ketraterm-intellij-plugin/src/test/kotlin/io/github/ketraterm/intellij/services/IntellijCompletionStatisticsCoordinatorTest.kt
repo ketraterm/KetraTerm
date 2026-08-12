@@ -16,154 +16,47 @@
 package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.TerminalCompletionSources
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
+import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
-import org.junit.Assert.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
+import java.nio.file.Files
 
-/** Tests the IntelliJ privacy boundary around learned-completion persistence. */
 class IntellijCompletionStatisticsCoordinatorTest {
     @Test
-    fun `disabled persistence neither loads nor writes but keeps in-memory learning`() {
-        val loaded = AtomicInteger()
-        val persisted = AtomicInteger()
-        val changed = CountDownLatch(1)
-        val stats = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
-        val coordinator =
-            IntellijCompletionStatisticsCoordinator(
-                statsSource = stats,
-                loadStats = {
-                    loaded.incrementAndGet()
-                    TerminalCommandCompletionStatsSnapshot.EMPTY
-                },
-                persistStats = { persisted.incrementAndGet() },
-                initialPersistenceEnabled = false,
-                onStatsChanged = changed::countDown,
+    fun `finished command is serialized and persisted by the repository`() =
+        runBlocking {
+            val directory = Files.createTempDirectory("intellij-completion-learning")
+            val path = directory.resolve(TerminalCompletionStatsStore.currentFileName())
+            val learning = TerminalCompletionSources.learningStore()
+            val coordinator =
+                IntellijCompletionStatisticsCoordinator(
+                    TerminalCompletionLearningRepository(learning, path),
+                    this,
+                )
+            coordinator.recordFinishedCommand(
+                "bash",
+                TerminalShellIntegrationCommandMetadata(
+                    recordId = 1,
+                    commandText = "git status",
+                    lifecycle = TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                    workingDirectoryUri = "file:///repo",
+                    exitCode = 0,
+                    startedAtEpochMillis = 1L,
+                    finishedAtEpochMillis = 42L,
+                ),
             )
-        try {
-            coordinator.recordFinishedCommand("pwsh", successfulCommand("tool local"))
+            coroutineContext[Job]?.children?.toList()?.joinAll()
 
-            assertTrue("in-memory mutation timed out", changed.await(5, TimeUnit.SECONDS))
-            assertEquals(listOf("tool local"), stats.snapshotAll().commandStats.map { it.commandLine })
-            assertEquals(0, loaded.get())
-            assertEquals(0, persisted.get())
-        } finally {
-            coordinator.close()
+            assertEquals(listOf("git status"), learning.snapshot().map { it.commandLine })
+            assertEquals(
+                listOf("git status"),
+                TerminalCompletionStatsStore(path).loadSnapshot().commandStats.map { it.commandLine },
+            )
         }
-    }
-
-    @Test
-    fun `enabling persistence loads stored learning when memory is empty`() {
-        val loaded = CountDownLatch(1)
-        val changed = CountDownLatch(1)
-        val stats = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
-        val stored =
-            TerminalCommandCompletionStatsSnapshot(
-                commandStats = listOf(TerminalCommandCompletionStats(commandLine = "tool stored", useCount = 1)),
-            )
-        val coordinator =
-            IntellijCompletionStatisticsCoordinator(
-                statsSource = stats,
-                loadStats = {
-                    loaded.countDown()
-                    stored
-                },
-                persistStats = {},
-                initialPersistenceEnabled = false,
-                onStatsChanged = changed::countDown,
-            )
-        try {
-            coordinator.setPersistenceEnabled(true)
-
-            assertTrue("stored snapshot load timed out", loaded.await(5, TimeUnit.SECONDS))
-            assertTrue("snapshot notification timed out", changed.await(5, TimeUnit.SECONDS))
-            assertEquals(stored, stats.snapshotAll())
-        } finally {
-            coordinator.close()
-        }
-    }
-
-    @Test
-    fun `enabling persistence preserves and writes existing in-memory learning`() {
-        val loaded = AtomicInteger()
-        val persisted = CountDownLatch(1)
-        val stats = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
-        stats.recordCommandResult(
-            commandLine = "tool current",
-            successful = true,
-            profileId = null,
-            workingDirectoryUri = null,
-            usedAtEpochMillis = 1_000L,
-        )
-        val coordinator =
-            IntellijCompletionStatisticsCoordinator(
-                statsSource = stats,
-                loadStats = {
-                    loaded.incrementAndGet()
-                    TerminalCommandCompletionStatsSnapshot.EMPTY
-                },
-                persistStats = { persisted.countDown() },
-                initialPersistenceEnabled = false,
-                onStatsChanged = {},
-            )
-        try {
-            coordinator.setPersistenceEnabled(true)
-
-            assertTrue("current snapshot persistence timed out", persisted.await(5, TimeUnit.SECONDS))
-            assertEquals(0, loaded.get())
-            assertFalse(stats.snapshotAll().commandStats.isEmpty())
-        } finally {
-            coordinator.close()
-        }
-    }
-
-    @Test
-    fun `disabling persistence cancels a queued enable before disk access`() {
-        val mutationEnteredNotification = CountDownLatch(1)
-        val releaseMutation = CountDownLatch(1)
-        val loaded = AtomicInteger()
-        val stats = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
-        val coordinator =
-            IntellijCompletionStatisticsCoordinator(
-                statsSource = stats,
-                loadStats = {
-                    loaded.incrementAndGet()
-                    TerminalCommandCompletionStatsSnapshot.EMPTY
-                },
-                persistStats = {},
-                initialPersistenceEnabled = false,
-                onStatsChanged = {
-                    mutationEnteredNotification.countDown()
-                    releaseMutation.await(5, TimeUnit.SECONDS)
-                },
-            )
-        try {
-            coordinator.recordFinishedCommand("pwsh", successfulCommand("tool local"))
-            assertTrue("mutation did not reach notification", mutationEnteredNotification.await(5, TimeUnit.SECONDS))
-
-            coordinator.setPersistenceEnabled(true)
-            coordinator.setPersistenceEnabled(false)
-            releaseMutation.countDown()
-        } finally {
-            coordinator.close()
-        }
-
-        assertEquals(0, loaded.get())
-    }
-
-    private fun successfulCommand(command: String): TerminalShellIntegrationCommandMetadata =
-        TerminalShellIntegrationCommandMetadata(
-            recordId = 1,
-            lifecycle = TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
-            commandText = command,
-            workingDirectoryUri = null,
-            exitCode = 0,
-            startedAtEpochMillis = 500L,
-            finishedAtEpochMillis = 1_000L,
-        )
 }

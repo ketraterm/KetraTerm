@@ -321,14 +321,14 @@ fun interface SwingShellSuggestionProvider {
     /**
      * Returns suggestions for [request].
      *
-     * This method is invoked on the Swing Event Dispatch Thread. Providers must
-     * keep the work bounded and return quickly; slower providers should cache or
-     * precompute outside this callback and return the latest ready snapshot.
+     * The reusable Swing terminal invokes this from its lifecycle coroutine.
+     * Implementations may suspend for bounded work and must cooperate with
+     * cancellation when a newer request replaces the current one.
      *
      * @param request command-line context.
      * @return ordered suggestions, best first.
      */
-    fun suggestions(request: SwingShellSuggestionRequest): List<SwingShellSuggestion>
+    suspend fun suggestions(request: SwingShellSuggestionRequest): List<SwingShellSuggestion>
 
     companion object {
         /**

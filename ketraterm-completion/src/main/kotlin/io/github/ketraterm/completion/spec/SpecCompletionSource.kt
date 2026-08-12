@@ -15,29 +15,25 @@
  */
 package io.github.ketraterm.completion.spec
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.commandline.*
+import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalOptionSpec
 
 internal class SpecCompletionSource(
     specs: List<TerminalCommandSpec>,
-) : ContextAwareCompletionSource {
-    override val commandSpecs = specs.toList()
+) : TerminalCompletionSource {
+    private val commandSpecs = specs.toList()
 
     init {
         require(specs.none { it.name.isBlank() }) { "specs must not contain blank command names" }
     }
 
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(request, request.resolveCompletionContext(commandSpecs))
-
-    override fun complete(
+    override suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
+        limit: Int,
     ): List<TerminalCompletionCandidate> {
         if (commandSpecs.isEmpty()) return emptyList()
         val candidates =
@@ -51,7 +47,7 @@ internal class SpecCompletionSource(
             }
         return candidates
             .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-            .take(request.maxCandidates)
+            .take(limit)
     }
 
     private fun completeCommands(context: TerminalCommandLineContext): List<TerminalCompletionCandidate> =
@@ -89,8 +85,7 @@ internal class SpecCompletionSource(
 
     private fun TerminalCompletionContext.isAlreadyUsedRepeatableSubcommand(spec: TerminalCommandSpec): Boolean {
         val source = subcommandCandidateSource ?: return false
-        if (!source.repeatableSubcommands) return false
-        return commandPath.dropWhile { it != source }.drop(1).any { command ->
+        return source.repeatableSubcommands && commandPath.dropWhile { it != source }.drop(1).any { command ->
             command.name.equals(spec.name, ignoreCase = true)
         }
     }

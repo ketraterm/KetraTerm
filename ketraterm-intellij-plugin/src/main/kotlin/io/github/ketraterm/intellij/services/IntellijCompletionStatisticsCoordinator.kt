@@ -17,37 +17,29 @@ package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
-import io.github.ketraterm.completion.persistence.TerminalCompletionLearningWorker
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
- * IntelliJ-owned serialization and persistence for learned completion statistics.
+ * IntelliJ adapter for learned completion statistics.
  *
- * This component owns the statistics executor independently from session/source
- * registration. Mutations are privacy-filtered, serialized, persisted, and
- * followed by one host notification.
+ * The shared suspending repository owns serialization and disk I/O; this class
+ * maps IntelliJ lifecycle and Swing feedback events into that repository.
  *
- * @param statsSource bounded shared statistics index.
- * @param loadStats startup snapshot loader.
- * @param persistStats snapshot persistence callback.
- * @param initialPersistenceEnabled whether disk-backed learning is initially enabled.
- * @param onStatsChanged callback invoked after loading or mutation.
+ * @param repository shared learning and persistence repository.
+ * @param coroutineScope IntelliJ lifecycle scope used to launch infrequent events.
  */
 internal class IntellijCompletionStatisticsCoordinator(
-    val statsSource: TerminalCompletionLearningStore,
-    private val loadStats: () -> TerminalCommandCompletionStatsSnapshot,
-    private val persistStats: (TerminalCommandCompletionStatsSnapshot) -> Unit,
-    initialPersistenceEnabled: Boolean,
-    private val onStatsChanged: () -> Unit,
+    private val repository: TerminalCompletionLearningRepository,
+    private val coroutineScope: CoroutineScope,
 ) : AutoCloseable {
-    private val persistenceEnabled = AtomicBoolean(initialPersistenceEnabled)
-    private val worker = TerminalCompletionLearningWorker("intellij-completion-stats")
+    val statsSource: TerminalCompletionLearningStore = repository.learningStore
     private val feedbackRecorder =
         SwingCompletionFeedbackRecorder(
             statsSource = statsSource,
@@ -56,13 +48,7 @@ internal class IntellijCompletionStatisticsCoordinator(
         )
 
     init {
-        if (persistenceEnabled.get()) {
-            worker.submit {
-                if (!persistenceEnabled.get()) return@submit
-                statsSource.replaceSnapshot(loadStats())
-                onStatsChanged()
-            }
-        }
+        coroutineScope.launch { repository.initialize() }
     }
 
     /**
@@ -75,18 +61,7 @@ internal class IntellijCompletionStatisticsCoordinator(
      * @param enabled `true` to permit snapshot reads and writes.
      */
     fun setPersistenceEnabled(enabled: Boolean) {
-        if (!persistenceEnabled.compareAndSet(!enabled, enabled)) return
-        if (!enabled) return
-        execute {
-            if (!persistenceEnabled.get()) return@execute
-            val current = statsSource.snapshotAll()
-            if (current == TerminalCommandCompletionStatsSnapshot.EMPTY) {
-                statsSource.replaceSnapshot(loadStats())
-            } else {
-                persistStats(current)
-            }
-            onStatsChanged()
-        }
+        coroutineScope.launch { repository.setPersistenceEnabled(enabled) }
     }
 
     /** Creates a shared Swing feedback handler for one live session context. */
@@ -112,19 +87,9 @@ internal class IntellijCompletionStatisticsCoordinator(
     }
 
     private fun executeMutation(mutation: () -> Unit) {
-        execute {
-            mutation()
-            if (persistenceEnabled.get()) persistStats(statsSource.snapshotAll())
-            onStatsChanged()
-        }
+        coroutineScope.launch { repository.mutate { mutation() } }
     }
 
-    private fun execute(action: () -> Unit) {
-        worker.submit(action)
-    }
-
-    /** Drains queued mutations and closes the statistics worker idempotently. */
-    override fun close() {
-        worker.close()
-    }
+    /** Has no private executor or persistence resource to close. */
+    override fun close() = Unit
 }

@@ -38,8 +38,7 @@ data class TerminalFileEntry(
  * The completion engine deliberately keeps [directoryPrefix] lexical. The
  * host owns interpreting drive roots, UNC paths, home-directory prefixes, and
  * the authority of [workingDirectoryUri] for its actual file-system context.
- * Implementations may return a previously published immutable snapshot and
- * refresh it asynchronously.
+ * Implementations resolve and load the requested directory suspendingly.
  *
  * @property workingDirectoryUri absolute host-reported working-directory URI.
  * @property directoryPrefix typed path portion ending at the final separator;
@@ -76,13 +75,12 @@ fun interface TerminalFileSystemProvider {
     /**
      * Returns matching children for [request].
      *
-     * This method is part of the synchronous completion hot path. Implementations
-     * must return promptly from bounded in-memory state; filesystem or network I/O
-     * belongs in host-owned background work.
+     * Implementations cooperate with cancellation and switch dispatchers around
+     * blocking host APIs when required.
      *
      * @param request lexical path request and host working-directory context.
-     * @return immutable ready snapshot of matching children, or an empty list
-     * while unavailable, unreadable, unsupported, or still loading.
+     * @return bounded matching children, or an empty list when unavailable,
+     * unreadable, or unsupported.
      */
-    fun listDirectory(request: TerminalDirectoryListingRequest): List<TerminalFileEntry>
+    suspend fun listDirectory(request: TerminalDirectoryListingRequest): List<TerminalFileEntry>
 }

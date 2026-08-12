@@ -16,13 +16,7 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
-import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
-import io.github.ketraterm.completion.commandline.TerminalCompletionContext
-import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.BoundedCompletionCandidateCollector
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 /**
@@ -39,16 +33,11 @@ internal class FuzzyPathCompletionSource(
     private val entriesProvider: TerminalFuzzyPathProvider,
     private val requiresNonEmptyPrefix: Boolean,
     private val allowedCommandNames: Set<String>,
-    commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-) : ContextAwareCompletionSource {
-    override val commandSpecs = commandSpecs.toList()
-
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(request, request.resolveCompletionContext(commandSpecs))
-
-    override fun complete(
+) : TerminalCompletionSource {
+    override suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
+        limit: Int,
     ): List<TerminalCompletionCandidate> {
         if (allowedCommandNames.isNotEmpty() && context.currentCommand?.name !in allowedCommandNames) {
             return emptyList()
@@ -61,7 +50,7 @@ internal class FuzzyPathCompletionSource(
         }
 
         val pathSeparator = if (prefix.contains('\\')) '\\' else '/'
-        val candidates = BoundedCompletionCandidateCollector(request.maxCandidates)
+        val candidates = BoundedCompletionCandidateCollector(limit)
         var orderIndex = 0
         for (entry in entriesProvider.entries(prefix)) {
             if (!context.expectedPathKind.acceptsPathEntry(entry.isDirectory)) continue
@@ -116,9 +105,9 @@ internal class FuzzyPathCompletionSource(
 
 /** Matches a ready static snapshot once for hosts without a queryable index. */
 internal class SnapshotFuzzyPathProvider(
-    private val entriesProvider: () -> List<TerminalFuzzyPathEntry>,
+    private val entriesProvider: suspend () -> List<TerminalFuzzyPathEntry>,
 ) : TerminalFuzzyPathProvider {
-    override fun entries(prefix: String): List<TerminalFuzzyPathEntry> =
+    override suspend fun entries(prefix: String): List<TerminalFuzzyPathEntry> =
         entriesProvider()
             .mapNotNull { entry -> fuzzyScore(entry.path, prefix)?.let { score -> ScoredEntry(entry, score) } }
             .sortedWith(ENTRY_ORDER)

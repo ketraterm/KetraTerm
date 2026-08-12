@@ -40,7 +40,7 @@ class SwingCompletionSuggestionProvider(
      * @param request visible command text, cursor, and popup anchor supplied by Swing.
      * @return ordered Swing suggestions, or an empty list when request conversion is invalid.
      */
-    override fun suggestions(request: SwingShellSuggestionRequest): List<SwingShellSuggestion> {
+    override suspend fun suggestions(request: SwingShellSuggestionRequest): List<SwingShellSuggestion> {
         val context = contextProvider()
         val completionRequest =
             try {

@@ -20,322 +20,339 @@ import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.host.SwingLiveCompletionScheduler
 import io.github.ketraterm.ui.swing.host.SwingLiveCompletionTriggerController
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class StandaloneCompletionTriggerControllerTest {
     @Test
-    fun `schedule coalesces refreshes and requests suggestions for active command snapshot`() {
-        val scheduler = FakeScheduler()
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        val snapshot: TerminalShellCommandLineSnapshot = snapshot("git s")
-        val controller =
-            controller(
-                scheduler = scheduler,
-                activeCommandLine = { snapshot },
-                requestSuggestions = { requested += it },
-            )
+    fun `schedule coalesces refreshes and requests suggestions for active command snapshot`() =
+        runBlocking {
+            val scheduler = FakeScheduler()
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            val snapshot: TerminalShellCommandLineSnapshot = snapshot("git s")
+            val controller =
+                controller(
+                    scheduler = scheduler,
+                    activeCommandLine = { snapshot },
+                    requestSuggestions = { requested += it },
+                )
 
-        controller.scheduleRefresh()
-        controller.scheduleRefresh()
+            controller.scheduleRefresh()
+            controller.scheduleRefresh()
 
-        assertEquals(2, scheduler.restartCount)
-        assertEquals(0, requested.size)
+            assertEquals(2, scheduler.restartCount)
+            assertEquals(0, requested.size)
 
-        scheduler.firePending()
+            scheduler.firePending()
 
-        assertEquals(listOf(snapshot), requested)
-    }
-
-    @Test
-    fun `refresh hides popup when active command snapshot is unavailable`() {
-        val hidden = Counter()
-        val controller =
-            controller(
-                activeCommandLine = { null },
-                hideSuggestions = hidden::increment,
-            )
-
-        controller.refreshNow()
-
-        assertEquals(1, hidden.count)
-    }
+            assertEquals(listOf(snapshot), requested)
+        }
 
     @Test
-    fun `refresh does not request suggestions twice for the same active command snapshot`() {
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        val activeSnapshot = snapshot("git s")
-        val controller =
-            controller(
-                activeCommandLine = { activeSnapshot },
-                requestSuggestions = { requested += it },
-            )
+    fun `refresh hides popup when active command snapshot is unavailable`() =
+        runBlocking {
+            val hidden = Counter()
+            val controller =
+                controller(
+                    activeCommandLine = { null },
+                    hideSuggestions = hidden::increment,
+                )
 
-        controller.refreshNow()
-        controller.refreshNow()
+            controller.refreshNow()
 
-        assertEquals(listOf(activeSnapshot), requested)
-    }
-
-    @Test
-    fun `refresh requests suggestions again when active command snapshot changes`() {
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        var activeSnapshot = snapshot("git s")
-        val controller =
-            controller(
-                activeCommandLine = { activeSnapshot },
-                requestSuggestions = { requested += it },
-            )
-
-        controller.refreshNow()
-        activeSnapshot = snapshot("git st")
-        controller.refreshNow()
-
-        assertEquals(listOf(snapshot("git s"), snapshot("git st")), requested)
-    }
+            assertEquals(1, hidden.count)
+        }
 
     @Test
-    fun `invalidate last request allows same active command snapshot to refresh again`() {
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        val activeSnapshot = snapshot("git s")
-        val controller =
-            controller(
-                activeCommandLine = { activeSnapshot },
-                requestSuggestions = { requested += it },
-            )
+    fun `refresh does not request suggestions twice for the same active command snapshot`() =
+        runBlocking {
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            val activeSnapshot = snapshot("git s")
+            val controller =
+                controller(
+                    activeCommandLine = { activeSnapshot },
+                    requestSuggestions = { requested += it },
+                )
 
-        controller.refreshNow()
-        controller.invalidateLastRequest()
-        controller.refreshNow()
+            controller.refreshNow()
+            controller.refreshNow()
 
-        assertEquals(listOf(activeSnapshot, activeSnapshot), requested)
-    }
-
-    @Test
-    fun `refresh requests suggestions again when ranking context changes`() {
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        var rankingContext = "file:///project-a"
-        val activeSnapshot = snapshot("git s")
-        val controller =
-            controller(
-                activeCommandLine = { activeSnapshot },
-                requestSuggestions = { requested += it },
-                rankingContextKey = { rankingContext },
-            )
-
-        controller.refreshNow()
-        rankingContext = "file:///project-b"
-        controller.refreshNow()
-
-        assertEquals(listOf(activeSnapshot, activeSnapshot), requested)
-    }
+            assertEquals(listOf(activeSnapshot), requested)
+        }
 
     @Test
-    fun `refresh hides popup when command prefix is too short`() {
-        val hidden = Counter()
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        val controller =
-            controller(
-                activeCommandLine = { snapshot(" g ") },
-                requestSuggestions = { requested += it },
-                hideSuggestions = hidden::increment,
-            )
+    fun `refresh requests suggestions again when active command snapshot changes`() =
+        runBlocking {
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            var activeSnapshot = snapshot("git s")
+            val controller =
+                controller(
+                    activeCommandLine = { activeSnapshot },
+                    requestSuggestions = { requested += it },
+                )
 
-        controller.refreshNow()
+            controller.refreshNow()
+            activeSnapshot = snapshot("git st")
+            controller.refreshNow()
 
-        assertEquals(0, requested.size)
-        assertEquals(1, hidden.count)
-    }
-
-    @Test
-    fun `disabled settings cancel pending refresh and hide popup on refresh`() {
-        val scheduler = FakeScheduler()
-        val hidden = Counter()
-        val controller =
-            controller(
-                scheduler = scheduler,
-                suggestionsEnabled = { false },
-                hideSuggestions = hidden::increment,
-            )
-
-        controller.scheduleRefresh()
-        assertEquals(1, scheduler.restartCount)
-
-        scheduler.firePending()
-
-        assertEquals(1, scheduler.cancelCount)
-        assertEquals(1, hidden.count)
-        assertNull(scheduler.pendingAction)
-    }
+            assertEquals(listOf(snapshot("git s"), snapshot("git st")), requested)
+        }
 
     @Test
-    fun `cancel and hide clears pending refresh without requesting suggestions`() {
-        val scheduler = FakeScheduler()
-        val hidden = Counter()
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        val controller =
-            controller(
-                scheduler = scheduler,
-                requestSuggestions = { requested += it },
-                hideSuggestions = hidden::increment,
-            )
+    fun `invalidate last request allows same active command snapshot to refresh again`() =
+        runBlocking {
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            val activeSnapshot = snapshot("git s")
+            val controller =
+                controller(
+                    activeCommandLine = { activeSnapshot },
+                    requestSuggestions = { requested += it },
+                )
 
-        controller.scheduleRefresh()
-        controller.cancelAndHide()
-        scheduler.firePending()
+            controller.refreshNow()
+            controller.invalidateLastRequest()
+            controller.refreshNow()
 
-        assertEquals(1, scheduler.cancelCount)
-        assertEquals(1, hidden.count)
-        assertEquals(0, requested.size)
-    }
+            assertEquals(listOf(activeSnapshot, activeSnapshot), requested)
+        }
 
     @Test
-    fun `refresh requests suggestions for hyphen option triggers bypassing length rules`() {
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        val hidden = Counter()
-        val activeSnapshot = snapshot("-")
-        val controller =
-            controller(
-                activeCommandLine = { activeSnapshot },
-                requestSuggestions = { requested += it },
-                hideSuggestions = hidden::increment,
-            )
+    fun `refresh requests suggestions again when ranking context changes`() =
+        runBlocking {
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            var rankingContext = "file:///project-a"
+            val activeSnapshot = snapshot("git s")
+            val controller =
+                controller(
+                    activeCommandLine = { activeSnapshot },
+                    requestSuggestions = { requested += it },
+                    rankingContextKey = { rankingContext },
+                )
 
-        controller.refreshNow()
+            controller.refreshNow()
+            rankingContext = "file:///project-b"
+            controller.refreshNow()
 
-        assertEquals(listOf(activeSnapshot), requested)
-        assertEquals(0, hidden.count)
-    }
-
-    @Test
-    fun `refresh requests suggestions for path separator triggers bypassing length rules`() {
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        val hidden = Counter()
-        val activeSnapshot = snapshot("/")
-        val controller =
-            controller(
-                activeCommandLine = { activeSnapshot },
-                requestSuggestions = { requested += it },
-                hideSuggestions = hidden::increment,
-            )
-
-        controller.refreshNow()
-
-        assertEquals(listOf(activeSnapshot), requested)
-        assertEquals(0, hidden.count)
-    }
+            assertEquals(listOf(activeSnapshot, activeSnapshot), requested)
+        }
 
     @Test
-    fun `refresh requests suggestions for environment variable triggers bypassing length rules`() {
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        val hidden = Counter()
-        val activeSnapshot = snapshot("$")
-        val controller =
-            controller(
-                activeCommandLine = { activeSnapshot },
-                requestSuggestions = { requested += it },
-                hideSuggestions = hidden::increment,
-            )
+    fun `refresh hides popup when command prefix is too short`() =
+        runBlocking {
+            val hidden = Counter()
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            val controller =
+                controller(
+                    activeCommandLine = { snapshot(" g ") },
+                    requestSuggestions = { requested += it },
+                    hideSuggestions = hidden::increment,
+                )
 
-        controller.refreshNow()
+            controller.refreshNow()
 
-        assertEquals(listOf(activeSnapshot), requested)
-        assertEquals(0, hidden.count)
-    }
-
-    @Test
-    fun `refresh requests suggestions for single space after word bypassing length rules`() {
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        val hidden = Counter()
-        val activeSnapshot = snapshot("go ")
-        val controller =
-            SwingLiveCompletionTriggerController(
-                activeCommandLine = { activeSnapshot },
-                requestSuggestions = { requested += it },
-                hideSuggestions = hidden::increment,
-                suggestionsEnabled = { true },
-                scheduler = FakeScheduler(),
-                debounceMillis = 50,
-                minimumNonWhitespaceCharacters = 3,
-            )
-
-        controller.refreshNow()
-
-        assertEquals(listOf(activeSnapshot), requested)
-        assertEquals(0, hidden.count)
-    }
+            assertEquals(0, requested.size)
+            assertEquals(1, hidden.count)
+        }
 
     @Test
-    fun `refresh uses supplied command specs for contextual space triggers`() {
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        val hidden = Counter()
-        val activeSnapshot = snapshot("go ")
-        val controller =
-            SwingLiveCompletionTriggerController(
-                activeCommandLine = { activeSnapshot },
-                requestSuggestions = { requested += it },
-                hideSuggestions = hidden::increment,
-                suggestionsEnabled = { true },
-                scheduler = FakeScheduler(),
-                debounceMillis = 50,
-                minimumNonWhitespaceCharacters = 99,
-                commandSpecs =
-                    listOf(
-                        TerminalCommandSpec(
-                            name = "go",
-                            positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+    fun `disabled settings cancel pending refresh and hide popup on refresh`() =
+        runBlocking {
+            val scheduler = FakeScheduler()
+            val hidden = Counter()
+            val controller =
+                controller(
+                    scheduler = scheduler,
+                    suggestionsEnabled = { false },
+                    hideSuggestions = hidden::increment,
+                )
+
+            controller.scheduleRefresh()
+            assertEquals(1, scheduler.restartCount)
+
+            scheduler.firePending()
+
+            assertEquals(1, scheduler.cancelCount)
+            assertEquals(1, hidden.count)
+            assertNull(scheduler.pendingAction)
+        }
+
+    @Test
+    fun `cancel and hide clears pending refresh without requesting suggestions`() =
+        runBlocking {
+            val scheduler = FakeScheduler()
+            val hidden = Counter()
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            val controller =
+                controller(
+                    scheduler = scheduler,
+                    requestSuggestions = { requested += it },
+                    hideSuggestions = hidden::increment,
+                )
+
+            controller.scheduleRefresh()
+            controller.cancelAndHide()
+            scheduler.firePending()
+
+            assertEquals(1, scheduler.cancelCount)
+            assertEquals(1, hidden.count)
+            assertEquals(0, requested.size)
+        }
+
+    @Test
+    fun `refresh requests suggestions for hyphen option triggers bypassing length rules`() =
+        runBlocking {
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            val hidden = Counter()
+            val activeSnapshot = snapshot("-")
+            val controller =
+                controller(
+                    activeCommandLine = { activeSnapshot },
+                    requestSuggestions = { requested += it },
+                    hideSuggestions = hidden::increment,
+                )
+
+            controller.refreshNow()
+
+            assertEquals(listOf(activeSnapshot), requested)
+            assertEquals(0, hidden.count)
+        }
+
+    @Test
+    fun `refresh requests suggestions for path separator triggers bypassing length rules`() =
+        runBlocking {
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            val hidden = Counter()
+            val activeSnapshot = snapshot("/")
+            val controller =
+                controller(
+                    activeCommandLine = { activeSnapshot },
+                    requestSuggestions = { requested += it },
+                    hideSuggestions = hidden::increment,
+                )
+
+            controller.refreshNow()
+
+            assertEquals(listOf(activeSnapshot), requested)
+            assertEquals(0, hidden.count)
+        }
+
+    @Test
+    fun `refresh requests suggestions for environment variable triggers bypassing length rules`() =
+        runBlocking {
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            val hidden = Counter()
+            val activeSnapshot = snapshot("$")
+            val controller =
+                controller(
+                    activeCommandLine = { activeSnapshot },
+                    requestSuggestions = { requested += it },
+                    hideSuggestions = hidden::increment,
+                )
+
+            controller.refreshNow()
+
+            assertEquals(listOf(activeSnapshot), requested)
+            assertEquals(0, hidden.count)
+        }
+
+    @Test
+    fun `refresh requests suggestions for single space after word bypassing length rules`() =
+        runBlocking {
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            val hidden = Counter()
+            val activeSnapshot = snapshot("go ")
+            val controller =
+                SwingLiveCompletionTriggerController(
+                    activeCommandLine = { activeSnapshot },
+                    requestSuggestions = { requested += it },
+                    hideSuggestions = hidden::increment,
+                    suggestionsEnabled = { true },
+                    scheduler = FakeScheduler(),
+                    debounceMillis = 50,
+                    minimumNonWhitespaceCharacters = 3,
+                )
+
+            controller.refreshNow()
+
+            assertEquals(listOf(activeSnapshot), requested)
+            assertEquals(0, hidden.count)
+        }
+
+    @Test
+    fun `refresh uses supplied command specs for contextual space triggers`() =
+        runBlocking {
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            val hidden = Counter()
+            val activeSnapshot = snapshot("go ")
+            val controller =
+                SwingLiveCompletionTriggerController(
+                    activeCommandLine = { activeSnapshot },
+                    requestSuggestions = { requested += it },
+                    hideSuggestions = hidden::increment,
+                    suggestionsEnabled = { true },
+                    scheduler = FakeScheduler(),
+                    debounceMillis = 50,
+                    minimumNonWhitespaceCharacters = 99,
+                    commandSpecs =
+                        listOf(
+                            TerminalCommandSpec(
+                                name = "go",
+                                positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+                            ),
                         ),
-                    ),
-            )
+                )
 
-        controller.refreshNow()
+            controller.refreshNow()
 
-        assertEquals(listOf(activeSnapshot), requested)
-        assertEquals(0, hidden.count)
-    }
-
-    @Test
-    fun `refresh hides popup for multiple trailing spaces or space on empty command`() {
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        val hidden = Counter()
-        var activeSnapshot = snapshot("g  ") // double space
-        val controller =
-            controller(
-                activeCommandLine = { activeSnapshot },
-                requestSuggestions = { requested += it },
-                hideSuggestions = hidden::increment,
-            )
-
-        controller.refreshNow()
-
-        assertEquals(0, requested.size)
-        assertEquals(1, hidden.count)
-
-        activeSnapshot = snapshot(" ") // space on empty
-        controller.refreshNow()
-        assertEquals(0, requested.size)
-        assertEquals(2, hidden.count)
-    }
+            assertEquals(listOf(activeSnapshot), requested)
+            assertEquals(0, hidden.count)
+        }
 
     @Test
-    fun `completed directory path remains eligible for a refreshed popup`() {
-        val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        var activeSnapshot = snapshot("cd A/")
-        val controller =
-            controller(
-                activeCommandLine = { activeSnapshot },
-                requestSuggestions = { requested += it },
-            )
+    fun `refresh hides popup for multiple trailing spaces or space on empty command`() =
+        runBlocking {
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            val hidden = Counter()
+            var activeSnapshot = snapshot("g  ") // double space
+            val controller =
+                controller(
+                    activeCommandLine = { activeSnapshot },
+                    requestSuggestions = { requested += it },
+                    hideSuggestions = hidden::increment,
+                )
 
-        controller.refreshNow()
+            controller.refreshNow()
 
-        assertEquals(listOf(activeSnapshot), requested)
+            assertEquals(0, requested.size)
+            assertEquals(1, hidden.count)
 
-        activeSnapshot = snapshot("cd A/B")
-        controller.refreshNow()
-        assertEquals(listOf(snapshot("cd A/"), activeSnapshot), requested)
-    }
+            activeSnapshot = snapshot(" ") // space on empty
+            controller.refreshNow()
+            assertEquals(0, requested.size)
+            assertEquals(2, hidden.count)
+        }
+
+    @Test
+    fun `completed directory path remains eligible for a refreshed popup`() =
+        runBlocking {
+            val requested = ArrayList<TerminalShellCommandLineSnapshot>()
+            var activeSnapshot = snapshot("cd A/")
+            val controller =
+                controller(
+                    activeCommandLine = { activeSnapshot },
+                    requestSuggestions = { requested += it },
+                )
+
+            controller.refreshNow()
+
+            assertEquals(listOf(activeSnapshot), requested)
+
+            activeSnapshot = snapshot("cd A/B")
+            controller.refreshNow()
+            assertEquals(listOf(snapshot("cd A/"), activeSnapshot), requested)
+        }
 
     private fun controller(
         activeCommandLine: () -> TerminalShellCommandLineSnapshot? = { snapshot("git s") },

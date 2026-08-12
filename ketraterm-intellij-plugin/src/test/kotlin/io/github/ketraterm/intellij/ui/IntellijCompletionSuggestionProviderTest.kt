@@ -17,12 +17,13 @@ package io.github.ketraterm.intellij.ui
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class IntellijCompletionSuggestionProviderTest {
     @Test
-    fun `provider forwards live IntelliJ context and preserves candidate presentation`() {
+    fun `provider forwards live IntelliJ context and preserves candidate presentation`() = runBlocking {
         var captured: TerminalCompletionRequest? = null
         var directory = "file:///project-a"
         val provider =

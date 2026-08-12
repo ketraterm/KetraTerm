@@ -16,12 +16,10 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
+import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalSessionMruCompletionSource
-import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
 import io.github.ketraterm.completion.commandline.TerminalCommandLineCursorRegion
-import io.github.ketraterm.completion.commandline.TerminalCompletionContext
-import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
@@ -42,12 +40,11 @@ internal class SessionMruCompletionSourceImpl(
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     private val learnedStatsProvider: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot.EMPTY },
     private val clockEpochMillis: () -> Long = System::currentTimeMillis,
-) : TerminalSessionMruCompletionSource,
-    ContextAwareCompletionSource {
+) : TerminalSessionMruCompletionSource {
     private val lock = Any()
     private val commandHistory: SessionCommandHistory
     private val observedTokens: SessionObservedTokenIndex
-    override val commandSpecs = commandSpecs.toList()
+    private val commandSpecs = commandSpecs.toList()
     private var nextSequence = 1L
 
     init {
@@ -76,12 +73,10 @@ internal class SessionMruCompletionSourceImpl(
         }
     }
 
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(request, request.resolveCompletionContext(commandSpecs))
-
-    override fun complete(
+    override suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
+        limit: Int,
     ): List<TerminalCompletionCandidate> {
         val commandLineContext = context.commandLineContext
         if (commandLineContext.cursorRegion == TerminalCommandLineCursorRegion.OPERATOR) return emptyList()
@@ -105,7 +100,7 @@ internal class SessionMruCompletionSourceImpl(
         )
         return candidates
             .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-            .take(request.maxCandidates)
+            .take(limit)
     }
 
     /** Returns a monotonic session-local sequence while preserving bounded score arithmetic after overflow. */

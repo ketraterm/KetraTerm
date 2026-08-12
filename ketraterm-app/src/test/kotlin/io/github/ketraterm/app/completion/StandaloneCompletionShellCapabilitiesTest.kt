@@ -17,40 +17,44 @@ package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.workspace.TerminalProfileKind
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class StandaloneCompletionShellCapabilitiesTest {
     @Test
-    fun `maps PowerShell profile to PowerShell completion capabilities`() {
-        assertEquals(TerminalShellCapabilities.POWERSHELL, TerminalProfileKind.POWERSHELL.completionShellCapabilities())
-    }
+    fun `maps PowerShell profile to PowerShell completion capabilities`() =
+        runBlocking {
+            assertEquals(TerminalShellCapabilities.POWERSHELL, TerminalProfileKind.POWERSHELL.completionShellCapabilities())
+        }
 
     @Test
-    fun `maps tested POSIX profiles to POSIX completion capabilities`() {
-        val profiles =
-            listOf(
-                TerminalProfileKind.GIT_BASH,
-                TerminalProfileKind.UBUNTU,
-                TerminalProfileKind.BASH,
-                TerminalProfileKind.ZSH,
-                TerminalProfileKind.WSL,
-                TerminalProfileKind.UNIX_SHELL,
-            )
+    fun `maps tested POSIX profiles to POSIX completion capabilities`() =
+        runBlocking {
+            val profiles =
+                listOf(
+                    TerminalProfileKind.GIT_BASH,
+                    TerminalProfileKind.UBUNTU,
+                    TerminalProfileKind.BASH,
+                    TerminalProfileKind.ZSH,
+                    TerminalProfileKind.WSL,
+                    TerminalProfileKind.UNIX_SHELL,
+                )
 
-        assertEquals(List(profiles.size) { TerminalShellCapabilities.POSIX }, profiles.map { it.completionShellCapabilities() })
-    }
+            assertEquals(List(profiles.size) { TerminalShellCapabilities.POSIX }, profiles.map { it.completionShellCapabilities() })
+        }
 
     @Test
-    fun `maps unsupported and unknown shell profiles to conservative capabilities`() {
-        val profiles =
-            listOf(
-                TerminalProfileKind.COMMAND_PROMPT,
-                TerminalProfileKind.FISH,
-                TerminalProfileKind.NUSHELL,
-                TerminalProfileKind.DEFAULT,
-            )
+    fun `maps unsupported and unknown shell profiles to conservative capabilities`() =
+        runBlocking {
+            val profiles =
+                listOf(
+                    TerminalProfileKind.COMMAND_PROMPT,
+                    TerminalProfileKind.FISH,
+                    TerminalProfileKind.NUSHELL,
+                    TerminalProfileKind.DEFAULT,
+                )
 
-        assertEquals(List(profiles.size) { TerminalShellCapabilities.PLAIN }, profiles.map { it.completionShellCapabilities() })
-    }
+            assertEquals(List(profiles.size) { TerminalShellCapabilities.PLAIN }, profiles.map { it.completionShellCapabilities() })
+        }
 }

@@ -91,7 +91,7 @@ KetraTerm is composed of strict, decoupled Gradle modules:
 * **`:ketraterm-host`**: Semantic translation adapter connecting the parser to core state.
 * **`:ketraterm-input`**: Keyboard/mouse event models and host-bound ANSI encoders.
 * **`:ketraterm-completion`**: Dependency-free command completion models, parsing, ranking, and learning indexes.
-* **`:ketraterm-completion-host`**: Bounded asynchronous snapshot and local path-provider infrastructure.
+* **`:ketraterm-completion-host`**: Direct suspending local path-provider and bounded scanning infrastructure.
 * **`:ketraterm-completion-persistence`**: Optional sanitized local-file storage for completion learning.
 * **`:ketraterm-render-api`**: Dependency-free visual frame contracts.
 * **`:ketraterm-render-cache`**: Double/triple-buffered publication cache.

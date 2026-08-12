@@ -1,8 +1,8 @@
 # Completion Module Architecture
 
-`ketraterm-completion` is a dependency-free completion engine module. It owns
-pure request/candidate contracts, static command specs, command-line parsing,
-ranking, and bounded in-memory learning indexes. It does not own UI popup
+`ketraterm-completion` is a suspending completion engine module. It owns
+request/candidate contracts, static command specs, command-line parsing,
+structured parallel source evaluation, ranking, and bounded in-memory learning indexes. It does not own UI popup
 behavior, persistence, shell processes, PTY/session lifecycle, or IntelliJ APIs.
 
 ## Public Surface
@@ -15,7 +15,7 @@ External modules should import only:
 The `api` package exposes host-facing engines, source factories, request and
 candidate contracts, a mutable session-history source, and a separate mutable
 statistics contract. Factory methods are intentionally narrow: hosts create
-spec, session-MRU, path, and host-snapshot sources, then give both the MRU
+spec, session-MRU, path, and host-backed sources, then give both the MRU
 source and merged engine one immutable learned-stats supplier. Statistics are
 ranking evidence and persisted fallback data; they are never composed as an
 independent candidate provider or ranking vote.
@@ -51,23 +51,22 @@ constructor state.
 Types used only to tokenize, classify, rank, merge, or index suggestions belong
 in implementation packages and must stay `internal`.
 
-`TerminalCompletionSources.valueDomain(...)` adapts a bounded immutable host snapshot for one declared
+`TerminalCompletionSources.valueDomain(...)` adapts a suspending host loader for one declared
 `TerminalCompletionValueDomain`. It resolves the active spec context through the shared tokenizer, applies the request's
-shell quoting policy, and emits domain-tagged argument candidates. Its snapshot supplier is a pure ready-state read and
-must never perform host I/O. A provider may additionally restrict itself to canonical command/subcommand names when a
+shell quoting policy, and emits domain-tagged argument candidates. A provider may perform bounded host I/O and must
+cooperate with cancellation. A provider may additionally restrict itself to canonical command/subcommand names when a
 value domain has command-specific validity.
 
-`TerminalCompletionSources.fuzzyPath(...)` adapts either a bounded immutable host path snapshot or a ready query-aware
+`TerminalCompletionSources.fuzzyPath(...)` adapts either a suspending bounded host path loader or a query-aware
 `TerminalFuzzyPathProvider` for context-aware fuzzy path completion. Static snapshots use the shared dependency-free
 matcher once. Query-aware providers receive the decoded active prefix and return already matched, relevance-ordered
-entries; the source never repeats that match. Providers must return immediately and schedule host index work
-asynchronously. The shared source retains path-kind filtering, explicit replacement ranges, and shell-safe quoting. It
+entries; the source never repeats that match. The shared source retains path-kind filtering, explicit replacement ranges, and shell-safe quoting. It
 requires typed path text by default; a small, context-specific provider such as Git status paths may opt in to
 empty-prefix suggestions.
 
 `TerminalCompletionContextResolver` is the shared internal command-line context
-resolver. The merged engine resolves once per distinct command-spec set and passes
-that immutable context to every matching source and the global ranker instead of independently
+resolver. The merged engine parses and resolves once from its one command-spec set, then passes
+that same immutable context to every source and the global ranker instead of independently
 guessing command position, subcommand position, option-name position,
 option-value position, positional-argument position, active option metadata,
 expected path kind, expected dynamic value domain, repeatable subcommand source,
@@ -116,7 +115,7 @@ contains both learned-history buckets and exact, shape, and provider evidence
 indexes. One scoring policy owns bounded counter math. Global fusion owns
 outcome grouping, explicit score components, semantic relevance,
 representative selection, and deterministic final ordering.
-Public directory snapshot, path resolution, scan contracts, and bounded scan
+Public directory path resolution, scan contracts, and bounded scan
 implementations each live in their matching file in `ketraterm-completion-host`.
 
 ## Host Ownership
@@ -129,11 +128,10 @@ read files, scan raw shell history, spawn shells, or talk to UI frameworks.
 Optional disk I/O belongs to the separately published
 `ketraterm-completion-persistence` module. Its
 `TerminalCompletionStatsStore` sanitizes again at the storage boundary, applies byte/line/row bounds before decoding or
-encoding, serializes through the shared versioned codec, and can coalesce atomic
-file replacements on a private worker. KetraTerm product hosts instead use one
-`TerminalCompletionLearningWorker` per host: mutation, snapshot publication,
-blocking atomic replacement, and notification form one ordered background
-transaction rather than two nested executor queues. Product hosts own the
+encoding, and performs one atomic file replacement on its caller. One
+`TerminalCompletionLearningRepository` serializes mutation, loading, and persistence with a `Mutex` and moves file I/O
+to `Dispatchers.IO`. Product hosts launch its suspending operations in their existing lifecycle scopes. There are no
+statistics executors, coalescing queues, flush barriers, or shutdown timeouts. Product hosts own the
 destination path, enablement policy, diagnostics, and store lifecycle.
 Completion persistence is not a workspace responsibility.
 
@@ -215,8 +213,8 @@ Path interpretation is host-owned. The pure source emits a
 URI, a transport-neutral lexical directory prefix, and the active entry-name
 prefix. It does not discard URI authorities, expand `~`, or interpret drive and
 UNC roots. Hosts must reject remote authorities they cannot map safely and
-return only bounded, already-published snapshots from the synchronous provider
-callback.
+return bounded results from a suspending provider that cooperates with request
+cancellation.
 
 Live trigger policy is command-context aware. Hyphen, path separator, and
 environment-variable triggers remain immediate. A trailing space is immediate
@@ -226,9 +224,9 @@ only when the resolved context expects useful candidates, such as paths after
 the user typed a space.
 
 Swing hosts share `SwingLiveCompletionTriggerController` and one EDT-confined
-one-shot `Timer`. Popup debouncing does not need a coroutine scope, lazy jobs,
-atomic job replacement, or host-specific controller copies. Coroutines remain
-at the host snapshot boundary, where loaders actually suspend.
+one-shot `Timer` for debouncing. `SwingTerminal` owns exactly one replaceable
+`suggestionJob`; a new request or popup hide cancels it. The provider and engine
+remain suspending end to end.
 
 Static bounded option domains belong in `TerminalOptionSpec.valueCandidates`.
 Examples are output formats, log levels, or other values that are stable and do
@@ -269,27 +267,24 @@ scalar positional fields remain the fallback for compact specs.
 
 ## Host Dynamic Providers
 
-Reusable ready-snapshot, local-path, and bounded directory-scanning machinery belongs to `ketraterm-completion-host`; it
-may perform bounded host work but does not parse, rank, or prioritize completion candidates. Standalone and IntelliJ
-share one latest-request snapshot implementation while retaining only their environment-specific loaders and scanners.
-The snapshot service owns one structured child job and one suspending semaphore, with two concurrent loads by default.
-Each provider keeps only its ready snapshot and optional active load job: changing its key cancels that job directly.
-There is no collector, scheduler, queue, or generation counter. Loaders are suspending functions and inherit their host
-scope; only blocking local filesystem access moves to an injected IO dispatcher.
-Enumeration has visit, result, and elapsed-time caps, while ready snapshots have a two-second expiry. The defaults (two
-concurrent loads, 8,192 visited entries, 256 matches, and a 50 ms scan budget) are an explicit desktop baseline covered by
-JMH directory-scan benchmarks; change them only with representative local and remote-filesystem measurements. Closing a
-provider cancels its active load, and `runInterruptible` makes local directory scans cooperatively interruptible. A failed
-load releases its job slot and can be retried by the next request. The app resolves
+Reusable local-path resolution and bounded directory-scanning machinery belongs to `ketraterm-completion-host`; it
+may perform bounded host work but does not parse, rank, prioritize, cache, or schedule completion candidates. Standalone
+and IntelliJ retain only environment-specific suspending loaders and scanners. There is no snapshot service, TTL,
+publication callback, refresh-after-publication pass, semaphore, or provider-owned job. Blocking local filesystem access
+moves to an injected IO dispatcher.
+Enumeration has visit, result, and elapsed-time caps. The defaults (8,192 visited entries, 256 matches, and a 50 ms scan
+budget) are an explicit desktop baseline covered by JMH directory-scan benchmarks; change them only with representative
+local and remote-filesystem measurements.
+`runInterruptible` makes local directory scans cooperatively interruptible. The app resolves
 local and `localhost` file URIs, explicit home paths,
 Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses
 write-allowing suspending read actions for project-aware VFS snapshots and bounded local scanning elsewhere. Its first
 dynamic value provider reads local branches from the Git4Idea repository that contains the terminal working directory
-and publishes latest-request, failure-retryable snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Remote
-branches are published through a separate snapshot for `checkout`, `merge`, and `rebase`, avoiding invalid remote
+and returns bounded values for `git switch`, `checkout`, `merge`, and `rebase`. Remote
+branches use a separate provider for `checkout`, `merge`, and `rebase`, avoiding invalid remote
 suggestions for `git switch`. Tags use the same bounded, repository-selected Git4Idea snapshot and are available for
 `checkout`, `merge`, and `rebase`; `git switch` remains local-branch-only.
-Whole-project fuzzy paths use a prefix-keyed asynchronous query through IntelliJ's Go to File model and item provider.
+Whole-project fuzzy paths use a prefix-keyed suspending query through IntelliJ's Go to File model and item provider.
 IntelliJ owns indexed discovery, fuzzy matching, path qualification, and result ordering; the plugin only converts PSI
 items into shell-facing paths, while the shared source applies terminal path semantics. These queries use IntelliJ's
 suspending `readAction`, so pending write actions restart the read without a blocking-context bridge. Fuzzy paths activate only in declared or
@@ -299,11 +294,10 @@ model into a bounded task snapshot; it never starts Gradle from a completion req
 supplies changed and
 untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Git process.
 
-IntelliJ dynamic providers are composed through additive provider factories. Each factory returns one prioritized source
-plus the closeable snapshot resources owned by that source. Adding a new value domain therefore does not require another
-field or close branch in the central session registry. The registry owns session composition; a separate statistics
-coordinator owns privacy filtering, serialized learning mutations, persistence, and shutdown. Standalone uses the same
-coordinator split so completion files are never loaded on the Swing event-dispatch thread.
+IntelliJ dynamic providers are composed through additive provider factories. Each factory returns one prioritized
+suspending source with no closeable snapshot resources. The registry owns session composition; a thin statistics adapter
+maps host events into the shared learning repository. Standalone uses the same repository path so completion files are
+never loaded on the Swing event-dispatch thread.
 
 The engine-to-Swing request/candidate bridge and Swing-feedback-to-statistics mapping live in `ketraterm-ui-swing-host`.
 Product hosts inject context, privacy, scheduling, and persistence policy instead of copying the vocabulary conversion
@@ -383,11 +377,11 @@ four times the visible limit with an absolute surplus cap of 256 and
 overflow-safe arithmetic, so learned evidence can promote an initially hidden
 candidate without permitting unbounded host work.
 
-Source collection is intentionally sequential. Engine sources are pure bounded
-reads over immutable in-memory snapshots; they never await host I/O. Launching
-one coroutine per source would add scheduling, synchronization, and unstable
-completion order without making the underlying work faster. Parallelism belongs
-only in host snapshot production, before the engine is called.
+Source collection uses one `coroutineScope`. The engine parses once, resolves one
+context, launches one `async` child per source, and consumes results with
+`awaitAll`. Individual sources are ordinary suspending functions and never own
+scopes or child jobs. Source declaration order remains the deterministic fusion
+tie-breaker regardless of completion order.
 
 ## Ranking Calibration
 

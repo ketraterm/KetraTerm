@@ -20,374 +20,378 @@ import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
+import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class StandaloneCompletionRegistryTest {
     @Test
-    fun `session MRU competes as a semantic subcommand without full-line presentation`() {
-        val registry = registry()
-        val provider =
-            registry.createProvider(
-                sessionId = "session-1",
-                profileId = "bash",
-                workingDirectoryUriProvider = { "file:///repo" },
-            )
-        registry.recordSuccessfulCommand(
-            sessionId = "session-1",
-            commandLine = "git switch main",
-            profileId = "bash",
-            workingDirectoryUri = "file:///repo",
-        )
-
-        val suggestions = provider.suggestions(request("git s"))
-
-        val mruSuggestion = suggestions.first()
-        assertEquals("switch main", mruSuggestion.replacementText)
-        assertEquals("mru", mruSuggestion.source)
-        assertEquals(4, mruSuggestion.replacementStartOffset)
-        assertEquals(5, mruSuggestion.replacementEndOffset)
-        assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
-    }
-
-    @Test
-    fun `directory path suggestions rank ahead of command MRU after cd space`() {
-        val directory = Files.createTempDirectory("ketraterm-completion")
-        try {
-            Files.createDirectory(directory.resolve("alpha"))
-            Files.createDirectory(directory.resolve(".hidden"))
-            Files.writeString(directory.resolve("README.md"), "not a directory")
-            val registry = registry(specs = TerminalCommandSpecs.defaults())
-            val snapshotReady = CountDownLatch(1)
+    fun `session MRU competes as a semantic subcommand without full-line presentation`() =
+        runBlocking {
+            val registry = registry()
             val provider =
                 registry.createProvider(
                     sessionId = "session-1",
-                    profileId = "pwsh",
-                    workingDirectoryUriProvider = { directory.toUri().toString() },
-                    onPathSnapshotChanged = snapshotReady::countDown,
+                    profileId = "bash",
+                    workingDirectoryUriProvider = { "file:///repo" },
                 )
             registry.recordSuccessfulCommand(
                 sessionId = "session-1",
-                commandLine = "cd remembered",
-                profileId = "pwsh",
-                workingDirectoryUri = directory.toUri().toString(),
+                commandLine = "git switch main",
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo",
             )
 
-            assertTrue(provider.suggestions(request("cd ")).none { it.source == "path" })
-            assertTrue(snapshotReady.await(5, TimeUnit.SECONDS))
-            val suggestions = provider.suggestions(request("cd "))
+            val suggestions = provider.suggestions(request("git s"))
 
-            assertEquals("alpha/", suggestions.first().replacementText)
-            assertEquals("path", suggestions.first().source)
-            assertTrue(suggestions.none { it.replacementText == ".hidden/" })
-            assertTrue(suggestions.none { it.replacementText == "README.md" })
-            assertTrue(suggestions.any { it.replacementText == "remembered" && it.source == "mru" })
-            registry.close()
-        } finally {
-            directory.toFile().deleteRecursively()
+            val mruSuggestion = suggestions.first()
+            assertEquals("switch main", mruSuggestion.replacementText)
+            assertEquals("mru", mruSuggestion.source)
+            assertEquals(4, mruSuggestion.replacementStartOffset)
+            assertEquals(5, mruSuggestion.replacementEndOffset)
+            assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
         }
-    }
 
     @Test
-    fun `learned nested directory is token-local and outranks its unused parent path`() {
-        val directory = Files.createTempDirectory("ketraterm-learned-directory")
-        try {
-            Files.createDirectories(directory.resolve("IdeaProjects/KetraTerm"))
+    fun `directory path suggestions rank ahead of command MRU after cd space`() =
+        runBlocking {
+            val directory = Files.createTempDirectory("ketraterm-completion")
+            try {
+                Files.createDirectory(directory.resolve("alpha"))
+                Files.createDirectory(directory.resolve(".hidden"))
+                Files.writeString(directory.resolve("README.md"), "not a directory")
+                val registry = registry(specs = TerminalCommandSpecs.defaults())
+                val provider =
+                    registry.createProvider(
+                        sessionId = "session-1",
+                        profileId = "pwsh",
+                        workingDirectoryUriProvider = { directory.toUri().toString() },
+                    )
+                registry.recordSuccessfulCommand(
+                    sessionId = "session-1",
+                    commandLine = "cd remembered",
+                    profileId = "pwsh",
+                    workingDirectoryUri = directory.toUri().toString(),
+                )
+
+                val suggestions = provider.suggestions(request("cd "))
+
+                assertEquals("alpha/", suggestions.first().replacementText)
+                assertEquals("path", suggestions.first().source)
+                assertTrue(suggestions.none { it.replacementText == ".hidden/" })
+                assertTrue(suggestions.none { it.replacementText == "README.md" })
+                assertTrue(suggestions.any { it.replacementText == "remembered" && it.source == "mru" })
+                registry.close()
+            } finally {
+                directory.toFile().deleteRecursively()
+            }
+        }
+
+    @Test
+    fun `learned nested directory is token-local and outranks its unused parent path`() =
+        runBlocking {
+            val directory = Files.createTempDirectory("ketraterm-learned-directory")
+            try {
+                Files.createDirectories(directory.resolve("IdeaProjects/KetraTerm"))
+                val persistentStats = TerminalCompletionSources.learningStore()
+                persistentStats.replaceSnapshot(
+                    TerminalCommandCompletionStatsSnapshot(
+                        commandStats =
+                            listOf(
+                                TerminalCommandCompletionStats(
+                                    commandLine = "cd IdeaProjects/KetraTerm/",
+                                    profileId = "pwsh",
+                                    workingDirectoryUri = directory.toUri().toString(),
+                                    useCount = 8,
+                                    successCount = 8,
+                                    acceptedCount = 2,
+                                    lastUsedEpochMillis = System.currentTimeMillis(),
+                                ),
+                            ),
+                    ),
+                )
+                val registry = registry(specs = TerminalCommandSpecs.defaults(), persistentStatsSource = persistentStats)
+                val provider =
+                    registry.createProvider(
+                        sessionId = "learned-directory",
+                        profileId = "pwsh",
+                        workingDirectoryUriProvider = { directory.toUri().toString() },
+                    )
+
+                val suggestions = provider.suggestions(request("cd I"))
+
+                assertEquals("IdeaProjects/KetraTerm/", suggestions.first().replacementText)
+                assertEquals("IdeaProjects/KetraTerm/", suggestions.first().displayText)
+                assertEquals("mru", suggestions.first().source)
+                assertEquals("cd IdeaProjects/KetraTerm/", suggestions.first().commandTextAfterReplacement(request("cd I")))
+                assertTrue(suggestions.none { it.source == "stats" })
+                registry.close()
+            } finally {
+                directory.toFile().deleteRecursively()
+            }
+        }
+
+    @Test
+    fun `bare path entries do not pollute command subcommand completion`() =
+        runBlocking {
+            val directory = Files.createTempDirectory("ketraterm-completion")
+            try {
+                Files.createDirectory(directory.resolve("status"))
+                val provider =
+                    registry().createProvider(
+                        sessionId = "session-1",
+                        profileId = "bash",
+                        workingDirectoryUriProvider = { directory.toUri().toString() },
+                    )
+
+                val suggestions = provider.suggestions(request("git s"))
+
+                assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
+                assertTrue(suggestions.none { it.source == "path" })
+            } finally {
+                directory.toFile().deleteRecursively()
+            }
+        }
+
+    @Test
+    fun `persistent stats supply learned fallback without a standalone stats source`() =
+        runBlocking {
+            val persistentStats = TerminalCompletionSources.learningStore()
+            persistentStats.recordCommandResult(
+                commandLine = "git show --stat",
+                successful = true,
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo",
+                usedAtEpochMillis = 1_000,
+            )
+            val registry = registry(persistentStatsSource = persistentStats)
+            val provider =
+                registry.createProvider(
+                    sessionId = "session-1",
+                    profileId = "bash",
+                    workingDirectoryUriProvider = { "file:///repo" },
+                )
+            registry.recordSuccessfulCommand(
+                sessionId = "session-1",
+                commandLine = "git switch main",
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo",
+            )
+
+            val request = request("git s")
+            val suggestions = provider.suggestions(request)
+            val outcomes = suggestions.mapNotNull { it.commandTextAfterReplacement(request) }
+
+            assertTrue("git switch main" in outcomes)
+            assertTrue("git show --stat" in outcomes)
+            assertTrue("git status" in outcomes)
+            assertTrue(suggestions.none { it.source == "stats" })
+            assertEquals("mru", suggestions.single { it.commandTextAfterReplacement(request) == "git show --stat" }.source)
+        }
+
+    @Test
+    fun `persistent stats source is shared across provider sessions`() =
+        runBlocking {
+            val persistentStats = TerminalCompletionSources.learningStore()
+            persistentStats.recordCommandResult(
+                commandLine = "npm test",
+                successful = true,
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo",
+                usedAtEpochMillis = 1_000,
+            )
+            val registry = registry(specs = emptyList(), persistentStatsSource = persistentStats)
+            val first = registry.createProvider("session-1", profileId = "bash") { "file:///repo" }
+            val second = registry.createProvider("session-2", profileId = "bash") { "file:///repo" }
+
+            assertEquals(listOf("npm test"), first.suggestions(request("npm")).map { it.replacementText })
+            assertEquals(listOf("npm test"), second.suggestions(request("npm")).map { it.replacementText })
+        }
+
+    @Test
+    fun `shape stats boost matching static spec suggestions`() =
+        runBlocking {
             val persistentStats = TerminalCompletionSources.learningStore()
             persistentStats.replaceSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
+                    shapeStats =
                         listOf(
-                            TerminalCommandCompletionStats(
-                                commandLine = "cd IdeaProjects/KetraTerm/",
-                                profileId = "pwsh",
-                                workingDirectoryUri = directory.toUri().toString(),
-                                useCount = 8,
-                                successCount = 8,
-                                acceptedCount = 2,
-                                lastUsedEpochMillis = System.currentTimeMillis(),
+                            shapeStats(
+                                commandLine = "git switch main",
+                                acceptedCount = 4,
+                                profileId = "bash",
+                                workingDirectoryUri = "file:///repo",
+                            ),
+                            shapeStats(
+                                commandLine = "git status",
+                                dismissedCount = 4,
+                                profileId = "bash",
+                                workingDirectoryUri = "file:///repo",
                             ),
                         ),
                 ),
             )
-            val snapshotReady = CountDownLatch(1)
-            val registry = registry(specs = TerminalCommandSpecs.defaults(), persistentStatsSource = persistentStats)
+            val provider =
+                registry(persistentStatsSource = persistentStats)
+                    .createProvider(
+                        sessionId = "session-1",
+                        profileId = "bash",
+                        workingDirectoryUriProvider = { "file:///repo" },
+                    )
+
+            val suggestions = provider.suggestions(request("git "))
+
+            assertEquals(listOf("switch", "status"), suggestions.map { it.replacementText }.take(2))
+            assertTrue(suggestions.take(2).all { it.source == "spec" })
+        }
+
+    @Test
+    fun `shape stats demote repeatedly dismissed static spec suggestions`() =
+        runBlocking {
+            val persistentStats = TerminalCompletionSources.learningStore()
+            persistentStats.replaceSnapshot(
+                TerminalCommandCompletionStatsSnapshot(
+                    shapeStats =
+                        listOf(
+                            shapeStats(
+                                commandLine = "git status",
+                                dismissedCount = 4,
+                                profileId = "bash",
+                                workingDirectoryUri = "file:///repo",
+                            ),
+                        ),
+                ),
+            )
+            val provider =
+                registry(persistentStatsSource = persistentStats)
+                    .createProvider(
+                        sessionId = "session-1",
+                        profileId = "bash",
+                        workingDirectoryUriProvider = { "file:///repo" },
+                    )
+
+            val suggestions = provider.suggestions(request("git "))
+
+            assertEquals("switch", suggestions.first().replacementText)
+            assertEquals("spec", suggestions.first().source)
+        }
+
+    @Test
+    fun `provider context boosts matching session MRU commands`() =
+        runBlocking {
+            val registry = registry(listOf(TerminalCommandSpec("git")))
             val provider =
                 registry.createProvider(
-                    sessionId = "learned-directory",
-                    profileId = "pwsh",
-                    workingDirectoryUriProvider = { directory.toUri().toString() },
-                    onPathSnapshotChanged = snapshotReady::countDown,
+                    sessionId = "session-1",
+                    profileId = "bash",
+                    workingDirectoryUriProvider = { "file:///repo" },
                 )
+            registry.recordSuccessfulCommand(
+                sessionId = "session-1",
+                commandLine = "git switch main",
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo",
+            )
+            registry.recordSuccessfulCommand(
+                sessionId = "session-1",
+                commandLine = "git status",
+                profileId = "pwsh",
+                workingDirectoryUri = "file:///other",
+            )
 
-            provider.suggestions(request("cd I"))
-            assertTrue(snapshotReady.await(5, TimeUnit.SECONDS))
-            val suggestions = provider.suggestions(request("cd I"))
+            val request = request("git s")
+            val suggestions = provider.suggestions(request)
 
-            assertEquals("IdeaProjects/KetraTerm/", suggestions.first().replacementText)
-            assertEquals("IdeaProjects/KetraTerm/", suggestions.first().displayText)
-            assertEquals("mru", suggestions.first().source)
-            assertEquals("cd IdeaProjects/KetraTerm/", suggestions.first().commandTextAfterReplacement(request("cd I")))
-            assertTrue(suggestions.none { it.source == "stats" })
-            registry.close()
-        } finally {
-            directory.toFile().deleteRecursively()
+            assertEquals(
+                listOf("git switch main", "git status"),
+                suggestions.filter { it.source == "mru" }.mapNotNull { it.commandTextAfterReplacement(request) },
+            )
         }
-    }
 
     @Test
-    fun `bare path entries do not pollute command subcommand completion`() {
-        val directory = Files.createTempDirectory("ketraterm-completion")
-        try {
-            Files.createDirectory(directory.resolve("status"))
+    fun `provider reads latest working-directory context when suggesting`() =
+        runBlocking {
+            val registry = registry(emptyList())
+            var workingDirectoryUri = "file:///repo"
             val provider =
-                registry().createProvider(
+                registry.createProvider(
                     sessionId = "session-1",
                     profileId = "bash",
-                    workingDirectoryUriProvider = { directory.toUri().toString() },
+                    workingDirectoryUriProvider = { workingDirectoryUri },
                 )
+            registry.recordSuccessfulCommand(
+                sessionId = "session-1",
+                commandLine = "git switch main",
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo",
+            )
+            registry.recordSuccessfulCommand(
+                sessionId = "session-1",
+                commandLine = "git status",
+                profileId = "bash",
+                workingDirectoryUri = "file:///other",
+            )
 
-            val suggestions = provider.suggestions(request("git s"))
+            workingDirectoryUri = "file:///other"
 
-            assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
-            assertTrue(suggestions.none { it.source == "path" })
-        } finally {
-            directory.toFile().deleteRecursively()
+            val request = request("git s")
+            val suggestions = provider.suggestions(request)
+
+            assertEquals("git status", suggestions.first().commandTextAfterReplacement(request))
         }
-    }
 
     @Test
-    fun `persistent stats supply learned fallback without a standalone stats source`() {
-        val persistentStats = TerminalCompletionSources.learningStore()
-        persistentStats.recordCommandResult(
-            commandLine = "git show --stat",
-            successful = true,
-            profileId = "bash",
-            workingDirectoryUri = "file:///repo",
-            usedAtEpochMillis = 1_000,
-        )
-        val registry = registry(persistentStatsSource = persistentStats)
-        val provider =
-            registry.createProvider(
+    fun `session MRU commands are isolated per provider session`() =
+        runBlocking {
+            val registry = registry(emptyList())
+            val first = registry.createProvider("session-1")
+            val second = registry.createProvider("session-2")
+
+            registry.recordSuccessfulCommand(
                 sessionId = "session-1",
+                commandLine = "git status",
                 profileId = "bash",
-                workingDirectoryUriProvider = { "file:///repo" },
+                workingDirectoryUri = null,
             )
-        registry.recordSuccessfulCommand(
-            sessionId = "session-1",
-            commandLine = "git switch main",
-            profileId = "bash",
-            workingDirectoryUri = "file:///repo",
-        )
 
-        val request = request("git s")
-        val suggestions = provider.suggestions(request)
-        val outcomes = suggestions.mapNotNull { it.commandTextAfterReplacement(request) }
-
-        assertTrue("git switch main" in outcomes)
-        assertTrue("git show --stat" in outcomes)
-        assertTrue("git status" in outcomes)
-        assertTrue(suggestions.none { it.source == "stats" })
-        assertEquals("mru", suggestions.single { it.commandTextAfterReplacement(request) == "git show --stat" }.source)
-    }
+            assertEquals(listOf("git status"), first.suggestions(request("git")).map { it.replacementText })
+            assertTrue(second.suggestions(request("git")).isEmpty())
+        }
 
     @Test
-    fun `persistent stats source is shared across provider sessions`() {
-        val persistentStats = TerminalCompletionSources.learningStore()
-        persistentStats.recordCommandResult(
-            commandLine = "npm test",
-            successful = true,
-            profileId = "bash",
-            workingDirectoryUri = "file:///repo",
-            usedAtEpochMillis = 1_000,
-        )
-        val registry = registry(specs = emptyList(), persistentStatsSource = persistentStats)
-        val first = registry.createProvider("session-1", profileId = "bash") { "file:///repo" }
-        val second = registry.createProvider("session-2", profileId = "bash") { "file:///repo" }
-
-        assertEquals(listOf("npm test"), first.suggestions(request("npm")).map { it.replacementText })
-        assertEquals(listOf("npm test"), second.suggestions(request("npm")).map { it.replacementText })
-    }
-
-    @Test
-    fun `shape stats boost matching static spec suggestions`() {
-        val persistentStats = TerminalCompletionSources.learningStore()
-        persistentStats.replaceSnapshot(
-            TerminalCommandCompletionStatsSnapshot(
-                shapeStats =
-                    listOf(
-                        shapeStats(
-                            commandLine = "git switch main",
-                            acceptedCount = 4,
-                            profileId = "bash",
-                            workingDirectoryUri = "file:///repo",
-                        ),
-                        shapeStats(
-                            commandLine = "git status",
-                            dismissedCount = 4,
-                            profileId = "bash",
-                            workingDirectoryUri = "file:///repo",
-                        ),
-                    ),
-            ),
-        )
-        val provider =
-            registry(persistentStatsSource = persistentStats)
-                .createProvider(
-                    sessionId = "session-1",
-                    profileId = "bash",
-                    workingDirectoryUriProvider = { "file:///repo" },
-                )
-
-        val suggestions = provider.suggestions(request("git "))
-
-        assertEquals(listOf("switch", "status"), suggestions.map { it.replacementText }.take(2))
-        assertTrue(suggestions.take(2).all { it.source == "spec" })
-    }
-
-    @Test
-    fun `shape stats demote repeatedly dismissed static spec suggestions`() {
-        val persistentStats = TerminalCompletionSources.learningStore()
-        persistentStats.replaceSnapshot(
-            TerminalCommandCompletionStatsSnapshot(
-                shapeStats =
-                    listOf(
-                        shapeStats(
-                            commandLine = "git status",
-                            dismissedCount = 4,
-                            profileId = "bash",
-                            workingDirectoryUri = "file:///repo",
-                        ),
-                    ),
-            ),
-        )
-        val provider =
-            registry(persistentStatsSource = persistentStats)
-                .createProvider(
-                    sessionId = "session-1",
-                    profileId = "bash",
-                    workingDirectoryUriProvider = { "file:///repo" },
-                )
-
-        val suggestions = provider.suggestions(request("git "))
-
-        assertEquals("switch", suggestions.first().replacementText)
-        assertEquals("spec", suggestions.first().source)
-    }
-
-    @Test
-    fun `provider context boosts matching session MRU commands`() {
-        val registry = registry(listOf(TerminalCommandSpec("git")))
-        val provider =
-            registry.createProvider(
+    fun `removed session clears already created provider MRU source`() =
+        runBlocking {
+            val registry = registry(emptyList())
+            val provider = registry.createProvider("session-1")
+            registry.recordSuccessfulCommand(
                 sessionId = "session-1",
+                commandLine = "git status",
                 profileId = "bash",
-                workingDirectoryUriProvider = { "file:///repo" },
+                workingDirectoryUri = null,
             )
-        registry.recordSuccessfulCommand(
-            sessionId = "session-1",
-            commandLine = "git switch main",
-            profileId = "bash",
-            workingDirectoryUri = "file:///repo",
-        )
-        registry.recordSuccessfulCommand(
-            sessionId = "session-1",
-            commandLine = "git status",
-            profileId = "pwsh",
-            workingDirectoryUri = "file:///other",
-        )
 
-        val request = request("git s")
-        val suggestions = provider.suggestions(request)
+            registry.removeSession("session-1")
 
-        assertEquals(
-            listOf("git switch main", "git status"),
-            suggestions.filter { it.source == "mru" }.mapNotNull { it.commandTextAfterReplacement(request) },
-        )
-    }
+            assertTrue(provider.suggestions(request("git")).isEmpty())
+        }
 
     @Test
-    fun `provider reads latest working-directory context when suggesting`() {
-        val registry = registry(emptyList())
-        var workingDirectoryUri = "file:///repo"
-        val provider =
-            registry.createProvider(
-                sessionId = "session-1",
+    fun `unregistered session records are ignored`() =
+        runBlocking {
+            val registry = registry(emptyList())
+
+            registry.recordSuccessfulCommand(
+                sessionId = "missing",
+                commandLine = "git status",
                 profileId = "bash",
-                workingDirectoryUriProvider = { workingDirectoryUri },
+                workingDirectoryUri = null,
             )
-        registry.recordSuccessfulCommand(
-            sessionId = "session-1",
-            commandLine = "git switch main",
-            profileId = "bash",
-            workingDirectoryUri = "file:///repo",
-        )
-        registry.recordSuccessfulCommand(
-            sessionId = "session-1",
-            commandLine = "git status",
-            profileId = "bash",
-            workingDirectoryUri = "file:///other",
-        )
 
-        workingDirectoryUri = "file:///other"
-
-        val request = request("git s")
-        val suggestions = provider.suggestions(request)
-
-        assertEquals("git status", suggestions.first().commandTextAfterReplacement(request))
-    }
-
-    @Test
-    fun `session MRU commands are isolated per provider session`() {
-        val registry = registry(emptyList())
-        val first = registry.createProvider("session-1")
-        val second = registry.createProvider("session-2")
-
-        registry.recordSuccessfulCommand(
-            sessionId = "session-1",
-            commandLine = "git status",
-            profileId = "bash",
-            workingDirectoryUri = null,
-        )
-
-        assertEquals(listOf("git status"), first.suggestions(request("git")).map { it.replacementText })
-        assertTrue(second.suggestions(request("git")).isEmpty())
-    }
-
-    @Test
-    fun `removed session clears already created provider MRU source`() {
-        val registry = registry(emptyList())
-        val provider = registry.createProvider("session-1")
-        registry.recordSuccessfulCommand(
-            sessionId = "session-1",
-            commandLine = "git status",
-            profileId = "bash",
-            workingDirectoryUri = null,
-        )
-
-        registry.removeSession("session-1")
-
-        assertTrue(provider.suggestions(request("git")).isEmpty())
-    }
-
-    @Test
-    fun `unregistered session records are ignored`() {
-        val registry = registry(emptyList())
-
-        registry.recordSuccessfulCommand(
-            sessionId = "missing",
-            commandLine = "git status",
-            profileId = "bash",
-            workingDirectoryUri = null,
-        )
-
-        val provider = registry.createProvider("session-1")
-        assertTrue(provider.suggestions(request("git")).isEmpty())
-    }
+            val provider = registry.createProvider("session-1")
+            assertTrue(provider.suggestions(request("git")).isEmpty())
+        }
 
     private fun registry(
         specs: List<TerminalCommandSpec> = specs(),

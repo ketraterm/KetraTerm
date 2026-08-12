@@ -373,6 +373,8 @@ internal class TerminalCompletionArchitectureTest {
                 "TerminalCompletionLearningStore",
                 "TerminalCompletionCandidate",
                 "TerminalCompletionCandidateKind",
+                "TerminalCompletionActivePosition",
+                "TerminalCompletionContext",
                 "TerminalCompletionEngine",
                 "TerminalCompletionEngines",
                 "TerminalCompletionPersistencePolicy",

@@ -16,11 +16,11 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
-import io.github.ketraterm.completion.commandline.TerminalCompletionContext
-import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -28,485 +28,513 @@ import kotlin.test.assertTrue
 
 class MergedCompletionEngineTest {
     @Test
-    fun `source priority ranks ahead of candidate score`() {
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                listOf(
-                    entry(source(candidate("status", source = "spec", score = 900)), priority = 0),
-                    entry(source(candidate("switch", source = "mru", score = 1)), priority = 100),
-                ),
-            )
-
-        val candidates = engine.complete(request(maxCandidates = 8))
-
-        assertEquals(listOf("switch", "status"), candidates.map { it.replacementText })
-        assertEquals(listOf("mru", "spec"), candidates.map { it.source })
-    }
-
-    @Test
-    fun `deduplicates by replacement range and replacement text using highest ranked candidate`() {
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                listOf(
-                    entry(source(candidate("status", detail = "static", source = "spec", score = 900)), priority = 0),
-                    entry(source(candidate("status", detail = "recent", source = "mru", score = 1)), priority = 100),
-                ),
-            )
-
-        val candidates = engine.complete(request(maxCandidates = 8))
-
-        assertEquals(listOf("status"), candidates.map { it.replacementText })
-        assertEquals("recent", candidates.single().detail)
-        assertEquals("mru", candidates.single().source)
-    }
-
-    @Test
-    fun `keeps same replacement text when replacement range differs`() {
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                listOf(
-                    entry(source(candidate("status", start = 0, end = 1, source = "left")), priority = 0),
-                    entry(source(candidate("status", start = 4, end = 5, source = "right")), priority = 0),
-                ),
-            )
-
-        val candidates = engine.complete(request(maxCandidates = 8))
-
-        assertEquals(listOf("left", "right"), candidates.map { it.source })
-        assertEquals(listOf(0, 4), candidates.map { it.replacementStartOffset })
-    }
-
-    @Test
-    fun `applies max candidates after merging and sorting`() {
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                listOf(
-                    entry(
-                        source(
-                            candidate("alpha", score = 10),
-                            candidate("charlie", score = 30),
-                        ),
-                        priority = 0,
-                    ),
-                    entry(source(candidate("bravo", score = 20)), priority = 0),
-                ),
-            )
-
-        val candidates = engine.complete(request(maxCandidates = 2))
-
-        assertEquals(listOf("bravo", "charlie"), candidates.map { it.replacementText })
-    }
-
-    @Test
-    fun `collects bounded surplus before context ranking applies final maximum`() {
-        val rawCandidates =
-            buildList {
-                repeat(8) { index ->
-                    add(
-                        candidate(
-                            replacement = "git remembered-${index + 1}",
-                            source = "mixed",
-                            kind = TerminalCompletionCandidateKind.HISTORY,
-                            score = 1_000 - index,
-                        ),
-                    )
+    fun `merged engine starts sources in parallel within the request scope`(): Unit =
+        runBlocking {
+            val bothStarted = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            var started = 0
+            val source =
+                TerminalCompletionSource { _, _, _ ->
+                    started++
+                    if (started == 2) bothStarted.complete(Unit)
+                    release.await()
+                    emptyList()
                 }
-                add(
-                    candidate(
-                        replacement = "status",
-                        start = 4,
-                        end = 5,
-                        source = "mixed",
-                        kind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                        score = 900,
+            val engine = TerminalCompletionEngines.fromSources(source, source)
+
+            val completion = async { engine.complete(request(maxCandidates = 8)) }
+            bothStarted.await()
+            assertEquals(2, started)
+            release.complete(Unit)
+            completion.await()
+        }
+
+    @Test
+    fun `source priority ranks ahead of candidate score`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry(source(candidate("status", source = "spec", score = 900)), priority = 0),
+                        entry(source(candidate("switch", source = "mru", score = 1)), priority = 100),
                     ),
                 )
-            }
-        var collectionLimit = 0
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                TerminalCompletionSource { request ->
-                    collectionLimit = request.maxCandidates
-                    rawCandidates.take(request.maxCandidates)
-                },
-            )
 
-        val candidates = engine.complete(request(commandLine = "git s", maxCandidates = 8))
+            val candidates = engine.complete(request(maxCandidates = 8))
 
-        assertEquals(32, collectionLimit)
-        assertEquals(8, candidates.size)
-        assertEquals("status", candidates.first().replacementText)
-    }
+            assertEquals(listOf("switch", "status"), candidates.map { it.replacementText })
+            assertEquals(listOf("mru", "spec"), candidates.map { it.source })
+        }
 
     @Test
-    fun `large provider result preserves exact deterministic ordering`() {
-        val candidates =
-            ArrayList<TerminalCompletionCandidate>(1_024).apply {
-                var index = 0
-                while (index < 1_024) {
+    fun `deduplicates by replacement range and replacement text using highest ranked candidate`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry(source(candidate("status", detail = "static", source = "spec", score = 900)), priority = 0),
+                        entry(source(candidate("status", detail = "recent", source = "mru", score = 1)), priority = 100),
+                    ),
+                )
+
+            val candidates = engine.complete(request(maxCandidates = 8))
+
+            assertEquals(listOf("status"), candidates.map { it.replacementText })
+            assertEquals("recent", candidates.single().detail)
+            assertEquals("mru", candidates.single().source)
+        }
+
+    @Test
+    fun `keeps same replacement text when replacement range differs`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry(source(candidate("status", start = 0, end = 1, source = "left")), priority = 0),
+                        entry(source(candidate("status", start = 4, end = 5, source = "right")), priority = 0),
+                    ),
+                )
+
+            val candidates = engine.complete(request(maxCandidates = 8))
+
+            assertEquals(listOf("left", "right"), candidates.map { it.source })
+            assertEquals(listOf(0, 4), candidates.map { it.replacementStartOffset })
+        }
+
+    @Test
+    fun `applies max candidates after merging and sorting`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry(
+                            source(
+                                candidate("alpha", score = 10),
+                                candidate("charlie", score = 30),
+                            ),
+                            priority = 0,
+                        ),
+                        entry(source(candidate("bravo", score = 20)), priority = 0),
+                    ),
+                )
+
+            val candidates = engine.complete(request(maxCandidates = 2))
+
+            assertEquals(listOf("bravo", "charlie"), candidates.map { it.replacementText })
+        }
+
+    @Test
+    fun `collects bounded surplus before context ranking applies final maximum`() =
+        runBlocking {
+            val rawCandidates =
+                buildList {
+                    repeat(8) { index ->
+                        add(
+                            candidate(
+                                replacement = "git remembered-${index + 1}",
+                                source = "mixed",
+                                kind = TerminalCompletionCandidateKind.HISTORY,
+                                score = 1_000 - index,
+                            ),
+                        )
+                    }
                     add(
                         candidate(
-                            replacement = "candidate-$index",
-                            display = "display-${1_024 - index}",
-                            score = (index * 37) % 101,
+                            replacement = "status",
+                            start = 4,
+                            end = 5,
+                            source = "mixed",
+                            kind = TerminalCompletionCandidateKind.SUBCOMMAND,
+                            score = 900,
                         ),
                     )
-                    index++
                 }
-            }
-        val engine = TerminalCompletionEngines.fromSources(TerminalCompletionSource { candidates })
+            var collectionLimit = 0
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    TerminalCompletionSource { _, _, limit ->
+                        collectionLimit = limit
+                        rawCandidates.take(limit)
+                    },
+                )
 
-        val actual = engine.complete(request(maxCandidates = 8))
-        val expected =
-            candidates
-                .sortedWith(
-                    compareByDescending<TerminalCompletionCandidate> { it.score }
-                        .thenBy { it.displayText }
-                        .thenBy { it.replacementText },
-                ).take(8)
+            val candidates = engine.complete(request(commandLine = "git s", maxCandidates = 8))
 
-        assertEquals(expected.map { it.replacementText }, actual.map { it.replacementText })
-        assertEquals(actual.map { it.score }.sortedDescending(), actual.map { it.score })
-    }
-
-    @Test
-    fun `equal ranking falls back to display text for deterministic order`() {
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                source(
-                    candidate("zeta", display = "zeta", score = 10),
-                    candidate("alpha", display = "alpha", score = 10),
-                ),
-            )
-
-        val candidates = engine.complete(request(maxCandidates = 8))
-
-        assertEquals(listOf("alpha", "zeta"), candidates.map { it.replacementText })
-    }
+            assertEquals(32, collectionLimit)
+            assertEquals(8, candidates.size)
+            assertEquals("status", candidates.first().replacementText)
+        }
 
     @Test
-    fun `path candidates outrank history in cd positional path position`() {
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                listOf(
-                    entry(
-                        source(
+    fun `large provider result preserves exact deterministic ordering`() =
+        runBlocking {
+            val candidates =
+                ArrayList<TerminalCompletionCandidate>(1_024).apply {
+                    var index = 0
+                    while (index < 1_024) {
+                        add(
                             candidate(
-                                replacement = "cd remembered",
-                                start = 0,
-                                end = 3,
-                                source = "mru",
-                                kind = TerminalCompletionCandidateKind.HISTORY,
+                                replacement = "candidate-$index",
+                                display = "display-${1_024 - index}",
+                                score = (index * 37) % 101,
                             ),
-                        ),
-                        priority = 100,
-                    ),
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "src/",
-                                start = 3,
-                                end = 3,
-                                source = "path",
-                                kind = TerminalCompletionCandidateKind.PATH,
-                            ),
-                        ),
-                        priority = 0,
-                    ),
-                ),
-            )
+                        )
+                        index++
+                    }
+                }
+            val engine = TerminalCompletionEngines.fromSources(TerminalCompletionSource { _, _, _ -> candidates })
 
-        val candidates = engine.complete(request(commandLine = "cd ", maxCandidates = 8))
+            val actual = engine.complete(request(maxCandidates = 8))
+            val expected =
+                candidates
+                    .sortedWith(
+                        compareByDescending<TerminalCompletionCandidate> { it.score }
+                            .thenBy { it.displayText }
+                            .thenBy { it.replacementText },
+                    ).take(8)
 
-        assertEquals(listOf("src/", "cd remembered"), candidates.map { it.replacementText })
-    }
+            assertEquals(expected.map { it.replacementText }, actual.map { it.replacementText })
+            assertEquals(actual.map { it.score }.sortedDescending(), actual.map { it.score })
+        }
 
     @Test
-    fun `subcommand candidates outrank history and paths in subcommand position`() {
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                listOf(
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "git stash",
-                                start = 0,
-                                end = 5,
-                                source = "mru",
-                                kind = TerminalCompletionCandidateKind.HISTORY,
-                            ),
-                        ),
-                        priority = 100,
+    fun `equal ranking falls back to display text for deterministic order`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    source(
+                        candidate("zeta", display = "zeta", score = 10),
+                        candidate("alpha", display = "alpha", score = 10),
                     ),
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "src/",
-                                start = 4,
-                                end = 5,
-                                source = "path",
-                                kind = TerminalCompletionCandidateKind.PATH,
-                            ),
-                        ),
-                        priority = 100,
-                    ),
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "status",
-                                start = 4,
-                                end = 5,
-                                source = "spec",
-                                kind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                            ),
-                        ),
-                        priority = 0,
-                    ),
-                ),
-            )
+                )
 
-        val candidates = engine.complete(request(commandLine = "git s", maxCandidates = 8))
+            val candidates = engine.complete(request(maxCandidates = 8))
 
-        assertEquals("status", candidates.first().replacementText)
-    }
+            assertEquals(listOf("alpha", "zeta"), candidates.map { it.replacementText })
+        }
 
     @Test
-    fun `static option values outrank history in option value position`() {
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                listOf(
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "aws --output table",
-                                start = 0,
-                                end = 14,
-                                source = "mru",
-                                kind = TerminalCompletionCandidateKind.HISTORY,
+    fun `path candidates outrank history in cd positional path position`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "cd remembered",
+                                    start = 0,
+                                    end = 3,
+                                    source = "mru",
+                                    kind = TerminalCompletionCandidateKind.HISTORY,
+                                ),
                             ),
+                            priority = 100,
                         ),
-                        priority = 100,
-                    ),
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "text",
-                                start = 13,
-                                end = 14,
-                                source = "spec",
-                                kind = TerminalCompletionCandidateKind.ARGUMENT,
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "src/",
+                                    start = 3,
+                                    end = 3,
+                                    source = "path",
+                                    kind = TerminalCompletionCandidateKind.PATH,
+                                ),
                             ),
+                            priority = 0,
                         ),
-                        priority = 0,
                     ),
-                ),
-            )
+                )
 
-        val candidates = engine.complete(request(commandLine = "aws --output t", maxCandidates = 8))
+            val candidates = engine.complete(request(commandLine = "cd ", maxCandidates = 8))
 
-        assertEquals(listOf("text", "aws --output table"), candidates.map { it.replacementText })
-    }
+            assertEquals(listOf("src/", "cd remembered"), candidates.map { it.replacementText })
+        }
 
     @Test
-    fun `option names outrank history and paths in option name position`() {
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                listOf(
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "git status",
-                                start = 0,
-                                end = 5,
-                                source = "mru",
-                                kind = TerminalCompletionCandidateKind.HISTORY,
+    fun `subcommand candidates outrank history and paths in subcommand position`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "git stash",
+                                    start = 0,
+                                    end = 5,
+                                    source = "mru",
+                                    kind = TerminalCompletionCandidateKind.HISTORY,
+                                ),
                             ),
+                            priority = 100,
                         ),
-                        priority = 100,
-                    ),
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "src/",
-                                start = 4,
-                                end = 5,
-                                source = "path",
-                                kind = TerminalCompletionCandidateKind.PATH,
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "src/",
+                                    start = 4,
+                                    end = 5,
+                                    source = "path",
+                                    kind = TerminalCompletionCandidateKind.PATH,
+                                ),
                             ),
+                            priority = 100,
                         ),
-                        priority = 100,
-                    ),
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "--help",
-                                start = 4,
-                                end = 5,
-                                source = "spec",
-                                kind = TerminalCompletionCandidateKind.OPTION,
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "status",
+                                    start = 4,
+                                    end = 5,
+                                    source = "spec",
+                                    kind = TerminalCompletionCandidateKind.SUBCOMMAND,
+                                ),
                             ),
+                            priority = 0,
                         ),
-                        priority = 0,
                     ),
-                ),
-            )
+                )
 
-        val candidates = engine.complete(request(commandLine = "git -", maxCandidates = 8))
+            val candidates = engine.complete(request(commandLine = "git s", maxCandidates = 8))
 
-        assertEquals("--help", candidates.first().replacementText)
-    }
+            assertEquals("status", candidates.first().replacementText)
+        }
 
     @Test
-    fun `dynamic positional domain candidates outrank paths and history`() {
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                listOf(
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "main/",
-                                start = 11,
-                                end = 14,
-                                source = "path",
-                                kind = TerminalCompletionCandidateKind.PATH,
+    fun `static option values outrank history in option value position`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "aws --output table",
+                                    start = 0,
+                                    end = 14,
+                                    source = "mru",
+                                    kind = TerminalCompletionCandidateKind.HISTORY,
+                                ),
                             ),
+                            priority = 100,
                         ),
-                        priority = 100,
-                    ),
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "git switch main",
-                                start = 0,
-                                end = 14,
-                                source = "mru",
-                                kind = TerminalCompletionCandidateKind.HISTORY,
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "text",
+                                    start = 13,
+                                    end = 14,
+                                    source = "spec",
+                                    kind = TerminalCompletionCandidateKind.ARGUMENT,
+                                ),
                             ),
+                            priority = 0,
                         ),
-                        priority = 100,
                     ),
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "main",
-                                start = 11,
-                                end = 14,
-                                source = "git-branches",
-                                kind = TerminalCompletionCandidateKind.ARGUMENT,
-                                valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
-                            ),
-                        ),
-                        priority = 0,
-                    ),
-                ),
-            )
+                )
 
-        val candidates = engine.complete(request(commandLine = "git switch mai", maxCandidates = 8))
+            val candidates = engine.complete(request(commandLine = "aws --output t", maxCandidates = 8))
 
-        assertEquals("main", candidates.first().replacementText)
-        assertEquals("git-branches", candidates.first().source)
-    }
+            assertEquals(listOf("text", "aws --output table"), candidates.map { it.replacementText })
+        }
 
     @Test
-    fun `dynamic option domain candidates outrank generic argument candidates`() {
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                listOf(
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "default-history",
-                                start = 20,
-                                end = 23,
-                                source = "stats",
-                                kind = TerminalCompletionCandidateKind.ARGUMENT,
+    fun `option names outrank history and paths in option name position`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "git status",
+                                    start = 0,
+                                    end = 5,
+                                    source = "mru",
+                                    kind = TerminalCompletionCandidateKind.HISTORY,
+                                ),
                             ),
+                            priority = 100,
                         ),
-                        priority = 100,
-                    ),
-                    entry(
-                        source(
-                            candidate(
-                                replacement = "default",
-                                start = 20,
-                                end = 23,
-                                source = "kubernetes",
-                                kind = TerminalCompletionCandidateKind.ARGUMENT,
-                                valueDomain = TerminalCompletionValueDomain.KUBERNETES_NAMESPACE,
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "src/",
+                                    start = 4,
+                                    end = 5,
+                                    source = "path",
+                                    kind = TerminalCompletionCandidateKind.PATH,
+                                ),
                             ),
+                            priority = 100,
                         ),
-                        priority = 0,
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "--help",
+                                    start = 4,
+                                    end = 5,
+                                    source = "spec",
+                                    kind = TerminalCompletionCandidateKind.OPTION,
+                                ),
+                            ),
+                            priority = 0,
+                        ),
                     ),
-                ),
-            )
+                )
 
-        val candidates = engine.complete(request(commandLine = "kubectl --namespace def", maxCandidates = 8))
+            val candidates = engine.complete(request(commandLine = "git -", maxCandidates = 8))
 
-        assertEquals(listOf("default", "default-history"), candidates.map { it.replacementText })
-    }
-
-    @Test
-    fun `empty source list returns no candidates`() {
-        val engine = TerminalCompletionEngines.fromSources(emptyList<TerminalCompletionSourceEntry>())
-
-        assertTrue(engine.complete(request(maxCandidates = 8)).isEmpty())
-    }
+            assertEquals("--help", candidates.first().replacementText)
+        }
 
     @Test
-    fun `operator region suppresses every source before source evaluation`() {
-        var sourceCalls = 0
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                TerminalCompletionSource {
-                    sourceCalls++
-                    listOf(candidate("unexpected"))
-                },
-            )
-        val commandLine = "git status && cd"
+    fun `dynamic positional domain candidates outrank paths and history`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "main/",
+                                    start = 11,
+                                    end = 14,
+                                    source = "path",
+                                    kind = TerminalCompletionCandidateKind.PATH,
+                                ),
+                            ),
+                            priority = 100,
+                        ),
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "git switch main",
+                                    start = 0,
+                                    end = 14,
+                                    source = "mru",
+                                    kind = TerminalCompletionCandidateKind.HISTORY,
+                                ),
+                            ),
+                            priority = 100,
+                        ),
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "main",
+                                    start = 11,
+                                    end = 14,
+                                    source = "git-branches",
+                                    kind = TerminalCompletionCandidateKind.ARGUMENT,
+                                    valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                                ),
+                            ),
+                            priority = 0,
+                        ),
+                    ),
+                )
 
-        val candidates =
-            engine.complete(
-                TerminalCompletionRequest(
-                    commandLine = commandLine,
-                    cursorOffset = commandLine.indexOf("&&") + 1,
-                    shellCapabilities = TerminalShellCapabilities.POSIX,
-                ),
-            )
+            val candidates = engine.complete(request(commandLine = "git switch mai", maxCandidates = 8))
 
-        assertTrue(candidates.isEmpty())
-        assertEquals(0, sourceCalls)
-    }
+            assertEquals("main", candidates.first().replacementText)
+            assertEquals("git-branches", candidates.first().source)
+        }
 
     @Test
-    fun `sources with the same command specs share one resolved context`() {
-        val contexts = ArrayList<TerminalCompletionContext>()
-        val specs = TerminalCommandSpecs.defaults()
-        val source =
-            object : ContextAwareCompletionSource {
-                override val commandSpecs: List<TerminalCommandSpec> = specs
+    fun `dynamic option domain candidates outrank generic argument candidates`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    listOf(
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "default-history",
+                                    start = 20,
+                                    end = 23,
+                                    source = "stats",
+                                    kind = TerminalCompletionCandidateKind.ARGUMENT,
+                                ),
+                            ),
+                            priority = 100,
+                        ),
+                        entry(
+                            source(
+                                candidate(
+                                    replacement = "default",
+                                    start = 20,
+                                    end = 23,
+                                    source = "kubernetes",
+                                    kind = TerminalCompletionCandidateKind.ARGUMENT,
+                                    valueDomain = TerminalCompletionValueDomain.KUBERNETES_NAMESPACE,
+                                ),
+                            ),
+                            priority = 0,
+                        ),
+                    ),
+                )
 
-                override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-                    error("Merged engine must use the resolved-context path")
+            val candidates = engine.complete(request(commandLine = "kubectl --namespace def", maxCandidates = 8))
 
-                override fun complete(
-                    request: TerminalCompletionRequest,
-                    context: TerminalCompletionContext,
-                ): List<TerminalCompletionCandidate> {
+            assertEquals(listOf("default", "default-history"), candidates.map { it.replacementText })
+        }
+
+    @Test
+    fun `empty source list returns no candidates`() =
+        runBlocking {
+            val engine = TerminalCompletionEngines.fromSources(emptyList<TerminalCompletionSourceEntry>())
+
+            assertTrue(engine.complete(request(maxCandidates = 8)).isEmpty())
+        }
+
+    @Test
+    fun `operator region suppresses every source before source evaluation`() =
+        runBlocking {
+            var sourceCalls = 0
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    TerminalCompletionSource { _, _, _ ->
+                        sourceCalls++
+                        listOf(candidate("unexpected"))
+                    },
+                )
+            val commandLine = "git status && cd"
+
+            val candidates =
+                engine.complete(
+                    TerminalCompletionRequest(
+                        commandLine = commandLine,
+                        cursorOffset = commandLine.indexOf("&&") + 1,
+                        shellCapabilities = TerminalShellCapabilities.POSIX,
+                    ),
+                )
+
+            assertTrue(candidates.isEmpty())
+            assertEquals(0, sourceCalls)
+        }
+
+    @Test
+    fun `sources with the same command specs share one resolved context`() =
+        runBlocking {
+            val contexts = ArrayList<TerminalCompletionContext>()
+            val specs = TerminalCommandSpecs.defaults()
+            val source =
+                TerminalCompletionSource { _, context, _ ->
                     contexts += context
-                    return emptyList()
+                    emptyList()
                 }
-            }
-        val engine =
-            TerminalCompletionEngines.fromSources(
-                sources = listOf(entry(source, 0), entry(source, 0)),
-                commandSpecs = specs,
-            )
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources = listOf(entry(source, 0), entry(source, 0)),
+                    commandSpecs = specs,
+                )
 
-        engine.complete(request(commandLine = "git --", maxCandidates = 8))
+            engine.complete(request(commandLine = "git --", maxCandidates = 8))
 
-        assertEquals(2, contexts.size)
-        assertSame(contexts[0], contexts[1])
-    }
+            assertEquals(2, contexts.size)
+            assertSame(contexts[0], contexts[1])
+        }
 
     private fun entry(
         source: TerminalCompletionSource,
@@ -518,7 +546,7 @@ class MergedCompletionEngineTest {
         )
 
     private fun source(vararg candidates: TerminalCompletionCandidate): TerminalCompletionSource =
-        TerminalCompletionSource { candidates.toList() }
+        TerminalCompletionSource { _, _, _ -> candidates.toList() }
 
     private fun candidate(
         replacement: String,

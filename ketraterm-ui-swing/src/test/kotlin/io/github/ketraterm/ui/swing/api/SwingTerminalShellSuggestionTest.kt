@@ -23,6 +23,9 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.*
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Insets
@@ -31,6 +34,50 @@ import java.nio.charset.StandardCharsets
 import javax.swing.SwingUtilities
 
 class SwingTerminalShellSuggestionTest {
+    @Test
+    fun `new suggestion request cancels the previous provider call`() {
+        val firstStarted = CompletableDeferred<Unit>()
+        val firstCancelled = CompletableDeferred<Unit>()
+        val secondCompleted = CompletableDeferred<Unit>()
+        val component =
+            SwingTerminal(
+                settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
+                hostServices =
+                    SwingHostServices(
+                        shellSuggestionProvider =
+                            SwingShellSuggestionProvider { request ->
+                                if (request.commandText == "first") {
+                                    firstStarted.complete(Unit)
+                                    try {
+                                        awaitCancellation()
+                                    } finally {
+                                        firstCancelled.complete(Unit)
+                                    }
+                                }
+                                suggestions(request.commandText).also {
+                                    secondCompleted.complete(Unit)
+                                }
+                            },
+                    ),
+            )
+
+        SwingUtilities.invokeAndWait {
+            component.size = component.preferredGridSize(12, 4)
+            component.requestShellSuggestions("first", 5, 0, 0)
+        }
+        runBlocking { firstStarted.await() }
+        SwingUtilities.invokeAndWait { component.requestShellSuggestions("second", 6, 0, 0) }
+        runBlocking { firstCancelled.await() }
+        runBlocking { secondCompleted.await() }
+
+        SwingUtilities.invokeAndWait {
+            val state = component.currentShellSuggestionState()
+            assertTrue(state.visible)
+            assertEquals(2, state.count)
+            component.dispose()
+        }
+    }
+
     @Test
     fun `public suggestion popup requires tab selection before tab acceptance`() {
         val accepted = ArrayList<SwingShellSuggestion>()

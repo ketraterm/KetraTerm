@@ -157,16 +157,16 @@ These are not badges of compatibility for this project. They expand attack surfa
   IDE run configurations, and IntelliJ-native popup styling remain host-owned
   follow-up work. IntelliJ now has a plugin-owned shared-engine adapter with profile/current-directory context,
   coroutine-debounced live refresh, active-keymap acceptance, session MRU, privacy-filtered application-level
-  exact/shape/feedback learning, and bounded off-EDT path snapshots with stale-generation rejection. The reusable Swing
+  exact/shape/feedback learning, and bounded suspending off-EDT path providers. The reusable Swing
   terminal popup surface, keyboard/mouse selection, acceptance callback, range-aware Swing acceptance, dependency-free
-  layered completion foundation, deterministic source merge/ranking/deduplication with context-aware
+  layered suspending completion foundation, deterministic source merge/ranking/deduplication with context-aware
   command/subcommand/option/value/path/domain ranking, context-aware live trigger policy, bounded in-memory session MRU
   plus session-only observed-token learning for unknown executable families, spec-declared path argument metadata,
   repeatable subcommand/task metadata, static option value domains, dynamic value-domain metadata for host providers,
   command-aware path completion with trailing-space argument semantics, quote-preserving and shell-escaped path
   replacement, cursor-aware POSIX/PowerShell command segments with graceful incomplete-input recovery, standalone and
   IntelliJ spec/MRU provider wiring, compact exact command/shape/source-feedback stats, source-specific feedback-aware
-  ranking, bounded coroutine-backed directory snapshots, and standalone/IntelliJ enablement settings exist.
+  ranking, direct coroutine-backed directory providers, and standalone/IntelliJ enablement settings exist.
   Shell-returned completions are intentionally deferred.
 - `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, latest-request local Git branch snapshots from
   Git4Idea for `git switch`, `checkout`, `merge`, and `rebase`, and uses the IDE VFS/project-content model for path

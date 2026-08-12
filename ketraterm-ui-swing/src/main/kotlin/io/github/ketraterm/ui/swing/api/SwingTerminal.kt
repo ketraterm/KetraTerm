@@ -99,6 +99,7 @@ class SwingTerminal
         private val componentScope =
             CoroutineScope(componentJob + uiCoroutineDispatcher + CoroutineName("swing-terminal"))
         private var bindingJob: Job? = null
+        private var suggestionJob: Job? = null
 
         internal val hasActiveRenderBinding: Boolean
             get() = bindingJob?.isActive == true
@@ -1103,6 +1104,8 @@ class SwingTerminal
             rowScroller.finish()
             selectionController.stopSelectionDrag()
             hyperlinkDiscoveryController.dispose()
+            suggestionJob?.cancel(CancellationException("Swing terminal disposed"))
+            suggestionJob = null
             shellSuggestionController.close()
             componentScope.cancel(CancellationException("Swing terminal disposed"))
         }
@@ -1349,6 +1352,8 @@ class SwingTerminal
         fun hideShellSuggestions() {
             runOnEdt(
                 Runnable {
+                    suggestionJob?.cancel(CancellationException("Shell suggestions hidden"))
+                    suggestionJob = null
                     shellSuggestionController.hide()
                 },
             )
@@ -1487,18 +1492,26 @@ class SwingTerminal
             request: SwingShellSuggestionRequest,
             automatic: Boolean = true,
         ) {
+            suggestionJob?.cancel(CancellationException("Shell suggestion request replaced"))
             if (automatic && !settings.shellSuggestionsEnabled) {
+                suggestionJob = null
                 shellSuggestionController.hide()
                 return
             }
-            val suggestions =
-                runCatching {
-                    hostServices.shellSuggestionProvider.suggestions(request)
-                }.getOrElse { exception ->
-                    System.err.println("Shell suggestion provider failed: ${exception.message}")
-                    emptyList()
+            suggestionJob =
+                componentScope.launch {
+                    val suggestions =
+                        try {
+                            hostServices.shellSuggestionProvider.suggestions(request)
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (exception: Exception) {
+                            System.err.println("Shell suggestion provider failed: ${exception.message}")
+                            emptyList()
+                        }
+                    ensureActive()
+                    shellSuggestionController.show(request, suggestions, selectedIndex = -1)
                 }
-            shellSuggestionController.show(request, suggestions, selectedIndex = -1)
         }
 
         /**

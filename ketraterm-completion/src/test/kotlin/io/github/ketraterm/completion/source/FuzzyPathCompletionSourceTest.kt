@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -39,113 +40,122 @@ class FuzzyPathCompletionSourceTest {
         )
 
     @Test
-    fun `finds a project file from a basename subsequence in a declared path argument`() {
-        val candidates = source.complete(request("cat FzT"))
+    fun `finds a project file from a basename subsequence in a declared path argument`() =
+        runBlocking {
+            val candidates = source.complete(request("cat FzT"))
 
-        assertEquals(
-            listOf("src/main/kotlin/FuzzyTarget.kt", "src/test/kotlin/FuzzyTargetTest.kt"),
-            candidates.map(TerminalCompletionCandidate::replacementText),
-        )
-        assertTrue(candidates.all { it.source == "project-file" && it.kind == TerminalCompletionCandidateKind.PATH })
-    }
-
-    @Test
-    fun `passes the active fuzzy prefix to a query-aware provider`() {
-        var requestedPrefix: String? = null
-        val queryAwareSource =
-            TerminalCompletionSources.fuzzyPath(
-                sourceId = "query-aware-project-file",
-                entriesProvider =
-                    TerminalFuzzyPathProvider { prefix ->
-                        requestedPrefix = prefix
-                        listOf(TerminalFuzzyPathEntry("settings.gradle.kts", isDirectory = false))
-                    },
+            assertEquals(
+                listOf("src/main/kotlin/FuzzyTarget.kt", "src/test/kotlin/FuzzyTargetTest.kt"),
+                candidates.map(TerminalCompletionCandidate::replacementText),
             )
-
-        val candidates = queryAwareSource.complete(request("cat sgk"))
-
-        assertEquals("sgk", requestedPrefix)
-        assertEquals(listOf("settings.gradle.kts"), candidates.map(TerminalCompletionCandidate::replacementText))
-    }
+            assertTrue(candidates.all { it.source == "project-file" && it.kind == TerminalCompletionCandidateKind.PATH })
+        }
 
     @Test
-    fun `filters fuzzy results to directories for cd`() {
-        val candidates = source.complete(request("cd rs"))
+    fun `passes the active fuzzy prefix to a query-aware provider`() =
+        runBlocking {
+            var requestedPrefix: String? = null
+            val queryAwareSource =
+                TerminalCompletionSources.fuzzyPath(
+                    sourceId = "query-aware-project-file",
+                    entriesProvider =
+                        TerminalFuzzyPathProvider { prefix ->
+                            requestedPrefix = prefix
+                            listOf(TerminalFuzzyPathEntry("settings.gradle.kts", isDirectory = false))
+                        },
+                )
 
-        assertEquals(listOf("src/main/resources/"), candidates.map(TerminalCompletionCandidate::replacementText))
-        assertEquals(listOf("project directory"), candidates.map(TerminalCompletionCandidate::detail))
-    }
+            val candidates = queryAwareSource.complete(request("cat sgk"))
+
+            assertEquals("sgk", requestedPrefix)
+            assertEquals(listOf("settings.gradle.kts"), candidates.map(TerminalCompletionCandidate::replacementText))
+        }
 
     @Test
-    fun `leaves an empty path prefix to direct directory completion`() {
-        assertTrue(source.complete(request("cd ")).isEmpty())
-    }
+    fun `filters fuzzy results to directories for cd`() =
+        runBlocking {
+            val candidates = source.complete(request("cd rs"))
+
+            assertEquals(listOf("src/main/resources/"), candidates.map(TerminalCompletionCandidate::replacementText))
+            assertEquals(listOf("project directory"), candidates.map(TerminalCompletionCandidate::detail))
+        }
 
     @Test
-    fun `can opt into an empty prefix for a small context-specific path snapshot`() {
-        val statusSource =
-            TerminalCompletionSources.fuzzyPath(
-                sourceId = "git-status-path",
-                entriesProvider = { listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false)) },
-                requiresNonEmptyPrefix = false,
-                allowedCommandNames = setOf("add", "restore", "rm", "diff"),
+    fun `leaves an empty path prefix to direct directory completion`() =
+        runBlocking {
+            assertTrue(source.complete(request("cd ")).isEmpty())
+        }
+
+    @Test
+    fun `can opt into an empty prefix for a small context-specific path snapshot`() =
+        runBlocking {
+            val statusSource =
+                TerminalCompletionSources.fuzzyPath(
+                    sourceId = "git-status-path",
+                    entriesProvider = { listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false)) },
+                    requiresNonEmptyPrefix = false,
+                    allowedCommandNames = setOf("add", "restore", "rm", "diff"),
+                )
+
+            assertEquals(
+                listOf("src/Changed.kt"),
+                statusSource.complete(request("git add ")).map(TerminalCompletionCandidate::replacementText),
             )
-
-        assertEquals(
-            listOf("src/Changed.kt"),
-            statusSource.complete(request("git add ")).map(TerminalCompletionCandidate::replacementText),
-        )
-        assertEquals(
-            listOf("src/Changed.kt"),
-            statusSource.complete(request("git restore ")).map(TerminalCompletionCandidate::replacementText),
-        )
-        assertEquals(
-            listOf("src/Changed.kt"),
-            statusSource.complete(request("git rm ")).map(TerminalCompletionCandidate::replacementText),
-        )
-        assertTrue(statusSource.complete(request("cd ")).isEmpty())
-    }
+            assertEquals(
+                listOf("src/Changed.kt"),
+                statusSource.complete(request("git restore ")).map(TerminalCompletionCandidate::replacementText),
+            )
+            assertEquals(
+                listOf("src/Changed.kt"),
+                statusSource.complete(request("git rm ")).map(TerminalCompletionCandidate::replacementText),
+            )
+            assertTrue(statusSource.complete(request("cd ")).isEmpty())
+        }
 
     @Test
-    fun `hides nested dot directories until the active path component starts with a dot`() {
-        assertTrue(source.complete(request("cat Hidden")).isEmpty())
+    fun `hides nested dot directories until the active path component starts with a dot`() =
+        runBlocking {
+            assertTrue(source.complete(request("cat Hidden")).isEmpty())
 
-        assertEquals(
-            listOf("src/main/.generated/Hidden.kt"),
-            source.complete(request("cat src/main/.g")).map(TerminalCompletionCandidate::replacementText),
-        )
-    }
-
-    @Test
-    fun `parent navigation segments are not treated as hidden directories`() {
-        assertEquals(
-            listOf("../shared/NearbySibling.kt"),
-            source.complete(request("cat NbySib")).map(TerminalCompletionCandidate::replacementText),
-        )
-        assertTrue(source.complete(request("cat NbySec")).isEmpty())
-        assertEquals(
-            listOf("../.private/NearbySecret.kt"),
-            source.complete(request("cat ../.p")).map(TerminalCompletionCandidate::replacementText),
-        )
-    }
+            assertEquals(
+                listOf("src/main/.generated/Hidden.kt"),
+                source.complete(request("cat src/main/.g")).map(TerminalCompletionCandidate::replacementText),
+            )
+        }
 
     @Test
-    fun `quotes fuzzy replacements using the active shell contract`() {
-        assertEquals(
-            listOf("notes/My\\ File.txt"),
-            source.complete(request("cat MyF")).map(TerminalCompletionCandidate::replacementText),
-        )
-        assertTrue(
-            source
-                .complete(request("cat MyF", TerminalShellCapabilities.PLAIN))
-                .isEmpty(),
-        )
-    }
+    fun `parent navigation segments are not treated as hidden directories`() =
+        runBlocking {
+            assertEquals(
+                listOf("../shared/NearbySibling.kt"),
+                source.complete(request("cat NbySib")).map(TerminalCompletionCandidate::replacementText),
+            )
+            assertTrue(source.complete(request("cat NbySec")).isEmpty())
+            assertEquals(
+                listOf("../.private/NearbySecret.kt"),
+                source.complete(request("cat ../.p")).map(TerminalCompletionCandidate::replacementText),
+            )
+        }
 
     @Test
-    fun `does not provide generic fuzzy paths in non-path command positions`() {
-        assertTrue(source.complete(request("git sw")).isEmpty())
-    }
+    fun `quotes fuzzy replacements using the active shell contract`() =
+        runBlocking {
+            assertEquals(
+                listOf("notes/My\\ File.txt"),
+                source.complete(request("cat MyF")).map(TerminalCompletionCandidate::replacementText),
+            )
+            assertTrue(
+                source
+                    .complete(request("cat MyF", TerminalShellCapabilities.PLAIN))
+                    .isEmpty(),
+            )
+        }
+
+    @Test
+    fun `does not provide generic fuzzy paths in non-path command positions`() =
+        runBlocking {
+            assertTrue(source.complete(request("git sw")).isEmpty())
+        }
 
     private fun request(
         commandLine: String,

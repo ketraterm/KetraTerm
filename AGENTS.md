@@ -20,8 +20,8 @@ The project is split into strict layers:
   APIs.
 - `ketraterm-input`: host-bound input encoding for keyboard, paste, focus, and
   future mouse reports.
-- `ketraterm-completion`: dependency-free command-line completion models, parsing, ranking, and bounded in-memory
-  learning.
+- `ketraterm-completion`: suspending command-line completion models, parsing, parallel source evaluation, ranking, and
+  bounded in-memory learning.
 - `ketraterm-completion-host`: host-neutral asynchronous snapshot, local-path, and bounded directory-scanning support
   for completion providers.
 - `ketraterm-completion-persistence`: optional sanitized, versioned local-file persistence for completion-learning
@@ -58,8 +58,8 @@ Keep these boundaries intact:
   internals.
 - Input encodes. It reads stable input-facing mode state and writes host-bound
   bytes without parsing terminal output or touching grid/cursor internals.
-- Completion evaluates. Its engine stays dependency-free and performs no host I/O; asynchronous host support and
-  optional disk persistence live in their dedicated completion modules.
+- Completion evaluates. Its engine performs no host I/O; it parses once and uses structured concurrency to evaluate
+  suspending sources. Host support and optional disk persistence live in their dedicated completion modules.
 - Render API exposes primitive frame contracts only. It must not depend on UI,
   Swing, PTY, parser, host, or core internals.
 - Render cache copies render frame data for consumers. It must not choose host

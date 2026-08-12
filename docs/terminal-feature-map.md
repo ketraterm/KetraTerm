@@ -159,31 +159,26 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   by deleting suffix text, backspacing prefix text, and pasting the selected replacement through the input/session
   boundary. The engine does not spawn shells, parse terminal output, perform I/O, or depend on
   Swing/IntelliJ/session/runtime modules.
-- **IntelliJ Dynamic Completion Snapshots**: The IntelliJ host uses Git4Idea repository metadata to publish bounded
-  local branch snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Snapshot loading shares the completion
-  service's suspending concurrency limit, is keyed by the terminal working directory, rejects obsolete loads, and never
-  runs from the shared engine or Swing EDT. Service and per-session jobs are children of IntelliJ's injected application
-  scope, so plugin unload, shutdown, and terminal-session closure cancel their owned work. Each provider keeps one optional
-  load job; a new key cancels it directly, and failed loads release that slot for retry without publishing partial
-  or stale state. IntelliJ project
+- **IntelliJ Dynamic Completion Providers**: The IntelliJ host uses Git4Idea repository metadata through bounded
+  suspending providers for `git switch`, `checkout`, `merge`, and `rebase`. Providers execute as children of the merged
+  engine request and are cancelled when `SwingTerminal` replaces its single suggestion job. IntelliJ project
   path completion uses the IDE's indexed Go to File matcher and ranking inside a write-action-aware suspending read
   action, while blocking directory scanning uses the IO dispatcher outside the project. Dynamic
-  sources are additive factory registrations whose closeable snapshots are released with their session; completion
-  statistics execution and persistence are isolated from source/session composition.
+  sources are additive factory registrations without provider-owned jobs, caches, or closeable snapshots.
   IntelliJ completion persistence is an explicit, disabled-by-default setting; session-local MRU and in-memory
   evidence remain active without disk access.
-- **Shared Completion Host Support**: `ketraterm-completion-host` owns one structured snapshot scope, a shared suspending
-  concurrency limit, and direct latest-request cancellation for stale-safe
-  directory and keyed-value snapshots, authority-preserving local path resolution, and bounded local scanning. Each
+- **Shared Completion Host Support**: `ketraterm-completion-host` owns direct suspending providers,
+  authority-preserving local path resolution, and bounded local scanning. `SwingTerminal` owns one replaceable request
+  job and the merged engine alone parallelizes sources with structured concurrency. Each
   product host retains source composition and priority policy. `ketraterm-completion-persistence` owns sanitized
-  versioned local-file storage with byte, line, and row bounds; standalone loads it on a serialized statistics worker.
+  versioned local-file storage with byte, line, and row bounds; one mutex-backed suspending repository serializes
+  learning and persistence on `Dispatchers.IO`.
   `ketraterm-ui-swing-host`
   owns the reusable engine/feedback vocabulary adapters. The pure completion engine, product-specific loaders, UI
   presentation, source composition, and persistence policy remain in their responsible layers.
 - **Fixed-Grid Smooth Swing Viewport**: One allocation-conscious row-scrolling engine serves notched mouse wheels, precise trackpads, Shift+Page Up/Down keyboard paging, selection-drag autoscroll, programmatic navigation, and standalone/IntelliJ scrollbars. The reusable Swing terminal defaults to zero top padding so smooth row animation can enter and leave through the top edge without clipping, while preserving a compact right edge for natural wrapping, a stable bottom spacer, and the left shell-integration decoration gutter. Alternate-screen rendering suppresses prompt decorations and uses symmetric left/right insets equal to the bottom spacer, then resizes the terminal grid to the newly available columns so full-screen TUIs avoid fake right slack. Optional host padding is treated consistently as an explicit visual inset on all four edges. Precise device deltas accumulate without moving content until they emit whole rows; every destination and resting viewport is therefore row-aligned. Animation retains a fractional visual position only while easing between integer destinations, with line-based render-cache addressing through an integer anchor and one overscan row clipped to the terminal grid. A fractional component height is covered by a separate render-only row, so a 10.9-row viewport requests 11 rows at rest and up to 12 during animation without changing the 10-row terminal grid. The Swing cache reserves both transient rows and reuses its primitive planes while overscan toggles, avoiding animation-loop storage allocation. Scrollbar dragging remains continuous at the thumb while every position maps immediately to an integer terminal top row, so content has no drag lag and release is already aligned. Allocation-free primitive viewport notifications keep the thumb synchronized on every animation frame; full snapshot objects remain event-level only. Sub-row animation frames update translated geometry without rereading the render cache or rebuilding shell/search projections until the integer render mapping changes. Hit testing, repaint bounds, command anchors, and terminal-pixel mouse coordinates consume the same translated geometry. Shell-integration prompt dots remain zero-layout decorations and never change row pitch, visible row count, scroll range, mouse coordinates, or PTY dimensions.
-- **Host Path Snapshot Providers**: Path interpretation remains host-owned. Standalone and IntelliJ resolve local and
+- **Host Path Providers**: Path interpretation remains host-owned. Standalone and IntelliJ resolve local and
   `localhost` OSC 7 file URIs, explicit home paths, Windows drive roots, and Windows UNC roots while rejecting non-local
-  authorities. Directory enumeration runs outside the EDT through host-owned coroutine services with one shared
-  suspending concurrency limit; each provider retains only its latest request and ready snapshot. Visit, result,
-  elapsed-time, and expiry limits bound work, while active-job identity prevents stale results from refreshing the popup.
+  authorities. Directory enumeration is suspending and interruptible outside the EDT. Visit, result, and elapsed-time
+  limits bound work; request cancellation prevents stale results from refreshing the popup.
 - **Bell Indicators**: Alerts embedding hosts of beep signals (`BEL`) through independently configurable audible bell and visual bell policies. The reusable Swing terminal can show a subtle edge pulse that remains available when audio is disabled.

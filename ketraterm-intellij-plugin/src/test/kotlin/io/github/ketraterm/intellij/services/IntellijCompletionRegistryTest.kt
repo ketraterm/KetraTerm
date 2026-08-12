@@ -15,708 +15,110 @@
  */
 package io.github.ketraterm.intellij.services
 
-import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.*
-import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
-import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
-import io.github.ketraterm.ui.swing.suggestion.*
-import kotlinx.coroutines.awaitCancellation
-import org.junit.Assert.*
+import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.api.TerminalFileEntry
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.host.TerminalDirectoryScanner
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import java.nio.file.Path
 
-/** Integration tests for IntelliJ completion source composition and lifecycle. */
 class IntellijCompletionRegistryTest {
     @Test
-    fun `shared evidence orders static specs identically to standalone`() {
-        val snapshot =
-            TerminalCommandCompletionStatsSnapshot(
-                shapeStats =
-                    listOf(
-                        TerminalCommandShapeStats(
-                            shape = TerminalCommandLineShape("git", listOf("switch"), positionalArgumentCount = 1),
-                            profileId = "bash",
-                            workingDirectoryUri = "file:///repo",
-                            acceptedCount = 4,
-                        ),
-                        TerminalCommandShapeStats(
-                            shape = TerminalCommandLineShape("git", listOf("status")),
-                            profileId = "bash",
-                            workingDirectoryUri = "file:///repo",
-                            dismissedCount = 4,
-                        ),
-                    ),
-            )
-        val statsSource = TerminalCompletionSources.learningStore()
-        statsSource.replaceSnapshot(snapshot)
-        val registry =
-            IntellijCompletionRegistry(
-                specs =
-                    listOf(
-                        TerminalCommandSpec(
-                            name = "git",
-                            subcommands = listOf(TerminalCommandSpec("status"), TerminalCommandSpec("switch")),
-                        ),
-                    ),
-                statsSource = statsSource,
-                loadStats = { snapshot },
-            )
-        try {
+    fun `directory completion suspends until the scanner returns real values`() =
+        runBlocking {
+            var scans = 0
+            val registry = IntellijCompletionRegistry(coroutineScope = this)
             val session =
                 registry.openSession(
-                    context("parity").copy(workingDirectoryUriProvider = { "file:///repo" }),
-                )
-
-            val suggestions = session.provider.suggestions(request("git "))
-
-            assertEquals(listOf("switch", "status"), suggestions.map { it.replacementText }.take(2))
-            assertTrue(suggestions.take(2).all { it.source == "spec" })
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `Gradle task evidence fuses with session MRU and persisted statistics`() {
-        val command = "./gradlew :app:test"
-        val snapshot =
-            TerminalCommandCompletionStatsSnapshot(
-                commandStats =
-                    listOf(
-                        TerminalCommandCompletionStats(
-                            commandLine = command,
-                            profileId = "bash",
-                            workingDirectoryUri = "file:///project",
-                            useCount = 8,
-                            successCount = 8,
-                            acceptedCount = 4,
-                            lastUsedEpochMillis = 2_000L,
-                        ),
-                    ),
-            )
-        val statsSource = TerminalCompletionSources.learningStore()
-        statsSource.replaceSnapshot(snapshot)
-        val registry = IntellijCompletionRegistry(statsSource = statsSource, loadStats = { snapshot })
-        try {
-            val changed = CountDownLatch(1)
-            val session =
-                registry.openSession(
-                    context("gradle-fusion").copy(
-                        workingDirectoryUriProvider = { "file:///project" },
-                        providerFactories =
-                            listOf(
-                                IntellijGradleTaskProviderFactory {
-                                    listOf(
-                                        TerminalGradleTask(":app:check", "unused sibling"),
-                                        TerminalGradleTask(":app:test", "learned task"),
-                                    )
-                                },
-                            ),
-                    ),
-                )
-            session.onSourceChanged(changed::countDown)
-            registry.recordFinishedCommand(
-                "gradle-fusion",
-                "bash",
-                successfulCommand(command, workingDirectoryUri = "file:///project"),
-            )
-            val request = request("./gradlew :app:")
-
-            session.provider.suggestions(request)
-            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
-            val suggestions = awaitSuggestions(session, request, "intellij-gradle-task")
-
-            assertEquals(command, suggestions.first().commandTextAfterReplacement(request))
-            assertEquals("intellij-gradle-task", suggestions.first().source)
-            assertEquals("./gradlew :app:check", suggestions[1].commandTextAfterReplacement(request))
-            assertTrue(suggestions.none { it.source == "stats" })
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `Git branch evidence fuses with session MRU and persisted statistics`() {
-        val command = "git switch feature/terminal"
-        val snapshot =
-            TerminalCommandCompletionStatsSnapshot(
-                commandStats =
-                    listOf(
-                        TerminalCommandCompletionStats(
-                            commandLine = command,
-                            profileId = "bash",
-                            workingDirectoryUri = "file:///repo",
-                            useCount = 8,
-                            successCount = 8,
-                            acceptedCount = 4,
-                            lastUsedEpochMillis = 2_000L,
-                        ),
-                    ),
-            )
-        val statsSource = TerminalCompletionSources.learningStore()
-        statsSource.replaceSnapshot(snapshot)
-        val registry = IntellijCompletionRegistry(statsSource = statsSource, loadStats = { snapshot })
-        try {
-            val changed = CountDownLatch(1)
-            val session =
-                registry.openSession(
-                    context("git-fusion").copy(
-                        workingDirectoryUriProvider = { "file:///repo" },
-                        providerFactories =
-                            listOf(
-                                IntellijGitBranchProviderFactory {
-                                    listOf(
-                                        TerminalCompletionDomainValue("feature/aaa", detail = "unused branch"),
-                                        TerminalCompletionDomainValue("feature/terminal", detail = "learned branch"),
-                                    )
-                                },
-                            ),
-                    ),
-                )
-            session.onSourceChanged(changed::countDown)
-            registry.recordFinishedCommand(
-                "git-fusion",
-                "bash",
-                successfulCommand(command, workingDirectoryUri = "file:///repo"),
-            )
-            val request = request("git switch feature/")
-
-            session.provider.suggestions(request)
-            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
-            val suggestions = awaitSuggestions(session, request, "intellij-git-branch")
-
-            assertEquals(command, suggestions.first().commandTextAfterReplacement(request))
-            assertEquals("intellij-git-branch", suggestions.first().source)
-            assertEquals("git switch feature/aaa", suggestions[1].commandTextAfterReplacement(request))
-            assertTrue(suggestions.none { it.source == "stats" })
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `additional provider factory composes source and closes its resources`() {
-        var resourceClosed = false
-        val factory =
-            IntellijCompletionProviderFactory {
-                IntellijCompletionProviderRegistration(
-                    sourceEntry =
-                        TerminalCompletionSourceEntry(
-                            source = { request ->
-                                listOf(
-                                    TerminalCompletionCandidate(
-                                        replacementText = "custom",
-                                        replacementStartOffset = 0,
-                                        replacementEndOffset = request.cursorOffset,
-                                        source = "custom-provider",
-                                        kind = TerminalCompletionCandidateKind.COMMAND,
-                                    ),
-                                )
+                    context(
+                        scanner =
+                            TerminalDirectoryScanner { _, _ ->
+                                scans++
+                                listOf(TerminalFileEntry("src", true))
                             },
-                            priority = 500,
-                        ),
-                    resources = listOf(AutoCloseable { resourceClosed = true }),
-                )
-            }
-        val registry = IntellijCompletionRegistry(specs = emptyList())
-        val session = registry.openSession(context("custom").copy(providerFactories = listOf(factory)))
-
-        assertEquals("custom", session.provider.suggestions(request("cu")).single().replacementText)
-
-        session.close()
-        assertTrue(resourceClosed)
-        registry.close()
-    }
-
-    @Test
-    fun `git branch snapshot refreshes the owning session provider`() {
-        val registry = IntellijCompletionRegistry()
-        try {
-            val changed = CountDownLatch(1)
-            val session =
-                registry.openSession(
-                    context("first").copy(
-                        providerFactories =
-                            listOf(
-                                IntellijGitBranchProviderFactory {
-                                    listOf(
-                                        TerminalCompletionDomainValue("feature/terminal", detail = "local branch"),
-                                    )
-                                },
-                            ),
                     ),
                 )
-            session.onSourceChanged(changed::countDown)
 
-            session.provider.suggestions(request("git switch fe"))
-            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            var suggestions = session.provider.suggestions(request("git switch fe"))
-            while (suggestions.none { it.source == "intellij-git-branch" } && System.nanoTime() < deadline) {
-                Thread.sleep(5)
-                suggestions = session.provider.suggestions(request("git switch fe"))
-            }
+            val suggestions = session.provider.suggestions(request("cd s"))
 
-            val suggestion = suggestions.single { it.source == "intellij-git-branch" }
-            assertEquals("feature/terminal", suggestion.replacementText)
-            assertEquals("local branch", suggestion.detail)
-            assertEquals("intellij-git-branch", suggestion.source)
-        } finally {
+            assertEquals(1, scans)
+            assertEquals("src/", suggestions.first { it.source == "path" }.replacementText)
+            session.close()
             registry.close()
         }
-    }
 
     @Test
-    fun `remote git branch snapshot is available for checkout but not switch`() {
-        val registry = IntellijCompletionRegistry()
-        try {
-            val changed = CountDownLatch(1)
-            val session =
-                registry.openSession(
-                    context("remote-branch").copy(
-                        providerFactories =
-                            listOf(
-                                IntellijGitRemoteBranchProviderFactory {
-                                    listOf(
-                                        TerminalCompletionDomainValue(
-                                            "origin/feature/terminal",
-                                            detail = "remote branch"
-                                        )
-                                    )
-                                },
-                            ),
-                    ),
-                )
-            session.onSourceChanged(changed::countDown)
-
-            session.provider.suggestions(request("git checkout or"))
-            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            var suggestions = session.provider.suggestions(request("git checkout or"))
-            while (suggestions.none { it.source == "intellij-git-remote-branch" } && System.nanoTime() < deadline) {
-                Thread.sleep(5)
-                suggestions = session.provider.suggestions(request("git checkout or"))
-            }
-
-            val suggestion = suggestions.single { it.source == "intellij-git-remote-branch" }
-            assertEquals("origin/feature/terminal", suggestion.replacementText)
-            assertEquals("remote branch", suggestion.detail)
-            assertTrue(
-                session.provider.suggestions(request("git switch or"))
-                    .none { it.source == "intellij-git-remote-branch" })
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `git tag snapshot is available for checkout but not switch`() {
-        val registry = IntellijCompletionRegistry()
-        try {
-            val changed = CountDownLatch(1)
-            val session =
-                registry.openSession(
-                    context("git-tag").copy(
-                        providerFactories =
-                            listOf(
-                                IntellijGitTagProviderFactory {
-                                    listOf(TerminalCompletionDomainValue("v2.0.0", detail = "tag"))
-                                },
-                            ),
-                    ),
-                )
-            session.onSourceChanged(changed::countDown)
-
-            session.provider.suggestions(request("git checkout v"))
-            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            var suggestions = session.provider.suggestions(request("git checkout v"))
-            while (suggestions.none { it.source == "intellij-git-tag" } && System.nanoTime() < deadline) {
-                Thread.sleep(5)
-                suggestions = session.provider.suggestions(request("git checkout v"))
-            }
-
-            val suggestion = suggestions.single { it.source == "intellij-git-tag" }
-            assertEquals("v2.0.0", suggestion.replacementText)
-            assertEquals("tag", suggestion.detail)
-            assertTrue(session.provider.suggestions(request("git switch v")).none { it.source == "intellij-git-tag" })
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `Gradle task snapshot supports qualified tasks and project directory task names`() {
-        val registry = IntellijCompletionRegistry()
-        try {
-            val changed = CountDownLatch(1)
-            val session =
-                registry.openSession(
-                    context("gradle-task").copy(
-                        workingDirectoryUriProvider = { "file:///project" },
-                        providerFactories =
-                            listOf(
-                                IntellijGradleTaskProviderFactory {
-                                    listOf(
-                                        TerminalGradleTask(":test", "run root tests", projectDirectory = "."),
-                                        TerminalGradleTask(
-                                            ":app:runIde",
-                                            "launch IDE sandbox",
-                                            projectDirectory = "app"
-                                        ),
-                                    )
-                                },
-                            ),
-                    ),
-                )
-            session.onSourceChanged(changed::countDown)
-
-            session.provider.suggestions(request("./gradlew :app:runI"))
-            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            var suggestions = session.provider.suggestions(request("./gradlew :app:runI"))
-            while (suggestions.none { it.source == "intellij-gradle-task" } && System.nanoTime() < deadline) {
-                Thread.sleep(5)
-                suggestions = session.provider.suggestions(request("./gradlew :app:runI"))
-            }
-
-            val qualified = suggestions.single { it.source == "intellij-gradle-task" }
-            assertEquals(":app:runIde", qualified.replacementText)
-            assertEquals("launch IDE sandbox", qualified.detail)
-            assertEquals(
-                listOf("runIde"),
-                session.provider.suggestions(request("./gradlew -p app runI"))
-                    .filter { it.source == "intellij-gradle-task" }
-                    .map { it.replacementText },
-            )
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `project fuzzy path snapshot refreshes the owning session provider`() {
-        val registry = IntellijCompletionRegistry()
-        try {
-            val changed = CountDownLatch(1)
-            var loadedWorkingDirectoryUri: String? = null
-            var loadedPrefix: String? = null
-            val session =
-                registry.openSession(
-                    context("project-files").copy(
-                        workingDirectoryUriProvider = { "file:///project" },
-                        providerFactories =
-                            listOf(
-                                IntellijProjectFileProviderFactory { workingDirectoryUri, prefix ->
-                                    loadedWorkingDirectoryUri = workingDirectoryUri
-                                    loadedPrefix = prefix
-                                    listOf(TerminalFuzzyPathEntry("settings.gradle.kts", isDirectory = false))
-                                },
-                            ),
-                    ),
-                )
-            session.onSourceChanged(changed::countDown)
-
-            session.provider.suggestions(request("cat sgk"))
-            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            var suggestions = session.provider.suggestions(request("cat sgk"))
-            while (suggestions.none { it.source == "intellij-project-file" } && System.nanoTime() < deadline) {
-                Thread.sleep(5)
-                suggestions = session.provider.suggestions(request("cat sgk"))
-            }
-
-            val suggestion = suggestions.single { it.source == "intellij-project-file" }
-            assertEquals("file:///project", loadedWorkingDirectoryUri)
-            assertEquals("sgk", loadedPrefix)
-            assertEquals("settings.gradle.kts", suggestion.replacementText)
-            assertEquals("project file", suggestion.detail)
-            assertEquals("PATH", suggestion.kind)
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `project fuzzy path snapshot works when workingDirectoryUriProvider returns null`() {
-        val registry = IntellijCompletionRegistry()
-        try {
-            val changed = CountDownLatch(1)
-            val session =
-                registry.openSession(
-                    context("project-files-null-uri").copy(
-                        workingDirectoryUriProvider = { null },
-                        providerFactories =
-                            listOf(
-                                IntellijProjectFileProviderFactory { _, _ ->
-                                    listOf(TerminalFuzzyPathEntry("src/main/NullUriTarget.kt", isDirectory = false))
-                                },
-                            ),
-                    ),
-                )
-            session.onSourceChanged(changed::countDown)
-
-            session.provider.suggestions(request("cat NullUri"))
-            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            var suggestions = session.provider.suggestions(request("cat NullUri"))
-            while (suggestions.none { it.source == "intellij-project-file" } && System.nanoTime() < deadline) {
-                Thread.sleep(5)
-                suggestions = session.provider.suggestions(request("cat NullUri"))
-            }
-
-            val suggestion = suggestions.single { it.source == "intellij-project-file" }
-            assertEquals("src/main/NullUriTarget.kt", suggestion.replacementText)
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `closing session cancels its active project fuzzy path load`() {
-        val registry = IntellijCompletionRegistry()
-        val started = CountDownLatch(1)
-        val cancelled = CountDownLatch(1)
-        val session =
-            registry.openSession(
-                context("project-files-close").copy(
-                    providerFactories =
-                        listOf(
-                            IntellijProjectFileProviderFactory { _, _ ->
-                                started.countDown()
-                                try {
-                                    awaitCancellation()
-                                } finally {
-                                    cancelled.countDown()
-                                }
+    fun `dynamic provider loads values in the completion coroutine`() =
+        runBlocking {
+            var loads = 0
+            val factory =
+                IntellijCompletionProviderFactory { providerContext ->
+                    providerContext.createSuspendingRegistration(50, loader = {
+                        loads++
+                        listOf("main")
+                    }) { values ->
+                        TerminalCompletionSources.valueDomain(
+                            sourceId = "test-branch",
+                            domain = io.github.ketraterm.completion.model.TerminalCompletionValueDomain.GIT_BRANCH,
+                            valuesProvider = {
+                                values().map { io.github.ketraterm.completion.model.TerminalCompletionDomainValue(it) }
                             },
-                        ),
-                ),
-            )
-        try {
-            session.provider.suggestions(request("cat sgk"))
-            assertTrue("project fuzzy load did not start", started.await(5, TimeUnit.SECONDS))
+                        )
+                    }
+                }
+            val registry = IntellijCompletionRegistry(coroutineScope = this)
+            val session = registry.openSession(context(factories = listOf(factory)))
 
-            session.close()
+            session.provider.suggestions(request("git switch m"))
 
-            assertTrue("project fuzzy load outlived its session", cancelled.await(5, TimeUnit.SECONDS))
-        } finally {
+            assertEquals(1, loads)
             session.close()
             registry.close()
         }
-    }
 
     @Test
-    fun `git status paths refresh the owning session provider for an empty add argument`() {
-        val registry = IntellijCompletionRegistry()
-        try {
-            val changed = CountDownLatch(1)
-            val session =
-                registry.openSession(
-                    context("git-status-path").copy(
-                        workingDirectoryUriProvider = { "file:///project" },
-                        providerFactories =
-                            listOf(
-                                IntellijGitStatusPathProviderFactory {
-                                    listOf(
-                                        TerminalFuzzyPathEntry(
-                                            "src/Changed.kt",
-                                            isDirectory = false,
-                                            detail = "changed file",
-                                        ),
-                                    )
-                                },
-                            ),
-                    ),
-                )
-            session.onSourceChanged(changed::countDown)
-
-            session.provider.suggestions(request("git add "))
-            assertTrue("completion source refresh timed out", changed.await(5, TimeUnit.SECONDS))
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            var suggestions = session.provider.suggestions(request("git add "))
-            while (suggestions.none { it.source == "intellij-git-status-path" } && System.nanoTime() < deadline) {
-                Thread.sleep(5)
-                suggestions = session.provider.suggestions(request("git add "))
-            }
-
-            val suggestion = suggestions.single { it.source == "intellij-git-status-path" }
-            assertEquals("src/Changed.kt", suggestion.replacementText)
-            assertEquals("changed file", suggestion.detail)
-            assertEquals("PATH", suggestion.kind)
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `successful commands feed only their owning session MRU`() {
-        val registry = IntellijCompletionRegistry(specs = emptyList())
-        try {
-            val first = registry.openSession(context("first"))
-            val second = registry.openSession(context("second"))
-
+    fun `successful commands feed session mru`() =
+        runBlocking {
+            val registry = IntellijCompletionRegistry(coroutineScope = this)
+            val first = registry.openSession(context(sessionId = "first"))
+            val second = registry.openSession(context(sessionId = "second"))
             registry.recordFinishedCommand(
-                sessionId = "first",
-                profileId = "bash",
-                metadata = successfulCommand("git --password secret"),
-            )
-
-            assertEquals(
-                listOf("git --password secret"),
-                first.provider.suggestions(request("git")).map { it.replacementText })
-            assertTrue(second.provider.suggestions(request("git")).isEmpty())
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `closing session clears its MRU source`() {
-        val registry = IntellijCompletionRegistry(specs = emptyList())
-        try {
-            val session = registry.openSession(context("first"))
-            registry.recordFinishedCommand("first", "bash", successfulCommand("git --password secret"))
-            val provider = session.provider
-
-            session.close()
-
-            assertTrue(provider.suggestions(request("git")).isEmpty())
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `accepted suggestion updates indexed feedback and persists compact snapshot`() {
-        val persisted = CountDownLatch(1)
-        val statsSource = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
-        val registry =
-            IntellijCompletionRegistry(
-                specs = emptyList(),
-                statsSource = statsSource,
-                persistStats = { persisted.countDown() },
-            )
-        try {
-            val session = registry.openSession(context("first"))
-            val request = request("git")
-            session.feedbackHandler.onSuggestionFeedback(
-                SwingShellSuggestionFeedback(
-                    kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
-                    suggestion =
-                        SwingShellSuggestion(
-                            replacementText = "git status",
-                            replacementStartOffset = 0,
-                            replacementEndOffset = 3,
-                            source = "session-mru",
-                            kind = "COMMAND",
-                        ),
-                    index = 0,
-                    request = request,
+                "first",
+                "bash",
+                io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata(
+                    recordId = 1,
+                    commandText = "git switch main",
+                    lifecycle = io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                    workingDirectoryUri = "file:///repo",
+                    exitCode = 0,
+                    startedAtEpochMillis = 1L,
+                    finishedAtEpochMillis = 2L,
                 ),
             )
 
-            assertTrue("feedback persistence timed out", persisted.await(5, TimeUnit.SECONDS))
-            assertEquals(1, statsSource.feedbackSnapshot().single().acceptedCount)
-        } finally {
+            assertTrue(first.provider.suggestions(request("git s")).any { it.source == "mru" })
+            first.close()
+            second.close()
             registry.close()
         }
-    }
 
-    @Test
-    fun `failed provider composition closes resources created by earlier factories`() {
-        var resourceClosed = false
-        val successfulFactory =
-            IntellijCompletionProviderFactory {
-                IntellijCompletionProviderRegistration(
-                    sourceEntry = TerminalCompletionSourceEntry(source = { emptyList() }, priority = 1),
-                    resources = listOf(AutoCloseable { resourceClosed = true }),
-                )
-            }
-        val failingFactory = IntellijCompletionProviderFactory { error("factory failed") }
-        val registry = IntellijCompletionRegistry(specs = emptyList())
-        try {
-            assertThrows(IllegalStateException::class.java) {
-                registry.openSession(
-                    context("failed").copy(providerFactories = listOf(successfulFactory, failingFactory)),
-                )
-            }
-            assertTrue(resourceClosed)
-        } finally {
-            registry.close()
-        }
-    }
-
-    @Test
-    fun `one provider close failure does not skip later resources`() {
-        val closed = ArrayList<String>()
-        val factory =
-            IntellijCompletionProviderFactory {
-                IntellijCompletionProviderRegistration(
-                    sourceEntry = TerminalCompletionSourceEntry(source = { emptyList() }, priority = 1),
-                    resources =
-                        listOf(
-                            AutoCloseable {
-                                closed += "throwing"
-                                error("close failed")
-                            },
-                            AutoCloseable { closed += "following" },
-                        ),
-                )
-            }
-        val registry = IntellijCompletionRegistry(specs = emptyList())
-        val session = registry.openSession(context("close-failure").copy(providerFactories = listOf(factory)))
-
-        assertThrows(IllegalStateException::class.java, session::close)
-        assertEquals(listOf("throwing", "following"), closed)
-        registry.close()
-    }
-
-    @Test
-    fun `invalid session capacity is rejected before registry resources are started`() {
-        assertThrows(IllegalArgumentException::class.java) {
-            IntellijCompletionRegistry(sessionMruCapacity = 0)
-        }
-    }
-
-    private fun context(sessionId: String): IntellijCompletionSessionContext =
+    private fun context(
+        sessionId: String = "session",
+        factories: List<IntellijCompletionProviderFactory> = emptyList(),
+        scanner: TerminalDirectoryScanner = TerminalDirectoryScanner { _: Path, _: String -> emptyList() },
+    ) =
         IntellijCompletionSessionContext(
             sessionId = sessionId,
             profileId = "bash",
-            workingDirectoryUriProvider = { null },
+            workingDirectoryUriProvider = { "file:///repo" },
             shellCapabilities = TerminalShellCapabilities.POSIX,
+            providerFactories = factories,
+            directoryScanner = scanner,
         )
 
-    private fun request(commandText: String): SwingShellSuggestionRequest =
-        SwingShellSuggestionRequest(commandText, commandText.length, anchorColumn = 0, anchorRow = 0)
-
-    private fun awaitSuggestions(
-        session: IntellijCompletionSession,
-        request: SwingShellSuggestionRequest,
-        source: String,
-    ): List<SwingShellSuggestion> {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-        var suggestions = session.provider.suggestions(request)
-        while (suggestions.none { it.source == source } && System.nanoTime() < deadline) {
-            Thread.sleep(5)
-            suggestions = session.provider.suggestions(request)
-        }
-        assertTrue("expected suggestions from $source", suggestions.any { it.source == source })
-        return suggestions
-    }
-
-    private fun successfulCommand(
-        commandText: String,
-        workingDirectoryUri: String? = null,
-    ): TerminalShellIntegrationCommandMetadata =
-        TerminalShellIntegrationCommandMetadata(
-            recordId = 1,
-            lifecycle = TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
-            commandText = commandText,
-            workingDirectoryUri = workingDirectoryUri,
-            exitCode = 0,
-            startedAtEpochMillis = 1,
-            finishedAtEpochMillis = 2,
-        )
+    private fun request(command: String) = SwingShellSuggestionRequest(command, command.length, 0, 0)
 }

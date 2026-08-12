@@ -16,14 +16,8 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.commandline.ContextAwareCompletionSource
-import io.github.ketraterm.completion.commandline.TerminalCompletionActivePosition
-import io.github.ketraterm.completion.commandline.TerminalCompletionContext
-import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.boundedTo
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 /**
@@ -38,16 +32,11 @@ import io.github.ketraterm.completion.model.TerminalPathArgumentKind
  */
 internal class PathCompletionSource(
     private val fileSystemProvider: TerminalFileSystemProvider,
-    commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-) : ContextAwareCompletionSource {
-    override val commandSpecs = commandSpecs.toList()
-
-    override fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
-        complete(request, request.resolveCompletionContext(commandSpecs))
-
-    override fun complete(
+) : TerminalCompletionSource {
+    override suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
+        limit: Int,
     ): List<TerminalCompletionCandidate> {
         val workingDir = request.workingDirectoryUri ?: return emptyList()
         val prefix = context.activePrefix
@@ -116,7 +105,7 @@ internal class PathCompletionSource(
         }
 
         candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-        return candidates.boundedTo(request.maxCandidates)
+        return candidates.boundedTo(limit)
     }
 
     private fun splitPathPrefix(prefix: String): PathParts? {

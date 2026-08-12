@@ -15,17 +15,10 @@
  */
 package io.github.ketraterm.completion.commandline
 
+import io.github.ketraterm.completion.api.TerminalCompletionActivePosition
+import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.model.*
-
-internal enum class TerminalCompletionActivePosition {
-    OPERATOR,
-    COMMAND,
-    SUBCOMMAND,
-    OPTION_NAME,
-    OPTION_VALUE,
-    POSITIONAL_ARGUMENT,
-}
 
 internal data class AttachedOptionValue(
     val option: TerminalOptionSpec,
@@ -33,30 +26,6 @@ internal data class AttachedOptionValue(
     val replacementStartOffset: Int,
     val quote: Char,
 )
-
-internal data class TerminalCompletionContext(
-    val commandLineContext: TerminalCommandLineContext,
-    val activePosition: TerminalCompletionActivePosition,
-    val commandTokenIndex: Int = 0,
-    val command: TerminalCommandSpec? = null,
-    val commandPath: List<TerminalCommandSpec> = emptyList(),
-    val activeOption: TerminalOptionSpec? = null,
-    val activePositionalArgument: TerminalArgumentSpec? = null,
-    val usedOptionExclusiveGroupIds: Set<String> = emptySet(),
-    val optionsTerminated: Boolean = false,
-    val expectedPathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
-    val expectedHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
-    val expectedValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
-    val subcommandCandidateSource: TerminalCommandSpec? = null,
-    val staticValueCandidates: List<String> = emptyList(),
-    val activeTokenQuote: Char = NO_QUOTE,
-    private val attachedOptionValue: AttachedOptionValue? = null,
-) {
-    val activePrefix: String get() = attachedOptionValue?.prefix ?: commandLineContext.activePrefix
-    val replacementStartOffset: Int get() = attachedOptionValue?.replacementStartOffset ?: commandLineContext.replacementStartOffset
-    val replacementEndOffset: Int get() = commandLineContext.replacementEndOffset
-    val currentCommand: TerminalCommandSpec? get() = commandPath.lastOrNull()
-}
 
 internal object TerminalCompletionContextResolver {
     fun resolve(
