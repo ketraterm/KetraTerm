@@ -89,10 +89,9 @@ internal class IntellijGitStatusPathLoader(
 /** Creates changed-Git-path completion without exposing IntelliJ VCS APIs to the shared engine. */
 internal fun intellijGitStatusPathCompletionSource(
     loader: suspend (String?) -> List<TerminalFuzzyPathEntry>,
-    workingDirectoryUriProvider: () -> String?,
 ) = TerminalCompletionSources.fuzzyPath(
     sourceId = "intellij-git-status-path",
-    entriesProvider = { loader(workingDirectoryUriProvider()) },
+    entriesProvider = { request -> loader(request.workingDirectoryUri) },
     requiresNonEmptyPrefix = false,
     allowedCommandNames = setOf("add", "restore", "rm", "diff"),
 )

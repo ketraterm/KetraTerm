@@ -30,7 +30,7 @@ import io.github.ketraterm.completion.internal.boundedTo
  */
 internal class GradleTaskCompletionSource(
     private val sourceId: String,
-    private val tasksProvider: suspend () -> List<TerminalGradleTask>,
+    private val tasksProvider: suspend (TerminalCompletionRequest) -> List<TerminalGradleTask>,
 ) : TerminalCompletionSource {
     init {
         require(sourceId.isNotBlank()) { "sourceId must not be blank" }
@@ -49,7 +49,7 @@ internal class GradleTaskCompletionSource(
 
         val prefix = context.activePrefix
         val projectDirectory = projectDirectoryBeforeActiveToken(context)
-        val tasks = tasksProvider()
+        val tasks = tasksProvider(request)
         if (tasks.isEmpty()) return emptyList()
 
         val candidates = ArrayList<TerminalCompletionCandidate>(minOf(tasks.size, limit))

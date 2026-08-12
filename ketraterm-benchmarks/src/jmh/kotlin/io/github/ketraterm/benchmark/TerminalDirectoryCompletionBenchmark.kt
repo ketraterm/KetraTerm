@@ -16,6 +16,7 @@
 package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner
+import kotlinx.coroutines.runBlocking
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.nio.file.Files
@@ -58,6 +59,6 @@ open class TerminalDirectoryCompletionBenchmark {
 
     @Benchmark
     open fun scanBoundedDirectory(blackhole: Blackhole) {
-        blackhole.consume(scanner.scan(directory, "entry-"))
+        blackhole.consume(runBlocking { scanner.scan(directory, "entry-") })
     }
 }

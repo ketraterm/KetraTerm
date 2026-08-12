@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
+import java.util.concurrent.atomic.AtomicLong
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 
@@ -29,133 +30,99 @@ import javax.swing.Timer
  * completion engine remains the authoritative semantic eligibility check and
  * returns an empty result when no source applies.
  */
-class SwingLiveCompletionTriggerController
-    internal constructor(
-        private val activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
-        private val requestSuggestions: (TerminalShellCommandLineSnapshot) -> Unit,
-        private val hideSuggestions: () -> Unit,
-        private val rankingContextKey: () -> String?,
-        private val suggestionsEnabled: () -> Boolean,
-        private val scheduler: SwingLiveCompletionScheduler,
-        private val debounceMillis: Int,
-        private val minimumNonWhitespaceCharacters: Int,
-    ) {
-        private var lastRequest: RequestKey? = null
+internal class SwingLiveCompletionTriggerController(
+    private val activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
+    private val requestSuggestions: (TerminalShellCommandLineSnapshot) -> Unit,
+    private val hideSuggestions: () -> Unit,
+    private val rankingContextKey: () -> String?,
+    private val suggestionsEnabled: () -> Boolean,
+    private val scheduler: SwingLiveCompletionScheduler,
+    private val debounceMillis: Int,
+    private val minimumNonWhitespaceCharacters: Int,
+) {
+    private var lastRequest: RequestKey? = null
 
-        init {
-            require(debounceMillis >= 0) { "debounceMillis must be >= 0, was $debounceMillis" }
-            require(minimumNonWhitespaceCharacters >= 0) {
-                "minimumNonWhitespaceCharacters must be >= 0, was $minimumNonWhitespaceCharacters"
-            }
-        }
-
-        /**
-         * Creates a controller backed by a one-shot Swing timer.
-         *
-         * @param activeCommandLine latest shell-integration command snapshot.
-         * @param requestSuggestions requests suggestions for an eligible snapshot.
-         * @param hideSuggestions cancels and hides the current popup through the host.
-         * @param rankingContextKey host context that can alter ranking for equal text.
-         * @param suggestionsEnabled whether live suggestions are enabled.
-         * @param debounceMillis non-negative quiet period before a refresh.
-         * @param minimumNonWhitespaceCharacters normal minimum typed-character count.
-         */
-        @JvmOverloads
-        constructor(
-            activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
-            requestSuggestions: (TerminalShellCommandLineSnapshot) -> Unit,
-            hideSuggestions: () -> Unit,
-            rankingContextKey: () -> String? = { null },
-            suggestionsEnabled: () -> Boolean,
-            debounceMillis: Int = DEFAULT_DEBOUNCE_MILLIS,
-            minimumNonWhitespaceCharacters: Int = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
-        ) : this(
-            activeCommandLine = activeCommandLine,
-            requestSuggestions = requestSuggestions,
-            hideSuggestions = hideSuggestions,
-            rankingContextKey = rankingContextKey,
-            suggestionsEnabled = suggestionsEnabled,
-            scheduler = SwingTimerLiveCompletionScheduler(),
-            debounceMillis = debounceMillis,
-            minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
-        )
-
-        /** Replaces any pending refresh with one based on the latest snapshot. */
-        fun scheduleRefresh() {
-            scheduler.restart(debounceMillis, ::refreshNow)
-        }
-
-        /** Allows the same visible command to be requested after context changes. */
-        fun invalidateLastRequest() {
-            lastRequest = null
-        }
-
-        /** Applies cheap UX gating and requests completion for the latest snapshot. */
-        internal fun refreshNow() {
-            if (!suggestionsEnabled()) {
-                cancelAndHide()
-                return
-            }
-            val snapshot = activeCommandLine()
-            if (snapshot == null || !shouldRequest(snapshot)) {
-                invalidateLastRequest()
-                hideSuggestions()
-                return
-            }
-            val request = RequestKey(snapshot, rankingContextKey())
-            if (request == lastRequest) return
-            lastRequest = request
-            requestSuggestions(snapshot)
-        }
-
-        /** Cancels a pending refresh, resets trigger state, and hides the popup. */
-        fun cancelAndHide() {
-            scheduler.cancel()
-            invalidateLastRequest()
-            hideSuggestions()
-        }
-
-        private fun shouldRequest(snapshot: TerminalShellCommandLineSnapshot): Boolean {
-            val text = snapshot.commandText
-            val cursorOffset = snapshot.cursorOffset
-            var nonWhitespaceCharacters = 0
-            for (index in 0 until cursorOffset) {
-                if (!text[index].isWhitespace()) nonWhitespaceCharacters++
-            }
-            if (nonWhitespaceCharacters == 0) return false
-            if (nonWhitespaceCharacters >= minimumNonWhitespaceCharacters) return true
-
-            return when (text.getOrNull(cursorOffset - 1)) {
-                '-', '/', '\\', '$', '=' -> true
-                ' ' ->
-                    nonWhitespaceCharacters >= MINIMUM_SPACE_TRIGGER_CHARACTERS &&
-                        text.getOrNull(cursorOffset - 2)?.isWhitespace() == false
-                else -> false
-            }
-        }
-
-        private data class RequestKey(
-            val commandText: String,
-            val cursorOffset: Int,
-            val cursorColumn: Int,
-            val cursorRow: Int,
-            val rankingContextKey: String?,
-        ) {
-            constructor(snapshot: TerminalShellCommandLineSnapshot, rankingContextKey: String?) : this(
-                commandText = snapshot.commandText,
-                cursorOffset = snapshot.cursorOffset,
-                cursorColumn = snapshot.cursorColumn,
-                cursorRow = snapshot.cursorRow,
-                rankingContextKey = rankingContextKey,
-            )
-        }
-
-        private companion object {
-            private const val DEFAULT_DEBOUNCE_MILLIS = 75
-            private const val DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS = 2
-            private const val MINIMUM_SPACE_TRIGGER_CHARACTERS = 2
+    init {
+        require(debounceMillis >= 0) { "debounceMillis must be >= 0, was $debounceMillis" }
+        require(minimumNonWhitespaceCharacters >= 0) {
+            "minimumNonWhitespaceCharacters must be >= 0, was $minimumNonWhitespaceCharacters"
         }
     }
+
+    /** Replaces any pending refresh with one based on the latest snapshot. */
+    fun scheduleRefresh() {
+        scheduler.restart(debounceMillis, ::refreshNow)
+    }
+
+    /** Allows the same visible command to be requested after context changes. */
+    fun invalidateLastRequest() {
+        lastRequest = null
+    }
+
+    /** Applies cheap UX gating and requests completion for the latest snapshot. */
+    internal fun refreshNow() {
+        if (!suggestionsEnabled()) {
+            cancelAndHide()
+            return
+        }
+        val snapshot = activeCommandLine()
+        if (snapshot == null || !shouldRequest(snapshot)) {
+            invalidateLastRequest()
+            hideSuggestions()
+            return
+        }
+        val request = RequestKey(snapshot, rankingContextKey())
+        if (request == lastRequest) return
+        lastRequest = request
+        requestSuggestions(snapshot)
+    }
+
+    /** Cancels a pending refresh, resets trigger state, and hides the popup. */
+    fun cancelAndHide() {
+        scheduler.cancel()
+        invalidateLastRequest()
+        hideSuggestions()
+    }
+
+    private fun shouldRequest(snapshot: TerminalShellCommandLineSnapshot): Boolean {
+        val text = snapshot.commandText
+        val cursorOffset = snapshot.cursorOffset
+        var nonWhitespaceCharacters = 0
+        for (index in 0 until cursorOffset) {
+            if (!text[index].isWhitespace()) nonWhitespaceCharacters++
+        }
+        if (nonWhitespaceCharacters == 0) return false
+        if (nonWhitespaceCharacters >= minimumNonWhitespaceCharacters) return true
+
+        return when (text.getOrNull(cursorOffset - 1)) {
+            '-', '/', '\\', '$', '=' -> true
+            ' ' ->
+                nonWhitespaceCharacters >= MINIMUM_SPACE_TRIGGER_CHARACTERS &&
+                    text.getOrNull(cursorOffset - 2)?.isWhitespace() == false
+            else -> false
+        }
+    }
+
+    private data class RequestKey(
+        val commandText: String,
+        val cursorOffset: Int,
+        val cursorColumn: Int,
+        val cursorRow: Int,
+        val rankingContextKey: String?,
+    ) {
+        constructor(snapshot: TerminalShellCommandLineSnapshot, rankingContextKey: String?) : this(
+            commandText = snapshot.commandText,
+            cursorOffset = snapshot.cursorOffset,
+            cursorColumn = snapshot.cursorColumn,
+            cursorRow = snapshot.cursorRow,
+            rankingContextKey = rankingContextKey,
+        )
+    }
+
+    private companion object {
+        private const val MINIMUM_SPACE_TRIGGER_CHARACTERS = 2
+    }
+}
 
 /** Replaceable delayed-action seam for Swing live completion refreshes. */
 internal interface SwingLiveCompletionScheduler {
@@ -169,8 +136,9 @@ internal interface SwingLiveCompletionScheduler {
     fun cancel()
 }
 
-/** One-shot Swing timer scheduler; all state is confined to the EDT. */
+/** One-shot Swing timer scheduler with EDT-confined timer state and cross-thread cancellation ordering. */
 internal class SwingTimerLiveCompletionScheduler : SwingLiveCompletionScheduler {
+    private val generation = AtomicLong()
     private var timer: Timer? = null
 
     /** Replaces the current one-shot timer. */
@@ -178,10 +146,13 @@ internal class SwingTimerLiveCompletionScheduler : SwingLiveCompletionScheduler 
         delayMillis: Int,
         action: () -> Unit,
     ) {
+        val scheduledGeneration = generation.incrementAndGet()
         runOnEdt {
+            if (scheduledGeneration != generation.get()) return@runOnEdt
             timer?.stop()
             timer =
                 Timer(delayMillis) {
+                    if (scheduledGeneration != generation.get()) return@Timer
                     timer = null
                     action()
                 }.apply {
@@ -193,7 +164,9 @@ internal class SwingTimerLiveCompletionScheduler : SwingLiveCompletionScheduler 
 
     /** Stops and releases the current timer. */
     override fun cancel() {
+        val cancelledGeneration = generation.incrementAndGet()
         runOnEdt {
+            if (cancelledGeneration != generation.get()) return@runOnEdt
             timer?.stop()
             timer = null
         }

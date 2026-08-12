@@ -52,7 +52,7 @@ internal class FuzzyPathCompletionSource(
         val pathSeparator = if (prefix.contains('\\')) '\\' else '/'
         val candidates = BoundedCompletionCandidateCollector(limit)
         var orderIndex = 0
-        for (entry in entriesProvider.entries(prefix)) {
+        for (entry in entriesProvider.entries(request, prefix)) {
             if (!context.expectedPathKind.acceptsPathEntry(entry.isDirectory)) continue
             if (!context.expectedHiddenPathPolicy.acceptsPath(entry.path, prefix)) continue
             val rawPath = if (pathSeparator == '\\') entry.path.replace('/', '\\') else entry.path
@@ -105,10 +105,13 @@ internal class FuzzyPathCompletionSource(
 
 /** Matches one bounded path result for hosts without a queryable index. */
 internal class BoundedFuzzyPathProvider(
-    private val entriesProvider: suspend () -> List<TerminalFuzzyPathEntry>,
+    private val entriesProvider: suspend (TerminalCompletionRequest) -> List<TerminalFuzzyPathEntry>,
 ) : TerminalFuzzyPathProvider {
-    override suspend fun entries(prefix: String): List<TerminalFuzzyPathEntry> =
-        entriesProvider()
+    override suspend fun entries(
+        request: TerminalCompletionRequest,
+        prefix: String,
+    ): List<TerminalFuzzyPathEntry> =
+        entriesProvider(request)
             .mapNotNull { entry -> fuzzyScore(entry.path, prefix)?.let { score -> ScoredEntry(entry, score) } }
             .sortedWith(ENTRY_ORDER)
             .map(ScoredEntry::entry)

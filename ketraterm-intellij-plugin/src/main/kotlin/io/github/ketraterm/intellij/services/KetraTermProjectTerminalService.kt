@@ -38,9 +38,7 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.workspace.*
-import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import java.awt.BorderLayout
 import java.awt.Component
 import java.util.concurrent.atomic.AtomicInteger
@@ -308,7 +306,7 @@ class KetraTermProjectTerminalService(
             KetraTermTerminalPane.create(
                 project = project,
                 tab = workspaceTab,
-                completionScope = createCompletionScope(workspaceTab.id),
+                completionScope = coroutineScope,
                 hostActions =
                     KetraTermTerminalPaneHostActions(
                         openNewTabAction = ::openDefaultTabFromContextMenu,
@@ -348,15 +346,6 @@ class KetraTermProjectTerminalService(
         container.add(component, BorderLayout.CENTER)
         container.revalidate()
         container.repaint()
-    }
-
-    private fun createCompletionScope(tabId: String): CoroutineScope {
-        val parentJob = coroutineScope.coroutineContext[Job]
-        return CoroutineScope(
-            coroutineScope.coroutineContext +
-                    Job(parentJob) +
-                    CoroutineName("ketraterm-completion-$tabId"),
-        )
     }
 
     private fun openDefaultTabFromContextMenu(): Boolean {

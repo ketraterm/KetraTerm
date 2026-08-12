@@ -26,7 +26,7 @@ class GradleTaskCompletionSourceTest {
     private val source =
         TerminalCompletionSources.gradleTask(
             sourceId = "gradle-task",
-            tasksProvider = {
+            tasksProvider = { _ ->
                 listOf(
                     TerminalGradleTask(":test", "run root tests", projectDirectory = "."),
                     TerminalGradleTask(":app:run", "run app", projectDirectory = "app"),
@@ -103,6 +103,24 @@ class GradleTaskCompletionSourceTest {
     fun `does not activate for unrelated commands`() =
         runBlocking {
             assertTrue(source.complete(request("npm run runI")).isEmpty())
+        }
+
+    @Test
+    fun `passes the immutable request to the task provider`() =
+        runBlocking {
+            var requestedDirectory: String? = null
+            val requestAwareSource =
+                TerminalCompletionSources.gradleTask(
+                    sourceId = "request-aware-gradle-task",
+                    tasksProvider = { request ->
+                        requestedDirectory = request.workingDirectoryUri
+                        listOf(TerminalGradleTask(":test", projectDirectory = "."))
+                    },
+                )
+
+            requestAwareSource.complete(request("gradle te"))
+
+            assertEquals("file:///project", requestedDirectory)
         }
 
     private fun request(commandLine: String): TerminalCompletionRequest =

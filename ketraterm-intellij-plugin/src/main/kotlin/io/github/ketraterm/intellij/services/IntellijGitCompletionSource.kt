@@ -89,14 +89,13 @@ internal class IntellijGitCompletionLoader(
 /** Creates one completion source backed by one composite Git-reference load per request. */
 internal fun intellijGitCompletionSource(
     loader: suspend (String?) -> IntellijGitCompletionSnapshot,
-    workingDirectoryUriProvider: () -> String?,
 ): TerminalCompletionSource =
     TerminalCompletionSource { request, context, limit ->
         if (context.expectedValueDomain != TerminalCompletionValueDomain.GIT_BRANCH) {
             return@TerminalCompletionSource emptyList()
         }
         val commandName = context.currentCommand?.name
-        val snapshot = loader(workingDirectoryUriProvider())
+        val snapshot = loader(request.workingDirectoryUri)
         val candidates = ArrayList<TerminalCompletionCandidate>(limit)
         candidates +=
             valueSource(LOCAL_SOURCE_ID, snapshot.localBranches)

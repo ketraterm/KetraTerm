@@ -27,15 +27,18 @@ class IntellijGitCompletionSourceTest {
     fun `checkout loads one composite snapshot and exposes all reference groups`() =
         runBlocking {
             var loads = 0
+            var requestedDirectory: String? = null
             val engine =
-                engine {
+                engine { workingDirectoryUri ->
                     loads++
+                    requestedDirectory = workingDirectoryUri
                     snapshot()
                 }
 
             val candidates = engine.complete(request("git checkout "))
 
             assertEquals(1, loads)
+            assertEquals("file:///repo", requestedDirectory)
             assertEquals(
                 setOf("intellij-git-branch", "intellij-git-remote-branch", "intellij-git-tag"),
                 candidates.mapTo(HashSet(), TerminalCompletionCandidate::source),
@@ -95,7 +98,7 @@ class IntellijGitCompletionSourceTest {
             sources =
                 listOf(
                     TerminalCompletionSourceEntry(
-                        source = intellijGitCompletionSource(loader) { "file:///repo" },
+                        source = intellijGitCompletionSource(loader),
                         priority = TerminalCompletionSourcePrior.GIT_REFERENCE,
                     ),
                 ),

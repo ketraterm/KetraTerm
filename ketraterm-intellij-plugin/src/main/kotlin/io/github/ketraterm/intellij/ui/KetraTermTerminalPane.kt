@@ -27,16 +27,13 @@ import io.github.ketraterm.intellij.services.IntellijCompletionSession
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.*
-import io.github.ketraterm.ui.swing.host.SwingLiveCompletionTriggerController
+import io.github.ketraterm.ui.swing.host.SwingLiveCompletionBinding
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import java.awt.Adjustable
 import java.awt.BorderLayout
 import javax.swing.JPanel
@@ -55,8 +52,7 @@ internal class KetraTermTerminalPane private constructor(
     private val searchBar: SwingTerminalSearchBar,
     private val hostActions: KetraTermTerminalPaneHostActions,
     private val completionSession: IntellijCompletionSession,
-    private val completionTriggerController: SwingLiveCompletionTriggerController,
-    private val completionScope: CoroutineScope,
+    private val liveCompletion: SwingLiveCompletionBinding,
 ) {
     private var shortcutController: KetraTermTerminalShortcutController? = null
 
@@ -216,8 +212,7 @@ internal class KetraTermTerminalPane private constructor(
      * Unbinds the pane from its session before the containing IDE tab is disposed.
      */
     fun close() {
-        completionTriggerController.cancelAndHide()
-        completionScope.cancel()
+        liveCompletion.close()
         completionSession.close()
         searchBar.close()
         shortcutController?.dispose()
@@ -242,7 +237,6 @@ internal class KetraTermTerminalPane private constructor(
             return try {
                 createBound(project, tab, hostActions, completionSession, completionScope)
             } catch (failure: Throwable) {
-                completionScope.cancel()
                 completionSession.close()
                 throw failure
             }
@@ -259,25 +253,14 @@ internal class KetraTermTerminalPane private constructor(
             val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
             val shortcutControllerRef = arrayOfNulls<KetraTermTerminalShortcutController>(1)
             val paneRef = arrayOfNulls<KetraTermTerminalPane>(1)
-            lateinit var terminalRef: SwingTerminal
-            val completionTriggerController =
-                SwingLiveCompletionTriggerController(
-                    activeCommandLine = tab.session::activeShellCommandLine,
-                    requestSuggestions = { snapshot -> terminalRef.requestShellSuggestionsForSnapshot(snapshot) },
-                    hideSuggestions = { terminalRef.hideShellSuggestions() },
-                    rankingContextKey = { tab.currentWorkingDirectoryUri },
+            val liveCompletion =
+                SwingLiveCompletionBinding(
+                    session = tab.session,
+                    coroutineScope = completionScope,
                     suggestionsEnabled = { KetraTermIntellijSettings.current().shellSuggestionsEnabled },
+                    rankingContextKey = { tab.currentWorkingDirectoryUri },
+                    feedbackHandler = completionSession.feedbackHandler,
                 )
-            val defaultSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session)
-            val suggestionHandler =
-                SwingShellSuggestionHandler { acceptance ->
-                    defaultSuggestionHandler.onSuggestionAccepted(acceptance)
-                }
-            val feedbackHandler =
-                SwingShellSuggestionFeedbackHandler { feedback ->
-                    completionTriggerController.invalidateLastRequest()
-                    completionSession.feedbackHandler.onSuggestionFeedback(feedback)
-                }
             val terminal =
                 SwingTerminal(
                     settingsProvider = { KetraTermIntellijSettings.current() },
@@ -288,8 +271,8 @@ internal class KetraTermTerminalPane private constructor(
                             viewportListener = scrollbarAdapter,
                             scrollbarOverlayEnabled = false,
                             shellSuggestionProvider = completionSession.provider,
-                            shellSuggestionHandler = suggestionHandler,
-                            shellSuggestionFeedbackHandler = feedbackHandler,
+                            shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
+                            shellSuggestionFeedbackHandler = liveCompletion.suggestionFeedbackHandler,
                             shellSuggestionKeymap = KetraTermShellSuggestionKeymap,
                             shellSuggestionViewFactory = IntellijShellSuggestionViewFactory,
                             uiDispatcher = TerminalUiDispatcher { runnable ->
@@ -303,15 +286,8 @@ internal class KetraTermTerminalPane private constructor(
                                 },
                         ),
                 )
-            terminalRef = terminal
             scrollbarAdapter.attach(terminal)
             terminal.bind(tab.session)
-
-            completionScope.launch {
-                tab.session.renderGeneration.collect {
-                    completionTriggerController.scheduleRefresh()
-                }
-            }
 
             val searchBar = SwingTerminalSearchBar(terminal)
             val terminalArea = SwingTerminalOverlayPane(terminal, searchBar.component)
@@ -332,31 +308,13 @@ internal class KetraTermTerminalPane private constructor(
                 searchBar = searchBar,
                 hostActions = hostActions,
                 completionSession = completionSession,
-                completionTriggerController = completionTriggerController,
-                completionScope = completionScope,
+                liveCompletion = liveCompletion,
             ).also { pane ->
                 pane.shortcutController = KetraTermTerminalShortcutController(pane)
                 shortcutControllerRef[0] = pane.shortcutController
                 paneRef[0] = pane
-                terminal.addFocusListener(
-                    object : java.awt.event.FocusAdapter() {
-                        override fun focusLost(event: java.awt.event.FocusEvent) {
-                            completionTriggerController.cancelAndHide()
-                        }
-                    },
-                )
+                liveCompletion.attach(terminal)
             }
-        }
-
-        private fun SwingTerminal.requestShellSuggestionsForSnapshot(
-            snapshot: io.github.ketraterm.session.TerminalShellCommandLineSnapshot,
-        ) {
-            requestShellSuggestions(
-                commandText = snapshot.commandText,
-                cursorOffset = snapshot.cursorOffset,
-                anchorColumn = snapshot.cursorColumn,
-                anchorRow = snapshot.cursorRow,
-            )
         }
     }
 }

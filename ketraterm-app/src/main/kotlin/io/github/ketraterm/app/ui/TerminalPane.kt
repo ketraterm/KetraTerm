@@ -16,12 +16,11 @@
 package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.config.KetraTermSettings
-import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuHandler
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
-import io.github.ketraterm.ui.swing.host.SwingLiveCompletionTriggerController
+import io.github.ketraterm.ui.swing.host.SwingLiveCompletionBinding
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
@@ -29,7 +28,7 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
 import javax.swing.JPanel
 
 /**
@@ -43,8 +42,7 @@ internal class TerminalPane private constructor(
     val terminal: SwingTerminal,
     val component: JPanel,
     private val settings: KetraTermSettings,
-    private val completionTriggerController: SwingLiveCompletionTriggerController,
-    private val completionObservationJob: Job,
+    private val liveCompletion: SwingLiveCompletionBinding,
     private val searchBar: SwingTerminalSearchBar,
 ) : TerminalPaneActionTarget {
     private var shortcutController: TerminalPaneShortcutController? = null
@@ -59,9 +57,9 @@ internal class TerminalPane private constructor(
         searchBar.refreshColors()
         tab.session.setHostPolicy(settings.createHostPolicy(tab.profile.command))
         if (settings.shellSuggestionsEnabled) {
-            completionTriggerController.scheduleRefresh()
+            liveCompletion.scheduleRefresh()
         } else {
-            completionTriggerController.cancelAndHide()
+            liveCompletion.cancelAndHide()
         }
     }
 
@@ -104,8 +102,7 @@ internal class TerminalPane private constructor(
     }
 
     fun close() {
-        completionObservationJob.cancel()
-        completionTriggerController.cancelAndHide()
+        liveCompletion.close()
         searchBar.close()
         shortcutController?.dispose()
         shortcutController = null
@@ -116,39 +113,29 @@ internal class TerminalPane private constructor(
         fun create(
             tab: TerminalWorkspaceTab,
             settings: KetraTermSettings,
+            completionScope: CoroutineScope,
             suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
             suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
             onContextMenu: (TerminalPane, SwingTerminalContextMenuRequest) -> Unit,
         ): TerminalPane {
             val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
             val paneRef = arrayOfNulls<TerminalPane>(1)
-            lateinit var terminalRef: SwingTerminal
-            val completionTriggerController =
-                SwingLiveCompletionTriggerController(
-                    activeCommandLine = tab.session::activeShellCommandLine,
-                    requestSuggestions = { snapshot -> terminalRef.requestShellSuggestionsForSnapshot(snapshot) },
-                    hideSuggestions = { terminalRef.hideShellSuggestions() },
-                    rankingContextKey = { tab.currentWorkingDirectoryUri },
+            val liveCompletion =
+                SwingLiveCompletionBinding(
+                    session = tab.session,
+                    coroutineScope = completionScope,
                     suggestionsEnabled = { settings.shellSuggestionsEnabled },
+                    rankingContextKey = { tab.currentWorkingDirectoryUri },
+                    feedbackHandler = suggestionFeedbackHandler,
                 )
-            val defaultHandler = SwingShellSuggestionHandler.createDefault(tab.session)
-            val shellSuggestionHandler =
-                SwingShellSuggestionHandler { acceptance ->
-                    defaultHandler.onSuggestionAccepted(acceptance)
-                }
-            val wrappedFeedbackHandler =
-                SwingShellSuggestionFeedbackHandler { feedback ->
-                    completionTriggerController.invalidateLastRequest()
-                    suggestionFeedbackHandler.onSuggestionFeedback(feedback)
-                }
             val terminal =
                 SwingTerminal(
                     settingsProvider = { settings.current() },
                     hostServices =
                         SwingHostServices(
                             shellSuggestionProvider = suggestionProvider,
-                            shellSuggestionHandler = shellSuggestionHandler,
-                            shellSuggestionFeedbackHandler = wrappedFeedbackHandler,
+                            shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
+                            shellSuggestionFeedbackHandler = liveCompletion.suggestionFeedbackHandler,
                             shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
                             hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
                             contextMenuHandler =
@@ -159,16 +146,8 @@ internal class TerminalPane private constructor(
                                 },
                         ),
                 )
-            terminalRef = terminal
 
             terminal.bind(tab.session)
-            val completionObservationJob =
-                CoroutineScope(Dispatchers.Default + CoroutineName("completion-${tab.id}"))
-                    .launch {
-                        tab.session.renderGeneration.collect {
-                            completionTriggerController.scheduleRefresh()
-                        }
-                    }
 
             val searchBar = SwingTerminalSearchBar(terminal)
             val component = terminalPanel(terminal, searchBar)
@@ -178,32 +157,15 @@ internal class TerminalPane private constructor(
                     terminal = terminal,
                     component = component,
                     settings = settings,
-                    completionTriggerController = completionTriggerController,
-                    completionObservationJob = completionObservationJob,
+                    liveCompletion = liveCompletion,
                     searchBar = searchBar,
                 )
             pane.shortcutController = TerminalPaneShortcutController(pane, settings)
             shortcutControllerRef[0] = pane.shortcutController
             paneRef[0] = pane
-
-            terminal.addFocusListener(
-                object : java.awt.event.FocusAdapter() {
-                    override fun focusLost(e: java.awt.event.FocusEvent) {
-                        completionTriggerController.cancelAndHide()
-                    }
-                },
-            )
             tab.session.requestRender(scrollbackOffset = 0)
+            liveCompletion.attach(terminal)
             return pane
-        }
-
-        private fun SwingTerminal.requestShellSuggestionsForSnapshot(snapshot: TerminalShellCommandLineSnapshot) {
-            requestShellSuggestions(
-                commandText = snapshot.commandText,
-                cursorOffset = snapshot.cursorOffset,
-                anchorColumn = snapshot.cursorColumn,
-                anchorRow = snapshot.cursorRow,
-            )
         }
 
         private fun terminalPanel(

@@ -60,14 +60,14 @@ internal class TabManager(
     private val tabContainers = HashMap<String, JPanel>()
     private val completionSpecs = TerminalCommandSpecs.defaults()
     private val commandCompletionStatsSource = TerminalCompletionSources.learningStore(commandSpecs = completionSpecs)
-    private val completionLearningScope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("standalone-completion-learning"))
+    private val completionScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("standalone-completion"))
     private val completionStatistics =
         StandaloneCompletionStatisticsCoordinator(
             statsSource = commandCompletionStatsSource,
             initialPersistencePath =
                 settings.commandCompletionStatsPath.takeIf { settings.persistentSuggestionLearningEnabled },
-            coroutineScope = completionLearningScope,
+            coroutineScope = completionScope,
         )
     private val completionRegistry =
         StandaloneCompletionRegistry(
@@ -297,8 +297,7 @@ internal class TabManager(
         }
         completionRegistry.close()
         workspace.close()
-        completionStatistics.close()
-        completionLearningScope.cancel()
+        completionScope.cancel()
     }
 
     /** Propagates a settings reload to all live panes and the workspace. */
@@ -416,6 +415,7 @@ internal class TabManager(
         return TerminalPane.create(
             tab = workspaceTab,
             settings = settings,
+            completionScope = completionScope,
             suggestionProvider = suggestionProvider,
             suggestionFeedbackHandler =
                 completionStatistics.createFeedbackHandler(

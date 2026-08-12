@@ -19,12 +19,14 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.ui.swing.host.SwingCompletionContext
+import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 
 /**
  * Standalone completion wiring for one application window.
  *
  * The registry owns host-specific source composition. It creates one
- * [StandaloneCompletionSuggestionProvider] per terminal session, pairs that
+ * [SwingCompletionSuggestionProvider] per terminal session, pairs that
  * provider with a session-scoped MRU source, then globally fuses every source
  * with shared learned evidence. It deliberately lives in `ketraterm-app`; plugin
  * integration should build its own host registry over the shared
@@ -68,7 +70,7 @@ internal class StandaloneCompletionRegistry(
         profileId: String? = null,
         shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
         workingDirectoryUriProvider: () -> String? = { null },
-    ): StandaloneCompletionSuggestionProvider {
+    ): SwingCompletionSuggestionProvider {
         require(sessionId.isNotBlank()) { "sessionId must not be blank" }
         val mruSource =
             TerminalCompletionSources.sessionMru(
@@ -96,7 +98,7 @@ internal class StandaloneCompletionRegistry(
                     ),
                 )
             }
-        return StandaloneCompletionSuggestionProvider(
+        return SwingCompletionSuggestionProvider(
             engine =
                 TerminalCompletionEngines.fromSources(
                     sources = sources,
@@ -106,7 +108,7 @@ internal class StandaloneCompletionRegistry(
                             ?: { io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot.EMPTY },
                 ),
             contextProvider = {
-                StandaloneCompletionSuggestionContext(
+                SwingCompletionContext(
                     profileId = profileId,
                     workingDirectoryUri = workingDirectoryUriProvider(),
                     shellCapabilities = shellCapabilities,
@@ -156,7 +158,7 @@ internal class StandaloneCompletionRegistry(
         state?.close()
     }
 
-    /** Releases every session snapshot and stops background directory workers. */
+    /** Clears the in-memory MRU completion state retained for every open session. */
     override fun close() {
         val states =
             synchronized(lock) {

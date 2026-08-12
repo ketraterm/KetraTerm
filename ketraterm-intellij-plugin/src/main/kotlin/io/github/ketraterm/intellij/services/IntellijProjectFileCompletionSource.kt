@@ -135,11 +135,10 @@ private class IntellijProjectFileSearchViewModel(
 /** Creates query-aware IntelliJ project paths without exposing VFS APIs to the shared engine. */
 internal fun intellijProjectFileCompletionSource(
     loader: suspend (String?, String) -> List<TerminalFuzzyPathEntry>,
-    workingDirectoryUriProvider: () -> String?,
 ) = TerminalCompletionSources.fuzzyPath(
     sourceId = "intellij-project-file",
     entriesProvider =
-        TerminalFuzzyPathProvider { prefix ->
-            loader(workingDirectoryUriProvider(), prefix)
+        TerminalFuzzyPathProvider { request, prefix ->
+            loader(request.workingDirectoryUri, prefix)
         },
 )

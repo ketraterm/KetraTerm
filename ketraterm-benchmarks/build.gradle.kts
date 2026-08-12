@@ -24,6 +24,8 @@ repositories {
 }
 
 dependencies {
+    val kotlinxCoroutinesVersion = rootProject.extra["kotlinxCoroutinesVersion"] as String
+
     implementation(project(":ketraterm-completion"))
     implementation(project(":ketraterm-completion-host"))
     implementation(project(":ketraterm-core"))
@@ -35,6 +37,7 @@ dependencies {
     implementation(project(":ketraterm-session"))
     implementation(project(":ketraterm-input"))
     implementation(project(":ketraterm-ui-swing"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
 
     implementation("org.openjdk.jmh:jmh-core:1.37")
     annotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:1.37")

@@ -59,8 +59,10 @@ value domain has command-specific validity.
 
 `TerminalCompletionSources.fuzzyPath(...)` adapts either a suspending bounded host path loader or a query-aware
 `TerminalFuzzyPathProvider` for context-aware fuzzy path completion. Bounded list loaders use the shared dependency-free
-matcher once. Query-aware providers receive the decoded active prefix and return already matched, relevance-ordered
-entries; the source never repeats that match. The shared source retains path-kind filtering, explicit replacement ranges, and shell-safe quoting. It
+matcher once. Both loader forms receive the same immutable completion request used by the engine, so host-relative
+results use its captured working-directory URI instead of resampling mutable session state. Query-aware providers also
+receive the decoded active prefix and return already matched, relevance-ordered entries; the source never repeats that
+match. The shared source retains path-kind filtering, explicit replacement ranges, and shell-safe quoting. It
 requires typed path text by default; a small, context-specific provider such as Git status paths may opt in to
 empty-prefix suggestions.
 
@@ -142,12 +144,12 @@ candidates to their own UI presentation.
 The public API should not grow by convenience. New public functions must be
 durable host contracts, used by standalone/plugin integration, or explicitly
 documented persistence/model contracts.
-Architecture tests enforce package/module boundaries and reject public
-implementation-package declarations and public completion contracts without
-leading KDoc. They do not mirror every permitted API name in a second manual
-allowlist. Public constructors and methods must document parameters/properties,
-return values, observable failure behavior, ownership, threading, and I/O
-expectations where those concepts apply.
+Kotlin `internal` visibility and Gradle module dependencies enforce the
+implementation boundary. Do not recreate source-scanning architecture tests or
+mirror permitted declarations in a second manual allowlist. Public constructors
+and methods must document parameters/properties, return values, observable
+failure behavior, ownership, threading, and I/O expectations where those
+concepts apply.
 
 ## Command-Line Context Policy
 
@@ -287,7 +289,8 @@ items into shell-facing paths, while the shared source applies terminal path sem
 suspending `readAction`, so pending write actions restart the read without a blocking-context bridge. Fuzzy paths activate only in declared or
 explicitly path-like terminal positions, while direct directory completion remains higher priority for immediate
 children. Changelists, SDKs, and run configurations remain follow-up work. IntelliJ also reads its already-imported Gradle external-system
-model into a bounded task result; it never starts Gradle from a completion request. A separate Git status loader
+model into a bounded task result; it never starts Gradle from a completion request. Every IntelliJ loader uses the
+working-directory URI captured in that immutable request. A separate Git status loader
 supplies changed and
 untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Git process.
 

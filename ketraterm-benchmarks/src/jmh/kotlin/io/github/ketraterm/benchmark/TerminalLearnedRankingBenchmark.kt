@@ -17,6 +17,7 @@ package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.*
+import kotlinx.coroutines.runBlocking
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
@@ -77,12 +78,12 @@ open class TerminalLearnedRankingBenchmark {
 
     @Benchmark
     open fun completeWithFullLearnedSnapshots(blackhole: Blackhole) {
-        blackhole.consume(learnedEngine.complete(learnedRequest))
+        blackhole.consume(runBlocking { learnedEngine.complete(learnedRequest) })
     }
 
     @Benchmark
     open fun mergeHostileProviderResultsIntoTopEight(blackhole: Blackhole) {
-        blackhole.consume(hostileMergeEngine.complete(hostileMergeRequest))
+        blackhole.consume(runBlocking { hostileMergeEngine.complete(hostileMergeRequest) })
     }
 
     @Benchmark
@@ -154,7 +155,7 @@ open class TerminalLearnedRankingBenchmark {
                     score = (candidateIndex * 37) % 101,
                 )
             }
-        return TerminalCompletionSource { candidates }
+        return TerminalCompletionSource { _, _, _ -> candidates }
     }
 
     private companion object {

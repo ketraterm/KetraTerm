@@ -18,6 +18,8 @@ package io.github.ketraterm.app.completion
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
+import io.github.ketraterm.ui.swing.host.SwingCompletionContext
+import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -31,19 +33,20 @@ import java.nio.file.Path
  * scope.
  */
 internal class StandaloneCompletionStatisticsCoordinator(
-    private val statsSource: TerminalCompletionLearningStore,
+    statsSource: TerminalCompletionLearningStore,
     initialPersistencePath: Path?,
     private val coroutineScope: CoroutineScope,
-) : AutoCloseable {
+) {
     private val repository =
         TerminalCompletionLearningRepository(
             learningStore = statsSource,
             initialPersistencePath = initialPersistencePath,
         )
     private val feedbackRecorder =
-        StandaloneCompletionFeedbackRecorder(
+        SwingCompletionFeedbackRecorder(
             statsSource = statsSource,
             submitMutation = ::executeMutation,
+            allowsCommand = TerminalCompletionPersistencePolicy::allowsCommand,
         )
 
     init {
@@ -54,7 +57,13 @@ internal class StandaloneCompletionStatisticsCoordinator(
     fun createFeedbackHandler(
         profileId: String?,
         workingDirectoryUriProvider: () -> String?,
-    ): SwingShellSuggestionFeedbackHandler = feedbackRecorder.createHandler(profileId, workingDirectoryUriProvider)
+    ): SwingShellSuggestionFeedbackHandler =
+        feedbackRecorder.createHandler {
+            SwingCompletionContext(
+                profileId = profileId,
+                workingDirectoryUri = workingDirectoryUriProvider(),
+            )
+        }
 
     /** Records one privacy-filtered shell command result off the caller thread. */
     fun recordFinishedCommand(
@@ -86,7 +95,4 @@ internal class StandaloneCompletionStatisticsCoordinator(
     private fun executeMutation(mutation: () -> Unit) {
         coroutineScope.launch { repository.mutate { mutation() } }
     }
-
-    /** Has no private worker or persistence resource to close. */
-    override fun close() = Unit
 }

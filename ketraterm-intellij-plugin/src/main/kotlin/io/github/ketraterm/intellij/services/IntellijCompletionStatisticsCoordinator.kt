@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
 internal class IntellijCompletionStatisticsCoordinator(
     private val repository: TerminalCompletionLearningRepository,
     private val coroutineScope: CoroutineScope,
-) : AutoCloseable {
+) {
     val statsSource: TerminalCompletionLearningStore = repository.learningStore
     private val feedbackRecorder =
         SwingCompletionFeedbackRecorder(
@@ -89,7 +89,4 @@ internal class IntellijCompletionStatisticsCoordinator(
     private fun executeMutation(mutation: () -> Unit) {
         coroutineScope.launch { repository.mutate { mutation() } }
     }
-
-    /** Has no private executor or persistence resource to close. */
-    override fun close() = Unit
 }

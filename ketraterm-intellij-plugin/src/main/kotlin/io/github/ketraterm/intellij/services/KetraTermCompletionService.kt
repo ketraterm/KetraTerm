@@ -29,10 +29,10 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
-import io.github.ketraterm.intellij.ui.IntellijCompletionContext
-import io.github.ketraterm.intellij.ui.IntellijCompletionSuggestionProvider
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
+import io.github.ketraterm.ui.swing.host.SwingCompletionContext
+import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
@@ -46,7 +46,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Application-level owner of IntelliJ completion learning and session sources.
  *
  * The service owns persistent statistics and one [IntellijCompletionRegistry].
- * IntelliJ disposal closes all session providers before closing persistence.
+ * IntelliJ disposal closes all session providers and cancels registry-owned work.
  */
 @Service(Service.Level.APP)
 internal class KetraTermCompletionService(
@@ -90,40 +90,35 @@ internal class KetraTermCompletionService(
         project: Project,
         tab: TerminalWorkspaceTab,
     ): IntellijCompletionSession {
-        val workingDirectoryUriProvider = { tab.currentWorkingDirectoryUri }
         return registry.openSession(
             IntellijCompletionSessionContext(
                 sessionId = tab.id,
                 profileId = tab.profile.id,
-                workingDirectoryUriProvider = workingDirectoryUriProvider,
+                workingDirectoryUriProvider = { tab.currentWorkingDirectoryUri },
                 shellCapabilities = tab.profile.kind.intellijCompletionShellCapabilities(),
                 additionalSources =
                     listOf(
                         TerminalCompletionSourceEntry(
                             intellijGitCompletionSource(
                                 loader = IntellijGitCompletionLoader(project)::load,
-                                workingDirectoryUriProvider = workingDirectoryUriProvider,
                             ),
                             TerminalCompletionSourcePrior.GIT_REFERENCE,
                         ),
                         TerminalCompletionSourceEntry(
                             intellijGitStatusPathCompletionSource(
                                 loader = IntellijGitStatusPathLoader(project)::load,
-                                workingDirectoryUriProvider = workingDirectoryUriProvider,
                             ),
                             TerminalCompletionSourcePrior.GIT_STATUS_PATH,
                         ),
                         TerminalCompletionSourceEntry(
                             intellijGradleTaskCompletionSource(
                                 loader = IntellijGradleTaskLoader(project)::load,
-                                workingDirectoryUriProvider = workingDirectoryUriProvider,
                             ),
                             TerminalCompletionSourcePrior.GRADLE_TASK,
                         ),
                         TerminalCompletionSourceEntry(
                             intellijProjectFileCompletionSource(
                                 loader = IntellijProjectFileLoader(project)::load,
-                                workingDirectoryUriProvider = workingDirectoryUriProvider,
                             ),
                             TerminalCompletionSourcePrior.PROJECT_FUZZY_PATH,
                         ),
@@ -263,7 +258,7 @@ internal class IntellijCompletionRegistry(
                     addAll(context.additionalSources)
                 }
             val provider =
-                IntellijCompletionSuggestionProvider(
+                SwingCompletionSuggestionProvider(
                     engine =
                         TerminalCompletionEngines.fromSources(
                             sources = sources,
@@ -339,7 +334,6 @@ internal class IntellijCompletionRegistry(
                 copy
             }
         states.forEach(SessionState::close)
-        statistics.close()
         ownedScope?.cancel()
     }
 
@@ -368,7 +362,8 @@ internal class IntellijCompletionRegistry(
  *
  * @property sessionId non-blank stable workspace-session identifier.
  * @property profileId non-blank stable terminal profile identifier.
- * @property workingDirectoryUriProvider thread-safe supplier for the latest URI.
+ * @property workingDirectoryUriProvider thread-safe supplier sampled once when
+ * constructing immutable completion request metadata.
  * @property shellCapabilities shell syntax and quoting capabilities.
  * @property additionalSources project-aware completion sources for this session.
  * @property directoryScanner suspending bounded directory scanner.
@@ -387,8 +382,8 @@ internal data class IntellijCompletionSessionContext(
         require(profileId.isNotBlank()) { "profileId must not be blank" }
     }
 
-    fun swingContext(): IntellijCompletionContext =
-        IntellijCompletionContext(
+    fun swingContext(): SwingCompletionContext =
+        SwingCompletionContext(
             profileId = profileId,
             workingDirectoryUri = workingDirectoryUriProvider(),
             shellCapabilities = shellCapabilities,

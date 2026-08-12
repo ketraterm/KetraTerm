@@ -43,7 +43,8 @@ data class TerminalFuzzyPathEntry(
 }
 
 /**
- * Supplies bounded fuzzy matches for the active terminal prefix.
+ * Supplies bounded fuzzy matches for one immutable completion request and its
+ * active terminal prefix.
  *
  * Entries must already match [entries]'s prefix and be ordered from most to
  * least relevant. The shared completion source deliberately does not run a
@@ -56,8 +57,13 @@ fun interface TerminalFuzzyPathProvider {
     /**
      * Returns path entries matching [prefix] in descending relevance.
      *
+     * @param request immutable completion request whose working-directory URI
+     * scopes host-relative paths.
      * @param prefix decoded active terminal path token.
      * @return bounded immutable path result, or an empty list when no match is available.
      */
-    suspend fun entries(prefix: String): List<TerminalFuzzyPathEntry>
+    suspend fun entries(
+        request: TerminalCompletionRequest,
+        prefix: String,
+    ): List<TerminalFuzzyPathEntry>
 }

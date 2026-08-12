@@ -26,7 +26,7 @@ class FuzzyPathCompletionSourceTest {
     private val source =
         TerminalCompletionSources.fuzzyPath(
             sourceId = "project-file",
-            entriesProvider = {
+            entriesProvider = { _ ->
                 listOf(
                     TerminalFuzzyPathEntry("src/main/kotlin/FuzzyTarget.kt", isDirectory = false),
                     TerminalFuzzyPathEntry("src/main/resources", isDirectory = true),
@@ -52,14 +52,16 @@ class FuzzyPathCompletionSourceTest {
         }
 
     @Test
-    fun `passes the active fuzzy prefix to a query-aware provider`() =
+    fun `passes the immutable request and active prefix to a query-aware provider`() =
         runBlocking {
+            var requestedDirectory: String? = null
             var requestedPrefix: String? = null
             val queryAwareSource =
                 TerminalCompletionSources.fuzzyPath(
                     sourceId = "query-aware-project-file",
                     entriesProvider =
-                        TerminalFuzzyPathProvider { prefix ->
+                        TerminalFuzzyPathProvider { request, prefix ->
+                            requestedDirectory = request.workingDirectoryUri
                             requestedPrefix = prefix
                             listOf(TerminalFuzzyPathEntry("settings.gradle.kts", isDirectory = false))
                         },
@@ -67,6 +69,7 @@ class FuzzyPathCompletionSourceTest {
 
             val candidates = queryAwareSource.complete(request("cat sgk"))
 
+            assertEquals("file:///project", requestedDirectory)
             assertEquals("sgk", requestedPrefix)
             assertEquals(listOf("settings.gradle.kts"), candidates.map(TerminalCompletionCandidate::replacementText))
         }
@@ -92,7 +95,7 @@ class FuzzyPathCompletionSourceTest {
             val statusSource =
                 TerminalCompletionSources.fuzzyPath(
                     sourceId = "git-status-path",
-                    entriesProvider = { listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false)) },
+                    entriesProvider = { _ -> listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false)) },
                     requiresNonEmptyPrefix = false,
                     allowedCommandNames = setOf("add", "restore", "rm", "diff"),
                 )

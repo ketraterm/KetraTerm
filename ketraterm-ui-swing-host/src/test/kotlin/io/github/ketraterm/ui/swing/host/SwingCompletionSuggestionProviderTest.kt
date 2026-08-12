@@ -36,7 +36,7 @@ class SwingCompletionSuggestionProviderTest {
                                 TerminalCompletionCandidate(
                                     replacementText = "status",
                                     replacementStartOffset = 4,
-                                    replacementEndOffset = 6,
+                                    replacementEndOffset = 7,
                                     source = "spec",
                                     kind = TerminalCompletionCandidateKind.SUBCOMMAND,
                                     displayText = "status",
@@ -53,12 +53,15 @@ class SwingCompletionSuggestionProviderTest {
                     },
                 )
 
-            val suggestions = provider.suggestions(request("git st", cursorOffset = 6))
+            val suggestions = provider.suggestions(request("git ste", cursorOffset = 6))
 
             assertEquals("bash", captured.profileId)
             assertEquals("file:///repo", captured.workingDirectoryUri)
             assertEquals(TerminalShellCapabilities.POSIX, captured.shellCapabilities)
             assertEquals("status", suggestions.single().replacementText)
+            assertEquals(4, suggestions.single().replacementStartOffset)
+            assertEquals(7, suggestions.single().replacementEndOffset)
+            assertEquals("show status", suggestions.single().detail)
             assertEquals("SUBCOMMAND", suggestions.single().kind)
         }
 

@@ -106,7 +106,8 @@ object TerminalCompletionSources {
      * terminal path rules are applied.
      *
      * @param sourceId stable candidate-source id used by ranking feedback.
-     * @param entriesProvider suspending loader for bounded indexed paths.
+     * @param entriesProvider suspending loader for bounded indexed paths. The
+     * immutable request supplies the authoritative working-directory URI.
      * @param requiresNonEmptyPrefix whether this source waits for explicit path
      * text before matching. Use `false` only for small, context-specific
      * result sets such as changed Git paths.
@@ -120,7 +121,7 @@ object TerminalCompletionSources {
     @JvmOverloads
     fun fuzzyPath(
         sourceId: String,
-        entriesProvider: suspend () -> List<TerminalFuzzyPathEntry>,
+        entriesProvider: suspend (TerminalCompletionRequest) -> List<TerminalFuzzyPathEntry>,
         requiresNonEmptyPrefix: Boolean = true,
         allowedCommandNames: Set<String> = emptySet(),
     ): TerminalCompletionSource {
@@ -137,15 +138,16 @@ object TerminalCompletionSources {
     /**
      * Creates a source backed by a query-aware host fuzzy-path provider.
      *
-     * Unlike the list-loader overload, this overload passes the decoded
-     * active path prefix to [entriesProvider]. This lets IDE hosts query their
-     * indexes asynchronously and apply bounds after matching instead of
+     * Unlike the list-loader overload, this overload passes the immutable
+     * request and decoded active path prefix to [entriesProvider]. This lets
+     * IDE hosts query their indexes asynchronously and apply bounds after matching instead of
      * truncating an unrelated whole-project traversal. The provider owns the
      * only fuzzy match and must return ready results in relevance order without
      * blocking the completion thread.
      *
      * @param sourceId stable candidate-source id used by ranking feedback.
-     * @param entriesProvider ready query-aware path provider.
+     * @param entriesProvider ready query-aware path provider scoped by the
+     * immutable completion request.
      * @param requiresNonEmptyPrefix whether this source waits for explicit path text.
      * @param allowedCommandNames optional canonical command/subcommand restriction.
      * @return context-aware fuzzy path completion source.
@@ -178,14 +180,15 @@ object TerminalCompletionSources {
      * may read a host model but must never start Gradle from a completion request.
      *
      * @param sourceId stable candidate-source id used by ranking feedback.
-     * @param tasksProvider suspending bounded Gradle-task loader.
+     * @param tasksProvider suspending bounded Gradle-task loader. The immutable
+     * request supplies the authoritative working-directory URI.
      * @return context-aware Gradle task completion source.
      * @throws IllegalArgumentException if [sourceId] is blank.
      */
     @JvmStatic
     fun gradleTask(
         sourceId: String,
-        tasksProvider: suspend () -> List<TerminalGradleTask>,
+        tasksProvider: suspend (TerminalCompletionRequest) -> List<TerminalGradleTask>,
     ): TerminalCompletionSource =
         GradleTaskCompletionSource(
             sourceId = sourceId,

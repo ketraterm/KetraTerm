@@ -130,8 +130,7 @@ internal object IntellijGradleTaskPath {
 /** Creates imported-Gradle-task completion without exposing IntelliJ model APIs to the shared engine. */
 internal fun intellijGradleTaskCompletionSource(
     loader: suspend (String?) -> List<TerminalGradleTask>,
-    workingDirectoryUriProvider: () -> String?,
 ) = TerminalCompletionSources.gradleTask(
     sourceId = "intellij-gradle-task",
-    tasksProvider = { loader(workingDirectoryUriProvider()) },
+    tasksProvider = { request -> loader(request.workingDirectoryUri) },
 )
