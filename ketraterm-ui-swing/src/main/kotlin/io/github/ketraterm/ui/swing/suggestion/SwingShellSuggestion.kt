@@ -321,9 +321,10 @@ fun interface SwingShellSuggestionProvider {
     /**
      * Returns suggestions for [request].
      *
-     * The reusable Swing terminal invokes this from its lifecycle coroutine.
-     * Implementations may suspend for bounded work and must cooperate with
-     * cancellation when a newer request replaces the current one.
+     * The reusable Swing terminal invokes this on [kotlinx.coroutines.Dispatchers.Default],
+     * outside the Swing Event Dispatch Thread. Implementations may suspend for
+     * bounded work and must cooperate with cancellation when a newer request
+     * replaces the current one.
      *
      * @param request command-line context.
      * @return ordered suggestions, best first.

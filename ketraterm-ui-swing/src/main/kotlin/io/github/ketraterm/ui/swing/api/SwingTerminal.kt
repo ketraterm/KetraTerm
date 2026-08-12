@@ -1504,7 +1504,9 @@ class SwingTerminal
                 componentScope.launch {
                     val suggestions =
                         try {
-                            hostServices.shellSuggestionProvider.suggestions(request)
+                            withContext(Dispatchers.Default) {
+                                hostServices.shellSuggestionProvider.suggestions(request)
+                            }
                         } catch (cancellation: CancellationException) {
                             throw cancellation
                         } catch (exception: Exception) {

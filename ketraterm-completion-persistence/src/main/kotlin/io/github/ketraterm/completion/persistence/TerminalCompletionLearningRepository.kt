@@ -50,10 +50,11 @@ class TerminalCompletionLearningRepository
         private var configuredPersistencePath: Path? = initialPersistencePath
         private var persistencePath: Path? = initialPersistencePath.takeIf { persistenceEnabled }
         private var initializedPath: Path? = null
+        private var initialized = false
 
         /** Loads the configured snapshot once and merges it with live learning. */
         suspend fun initialize() {
-            mutex.withLock { loadConfiguredPath() }
+            mutex.withLock { ensureInitializedLocked() }
         }
 
         /**
@@ -64,10 +65,9 @@ class TerminalCompletionLearningRepository
          */
         suspend fun setPersistencePath(path: Path?) {
             mutex.withLock {
-                if (path == persistencePath && path == initializedPath) return
                 configuredPersistencePath = path
                 persistencePath = path
-                loadConfiguredPath()
+                ensureInitializedLocked()
             }
         }
 
@@ -75,9 +75,8 @@ class TerminalCompletionLearningRepository
         suspend fun setPersistenceEnabled(enabled: Boolean) {
             mutex.withLock {
                 val replacement = configuredPersistencePath.takeIf { enabled }
-                if (replacement == persistencePath && replacement == initializedPath) return
                 persistencePath = replacement
-                loadConfiguredPath()
+                ensureInitializedLocked()
             }
         }
 
@@ -88,14 +87,21 @@ class TerminalCompletionLearningRepository
          */
         suspend fun mutate(mutation: TerminalCompletionLearningStore.() -> Unit) {
             mutex.withLock {
+                ensureInitializedLocked()
                 learningStore.mutation()
                 persistCurrentSnapshot()
             }
         }
 
+        private suspend fun ensureInitializedLocked() {
+            if (initialized && initializedPath == persistencePath) return
+            loadConfiguredPath()
+            initializedPath = persistencePath
+            initialized = true
+        }
+
         private suspend fun loadConfiguredPath() {
             val path = persistencePath
-            initializedPath = path
             if (path == null) return
             val store = TerminalCompletionStatsStore(path, onPersistenceFailure)
             val loaded = withContext(ioDispatcher) { store.loadSnapshot() }

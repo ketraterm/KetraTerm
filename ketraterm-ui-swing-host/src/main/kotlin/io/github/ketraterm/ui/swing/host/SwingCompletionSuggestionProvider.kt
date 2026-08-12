@@ -27,7 +27,8 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
  * The adapter reads [contextProvider] for every request so hosts can publish
  * current profile and working-directory state without rebuilding the engine.
  *
- * @param engine pure completion engine queried on the Swing caller's thread.
+ * @param engine pure suspending completion engine. This adapter does not select
+ * a dispatcher; the owning suggestion caller controls its coroutine context.
  * @param contextProvider supplier for current host-owned request metadata.
  */
 class SwingCompletionSuggestionProvider(

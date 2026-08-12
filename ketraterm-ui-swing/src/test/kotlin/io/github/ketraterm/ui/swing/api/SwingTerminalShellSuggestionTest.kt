@@ -23,22 +23,24 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.*
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Insets
 import java.awt.event.KeyEvent
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
+import javax.swing.JPanel
 import javax.swing.SwingUtilities
+import kotlin.coroutines.ContinuationInterceptor
 
 class SwingTerminalShellSuggestionTest {
     @Test
     fun `new suggestion request cancels the previous provider call`() {
         val firstStarted = CompletableDeferred<Unit>()
         val firstCancelled = CompletableDeferred<Unit>()
-        val secondCompleted = CompletableDeferred<Unit>()
+        val view = RecordingSuggestionView()
         val component =
             SwingTerminal(
                 settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
@@ -54,10 +56,9 @@ class SwingTerminalShellSuggestionTest {
                                         firstCancelled.complete(Unit)
                                     }
                                 }
-                                suggestions(request.commandText).also {
-                                    secondCompleted.complete(Unit)
-                                }
+                                suggestions(request.commandText)
                             },
+                        shellSuggestionViewFactory = view.factory(),
                     ),
             )
 
@@ -68,12 +69,48 @@ class SwingTerminalShellSuggestionTest {
         runBlocking { firstStarted.await() }
         SwingUtilities.invokeAndWait { component.requestShellSuggestions("second", 6, 0, 0) }
         runBlocking { firstCancelled.await() }
-        runBlocking { secondCompleted.await() }
+        val update = view.awaitUpdate()
 
         SwingUtilities.invokeAndWait {
             val state = component.currentShellSuggestionState()
             assertTrue(state.visible)
             assertEquals(2, state.count)
+            assertTrue(update.onEdt)
+            component.dispose()
+        }
+    }
+
+    @Test
+    fun `provider runs on default dispatcher and publishes on EDT`() {
+        val providerWasOnEdt = CompletableDeferred<Boolean>()
+        val providerDispatcher = CompletableDeferred<ContinuationInterceptor?>()
+        val view = RecordingSuggestionView()
+        val component =
+            SwingTerminal(
+                settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
+                hostServices =
+                    SwingHostServices(
+                        shellSuggestionProvider =
+                            SwingShellSuggestionProvider { request ->
+                                providerWasOnEdt.complete(SwingUtilities.isEventDispatchThread())
+                                providerDispatcher.complete(currentCoroutineContext()[ContinuationInterceptor])
+                                suggestions(request.commandText)
+                            },
+                        shellSuggestionViewFactory = view.factory(),
+                    ),
+            )
+
+        SwingUtilities.invokeAndWait {
+            component.size = component.preferredGridSize(12, 4)
+            component.requestShellSuggestions("git s", 5, 0, 0)
+        }
+        val update = view.awaitUpdate()
+
+        assertFalse(runBlocking { providerWasOnEdt.await() })
+        assertSame(Dispatchers.Default, runBlocking { providerDispatcher.await() })
+        assertTrue(update.onEdt)
+        SwingUtilities.invokeAndWait {
+            assertTrue(component.currentShellSuggestionState().visible)
             component.dispose()
         }
     }
@@ -118,6 +155,7 @@ class SwingTerminalShellSuggestionTest {
     fun `provider backed suggestion request shows results and preserves acceptance context`() {
         val providerRequests = ArrayList<SwingShellSuggestionRequest>()
         val acceptedRequests = ArrayList<SwingShellSuggestionRequest>()
+        val view = RecordingSuggestionView()
         val component =
             SwingTerminal(
                 settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
@@ -132,6 +170,7 @@ class SwingTerminalShellSuggestionTest {
                             SwingShellSuggestionHandler { acceptance ->
                                 acceptedRequests += acceptance.request
                             },
+                        shellSuggestionViewFactory = view.factory(),
                     ),
             )
 
@@ -143,7 +182,10 @@ class SwingTerminalShellSuggestionTest {
                 anchorColumn = 5,
                 anchorRow = 2,
             )
+        }
+        view.awaitUpdate()
 
+        SwingUtilities.invokeAndWait {
             val state = component.currentShellSuggestionState()
             assertTrue(state.visible)
             assertEquals(2, state.count)
@@ -169,12 +211,14 @@ class SwingTerminalShellSuggestionTest {
 
     @Test
     fun `provider empty result hides current suggestion popup`() {
+        val view = RecordingSuggestionView()
         val component =
             SwingTerminal(
                 settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
                 hostServices =
                     SwingHostServices(
                         shellSuggestionProvider = SwingShellSuggestionProvider { emptyList() },
+                        shellSuggestionViewFactory = view.factory(),
                     ),
             )
 
@@ -182,9 +226,15 @@ class SwingTerminalShellSuggestionTest {
             component.size = component.preferredGridSize(12, 4)
             component.showShellSuggestions(request(), suggestions())
             assertTrue(component.currentShellSuggestionState().visible)
+        }
+        assertTrue(view.awaitUpdate().suggestions.isNotEmpty())
 
+        SwingUtilities.invokeAndWait {
             component.requestShellSuggestions(commandText = "missing", cursorOffset = 7, anchorColumn = 0, anchorRow = 0)
+        }
+        assertTrue(view.awaitUpdate().suggestions.isEmpty())
 
+        SwingUtilities.invokeAndWait {
             assertFalse(component.currentShellSuggestionState().visible)
         }
     }
@@ -195,6 +245,7 @@ class SwingTerminalShellSuggestionTest {
         val session = activeSuggestionSession(connector)
         connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git s".utf8())
         val providerRequests = ArrayList<SwingShellSuggestionRequest>()
+        val view = RecordingSuggestionView()
         val component =
             SwingTerminal(
                 settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
@@ -205,6 +256,7 @@ class SwingTerminalShellSuggestionTest {
                                 providerRequests += request
                                 suggestions(request.commandText)
                             },
+                        shellSuggestionViewFactory = view.factory(),
                     ),
             )
 
@@ -212,7 +264,10 @@ class SwingTerminalShellSuggestionTest {
             component.size = component.preferredGridSize(30, 4)
             component.bind(session)
             component.requestActiveShellSuggestions()
+        }
+        view.awaitUpdate()
 
+        SwingUtilities.invokeAndWait {
             val state = component.currentShellSuggestionState()
             assertTrue(state.visible)
             assertEquals(-1, state.selectedIndex)
@@ -285,6 +340,7 @@ class SwingTerminalShellSuggestionTest {
         val session = activeSuggestionSession(connector)
         connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git s".utf8())
         val providerRequests = ArrayList<SwingShellSuggestionRequest>()
+        val view = RecordingSuggestionView()
         val component =
             SwingTerminal(
                 settingsProvider = { SwingSettings(shellSuggestionsEnabled = false) },
@@ -295,6 +351,7 @@ class SwingTerminalShellSuggestionTest {
                                 providerRequests += request
                                 suggestions(request.commandText)
                             },
+                        shellSuggestionViewFactory = view.factory(),
                     ),
             )
 
@@ -302,7 +359,10 @@ class SwingTerminalShellSuggestionTest {
             component.size = component.preferredGridSize(30, 4)
             component.bind(session)
             component.requestActiveShellSuggestions()
+        }
+        view.awaitUpdate()
 
+        SwingUtilities.invokeAndWait {
             assertTrue(component.currentShellSuggestionState().visible)
         }
 
@@ -558,6 +618,33 @@ class SwingTerminalShellSuggestionTest {
             listener?.onBytes(bytes, 0, bytes.size)
         }
     }
+
+    private class RecordingSuggestionView : SwingShellSuggestionView {
+        override val component = JPanel()
+        private val updates = LinkedBlockingQueue<RecordedSuggestionUpdate>()
+
+        override fun update(
+            suggestions: List<SwingShellSuggestion>,
+            selectedIndex: Int,
+        ) {
+            updates +=
+                RecordedSuggestionUpdate(
+                    suggestions = suggestions,
+                    selectedIndex = selectedIndex,
+                    onEdt = SwingUtilities.isEventDispatchThread(),
+                )
+        }
+
+        fun factory(): SwingShellSuggestionViewFactory = SwingShellSuggestionViewFactory { this }
+
+        fun awaitUpdate(): RecordedSuggestionUpdate = updates.poll(5, TimeUnit.SECONDS) ?: fail("Suggestion view update was not published")
+    }
+
+    private data class RecordedSuggestionUpdate(
+        val suggestions: List<SwingShellSuggestion>,
+        val selectedIndex: Int,
+        val onEdt: Boolean,
+    )
 
     private fun activeSuggestionSession(connector: RecordingConnector): TerminalSession {
         val terminal = TerminalBuffers.create(width = 30, height = 4, maxHistory = 20)
