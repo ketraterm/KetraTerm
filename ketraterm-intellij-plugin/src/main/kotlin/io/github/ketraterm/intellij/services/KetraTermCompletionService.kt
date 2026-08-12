@@ -81,7 +81,7 @@ internal class KetraTermCompletionService(
     /**
      * Creates completion resources bound to one terminal workspace tab.
      *
-     * @param project IntelliJ project used for project-aware VFS and Git snapshots.
+     * @param project IntelliJ project used for project-aware VFS and Git queries.
      * @param tab terminal tab providing identity, profile, and working-directory state.
      * @return session resources that the owning terminal pane must close.
      * @throws IllegalStateException if application-level completion has been disposed.
@@ -89,25 +89,49 @@ internal class KetraTermCompletionService(
     fun openSession(
         project: Project,
         tab: TerminalWorkspaceTab,
-    ): IntellijCompletionSession =
-        registry.openSession(
+    ): IntellijCompletionSession {
+        val workingDirectoryUriProvider = { tab.currentWorkingDirectoryUri }
+        return registry.openSession(
             IntellijCompletionSessionContext(
                 sessionId = tab.id,
                 profileId = tab.profile.id,
-                workingDirectoryUriProvider = { tab.currentWorkingDirectoryUri },
+                workingDirectoryUriProvider = workingDirectoryUriProvider,
                 shellCapabilities = tab.profile.kind.intellijCompletionShellCapabilities(),
-                providerFactories =
+                additionalSources =
                     listOf(
-                        IntellijGitBranchProviderFactory(IntellijGitBranchLoader(project)::load),
-                        IntellijGitRemoteBranchProviderFactory(IntellijGitRemoteBranchLoader(project)::load),
-                        IntellijGitTagProviderFactory(IntellijGitTagLoader(project)::load),
-                        IntellijGitStatusPathProviderFactory(IntellijGitStatusPathLoader(project)::load),
-                        IntellijGradleTaskProviderFactory(IntellijGradleTaskLoader(project)::load),
-                        IntellijProjectFileProviderFactory(IntellijProjectFileLoader(project)::load),
+                        TerminalCompletionSourceEntry(
+                            intellijGitCompletionSource(
+                                loader = IntellijGitCompletionLoader(project)::load,
+                                workingDirectoryUriProvider = workingDirectoryUriProvider,
+                            ),
+                            TerminalCompletionSourcePrior.GIT_REFERENCE,
+                        ),
+                        TerminalCompletionSourceEntry(
+                            intellijGitStatusPathCompletionSource(
+                                loader = IntellijGitStatusPathLoader(project)::load,
+                                workingDirectoryUriProvider = workingDirectoryUriProvider,
+                            ),
+                            TerminalCompletionSourcePrior.GIT_STATUS_PATH,
+                        ),
+                        TerminalCompletionSourceEntry(
+                            intellijGradleTaskCompletionSource(
+                                loader = IntellijGradleTaskLoader(project)::load,
+                                workingDirectoryUriProvider = workingDirectoryUriProvider,
+                            ),
+                            TerminalCompletionSourcePrior.GRADLE_TASK,
+                        ),
+                        TerminalCompletionSourceEntry(
+                            intellijProjectFileCompletionSource(
+                                loader = IntellijProjectFileLoader(project)::load,
+                                workingDirectoryUriProvider = workingDirectoryUriProvider,
+                            ),
+                            TerminalCompletionSourcePrior.PROJECT_FUZZY_PATH,
+                        ),
                     ),
                 directoryScanner = IntellijProjectDirectoryScanner(project),
             ),
         )
+    }
 
     /**
      * Records one shell-integration command completion for MRU and learned ranking.
@@ -170,7 +194,7 @@ internal class IntellijCompletionRegistry(
     }
 
     /** Defensive immutable copy of the command specifications used by sessions. */
-    val commandSpecs: List<TerminalCommandSpec> = specs.toList()
+    private val commandSpecs: List<TerminalCommandSpec> = specs.toList()
     private val lock = Any()
     private val closed = AtomicBoolean()
     private val sessionStates = HashMap<String, SessionState>()
@@ -186,7 +210,7 @@ internal class IntellijCompletionRegistry(
     /**
      * Creates and registers all completion sources for one terminal session.
      *
-     * @param context host capabilities and snapshot adapters for the session.
+     * @param context host capabilities and additional suspending sources for the session.
      * @return closeable session-facing provider and feedback resources.
      * @throws IllegalStateException if this registry is closed.
      */
@@ -214,15 +238,6 @@ internal class IntellijCompletionRegistry(
             )
         try {
             val fileSystemProvider = TerminalLocalFileSystemProvider(scanner = context.directoryScanner)
-            val providerContext =
-                IntellijCompletionProviderContext(
-                    commandSpecs = commandSpecs,
-                    workingDirectoryUriProvider = context.workingDirectoryUriProvider,
-                )
-            val dynamicRegistrations =
-                context.providerFactories.mapNotNull { factory ->
-                    factory.create(providerContext)
-                }
             val sources =
                 buildList {
                     add(
@@ -245,7 +260,7 @@ internal class IntellijCompletionRegistry(
                             priority = TerminalCompletionSourcePrior.DIRECTORY_PATH,
                         ),
                     )
-                    dynamicRegistrations.mapTo(this, IntellijCompletionProviderRegistration::sourceEntry)
+                    addAll(context.additionalSources)
                 }
             val provider =
                 IntellijCompletionSuggestionProvider(
@@ -262,8 +277,6 @@ internal class IntellijCompletionRegistry(
                 IntellijCompletionSession(
                     provider = provider,
                     feedbackHandler = statistics.createFeedbackHandler(context::swingContext),
-                    commandSpecs = commandSpecs,
-                    shellCapabilities = context.shellCapabilities,
                     closeAction = { removeSession(context.sessionId, state) },
                 )
             return OpenedSession(session, sessionStates.put(context.sessionId, state))
@@ -357,8 +370,8 @@ internal class IntellijCompletionRegistry(
  * @property profileId non-blank stable terminal profile identifier.
  * @property workingDirectoryUriProvider thread-safe supplier for the latest URI.
  * @property shellCapabilities shell syntax and quoting capabilities.
- * @property providerFactories additive dynamic provider factories.
- * @property directoryScanner suspending bounded directory snapshot scanner.
+ * @property additionalSources project-aware completion sources for this session.
+ * @property directoryScanner suspending bounded directory scanner.
  * @throws IllegalArgumentException if [sessionId] or [profileId] is blank.
  */
 internal data class IntellijCompletionSessionContext(
@@ -366,7 +379,7 @@ internal data class IntellijCompletionSessionContext(
     val profileId: String,
     val workingDirectoryUriProvider: () -> String?,
     val shellCapabilities: TerminalShellCapabilities,
-    val providerFactories: List<IntellijCompletionProviderFactory> = emptyList(),
+    val additionalSources: List<TerminalCompletionSourceEntry> = emptyList(),
     val directoryScanner: TerminalDirectoryScanner = TerminalBoundedDirectoryScanner(),
 ) {
     init {
@@ -387,15 +400,11 @@ internal data class IntellijCompletionSessionContext(
  *
  * @property provider popup-facing suggestion provider.
  * @property feedbackHandler acceptance and dismissal learning handler.
- * @property commandSpecs immutable command specifications used for triggering.
- * @property shellCapabilities shell syntax and quoting capabilities.
  * @property closeAction registry callback that removes and closes this session.
  */
 internal class IntellijCompletionSession(
     val provider: SwingShellSuggestionProvider,
     val feedbackHandler: SwingShellSuggestionFeedbackHandler,
-    val commandSpecs: List<TerminalCommandSpec>,
-    val shellCapabilities: TerminalShellCapabilities,
     private val closeAction: () -> Unit,
 ) : AutoCloseable {
     private val closed = AtomicBoolean()
@@ -405,23 +414,4 @@ internal class IntellijCompletionSession(
         if (!closed.compareAndSet(false, true)) return
         closeAction()
     }
-}
-
-private fun closeCompletionResources(
-    resources: Iterable<AutoCloseable>,
-    initialFailure: Throwable? = null,
-): Throwable? {
-    var failure = initialFailure
-    for (resource in resources) {
-        try {
-            resource.close()
-        } catch (closeFailure: Throwable) {
-            if (failure == null) {
-                failure = closeFailure
-            } else if (failure !== closeFailure) {
-                failure.addSuppressed(closeFailure)
-            }
-        }
-    }
-    return failure
 }

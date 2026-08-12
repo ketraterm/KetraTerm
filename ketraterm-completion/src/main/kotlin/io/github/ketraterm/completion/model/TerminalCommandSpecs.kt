@@ -127,8 +127,7 @@ object TerminalCommandSpecs {
      *
      * @return Git command specification.
      */
-    @JvmStatic
-    fun git(): TerminalCommandSpec =
+    private fun git(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "git",
             description = "distributed version control",
@@ -210,8 +209,7 @@ object TerminalCommandSpecs {
      *
      * @return Gradle command specification.
      */
-    @JvmStatic
-    fun gradle(): TerminalCommandSpec =
+    private fun gradle(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = GradleCompletionSyntax.COMMAND_NAME,
             description = "build automation",
@@ -254,8 +252,7 @@ object TerminalCommandSpecs {
      *
      * @return npm command specification.
      */
-    @JvmStatic
-    fun npm(): TerminalCommandSpec =
+    private fun npm(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "npm",
             description = "JavaScript package manager",
@@ -286,8 +283,7 @@ object TerminalCommandSpecs {
      *
      * @return Docker command specification.
      */
-    @JvmStatic
-    fun docker(): TerminalCommandSpec =
+    private fun docker(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "docker",
             description = "container platform CLI",
@@ -329,8 +325,7 @@ object TerminalCommandSpecs {
      *
      * @return Cargo command specification.
      */
-    @JvmStatic
-    fun cargo(): TerminalCommandSpec =
+    private fun cargo(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "cargo",
             description = "Rust package manager",
@@ -367,8 +362,7 @@ object TerminalCommandSpecs {
      *
      * @return kubectl command specification.
      */
-    @JvmStatic
-    fun kubectl(): TerminalCommandSpec =
+    private fun kubectl(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "kubectl",
             description = "Kubernetes cluster CLI",
@@ -422,8 +416,7 @@ object TerminalCommandSpecs {
      *
      * @return GitHub CLI command specification.
      */
-    @JvmStatic
-    fun gh(): TerminalCommandSpec =
+    private fun gh(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "gh",
             description = "GitHub CLI",
@@ -452,8 +445,7 @@ object TerminalCommandSpecs {
      *
      * @return pip command specification.
      */
-    @JvmStatic
-    fun pip(): TerminalCommandSpec =
+    private fun pip(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "pip",
             description = "Python package installer",
@@ -482,8 +474,7 @@ object TerminalCommandSpecs {
      *
      * @return Go command specification.
      */
-    @JvmStatic
-    fun go(): TerminalCommandSpec =
+    private fun go(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "go",
             description = "Go toolchain CLI",
@@ -513,8 +504,7 @@ object TerminalCommandSpecs {
      *
      * @return AWS CLI command specification.
      */
-    @JvmStatic
-    fun aws(): TerminalCommandSpec =
+    private fun aws(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "aws",
             description = "AWS Unified Command Line Interface",
@@ -560,8 +550,7 @@ object TerminalCommandSpecs {
      *
      * @return KetraTerm launcher command specification.
      */
-    @JvmStatic
-    fun ketra(): TerminalCommandSpec =
+    private fun ketra(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "ketra",
             description = "KetraTerm launcher CLI",

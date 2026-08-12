@@ -267,8 +267,6 @@ internal class KetraTermTerminalPane private constructor(
                     hideSuggestions = { terminalRef.hideShellSuggestions() },
                     rankingContextKey = { tab.currentWorkingDirectoryUri },
                     suggestionsEnabled = { KetraTermIntellijSettings.current().shellSuggestionsEnabled },
-                    commandSpecs = completionSession.commandSpecs,
-                    shellCapabilities = completionSession.shellCapabilities,
                 )
             val defaultSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session)
             val suggestionHandler =

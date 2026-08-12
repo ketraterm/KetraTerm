@@ -38,21 +38,21 @@ internal fun selectIntellijGitRepository(
  * URI validation, project disposal, read-action ownership, and nested-repository
  * selection are centralized here so every Git completion loader follows the same policy.
  */
-internal suspend fun <T> loadIntellijGitRepositorySnapshot(
+internal suspend fun <T> readIntellijGitRepository(
     project: Project,
     workingDirectoryUri: String?,
-    loader: (repository: GitRepository, workingDirectory: Path) -> List<T>,
-): List<T> {
-    if (project.isDisposed) return emptyList()
+    reader: (repository: GitRepository, workingDirectory: Path) -> T,
+): T? {
+    if (project.isDisposed) return null
     val workingDirectory =
         TerminalLocalFileUriResolver.resolve(workingDirectoryUri)
             ?: project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
-            ?: return emptyList()
+            ?: return null
     return readAction {
-        if (project.isDisposed) return@readAction emptyList()
+        if (project.isDisposed) return@readAction null
         val repository =
             selectIntellijGitRepository(GitRepositoryManager.getInstance(project).repositories, workingDirectory)
-                ?: return@readAction emptyList()
-        loader(repository, workingDirectory)
+                ?: return@readAction null
+        reader(repository, workingDirectory)
     }
 }

@@ -35,13 +35,13 @@ or construct:
 - `TerminalCommandCompletionStats`
 - `TerminalCommandShapeStats` and `TerminalCommandLineShape`
 - `TerminalCompletionFeedbackStats` and feedback vocabulary
-- `TerminalCompletionPersistenceDecision` and its reason/location vocabulary
 - `TerminalCommandCompletionStatsSnapshot`
 - `TerminalCommandCompletionStatsSnapshotCodec`
 
-`TerminalCompletionPersistencePolicy` is the reviewed host-facing privacy facade. It evaluates exact commands and
-structural statistics and sanitizes a complete snapshot before a host crosses a storage boundary. Its keyword matching
-and filtering implementation remains internal.
+`TerminalCompletionPersistencePolicy` is the reviewed host-facing privacy facade. It answers whether an exact command
+may be persisted and sanitizes a complete snapshot before a host crosses a storage boundary. Detailed rejection
+reasons, command-location analysis, keyword matching, and structural-statistic filtering remain internal because hosts
+do not need to branch on them.
 
 Model constructors expose durable host-owned fields only. Derived matching keys,
 such as normalized command text and normalized command-shape keys, are computed
@@ -58,7 +58,7 @@ cooperate with cancellation. A provider may additionally restrict itself to cano
 value domain has command-specific validity.
 
 `TerminalCompletionSources.fuzzyPath(...)` adapts either a suspending bounded host path loader or a query-aware
-`TerminalFuzzyPathProvider` for context-aware fuzzy path completion. Static snapshots use the shared dependency-free
+`TerminalFuzzyPathProvider` for context-aware fuzzy path completion. Bounded list loaders use the shared dependency-free
 matcher once. Query-aware providers receive the decoded active prefix and return already matched, relevance-ordered
 entries; the source never repeats that match. The shared source retains path-kind filtering, explicit replacement ranges, and shell-safe quoting. It
 requires typed path text by default; a small, context-specific provider such as Git status paths may opt in to
@@ -70,15 +70,15 @@ that same immutable context to every source and the global ranker instead of ind
 guessing command position, subcommand position, option-name position,
 option-value position, positional-argument position, active option metadata,
 expected path kind, expected dynamic value domain, repeatable subcommand source,
-static value candidates, context-aware live trigger state, replacement offsets,
+static value candidates, replacement offsets,
 or active quote state from raw command text.
 
-`TerminalLiveCompletionTriggerState` is the shared pure host-facing state
-machine for debounced suggestion refreshes. It owns only eligibility and
-primitive request de-duplication; hosts retain their scheduler, EDT dispatch,
-and popup lifecycle. It avoids allocating a per-refresh snapshot key while
-still re-requesting when command text, cursor anchor, or ranking context
-changes.
+Swing hosts share one `SwingLiveCompletionTriggerController`. Its debounced,
+text-only predicate is deliberately a cheap UX gate: it never tokenizes,
+resolves command specs, or duplicates source eligibility. The merged engine is
+the sole semantic authority and returns an empty result when completion is not
+valid. The controller retains only the last primitive request identity so equal
+render frames do not republish work.
 
 `TerminalShellCapabilities` is the single host-to-engine dialect contract. It
 contains `TerminalShellSyntax` for segment lexing and
@@ -142,11 +142,12 @@ candidates to their own UI presentation.
 The public API should not grow by convenience. New public functions must be
 durable host contracts, used by standalone/plugin integration, or explicitly
 documented persistence/model contracts.
-Architecture tests reject unreviewed public declarations, implementation
-package leaks, and public completion contracts without leading KDoc. Public
-constructors and methods must document parameters/properties, return values,
-observable failure behavior, ownership, threading, and I/O expectations where
-those concepts apply.
+Architecture tests enforce package/module boundaries and reject public
+implementation-package declarations and public completion contracts without
+leading KDoc. They do not mirror every permitted API name in a second manual
+allowlist. Public constructors and methods must document parameters/properties,
+return values, observable failure behavior, ownership, threading, and I/O
+expectations where those concepts apply.
 
 ## Command-Line Context Policy
 
@@ -216,12 +217,10 @@ UNC roots. Hosts must reject remote authorities they cannot map safely and
 return bounded results from a suspending provider that cooperates with request
 cancellation.
 
-Live trigger policy is command-context aware. Hyphen, path separator, and
-environment-variable triggers remain immediate. A trailing space is immediate
-only when the resolved context expects useful candidates, such as paths after
-`cd `, domain values after `git switch `, or repeatable tasks after
-`./gradlew `. Unknown command arguments do not become live triggers just because
-the user typed a space.
+Live trigger policy is a cheap presentation check, not a second completion
+parser. A small non-whitespace threshold plus common trigger characters keeps
+typing responsive, while the merged engine parses once and suppresses invalid
+operator, command, option, path, and value-domain requests authoritatively.
 
 Swing hosts share `SwingLiveCompletionTriggerController` and one EDT-confined
 one-shot `Timer` for debouncing. `SwingTerminal` owns exactly one replaceable
@@ -249,7 +248,7 @@ Task-style CLIs that accept several sibling command values on one line should
 set `TerminalCommandSpec.repeatableSubcommands`. Gradle is the built-in example:
 after `./gradlew clean bu`, the context remains attached to the root Gradle
 task set and the spec source can suggest `build` while omitting already-used tasks such as `clean`. A host may add a
-ready Gradle-task snapshot source for the same context. It completes imported root tasks, canonical module tasks such as
+suspending Gradle-task source for the same context. It completes imported root tasks, canonical module tasks such as
 `:app:run`, and short names after `-p app` or `--project-dir app`; `-p`
 uses a project directory, not a Gradle colon path.
 
@@ -278,24 +277,23 @@ local and remote-filesystem measurements.
 `runInterruptible` makes local directory scans cooperatively interruptible. The app resolves
 local and `localhost` file URIs, explicit home paths,
 Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses
-write-allowing suspending read actions for project-aware VFS snapshots and bounded local scanning elsewhere. Its first
-dynamic value provider reads local branches from the Git4Idea repository that contains the terminal working directory
-and returns bounded values for `git switch`, `checkout`, `merge`, and `rebase`. Remote
-branches use a separate provider for `checkout`, `merge`, and `rebase`, avoiding invalid remote
-suggestions for `git switch`. Tags use the same bounded, repository-selected Git4Idea snapshot and are available for
-`checkout`, `merge`, and `rebase`; `git switch` remains local-branch-only.
+write-allowing suspending read actions for project-aware VFS queries and bounded local scanning elsewhere. One Git
+source selects the repository for the terminal working directory and reads local branches, remote branches, and tags in
+one IntelliJ read action. Local branches apply to `git switch`, `checkout`, `merge`, and `rebase`; remote branches and
+tags apply to `checkout`, `merge`, and `rebase`, so `git switch` remains local-branch-only.
 Whole-project fuzzy paths use a prefix-keyed suspending query through IntelliJ's Go to File model and item provider.
 IntelliJ owns indexed discovery, fuzzy matching, path qualification, and result ordering; the plugin only converts PSI
 items into shell-facing paths, while the shared source applies terminal path semantics. These queries use IntelliJ's
 suspending `readAction`, so pending write actions restart the read without a blocking-context bridge. Fuzzy paths activate only in declared or
 explicitly path-like terminal positions, while direct directory completion remains higher priority for immediate
 children. Changelists, SDKs, and run configurations remain follow-up work. IntelliJ also reads its already-imported Gradle external-system
-model into a bounded task snapshot; it never starts Gradle from a completion request. A separate Git status snapshot
+model into a bounded task result; it never starts Gradle from a completion request. A separate Git status loader
 supplies changed and
 untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Git process.
 
-IntelliJ dynamic providers are composed through additive provider factories. Each factory returns one prioritized
-suspending source with no closeable snapshot resources. The registry owns session composition; a thin statistics adapter
+IntelliJ dynamic completion is composed from ordinary source-producing functions and explicit prioritized source
+entries. There is no provider-factory or registration framework and no closeable provider state. The registry owns
+session composition; a thin statistics adapter
 maps host events into the shared learning repository. Standalone uses the same repository path so completion files are
 never loaded on the Swing event-dispatch thread.
 

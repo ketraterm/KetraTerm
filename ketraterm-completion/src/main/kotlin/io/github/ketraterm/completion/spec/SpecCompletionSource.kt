@@ -85,9 +85,10 @@ internal class SpecCompletionSource(
 
     private fun TerminalCompletionContext.isAlreadyUsedRepeatableSubcommand(spec: TerminalCommandSpec): Boolean {
         val source = subcommandCandidateSource ?: return false
-        return source.repeatableSubcommands && commandPath.dropWhile { it != source }.drop(1).any { command ->
-            command.name.equals(spec.name, ignoreCase = true)
-        }
+        return source.repeatableSubcommands &&
+            commandPath.dropWhile { it != source }.drop(1).any { command ->
+                command.name.equals(spec.name, ignoreCase = true)
+            }
     }
 
     private fun completeOptions(context: TerminalCompletionContext): List<TerminalCompletionCandidate> {

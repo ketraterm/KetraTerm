@@ -17,10 +17,7 @@ package io.github.ketraterm.completion.api
 
 import io.github.ketraterm.completion.history.CommandCompletionStatsSanitizer
 import io.github.ketraterm.completion.history.CommandPersistencePrivacyPolicy
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
-import io.github.ketraterm.completion.model.TerminalCommandShapeStats
-import io.github.ketraterm.completion.model.TerminalCompletionPersistenceDecision
 
 /**
  * Host-facing privacy policy for persisted completion-learning data.
@@ -37,48 +34,6 @@ object TerminalCompletionPersistencePolicy {
      * @return `true` when [command] is safe enough for local persisted learning.
      */
     fun allowsCommand(command: String): Boolean = CommandPersistencePrivacyPolicy.allowsCommand(command)
-
-    /**
-     * Evaluates whether [command] may be learned persistently or written to disk.
-     *
-     * @param command full command line captured by an authoritative host integration.
-     * @return auditable privacy decision explaining the allow or reject result.
-     */
-    fun evaluateCommand(command: String): TerminalCompletionPersistenceDecision = CommandPersistencePrivacyPolicy.evaluateCommand(command)
-
-    /**
-     * Returns whether an exact command-statistics row may be persisted.
-     *
-     * @param record aggregate exact command-statistics row.
-     * @return `true` when [record] is safe enough for local persistence.
-     */
-    fun allowsCommandStats(record: TerminalCommandCompletionStats): Boolean = CommandPersistencePrivacyPolicy.allowsCommandStats(record)
-
-    /**
-     * Evaluates whether an exact command-statistics row may be persisted.
-     *
-     * @param record aggregate exact command-statistics row.
-     * @return auditable privacy decision for [record].
-     */
-    fun evaluateCommandStats(record: TerminalCommandCompletionStats): TerminalCompletionPersistenceDecision =
-        CommandPersistencePrivacyPolicy.evaluateCommandStats(record)
-
-    /**
-     * Returns whether a structural shape-statistics row may be persisted.
-     *
-     * @param record aggregate structural command-shape row.
-     * @return `true` when [record] is safe enough for local persistence.
-     */
-    fun allowsShapeStats(record: TerminalCommandShapeStats): Boolean = CommandPersistencePrivacyPolicy.allowsShapeStats(record)
-
-    /**
-     * Evaluates whether a structural shape-statistics row may be persisted.
-     *
-     * @param record aggregate structural command-shape row.
-     * @return auditable privacy decision for [record].
-     */
-    fun evaluateShapeStats(record: TerminalCommandShapeStats): TerminalCompletionPersistenceDecision =
-        CommandPersistencePrivacyPolicy.evaluateShapeStats(record)
 
     /**
      * Returns a snapshot safe enough for local persisted completion learning.

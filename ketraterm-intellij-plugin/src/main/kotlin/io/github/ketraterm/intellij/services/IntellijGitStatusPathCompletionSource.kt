@@ -17,7 +17,6 @@ package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.ChangeListManager
-import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
 import java.nio.file.Path
@@ -25,7 +24,7 @@ import java.nio.file.Path
 /**
  * Loads changed and unversioned paths tracked by IntelliJ for the Git repository containing a terminal directory.
  *
- * The IDE change-list model supplies the paths; no Git command is started. Snapshot creation runs under a read action
+ * The IDE change-list model supplies the paths; no Git command is started. Collection runs under one read action
  * on a completion worker and returns only paths belonging to the selected, deepest containing repository.
  *
  * @property project IntelliJ project that owns the change-list and Git repository models.
@@ -34,7 +33,7 @@ internal class IntellijGitStatusPathLoader(
     private val project: Project,
 ) {
     /**
-     * Loads a bounded, deterministic changed-path snapshot for one terminal directory.
+     * Loads bounded, deterministic changed paths for one terminal directory.
      *
      * Renamed paths use their post-rename path when available; deleted paths use their prior path.
      *
@@ -42,7 +41,7 @@ internal class IntellijGitStatusPathLoader(
      * @return at most 2,048 changed paths, or an empty list for unusable project, URI, or repository state.
      */
     suspend fun load(workingDirectoryUri: String?): List<TerminalFuzzyPathEntry> =
-        loadIntellijGitRepositorySnapshot(project, workingDirectoryUri) { repository, workingDirectory ->
+        readIntellijGitRepository(project, workingDirectoryUri) { repository, workingDirectory ->
             val repositoryRoot = repository.root.toNioPath()
             val retained = BoundedSnapshotCollector(MAX_RETAINED_PATHS, ENTRY_ORDER)
             var visited = 0
@@ -69,7 +68,7 @@ internal class IntellijGitStatusPathLoader(
                 retain(path, isDirectory = false, detail = "untracked file")
             }
             retained.toSortedList()
-        }
+        } ?: emptyList()
 
     private fun relativePath(
         workingDirectory: Path,
@@ -87,22 +86,13 @@ internal class IntellijGitStatusPathLoader(
     }
 }
 
-/** Adds changed Git paths as a high-priority path source without leaking IntelliJ VCS APIs into the shared engine. */
-internal class IntellijGitStatusPathProviderFactory(
-    private val loader: suspend (String?) -> List<TerminalFuzzyPathEntry>,
-) : IntellijCompletionProviderFactory {
-    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
-        context.createSuspendingRegistration(TerminalCompletionSourcePrior.GIT_STATUS_PATH, loader) { valuesProvider ->
-            TerminalCompletionSources.fuzzyPath(
-                sourceId = SOURCE_ID,
-                entriesProvider = valuesProvider,
-                requiresNonEmptyPrefix = false,
-                allowedCommandNames = ALLOWED_COMMAND_NAMES,
-            )
-        }
-
-    private companion object {
-        private const val SOURCE_ID = "intellij-git-status-path"
-        private val ALLOWED_COMMAND_NAMES = setOf("add", "restore", "rm", "diff")
-    }
-}
+/** Creates changed-Git-path completion without exposing IntelliJ VCS APIs to the shared engine. */
+internal fun intellijGitStatusPathCompletionSource(
+    loader: suspend (String?) -> List<TerminalFuzzyPathEntry>,
+    workingDirectoryUriProvider: () -> String?,
+) = TerminalCompletionSources.fuzzyPath(
+    sourceId = "intellij-git-status-path",
+    entriesProvider = { loader(workingDirectoryUriProvider()) },
+    requiresNonEmptyPrefix = false,
+    allowedCommandNames = setOf("add", "restore", "rm", "diff"),
+)

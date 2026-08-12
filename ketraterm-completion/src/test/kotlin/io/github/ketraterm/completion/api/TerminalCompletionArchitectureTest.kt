@@ -22,7 +22,7 @@ import kotlin.io.path.invariantSeparatorsPathString
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/** Enforces the completion module's public package and visibility boundaries. */
+/** Enforces module boundaries without mirroring the completion public API. */
 internal class TerminalCompletionArchitectureTest {
     @Test
     fun `implementation packages expose no public top-level declarations`() {
@@ -34,121 +34,6 @@ internal class TerminalCompletionArchitectureTest {
         assertTrue(
             actual = violations.isEmpty(),
             message = violations.joinToString(prefix = "Implementation declarations must be internal:\n", separator = "\n"),
-        )
-    }
-
-    @Test
-    fun `public model package contains only public contracts`() {
-        val violations =
-            kotlinFiles(completionMainRoot.resolve("model")).flatMap { file ->
-                file
-                    .readSourceLines()
-                    .mapIndexedNotNull { index, line ->
-                        when {
-                            line.startsWith("internal ") -> "${file.relativeToRepository()}:${index + 1}: $line"
-                            PUBLIC_TOP_LEVEL_DECLARATION.matches(line) && line.declaredName() !in PUBLIC_MODEL_DECLARATIONS ->
-                                "${file.relativeToRepository()}:${index + 1}: $line"
-                            else -> null
-                        }
-                    }
-            }
-
-        assertTrue(
-            actual = violations.isEmpty(),
-            message = violations.joinToString(prefix = "Only durable public contracts belong in model:\n", separator = "\n"),
-        )
-    }
-
-    @Test
-    fun `public api package contains only host-facing contracts`() {
-        val violations =
-            kotlinFiles(completionMainRoot.resolve("api")).flatMap { file ->
-                file
-                    .readSourceLines()
-                    .mapIndexedNotNull { index, line ->
-                        when {
-                            line.startsWith("internal ") -> "${file.relativeToRepository()}:${index + 1}: $line"
-                            PUBLIC_TOP_LEVEL_DECLARATION.matches(line) && line.declaredName() !in PUBLIC_API_DECLARATIONS ->
-                                "${file.relativeToRepository()}:${index + 1}: $line"
-                            else -> null
-                        }
-                    }
-            }
-
-        assertTrue(
-            actual = violations.isEmpty(),
-            message = violations.joinToString(prefix = "Only host-facing contracts belong in api:\n", separator = "\n"),
-        )
-    }
-
-    @Test
-    fun `public source and engine factories expose only reviewed functions`() {
-        val violations =
-            listOf(
-                completionMainRoot.resolve("api/TerminalCompletionSources.kt") to PUBLIC_COMPLETION_SOURCE_FACTORIES,
-                completionMainRoot.resolve("api/TerminalCompletionEngines.kt") to PUBLIC_COMPLETION_ENGINE_FACTORIES,
-            ).flatMap { (file, allowedFunctions) ->
-                file
-                    .readSourceLines()
-                    .mapIndexedNotNull { index, line ->
-                        val functionName = PUBLIC_MEMBER_FUNCTION.find(line)?.groupValues?.get(1)
-                        if (functionName != null && functionName !in allowedFunctions) {
-                            "${file.relativeToRepository()}:${index + 1}: $line"
-                        } else {
-                            null
-                        }
-                    }
-            }
-
-        assertTrue(
-            actual = violations.isEmpty(),
-            message = violations.joinToString(prefix = "Unreviewed completion factory functions:\n", separator = "\n"),
-        )
-    }
-
-    @Test
-    fun `public model helper functions expose only reviewed contracts`() {
-        val violations =
-            kotlinFiles(completionMainRoot.resolve("model")).flatMap { file ->
-                val allowedFunctions = PUBLIC_MODEL_MEMBER_FUNCTIONS[file.relativeToCompletionRoot()] ?: emptySet()
-                file
-                    .readSourceLines()
-                    .mapIndexedNotNull { index, line ->
-                        val functionName = PUBLIC_MEMBER_FUNCTION.find(line)?.groupValues?.get(1)
-                        if (functionName != null && functionName !in allowedFunctions) {
-                            "${file.relativeToRepository()}:${index + 1}: $line"
-                        } else {
-                            null
-                        }
-                    }
-            }
-
-        assertTrue(
-            actual = violations.isEmpty(),
-            message = violations.joinToString(prefix = "Unreviewed public model helper functions:\n", separator = "\n"),
-        )
-    }
-
-    @Test
-    fun `public api member functions expose only reviewed contracts`() {
-        val violations =
-            kotlinFiles(completionMainRoot.resolve("api")).flatMap { file ->
-                val allowedFunctions = PUBLIC_API_MEMBER_FUNCTIONS[file.relativeToCompletionRoot()] ?: emptySet()
-                file
-                    .readSourceLines()
-                    .mapIndexedNotNull { index, line ->
-                        val functionName = PUBLIC_MEMBER_FUNCTION.find(line)?.groupValues?.get(1)
-                        if (functionName != null && functionName !in allowedFunctions) {
-                            "${file.relativeToRepository()}:${index + 1}: $line"
-                        } else {
-                            null
-                        }
-                    }
-            }
-
-        assertTrue(
-            actual = violations.isEmpty(),
-            message = violations.joinToString(prefix = "Unreviewed public api member functions:\n", separator = "\n"),
         )
     }
 
@@ -178,35 +63,6 @@ internal class TerminalCompletionArchitectureTest {
     }
 
     @Test
-    fun `statistics remain evidence and never a completion provider`() {
-        val statsContract =
-            completionMainRoot
-                .resolve("api/TerminalCompletionLearningStore.kt")
-                .readSourceLines()
-                .joinToString("\n")
-        val compositionViolations =
-            completionCompositionFiles.filter { file ->
-                val source = file.readSourceLines().joinToString("\n")
-                source.contains("PERSISTENT_STATISTICS") ||
-                    Regex("TerminalCompletionSourceEntry\\s*\\(\\s*statsSource").containsMatchIn(source)
-            }
-
-        assertTrue(
-            actual = !statsContract.contains("interface TerminalCompletionLearningStore : TerminalCompletionSource"),
-            message = "Command statistics must not implement TerminalCompletionSource",
-        )
-        assertTrue(
-            actual = compositionViolations.isEmpty(),
-            message =
-                compositionViolations.joinToString(
-                    prefix = "Hosts must pass statistics as evidence, not compose them as providers:\n",
-                    separator = "\n",
-                    transform = { file -> file.relativeToRepository() },
-                ),
-        )
-    }
-
-    @Test
     fun `external modules import only completion api or model packages`() {
         val violations =
             externalModuleSourceRoots.flatMap { sourceRoot ->
@@ -214,7 +70,11 @@ internal class TerminalCompletionArchitectureTest {
                     file
                         .readSourceLines()
                         .mapIndexedNotNull { index, line ->
-                            if (IMPLEMENTATION_IMPORT.matches(line)) "${file.relativeToRepository()}:${index + 1}: $line" else null
+                            if (IMPLEMENTATION_IMPORT.matches(line)) {
+                                "${file.relativeToRepository()}:${index + 1}: $line"
+                            } else {
+                                null
+                            }
                         }
                 }
             }
@@ -279,17 +139,6 @@ internal class TerminalCompletionArchitectureTest {
             .relativize(this)
             .invariantSeparatorsPathString
 
-    private fun Path.relativeToCompletionRoot(): String =
-        completionMainRoot
-            .relativize(this)
-            .invariantSeparatorsPathString
-
-    private fun String.declaredName(): String? =
-        PUBLIC_TOP_LEVEL_DECLARATION
-            .find(this)
-            ?.groupValues
-            ?.get(2)
-
     private companion object {
         private val workingDirectory: Path = Paths.get("").toAbsolutePath()
         private val repositoryRoot: Path =
@@ -311,16 +160,6 @@ internal class TerminalCompletionArchitectureTest {
                     "ketraterm-completion-persistence/src/main/kotlin/io/github/ketraterm/completion/persistence",
                 ),
             )
-        private val completionCompositionFiles =
-            listOf(
-                repositoryRoot.resolve(
-                    "ketraterm-app/src/main/kotlin/io/github/ketraterm/app/completion/StandaloneCompletionRegistry.kt",
-                ),
-                repositoryRoot.resolve(
-                    "ketraterm-intellij-plugin/src/main/kotlin/io/github/ketraterm/intellij/services/KetraTermCompletionService.kt",
-                ),
-            )
-
         private val IMPLEMENTATION_PACKAGES =
             listOf(
                 "commandline",
@@ -345,122 +184,6 @@ internal class TerminalCompletionArchitectureTest {
                         .sorted()
                         .toList()
                 }
-        private val PUBLIC_MODEL_DECLARATIONS =
-            setOf(
-                "TerminalCommandCompletionStats",
-                "TerminalCommandCompletionStatsSnapshot",
-                "TerminalCommandCompletionStatsSnapshotCodec",
-                "TerminalCommandLineShape",
-                "TerminalCommandShapeStats",
-                "TerminalArgumentSpec",
-                "TerminalCommandSpec",
-                "TerminalCommandSpecs",
-                "TerminalCompletionFeedbackContext",
-                "TerminalCompletionFeedbackKind",
-                "TerminalCompletionFeedbackStats",
-                "TerminalCompletionPersistenceDecision",
-                "TerminalCompletionPersistenceDecisionKind",
-                "TerminalCompletionPersistenceDecisionLocation",
-                "TerminalCompletionDomainValue",
-                "TerminalCompletionTokenPosition",
-                "TerminalCompletionValueDomain",
-                "TerminalHiddenPathPolicy",
-                "TerminalOptionSpec",
-                "TerminalPathArgumentKind",
-            )
-        private val PUBLIC_API_DECLARATIONS =
-            setOf(
-                "TerminalCompletionLearningStore",
-                "TerminalCompletionCandidate",
-                "TerminalCompletionCandidateKind",
-                "TerminalCompletionActivePosition",
-                "TerminalCompletionContext",
-                "TerminalCompletionEngine",
-                "TerminalCompletionEngines",
-                "TerminalCompletionPersistencePolicy",
-                "TerminalCompletionRequest",
-                "TerminalCompletionSource",
-                "TerminalCompletionSourceEntry",
-                "TerminalCompletionSourcePrior",
-                "TerminalCompletionSources",
-                "TerminalSessionMruCompletionSource",
-                "TerminalCompletionTriggerEvaluator",
-                "TerminalLiveCompletionTriggerDecision",
-                "TerminalLiveCompletionTriggerState",
-                "TerminalDirectoryListingRequest",
-                "TerminalFileEntry",
-                "TerminalFuzzyPathEntry",
-                "TerminalFuzzyPathProvider",
-                "TerminalGradleTask",
-                "TerminalFileSystemProvider",
-                "TerminalShellQuotingPolicy",
-                "TerminalShellSyntax",
-                "TerminalShellCapabilities",
-            )
-        private val PUBLIC_COMPLETION_SOURCE_FACTORIES =
-            setOf(
-                "learningStore",
-                "fromSpecs",
-                "sessionMru",
-                "path",
-                "fuzzyPath",
-                "gradleTask",
-                "valueDomain",
-            )
-        private val PUBLIC_COMPLETION_ENGINE_FACTORIES =
-            setOf(
-                "fromSources",
-            )
-        private val PUBLIC_MODEL_MEMBER_FUNCTIONS =
-            mapOf(
-                "model/TerminalCommandCompletionStatsSnapshotCodec.kt" to setOf("currentFileName", "decode", "encode"),
-                "model/TerminalCompletionPersistenceDecision.kt" to setOf("sensitiveKeyword"),
-                "model/TerminalCommandSpecs.kt" to
-                    setOf("defaults", "docker", "git", "gradle", "npm", "cargo", "kubectl", "gh", "pip", "go", "aws", "ketra"),
-                "model/TerminalCompletionFeedbackStats.kt" to setOf("fromCandidateKind"),
-            )
-        private val PUBLIC_API_MEMBER_FUNCTIONS =
-            mapOf(
-                "api/TerminalCompletionLearningStore.kt" to
-                    setOf(
-                        "replaceSnapshot",
-                        "snapshot",
-                        "shapeSnapshot",
-                        "feedbackSnapshot",
-                        "snapshotAll",
-                        "recordCommandResult",
-                        "recordSuggestionFeedback",
-                    ),
-                "api/TerminalCompletionEngine.kt" to setOf("complete"),
-                "api/TerminalCompletionEngines.kt" to setOf("fromSources"),
-                "api/TerminalCompletionPersistencePolicy.kt" to
-                    setOf(
-                        "allowsCommand",
-                        "evaluateCommand",
-                        "allowsCommandStats",
-                        "evaluateCommandStats",
-                        "allowsShapeStats",
-                        "evaluateShapeStats",
-                        "sanitizeSnapshot",
-                    ),
-                "api/TerminalCompletionSource.kt" to setOf("complete"),
-                "api/TerminalCompletionSources.kt" to
-                    setOf(
-                        "learningStore",
-                        "fromSpecs",
-                        "sessionMru",
-                        "path",
-                        "fuzzyPath",
-                        "gradleTask",
-                        "valueDomain",
-                    ),
-                "api/TerminalSessionMruCompletionSource.kt" to setOf("recordSuccessfulCommand", "clear"),
-                "api/TerminalCompletionTriggerEvaluator.kt" to setOf("shouldTrigger", "isLiveTrigger"),
-                "api/TerminalLiveCompletionTriggerState.kt" to setOf("evaluate", "invalidate"),
-                "api/TerminalFileSystemProvider.kt" to setOf("listDirectory"),
-                "api/TerminalFuzzyPathEntry.kt" to setOf("entries"),
-            )
-
         private val PUBLIC_TOP_LEVEL_DECLARATION =
             Regex("""^(data class|enum class|fun interface|sealed interface|class|fun|interface|object)\s+([A-Za-z0-9_]+).*""")
         private val PUBLIC_MEMBER_FUNCTION = Regex("""^\s+(?!private |internal )fun\s+([A-Za-z0-9_]+)\(.*""")

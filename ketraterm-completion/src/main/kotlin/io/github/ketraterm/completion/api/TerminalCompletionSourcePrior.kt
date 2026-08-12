@@ -27,17 +27,11 @@ object TerminalCompletionSourcePrior {
     /** Prior for imported Gradle task candidates. */
     const val GRADLE_TASK: Int = 15
 
-    /** Prior for local Git branch candidates. */
-    const val LOCAL_GIT_BRANCH: Int = 15
+    /** Prior for Git branch and tag candidates captured by one repository read. */
+    const val GIT_REFERENCE: Int = 15
 
     /** Prior for changed or untracked Git path candidates. */
     const val GIT_STATUS_PATH: Int = 15
-
-    /** Prior for remote Git branch candidates. */
-    const val REMOTE_GIT_BRANCH: Int = 14
-
-    /** Prior for Git tag candidates. */
-    const val GIT_TAG: Int = 13
 
     /** Prior for direct children returned by the active directory provider. */
     const val DIRECTORY_PATH: Int = 12

@@ -15,10 +15,13 @@
  */
 package io.github.ketraterm.intellij.services
 
+import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFileEntry
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.host.TerminalDirectoryScanner
+import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -55,23 +58,17 @@ class IntellijCompletionRegistryTest {
     fun `dynamic provider loads values in the completion coroutine`() =
         runBlocking {
             var loads = 0
-            val factory =
-                IntellijCompletionProviderFactory { providerContext ->
-                    providerContext.createSuspendingRegistration(50, loader = {
+            val source =
+                TerminalCompletionSources.valueDomain(
+                    sourceId = "test-branch",
+                    domain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    valuesProvider = {
                         loads++
-                        listOf("main")
-                    }) { values ->
-                        TerminalCompletionSources.valueDomain(
-                            sourceId = "test-branch",
-                            domain = io.github.ketraterm.completion.model.TerminalCompletionValueDomain.GIT_BRANCH,
-                            valuesProvider = {
-                                values().map { io.github.ketraterm.completion.model.TerminalCompletionDomainValue(it) }
-                            },
-                        )
-                    }
-                }
+                        listOf(TerminalCompletionDomainValue("main"))
+                    },
+                )
             val registry = IntellijCompletionRegistry(coroutineScope = this)
-            val session = registry.openSession(context(factories = listOf(factory)))
+            val session = registry.openSession(context(additionalSources = listOf(TerminalCompletionSourceEntry(source, 20))))
 
             session.provider.suggestions(request("git switch m"))
 
@@ -108,7 +105,7 @@ class IntellijCompletionRegistryTest {
 
     private fun context(
         sessionId: String = "session",
-        factories: List<IntellijCompletionProviderFactory> = emptyList(),
+        additionalSources: List<TerminalCompletionSourceEntry> = emptyList(),
         scanner: TerminalDirectoryScanner = TerminalDirectoryScanner { _: Path, _: String -> emptyList() },
     ) =
         IntellijCompletionSessionContext(
@@ -116,7 +113,7 @@ class IntellijCompletionRegistryTest {
             profileId = "bash",
             workingDirectoryUriProvider = { "file:///repo" },
             shellCapabilities = TerminalShellCapabilities.POSIX,
-            providerFactories = factories,
+            additionalSources = additionalSources,
             directoryScanner = scanner,
         )
 

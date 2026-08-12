@@ -1278,12 +1278,14 @@ class SwingTerminal
 
         /**
          * Requests shell suggestions from [SwingHostServices.shellSuggestionProvider]
-         * and shows the returned snapshot near a terminal-grid cell.
+         * and shows the returned suggestions near a terminal-grid cell.
          *
-         * Providers run on the Swing Event Dispatch Thread and should return a
-         * bounded, already-computed snapshot quickly. This automatic request is
-         * ignored when [SwingSettings.shellSuggestionsEnabled] is `false`.
-         * Empty provider results hide the current popup.
+         * The component replaces its one completion coroutine for every request,
+         * so suspending providers run outside the Swing Event Dispatch Thread and
+         * are cancelled when newer input arrives or the popup is hidden. This
+         * automatic request is ignored when
+         * [SwingSettings.shellSuggestionsEnabled] is `false`. Empty provider
+         * results hide the current popup.
          *
          * @param commandText visible command-line text known to the host.
          * @param cursorOffset UTF-16 cursor offset within [commandText].

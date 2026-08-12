@@ -16,9 +16,6 @@
 package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.config.KetraTermSettings
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
@@ -121,8 +118,6 @@ internal class TerminalPane private constructor(
             settings: KetraTermSettings,
             suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
             suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
-            commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-            shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
             onContextMenu: (TerminalPane, SwingTerminalContextMenuRequest) -> Unit,
         ): TerminalPane {
             val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
@@ -135,8 +130,6 @@ internal class TerminalPane private constructor(
                     hideSuggestions = { terminalRef.hideShellSuggestions() },
                     rankingContextKey = { tab.currentWorkingDirectoryUri },
                     suggestionsEnabled = { settings.shellSuggestionsEnabled },
-                    commandSpecs = commandSpecs,
-                    shellCapabilities = shellCapabilities,
                 )
             val defaultHandler = SwingShellSuggestionHandler.createDefault(tab.session)
             val shellSuggestionHandler =

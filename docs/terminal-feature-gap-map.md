@@ -160,7 +160,7 @@ These are not badges of compatibility for this project. They expand attack surfa
   exact/shape/feedback learning, and bounded suspending off-EDT path providers. The reusable Swing
   terminal popup surface, keyboard/mouse selection, acceptance callback, range-aware Swing acceptance, dependency-free
   layered suspending completion foundation, deterministic source merge/ranking/deduplication with context-aware
-  command/subcommand/option/value/path/domain ranking, context-aware live trigger policy, bounded in-memory session MRU
+  command/subcommand/option/value/path/domain ranking, a cheap shared Swing live-trigger gate, bounded in-memory session MRU
   plus session-only observed-token learning for unknown executable families, spec-declared path argument metadata,
   repeatable subcommand/task metadata, static option value domains, dynamic value-domain metadata for host providers,
   command-aware path completion with trailing-space argument semantics, quote-preserving and shell-escaped path
@@ -168,20 +168,18 @@ These are not badges of compatibility for this project. They expand attack surfa
   IntelliJ spec/MRU provider wiring, compact exact command/shape/source-feedback stats, source-specific feedback-aware
   ranking, direct coroutine-backed directory providers, and standalone/IntelliJ enablement settings exist.
   Shell-returned completions are intentionally deferred.
-- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, latest-request local Git branch snapshots from
-  Git4Idea for `git switch`, `checkout`, `merge`, and `rebase`, and uses the IDE VFS/project-content model for path
-  directories inside the project with a bounded local-filesystem fallback elsewhere.
-- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, latest-request remote Git branch snapshots for
-  `checkout`, `merge`, and `rebase`; `git switch` deliberately remains local-branch-only.
-- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, latest-request Git tag snapshots for `checkout`,
-  `merge`, and `rebase`; `git switch` deliberately remains local-branch-only.
-- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, latest-request project-content fuzzy path snapshots
+- `DONE(completion/provider/intellij)`: One suspending IntelliJ Git source selects the Git4Idea repository once and
+  loads bounded local branches, remote branches, and tags in one read action. Local branches serve `git switch`,
+  `checkout`, `merge`, and `rebase`; remote branches and tags serve `checkout`, `merge`, and `rebase`, so `git switch`
+  deliberately remains local-branch-only. The IDE VFS/project-content model serves project directories with a bounded
+  local-filesystem fallback elsewhere.
+- `DONE(completion/provider/intellij)`: IntelliJ returns bounded, latest-request project-content fuzzy path results
   for declared or explicitly path-like completion positions. Direct directory completion stays higher priority for
   concise immediate-child results.
-- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, latest-request Git status path snapshots from its
+- `DONE(completion/provider/intellij)`: IntelliJ returns bounded Git status paths from its
   change-list model for changed and untracked paths in the selected repository. The provider is active for `git add`,
   `restore`, `rm`, and `diff`, and never starts a Git process.
-- `DONE(completion/provider/intellij)`: IntelliJ publishes a bounded imported-Gradle task snapshot for `gradle`,
+- `DONE(completion/provider/intellij)`: IntelliJ loads bounded imported Gradle tasks for `gradle`,
   `gradlew`, and `./gradlew`. It completes root tasks, canonical `:module:task` paths, and short task names after
   `-p` or `--project-dir`; it reads the IDE model and never invokes Gradle during completion.
 - `TODO(completion/provider)`: implement remaining standalone and IntelliJ dynamic providers for declared value domains,

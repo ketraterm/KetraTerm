@@ -21,11 +21,12 @@ import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORD
 import io.github.ketraterm.completion.internal.boundedTo
 
 /**
- * Pure Gradle-task source backed by a bounded host-published task snapshot.
+ * Gradle-task source backed by a bounded suspending host loader.
  *
  * This source has no Gradle or filesystem dependency. It recognises the
  * declared `gradle` command (including its wrapper aliases), full `:project:task`
  * paths, and task names scoped by a preceding `-p` or `--project-dir` option.
+ * It retains no loaded task state.
  */
 internal class GradleTaskCompletionSource(
     private val sourceId: String,

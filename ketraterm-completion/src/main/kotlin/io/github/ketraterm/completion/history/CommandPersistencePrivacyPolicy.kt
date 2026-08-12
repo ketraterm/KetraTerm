@@ -15,11 +15,9 @@
  */
 package io.github.ketraterm.completion.history
 
-import io.github.ketraterm.completion.history.CommandPersistencePrivacyPolicy.allowsCommand
+import io.github.ketraterm.completion.history.CompletionPersistenceDecisionLocation.*
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandShapeStats
-import io.github.ketraterm.completion.model.TerminalCompletionPersistenceDecision
-import io.github.ketraterm.completion.model.TerminalCompletionPersistenceDecisionLocation.*
 
 /**
  * Host-owned privacy gate for persisted command learning data.
@@ -48,18 +46,18 @@ internal object CommandPersistencePrivacyPolicy {
      * @param command full command line captured from shell integration or popup feedback.
      * @return auditable privacy decision explaining allow/reject outcome.
      */
-    fun evaluateCommand(command: String): TerminalCompletionPersistenceDecision {
+    fun evaluateCommand(command: String): CompletionPersistenceDecision {
         if (command.isBlank() || command.indexOf('\n') >= 0 || command.indexOf('\r') >= 0) {
-            return TerminalCompletionPersistenceDecision.BLANK_OR_MULTILINE
+            return CompletionPersistenceDecision.BLANK_OR_MULTILINE
         }
         if (command.startsWith(" ") || command.startsWith("\t")) {
-            return TerminalCompletionPersistenceDecision.IGNORES_SPACE
+            return CompletionPersistenceDecision.IGNORES_SPACE
         }
         val keyword = findSensitiveKeyword(command)
         return if (keyword == null) {
-            TerminalCompletionPersistenceDecision.ALLOWED
+            CompletionPersistenceDecision.ALLOWED
         } else {
-            TerminalCompletionPersistenceDecision.sensitiveKeyword(keyword, COMMAND_TEXT)
+            CompletionPersistenceDecision.sensitiveKeyword(keyword, COMMAND_TEXT)
         }
     }
 
@@ -77,8 +75,7 @@ internal object CommandPersistencePrivacyPolicy {
      * @param record aggregate exact command stats row.
      * @return auditable privacy decision for [record].
      */
-    fun evaluateCommandStats(record: TerminalCommandCompletionStats): TerminalCompletionPersistenceDecision =
-        evaluateCommand(record.commandLine)
+    fun evaluateCommandStats(record: TerminalCommandCompletionStats): CompletionPersistenceDecision = evaluateCommand(record.commandLine)
 
     /**
      * Returns whether a structural shape stats row may be persisted.
@@ -99,21 +96,21 @@ internal object CommandPersistencePrivacyPolicy {
      * @param record aggregate command-shape stats row.
      * @return auditable privacy decision for [record].
      */
-    fun evaluateShapeStats(record: TerminalCommandShapeStats): TerminalCompletionPersistenceDecision {
+    fun evaluateShapeStats(record: TerminalCommandShapeStats): CompletionPersistenceDecision {
         findSensitiveKeyword(record.shape.executable)?.let {
-            return TerminalCompletionPersistenceDecision.sensitiveKeyword(it, SHAPE_EXECUTABLE)
+            return CompletionPersistenceDecision.sensitiveKeyword(it, SHAPE_EXECUTABLE)
         }
         for (subcommand in record.shape.subcommands) {
             findSensitiveKeyword(subcommand)?.let {
-                return TerminalCompletionPersistenceDecision.sensitiveKeyword(it, SHAPE_SUBCOMMAND)
+                return CompletionPersistenceDecision.sensitiveKeyword(it, SHAPE_SUBCOMMAND)
             }
         }
         for (optionName in record.shape.optionNames) {
             findSensitiveKeyword(optionName)?.let {
-                return TerminalCompletionPersistenceDecision.sensitiveKeyword(it, SHAPE_OPTION_NAME)
+                return CompletionPersistenceDecision.sensitiveKeyword(it, SHAPE_OPTION_NAME)
             }
         }
-        return TerminalCompletionPersistenceDecision.ALLOWED
+        return CompletionPersistenceDecision.ALLOWED
     }
 
     private fun findSensitiveKeyword(text: String): String? {

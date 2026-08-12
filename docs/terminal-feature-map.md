@@ -125,7 +125,7 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   static option value domains, dynamic host-owned value-domain metadata, and host-resolved shell lexical/replacement
   capabilities, shell-word tokenization, a shared internal completion-context resolver for
   command/subcommand/option/value/argument positions, spec-backed evaluation, spec-aware command-line classification,
-  context-aware live trigger policy, context-aware merged ranking for command/subcommand/option/value/path/domain
+  a cheap text-only Swing live-trigger gate, context-aware merged ranking for command/subcommand/option/value/path/domain
   positions, privacy-preserving argument shape categories, source-specific accepted/dismissed feedback stats, one
   global evidence-fusion ranker, bounded surplus collection before final presentation truncation, a
   bounded in-memory session MRU source, command-aware path
@@ -159,12 +159,13 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   by deleting suffix text, backspacing prefix text, and pasting the selected replacement through the input/session
   boundary. The engine does not spawn shells, parse terminal output, perform I/O, or depend on
   Swing/IntelliJ/session/runtime modules.
-- **IntelliJ Dynamic Completion Providers**: The IntelliJ host uses Git4Idea repository metadata through bounded
-  suspending providers for `git switch`, `checkout`, `merge`, and `rebase`. Providers execute as children of the merged
+- **IntelliJ Dynamic Completion Providers**: The IntelliJ host uses Git4Idea repository metadata through one bounded
+  suspending Git source for `git switch`, `checkout`, `merge`, and `rebase`. It selects the repository once and derives
+  local branches, remote branches, and tags in one IntelliJ read action. Sources execute as children of the merged
   engine request and are cancelled when `SwingTerminal` replaces its single suggestion job. IntelliJ project
   path completion uses the IDE's indexed Go to File matcher and ranking inside a write-action-aware suspending read
   action, while blocking directory scanning uses the IO dispatcher outside the project. Dynamic
-  sources are additive factory registrations without provider-owned jobs, caches, or closeable snapshots.
+  sources are ordinary prioritized source entries without provider factories, provider-owned jobs, or closeable state.
   IntelliJ completion persistence is an explicit, disabled-by-default setting; session-local MRU and in-memory
   evidence remain active without disk access.
 - **Shared Completion Host Support**: `ketraterm-completion-host` owns direct suspending providers,

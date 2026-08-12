@@ -417,8 +417,6 @@ internal class TabManager(
             tab = workspaceTab,
             settings = settings,
             suggestionProvider = suggestionProvider,
-            commandSpecs = completionRegistry.commandSpecs,
-            shellCapabilities = shellCapabilities,
             suggestionFeedbackHandler =
                 completionStatistics.createFeedbackHandler(
                     profileId = workspaceTab.profile.id,

@@ -22,7 +22,6 @@ import com.intellij.openapi.externalSystem.model.task.TaskData
 import com.intellij.openapi.externalSystem.service.project.ProjectDataManager
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.project.Project
-import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalGradleTask
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
@@ -30,7 +29,7 @@ import org.jetbrains.plugins.gradle.util.GradleConstants
 import java.nio.file.Path
 
 /**
- * Loads a bounded Gradle-task snapshot from IntelliJ's imported external-system model.
+ * Loads bounded Gradle tasks from IntelliJ's imported external-system model.
  *
  * The loader never invokes Gradle. It reads the public IntelliJ External System
  * model built by a successful Gradle import.
@@ -128,19 +127,11 @@ internal object IntellijGradleTaskPath {
     }
 }
 
-/** Adds imported Gradle tasks without leaking IntelliJ external-system APIs into the shared completion module. */
-internal class IntellijGradleTaskProviderFactory(
-    private val loader: suspend (String?) -> List<TerminalGradleTask>,
-) : IntellijCompletionProviderFactory {
-    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
-        context.createSuspendingRegistration(TerminalCompletionSourcePrior.GRADLE_TASK, loader) { valuesProvider ->
-            TerminalCompletionSources.gradleTask(
-                sourceId = SOURCE_ID,
-                tasksProvider = valuesProvider,
-            )
-        }
-
-    private companion object {
-        private const val SOURCE_ID = "intellij-gradle-task"
-    }
-}
+/** Creates imported-Gradle-task completion without exposing IntelliJ model APIs to the shared engine. */
+internal fun intellijGradleTaskCompletionSource(
+    loader: suspend (String?) -> List<TerminalGradleTask>,
+    workingDirectoryUriProvider: () -> String?,
+) = TerminalCompletionSources.gradleTask(
+    sourceId = "intellij-gradle-task",
+    tasksProvider = { loader(workingDirectoryUriProvider()) },
+)

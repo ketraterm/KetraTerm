@@ -22,7 +22,7 @@ The project is split into strict layers:
   future mouse reports.
 - `ketraterm-completion`: suspending command-line completion models, parsing, parallel source evaluation, ranking, and
   bounded in-memory learning.
-- `ketraterm-completion-host`: host-neutral asynchronous snapshot, local-path, and bounded directory-scanning support
+- `ketraterm-completion-host`: host-neutral suspending local-path and bounded directory-scanning support
   for completion providers.
 - `ketraterm-completion-persistence`: optional sanitized, versioned local-file persistence for completion-learning
   snapshots.

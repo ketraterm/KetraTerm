@@ -26,14 +26,16 @@ import com.intellij.psi.PsiFileSystemItem
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.util.Processor
 import com.intellij.util.indexing.FindSymbolParameters
-import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
+import io.github.ketraterm.completion.api.TerminalFuzzyPathProvider
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.nio.file.Path
 
 /**
- * Queries IntelliJ's Go to File engine for a bounded fuzzy path snapshot.
+ * Queries IntelliJ's Go to File engine for bounded fuzzy paths.
  *
  * IntelliJ owns project discovery, fuzzy matching, path qualification, and result
  * ordering. This adapter only converts PSI items into shell-facing paths relative
@@ -130,25 +132,14 @@ private class IntellijProjectFileSearchViewModel(
     override fun getMaximumListSizeLimit(): Int = 0
 }
 
-/** Adds query-aware IntelliJ project fuzzy paths without leaking VFS APIs into the shared engine. */
-internal class IntellijProjectFileProviderFactory(
-    private val loader: suspend (String?, String) -> List<TerminalFuzzyPathEntry>,
-) : IntellijCompletionProviderFactory {
-    override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration {
-        val source =
-            TerminalCompletionSources.fuzzyPath(
-                sourceId = SOURCE_ID,
-                entriesProvider =
-                    TerminalFuzzyPathProvider { prefix ->
-                        loader(context.workingDirectoryUriProvider(), prefix)
-                    },
-            )
-        return IntellijCompletionProviderRegistration(
-            sourceEntry = TerminalCompletionSourceEntry(source, TerminalCompletionSourcePrior.PROJECT_FUZZY_PATH),
-        )
-    }
-
-    private companion object {
-        private const val SOURCE_ID = "intellij-project-file"
-    }
-}
+/** Creates query-aware IntelliJ project paths without exposing VFS APIs to the shared engine. */
+internal fun intellijProjectFileCompletionSource(
+    loader: suspend (String?, String) -> List<TerminalFuzzyPathEntry>,
+    workingDirectoryUriProvider: () -> String?,
+) = TerminalCompletionSources.fuzzyPath(
+    sourceId = "intellij-project-file",
+    entriesProvider =
+        TerminalFuzzyPathProvider { prefix ->
+            loader(workingDirectoryUriProvider(), prefix)
+        },
+)

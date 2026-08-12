@@ -45,7 +45,7 @@ internal class StandaloneCompletionRegistry(
     }
 
     /** Immutable command specs shared by standalone completion integration. */
-    val commandSpecs = specs.toList()
+    private val commandSpecs = specs.toList()
     private val lock = Any()
     private val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
     private val sessionStates = HashMap<String, SessionCompletionState>()

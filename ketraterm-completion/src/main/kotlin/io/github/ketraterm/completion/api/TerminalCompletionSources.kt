@@ -97,18 +97,19 @@ object TerminalCompletionSources {
     fun path(fileSystemProvider: TerminalFileSystemProvider): TerminalCompletionSource = PathCompletionSource(fileSystemProvider)
 
     /**
-     * Creates a pure source that fuzzy-matches a bounded path snapshot.
+     * Creates a source that fuzzy-matches a bounded host path result.
      *
-     * [entriesProvider] must return a ready immutable snapshot whose paths are
-     * relative to the request's current directory. Hosts own indexing and
-     * asynchronous refresh. The snapshot is matched once by the shared
-     * dependency-free matcher before terminal path rules are applied.
+     * [entriesProvider] is called only for an eligible completion context and
+     * must return paths relative to the request's current directory. It may
+     * perform bounded suspending host work and must cooperate with cancellation.
+     * The result is matched once by the shared dependency-free matcher before
+     * terminal path rules are applied.
      *
      * @param sourceId stable candidate-source id used by ranking feedback.
-     * @param entriesProvider supplier for the latest bounded indexed-path snapshot.
+     * @param entriesProvider suspending loader for bounded indexed paths.
      * @param requiresNonEmptyPrefix whether this source waits for explicit path
      * text before matching. Use `false` only for small, context-specific
-     * snapshots such as changed Git paths.
+     * result sets such as changed Git paths.
      * @param allowedCommandNames optional canonical command/subcommand names to
      * which this source is restricted. An empty set permits every valid path
      * position.
@@ -127,16 +128,16 @@ object TerminalCompletionSources {
         require(allowedCommandNames.none(String::isBlank)) { "allowedCommandNames must not contain blank values" }
         return FuzzyPathCompletionSource(
             sourceId = sourceId,
-            entriesProvider = SnapshotFuzzyPathProvider(entriesProvider),
+            entriesProvider = BoundedFuzzyPathProvider(entriesProvider),
             requiresNonEmptyPrefix = requiresNonEmptyPrefix,
             allowedCommandNames = allowedCommandNames.toSet(),
         )
     }
 
     /**
-     * Creates a pure source backed by a query-aware host fuzzy-path provider.
+     * Creates a source backed by a query-aware host fuzzy-path provider.
      *
-     * Unlike the snapshot-supplier overload, this overload passes the decoded
+     * Unlike the list-loader overload, this overload passes the decoded
      * active path prefix to [entriesProvider]. This lets IDE hosts query their
      * indexes asynchronously and apply bounds after matching instead of
      * truncating an unrelated whole-project traversal. The provider owns the
@@ -169,15 +170,15 @@ object TerminalCompletionSources {
     }
 
     /**
-     * Creates a pure source for host-indexed Gradle task snapshots.
+     * Creates a source for host-indexed Gradle tasks.
      *
      * The source understands Gradle's canonical `:project:task` notation and
      * scopes short task names after `-p` or `--project-dir`. [tasksProvider]
-     * must return a bounded ready snapshot and must never start Gradle, read
-     * the filesystem, or access an IDE model on the completion thread.
+     * must return a bounded result and cooperate with cancellation. The loader
+     * may read a host model but must never start Gradle from a completion request.
      *
      * @param sourceId stable candidate-source id used by ranking feedback.
-     * @param tasksProvider supplier for the latest immutable Gradle task snapshot.
+     * @param tasksProvider suspending bounded Gradle-task loader.
      * @return context-aware Gradle task completion source.
      * @throws IllegalArgumentException if [sourceId] is blank.
      */
@@ -192,15 +193,15 @@ object TerminalCompletionSources {
         )
 
     /**
-     * Creates a pure source for one host-owned dynamic value domain.
+     * Creates a source for one host-owned dynamic value domain.
      *
-     * [valuesProvider] must return a bounded, ready in-memory snapshot and must
-     * never perform disk, network, shell, index, or UI work. Hosts should refresh
-     * snapshots asynchronously and notify their presentation layer separately.
+     * [valuesProvider] is called only when the resolved context expects [domain].
+     * It may perform bounded suspending host work and must cooperate with
+     * cancellation. The source retains no returned values.
      *
      * @param domain command-spec value domain served by this source.
      * @param sourceId stable candidate-source id used by ranking feedback.
-     * @param valuesProvider supplier for the latest immutable value snapshot.
+     * @param valuesProvider suspending bounded value loader.
      * @param allowedCommandNames optional canonical command/subcommand names to
      * which this source is restricted. An empty set permits every matching
      * value-domain position.

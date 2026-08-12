@@ -43,20 +43,21 @@ data class TerminalFuzzyPathEntry(
 }
 
 /**
- * Supplies ready fuzzy matches for the active terminal prefix.
+ * Supplies bounded fuzzy matches for the active terminal prefix.
  *
  * Entries must already match [entries]'s prefix and be ordered from most to
  * least relevant. The shared completion source deliberately does not run a
  * second fuzzy matcher; it only applies terminal path and quoting rules.
- * Implementations must return immediately and perform no blocking I/O.
+ * Implementations may perform bounded suspending host queries and must
+ * cooperate with cancellation. Blocking I/O must be moved to an appropriate
+ * dispatcher by the host.
  */
 fun interface TerminalFuzzyPathProvider {
     /**
-     * Returns ready path entries matching [prefix] in descending relevance.
+     * Returns path entries matching [prefix] in descending relevance.
      *
      * @param prefix decoded active terminal path token.
-     * @return immutable bounded path snapshot, or an empty list while an
-     * asynchronous host query is pending.
+     * @return bounded immutable path result, or an empty list when no match is available.
      */
     suspend fun entries(prefix: String): List<TerminalFuzzyPathEntry>
 }

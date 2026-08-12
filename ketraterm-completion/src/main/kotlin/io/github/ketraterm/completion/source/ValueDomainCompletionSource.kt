@@ -22,15 +22,15 @@ import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 
 /**
- * Pure dynamic-domain source backed by a host-published immutable snapshot.
+ * Dynamic-domain source backed by a bounded suspending host loader.
  *
- * The source performs no I/O and does not retain provider results. The host is
- * responsible for publishing bounded snapshots and for making
- * [valuesProvider] safe to invoke from the completion caller's thread.
+ * The source invokes [valuesProvider] only for a matching resolved context and
+ * does not retain returned values. The loader owns any host I/O and must
+ * cooperate with coroutine cancellation.
  *
  * @property domain command-spec value domain served by this source.
  * @property sourceId stable candidate-source identifier used by feedback ranking.
- * @property valuesProvider provider of the latest ready in-memory snapshot.
+ * @property valuesProvider suspending bounded value loader.
  * @throws IllegalArgumentException if [domain] is
  * [TerminalCompletionValueDomain.NONE] or [sourceId] is blank.
  */

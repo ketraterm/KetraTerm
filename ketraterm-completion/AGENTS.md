@@ -13,8 +13,9 @@ External modules must import completion through:
 Implementation packages are not product API. Keep top-level declarations in
 `commandline`, `engine`, `history`, `internal`, `ranking`, `source`, `spec`, and `stats`
 `internal` unless a deliberate design change promotes the type into `api` or
-`model`. Update `docs/completion-architecture.md` and the architecture guard
-test when changing this boundary.
+`model`. Update `docs/completion-architecture.md` and structural architecture
+tests when changing this boundary. Do not maintain a second declaration-name
+allowlist that mirrors the source API.
 
 ## Boundary
 

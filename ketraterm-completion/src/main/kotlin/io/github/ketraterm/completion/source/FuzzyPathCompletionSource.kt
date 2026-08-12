@@ -22,9 +22,9 @@ import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 /**
  * Materializes already-matched host paths using terminal-safe semantics.
  *
- * The host supplies a ready snapshot whose entries are already relative to the
- * request working directory and relevance-ordered for the active prefix. This
- * source never indexes files, performs I/O, or repeats the host's fuzzy match.
+ * The host supplies bounded entries that are already relative to the request
+ * working directory and relevance-ordered for the active prefix. This source
+ * never indexes files or repeats the host's fuzzy match.
  * It normally complements direct directory completion by requiring a non-empty
  * prefix, while small context-specific providers may opt into empty-prefix matching.
  */
@@ -103,8 +103,8 @@ internal class FuzzyPathCompletionSource(
     }
 }
 
-/** Matches a ready static snapshot once for hosts without a queryable index. */
-internal class SnapshotFuzzyPathProvider(
+/** Matches one bounded path result for hosts without a queryable index. */
+internal class BoundedFuzzyPathProvider(
     private val entriesProvider: suspend () -> List<TerminalFuzzyPathEntry>,
 ) : TerminalFuzzyPathProvider {
     override suspend fun entries(prefix: String): List<TerminalFuzzyPathEntry> =

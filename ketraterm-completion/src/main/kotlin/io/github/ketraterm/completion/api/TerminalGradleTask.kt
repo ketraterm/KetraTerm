@@ -16,7 +16,7 @@
 package io.github.ketraterm.completion.api
 
 /**
- * One imported Gradle task exposed by a host-owned, ready completion snapshot.
+ * One imported Gradle task returned by a host completion loader.
  *
  * [path] is the canonical Gradle task path, including its leading colon. Hosts
  * may provide [projectDirectory] relative to the terminal working directory so

@@ -25,7 +25,7 @@ This module must not:
 - mutate terminal core internals.
 - encode input bytes directly.
 - introduce IntelliJ Platform dependencies.
-- move reusable completion snapshots or Swing vocabulary adapters into the app.
+- move reusable completion providers or Swing vocabulary adapters into the app.
 
 Reusable UI fixes discovered while building the standalone app belong in
 `ketraterm-ui-swing`.
