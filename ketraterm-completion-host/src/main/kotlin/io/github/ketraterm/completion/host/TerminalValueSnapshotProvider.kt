@@ -16,21 +16,18 @@
 package io.github.ketraterm.completion.host
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.filterNotNull
 import java.util.concurrent.TimeUnit
 
 /**
  * Non-blocking view of one latest keyed immutable value snapshot.
  *
- * [values] only reads ready state and emits a refresh request. A single
- * `collectLatest` child performs loads, so a new key or provider closure
- * cancels obsolete work through normal structured concurrency.
+ * [values] only reads ready state and lazily starts one load when needed. A
+ * new key cancels that load directly; there is no collector, queue, generation
+ * counter, or detached worker.
  */
 class TerminalValueSnapshotProvider<K, V>
     internal constructor(
-        scope: CoroutineScope,
+        private val scope: CoroutineScope,
         private val loader: suspend (K) -> List<V>,
         private val onSnapshotChanged: () -> Unit,
         private val onBackgroundFailure: (Throwable) -> Unit,
@@ -38,23 +35,11 @@ class TerminalValueSnapshotProvider<K, V>
         private val snapshotTtlNanos: Long = TimeUnit.SECONDS.toNanos(DEFAULT_SNAPSHOT_TTL_SECONDS),
     ) : AutoCloseable {
         private val lock = Any()
-        private val requests = MutableStateFlow<LoadRequest<K>?>(null)
         private var closed = false
-        private var key: K? = null
-        private var hasKey = false
-        private var snapshot = emptyList<V>()
-        private var createdAtNanos = 0L
-        private var hasSnapshot = false
-        private var generation = 0L
-        private var loadingGeneration: Long? = null
-        private val collectorJob: Job
+        private var state: SnapshotState<K, V>? = null
 
         init {
             require(snapshotTtlNanos > 0L) { "snapshotTtlNanos must be > 0, was $snapshotTtlNanos" }
-            collectorJob =
-                scope.launch {
-                    requests.filterNotNull().collectLatest(::load)
-                }
         }
 
         /**
@@ -63,93 +48,102 @@ class TerminalValueSnapshotProvider<K, V>
          * @param requestedKey key whose snapshot is requested.
          * @return immutable ready values, or an empty list while loading or closed.
          */
-        fun values(requestedKey: K): List<V> =
-            synchronized(lock) {
-                if (closed || !collectorJob.isActive) return emptyList()
-                val now = nanoTime()
-                if (!hasKey || requestedKey != key) {
-                    key = requestedKey
-                    hasKey = true
-                    snapshot = emptyList()
-                    createdAtNanos = 0L
-                    hasSnapshot = false
-                    loadingGeneration = null
+        fun values(requestedKey: K): List<V> {
+            var loadToCancel: Job? = null
+            var loadToStart: Job? = null
+            val readySnapshot =
+                synchronized(lock) {
+                    if (closed || !scope.isActive) return emptyList()
+                    var current = state
+                    if (current == null || current.key != requestedKey) {
+                        loadToCancel = current?.activeLoad
+                        current = SnapshotState(requestedKey)
+                    }
+                    val snapshot = current.snapshot
+                    val isFresh = snapshot != null && nanoTime() - current.createdAtNanos < snapshotTtlNanos
+                    if (!isFresh && current.activeLoad == null) {
+                        val load =
+                            scope.launch(start = CoroutineStart.LAZY) {
+                                load(requestedKey)
+                            }
+                        current = current.copy(activeLoad = load)
+                        loadToStart = load
+                    }
+                    state = current
+                    snapshot ?: emptyList()
                 }
-                if (hasSnapshot && now - createdAtNanos < snapshotTtlNanos) return snapshot
-                if (loadingGeneration == null) {
-                    val request = LoadRequest(requestedKey, ++generation)
-                    loadingGeneration = request.generation
-                    requests.value = request
-                }
-                snapshot
-            }
 
-        private suspend fun load(request: LoadRequest<K>) {
+            loadToCancel?.cancel()
+            loadToStart?.let { load ->
+                if (!load.start()) {
+                    synchronized(lock) {
+                        val current = state
+                        if (current?.activeLoad === load) state = current.copy(activeLoad = null)
+                    }
+                }
+            }
+            return readySnapshot
+        }
+
+        private suspend fun load(requestedKey: K) {
+            val context = currentCoroutineContext()
+            val loadJob = checkNotNull(context[Job])
             try {
-                val loaded = loader(request.key).toList()
-                currentCoroutineContext().ensureActive()
+                val loaded = loader(requestedKey).toList()
+                context.ensureActive()
                 val publish =
                     synchronized(lock) {
-                        if (closed || loadingGeneration != request.generation || key != request.key) {
+                        val current = state
+                        if (current?.activeLoad !== loadJob) {
                             false
                         } else {
-                            snapshot = loaded
-                            createdAtNanos = nanoTime()
-                            hasSnapshot = true
-                            loadingGeneration = null
+                            state =
+                                current.copy(
+                                    snapshot = loaded,
+                                    createdAtNanos = nanoTime(),
+                                    activeLoad = null,
+                                )
                             true
                         }
                     }
-                if (publish) notifySnapshotChanged()
+                if (publish) {
+                    try {
+                        onSnapshotChanged()
+                    } catch (failure: RuntimeException) {
+                        onBackgroundFailure(failure)
+                    }
+                }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Exception) {
-                reportBackgroundFailure(failure)
+                onBackgroundFailure(failure)
             } finally {
                 synchronized(lock) {
-                    if (loadingGeneration == request.generation) loadingGeneration = null
+                    val current = state
+                    if (current?.activeLoad === loadJob) state = current.copy(activeLoad = null)
                 }
             }
         }
 
-        private fun notifySnapshotChanged() {
-            try {
-                onSnapshotChanged()
-            } catch (failure: RuntimeException) {
-                reportBackgroundFailure(failure)
-            }
-        }
-
-        private fun reportBackgroundFailure(failure: Throwable) {
-            try {
-                onBackgroundFailure(failure)
-            } catch (_: RuntimeException) {
-                // Diagnostics must not affect snapshot publication.
-            }
-        }
-
-        /** Cancels the collector, active load, and any load waiting for a permit. */
+        /** Cancels the active load, if any, and releases the ready snapshot. */
         override fun close() {
-            synchronized(lock) {
-                if (closed) return
-                closed = true
-                generation++
-                loadingGeneration = null
-                snapshot = emptyList()
-                hasSnapshot = false
-                hasKey = false
-                key = null
-            }
-            collectorJob.cancel(CancellationException(CANCELLATION_MESSAGE))
+            val load =
+                synchronized(lock) {
+                    if (closed) return
+                    closed = true
+                    state?.activeLoad.also { state = null }
+                }
+            load?.cancel()
         }
 
-        private data class LoadRequest<K>(
+        private data class SnapshotState<K, V>(
             val key: K,
-            val generation: Long,
+            val snapshot: List<V>? = null,
+            val createdAtNanos: Long = 0L,
+            val activeLoad: Job? = null,
         )
 
         private companion object {
-            private const val CANCELLATION_MESSAGE = "Completion value snapshot provider closed"
             private const val DEFAULT_SNAPSHOT_TTL_SECONDS = 2L
         }
     }

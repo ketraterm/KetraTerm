@@ -41,7 +41,6 @@ import io.github.ketraterm.workspace.*
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import java.awt.BorderLayout
 import java.awt.Component
 import java.util.concurrent.atomic.AtomicInteger
@@ -172,6 +171,7 @@ class KetraTermProjectTerminalService(
             )
 
         content.isCloseable = true
+        @Suppress("UsePropertyAccessSyntax")
         content.setDisposer(PendingTerminalTabDisposable(pendingId))
 
         pendingTabsById[pendingId] = PendingTerminalTab(content, container)
@@ -320,6 +320,7 @@ class KetraTermProjectTerminalService(
         replaceContent(pendingTab.container, pane.component)
         pendingTab.content.displayName = workspaceTab.title
         pendingTab.content.preferredFocusableComponent = pane.terminal
+        @Suppress("UsePropertyAccessSyntax")
         pendingTab.content.setDisposer(TerminalTabDisposable(workspaceTab.id))
         installCloseQueryListener(pendingTab.content, workspaceTab)
         contentsByTabId[workspaceTab.id] = pendingTab.content
@@ -353,7 +354,7 @@ class KetraTermProjectTerminalService(
         val parentJob = coroutineScope.coroutineContext[Job]
         return CoroutineScope(
             coroutineScope.coroutineContext +
-                    SupervisorJob(parentJob) +
+                    Job(parentJob) +
                     CoroutineName("ketraterm-completion-$tabId"),
         )
     }

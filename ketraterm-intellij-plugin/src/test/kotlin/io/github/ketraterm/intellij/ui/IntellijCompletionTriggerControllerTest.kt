@@ -17,11 +17,43 @@ package io.github.ketraterm.intellij.ui
 
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import org.junit.Assert.*
 import org.junit.Test
 
 class IntellijCompletionTriggerControllerTest {
+    @Test
+    fun `coroutine scheduler ignores an obsolete dispatched action`() {
+        val scope = CoroutineScope(Job() + Dispatchers.Unconfined)
+        val dispatched = ArrayDeque<() -> Unit>()
+        val actions = ArrayList<String>()
+        val scheduler = CoroutineIntellijCompletionTriggerScheduler(scope, dispatched::addLast)
+
+        scheduler.restart(0) { actions += "obsolete" }
+        scheduler.restart(0) { actions += "latest" }
+        while (dispatched.isNotEmpty()) dispatched.removeFirst().invoke()
+
+        assertEquals(listOf("latest"), actions)
+        scope.coroutineContext[Job]?.cancel()
+    }
+
+    @Test
+    fun `coroutine scheduler cancel invalidates an already dispatched action`() {
+        val scope = CoroutineScope(Job() + Dispatchers.Unconfined)
+        val dispatched = ArrayDeque<() -> Unit>()
+        val actions = ArrayList<String>()
+        val scheduler = CoroutineIntellijCompletionTriggerScheduler(scope, dispatched::addLast)
+
+        scheduler.restart(0) { actions += "late" }
+        scheduler.cancel()
+        dispatched.single().invoke()
+
+        assertTrue(actions.isEmpty())
+        scope.coroutineContext[Job]?.cancel()
+    }
+
     @Test
     fun `scheduled refresh is coalesced and evaluates latest snapshot`() {
         val scheduler = RecordingScheduler()

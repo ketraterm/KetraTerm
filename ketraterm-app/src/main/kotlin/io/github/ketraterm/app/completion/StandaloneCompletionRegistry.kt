@@ -17,6 +17,7 @@ package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalAsyncFileSystemProvider
+import io.github.ketraterm.completion.host.TerminalCompletionSnapshotService
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 
@@ -48,7 +49,11 @@ internal class StandaloneCompletionRegistry(
     val commandSpecs = specs.toList()
     private val lock = Any()
     private val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
-    private val directoryCompletionService = StandaloneDirectoryCompletionService()
+    private val logger = System.getLogger(StandaloneCompletionRegistry::class.java.name)
+    private val snapshotService =
+        TerminalCompletionSnapshotService { failure ->
+            logger.log(System.Logger.Level.WARNING, "Standalone completion snapshot work failed", failure)
+        }
     private val sessionStates = HashMap<String, SessionCompletionState>()
 
     /**
@@ -82,7 +87,7 @@ internal class StandaloneCompletionRegistry(
                     persistentStatsSource?.let { it::snapshotAll }
                         ?: { io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot.EMPTY },
             )
-        val fileSystemProvider = directoryCompletionService.createProvider(onPathSnapshotChanged)
+        val fileSystemProvider = snapshotService.createDirectoryProvider(onPathSnapshotChanged)
         val previous =
             synchronized(lock) {
                 sessionStates.put(sessionId, SessionCompletionState(mruSource, fileSystemProvider))
@@ -171,7 +176,7 @@ internal class StandaloneCompletionRegistry(
                 copy
             }
         states.forEach(SessionCompletionState::close)
-        directoryCompletionService.close()
+        snapshotService.close()
     }
 
     private data class SessionCompletionState(

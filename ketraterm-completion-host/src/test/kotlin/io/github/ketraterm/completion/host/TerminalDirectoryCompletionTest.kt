@@ -81,6 +81,35 @@ class TerminalDirectoryCompletionTest {
     }
 
     @Test
+    fun `localhost authority remains local`() {
+        val resolver = TerminalCompletionPathResolver(homeDirectory = null, windows = false)
+        val path = Files.createTempDirectory("ketraterm-localhost")
+        try {
+            val uri = URI("file", "localhost", path.toUri().path, null).toASCIIString()
+
+            assertEquals(path.toAbsolutePath().normalize(), resolver.resolve(request(workingDirectoryUri = uri)))
+        } finally {
+            Files.deleteIfExists(path)
+        }
+    }
+
+    @Test
+    fun `tilde path resolves through explicit host home`() {
+        val home = Path.of("host-home").toAbsolutePath().normalize()
+        val resolver = TerminalCompletionPathResolver(homeDirectory = home, windows = false)
+
+        assertEquals(home.resolve("projects"), resolver.resolve(request(directoryPrefix = "~/projects/")))
+    }
+
+    @Test
+    fun `Windows drive and UNC paths are rejected on non-Windows hosts`() {
+        val resolver = TerminalCompletionPathResolver(homeDirectory = null, windows = false)
+
+        assertNull(resolver.resolve(request(directoryPrefix = "C:/Users/")))
+        assertNull(resolver.resolve(request(directoryPrefix = "//server/share/")))
+    }
+
+    @Test
     fun `malformed lexical path is rejected without escaping the resolver contract`() {
         val resolver = TerminalCompletionPathResolver(homeDirectory = null, windows = false)
 

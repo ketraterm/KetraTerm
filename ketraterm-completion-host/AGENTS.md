@@ -7,7 +7,7 @@
 This module may:
 
 - schedule bounded background snapshot work.
-- publish immutable, generation-safe ready snapshots.
+- publish immutable latest-request ready snapshots.
 - resolve explicitly local filesystem completion paths.
 - perform bounded local directory scans outside UI threads.
 

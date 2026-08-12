@@ -19,9 +19,11 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner
+import io.github.ketraterm.completion.host.TerminalCompletionSnapshotService
 import io.github.ketraterm.completion.host.TerminalDirectoryScanner
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
@@ -158,7 +160,6 @@ internal class KetraTermCompletionService(
  * @param sessionMruCapacity positive per-session MRU capacity.
  * @param coroutineScope host lifecycle scope that parents completion work, or
  * `null` for a registry-owned test scope.
- * @param snapshotService optional application-owned asynchronous snapshot service.
  * @throws IllegalArgumentException if [sessionMruCapacity] is not positive.
  */
 internal class IntellijCompletionRegistry(
@@ -169,7 +170,6 @@ internal class IntellijCompletionRegistry(
     persistenceEnabled: Boolean = true,
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
     coroutineScope: CoroutineScope? = null,
-    snapshotService: IntellijCompletionSnapshotService? = null,
 ) : AutoCloseable {
     init {
         require(sessionMruCapacity > 0) { "sessionMruCapacity must be > 0, was $sessionMruCapacity" }
@@ -181,8 +181,12 @@ internal class IntellijCompletionRegistry(
     private val closed = AtomicBoolean()
     private val sessionStates = HashMap<String, SessionState>()
     private val snapshotService =
-        snapshotService
-            ?: IntellijCompletionSnapshotService(coroutineScope)
+        TerminalCompletionSnapshotService(
+            parentScope = coroutineScope,
+            onBackgroundFailure = { failure ->
+                LOG.warn("IntelliJ completion snapshot work failed", failure)
+            },
+        )
     private val statistics =
         IntellijCompletionStatisticsCoordinator(
             statsSource = statsSource,
@@ -380,6 +384,7 @@ internal class IntellijCompletionRegistry(
 
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
+        private val LOG = Logger.getInstance(IntellijCompletionRegistry::class.java)
     }
 }
 

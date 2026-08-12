@@ -26,9 +26,20 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalCompletionSnapshotServiceTest {
     @Test
+    fun `service close does not cancel its host scope`() {
+        val parentJob = Job()
+        val service = TerminalCompletionSnapshotService(parentScope = CoroutineScope(parentJob))
+
+        service.close()
+
+        assertTrue(parentJob.isActive)
+        parentJob.cancel()
+    }
+
+    @Test
     fun `parent scope cancellation reaches active provider load`() =
         runTest {
-            val parentJob = SupervisorJob()
+            val parentJob = Job()
             val parentScope = CoroutineScope(coroutineContext + parentJob)
             val service = TerminalCompletionSnapshotService(parentScope = parentScope)
             val started = CompletableDeferred<Unit>()
@@ -49,7 +60,7 @@ class TerminalCompletionSnapshotServiceTest {
             provider.values("key")
             runCurrent()
             started.await()
-            parentJob.cancel(CancellationException("host lifecycle closed"))
+            parentJob.cancel()
             advanceUntilIdle()
 
             assertTrue(cancelled.isCompleted)

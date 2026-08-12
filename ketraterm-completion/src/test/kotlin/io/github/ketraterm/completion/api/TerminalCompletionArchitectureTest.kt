@@ -317,12 +317,6 @@ internal class TerminalCompletionArchitectureTest {
                     "ketraterm-app/src/main/kotlin/io/github/ketraterm/app/completion/StandaloneCompletionRegistry.kt",
                 ),
                 repositoryRoot.resolve(
-                    "ketraterm-app/src/main/kotlin/io/github/ketraterm/app/completion/StandaloneDirectoryCompletionService.kt",
-                ),
-                repositoryRoot.resolve(
-                    "ketraterm-intellij-plugin/src/main/kotlin/io/github/ketraterm/intellij/services/IntellijDirectoryCompletion.kt",
-                ),
-                repositoryRoot.resolve(
                     "ketraterm-intellij-plugin/src/main/kotlin/io/github/ketraterm/intellij/services/KetraTermCompletionService.kt",
                 ),
             )

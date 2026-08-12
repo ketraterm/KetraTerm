@@ -168,17 +168,17 @@ These are not badges of compatibility for this project. They expand attack surfa
   IntelliJ spec/MRU provider wiring, compact exact command/shape/source-feedback stats, source-specific feedback-aware
   ranking, bounded coroutine-backed directory snapshots, and standalone/IntelliJ enablement settings exist.
   Shell-returned completions are intentionally deferred.
-- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe local Git branch snapshots from
+- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, latest-request local Git branch snapshots from
   Git4Idea for `git switch`, `checkout`, `merge`, and `rebase`, and uses the IDE VFS/project-content model for path
   directories inside the project with a bounded local-filesystem fallback elsewhere.
-- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe remote Git branch snapshots for
+- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, latest-request remote Git branch snapshots for
   `checkout`, `merge`, and `rebase`; `git switch` deliberately remains local-branch-only.
-- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe Git tag snapshots for `checkout`,
+- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, latest-request Git tag snapshots for `checkout`,
   `merge`, and `rebase`; `git switch` deliberately remains local-branch-only.
-- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe project-content fuzzy path snapshots
+- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, latest-request project-content fuzzy path snapshots
   for declared or explicitly path-like completion positions. Direct directory completion stays higher priority for
   concise immediate-child results.
-- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, generation-safe Git status path snapshots from its
+- `DONE(completion/provider/intellij)`: IntelliJ publishes bounded, latest-request Git status path snapshots from its
   change-list model for changed and untracked paths in the selected repository. The provider is active for `git add`,
   `restore`, `rm`, and `diff`, and never starts a Git process.
 - `DONE(completion/provider/intellij)`: IntelliJ publishes a bounded imported-Gradle task snapshot for `gradle`,

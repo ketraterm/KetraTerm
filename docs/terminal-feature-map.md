@@ -161,10 +161,10 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   Swing/IntelliJ/session/runtime modules.
 - **IntelliJ Dynamic Completion Snapshots**: The IntelliJ host uses Git4Idea repository metadata to publish bounded
   local branch snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Snapshot loading shares the completion
-  service's suspending concurrency limit, is keyed by the terminal working directory, rejects stale generations, and never
+  service's suspending concurrency limit, is keyed by the terminal working directory, rejects obsolete loads, and never
   runs from the shared engine or Swing EDT. Service and per-session jobs are children of IntelliJ's injected application
-  scope, so plugin unload, shutdown, and terminal-session closure cancel their owned work. Superseded keyed loads use
-  `collectLatest`; failed loads release their matching in-flight generation and may be retried without publishing partial
+  scope, so plugin unload, shutdown, and terminal-session closure cancel their owned work. Each provider keeps one optional
+  load job; a new key cancels it directly, and failed loads release that slot for retry without publishing partial
   or stale state. IntelliJ project
   path completion uses the IDE's indexed Go to File matcher and ranking inside a write-action-aware suspending read
   action, while blocking directory scanning uses the IO dispatcher outside the project. Dynamic
@@ -173,7 +173,7 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   IntelliJ completion persistence is an explicit, disabled-by-default setting; session-local MRU and in-memory
   evidence remain active without disk access.
 - **Shared Completion Host Support**: `ketraterm-completion-host` owns one structured snapshot scope, a shared suspending
-  concurrency limit, and latest-request cancellation for generation-safe
+  concurrency limit, and direct latest-request cancellation for stale-safe
   directory and keyed-value snapshots, authority-preserving local path resolution, and bounded local scanning. Each
   product host retains source composition and priority policy. `ketraterm-completion-persistence` owns sanitized
   versioned local-file storage with byte, line, and row bounds; standalone loads it on a serialized statistics worker.
@@ -185,5 +185,5 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   `localhost` OSC 7 file URIs, explicit home paths, Windows drive roots, and Windows UNC roots while rejecting non-local
   authorities. Directory enumeration runs outside the EDT through host-owned coroutine services with one shared
   suspending concurrency limit; each provider retains only its latest request and ready snapshot. Visit, result,
-  elapsed-time, and expiry limits bound work, while `collectLatest` prevents stale results from refreshing the popup.
+  elapsed-time, and expiry limits bound work, while active-job identity prevents stale results from refreshing the popup.
 - **Bell Indicators**: Alerts embedding hosts of beep signals (`BEL`) through independently configurable audible bell and visual bell policies. The reusable Swing terminal can show a subtle edge pulse that remains available when audio is disabled.

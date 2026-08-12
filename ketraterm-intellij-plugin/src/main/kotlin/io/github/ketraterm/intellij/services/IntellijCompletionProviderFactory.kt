@@ -17,6 +17,7 @@ package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.TerminalCompletionSource
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
+import io.github.ketraterm.completion.host.TerminalCompletionSnapshotService
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 
 /** Factory for one optional IntelliJ completion source and its lifecycle. */
@@ -40,7 +41,7 @@ internal fun interface IntellijCompletionProviderFactory {
 internal data class IntellijCompletionProviderContext(
     val commandSpecs: List<TerminalCommandSpec>,
     val workingDirectoryUriProvider: () -> String?,
-    val snapshotService: IntellijCompletionSnapshotService,
+    val snapshotService: TerminalCompletionSnapshotService,
     val onSnapshotChanged: () -> Unit,
 )
 

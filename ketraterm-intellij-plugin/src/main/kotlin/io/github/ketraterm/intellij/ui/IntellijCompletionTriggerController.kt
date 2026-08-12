@@ -21,7 +21,7 @@ import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import kotlinx.coroutines.*
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.milliseconds
 
 /** IntelliJ host policy for debounced live shell-suggestion refreshes. */
@@ -106,41 +106,30 @@ internal interface IntellijCompletionTriggerScheduler {
     fun cancel()
 }
 
-/** Coroutine-backed scheduler that publishes only its latest generation. */
+/** Coroutine-backed scheduler that publishes only its latest pending job. */
 internal class CoroutineIntellijCompletionTriggerScheduler(
     private val scope: CoroutineScope,
     private val dispatch: ((() -> Unit) -> Unit),
 ) : IntellijCompletionTriggerScheduler {
-    private val generation = AtomicLong()
-    private val lock = Any()
-    private var job: Job? = null
+    private val pending = AtomicReference<Job?>()
 
     override fun restart(
         delayMillis: Int,
         action: () -> Unit,
     ) {
-        synchronized(lock) {
-            val requestGeneration = generation.incrementAndGet()
-            job?.cancel(CancellationException(CANCELLATION_MESSAGE))
-            job =
-                scope.launch {
-                    if (delayMillis > 0) delay(delayMillis.toLong().milliseconds)
-                    dispatch {
-                        if (generation.get() == requestGeneration) action()
-                    }
+        val scheduled =
+            scope.launch(start = CoroutineStart.LAZY) {
+                if (delayMillis > 0) delay(delayMillis.toLong().milliseconds)
+                val currentJob = checkNotNull(currentCoroutineContext()[Job])
+                dispatch {
+                    if (pending.compareAndSet(currentJob, null)) action()
                 }
-        }
+            }
+        pending.getAndSet(scheduled)?.cancel()
+        if (!scheduled.start()) pending.compareAndSet(scheduled, null)
     }
 
     override fun cancel() {
-        generation.incrementAndGet()
-        synchronized(lock) {
-            job?.cancel(CancellationException(CANCELLATION_MESSAGE))
-            job = null
-        }
-    }
-
-    private companion object {
-        private const val CANCELLATION_MESSAGE = "IntelliJ completion trigger superseded"
+        pending.getAndSet(null)?.cancel()
     }
 }

@@ -257,20 +257,20 @@ scalar positional fields remain the fallback for compact specs.
 Reusable ready-snapshot, local-path, and bounded directory-scanning machinery belongs to `ketraterm-completion-host`; it
 may perform bounded host work but does not parse, rank, or prioritize completion candidates. Standalone and IntelliJ
 share one latest-request snapshot implementation while retaining only their environment-specific loaders and scanners.
-The snapshot service owns a structured child scope and one suspending semaphore, with two concurrent loads by default.
-Each provider has one `collectLatest` child: changing its key cancels obsolete running or permit-waiting work instead of
-adding another scheduler or queue. Loaders are suspending functions and inherit their host scope; only blocking local
-filesystem access moves to an injected IO dispatcher.
+The snapshot service owns one structured child job and one suspending semaphore, with two concurrent loads by default.
+Each provider keeps only its ready snapshot and optional active load job: changing its key cancels that job directly.
+There is no collector, scheduler, queue, or generation counter. Loaders are suspending functions and inherit their host
+scope; only blocking local filesystem access moves to an injected IO dispatcher.
 Enumeration has visit, result, and elapsed-time caps, while ready snapshots have a two-second expiry. The defaults (two
 concurrent loads, 8,192 visited entries, 256 matches, and a 50 ms scan budget) are an explicit desktop baseline covered by
 JMH directory-scan benchmarks; change them only with representative local and remote-filesystem measurements. Closing a
-provider cancels its collector and active load, and `runInterruptible` makes local directory scans cooperatively
-interruptible. A failed load clears only its matching generation and can be retried by the next request. The app resolves
+provider cancels its active load, and `runInterruptible` makes local directory scans cooperatively interruptible. A failed
+load releases its job slot and can be retried by the next request. The app resolves
 local and `localhost` file URIs, explicit home paths,
 Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses
 write-allowing suspending read actions for project-aware VFS snapshots and bounded local scanning elsewhere. Its first
 dynamic value provider reads local branches from the Git4Idea repository that contains the terminal working directory
-and publishes generation-safe, failure-retryable snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Remote
+and publishes latest-request, failure-retryable snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Remote
 branches are published through a separate snapshot for `checkout`, `merge`, and `rebase`, avoiding invalid remote
 suggestions for `git switch`. Tags use the same bounded, repository-selected Git4Idea snapshot and are available for
 `checkout`, `merge`, and `rebase`; `git switch` remains local-branch-only.

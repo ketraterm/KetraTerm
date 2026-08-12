@@ -15,51 +15,47 @@
  */
 package io.github.ketraterm.completion.host
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
 /**
  * Lifecycle owner for asynchronous completion snapshots.
  *
- * Every provider keeps one latest-request coroutine. Loads inherit this
- * service's structured lifecycle and share a suspending concurrency limit;
- * there is no second worker queue or detached load job. Superseding a request
- * cancels its load while it is running or waiting for a permit.
+ * Provider loads inherit this service's structured lifecycle and share a
+ * suspending concurrency limit. Each provider owns at most one load job, with
+ * no collector, worker queue, or detached coroutine.
  *
  * @param parentScope optional host lifecycle scope. When present, cancellation
  * of that scope cancels all snapshot work. Otherwise this closeable service
  * owns its root job.
  * @param maxConcurrentLoads positive maximum number of loaders running at once.
- * @param coroutineName non-blank diagnostic name for service children.
  * @param onBackgroundFailure diagnostic callback for failed loaders or
  * publication callbacks.
- * @throws IllegalArgumentException if [maxConcurrentLoads] is not positive or
- * [coroutineName] is blank.
+ * @throws IllegalArgumentException if [maxConcurrentLoads] is not positive.
  */
 class TerminalCompletionSnapshotService
     @JvmOverloads
     constructor(
         parentScope: CoroutineScope? = null,
         maxConcurrentLoads: Int = DEFAULT_MAX_CONCURRENT_LOADS,
-        coroutineName: String = DEFAULT_COROUTINE_NAME,
         private val onBackgroundFailure: (Throwable) -> Unit = {},
     ) : AutoCloseable {
-        private val validatedCoroutineName =
-            coroutineName.also { require(it.isNotBlank()) { "coroutineName must not be blank" } }
-        private val job = SupervisorJob(parentScope?.coroutineContext?.get(Job))
+        init {
+            require(maxConcurrentLoads > 0) { "maxConcurrentLoads must be > 0, was $maxConcurrentLoads" }
+        }
+
+        private val job = Job(parentScope?.coroutineContext?.get(Job))
         private val scope =
             CoroutineScope(
                 (parentScope?.coroutineContext ?: Dispatchers.Default) +
                     job +
-                    CoroutineName(validatedCoroutineName),
+                    CoroutineName(COROUTINE_NAME),
             )
-        private val loadPermits =
-            Semaphore(
-                maxConcurrentLoads.also {
-                    require(it > 0) { "maxConcurrentLoads must be > 0, was $it" }
-                },
-            )
+        private val loadPermits = Semaphore(maxConcurrentLoads)
 
         /**
          * Creates a provider that scans only its latest directory request.
@@ -105,11 +101,11 @@ class TerminalCompletionSnapshotService
                 onBackgroundFailure = ::reportBackgroundFailure,
             )
 
-        /** Cancels all provider collectors and their active or waiting loads. */
+        /** Cancels every active or permit-waiting provider load. */
         override fun close() {
             // The explicit overload avoids a cancellation default-argument
             // bridge that is absent from some IntelliJ-bundled runtimes.
-            job.cancel(CancellationException("Completion snapshot service closed"))
+            job.cancel()
         }
 
         private suspend fun <T> withLoadPermit(block: suspend () -> T): T = loadPermits.withPermit { block() }
@@ -124,6 +120,6 @@ class TerminalCompletionSnapshotService
 
         private companion object {
             private const val DEFAULT_MAX_CONCURRENT_LOADS = 2
-            private const val DEFAULT_COROUTINE_NAME = "completion-snapshots"
+            private const val COROUTINE_NAME = "completion-snapshots"
         }
     }
