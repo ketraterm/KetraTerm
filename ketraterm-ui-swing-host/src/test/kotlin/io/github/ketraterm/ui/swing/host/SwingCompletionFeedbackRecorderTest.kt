@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
 class SwingCompletionFeedbackRecorderTest {
     @Test
     fun `privacy policy sees leading whitespace before feedback is learned`() {
-        val statsSource = TerminalCompletionSources.commandStats(commandSpecs = emptyList())
+        val statsSource = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
         val recorder =
             SwingCompletionFeedbackRecorder(
                 statsSource = statsSource,

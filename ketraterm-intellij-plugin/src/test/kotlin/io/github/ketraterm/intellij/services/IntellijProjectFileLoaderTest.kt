@@ -20,6 +20,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.concurrency.AppExecutorUtil
+import com.intellij.util.concurrency.annotations.RequiresBlockingContext
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
 import java.util.concurrent.Callable
@@ -74,7 +75,7 @@ class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
             )
 
         assertTrue("project-file read did not start", enteredRead.await(10, TimeUnit.SECONDS))
-        ApplicationManager.getApplication().runWriteAction { writeCompleted.set(true) }
+        completeWriteAction(writeCompleted)
         val entries = loading.get(10, TimeUnit.SECONDS)
 
         assertTrue(entries.toString(), entries.any { it.path == "settings.gradle.kts" })
@@ -92,4 +93,9 @@ class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
     }
 
     private fun projectDirectoryUri(): String = Path.of(requireNotNull(project.basePath)).toUri().toString()
+
+    @RequiresBlockingContext
+    private fun completeWriteAction(writeCompleted: AtomicBoolean) {
+        ApplicationManager.getApplication().runWriteAction { writeCompleted.set(true) }
+    }
 }

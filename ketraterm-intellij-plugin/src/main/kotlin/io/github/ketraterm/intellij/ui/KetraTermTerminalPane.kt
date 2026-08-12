@@ -27,6 +27,7 @@ import io.github.ketraterm.intellij.services.IntellijCompletionSession
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.*
+import io.github.ketraterm.ui.swing.host.SwingLiveCompletionTriggerController
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
@@ -54,7 +55,7 @@ internal class KetraTermTerminalPane private constructor(
     private val searchBar: SwingTerminalSearchBar,
     private val hostActions: KetraTermTerminalPaneHostActions,
     private val completionSession: IntellijCompletionSession,
-    private val completionTriggerController: IntellijCompletionTriggerController,
+    private val completionTriggerController: SwingLiveCompletionTriggerController,
     private val completionScope: CoroutineScope,
 ) {
     private var shortcutController: KetraTermTerminalShortcutController? = null
@@ -261,16 +262,12 @@ internal class KetraTermTerminalPane private constructor(
             val paneRef = arrayOfNulls<KetraTermTerminalPane>(1)
             lateinit var terminalRef: SwingTerminal
             val completionTriggerController =
-                IntellijCompletionTriggerController(
+                SwingLiveCompletionTriggerController(
                     activeCommandLine = tab.session::activeShellCommandLine,
                     requestSuggestions = { snapshot -> terminalRef.requestShellSuggestionsForSnapshot(snapshot) },
                     hideSuggestions = { terminalRef.hideShellSuggestions() },
                     rankingContextKey = { tab.currentWorkingDirectoryUri },
                     suggestionsEnabled = { KetraTermIntellijSettings.current().shellSuggestionsEnabled },
-                    scheduler =
-                        CoroutineIntellijCompletionTriggerScheduler(completionScope) { action ->
-                            ApplicationManager.getApplication().invokeLater(action)
-                        },
                     commandSpecs = completionSession.commandSpecs,
                     shellCapabilities = completionSession.shellCapabilities,
                 )

@@ -24,6 +24,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Versioned local-file persistence for compact completion statistics.
@@ -43,6 +44,7 @@ class TerminalCompletionStatsStore
         private val path: Path,
         private val onFailure: (Throwable) -> Unit = {},
     ) : AutoCloseable {
+        private val closed = AtomicBoolean()
         private val writeQueue = CompletionStatsWriteQueue(::writeSnapshot)
 
         /**
@@ -79,8 +81,24 @@ class TerminalCompletionStatsStore
          * @param snapshot compact statistics produced by the completion engine.
          */
         fun persist(snapshot: TerminalCommandCompletionStatsSnapshot) {
+            if (closed.get()) return
             val stableSnapshot = boundedSnapshot(TerminalCompletionPersistencePolicy.sanitizeSnapshot(snapshot))
             writeQueue.enqueue(stableSnapshot)
+        }
+
+        /**
+         * Writes [snapshot] on the calling thread.
+         *
+         * This is intended for hosts that already serialize learning and disk
+         * work on [TerminalCompletionLearningWorker]. UI and session threads
+         * should use [persist], which retains the store's coalescing queue.
+         * Calls after [close] are ignored.
+         *
+         * @param snapshot complete statistics snapshot to sanitize and write.
+         */
+        fun persistBlocking(snapshot: TerminalCommandCompletionStatsSnapshot) {
+            if (closed.get()) return
+            writeSnapshot(boundedSnapshot(TerminalCompletionPersistencePolicy.sanitizeSnapshot(snapshot)))
         }
 
         /**
@@ -104,7 +122,9 @@ class TerminalCompletionStatsStore
          * @throws java.util.concurrent.ExecutionException if the queue worker
          * cannot execute its final flush barrier.
          */
-        override fun close() = writeQueue.close()
+        override fun close() {
+            if (closed.compareAndSet(false, true)) writeQueue.close()
+        }
 
         private fun writeSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot) {
             runCatching {

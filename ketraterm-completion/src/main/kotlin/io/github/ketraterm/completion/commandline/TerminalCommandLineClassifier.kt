@@ -20,7 +20,6 @@ import io.github.ketraterm.completion.internal.hasTerminalCompletionLineBreak
 import io.github.ketraterm.completion.model.TerminalCommandLineShape
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.spec.findCommandSpec
-import io.github.ketraterm.completion.spec.optionRequiresSeparateValue
 
 /**
  * Spec-aware command-line classifier used by completion ranking.
@@ -76,99 +75,30 @@ internal object TerminalCommandLineClassifier {
         tokens: List<TerminalCommandLineToken>,
         specs: List<TerminalCommandSpec>,
     ): TerminalCommandLineClassification? {
-        var tokenIndex = tokens.firstCommandTokenIndex()
+        val tokenIndex = tokens.firstCommandTokenIndex()
         if (tokenIndex >= tokens.size) return null
 
         val executableToken = normalizeTerminalCommandToken(tokens[tokenIndex].text)
         if (executableToken.isBlank()) return null
         val rootSpec = findCommandSpec(specs, executableToken) ?: return classifyWithoutSpec(tokens)
 
-        tokenIndex++
-        var currentSpec = rootSpec
-        val subcommands = ArrayList<String>(TERMINAL_COMMAND_LIST_CAPACITY)
-        val commandPath = ArrayList<TerminalCommandSpec>(TERMINAL_COMMAND_LIST_CAPACITY)
-        val optionNames = ArrayList<String>(TERMINAL_COMMAND_LIST_CAPACITY)
-        val arguments = ArrayList<TerminalCommandArgumentShape>(TERMINAL_COMMAND_LIST_CAPACITY)
-        var expectingOptionValue: String? = null
-        var acceptingSubcommands = true
-        var optionsEnabled = true
-        commandPath += rootSpec
-
-        while (tokenIndex < tokens.size) {
-            val normalized = normalizeTerminalCommandToken(tokens[tokenIndex].text)
-            if (normalized.isBlank()) {
-                tokenIndex++
-                continue
-            }
-
-            val optionValueFor = expectingOptionValue
-            when {
-                optionValueFor != null -> {
-                    arguments += TerminalCommandArgumentShape(TerminalCommandArgumentKind.OPTION_VALUE, optionValueFor)
-                    expectingOptionValue = null
-                }
-                normalized == TERMINAL_COMMAND_OPTION_TERMINATOR -> {
-                    acceptingSubcommands = false
-                    optionsEnabled = false
-                }
-                optionsEnabled && normalized.isTerminalOptionToken() -> {
-                    val optionName = normalized.substringBefore("=")
-                    optionNames += optionName
-                    if (!normalized.contains("=") &&
-                        optionRequiresSeparateValue(optionName, rootSpec, subcommands)
-                    ) {
-                        expectingOptionValue = optionName
-                    }
-                }
-                acceptingSubcommands -> {
-                    val next = findNextSubcommand(commandPath, currentSpec, normalized)
-                    if (next != null) {
-                        subcommands += normalizeTerminalCommandToken(next.name)
-                        currentSpec = next
-                        commandPath += next
-                    } else {
-                        arguments += TerminalCommandArgumentShape(TerminalCommandArgumentKind.POSITIONAL)
-                        acceptingSubcommands = false
-                    }
-                }
-                optionsEnabled -> {
-                    arguments += TerminalCommandArgumentShape(TerminalCommandArgumentKind.POSITIONAL)
-                }
-                else -> {
-                    arguments += TerminalCommandArgumentShape(TerminalCommandArgumentKind.OPTION_TERMINATED_POSITIONAL)
-                }
-            }
-            tokenIndex++
-        }
+        val analysis = analyzeCommandTokens(tokens, tokenIndex + 1, tokens.size, rootSpec)
+        val subcommands = analysis.commandPath.drop(1).map { normalizeTerminalCommandToken(it.name) }
+        val arguments = analysis.arguments
 
         return TerminalCommandLineClassification(
             shape =
                 TerminalCommandLineShape(
                     executable = normalizeTerminalCommandToken(rootSpec.name),
                     subcommands = subcommands,
-                    optionNames = optionNames.sorted(),
-                    positionalArgumentCount =
-                        arguments.count {
-                            it.kind == TerminalCommandArgumentKind.POSITIONAL ||
-                                it.kind == TerminalCommandArgumentKind.OPTION_TERMINATED_POSITIONAL
-                        },
+                    optionNames = analysis.optionNames.sorted(),
+                    positionalArgumentCount = analysis.positionalArgumentCount,
                     optionValueCount = arguments.count { it.kind == TerminalCommandArgumentKind.OPTION_VALUE },
                 ),
             arguments = arguments,
             matchedSpec = true,
         )
     }
-
-    private fun findNextSubcommand(
-        commandPath: List<TerminalCommandSpec>,
-        currentSpec: TerminalCommandSpec,
-        normalizedToken: String,
-    ): TerminalCommandSpec? =
-        findCommandSpec(currentSpec.subcommands, normalizedToken)
-            ?: commandPath
-                .asReversed()
-                .firstOrNull { it.repeatableSubcommands }
-                ?.let { repeatableSource -> findCommandSpec(repeatableSource.subcommands, normalizedToken) }
 
     private fun classifyWithoutSpec(tokens: List<TerminalCommandLineToken>): TerminalCommandLineClassification? {
         val shape = classifyGenericCommandLineShape(tokens) ?: return null

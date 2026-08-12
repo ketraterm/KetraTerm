@@ -289,7 +289,7 @@ class TerminalSessionMruCompletionSourceTest {
 
     @Test
     fun `persisted statistics recover one token-local learned fallback`() {
-        val stats = TerminalCompletionSources.commandStats()
+        val stats = TerminalCompletionSources.learningStore()
         stats.recordCommandResult(
             commandLine = "cd IdeaProjects/KetraTerm/",
             successful = true,

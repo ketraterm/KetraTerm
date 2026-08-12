@@ -17,43 +17,13 @@ package io.github.ketraterm.intellij.ui
 
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import org.junit.Assert.*
+import io.github.ketraterm.ui.swing.host.SwingLiveCompletionScheduler
+import io.github.ketraterm.ui.swing.host.SwingLiveCompletionTriggerController
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class IntellijCompletionTriggerControllerTest {
-    @Test
-    fun `coroutine scheduler ignores an obsolete dispatched action`() {
-        val scope = CoroutineScope(Job() + Dispatchers.Unconfined)
-        val dispatched = ArrayDeque<() -> Unit>()
-        val actions = ArrayList<String>()
-        val scheduler = CoroutineIntellijCompletionTriggerScheduler(scope, dispatched::addLast)
-
-        scheduler.restart(0) { actions += "obsolete" }
-        scheduler.restart(0) { actions += "latest" }
-        while (dispatched.isNotEmpty()) dispatched.removeFirst().invoke()
-
-        assertEquals(listOf("latest"), actions)
-        scope.coroutineContext[Job]?.cancel()
-    }
-
-    @Test
-    fun `coroutine scheduler cancel invalidates an already dispatched action`() {
-        val scope = CoroutineScope(Job() + Dispatchers.Unconfined)
-        val dispatched = ArrayDeque<() -> Unit>()
-        val actions = ArrayList<String>()
-        val scheduler = CoroutineIntellijCompletionTriggerScheduler(scope, dispatched::addLast)
-
-        scheduler.restart(0) { actions += "late" }
-        scheduler.cancel()
-        dispatched.single().invoke()
-
-        assertTrue(actions.isEmpty())
-        scope.coroutineContext[Job]?.cancel()
-    }
-
     @Test
     fun `scheduled refresh is coalesced and evaluates latest snapshot`() {
         val scheduler = RecordingScheduler()
@@ -107,7 +77,7 @@ class IntellijCompletionTriggerControllerTest {
         val scheduler = RecordingScheduler()
         var hidden = 0
         val controller =
-            IntellijCompletionTriggerController(
+            SwingLiveCompletionTriggerController(
                 activeCommandLine = { snapshot("git s") },
                 requestSuggestions = {},
                 hideSuggestions = { hidden++ },
@@ -131,8 +101,8 @@ class IntellijCompletionTriggerControllerTest {
         activeCommandLine: () -> TerminalShellCommandLineSnapshot,
         requestSuggestions: (TerminalShellCommandLineSnapshot) -> Unit,
         rankingContextKey: () -> String? = { null },
-    ): IntellijCompletionTriggerController =
-        IntellijCompletionTriggerController(
+    ): SwingLiveCompletionTriggerController =
+        SwingLiveCompletionTriggerController(
             activeCommandLine = activeCommandLine,
             requestSuggestions = requestSuggestions,
             hideSuggestions = {},
@@ -146,7 +116,7 @@ class IntellijCompletionTriggerControllerTest {
     private fun snapshot(command: String): TerminalShellCommandLineSnapshot =
         TerminalShellCommandLineSnapshot(command, command.length, cursorColumn = command.length, cursorRow = 2)
 
-    private class RecordingScheduler : IntellijCompletionTriggerScheduler {
+    private class RecordingScheduler : SwingLiveCompletionScheduler {
         var pending: (() -> Unit)? = null
         var cancelCount = 0
 

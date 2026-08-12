@@ -48,7 +48,7 @@ class IntellijCompletionRegistryTest {
                         ),
                     ),
             )
-        val statsSource = TerminalCompletionSources.commandStats()
+        val statsSource = TerminalCompletionSources.learningStore()
         statsSource.replaceSnapshot(snapshot)
         val registry =
             IntellijCompletionRegistry(
@@ -95,7 +95,7 @@ class IntellijCompletionRegistryTest {
                         ),
                     ),
             )
-        val statsSource = TerminalCompletionSources.commandStats()
+        val statsSource = TerminalCompletionSources.learningStore()
         statsSource.replaceSnapshot(snapshot)
         val registry = IntellijCompletionRegistry(statsSource = statsSource, loadStats = { snapshot })
         try {
@@ -154,7 +154,7 @@ class IntellijCompletionRegistryTest {
                         ),
                     ),
             )
-        val statsSource = TerminalCompletionSources.commandStats()
+        val statsSource = TerminalCompletionSources.learningStore()
         statsSource.replaceSnapshot(snapshot)
         val registry = IntellijCompletionRegistry(statsSource = statsSource, loadStats = { snapshot })
         try {
@@ -591,7 +591,7 @@ class IntellijCompletionRegistryTest {
     @Test
     fun `accepted suggestion updates indexed feedback and persists compact snapshot`() {
         val persisted = CountDownLatch(1)
-        val statsSource = TerminalCompletionSources.commandStats(commandSpecs = emptyList())
+        val statsSource = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
         val registry =
             IntellijCompletionRegistry(
                 specs = emptyList(),

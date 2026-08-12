@@ -227,6 +227,19 @@ internal class TerminalCompletionStatsStoreTest {
     }
 
     @Test
+    fun `blocking persistence is immediately visible to an ordered host worker`(
+        @TempDir directory: Path,
+    ) {
+        val path = directory.resolve("completion-stats.tsv")
+        val record = stats(commandLine = "git status")
+
+        TerminalCompletionStatsStore(path).use { store ->
+            store.persistBlocking(TerminalCommandCompletionStatsSnapshot(commandStats = listOf(record)))
+            assertEquals(listOf(record), store.loadSnapshot().commandStats)
+        }
+    }
+
+    @Test
     fun `close flushes latest persisted snapshot`(
         @TempDir directory: Path,
     ) {

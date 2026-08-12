@@ -181,7 +181,7 @@ internal class TerminalCompletionArchitectureTest {
     fun `statistics remain evidence and never a completion provider`() {
         val statsContract =
             completionMainRoot
-                .resolve("api/TerminalCommandStatsCompletionSource.kt")
+                .resolve("api/TerminalCompletionLearningStore.kt")
                 .readSourceLines()
                 .joinToString("\n")
         val compositionViolations =
@@ -192,7 +192,7 @@ internal class TerminalCompletionArchitectureTest {
             }
 
         assertTrue(
-            actual = !statsContract.contains("interface TerminalCommandStatsCompletionSource : TerminalCompletionSource"),
+            actual = !statsContract.contains("interface TerminalCompletionLearningStore : TerminalCompletionSource"),
             message = "Command statistics must not implement TerminalCompletionSource",
         )
         assertTrue(
@@ -370,7 +370,7 @@ internal class TerminalCompletionArchitectureTest {
             )
         private val PUBLIC_API_DECLARATIONS =
             setOf(
-                "TerminalCommandStatsCompletionSource",
+                "TerminalCompletionLearningStore",
                 "TerminalCompletionCandidate",
                 "TerminalCompletionCandidateKind",
                 "TerminalCompletionEngine",
@@ -397,7 +397,7 @@ internal class TerminalCompletionArchitectureTest {
             )
         private val PUBLIC_COMPLETION_SOURCE_FACTORIES =
             setOf(
-                "commandStats",
+                "learningStore",
                 "fromSpecs",
                 "sessionMru",
                 "path",
@@ -419,7 +419,7 @@ internal class TerminalCompletionArchitectureTest {
             )
         private val PUBLIC_API_MEMBER_FUNCTIONS =
             mapOf(
-                "api/TerminalCommandStatsCompletionSource.kt" to
+                "api/TerminalCompletionLearningStore.kt" to
                     setOf(
                         "replaceSnapshot",
                         "snapshot",
@@ -444,7 +444,7 @@ internal class TerminalCompletionArchitectureTest {
                 "api/TerminalCompletionSource.kt" to setOf("complete"),
                 "api/TerminalCompletionSources.kt" to
                     setOf(
-                        "commandStats",
+                        "learningStore",
                         "fromSpecs",
                         "sessionMru",
                         "path",

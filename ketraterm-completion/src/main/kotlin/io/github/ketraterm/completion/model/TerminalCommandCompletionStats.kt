@@ -23,7 +23,7 @@ import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
  *
  * The model stores compact counters instead of raw repeated history rows.
  * Hosts own persistence and import/export these values into
- * [io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource];
+ * [io.github.ketraterm.completion.api.TerminalCompletionLearningStore];
  * this shared model performs no I/O.
  * The normalized matching key is derived from [commandLine] so callers cannot
  * persist contradictory command text and lookup state.

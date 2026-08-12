@@ -105,27 +105,37 @@ workspace, Swing UI, or future plugin code:
 Top-level declarations in those packages should be `internal` unless a product
 decision explicitly promotes a type into `api` or `model`.
 
-Implementation files follow the completion request directly. Session MRU coordinates independent
-bounded command-history and observed-token indexes, projects learned commands
-into the active replacement range, and recovers positive persisted commands as one learned fallback stream. One identity-cached
-learned-evidence index owns exact, shape, and provider lookups; one scoring policy owns bounded counter math. Global fusion owns
-outcome grouping, semantic relevance, representative selection, and deterministic final ordering.
+Implementation files follow the completion request directly. One semantic
+token pass resolves command paths, inherited options, repeatable subcommands,
+option values, and positional arguments for both live completion and learned
+command-shape classification. Session MRU coordinates bounded command-history
+and observed-token indexes, projects learned commands into the active
+replacement range, and recovers positive persisted commands as one learned
+fallback stream. Each immutable learning snapshot owns one compiled view that
+contains both learned-history buckets and exact, shape, and provider evidence
+indexes. One scoring policy owns bounded counter math. Global fusion owns
+outcome grouping, explicit score components, semantic relevance,
+representative selection, and deterministic final ordering.
 Public directory snapshot, path resolution, scan contracts, and bounded scan
 implementations each live in their matching file in `ketraterm-completion-host`.
 
 ## Host Ownership
 
 Hosts are responsible for applying `TerminalCompletionPersistencePolicy` to authoritative command records and for
-choosing whether and where persistence is enabled. The statistics index accepts compact snapshots and live feedback
+choosing whether and where persistence is enabled. `TerminalCompletionLearningStore` accepts compact snapshots and live feedback
 events, but it is not a completion source and never contributes a second visible candidate. Completion components never
 read files, scan raw shell history, spawn shells, or talk to UI frameworks.
 
 Optional disk I/O belongs to the separately published
 `ketraterm-completion-persistence` module. Its
 `TerminalCompletionStatsStore` sanitizes again at the storage boundary, applies byte/line/row bounds before decoding or
-encoding, serializes through the shared versioned codec, and coalesces atomic file replacements on a private worker.
-Product hosts own the destination path, load scheduling, diagnostics, and store lifecycle. Completion persistence is not
-a workspace responsibility.
+encoding, serializes through the shared versioned codec, and can coalesce atomic
+file replacements on a private worker. KetraTerm product hosts instead use one
+`TerminalCompletionLearningWorker` per host: mutation, snapshot publication,
+blocking atomic replacement, and notification form one ordered background
+transaction rather than two nested executor queues. Product hosts own the
+destination path, enablement policy, diagnostics, and store lifecycle.
+Completion persistence is not a workspace responsibility.
 
 The standalone app and IntelliJ plugin should compose completion sources through
 `TerminalCompletionSources` and `TerminalCompletionEngines`, then adapt returned
@@ -214,6 +224,11 @@ only when the resolved context expects useful candidates, such as paths after
 `cd `, domain values after `git switch `, or repeatable tasks after
 `./gradlew `. Unknown command arguments do not become live triggers just because
 the user typed a space.
+
+Swing hosts share `SwingLiveCompletionTriggerController` and one EDT-confined
+one-shot `Timer`. Popup debouncing does not need a coroutine scope, lazy jobs,
+atomic job replacement, or host-specific controller copies. Coroutines remain
+at the host snapshot boundary, where loaders actually suspend.
 
 Static bounded option domains belong in `TerminalOptionSpec.valueCandidates`.
 Examples are output formats, log levels, or other values that are stable and do
@@ -387,5 +402,6 @@ Performance changes must also run `TerminalCompletionBenchmark`. The benchmark
 includes eight-provider fusion, 2,048 learned rows, duplicate-heavy evidence,
 hostile collection-cap input, and a real session-MRU lookup backed by the full
 persisted snapshot. The persisted-history case is prewarmed deliberately: it
-measures the normal snapshot-identity cache hit, while index construction stays
-bounded to snapshot mutation or first use for a new shell syntax.
+measures the normal snapshot-owned compiled-view cache hit, while index
+construction stays bounded to snapshot mutation or first use for a new shell
+syntax and command-spec set.

@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.spec
 
 import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
 import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalOptionSpec
 
 /**
  * Spec lookup helper for command-line classification.
@@ -33,31 +34,30 @@ internal fun findCommandSpec(
             spec.aliases.any { normalizeTerminalCommandToken(it) == normalizedToken }
     }
 
-internal fun optionRequiresSeparateValue(
-    optionName: String,
-    rootSpec: TerminalCommandSpec,
-    subcommands: List<String>,
-): Boolean {
-    val option =
-        commandPath(rootSpec, subcommands).asReversed().firstNotNullOfOrNull { spec ->
-            spec.options.firstOrNull { option ->
-                option.names.any { normalizeTerminalCommandToken(it) == optionName }
-            }
+/** Finds an option on the current command or an inherited parent command. */
+internal fun findOptionSpec(
+    commandPath: List<TerminalCommandSpec>,
+    token: String,
+): TerminalOptionSpec? {
+    val normalized = normalizeTerminalCommandToken(token.substringBefore(OPTION_VALUE_SEPARATOR))
+    return commandPath.asReversed().firstNotNullOfOrNull { command ->
+        command.options.firstOrNull { option ->
+            option.names.any { normalizeTerminalCommandToken(it) == normalized }
         }
-    return option?.requiresValue == true
+    }
 }
 
-private fun commandPath(
-    rootSpec: TerminalCommandSpec,
-    subcommands: List<String>,
-): List<TerminalCommandSpec> {
-    val path = ArrayList<TerminalCommandSpec>(subcommands.size + 1)
-    path += rootSpec
-    var current = rootSpec
-    for (subcommand in subcommands) {
-        val next = findCommandSpec(current.subcommands, subcommand) ?: break
-        path += next
-        current = next
-    }
-    return path
+/** Finds a direct or repeatable subcommand from the current command path. */
+internal fun findNextCommandSpec(
+    commandPath: List<TerminalCommandSpec>,
+    normalizedToken: String,
+): TerminalCommandSpec? {
+    val current = commandPath.last()
+    return findCommandSpec(current.subcommands, normalizedToken)
+        ?: commandPath
+            .asReversed()
+            .firstOrNull { it.repeatableSubcommands }
+            ?.let { findCommandSpec(it.subcommands, normalizedToken) }
 }
+
+private const val OPTION_VALUE_SEPARATOR = '='

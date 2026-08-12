@@ -15,17 +15,15 @@
  */
 package io.github.ketraterm.intellij.services
 
-import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningWorker
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -42,18 +40,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @param onStatsChanged callback invoked after loading or mutation.
  */
 internal class IntellijCompletionStatisticsCoordinator(
-    val statsSource: TerminalCommandStatsCompletionSource,
+    val statsSource: TerminalCompletionLearningStore,
     private val loadStats: () -> TerminalCommandCompletionStatsSnapshot,
     private val persistStats: (TerminalCommandCompletionStatsSnapshot) -> Unit,
     initialPersistenceEnabled: Boolean,
     private val onStatsChanged: () -> Unit,
 ) : AutoCloseable {
-    private val closed = AtomicBoolean()
     private val persistenceEnabled = AtomicBoolean(initialPersistenceEnabled)
-    private val executor: ExecutorService =
-        Executors.newSingleThreadExecutor { runnable ->
-            Thread(runnable, "intellij-completion-stats").apply { isDaemon = true }
-        }
+    private val worker = TerminalCompletionLearningWorker("intellij-completion-stats")
     private val feedbackRecorder =
         SwingCompletionFeedbackRecorder(
             statsSource = statsSource,
@@ -63,8 +57,8 @@ internal class IntellijCompletionStatisticsCoordinator(
 
     init {
         if (persistenceEnabled.get()) {
-            executor.execute {
-                if (!persistenceEnabled.get()) return@execute
+            worker.submit {
+                if (!persistenceEnabled.get()) return@submit
                 statsSource.replaceSnapshot(loadStats())
                 onStatsChanged()
             }
@@ -82,7 +76,7 @@ internal class IntellijCompletionStatisticsCoordinator(
      */
     fun setPersistenceEnabled(enabled: Boolean) {
         if (!persistenceEnabled.compareAndSet(!enabled, enabled)) return
-        if (!enabled || closed.get()) return
+        if (!enabled) return
         execute {
             if (!persistenceEnabled.get()) return@execute
             val current = statsSource.snapshotAll()
@@ -126,25 +120,11 @@ internal class IntellijCompletionStatisticsCoordinator(
     }
 
     private fun execute(action: () -> Unit) {
-        if (closed.get()) return
-        runCatching { executor.execute(action) }
+        worker.submit(action)
     }
 
     /** Drains queued mutations and closes the statistics worker idempotently. */
     override fun close() {
-        if (!closed.compareAndSet(false, true)) return
-        executor.shutdown()
-        val terminated =
-            try {
-                executor.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                false
-            }
-        if (!terminated) executor.shutdownNow()
-    }
-
-    private companion object {
-        private const val SHUTDOWN_TIMEOUT_SECONDS = 5L
+        worker.close()
     }
 }

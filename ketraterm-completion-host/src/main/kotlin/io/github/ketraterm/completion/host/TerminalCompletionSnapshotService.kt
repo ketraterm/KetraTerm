@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.completion.host
 
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
@@ -105,7 +102,7 @@ class TerminalCompletionSnapshotService
         override fun close() {
             // The explicit overload avoids a cancellation default-argument
             // bridge that is absent from some IntelliJ-bundled runtimes.
-            job.cancel()
+            job.cancel(CancellationException("Completion snapshot service closed"))
         }
 
         private suspend fun <T> withLoadPermit(block: suspend () -> T): T = loadPermits.withPermit { block() }

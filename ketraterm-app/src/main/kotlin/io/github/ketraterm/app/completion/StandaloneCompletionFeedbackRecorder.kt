@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
@@ -32,7 +32,7 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandl
  * @param clockEpochMillis host wall-clock supplier.
  */
 internal class StandaloneCompletionFeedbackRecorder(
-    statsSource: TerminalCommandStatsCompletionSource,
+    statsSource: TerminalCompletionLearningStore,
     persistSnapshot: ((TerminalCommandCompletionStatsSnapshot) -> Unit)? = null,
     submitMutation: (() -> Unit) -> Unit = { mutation -> mutation() },
     clockEpochMillis: () -> Long = System::currentTimeMillis,

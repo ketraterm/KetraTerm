@@ -73,7 +73,7 @@ class TerminalValueSnapshotProvider<K, V>
                     snapshot ?: emptyList()
                 }
 
-            loadToCancel?.cancel()
+            loadToCancel?.cancel(CancellationException("Completion snapshot key changed"))
             loadToStart?.let { load ->
                 if (!load.start()) {
                     synchronized(lock) {
@@ -133,7 +133,7 @@ class TerminalValueSnapshotProvider<K, V>
                     closed = true
                     state?.activeLoad.also { state = null }
                 }
-            load?.cancel()
+            load?.cancel(CancellationException("Completion snapshot provider closed"))
         }
 
         private data class SnapshotState<K, V>(

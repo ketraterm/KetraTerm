@@ -57,7 +57,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `source records command results into matching shape stats`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
 
         source.recordCommandResult(
             commandLine = "git log --stat main",
@@ -87,7 +87,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `source records spec aware nested command family shapes`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
 
         source.recordCommandResult(
             commandLine = "docker compose up",
@@ -105,7 +105,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `source records accepted and dismissed feedback into shape stats`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
 
         source.recordSuggestionFeedback(
             commandLine = "npm test -- --watch",
@@ -130,7 +130,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `replace snapshot deduplicates by shape profile and directory`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         val shape = classifyGenericCommandLineShape("git status")!!
 
         source.replaceSnapshot(

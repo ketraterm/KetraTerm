@@ -48,7 +48,6 @@ internal class SessionMruCompletionSourceImpl(
     private val commandHistory: SessionCommandHistory
     private val observedTokens: SessionObservedTokenIndex
     override val commandSpecs = commandSpecs.toList()
-    private val learnedHistoryIndexCache = LearnedHistoryCandidateIndexCache()
     private var nextSequence = 1L
 
     init {
@@ -97,7 +96,10 @@ internal class SessionMruCompletionSourceImpl(
             request = request,
             lineContext = commandLineContext,
             completionContext = context,
-            index = learnedHistoryIndexCache.indexFor(learnedSnapshot, request.shellCapabilities.syntax),
+            index =
+                learnedSnapshot.compiledLearning
+                    .indexesFor(request.shellCapabilities.syntax, commandSpecs)
+                    .history,
             nowEpochMillis = clockEpochMillis().coerceAtLeast(0L),
             destination = candidates,
         )

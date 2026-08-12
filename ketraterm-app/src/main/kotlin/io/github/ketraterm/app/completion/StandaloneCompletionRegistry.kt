@@ -38,7 +38,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
  */
 internal class StandaloneCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    private val persistentStatsSource: TerminalCommandStatsCompletionSource? = null,
+    private val persistentStatsSource: TerminalCompletionLearningStore? = null,
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
 ) : AutoCloseable {
     init {

@@ -91,7 +91,7 @@ open class TerminalCompletionBenchmark {
                 commandSpecs,
                 learnedStatsProvider = { learnedSnapshot },
             )
-        val persistedStatsSource = TerminalCompletionSources.commandStats(capacity = 2_048, commandSpecs = commandSpecs)
+        val persistedStatsSource = TerminalCompletionSources.learningStore(capacity = 2_048, commandSpecs = commandSpecs)
         persistedStatsSource.replaceSnapshot(learnedSnapshot)
         val sessionMru =
             TerminalCompletionSources.sessionMru(

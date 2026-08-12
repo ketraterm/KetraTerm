@@ -21,8 +21,6 @@ import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotSame
-import kotlin.test.assertSame
 
 class LearnedHistoryCandidateIndexTest {
     @Test
@@ -44,19 +42,6 @@ class LearnedHistoryCandidateIndexTest {
         val matches = index.matching(requestLine)
 
         assertEquals(listOf("git switch main", "git switch maintenance"), matches.map { it.stats.commandLine })
-    }
-
-    @Test
-    fun `cache reuses snapshot identity per shell syntax and invalidates on replacement`() {
-        val cache = LearnedHistoryCandidateIndexCache()
-        val firstSnapshot = TerminalCommandCompletionStatsSnapshot(commandStats = listOf(positive("git status")))
-        val replacement = firstSnapshot.copy()
-
-        val first = cache.indexFor(firstSnapshot, TerminalShellSyntax.POSIX)
-
-        assertSame(first, cache.indexFor(firstSnapshot, TerminalShellSyntax.POSIX))
-        assertNotSame(first, cache.indexFor(firstSnapshot, TerminalShellSyntax.POWERSHELL))
-        assertNotSame(first, cache.indexFor(replacement, TerminalShellSyntax.POSIX))
     }
 
     private fun positive(commandLine: String): TerminalCommandCompletionStats =

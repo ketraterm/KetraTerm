@@ -58,7 +58,7 @@ internal class TabManager(
     private val tabRoots = HashMap<String, SplitNode>()
     private val tabContainers = HashMap<String, JPanel>()
     private val completionSpecs = TerminalCommandSpecs.defaults()
-    private val commandCompletionStatsSource = TerminalCompletionSources.commandStats(commandSpecs = completionSpecs)
+    private val commandCompletionStatsSource = TerminalCompletionSources.learningStore(commandSpecs = completionSpecs)
     private val completionStatistics =
         StandaloneCompletionStatisticsCoordinator(
             statsSource = commandCompletionStatsSource,

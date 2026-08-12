@@ -33,12 +33,12 @@ open class TerminalLearnedRankingBenchmark {
     private lateinit var hostileMergeEngine: TerminalCompletionEngine
     private lateinit var learnedRequest: TerminalCompletionRequest
     private lateinit var hostileMergeRequest: TerminalCompletionRequest
-    private lateinit var statsSource: TerminalCommandStatsCompletionSource
+    private lateinit var statsSource: TerminalCompletionLearningStore
 
     @Setup
     open fun setUp() {
         val commandSpecs = TerminalCommandSpecs.defaults()
-        statsSource = TerminalCompletionSources.commandStats(capacity = STATS_CAPACITY, commandSpecs = commandSpecs)
+        statsSource = TerminalCompletionSources.learningStore(capacity = STATS_CAPACITY, commandSpecs = commandSpecs)
         statsSource.replaceSnapshot(fullLearnedSnapshot())
         val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
         learnedEngine =

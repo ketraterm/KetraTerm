@@ -78,11 +78,11 @@ object TerminalCompletionSources {
      */
     @JvmStatic
     @JvmOverloads
-    fun commandStats(
+    fun learningStore(
         capacity: Int = 2048,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    ): TerminalCommandStatsCompletionSource =
-        CommandStatsCompletionSourceImpl(
+    ): TerminalCompletionLearningStore =
+        CompletionLearningStoreImpl(
             capacity = capacity,
             commandSpecs = commandSpecs,
         )

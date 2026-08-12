@@ -15,7 +15,6 @@
  */
 package io.github.ketraterm.app.ui
 
-import io.github.ketraterm.app.completion.StandaloneCompletionTriggerController
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCommandSpec
@@ -25,6 +24,7 @@ import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuHandler
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
+import io.github.ketraterm.ui.swing.host.SwingLiveCompletionTriggerController
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
@@ -46,7 +46,7 @@ internal class TerminalPane private constructor(
     val terminal: SwingTerminal,
     val component: JPanel,
     private val settings: KetraTermSettings,
-    private val completionTriggerController: StandaloneCompletionTriggerController,
+    private val completionTriggerController: SwingLiveCompletionTriggerController,
     private val completionObservationJob: Job,
     private val searchBar: SwingTerminalSearchBar,
 ) : TerminalPaneActionTarget {
@@ -134,7 +134,7 @@ internal class TerminalPane private constructor(
             val paneRef = arrayOfNulls<TerminalPane>(1)
             lateinit var terminalRef: SwingTerminal
             val completionTriggerController =
-                StandaloneCompletionTriggerController(
+                SwingLiveCompletionTriggerController(
                     activeCommandLine = tab.session::activeShellCommandLine,
                     requestSuggestions = { snapshot -> terminalRef.requestShellSuggestionsForSnapshot(snapshot) },
                     hideSuggestions = { terminalRef.hideShellSuggestions() },

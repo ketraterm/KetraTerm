@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.completion.model
 
+import io.github.ketraterm.completion.internal.CompiledCompletionLearning
+
 /**
  * Complete snapshot of exact command, structural shape, and feedback statistics.
  *
@@ -33,6 +35,9 @@ data class TerminalCommandCompletionStatsSnapshot(
     val shapeStats: List<TerminalCommandShapeStats> = emptyList(),
     val feedbackStats: List<TerminalCompletionFeedbackStats> = emptyList(),
 ) {
+    /** Compiled indexes shared by every consumer of this immutable snapshot. */
+    internal val compiledLearning = CompiledCompletionLearning(this)
+
     companion object {
         /** Shared empty learned-statistics snapshot. */
         @JvmField

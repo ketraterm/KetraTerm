@@ -113,9 +113,15 @@ internal object TerminalCompletionContextResolver {
             )
         }
 
-        val resolvedCommandPath = resolveCommandPath(lineContext, commandTokenIndex, root)
-        val optionsTerminated = resolvedCommandPath.optionsTerminated
-        val commandPath = resolvedCommandPath.commandPath
+        val analysis =
+            analyzeCommandTokens(
+                tokens = lineContext.tokens,
+                startIndex = commandTokenIndex + 1,
+                endIndexExclusive = lineContext.activeTokenIndex,
+                rootSpec = root,
+            )
+        val optionsTerminated = analysis.optionsTerminated
+        val commandPath = analysis.commandPath
         val attachedOptionValue =
             if (optionsTerminated) {
                 null
@@ -123,19 +129,14 @@ internal object TerminalCompletionContextResolver {
                 attachedOptionValue(commandLine, lineContext, commandPath)
             }
         val activeOption =
-            attachedOptionValue?.option
-                ?: if (optionsTerminated) {
-                    null
-                } else {
-                    optionBeforeActiveValue(lineContext, commandTokenIndex, commandPath)
-                }
+            attachedOptionValue?.option ?: if (optionsTerminated) null else analysis.pendingOptionValue
         val activePositionalArgument =
             if (activeOption == null) {
-                commandPath.last().positionalArgumentAt(resolvedCommandPath.positionalArgumentCountBeforeActive)
+                commandPath.last().positionalArgumentAt(analysis.positionalArgumentCount)
             } else {
                 null
             }
-        val usedOptionExclusiveGroupIds = resolvedCommandPath.usedOptionExclusiveGroupIds
+        val usedOptionExclusiveGroupIds = analysis.usedOptionExclusiveGroupIds
         val subcommandCandidateSource = if (optionsTerminated) null else subcommandCandidateSource(commandPath)
         val lastCommand = commandPath.last()
         val activePosition =
@@ -237,88 +238,6 @@ internal object TerminalCompletionContextResolver {
         return commandPath.asReversed().firstOrNull { it.repeatableSubcommands }
     }
 
-    private fun resolveCommandPath(
-        context: TerminalCommandLineContext,
-        commandTokenIndex: Int,
-        root: TerminalCommandSpec,
-    ): ResolvedCommandPath {
-        val commands = ArrayList<TerminalCommandSpec>()
-        var usedExclusiveGroupIds: LinkedHashSet<String>? = null
-        var positionalArgumentCount = 0
-        var optionsTerminated = false
-        var subcommandResolutionOpen = true
-        commands += root
-        var current = root
-        var index = commandTokenIndex + 1
-        while (index < context.activeTokenIndex) {
-            val token = context.tokens[index].text
-            if (token == TERMINAL_COMMAND_OPTION_TERMINATOR) {
-                optionsTerminated = true
-                index++
-                continue
-            }
-            if (!optionsTerminated && token.isTerminalOptionToken()) {
-                val option = findOption(commands, token)
-                if (option != null) {
-                    if (option.exclusiveGroupIds.isNotEmpty()) {
-                        if (usedExclusiveGroupIds == null) {
-                            usedExclusiveGroupIds = LinkedHashSet(option.exclusiveGroupIds.size)
-                        }
-                        usedExclusiveGroupIds.addAll(option.exclusiveGroupIds)
-                    }
-                    if (option.requiresValue && !token.hasAttachedOptionValue()) index++
-                }
-                index++
-                continue
-            }
-
-            val next =
-                if (optionsTerminated || !subcommandResolutionOpen) {
-                    null
-                } else {
-                    findNextSubcommand(commands, current, normalizeTerminalCommandToken(token))
-                }
-            if (next != null) {
-                current = next
-                commands += current
-            } else {
-                positionalArgumentCount++
-                subcommandResolutionOpen = false
-            }
-            index++
-        }
-        return ResolvedCommandPath(
-            commandPath = commands,
-            usedOptionExclusiveGroupIds = usedExclusiveGroupIds ?: emptySet(),
-            positionalArgumentCountBeforeActive = positionalArgumentCount,
-            optionsTerminated = optionsTerminated,
-        )
-    }
-
-    private fun findNextSubcommand(
-        commands: List<TerminalCommandSpec>,
-        current: TerminalCommandSpec,
-        normalizedToken: String,
-    ): TerminalCommandSpec? =
-        findSpec(current.subcommands, normalizedToken)
-            ?: commands
-                .asReversed()
-                .firstOrNull { it.repeatableSubcommands }
-                ?.let { repeatableSource -> findSpec(repeatableSource.subcommands, normalizedToken) }
-
-    private fun optionBeforeActiveValue(
-        context: TerminalCommandLineContext,
-        commandTokenIndex: Int,
-        commands: List<TerminalCommandSpec>,
-    ): TerminalOptionSpec? {
-        val optionIndex = context.activeTokenIndex - 1
-        if (optionIndex <= commandTokenIndex) return null
-        val optionToken = context.tokens.getOrNull(optionIndex) ?: return null
-        if (!optionToken.text.isTerminalOptionToken()) return null
-        val option = findOption(commands, optionToken.text) ?: return null
-        return if (option.requiresValue && !optionToken.text.hasAttachedOptionValue()) option else null
-    }
-
     private fun attachedOptionValue(
         commandLine: String,
         context: TerminalCommandLineContext,
@@ -329,7 +248,11 @@ internal object TerminalCompletionContextResolver {
         if (separatorOffset !in activeToken.startOffset until activeToken.endOffset || context.cursorOffset <= separatorOffset) {
             return null
         }
-        val option = findOption(commands, commandLine.substring(activeToken.startOffset, separatorOffset)) ?: return null
+        val option =
+            io.github.ketraterm.completion.spec.findOptionSpec(
+                commands,
+                commandLine.substring(activeToken.startOffset, separatorOffset),
+            ) ?: return null
         if (!option.requiresValue) return null
         val prefixSeparatorIndex = context.activePrefix.indexOf(OPTION_VALUE_SEPARATOR)
         if (prefixSeparatorIndex < 0) return null
@@ -340,19 +263,6 @@ internal object TerminalCompletionContextResolver {
             replacementStartOffset = separatorOffset + 1,
             quote = if (quote == SINGLE_QUOTE || quote == DOUBLE_QUOTE) quote else NO_QUOTE,
         )
-    }
-
-    private fun findOption(
-        commands: List<TerminalCommandSpec>,
-        token: String,
-    ): TerminalOptionSpec? {
-        val separatorIndex = token.indexOf(OPTION_VALUE_SEPARATOR)
-        val normalized = normalizeTerminalCommandToken(if (separatorIndex < 0) token else token.substring(0, separatorIndex))
-        return commands.asReversed().firstNotNullOfOrNull { command ->
-            command.options.firstOrNull { option ->
-                option.names.any { name -> normalizeTerminalCommandToken(name) == normalized }
-            }
-        }
     }
 
     private fun findSpec(
@@ -375,13 +285,6 @@ internal object TerminalCompletionContextResolver {
     private const val SINGLE_QUOTE = '\''
     private const val DOUBLE_QUOTE = '"'
     private const val OPTION_VALUE_SEPARATOR = '='
-
-    private data class ResolvedCommandPath(
-        val commandPath: List<TerminalCommandSpec>,
-        val usedOptionExclusiveGroupIds: Set<String>,
-        val positionalArgumentCountBeforeActive: Int,
-        val optionsTerminated: Boolean,
-    )
 }
 
 private fun TerminalCommandSpec.positionalArgumentAt(position: Int): TerminalArgumentSpec? {
@@ -392,7 +295,5 @@ private fun TerminalCommandSpec.positionalArgumentAt(position: Int): TerminalArg
 }
 
 private fun String.isOptionNamePrefix(): Boolean = startsWith('-')
-
-private fun String.hasAttachedOptionValue(): Boolean = indexOf('=') > 1
 
 private const val NO_QUOTE = '\u0000'

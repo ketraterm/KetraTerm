@@ -27,7 +27,7 @@ import io.github.ketraterm.completion.model.*
  * as a second provider vote. Implementations must stay dependency-free,
  * bounded, thread-safe, and must not scan raw shell history.
  */
-interface TerminalCommandStatsCompletionSource {
+interface TerminalCompletionLearningStore {
     /**
      * Replaces all retained statistics with [snapshot].
      *

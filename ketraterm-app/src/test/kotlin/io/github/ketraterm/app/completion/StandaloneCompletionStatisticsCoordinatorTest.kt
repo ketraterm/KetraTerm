@@ -32,7 +32,7 @@ class StandaloneCompletionStatisticsCoordinatorTest {
         @TempDir tempDirectory: Path,
     ) {
         val path = tempDirectory.resolve(TerminalCompletionStatsStore.currentFileName())
-        val liveSource = TerminalCompletionSources.commandStats(commandSpecs = TerminalCommandSpecs.defaults())
+        val liveSource = TerminalCompletionSources.learningStore(commandSpecs = TerminalCommandSpecs.defaults())
 
         StandaloneCompletionStatisticsCoordinator(liveSource, path).use { coordinator ->
             val handler = coordinator.createFeedbackHandler("bash") { "file:///repo" }
@@ -52,7 +52,7 @@ class StandaloneCompletionStatisticsCoordinatorTest {
         assertEquals(setOf("git switch", "git status"), reloaded.commandStats.map { it.commandLine }.toSet())
         assertFalse(reloaded.commandStats.any { "hunter2" in it.commandLine })
 
-        val restartedSource = TerminalCompletionSources.commandStats(commandSpecs = TerminalCommandSpecs.defaults())
+        val restartedSource = TerminalCompletionSources.learningStore(commandSpecs = TerminalCommandSpecs.defaults())
         restartedSource.replaceSnapshot(reloaded)
         val registry =
             StandaloneCompletionRegistry(
@@ -88,7 +88,7 @@ class StandaloneCompletionStatisticsCoordinatorTest {
         @TempDir tempDirectory: Path,
     ) {
         val path = tempDirectory.resolve(TerminalCompletionStatsStore.currentFileName())
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
 
         StandaloneCompletionStatisticsCoordinator(source, path).use { coordinator ->
             coordinator.recordFinishedCommand(

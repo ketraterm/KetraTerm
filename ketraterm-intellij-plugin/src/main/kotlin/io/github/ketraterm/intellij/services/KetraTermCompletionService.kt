@@ -62,7 +62,7 @@ internal class KetraTermCompletionService(
     private val registry =
         IntellijCompletionRegistry(
             loadStats = statsStore::loadSnapshot,
-            persistStats = statsStore::persist,
+            persistStats = statsStore::persistBlocking,
             persistenceEnabled = settings.completionLearningPersistenceEnabled(),
             coroutineScope = coroutineScope,
         )
@@ -164,7 +164,7 @@ internal class KetraTermCompletionService(
  */
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    private val statsSource: TerminalCommandStatsCompletionSource = TerminalCompletionSources.commandStats(commandSpecs = specs),
+    private val statsSource: TerminalCompletionLearningStore = TerminalCompletionSources.learningStore(commandSpecs = specs),
     loadStats: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot() },
     persistStats: (TerminalCommandCompletionStatsSnapshot) -> Unit = {},
     persistenceEnabled: Boolean = true,

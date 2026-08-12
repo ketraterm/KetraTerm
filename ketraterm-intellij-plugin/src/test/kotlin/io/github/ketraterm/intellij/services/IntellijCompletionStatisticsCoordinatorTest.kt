@@ -33,7 +33,7 @@ class IntellijCompletionStatisticsCoordinatorTest {
         val loaded = AtomicInteger()
         val persisted = AtomicInteger()
         val changed = CountDownLatch(1)
-        val stats = TerminalCompletionSources.commandStats(commandSpecs = emptyList())
+        val stats = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
         val coordinator =
             IntellijCompletionStatisticsCoordinator(
                 statsSource = stats,
@@ -61,7 +61,7 @@ class IntellijCompletionStatisticsCoordinatorTest {
     fun `enabling persistence loads stored learning when memory is empty`() {
         val loaded = CountDownLatch(1)
         val changed = CountDownLatch(1)
-        val stats = TerminalCompletionSources.commandStats(commandSpecs = emptyList())
+        val stats = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
         val stored =
             TerminalCommandCompletionStatsSnapshot(
                 commandStats = listOf(TerminalCommandCompletionStats(commandLine = "tool stored", useCount = 1)),
@@ -92,7 +92,7 @@ class IntellijCompletionStatisticsCoordinatorTest {
     fun `enabling persistence preserves and writes existing in-memory learning`() {
         val loaded = AtomicInteger()
         val persisted = CountDownLatch(1)
-        val stats = TerminalCompletionSources.commandStats(commandSpecs = emptyList())
+        val stats = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
         stats.recordCommandResult(
             commandLine = "tool current",
             successful = true,
@@ -127,7 +127,7 @@ class IntellijCompletionStatisticsCoordinatorTest {
         val mutationEnteredNotification = CountDownLatch(1)
         val releaseMutation = CountDownLatch(1)
         val loaded = AtomicInteger()
-        val stats = TerminalCompletionSources.commandStats(commandSpecs = emptyList())
+        val stats = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
         val coordinator =
             IntellijCompletionStatisticsCoordinator(
                 statsSource = stats,

@@ -45,8 +45,8 @@ internal class GlobalCompletionRanker(
     private val learnedStatsProvider: () -> TerminalCommandCompletionStatsSnapshot,
     private val clockEpochMillis: () -> Long,
 ) {
+    private val commandSpecs = commandSpecs.toList()
     private val outcomeResolver = TerminalCompletionOutcomeKeyResolver(commandSpecs)
-    private val learnedIndexCache = LearnedCompletionEvidenceIndexCache(outcomeResolver)
 
     fun rank(
         request: TerminalCompletionRequest,
@@ -56,7 +56,11 @@ internal class GlobalCompletionRanker(
         val aggregates = groupByOutcome(request, context, sourceCandidates)
         if (aggregates.isEmpty()) return emptyList()
 
-        val learnedIndex = learnedIndexCache.indexFor(learnedStatsProvider(), request.shellCapabilities.syntax)
+        val learnedIndex =
+            learnedStatsProvider()
+                .compiledLearning
+                .indexesFor(request.shellCapabilities.syntax, commandSpecs)
+                .evidence
         val now = clockEpochMillis().coerceAtLeast(0L)
         val fused = ArrayList<FusedCandidate>(aggregates.size)
         for (aggregate in aggregates.values) {
@@ -118,28 +122,57 @@ internal class GlobalCompletionRanker(
             now: Long,
         ): FusedCandidate {
             val representative = contributions.minWith(REPRESENTATIVE_ORDER)
-            var score = 0L
+            var reciprocalRankScore = 0L
+            var sourcePriorScore = 0L
+            var providerLearningScore = 0L
             var strongestContext = Int.MIN_VALUE
             for (contribution in contributions) {
-                score += reciprocalRank(contribution.localRank)
-                score += contribution.sourcePrior
-                score += learnedIndex.providerAdjustment(contribution.candidate, request)
+                reciprocalRankScore += reciprocalRank(contribution.localRank)
+                sourcePriorScore += contribution.sourcePrior
+                providerLearningScore += learnedIndex.providerAdjustment(contribution.candidate, request)
                 strongestContext = maxOf(strongestContext, contribution.contextAdjustment)
             }
-            score += strongestContext
-            representative.resolved?.let { resolved ->
-                score += learnedIndex.exactAdjustment(resolved.learnedKey, request, now)
-                score += learnedIndex.shapeAdjustment(resolved.shape, request)
-            }
+            val exactLearningScore =
+                representative.resolved?.let { learnedIndex.exactAdjustment(it.learnedKey, request, now) } ?: 0
+            val shapeLearningScore =
+                representative.resolved?.let { learnedIndex.shapeAdjustment(it.shape, request) } ?: 0
+            val score =
+                CompletionScoreComponents(
+                    reciprocalRank = reciprocalRankScore,
+                    sourcePrior = sourcePriorScore,
+                    semanticContext = strongestContext,
+                    exactLearning = exactLearningScore,
+                    shapeLearning = shapeLearningScore,
+                    providerLearning = providerLearningScore,
+                )
             return FusedCandidate(
                 candidate = representative.candidate,
-                score = score,
+                score = score.total,
                 strongestContext = strongestContext,
                 bestLocalRank = contributions.minOf { it.localRank },
                 sourceIndex = representative.sourceIndex,
                 candidateIndex = representative.candidateIndex,
             )
         }
+    }
+
+    /** Auditable score composition; each ranking policy contributes exactly once. */
+    private data class CompletionScoreComponents(
+        val reciprocalRank: Long,
+        val sourcePrior: Long,
+        val semanticContext: Int,
+        val exactLearning: Int,
+        val shapeLearning: Int,
+        val providerLearning: Long,
+    ) {
+        val total: Long
+            get() =
+                reciprocalRank +
+                    sourcePrior +
+                    semanticContext +
+                    exactLearning +
+                    shapeLearning +
+                    providerLearning
     }
 
     private data class RankedContribution(

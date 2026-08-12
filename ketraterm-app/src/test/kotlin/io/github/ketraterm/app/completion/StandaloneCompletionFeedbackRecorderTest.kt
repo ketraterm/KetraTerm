@@ -33,7 +33,7 @@ import kotlin.test.assertTrue
 class StandaloneCompletionFeedbackRecorderTest {
     @Test
     fun `accepted range suggestion records resulting command and persists snapshot`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         val persisted = ArrayList<TerminalCommandCompletionStatsSnapshot>()
         val recorder =
             StandaloneCompletionFeedbackRecorder(
@@ -94,7 +94,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `dismissed token suggestion records resulting command without making it suggestible`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         val recorder =
             StandaloneCompletionFeedbackRecorder(
                 statsSource = source,
@@ -137,7 +137,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `unknown suggestion kind records command feedback without source-specific row`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         val recorder =
             StandaloneCompletionFeedbackRecorder(
                 statsSource = source,
@@ -165,7 +165,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `invalid replacement range is ignored and not persisted`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         var persistCount = 0
         val recorder =
             StandaloneCompletionFeedbackRecorder(
@@ -192,7 +192,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `explicit Unicode range records same command accepted by Swing handler`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         val persisted = ArrayList<TerminalCommandCompletionStatsSnapshot>()
         val recorder =
             StandaloneCompletionFeedbackRecorder(
@@ -228,7 +228,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `explicit Unicode range with malformed cursor is ignored`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         var persistCount = 0
         val recorder =
             StandaloneCompletionFeedbackRecorder(
@@ -257,7 +257,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `sensitive resulting command is ignored and not persisted`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         var persistCount = 0
         val recorder =
             StandaloneCompletionFeedbackRecorder(
@@ -285,7 +285,7 @@ class StandaloneCompletionFeedbackRecorderTest {
 
     @Test
     fun `created handler reads latest working directory`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         val recorder =
             StandaloneCompletionFeedbackRecorder(
                 statsSource = source,

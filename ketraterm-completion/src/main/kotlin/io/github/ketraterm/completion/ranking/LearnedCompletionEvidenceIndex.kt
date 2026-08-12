@@ -144,36 +144,6 @@ internal class LearnedCompletionEvidenceIndex private constructor(
     }
 }
 
-/** Thread-safe identity cache for immutable learned snapshots and shell syntax. */
-internal class LearnedCompletionEvidenceIndexCache(
-    private val outcomeResolver: TerminalCompletionOutcomeKeyResolver,
-) {
-    private val lock = Any()
-
-    @Volatile
-    private var cachedSnapshot: TerminalCommandCompletionStatsSnapshot? = null
-
-    @Volatile
-    private var cachedIndexes: Map<TerminalShellSyntax, LearnedCompletionEvidenceIndex> = emptyMap()
-
-    fun indexFor(
-        snapshot: TerminalCommandCompletionStatsSnapshot,
-        shellSyntax: TerminalShellSyntax,
-    ): LearnedCompletionEvidenceIndex {
-        if (snapshot === cachedSnapshot) {
-            cachedIndexes[shellSyntax]?.let { return it }
-        }
-        return synchronized(lock) {
-            val indexes = if (snapshot === cachedSnapshot) cachedIndexes else emptyMap()
-            indexes[shellSyntax]
-                ?: LearnedCompletionEvidenceIndex.build(snapshot, shellSyntax, outcomeResolver).also { built ->
-                    cachedSnapshot = snapshot
-                    cachedIndexes = indexes + (shellSyntax to built)
-                }
-        }
-    }
-}
-
 private data class EvidenceContext(
     val profileId: String?,
     val workingDirectoryUri: String?,

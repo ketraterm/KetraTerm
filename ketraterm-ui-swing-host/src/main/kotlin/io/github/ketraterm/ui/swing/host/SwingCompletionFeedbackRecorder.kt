@@ -15,8 +15,8 @@
  */
 package io.github.ketraterm.ui.swing.host
 
-import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackContext
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
@@ -42,7 +42,7 @@ import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
 class SwingCompletionFeedbackRecorder
     @JvmOverloads
     constructor(
-        private val statsSource: TerminalCommandStatsCompletionSource,
+        private val statsSource: TerminalCompletionLearningStore,
         private val submitMutation: (() -> Unit) -> Unit = { mutation -> mutation() },
         private val afterMutation: ((TerminalCommandCompletionStatsSnapshot) -> Unit)? = null,
         private val allowsCommand: (String) -> Boolean = { true },

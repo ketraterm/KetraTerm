@@ -18,6 +18,8 @@ package io.github.ketraterm.app.completion
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
+import io.github.ketraterm.ui.swing.host.SwingLiveCompletionScheduler
+import io.github.ketraterm.ui.swing.host.SwingLiveCompletionTriggerController
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -27,7 +29,7 @@ class StandaloneCompletionTriggerControllerTest {
     fun `schedule coalesces refreshes and requests suggestions for active command snapshot`() {
         val scheduler = FakeScheduler()
         val requested = ArrayList<TerminalShellCommandLineSnapshot>()
-        var snapshot: TerminalShellCommandLineSnapshot? = snapshot("git s")
+        val snapshot: TerminalShellCommandLineSnapshot = snapshot("git s")
         val controller =
             controller(
                 scheduler = scheduler,
@@ -248,7 +250,7 @@ class StandaloneCompletionTriggerControllerTest {
         val hidden = Counter()
         val activeSnapshot = snapshot("go ")
         val controller =
-            StandaloneCompletionTriggerController(
+            SwingLiveCompletionTriggerController(
                 activeCommandLine = { activeSnapshot },
                 requestSuggestions = { requested += it },
                 hideSuggestions = hidden::increment,
@@ -270,7 +272,7 @@ class StandaloneCompletionTriggerControllerTest {
         val hidden = Counter()
         val activeSnapshot = snapshot("go ")
         val controller =
-            StandaloneCompletionTriggerController(
+            SwingLiveCompletionTriggerController(
                 activeCommandLine = { activeSnapshot },
                 requestSuggestions = { requested += it },
                 hideSuggestions = hidden::increment,
@@ -341,9 +343,9 @@ class StandaloneCompletionTriggerControllerTest {
         hideSuggestions: () -> Unit = { },
         rankingContextKey: () -> String? = { null },
         suggestionsEnabled: () -> Boolean = { true },
-        scheduler: StandaloneCompletionTriggerScheduler = FakeScheduler(),
-    ): StandaloneCompletionTriggerController =
-        StandaloneCompletionTriggerController(
+        scheduler: SwingLiveCompletionScheduler = FakeScheduler(),
+    ): SwingLiveCompletionTriggerController =
+        SwingLiveCompletionTriggerController(
             activeCommandLine = activeCommandLine,
             requestSuggestions = requestSuggestions,
             hideSuggestions = hideSuggestions,
@@ -362,7 +364,7 @@ class StandaloneCompletionTriggerControllerTest {
             cursorRow = 0,
         )
 
-    private class FakeScheduler : StandaloneCompletionTriggerScheduler {
+    private class FakeScheduler : SwingLiveCompletionScheduler {
         var restartCount = 0
             private set
         var cancelCount = 0

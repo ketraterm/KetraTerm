@@ -15,16 +15,13 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningWorker
 import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import java.nio.file.Path
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Standalone owner of serialized completion learning and optional persistence.
@@ -34,14 +31,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * never reads completion-learning files on the event-dispatch thread.
  */
 internal class StandaloneCompletionStatisticsCoordinator(
-    private val statsSource: TerminalCommandStatsCompletionSource,
+    private val statsSource: TerminalCompletionLearningStore,
     initialPersistencePath: Path?,
 ) : AutoCloseable {
-    private val closed = AtomicBoolean()
-    private val executor: ExecutorService =
-        Executors.newSingleThreadExecutor { task ->
-            Thread(task, "standalone-completion-stats").apply { isDaemon = true }
-        }
+    private val worker = TerminalCompletionLearningWorker("standalone-completion-stats")
     private var storePath: Path? = null
     private var store: TerminalCompletionStatsStore? = null
     private val feedbackRecorder =
@@ -93,7 +86,7 @@ internal class StandaloneCompletionStatisticsCoordinator(
                 statsSource.replaceSnapshot(
                     mergeSnapshots(replacement.loadSnapshot(), statsSource.snapshotAll()),
                 )
-                replacement.persist(statsSource.snapshotAll())
+                replacement.persistBlocking(statsSource.snapshotAll())
             }
         }
     }
@@ -101,40 +94,24 @@ internal class StandaloneCompletionStatisticsCoordinator(
     private fun executeMutation(mutation: () -> Unit) {
         execute {
             mutation()
-            store?.persist(statsSource.snapshotAll())
+            store?.persistBlocking(statsSource.snapshotAll())
         }
     }
 
     private fun execute(action: () -> Unit) {
-        if (closed.get()) return
-        runCatching { executor.execute(action) }
+        worker.submit(action)
     }
 
     /** Drains queued learning, closes persistence, and stops the worker. */
     override fun close() {
-        if (!closed.compareAndSet(false, true)) return
-        runCatching {
-            executor
-                .submit {
-                    store?.close()
-                    store = null
-                    storePath = null
-                }.get()
+        worker.close {
+            store?.close()
+            store = null
+            storePath = null
         }
-        executor.shutdown()
-        val terminated =
-            try {
-                executor.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                false
-            }
-        if (!terminated) executor.shutdownNow()
     }
 
     private companion object {
-        private const val SHUTDOWN_TIMEOUT_SECONDS = 5L
-
         private fun mergeSnapshots(
             loaded: TerminalCommandCompletionStatsSnapshot,
             live: TerminalCommandCompletionStatsSnapshot,

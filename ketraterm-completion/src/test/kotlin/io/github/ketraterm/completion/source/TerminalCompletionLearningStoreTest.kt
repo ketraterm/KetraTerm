@@ -19,10 +19,10 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.*
 import kotlin.test.*
 
-class TerminalCommandStatsCompletionSourceTest {
+class TerminalCompletionLearningStoreTest {
     @Test
     fun `complete snapshot identity remains stable until mutation`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
 
         val before = source.snapshotAll()
         assertSame(before, source.snapshotAll())
@@ -36,7 +36,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `successful command result supplies token-local learned history evidence`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         source.recordCommandResult(
             commandLine = "git status",
             successful = true,
@@ -57,7 +57,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `records compact success and failure counts for one normalized command`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
 
         source.recordCommandResult("Git Status", successful = true, profileId = "bash", workingDirectoryUri = null, usedAtEpochMillis = 10)
         source.recordCommandResult("git status", successful = false, profileId = "bash", workingDirectoryUri = null, usedAtEpochMillis = 20)
@@ -82,7 +82,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `accepted feedback boosts candidate above dismissed candidate`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         source.recordCommandResult("git status", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 100)
         source.recordCommandResult(
             "git switch main",
@@ -119,7 +119,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `exact command ranking caps learned counter contribution`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         source.replaceSnapshot(
             TerminalCommandCompletionStatsSnapshot(
                 commandStats =
@@ -150,7 +150,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `profile and working directory matches affect ranking`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         source.recordCommandResult(
             "npm test",
             successful = true,
@@ -174,7 +174,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `exact command prefix is not suggested`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         source.recordCommandResult("git status", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 100)
 
         assertTrue(learnedHistory(source).complete(request("git status")).isEmpty())
@@ -182,7 +182,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `does not replace a chained command segment with whole-line history`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         source.recordCommandResult("git status", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 100)
 
         val candidates =
@@ -198,7 +198,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `failure only and dismissed only rows are tracked but not suggested`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         source.recordCommandResult("git status", successful = false, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 100)
         source.recordSuggestionFeedback(
             commandLine = "git switch main",
@@ -214,7 +214,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `blank multiline and negative timestamp events are ignored`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
 
         source.recordCommandResult("   ", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 100)
         source.recordCommandResult(
@@ -237,7 +237,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `capacity keeps most relevant recent records`() {
-        val source = TerminalCompletionSources.commandStats(capacity = 2)
+        val source = TerminalCompletionSources.learningStore(capacity = 2)
 
         source.recordCommandResult("one", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 1)
         source.recordCommandResult("two", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 2)
@@ -248,7 +248,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `replace snapshot deduplicates by normalized command profile and directory`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
 
         source.replaceSnapshot(
             TerminalCommandCompletionStatsSnapshot(
@@ -272,7 +272,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `factory creates command stats source`() {
-        val source = TerminalCompletionSources.commandStats(capacity = 1)
+        val source = TerminalCompletionSources.learningStore(capacity = 1)
 
         source.recordCommandResult("git status", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 1)
 
@@ -282,7 +282,7 @@ class TerminalCommandStatsCompletionSourceTest {
     @Test
     fun `custom command specs classify nested command shapes`() {
         val source =
-            TerminalCompletionSources.commandStats(
+            TerminalCompletionSources.learningStore(
                 commandSpecs =
                     listOf(
                         TerminalCommandSpec(
@@ -316,7 +316,7 @@ class TerminalCommandStatsCompletionSourceTest {
     @Test
     fun `custom command specs canonicalize aliased subcommands`() {
         val source =
-            TerminalCompletionSources.commandStats(
+            TerminalCompletionSources.learningStore(
                 commandSpecs =
                     listOf(
                         TerminalCommandSpec(
@@ -342,7 +342,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `empty command specs fall back to generic private shape classification`() {
-        val source = TerminalCompletionSources.commandStats(commandSpecs = emptyList())
+        val source = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
 
         source.recordCommandResult(
             commandLine = "docker compose up secret-project",
@@ -361,7 +361,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `records source-specific feedback context without command text`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
 
         source.recordSuggestionFeedback(
             commandLine = "git status",
@@ -410,7 +410,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `replace snapshot keeps newest duplicate feedback context`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
 
         source.replaceSnapshot(
             TerminalCommandCompletionStatsSnapshot(
@@ -429,7 +429,7 @@ class TerminalCommandStatsCompletionSourceTest {
 
     @Test
     fun `recorded counters saturate at integer maximum`() {
-        val source = TerminalCompletionSources.commandStats()
+        val source = TerminalCompletionSources.learningStore()
         source.replaceSnapshot(
             TerminalCommandCompletionStatsSnapshot(
                 commandStats =
@@ -480,7 +480,7 @@ class TerminalCommandStatsCompletionSourceTest {
             shellCapabilities = shellCapabilities,
         )
 
-    private fun learnedHistory(source: TerminalCommandStatsCompletionSource) =
+    private fun learnedHistory(source: TerminalCompletionLearningStore) =
         TerminalCompletionSources.sessionMru(learnedStatsProvider = source::snapshotAll)
 
     private fun stats(

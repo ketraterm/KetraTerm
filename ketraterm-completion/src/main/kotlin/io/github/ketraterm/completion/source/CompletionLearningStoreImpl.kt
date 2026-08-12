@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.completion.source
 
-import io.github.ketraterm.completion.api.TerminalCommandStatsCompletionSource
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.stats.CommandCompletionStatsIndex
@@ -34,10 +34,10 @@ import io.github.ketraterm.completion.stats.CompletionFeedbackStatsIndex
  * @param commandSpecs command specifications used to classify command-family
  * shapes for privacy-preserving structural learning.
  */
-internal class CommandStatsCompletionSourceImpl(
+internal class CompletionLearningStoreImpl(
     capacity: Int = DEFAULT_CAPACITY,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-) : TerminalCommandStatsCompletionSource {
+) : TerminalCompletionLearningStore {
     init {
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
     }

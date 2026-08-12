@@ -47,17 +47,17 @@ class LearnedCompletionEvidenceIndexTest {
     }
 
     @Test
-    fun `cache reuses snapshot identity per syntax and invalidates for a new snapshot`() {
-        val cache = LearnedCompletionEvidenceIndexCache(TerminalCompletionOutcomeKeyResolver(TerminalCommandSpecs.defaults()))
+    fun `snapshot shares one compiled learning view per syntax and command specs`() {
+        val specs = TerminalCommandSpecs.defaults()
         val snapshot = TerminalCommandCompletionStatsSnapshot.EMPTY
 
-        val firstPosix = cache.indexFor(snapshot, TerminalShellSyntax.POSIX)
+        val firstPosix = snapshot.compiledLearning.indexesFor(TerminalShellSyntax.POSIX, specs)
 
-        assertSame(firstPosix, cache.indexFor(snapshot, TerminalShellSyntax.POSIX))
-        assertNotSame(firstPosix, cache.indexFor(snapshot, TerminalShellSyntax.POWERSHELL))
+        assertSame(firstPosix, snapshot.compiledLearning.indexesFor(TerminalShellSyntax.POSIX, specs))
+        assertNotSame(firstPosix, snapshot.compiledLearning.indexesFor(TerminalShellSyntax.POWERSHELL, specs))
         assertNotSame(
             firstPosix,
-            cache.indexFor(TerminalCommandCompletionStatsSnapshot(), TerminalShellSyntax.POSIX),
+            TerminalCommandCompletionStatsSnapshot().compiledLearning.indexesFor(TerminalShellSyntax.POSIX, specs),
         )
     }
 
