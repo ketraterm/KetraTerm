@@ -15,120 +15,99 @@
  */
 package io.github.ketraterm.completion.host
 
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Generation-safe asynchronous provider for one keyed immutable value snapshot.
+ * Non-blocking view of one latest keyed immutable value snapshot.
  *
- * [values] never invokes [loader] directly. It returns the latest ready values
- * and schedules refresh work when the key changes or the snapshot expires.
- * Failed loads retain the previous ready snapshot and can be retried.
- *
- * @param scheduler bounded non-blocking scheduler.
- * @param loader blocking bounded value loader invoked only by scheduled work.
- * @param onSnapshotChanged callback invoked after active publication.
- * @param onBackgroundFailure diagnostic callback for a failed publication callback.
- * @param nanoTime monotonic clock used for expiry.
- * @param snapshotTtlNanos positive lifetime of a ready snapshot.
- * @throws IllegalArgumentException if [snapshotTtlNanos] is not positive.
+ * [values] only reads ready state and emits a refresh request. A single
+ * `collectLatest` child performs loads, so a new key or provider closure
+ * cancels obsolete work through normal structured concurrency.
  */
 class TerminalValueSnapshotProvider<K, V>
-    @JvmOverloads
-    constructor(
-        private val scheduler: TerminalCompletionLoadScheduler,
-        private val loader: (K) -> List<V>,
+    internal constructor(
+        scope: CoroutineScope,
+        private val loader: suspend (K) -> List<V>,
         private val onSnapshotChanged: () -> Unit,
-        private val onBackgroundFailure: (Throwable) -> Unit = {},
+        private val onBackgroundFailure: (Throwable) -> Unit,
         private val nanoTime: () -> Long = System::nanoTime,
         private val snapshotTtlNanos: Long = TimeUnit.SECONDS.toNanos(DEFAULT_SNAPSHOT_TTL_SECONDS),
     ) : AutoCloseable {
         private val lock = Any()
-        private val closed = AtomicBoolean()
+        private val requests = MutableStateFlow<LoadRequest<K>?>(null)
+        private var closed = false
         private var key: K? = null
         private var hasKey = false
         private var snapshot = emptyList<V>()
         private var createdAtNanos = 0L
         private var hasSnapshot = false
         private var generation = 0L
-        private var inFlightLoad: InFlightLoad? = null
+        private var loadingGeneration: Long? = null
+        private val collectorJob: Job
 
         init {
             require(snapshotTtlNanos > 0L) { "snapshotTtlNanos must be > 0, was $snapshotTtlNanos" }
+            collectorJob =
+                scope.launch {
+                    requests.filterNotNull().collectLatest(::load)
+                }
         }
 
         /**
-         * Returns ready values and schedules a refresh when necessary.
+         * Returns the ready snapshot and requests a refresh when absent or stale.
          *
-         * @param requestedKey key whose latest snapshot is requested.
-         * @return the latest immutable snapshot, or an empty list before first publication or after closure.
+         * @param requestedKey key whose snapshot is requested.
+         * @return immutable ready values, or an empty list while loading or closed.
          */
-        fun values(requestedKey: K): List<V> {
-            if (closed.get()) return emptyList()
-            val now = nanoTime()
-            var loadToSubmit: InFlightLoad? = null
+        fun values(requestedKey: K): List<V> =
             synchronized(lock) {
+                if (closed || !collectorJob.isActive) return emptyList()
+                val now = nanoTime()
                 if (!hasKey || requestedKey != key) {
                     key = requestedKey
                     hasKey = true
                     snapshot = emptyList()
                     createdAtNanos = 0L
                     hasSnapshot = false
-                    generation++
-                    inFlightLoad = null
+                    loadingGeneration = null
                 }
                 if (hasSnapshot && now - createdAtNanos < snapshotTtlNanos) return snapshot
-                if (inFlightLoad == null) {
-                    val load = InFlightLoad(generation)
-                    inFlightLoad = load
-                    loadToSubmit = load
+                if (loadingGeneration == null) {
+                    val request = LoadRequest(requestedKey, ++generation)
+                    loadingGeneration = request.generation
+                    requests.value = request
                 }
+                snapshot
             }
-            loadToSubmit?.let { load -> submitLoad(requestedKey, load) }
-            return synchronized(lock) { snapshot }
-        }
 
-        private fun submitLoad(
-            requestedKey: K,
-            load: InFlightLoad,
-        ) {
-            val accepted =
-                scheduler.schedule {
-                    try {
-                        val shouldLoad =
-                            synchronized(lock) {
-                                val ownsSlot = inFlightLoad === load
-                                if (closed.get() || generation != load.generation || key != requestedKey || !ownsSlot) {
-                                    if (ownsSlot) inFlightLoad = null
-                                    false
-                                } else {
-                                    true
-                                }
-                            }
-                        if (!shouldLoad) return@schedule
-                        val loaded = loader(requestedKey).toList()
-                        var publish = false
-                        synchronized(lock) {
-                            if (inFlightLoad === load) {
-                                inFlightLoad = null
-                                if (!closed.get() && generation == load.generation && key == requestedKey) {
-                                    snapshot = loaded
-                                    createdAtNanos = nanoTime()
-                                    hasSnapshot = true
-                                    publish = true
-                                }
-                            }
-                        }
-                        if (publish) notifySnapshotChanged()
-                    } finally {
-                        synchronized(lock) {
-                            if (inFlightLoad === load) inFlightLoad = null
+        private suspend fun load(request: LoadRequest<K>) {
+            try {
+                val loaded = loader(request.key).toList()
+                currentCoroutineContext().ensureActive()
+                val publish =
+                    synchronized(lock) {
+                        if (closed || loadingGeneration != request.generation || key != request.key) {
+                            false
+                        } else {
+                            snapshot = loaded
+                            createdAtNanos = nanoTime()
+                            hasSnapshot = true
+                            loadingGeneration = null
+                            true
                         }
                     }
-                }
-            if (!accepted) {
+                if (publish) notifySnapshotChanged()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                reportBackgroundFailure(failure)
+            } finally {
                 synchronized(lock) {
-                    if (inFlightLoad === load) inFlightLoad = null
+                    if (loadingGeneration == request.generation) loadingGeneration = null
                 }
             }
         }
@@ -137,7 +116,6 @@ class TerminalValueSnapshotProvider<K, V>
             try {
                 onSnapshotChanged()
             } catch (failure: RuntimeException) {
-                // The owning UI may close while publication is in flight.
                 reportBackgroundFailure(failure)
             }
         }
@@ -146,28 +124,32 @@ class TerminalValueSnapshotProvider<K, V>
             try {
                 onBackgroundFailure(failure)
             } catch (_: RuntimeException) {
-                // A diagnostics sink must not affect completion publication.
+                // Diagnostics must not affect snapshot publication.
             }
         }
 
-        /** Invalidates active work and releases the retained snapshot. */
+        /** Cancels the collector, active load, and any load waiting for a permit. */
         override fun close() {
-            if (!closed.compareAndSet(false, true)) return
             synchronized(lock) {
+                if (closed) return
+                closed = true
                 generation++
-                inFlightLoad = null
+                loadingGeneration = null
                 snapshot = emptyList()
                 hasSnapshot = false
                 hasKey = false
                 key = null
             }
+            collectorJob.cancel(CancellationException(CANCELLATION_MESSAGE))
         }
 
-        private class InFlightLoad(
+        private data class LoadRequest<K>(
+            val key: K,
             val generation: Long,
         )
 
         private companion object {
+            private const val CANCELLATION_MESSAGE = "Completion value snapshot provider closed"
             private const val DEFAULT_SNAPSHOT_TTL_SECONDS = 2L
         }
     }

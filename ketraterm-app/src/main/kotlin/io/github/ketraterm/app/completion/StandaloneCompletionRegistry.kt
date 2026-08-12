@@ -16,6 +16,7 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.host.TerminalAsyncFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 
@@ -175,7 +176,7 @@ internal class StandaloneCompletionRegistry(
 
     private data class SessionCompletionState(
         val mruSource: TerminalSessionMruCompletionSource,
-        val fileSystemProvider: StandaloneAsyncFileSystemProvider,
+        val fileSystemProvider: TerminalAsyncFileSystemProvider,
     ) {
         fun close() {
             mruSource.clear()

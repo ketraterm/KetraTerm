@@ -63,7 +63,7 @@ internal data class IntellijCompletionProviderRegistration(
  */
 internal fun <V> IntellijCompletionProviderContext.createSnapshotRegistration(
     priority: Int,
-    loader: (String?) -> List<V>,
+    loader: suspend (String?) -> List<V>,
     sourceFactory: (valuesProvider: () -> List<V>) -> TerminalCompletionSource,
 ): IntellijCompletionProviderRegistration {
     val snapshotProvider =

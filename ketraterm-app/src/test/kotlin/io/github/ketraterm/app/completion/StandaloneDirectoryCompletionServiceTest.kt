@@ -17,24 +17,29 @@ package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalDirectoryListingRequest
 import io.github.ketraterm.completion.api.TerminalFileEntry
+import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner
+import io.github.ketraterm.completion.host.TerminalCompletionPathResolver
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.test.*
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class StandaloneDirectoryCompletionServiceTest {
     @Test
     fun `remote OSC 7 authority is rejected instead of becoming a local path`() {
-        val resolver = StandalonePathResolver(homeDirectory = Path.of("home"), windows = false)
+        val resolver = TerminalCompletionPathResolver(homeDirectory = Path.of("home"), windows = false)
 
-        val resolved = resolver.resolve(request("file://remote.example/work", ""))
-
-        assertNull(resolved)
+        assertNull(resolver.resolve(request("file://remote.example/work", "")))
     }
 
     @Test
     fun `localhost OSC 7 authority remains local`() {
-        val resolver = StandalonePathResolver(homeDirectory = Path.of("home"), windows = false)
+        val resolver = TerminalCompletionPathResolver(homeDirectory = Path.of("home"), windows = false)
         val path = Files.createTempDirectory("ketraterm-localhost")
         try {
             val uri = "file://localhost${path.toUri().path}"
@@ -48,191 +53,56 @@ class StandaloneDirectoryCompletionServiceTest {
     @Test
     fun `tilde directory resolves through explicit host home capability`() {
         val home = Path.of("host-home").toAbsolutePath().normalize()
-        val resolver = StandalonePathResolver(homeDirectory = home, windows = false)
+        val resolver = TerminalCompletionPathResolver(homeDirectory = home, windows = false)
 
-        val resolved = resolver.resolve(request("file:///workspace", "~/projects/"))
-
-        assertEquals(home.resolve("projects").normalize(), resolved)
+        assertEquals(home.resolve("projects").normalize(), resolver.resolve(request("file:///workspace", "~/projects/")))
     }
 
     @Test
     fun `Windows drive and UNC syntax are rejected on non-Windows hosts`() {
-        val resolver = StandalonePathResolver(homeDirectory = null, windows = false)
+        val resolver = TerminalCompletionPathResolver(homeDirectory = null, windows = false)
 
         assertNull(resolver.resolve(request("file:///workspace", "C:/Users/")))
         assertNull(resolver.resolve(request("file:///workspace", "//server/share/")))
     }
 
     @Test
-    fun `provider returns immediately and publishes immutable ready snapshot`() {
-        val scheduler = RecordingLoadScheduler()
-        var publications = 0
-        val expected = listOf(TerminalFileEntry("src", isDirectory = true))
-        val provider = provider(scheduler, onSnapshotChanged = { publications++ }) { _, _ -> expected }
-
-        assertTrue(provider.listDirectory(request()).isEmpty())
-        assertEquals(1, scheduler.size)
-
-        scheduler.runNext()
-
-        assertEquals(1, publications)
-        assertEquals(expected, provider.listDirectory(request()))
-    }
-
-    @Test
-    fun `completion from superseded request does not publish stale refresh`() {
-        val scheduler = RecordingLoadScheduler()
-        var publications = 0
-        val provider =
-            provider(scheduler, onSnapshotChanged = { publications++ }) { _, prefix ->
-                listOf(TerminalFileEntry(prefix, isDirectory = true))
-            }
-
-        provider.listDirectory(request(entryNamePrefix = "a"))
-        provider.listDirectory(request(entryNamePrefix = "b"))
-
-        scheduler.runNext()
-        assertEquals(0, publications)
-
-        scheduler.runNext()
-        assertEquals(1, publications)
-        assertEquals("b", provider.listDirectory(request(entryNamePrefix = "b")).single().name)
-    }
-
-    @Test
-    fun `returning to an in-flight request updates its accepted generation`() {
-        val scheduler = RecordingLoadScheduler()
-        var publications = 0
-        val provider =
-            provider(scheduler, onSnapshotChanged = { publications++ }) { _, prefix ->
-                listOf(TerminalFileEntry(prefix, isDirectory = true))
-            }
-
-        provider.listDirectory(request(entryNamePrefix = "a"))
-        provider.listDirectory(request(entryNamePrefix = "b"))
-        provider.listDirectory(request(entryNamePrefix = "a"))
-
-        scheduler.runNext()
-
-        assertEquals(1, publications)
-        assertEquals("a", provider.listDirectory(request(entryNamePrefix = "a")).single().name)
-    }
-
-    @Test
-    fun `closed provider discards queued results and callbacks`() {
-        val scheduler = RecordingLoadScheduler()
-        var publications = 0
-        val provider =
-            provider(scheduler, onSnapshotChanged = { publications++ }) { _, _ ->
-                listOf(TerminalFileEntry("src", isDirectory = true))
-            }
-        provider.listDirectory(request())
-
-        provider.close()
-        scheduler.runNext()
-
-        assertEquals(0, publications)
-        assertTrue(provider.listDirectory(request()).isEmpty())
-    }
-
-    @Test
-    fun `rejected bounded queue submission does not leave request stuck in flight`() {
-        var attempts = 0
-        val provider =
-            provider(
-                scheduler =
-                    StandaloneDirectoryLoadScheduler {
-                        attempts++
-                        false
-                    },
-                onSnapshotChanged = {},
-            ) { _, _ -> error("rejected work must not execute") }
-
-        assertTrue(provider.listDirectory(request()).isEmpty())
-        assertTrue(provider.listDirectory(request()).isEmpty())
-
-        assertEquals(2, attempts)
-    }
-
-    @Test
-    fun `failed scan can be retried`() {
-        val scheduler = RecordingLoadScheduler()
-        var attempts = 0
-        val expected = listOf(TerminalFileEntry("recovered", isDirectory = true))
-        val provider =
-            provider(scheduler, onSnapshotChanged = {}) { _, _ ->
-                attempts++
-                if (attempts == 1) error("scan failed")
-                expected
-            }
-
-        provider.listDirectory(request())
+    fun `standalone service publishes a ready directory snapshot`() {
+        val directory = Files.createTempDirectory("ketraterm-standalone-completion")
+        val child = Files.createDirectory(directory.resolve("src"))
+        val published = CountDownLatch(1)
+        val service = StandaloneDirectoryCompletionService()
+        val provider = service.createProvider(published::countDown)
         try {
-            scheduler.runNext()
-            fail("Expected the first scan to fail")
-        } catch (expectedFailure: IllegalStateException) {
-            assertEquals("scan failed", expectedFailure.message)
+            val request = request(directory.toUri().toString(), "")
+
+            assertTrue(provider.listDirectory(request).isEmpty())
+            assertTrue(published.await(5, TimeUnit.SECONDS), "directory snapshot did not publish")
+            assertEquals(listOf("src"), provider.listDirectory(request).map(TerminalFileEntry::name))
+        } finally {
+            provider.close()
+            service.close()
+            Files.deleteIfExists(child)
+            Files.deleteIfExists(directory)
         }
-
-        assertTrue(provider.listDirectory(request()).isEmpty())
-        scheduler.runNext()
-
-        assertEquals(expected, provider.listDirectory(request()))
     }
 
     @Test
-    fun `completed load cleanup does not clear a newer generation`() {
-        val scheduler = RecordingLoadScheduler()
-        var clock = 0L
-        var publications = 0
-        lateinit var provider: StandaloneAsyncFileSystemProvider
-        provider =
-            StandaloneAsyncFileSystemProvider(
-                scheduler = scheduler,
-                onSnapshotChanged = {
-                    publications++
-                    if (publications == 1) {
-                        clock = 2L
-                        provider.listDirectory(request(entryNamePrefix = "b"))
-                        provider.listDirectory(request(entryNamePrefix = "a"))
-                    }
-                },
-                resolver = StandalonePathResolver(homeDirectory = null, windows = false),
-                scanner =
-                    StandaloneDirectoryScanner { _, prefix ->
-                        listOf(TerminalFileEntry(prefix, isDirectory = true))
-                    },
-                nanoTime = { clock },
-                snapshotTtlNanos = 1L,
-            )
-
-        provider.listDirectory(request(entryNamePrefix = "a"))
-        scheduler.runNext()
-        assertEquals(2, scheduler.size)
-
-        scheduler.runNext()
-        scheduler.runNext()
-
-        assertEquals(2, publications)
-        assertEquals("a", provider.listDirectory(request(entryNamePrefix = "a")).single().name)
-    }
-
-    @Test
-    fun `scanner caps matching entries and returns deterministic order`() {
+    fun `scanner caps matches and returns deterministic order`() {
         val directory = Files.createTempDirectory("ketraterm-bounded-scan")
         try {
             Files.createDirectory(directory.resolve("zeta"))
             Files.createDirectory(directory.resolve("Alpha"))
             Files.createDirectory(directory.resolve("beta"))
             val scanner =
-                BoundedStandaloneDirectoryScanner(
+                TerminalBoundedDirectoryScanner(
                     maxVisitedEntries = 16,
                     maxMatchingEntries = 2,
                     scanBudgetNanos = Long.MAX_VALUE,
                     nanoTime = { 0L },
                 )
 
-            val entries = scanner.scan(directory, "")
+            val entries = runBlocking { scanner.scan(directory, "") }
 
             assertEquals(2, entries.size)
             assertEquals(
@@ -243,19 +113,6 @@ class StandaloneDirectoryCompletionServiceTest {
             directory.toFile().deleteRecursively()
         }
     }
-
-    private fun provider(
-        scheduler: StandaloneDirectoryLoadScheduler,
-        onSnapshotChanged: () -> Unit,
-        scanner: StandaloneDirectoryScanner,
-    ): StandaloneAsyncFileSystemProvider =
-        StandaloneAsyncFileSystemProvider(
-            scheduler = scheduler,
-            onSnapshotChanged = onSnapshotChanged,
-            resolver = StandalonePathResolver(homeDirectory = null, windows = false),
-            scanner = scanner,
-            snapshotTtlNanos = Long.MAX_VALUE,
-        )
 
     private fun request(
         workingDirectoryUri: String =
@@ -273,21 +130,4 @@ class StandaloneDirectoryCompletionServiceTest {
             directoryPrefix = directoryPrefix,
             entryNamePrefix = entryNamePrefix,
         )
-
-    private class RecordingLoadScheduler : StandaloneDirectoryLoadScheduler {
-        private val tasks = ArrayDeque<suspend () -> Unit>()
-        val size: Int
-            get() = tasks.size
-
-        override fun schedule(work: suspend () -> Unit): Boolean {
-            tasks.addLast(work)
-            return true
-        }
-
-        fun runNext() {
-            runBlocking {
-                tasks.removeFirst().invoke()
-            }
-        }
-    }
 }

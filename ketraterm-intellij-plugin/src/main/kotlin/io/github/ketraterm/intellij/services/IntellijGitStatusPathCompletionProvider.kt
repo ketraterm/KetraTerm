@@ -41,7 +41,7 @@ internal class IntellijGitStatusPathLoader(
      * @param workingDirectoryUri local `file` URI used to select and relativize a repository.
      * @return at most 2,048 changed paths, or an empty list for unusable project, URI, or repository state.
      */
-    fun load(workingDirectoryUri: String?): List<TerminalFuzzyPathEntry> =
+    suspend fun load(workingDirectoryUri: String?): List<TerminalFuzzyPathEntry> =
         loadIntellijGitRepositorySnapshot(project, workingDirectoryUri) { repository, workingDirectory ->
             val repositoryRoot = repository.root.toNioPath()
             val retained = BoundedSnapshotCollector(MAX_RETAINED_PATHS, ENTRY_ORDER)
@@ -89,7 +89,7 @@ internal class IntellijGitStatusPathLoader(
 
 /** Adds changed Git paths as a high-priority path source without leaking IntelliJ VCS APIs into the shared engine. */
 internal class IntellijGitStatusPathProviderFactory(
-    private val loader: (String?) -> List<TerminalFuzzyPathEntry>,
+    private val loader: suspend (String?) -> List<TerminalFuzzyPathEntry>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
         context.createSnapshotRegistration(TerminalCompletionSourcePrior.GIT_STATUS_PATH, loader) { valuesProvider ->

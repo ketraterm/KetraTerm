@@ -72,7 +72,7 @@ services, tool windows, settings bridges, notifications, and disposal hooks.
 Reusable terminal behavior stays in the main KetraTerm modules:
 
 - `ketraterm-completion`: pure command parsing, sources, ranking, and learning.
-- `ketraterm-completion-host`: bounded asynchronous directory and value snapshots.
+- `ketraterm-completion-host`: structured latest-request directory and value snapshots.
 - `ketraterm-completion-persistence`: sanitized, bounded statistics storage.
 - `ketraterm-ui-swing`: Swing terminal component, painting, selection, input, and
   viewport behavior.

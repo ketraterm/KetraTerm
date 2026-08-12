@@ -256,19 +256,19 @@ scalar positional fields remain the fallback for compact specs.
 
 Reusable ready-snapshot, local-path, and bounded directory-scanning machinery belongs to `ketraterm-completion-host`; it
 may perform bounded host work but does not parse, rank, or prioritize completion candidates. Standalone and IntelliJ
-share its generation and failure semantics while retaining only their environment-specific loaders and scanners. The
-standalone app uses session-local, immutable directory snapshots fed by a window-owned instance of the shared coroutine
-service with a bounded channel and two IO workers.
-Enumeration has visit, result, and elapsed-time caps; caches have capacity and
-expiry bounds; request generations prevent stale work from refreshing the popup. The defaults (two IO workers, a 32-item
-submission queue, 32 cached directory snapshots, a two-second snapshot lifetime, 8,192 visited entries, 256 matches, and
-a 50 ms scan budget) are an explicit desktop baseline covered by JMH directory-scan benchmarks; change them only with
-representative local and remote-filesystem measurements. Closing discards in-flight results and scanner loops observe
-thread interruption, but blocking filesystem calls remain best-effort cancellable. A failed load clears only its matching
-in-flight generation, retains any previous ready snapshot, and can be retried by the next request. The app resolves
+share one latest-request snapshot implementation while retaining only their environment-specific loaders and scanners.
+The snapshot service owns a structured child scope and one suspending semaphore, with two concurrent loads by default.
+Each provider has one `collectLatest` child: changing its key cancels obsolete running or permit-waiting work instead of
+adding another scheduler or queue. Loaders are suspending functions and inherit their host scope; only blocking local
+filesystem access moves to an injected IO dispatcher.
+Enumeration has visit, result, and elapsed-time caps, while ready snapshots have a two-second expiry. The defaults (two
+concurrent loads, 8,192 visited entries, 256 matches, and a 50 ms scan budget) are an explicit desktop baseline covered by
+JMH directory-scan benchmarks; change them only with representative local and remote-filesystem measurements. Closing a
+provider cancels its collector and active load, and `runInterruptible` makes local directory scans cooperatively
+interruptible. A failed load clears only its matching generation and can be retried by the next request. The app resolves
 local and `localhost` file URIs, explicit home paths,
 Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses
-project-aware VFS directory snapshots for paths inside project content and bounded local scanning elsewhere. Its first
+write-allowing suspending read actions for project-aware VFS snapshots and bounded local scanning elsewhere. Its first
 dynamic value provider reads local branches from the Git4Idea repository that contains the terminal working directory
 and publishes generation-safe, failure-retryable snapshots for `git switch`, `checkout`, `merge`, and `rebase`. Remote
 branches are published through a separate snapshot for `checkout`, `merge`, and `rebase`, avoiding invalid remote
@@ -276,7 +276,8 @@ suggestions for `git switch`. Tags use the same bounded, repository-selected Git
 `checkout`, `merge`, and `rebase`; `git switch` remains local-branch-only.
 Whole-project fuzzy paths use a prefix-keyed asynchronous query through IntelliJ's Go to File model and item provider.
 IntelliJ owns indexed discovery, fuzzy matching, path qualification, and result ordering; the plugin only converts PSI
-items into shell-facing paths, while the shared source applies terminal path semantics. Fuzzy paths activate only in declared or
+items into shell-facing paths, while the shared source applies terminal path semantics. These queries use IntelliJ's
+suspending `readAction`, so pending write actions restart the read without a blocking-context bridge. Fuzzy paths activate only in declared or
 explicitly path-like terminal positions, while direct directory completion remains higher priority for immediate
 children. Changelists, SDKs, and run configurations remain follow-up work. IntelliJ also reads its already-imported Gradle external-system
 model into a bounded task snapshot; it never starts Gradle from a completion request. A separate Git status snapshot
@@ -366,6 +367,12 @@ requests a bounded surplus from every collecting source and applies
 four times the visible limit with an absolute surplus cap of 256 and
 overflow-safe arithmetic, so learned evidence can promote an initially hidden
 candidate without permitting unbounded host work.
+
+Source collection is intentionally sequential. Engine sources are pure bounded
+reads over immutable in-memory snapshots; they never await host I/O. Launching
+one coroutine per source would add scheduling, synchronization, and unstable
+completion order without making the underlying work faster. Parallelism belongs
+only in host snapshot production, before the engine is called.
 
 ## Ranking Calibration
 

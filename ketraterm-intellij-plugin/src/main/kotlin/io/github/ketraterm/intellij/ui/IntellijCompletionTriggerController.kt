@@ -20,11 +20,9 @@ import io.github.ketraterm.completion.api.TerminalLiveCompletionTriggerState
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration.Companion.milliseconds
 
 /** IntelliJ host policy for debounced live shell-suggestion refreshes. */
 internal class IntellijCompletionTriggerController(
@@ -123,10 +121,10 @@ internal class CoroutineIntellijCompletionTriggerScheduler(
     ) {
         synchronized(lock) {
             val requestGeneration = generation.incrementAndGet()
-            job?.cancel()
+            job?.cancel(CancellationException(CANCELLATION_MESSAGE))
             job =
                 scope.launch {
-                    if (delayMillis > 0) delay(delayMillis.toLong())
+                    if (delayMillis > 0) delay(delayMillis.toLong().milliseconds)
                     dispatch {
                         if (generation.get() == requestGeneration) action()
                     }
@@ -137,8 +135,12 @@ internal class CoroutineIntellijCompletionTriggerScheduler(
     override fun cancel() {
         generation.incrementAndGet()
         synchronized(lock) {
-            job?.cancel()
+            job?.cancel(CancellationException(CANCELLATION_MESSAGE))
             job = null
         }
+    }
+
+    private companion object {
+        private const val CANCELLATION_MESSAGE = "IntelliJ completion trigger superseded"
     }
 }

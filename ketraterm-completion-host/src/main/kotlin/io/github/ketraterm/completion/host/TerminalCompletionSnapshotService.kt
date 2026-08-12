@@ -16,141 +16,114 @@
 package io.github.ketraterm.completion.host
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
- * Bounded scheduler seam used by asynchronous completion snapshot providers.
+ * Lifecycle owner for asynchronous completion snapshots.
  *
- * Implementations must reject work rather than block when their capacity has
- * been exhausted.
- */
-fun interface TerminalCompletionLoadScheduler {
-    /**
-     * Attempts to enqueue [work] without blocking the caller.
-     *
-     * @param work suspending snapshot load operation.
-     * @return `true` when accepted, or `false` when closed or capacity-limited.
-     */
-    fun schedule(work: suspend () -> Unit): Boolean
-}
-
-/**
- * Shared owner of bounded background completion snapshot work.
+ * Every provider keeps one latest-request coroutine. Loads inherit this
+ * service's structured lifecycle and share a suspending concurrency limit;
+ * there is no second worker queue or detached load job. Superseding a request
+ * cancels its load while it is running or waiting for a permit.
  *
- * Providers created by this service retain their own immutable snapshots and
- * generations. The service only owns worker and queue capacity. Closing it
- * cancels queued and active work and is safe to repeat.
- *
- * @param workerCount positive number of concurrent snapshot workers.
- * @param queueCapacity positive number of queued operations accepted without blocking.
- * @param coroutineName diagnostic worker-name prefix.
- * @param onBackgroundFailure diagnostic callback for a failed provider load or publication callback.
- * @throws IllegalArgumentException if worker/queue capacity is not positive or
+ * @param parentScope optional host lifecycle scope. When present, cancellation
+ * of that scope cancels all snapshot work. Otherwise this closeable service
+ * owns its root job.
+ * @param maxConcurrentLoads positive maximum number of loaders running at once.
+ * @param coroutineName non-blank diagnostic name for service children.
+ * @param onBackgroundFailure diagnostic callback for failed loaders or
+ * publication callbacks.
+ * @throws IllegalArgumentException if [maxConcurrentLoads] is not positive or
  * [coroutineName] is blank.
  */
 class TerminalCompletionSnapshotService
     @JvmOverloads
     constructor(
-        workerCount: Int = DEFAULT_WORKER_COUNT,
-        queueCapacity: Int = DEFAULT_QUEUE_CAPACITY,
+        parentScope: CoroutineScope? = null,
+        maxConcurrentLoads: Int = DEFAULT_MAX_CONCURRENT_LOADS,
         coroutineName: String = DEFAULT_COROUTINE_NAME,
         private val onBackgroundFailure: (Throwable) -> Unit = {},
     ) : AutoCloseable {
-        private val validatedWorkerCount = workerCount.also { require(it > 0) { "workerCount must be > 0, was $it" } }
-        private val validatedQueueCapacity =
-            queueCapacity.also { require(it > 0) { "queueCapacity must be > 0, was $it" } }
         private val validatedCoroutineName =
             coroutineName.also { require(it.isNotBlank()) { "coroutineName must not be blank" } }
-        private val job = SupervisorJob()
+        private val job = SupervisorJob(parentScope?.coroutineContext?.get(Job))
         private val scope =
             CoroutineScope(
-                job +
-                    Dispatchers.IO.limitedParallelism(validatedWorkerCount) +
+                (parentScope?.coroutineContext ?: Dispatchers.Default) +
+                    job +
                     CoroutineName(validatedCoroutineName),
             )
-        private val workQueue = Channel<suspend () -> Unit>(validatedQueueCapacity)
-        private val scheduler = TerminalCompletionLoadScheduler { work -> workQueue.trySend(work).isSuccess }
-
-        init {
-            repeat(validatedWorkerCount) { workerIndex ->
-                scope.launch(CoroutineName("$validatedCoroutineName-worker-$workerIndex")) {
-                    for (work in workQueue) {
-                        try {
-                            work()
-                        } catch (_: CancellationException) {
-                            // A provider may cancel only its own load. Stop the
-                            // worker only when the service job was cancelled.
-                            currentCoroutineContext().ensureActive()
-                        } catch (failure: Exception) {
-                            // One provider failure must not terminate a shared worker.
-                            reportBackgroundFailure(failure)
-                        }
-                    }
-                }
-            }
-        }
+        private val loadPermits =
+            Semaphore(
+                maxConcurrentLoads.also {
+                    require(it > 0) { "maxConcurrentLoads must be > 0, was $it" }
+                },
+            )
 
         /**
-         * Creates a session-owned asynchronous directory provider.
+         * Creates a provider that scans only its latest directory request.
          *
-         * @param onSnapshotChanged callback invoked on a worker after publication.
+         * @param onSnapshotChanged callback invoked after publication.
          * @param resolver pure local path resolver.
-         * @param scanner optional blocking bounded directory scanner run only by workers; omitted uses the diagnostic-aware
-         * default scanner.
+         * @param scanner suspending bounded directory scanner.
          * @return provider that the owning session must close.
          */
         @JvmOverloads
         fun createDirectoryProvider(
             onSnapshotChanged: () -> Unit,
             resolver: TerminalCompletionPathResolver = TerminalCompletionPathResolver(),
-            scanner: TerminalDirectoryScanner? = null,
+            scanner: TerminalDirectoryScanner = TerminalBoundedDirectoryScanner(onFailure = ::reportBackgroundFailure),
         ): TerminalAsyncFileSystemProvider =
             TerminalAsyncFileSystemProvider(
-                scheduler = scheduler,
+                scope = scope,
+                loader = { directory, prefix -> withLoadPermit { scanner.scan(directory, prefix) } },
                 onSnapshotChanged = onSnapshotChanged,
                 resolver = resolver,
-                scanner = scanner ?: TerminalBoundedDirectoryScanner { failure -> reportBackgroundFailure(failure) },
                 onBackgroundFailure = ::reportBackgroundFailure,
             )
 
         /**
-         * Creates a session-owned asynchronous value snapshot provider.
+         * Creates a provider for one latest keyed immutable value snapshot.
          *
-         * @param loader blocking bounded loader invoked only by workers.
-         * @param onSnapshotChanged callback invoked on a worker after publication.
+         * The loader is already suspending and inherits the service dispatcher.
+         * Blocking implementations must move only their blocking section to an
+         * injected [kotlinx.coroutines.CoroutineDispatcher].
+         *
+         * @param loader suspending bounded loader.
+         * @param onSnapshotChanged callback invoked after publication.
          * @return provider that the owning session must close.
          */
         fun <K, V> createValueProvider(
-            loader: (K) -> List<V>,
+            loader: suspend (K) -> List<V>,
             onSnapshotChanged: () -> Unit,
         ): TerminalValueSnapshotProvider<K, V> =
             TerminalValueSnapshotProvider(
-                scheduler = scheduler,
-                loader = loader,
+                scope = scope,
+                loader = { key -> withLoadPermit { loader(key) } },
                 onSnapshotChanged = onSnapshotChanged,
                 onBackgroundFailure = ::reportBackgroundFailure,
             )
 
-        /** Cancels queued and active work and releases worker resources. */
+        /** Cancels all provider collectors and their active or waiting loads. */
         override fun close() {
-            // Pass the nullable cause explicitly: an embedding host may provide
-            // a compatible coroutines runtime without newer
-            // compiler-generated default-argument bridge methods.
-            workQueue.close(null)
+            // The explicit overload avoids a cancellation default-argument
+            // bridge that is absent from some IntelliJ-bundled runtimes.
             job.cancel(CancellationException("Completion snapshot service closed"))
         }
+
+        private suspend fun <T> withLoadPermit(block: suspend () -> T): T = loadPermits.withPermit { block() }
 
         private fun reportBackgroundFailure(failure: Throwable) {
             try {
                 onBackgroundFailure(failure)
             } catch (_: RuntimeException) {
-                // A diagnostics sink must not prevent other completion providers from running.
+                // Diagnostics must not affect provider lifecycles.
             }
         }
 
         private companion object {
-            private const val DEFAULT_WORKER_COUNT = 2
-            private const val DEFAULT_QUEUE_CAPACITY = 32
+            private const val DEFAULT_MAX_CONCURRENT_LOADS = 2
             private const val DEFAULT_COROUTINE_NAME = "completion-snapshots"
         }
     }

@@ -18,21 +18,18 @@ package io.github.ketraterm.completion.host
 import io.github.ketraterm.completion.api.TerminalFileEntry
 import java.nio.file.Path
 
-/**
- * Blocking directory scan contract invoked only by host snapshot workers.
- *
- * Closing a provider prevents an in-flight result from publishing, but filesystem
- * operations are only best-effort cancellable and may complete after closure.
- */
+/** Suspending bounded directory-scan contract used by snapshot providers. */
 fun interface TerminalDirectoryScanner {
     /**
      * Scans direct children beginning with [entryNamePrefix].
+     *
+     * Implementations own any dispatcher switch required by their backing API.
      *
      * @param directory normalized absolute local directory.
      * @param entryNamePrefix case-insensitive child-name prefix.
      * @return bounded deterministically ordered entries.
      */
-    fun scan(
+    suspend fun scan(
         directory: Path,
         entryNamePrefix: String,
     ): List<TerminalFileEntry>

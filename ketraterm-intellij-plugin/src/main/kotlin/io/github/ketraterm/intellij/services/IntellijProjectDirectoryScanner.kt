@@ -15,12 +15,14 @@
  */
 package io.github.ketraterm.intellij.services
 
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import io.github.ketraterm.completion.api.TerminalFileEntry
+import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner
+import io.github.ketraterm.completion.host.TerminalDirectoryScanner
 import java.nio.file.Path
 import java.util.*
 
@@ -43,11 +45,11 @@ import java.util.*
  */
 internal class IntellijProjectDirectoryScanner(
     private val project: Project,
-    private val fallback: IntellijDirectoryScanner = BoundedIntellijDirectoryScanner(),
+    private val fallback: TerminalDirectoryScanner = TerminalBoundedDirectoryScanner(),
     private val virtualFileResolver: (Path) -> VirtualFile? = VirtualFileManager.getInstance()::findFileByNioPath,
     private val maxVisitedEntries: Int = DEFAULT_MAX_VISITED_ENTRIES,
     private val maxMatchingEntries: Int = DEFAULT_MAX_MATCHING_ENTRIES,
-) : IntellijDirectoryScanner {
+) : TerminalDirectoryScanner {
     init {
         require(maxVisitedEntries > 0) { "maxVisitedEntries must be > 0, was $maxVisitedEntries" }
         require(maxMatchingEntries > 0) { "maxMatchingEntries must be > 0, was $maxMatchingEntries" }
@@ -62,18 +64,18 @@ internal class IntellijProjectDirectoryScanner(
      * project or an indexed non-directory; otherwise [fallback]'s result when
      * no applicable project-content snapshot exists.
      */
-    override fun scan(
+    override suspend fun scan(
         directory: Path,
         entryNamePrefix: String,
     ): List<TerminalFileEntry> {
         if (project.isDisposed) return emptyList()
         val projectEntries =
-            ApplicationManager.getApplication().runReadAction<List<TerminalFileEntry>?> {
-                if (project.isDisposed) return@runReadAction emptyList()
-                val virtualDirectory = virtualFileResolver(directory) ?: return@runReadAction null
-                if (!virtualDirectory.isDirectory) return@runReadAction emptyList()
+            readAction<List<TerminalFileEntry>?> {
+                if (project.isDisposed) return@readAction emptyList()
+                val virtualDirectory = virtualFileResolver(directory) ?: return@readAction null
+                if (!virtualDirectory.isDirectory) return@readAction emptyList()
                 val fileIndex = ProjectRootManager.getInstance(project).fileIndex
-                if (!fileIndex.isInContent(virtualDirectory)) return@runReadAction null
+                if (!fileIndex.isInContent(virtualDirectory)) return@readAction null
 
                 val matches = PriorityQueue(maxMatchingEntries, ENTRY_ORDER.reversed())
                 val children = virtualDirectory.children

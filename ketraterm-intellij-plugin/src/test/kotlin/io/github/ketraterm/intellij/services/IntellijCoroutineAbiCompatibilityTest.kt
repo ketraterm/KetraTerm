@@ -41,6 +41,8 @@ class IntellijCoroutineAbiCompatibilityTest {
         private const val CANCEL_DEFAULT_BRIDGE = "cancel\$default"
         private val PLUGIN_LOADED_SHARED_CLASSES =
             arrayOf(
+                "io/github/ketraterm/completion/host/TerminalCompletionSnapshotService.class",
+                "io/github/ketraterm/completion/host/TerminalValueSnapshotProvider.class",
                 "io/github/ketraterm/session/TerminalSession.class",
                 "io/github/ketraterm/ui/swing/api/SwingTerminal.class",
                 "io/github/ketraterm/ui/swing/api/TerminalHyperlinkDiscoveryController.class",

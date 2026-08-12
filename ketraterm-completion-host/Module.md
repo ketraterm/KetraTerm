@@ -2,7 +2,8 @@
 
 ## KetraTerm Completion Host Support (`:ketraterm-completion-host`)
 
-This module provides bounded, asynchronous completion snapshot infrastructure shared by standalone and IDE hosts. It
-owns generation-safe ready snapshots, local path interpretation, and bounded local directory scanning while keeping all
-command parsing and ranking in `ketraterm-completion`.
+This module provides structured asynchronous completion snapshots shared by standalone and IDE hosts. It owns one
+latest-request collector per provider, a shared suspending concurrency limit, immutable ready snapshots, local path
+interpretation, and bounded interruptible directory scanning while keeping all command parsing and ranking in
+`ketraterm-completion`.
 

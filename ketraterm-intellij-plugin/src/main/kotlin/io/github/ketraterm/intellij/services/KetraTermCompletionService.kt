@@ -21,6 +21,8 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner
+import io.github.ketraterm.completion.host.TerminalDirectoryScanner
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -33,6 +35,7 @@ import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
+import kotlinx.coroutines.CoroutineScope
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -43,7 +46,9 @@ import java.util.concurrent.atomic.AtomicReference
  * IntelliJ disposal closes all session providers before closing persistence.
  */
 @Service(Service.Level.APP)
-internal class KetraTermCompletionService : Disposable {
+internal class KetraTermCompletionService(
+    coroutineScope: CoroutineScope,
+) : Disposable {
     private val settings = KetraTermIntellijSettings.getInstance()
     private val statsStore =
         TerminalCompletionStatsStore(
@@ -57,6 +62,7 @@ internal class KetraTermCompletionService : Disposable {
             loadStats = statsStore::loadSnapshot,
             persistStats = statsStore::persist,
             persistenceEnabled = settings.completionLearningPersistenceEnabled(),
+            coroutineScope = coroutineScope,
         )
     private val settingsListener: () -> Unit = {
         registry.setPersistenceEnabled(settings.completionLearningPersistenceEnabled())
@@ -150,7 +156,9 @@ internal class KetraTermCompletionService : Disposable {
  * @param persistStats snapshot writer executed after statistics mutations.
  * @param persistenceEnabled whether disk-backed learning is initially enabled.
  * @param sessionMruCapacity positive per-session MRU capacity.
- * @param snapshotService optional application-owned asynchronous snapshot scheduler.
+ * @param coroutineScope host lifecycle scope that parents completion work, or
+ * `null` for a registry-owned test scope.
+ * @param snapshotService optional application-owned asynchronous snapshot service.
  * @throws IllegalArgumentException if [sessionMruCapacity] is not positive.
  */
 internal class IntellijCompletionRegistry(
@@ -160,6 +168,7 @@ internal class IntellijCompletionRegistry(
     persistStats: (TerminalCommandCompletionStatsSnapshot) -> Unit = {},
     persistenceEnabled: Boolean = true,
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
+    coroutineScope: CoroutineScope? = null,
     snapshotService: IntellijCompletionSnapshotService? = null,
 ) : AutoCloseable {
     init {
@@ -171,7 +180,9 @@ internal class IntellijCompletionRegistry(
     private val lock = Any()
     private val closed = AtomicBoolean()
     private val sessionStates = HashMap<String, SessionState>()
-    private val snapshotService = snapshotService ?: IntellijCompletionSnapshotService()
+    private val snapshotService =
+        snapshotService
+            ?: IntellijCompletionSnapshotService(coroutineScope)
     private val statistics =
         IntellijCompletionStatisticsCoordinator(
             statsSource = statsSource,
@@ -380,7 +391,7 @@ internal class IntellijCompletionRegistry(
  * @property workingDirectoryUriProvider thread-safe supplier for the latest URI.
  * @property shellCapabilities shell syntax and quoting capabilities.
  * @property providerFactories additive dynamic provider factories.
- * @property directoryScanner blocking bounded directory snapshot scanner.
+ * @property directoryScanner suspending bounded directory snapshot scanner.
  * @throws IllegalArgumentException if [sessionId] or [profileId] is blank.
  */
 internal data class IntellijCompletionSessionContext(
@@ -389,7 +400,7 @@ internal data class IntellijCompletionSessionContext(
     val workingDirectoryUriProvider: () -> String?,
     val shellCapabilities: TerminalShellCapabilities,
     val providerFactories: List<IntellijCompletionProviderFactory> = emptyList(),
-    val directoryScanner: IntellijDirectoryScanner = BoundedIntellijDirectoryScanner(),
+    val directoryScanner: TerminalDirectoryScanner = TerminalBoundedDirectoryScanner(),
 ) {
     init {
         require(sessionId.isNotBlank()) { "sessionId must not be blank" }

@@ -20,6 +20,7 @@ import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.suggestion.*
+import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
@@ -468,6 +469,40 @@ class IntellijCompletionRegistryTest {
             val suggestion = suggestions.single { it.source == "intellij-project-file" }
             assertEquals("src/main/NullUriTarget.kt", suggestion.replacementText)
         } finally {
+            registry.close()
+        }
+    }
+
+    @Test
+    fun `closing session cancels its active project fuzzy path load`() {
+        val registry = IntellijCompletionRegistry()
+        val started = CountDownLatch(1)
+        val cancelled = CountDownLatch(1)
+        val session =
+            registry.openSession(
+                context("project-files-close").copy(
+                    providerFactories =
+                        listOf(
+                            IntellijProjectFileProviderFactory { _, _ ->
+                                started.countDown()
+                                try {
+                                    awaitCancellation()
+                                } finally {
+                                    cancelled.countDown()
+                                }
+                            },
+                        ),
+                ),
+            )
+        try {
+            session.provider.suggestions(request("cat sgk"))
+            assertTrue("project fuzzy load did not start", started.await(5, TimeUnit.SECONDS))
+
+            session.close()
+
+            assertTrue("project fuzzy load outlived its session", cancelled.await(5, TimeUnit.SECONDS))
+        } finally {
+            session.close()
             registry.close()
         }
     }

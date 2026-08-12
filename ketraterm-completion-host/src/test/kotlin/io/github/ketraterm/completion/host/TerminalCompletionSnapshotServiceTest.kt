@@ -15,76 +15,86 @@
  */
 package io.github.ketraterm.completion.host
 
-import kotlinx.coroutines.CancellationException
-import java.io.IOException
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.*
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
-import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TerminalCompletionSnapshotServiceTest {
     @Test
-    fun `provider-local cancellation does not terminate shared worker`() {
-        assertWorkerSurvives(CancellationException("provider load cancelled"))
-    }
+    fun `parent scope cancellation reaches active provider load`() =
+        runTest {
+            val parentJob = SupervisorJob()
+            val parentScope = CoroutineScope(coroutineContext + parentJob)
+            val service = TerminalCompletionSnapshotService(parentScope = parentScope)
+            val started = CompletableDeferred<Unit>()
+            val cancelled = CompletableDeferred<Unit>()
+            val provider =
+                service.createValueProvider<String, String>(
+                    loader = {
+                        started.complete(Unit)
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            cancelled.complete(Unit)
+                        }
+                    },
+                    onSnapshotChanged = {},
+                )
 
-    @Test
-    fun `checked provider failure does not terminate shared worker`() {
-        assertWorkerSurvives(IOException("provider load failed"))
-    }
-
-    @Test
-    fun `checked provider failure is reported without terminating shared worker`() {
-        val failure = IOException("provider load failed")
-        val reported = AtomicReference<Throwable?>()
-
-        assertWorkerSurvives(failure) { reported.set(it) }
-
-        assertEquals(failure, reported.get())
-    }
-
-    private fun assertWorkerSurvives(
-        firstFailure: Exception,
-        onBackgroundFailure: (Throwable) -> Unit = {},
-    ) {
-        val service =
-            TerminalCompletionSnapshotService(
-                workerCount = 1,
-                queueCapacity = 2,
-                onBackgroundFailure = onBackgroundFailure,
-            )
-        val attempts = AtomicInteger()
-        val firstAttempt = CountDownLatch(1)
-        val published = CountDownLatch(1)
-        val provider =
-            service.createValueProvider<String, String>(
-                loader = {
-                    if (attempts.incrementAndGet() == 1) {
-                        firstAttempt.countDown()
-                        throw firstFailure
-                    }
-                    listOf("recovered")
-                },
-                onSnapshotChanged = published::countDown,
-            )
-        try {
             provider.values("key")
-            assertTrue(firstAttempt.await(5, TimeUnit.SECONDS), "first provider load did not run")
+            runCurrent()
+            started.await()
+            parentJob.cancel(CancellationException("host lifecycle closed"))
+            advanceUntilIdle()
 
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            while (published.count != 0L && System.nanoTime() < deadline) {
-                provider.values("key")
-                Thread.sleep(5)
-            }
-
-            assertEquals(0L, published.count, "shared worker did not process the retry")
-            assertEquals(listOf("recovered"), provider.values("key"))
-        } finally {
+            assertTrue(cancelled.isCompleted)
             provider.close()
             service.close()
         }
-    }
+
+    @Test
+    fun `shared semaphore limits loaders without a second work queue`() =
+        runTest {
+            val service = TerminalCompletionSnapshotService(parentScope = this, maxConcurrentLoads = 1)
+            val firstStarted = CompletableDeferred<Unit>()
+            val firstRelease = CompletableDeferred<Unit>()
+            val secondStarted = CompletableDeferred<Unit>()
+            val first =
+                service.createValueProvider<String, String>(
+                    loader = {
+                        firstStarted.complete(Unit)
+                        firstRelease.await()
+                        listOf("first")
+                    },
+                    onSnapshotChanged = {},
+                )
+            val second =
+                service.createValueProvider<String, String>(
+                    loader = {
+                        secondStarted.complete(Unit)
+                        listOf("second")
+                    },
+                    onSnapshotChanged = {},
+                )
+
+            first.values("key")
+            runCurrent()
+            firstStarted.await()
+            second.values("key")
+            runCurrent()
+            assertFalse(secondStarted.isCompleted)
+
+            firstRelease.complete(Unit)
+            advanceUntilIdle()
+            assertTrue(secondStarted.isCompleted)
+
+            first.close()
+            second.close()
+            service.close()
+        }
 }

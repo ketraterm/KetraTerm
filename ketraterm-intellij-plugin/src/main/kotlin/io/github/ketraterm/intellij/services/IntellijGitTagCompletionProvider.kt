@@ -31,7 +31,7 @@ internal class IntellijGitTagLoader(
      * @param workingDirectoryUri local `file` URI used to select a repository.
      * @return at most 2,048 tag values, or an empty list for unusable project, URI, or repository state.
      */
-    fun load(workingDirectoryUri: String?): List<TerminalCompletionDomainValue> =
+    suspend fun load(workingDirectoryUri: String?): List<TerminalCompletionDomainValue> =
         loadIntellijGitRepositorySnapshot(project, workingDirectoryUri) { repository, _ ->
             repository.tagsHolder.state.value.tagsToCommitHashes.keys
                 .asSequence()
@@ -51,7 +51,7 @@ internal class IntellijGitTagLoader(
 
 /** Adds tag values only where Git accepts an arbitrary revision directly. */
 internal class IntellijGitTagProviderFactory(
-    private val loader: (String?) -> List<TerminalCompletionDomainValue>,
+    private val loader: suspend (String?) -> List<TerminalCompletionDomainValue>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
         context.createSnapshotRegistration(TerminalCompletionSourcePrior.GIT_TAG, loader) { valuesProvider ->

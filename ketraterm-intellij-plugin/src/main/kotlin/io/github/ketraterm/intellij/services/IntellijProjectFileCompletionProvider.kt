@@ -16,7 +16,7 @@
 package io.github.ketraterm.intellij.services
 
 import com.intellij.ide.util.gotoByName.*
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
@@ -28,6 +28,8 @@ import com.intellij.util.Processor
 import com.intellij.util.indexing.FindSymbolParameters
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.nio.file.Path
 
 /**
@@ -53,10 +55,11 @@ internal class IntellijProjectFileLoader(
      * @return ready project paths, or an empty list for disposed projects and
      * unsupported working-directory URIs.
      */
-    fun load(
+    suspend fun load(
         workingDirectoryUri: String?,
         prefix: String,
     ): List<TerminalFuzzyPathEntry> {
+        currentCoroutineContext().ensureActive()
         if (project.isDisposed) return emptyList()
         val normalizedPrefix = prefix.replace('\\', '/')
         if (normalizedPrefix.substringAfterLast('/').isEmpty()) return emptyList()
@@ -64,15 +67,17 @@ internal class IntellijProjectFileLoader(
             TerminalLocalFileUriResolver.resolve(workingDirectoryUri)
                 ?: project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
                 ?: return emptyList()
-        return ApplicationManager.getApplication().runReadAction<List<TerminalFuzzyPathEntry>> {
-            if (project.isDisposed) return@runReadAction emptyList()
+        return readAction {
+            ProgressManager.checkCanceled()
+            if (project.isDisposed) return@readAction emptyList()
             val model = GotoFileModel(project)
             try {
+                val itemProvider = model.getItemProvider(null)
+                if (itemProvider !is ChooseByNameInScopeItemProvider) return@readAction emptyList()
                 val viewModel = IntellijProjectFileSearchViewModel(project, model)
                 val results = ArrayList<TerminalFuzzyPathEntry>(INITIAL_RESULT_CAPACITY)
                 val paths = HashSet<String>(INITIAL_RESULT_CAPACITY)
                 val indicator = ProgressManager.getInstance().progressIndicator ?: EmptyProgressIndicator()
-                val itemProvider = model.getItemProvider(null) as ChooseByNameInScopeItemProvider
                 val parameters = FindSymbolParameters.wrap(normalizedPrefix, GlobalSearchScope.projectScope(project))
                 itemProvider.filterElementsWithWeights(
                     viewModel,
@@ -132,7 +137,7 @@ private data class ProjectPathQuery(
 
 /** Adds query-aware IntelliJ project fuzzy paths without leaking VFS APIs into the shared engine. */
 internal class IntellijProjectFileProviderFactory(
-    private val loader: (String?, String) -> List<TerminalFuzzyPathEntry>,
+    private val loader: suspend (String?, String) -> List<TerminalFuzzyPathEntry>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration {
         val snapshotProvider =

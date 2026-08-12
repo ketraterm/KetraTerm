@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.intellij.services
 
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.Project
 import git4idea.repo.GitRepository
 import git4idea.repo.GitRepositoryManager
@@ -38,7 +38,7 @@ internal fun selectIntellijGitRepository(
  * URI validation, project disposal, read-action ownership, and nested-repository
  * selection are centralized here so every Git completion loader follows the same policy.
  */
-internal fun <T> loadIntellijGitRepositorySnapshot(
+internal suspend fun <T> loadIntellijGitRepositorySnapshot(
     project: Project,
     workingDirectoryUri: String?,
     loader: (repository: GitRepository, workingDirectory: Path) -> List<T>,
@@ -48,11 +48,11 @@ internal fun <T> loadIntellijGitRepositorySnapshot(
         TerminalLocalFileUriResolver.resolve(workingDirectoryUri)
             ?: project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
             ?: return emptyList()
-    return ApplicationManager.getApplication().runReadAction<List<T>> {
-        if (project.isDisposed) return@runReadAction emptyList()
+    return readAction {
+        if (project.isDisposed) return@readAction emptyList()
         val repository =
             selectIntellijGitRepository(GitRepositoryManager.getInstance(project).repositories, workingDirectory)
-                ?: return@runReadAction emptyList()
+                ?: return@readAction emptyList()
         loader(repository, workingDirectory)
     }
 }

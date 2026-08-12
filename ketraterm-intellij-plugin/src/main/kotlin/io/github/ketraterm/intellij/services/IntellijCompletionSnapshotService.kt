@@ -16,21 +16,26 @@
 package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.diagnostic.Logger
-import io.github.ketraterm.completion.host.TerminalCompletionSnapshotService
-import io.github.ketraterm.completion.host.TerminalValueSnapshotProvider
+import io.github.ketraterm.completion.host.*
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * Application-scoped owner of bounded IntelliJ completion snapshot work.
  *
- * Two IO workers consume a bounded, non-blocking queue shared by all terminal
- * completion sessions. Submission rejects work when the queue is full instead
- * of blocking the Swing event-dispatch thread. Provider failures are isolated
- * so one failed load cannot terminate a worker. Closing this owner cancels
- * queued and active work and is safe to repeat.
+ * Completion loads are children of IntelliJ's injected application-service
+ * scope and share a suspending concurrency limit across terminal sessions.
+ * Provider failures are isolated so one failed load cannot terminate sibling
+ * work. Closing this owner cancels active and permit-waiting work.
+ *
+ * @param parentScope IntelliJ's application-service scope, or `null` for
+ * isolated tests that let the delegate own its lifecycle.
  */
-internal class IntellijCompletionSnapshotService : AutoCloseable {
+internal class IntellijCompletionSnapshotService(
+    parentScope: CoroutineScope? = null,
+) : AutoCloseable {
     private val delegate =
         TerminalCompletionSnapshotService(
+            parentScope = parentScope,
             coroutineName = "intellij-completion-snapshots",
             onBackgroundFailure = { failure ->
                 LOG.warn("IntelliJ completion snapshot work failed", failure)
@@ -43,13 +48,13 @@ internal class IntellijCompletionSnapshotService : AutoCloseable {
      * @param onSnapshotChanged callback invoked on a snapshot worker after a
      * new active snapshot is published; the callback must arrange any required
      * Swing-thread handoff.
-     * @param scanner blocking directory scanner executed only by snapshot workers.
+     * @param scanner suspending directory scanner.
      * @return provider that must be closed with its terminal session.
      */
     fun createDirectoryProvider(
         onSnapshotChanged: () -> Unit,
-        scanner: IntellijDirectoryScanner = BoundedIntellijDirectoryScanner(),
-    ): IntellijAsyncFileSystemProvider =
+        scanner: TerminalDirectoryScanner = TerminalBoundedDirectoryScanner(),
+    ): TerminalAsyncFileSystemProvider =
         delegate.createDirectoryProvider(
             onSnapshotChanged = onSnapshotChanged,
             scanner = scanner,
@@ -58,14 +63,15 @@ internal class IntellijCompletionSnapshotService : AutoCloseable {
     /**
      * Creates a session-owned asynchronous keyed-value snapshot provider.
      *
-     * @param loader blocking bounded loader executed only by snapshot workers.
+     * @param loader suspending bounded loader whose request is cancelled when
+     * its key is superseded or provider closes.
      * @param onSnapshotChanged callback invoked on a snapshot worker after a
      * new active snapshot is published; the callback must arrange any required
      * Swing-thread handoff.
      * @return provider that must be closed with its terminal session.
      */
     fun <K, V> createValueProvider(
-        loader: (K) -> List<V>,
+        loader: suspend (K) -> List<V>,
         onSnapshotChanged: () -> Unit,
     ): TerminalValueSnapshotProvider<K, V> =
         delegate.createValueProvider(

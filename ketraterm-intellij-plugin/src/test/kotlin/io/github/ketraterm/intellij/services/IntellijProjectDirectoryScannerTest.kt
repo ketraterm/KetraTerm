@@ -17,6 +17,8 @@ package io.github.ketraterm.intellij.services
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import io.github.ketraterm.completion.api.TerminalFileEntry
+import io.github.ketraterm.completion.host.TerminalDirectoryScanner
+import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
 
 /** IntelliJ fixture tests for project-aware VFS directory snapshots. */
@@ -31,14 +33,14 @@ class IntellijProjectDirectoryScannerTest : BasePlatformTestCase() {
         val scanner =
             IntellijProjectDirectoryScanner(
                 project = project,
-                fallback = IntellijDirectoryScanner { _, _ ->
+                fallback = TerminalDirectoryScanner { _, _ ->
                     fallbackCalls++
                     listOf(TerminalFileEntry("fallback", false))
                 },
                 virtualFileResolver = { directory },
             )
 
-        val entries = scanner.scan(Path.of("project-content"), "A")
+        val entries = runBlocking { scanner.scan(Path.of("project-content"), "A") }
 
         assertEquals(0, fallbackCalls)
         assertEquals(

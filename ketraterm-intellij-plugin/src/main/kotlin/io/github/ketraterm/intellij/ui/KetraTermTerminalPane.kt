@@ -33,6 +33,7 @@ import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -217,7 +218,7 @@ internal class KetraTermTerminalPane private constructor(
     fun close() {
         completionSession.onSourceChanged(null)
         completionTriggerController.cancelAndHide()
-        completionScope.cancel()
+        completionScope.cancel(CancellationException(COMPLETION_SCOPE_CANCELLATION_MESSAGE))
         completionSession.close()
         searchBar.close()
         shortcutController?.dispose()
@@ -226,6 +227,8 @@ internal class KetraTermTerminalPane private constructor(
     }
 
     companion object {
+        private const val COMPLETION_SCOPE_CANCELLATION_MESSAGE = "Terminal completion pane closed"
+
         /**
          * Creates and binds a pane for [tab].
          *
@@ -242,7 +245,7 @@ internal class KetraTermTerminalPane private constructor(
             return try {
                 createBound(project, tab, hostActions, completionSession, completionScope)
             } catch (failure: Throwable) {
-                completionScope.cancel()
+                completionScope.cancel(CancellationException(COMPLETION_SCOPE_CANCELLATION_MESSAGE))
                 completionSession.close()
                 throw failure
             }

@@ -44,7 +44,7 @@ internal class IntellijGitBranchLoader(
      * @return at most 2,048 immutable completion values, or an empty list when
      * the directory cannot be mapped to a usable project repository.
      */
-    fun load(workingDirectoryUri: String?): List<TerminalCompletionDomainValue> =
+    suspend fun load(workingDirectoryUri: String?): List<TerminalCompletionDomainValue> =
         loadIntellijGitRepositorySnapshot(project, workingDirectoryUri) { repository, _ ->
             val currentBranchName = repository.currentBranch?.name
             repository.branches.localBranches
@@ -71,7 +71,7 @@ internal class IntellijGitBranchLoader(
 
 /** Adds local Git branch values without coupling the registry to Git4Idea. */
 internal class IntellijGitBranchProviderFactory(
-    private val loader: (String?) -> List<TerminalCompletionDomainValue>,
+    private val loader: suspend (String?) -> List<TerminalCompletionDomainValue>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
         context.createSnapshotRegistration(TerminalCompletionSourcePrior.LOCAL_GIT_BRANCH, loader) { valuesProvider ->

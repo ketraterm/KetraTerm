@@ -15,9 +15,10 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.host.*
+import io.github.ketraterm.completion.host.TerminalAsyncFileSystemProvider
+import io.github.ketraterm.completion.host.TerminalCompletionSnapshotService
 
-/** Window-scoped owner of shared bounded completion snapshot workers. */
+/** Window-scoped owner of structured completion snapshot work. */
 internal class StandaloneDirectoryCompletionService : AutoCloseable {
     private val logger = System.getLogger(StandaloneDirectoryCompletionService::class.java.name)
     private val delegate =
@@ -29,24 +30,8 @@ internal class StandaloneDirectoryCompletionService : AutoCloseable {
         )
 
     /** Creates a session-owned asynchronous filesystem provider. */
-    fun createProvider(onSnapshotChanged: () -> Unit): StandaloneAsyncFileSystemProvider =
-        delegate.createDirectoryProvider(onSnapshotChanged)
+    fun createProvider(onSnapshotChanged: () -> Unit): TerminalAsyncFileSystemProvider = delegate.createDirectoryProvider(onSnapshotChanged)
 
-    /** Cancels queued and active directory snapshot work. */
+    /** Cancels active and permit-waiting directory snapshot work. */
     override fun close() = delegate.close()
 }
-
-/** Standalone-local name for the shared bounded completion scheduler. */
-internal typealias StandaloneDirectoryLoadScheduler = TerminalCompletionLoadScheduler
-
-/** Standalone-local name for the shared generation-safe filesystem provider. */
-internal typealias StandaloneAsyncFileSystemProvider = TerminalAsyncFileSystemProvider
-
-/** Standalone-local name for the shared local path resolver. */
-internal typealias StandalonePathResolver = TerminalCompletionPathResolver
-
-/** Standalone-local name for the shared blocking directory scan contract. */
-internal typealias StandaloneDirectoryScanner = TerminalDirectoryScanner
-
-/** Standalone-local name for the shared bounded local directory scanner. */
-internal typealias BoundedStandaloneDirectoryScanner = TerminalBoundedDirectoryScanner

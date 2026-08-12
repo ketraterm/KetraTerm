@@ -16,6 +16,9 @@
 package io.github.ketraterm.completion.host
 
 import io.github.ketraterm.completion.api.TerminalFileEntry
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.BasicFileAttributes
@@ -30,6 +33,7 @@ import java.util.concurrent.TimeUnit
  * @param scanBudgetNanos positive best-effort monotonic scan budget.
  * @param nanoTime monotonic clock used to enforce the budget.
  * @param onFailure diagnostic callback for a directory-level scan failure.
+ * @param ioDispatcher dispatcher used only for blocking filesystem access.
  * @throws IllegalArgumentException if a capacity or the scan budget is not positive.
  */
 class TerminalBoundedDirectoryScanner
@@ -40,6 +44,7 @@ class TerminalBoundedDirectoryScanner
         private val scanBudgetNanos: Long = TimeUnit.MILLISECONDS.toNanos(DEFAULT_SCAN_BUDGET_MILLIS),
         private val nanoTime: () -> Long = System::nanoTime,
         private val onFailure: (Throwable) -> Unit = {},
+        private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) : TerminalDirectoryScanner {
         init {
             require(maxVisitedEntries > 0) { "maxVisitedEntries must be > 0, was $maxVisitedEntries" }
@@ -54,7 +59,12 @@ class TerminalBoundedDirectoryScanner
          * @param entryNamePrefix case-insensitive child-name prefix.
          * @return bounded deterministic entries, or an empty list on failure/interruption.
          */
-        override fun scan(
+        override suspend fun scan(
+            directory: Path,
+            entryNamePrefix: String,
+        ): List<TerminalFileEntry> = runInterruptible(ioDispatcher) { scanBlocking(directory, entryNamePrefix) }
+
+        private fun scanBlocking(
             directory: Path,
             entryNamePrefix: String,
         ): List<TerminalFileEntry> {

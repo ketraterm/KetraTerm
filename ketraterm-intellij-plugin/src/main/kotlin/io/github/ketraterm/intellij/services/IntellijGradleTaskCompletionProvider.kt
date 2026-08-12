@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.intellij.services
 
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.externalSystem.model.ProjectKeys
 import com.intellij.openapi.externalSystem.model.project.ModuleData
 import com.intellij.openapi.externalSystem.model.task.TaskData
@@ -45,11 +45,11 @@ internal class IntellijGradleTaskLoader(
      * @return at most 4,096 deterministic task entries, or an empty list when the
      * project is disposed, the directory is unavailable, or no Gradle model is imported.
      */
-    fun load(workingDirectoryUri: String?): List<TerminalGradleTask> {
+    suspend fun load(workingDirectoryUri: String?): List<TerminalGradleTask> {
         if (project.isDisposed) return emptyList()
         val workingDirectory = TerminalLocalFileUriResolver.resolve(workingDirectoryUri) ?: return emptyList()
-        return ApplicationManager.getApplication().runReadAction<List<TerminalGradleTask>> {
-            if (project.isDisposed) return@runReadAction emptyList()
+        return readAction {
+            if (project.isDisposed) return@readAction emptyList()
             val retained = BoundedSnapshotCollector(MAX_RETAINED_TASKS, TASK_ORDER)
             var visited = 0
             for (projectInfo in ProjectDataManager.getInstance().getExternalProjectsData(project, GradleConstants.SYSTEM_ID)) {
@@ -130,7 +130,7 @@ internal object IntellijGradleTaskPath {
 
 /** Adds imported Gradle tasks without leaking IntelliJ external-system APIs into the shared completion module. */
 internal class IntellijGradleTaskProviderFactory(
-    private val loader: (String?) -> List<TerminalGradleTask>,
+    private val loader: suspend (String?) -> List<TerminalGradleTask>,
 ) : IntellijCompletionProviderFactory {
     override fun create(context: IntellijCompletionProviderContext): IntellijCompletionProviderRegistration =
         context.createSnapshotRegistration(TerminalCompletionSourcePrior.GRADLE_TASK, loader) { valuesProvider ->
