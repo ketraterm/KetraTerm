@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.completion.internal
+package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
+import kotlinx.coroutines.flow.last
 
-internal fun List<TerminalCompletionCandidate>.boundedTo(limit: Int): List<TerminalCompletionCandidate> {
-    require(limit > 0) { "limit must be > 0, was $limit" }
-    return if (size <= limit) this else subList(0, limit).toList()
-}
+/** Collects the final progressive result for tests that assert settled ranking. */
+internal suspend fun TerminalCompletionEngine.complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
+    completions(request).last()

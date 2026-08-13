@@ -275,13 +275,19 @@ scalar positional fields remain the fallback for compact specs.
 ## Host Dynamic Providers
 
 Reusable local-path resolution and bounded directory-scanning machinery belongs to `ketraterm-completion-host`; it
-may perform bounded host work but does not parse, rank, prioritize, cache, or schedule completion candidates. Standalone
+may perform bounded host work but does not parse, rank, prioritize, or schedule completion candidates. Standalone
 and IntelliJ retain only environment-specific suspending loaders and scanners. There is no snapshot service, TTL,
 publication callback, refresh-after-publication pass, semaphore, or provider-owned job. Blocking local filesystem access
 moves to an injected IO dispatcher.
 Enumeration has visit, result, and elapsed-time caps. The defaults (8,192 visited entries, 256 matches, and a 50 ms scan
 budget) are an explicit desktop baseline covered by JMH directory-scan benchmarks; change them only with representative
 local and remote-filesystem measurements.
+Direct local and project-VFS scanners retain one replace-only raw snapshot for
+the last directory when an authoritative directory identity and modification
+version are available. The snapshot is capped at 8,192 sorted entries and is
+filtered per prefix to at most 256 source candidates. Incomplete, cancelled,
+failed, or version-changing scans are never published into the cache. There is
+no TTL, refresh callback, worker, or merged-candidate cache.
 `runInterruptible` makes local directory scans cooperatively interruptible. The app resolves
 local and `localhost` file URIs, explicit home paths,
 Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses
@@ -377,18 +383,19 @@ The selected representative favors semantic fit, a narrow replacement range,
 the bounded prior, local rank, and stable declaration order. Returned candidate
 scores are the fused global score. Ordering and all tie-breakers are deterministic.
 
-Source collection and final presentation limits remain distinct. The engine
-requests a bounded surplus from every collecting source and applies
-`request.maxCandidates` only after outcome fusion. The collection budget is
-four times the visible limit with an absolute surplus cap of 256 and
-overflow-safe arithmetic, so learned evidence can promote an initially hidden
-candidate without permitting unbounded host work.
+Source safety and presentation are independent. Every source receives a fixed
+256-candidate safety budget. The engine globally fuses the complete bounded
+union and has no popup-size parameter; the Swing controller alone presents an
+eight-row sliding viewport across the ranked snapshot.
 
-Source collection uses one `coroutineScope`. The engine parses once, resolves one
-context, launches one `async` child per source, and consumes results with
-`awaitAll`. Individual sources are ordinary suspending functions and never own
-scopes or child jobs. Source declaration order remains the deterministic fusion
-tie-breaker regardless of completion order.
+Source collection uses one cold structured `channelFlow`. The engine parses
+once, resolves one context, launches one child per source under a supervisor,
+and serially incorporates completed-source events in the parent. Each changed
+global ranking is emitted immediately, so a slow Git or index source cannot
+block a fast spec, MRU, or direct-path result. Individual sources remain
+ordinary suspending functions and never own scopes or child jobs. A source
+failure contributes an empty result, request cancellation reaches every child,
+and source declaration order remains the deterministic final-fusion tie-breaker.
 
 ## Ranking Calibration
 

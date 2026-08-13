@@ -17,6 +17,8 @@ package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalTextReplacementEvent
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import java.util.regex.Pattern
 
 /**
@@ -275,7 +277,7 @@ data class SwingShellSuggestionRequest(
  * Host/provider result accepted by the user.
  *
  * @property suggestion accepted suggestion.
- * @property index index of [suggestion] in the displayed list.
+ * @property index global rank of [suggestion] in the current ranked snapshot.
  * @property request command-line context that produced the accepted suggestion.
  */
 data class SwingShellSuggestionAcceptance(
@@ -315,29 +317,40 @@ data class SwingShellSuggestionFeedback(
 )
 
 /**
- * Host provider for event-level shell suggestions.
+ * Host provider for progressive shell-suggestion snapshots.
  */
 fun interface SwingShellSuggestionProvider {
     /**
-     * Returns suggestions for [request].
+     * Returns a cold stream of suggestions for [request].
      *
      * The reusable Swing terminal invokes this on [kotlinx.coroutines.Dispatchers.Default],
-     * outside the Swing Event Dispatch Thread. Implementations may suspend for
-     * bounded work and must cooperate with cancellation when a newer request
-     * replaces the current one.
+     * outside the Swing Event Dispatch Thread. Implementations must cooperate
+     * with cancellation when a newer request replaces the current one.
      *
      * @param request command-line context.
-     * @return ordered suggestions, best first.
+     * @return cold stream of ordered suggestion snapshots, best first.
      */
-    suspend fun suggestions(request: SwingShellSuggestionRequest): List<SwingShellSuggestion>
+    fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>>
 
     companion object {
         /**
          * Provider that returns no suggestions.
          */
         @JvmField
-        val NONE: SwingShellSuggestionProvider = SwingShellSuggestionProvider { emptyList() }
+        val NONE: SwingShellSuggestionProvider = SwingShellSuggestionProvider { flowOf(emptyList()) }
     }
+}
+
+/**
+ * Listener notified immediately before command-affecting terminal input is submitted.
+ *
+ * Listeners are registered on one [io.github.ketraterm.ui.swing.api.SwingTerminal]
+ * and invoked synchronously on the Swing Event Dispatch Thread after its active
+ * provider collection is cancelled and its popup is hidden.
+ */
+fun interface SwingShellSuggestionInvalidationListener {
+    /** Called on the Swing Event Dispatch Thread before command-affecting input is submitted. */
+    fun onShellSuggestionsInvalidated()
 }
 
 /**

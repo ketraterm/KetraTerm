@@ -20,6 +20,9 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAccentRole
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 /**
  * Host-neutral adapter from the pure completion engine to Swing suggestions.
@@ -27,7 +30,7 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
  * The adapter reads [contextProvider] for every request so hosts can publish
  * current profile and working-directory state without rebuilding the engine.
  *
- * @param engine pure suspending completion engine. This adapter does not select
+ * @param engine pure progressive completion engine. This adapter does not select
  * a dispatcher; the owning suggestion caller controls its coroutine context.
  * @param contextProvider supplier for current host-owned request metadata.
  */
@@ -36,12 +39,12 @@ class SwingCompletionSuggestionProvider(
     private val contextProvider: () -> SwingCompletionContext = { SwingCompletionContext.EMPTY },
 ) : SwingShellSuggestionProvider {
     /**
-     * Returns candidates adapted to the reusable Swing popup contract.
+     * Returns progressive candidate snapshots adapted to the reusable Swing popup contract.
      *
      * @param request visible command text, cursor, and popup anchor supplied by Swing.
-     * @return ordered Swing suggestions, or an empty list when request conversion is invalid.
+     * @return cold ordered Swing suggestion snapshots, or one empty snapshot when conversion is invalid.
      */
-    override suspend fun suggestions(request: SwingShellSuggestionRequest): List<SwingShellSuggestion> {
+    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> {
         val context = contextProvider()
         val completionRequest =
             try {
@@ -53,9 +56,9 @@ class SwingCompletionSuggestionProvider(
                     shellCapabilities = context.shellCapabilities,
                 )
             } catch (_: IllegalArgumentException) {
-                return emptyList()
+                return flowOf(emptyList())
             }
-        return engine.complete(completionRequest).map { candidate -> candidate.toSwingSuggestion() }
+        return engine.completions(completionRequest).map { candidates -> candidates.map { it.toSwingSuggestion() } }
     }
 
     private companion object {

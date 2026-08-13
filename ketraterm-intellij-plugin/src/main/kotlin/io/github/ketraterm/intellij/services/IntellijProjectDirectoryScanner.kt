@@ -22,9 +22,9 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import io.github.ketraterm.completion.api.TerminalFileEntry
 import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner
+import io.github.ketraterm.completion.host.TerminalDirectoryEntrySnapshot
 import io.github.ketraterm.completion.host.TerminalDirectoryScanner
 import java.nio.file.Path
-import java.util.*
 
 /**
  * Uses IntelliJ's project-aware VFS snapshot for directories in project
@@ -50,6 +50,9 @@ internal class IntellijProjectDirectoryScanner(
     private val maxVisitedEntries: Int = DEFAULT_MAX_VISITED_ENTRIES,
     private val maxMatchingEntries: Int = DEFAULT_MAX_MATCHING_ENTRIES,
 ) : TerminalDirectoryScanner {
+    @Volatile
+    private var cachedSnapshot: VfsDirectorySnapshot? = null
+
     init {
         require(maxVisitedEntries > 0) { "maxVisitedEntries must be > 0, was $maxVisitedEntries" }
         require(maxMatchingEntries > 0) { "maxMatchingEntries must be > 0, was $maxMatchingEntries" }
@@ -77,25 +80,32 @@ internal class IntellijProjectDirectoryScanner(
                 val fileIndex = ProjectRootManager.getInstance(project).fileIndex
                 if (!fileIndex.isInContent(virtualDirectory)) return@readAction null
 
-                val matches = PriorityQueue(maxMatchingEntries, ENTRY_ORDER.reversed())
+                val version =
+                    VfsDirectoryVersion(
+                        directoryUrl = virtualDirectory.url,
+                        modificationStamp = virtualDirectory.modificationStamp,
+                        projectRootsModificationCount = ProjectRootManager.getInstance(project).modificationCount,
+                    )
+                val cached = cachedSnapshot
+                if (cached?.version == version) return@readAction cached.entries.matching(entryNamePrefix, maxMatchingEntries)
+                val entries = ArrayList<TerminalFileEntry>(minOf(virtualDirectory.children.size, maxVisitedEntries))
                 val children = virtualDirectory.children
                 val limit = minOf(children.size, maxVisitedEntries)
                 for (index in 0 until limit) {
                     val child = children[index]
-                    if (!fileIndex.isInContent(child) || !child.name.startsWith(
-                            entryNamePrefix,
-                            ignoreCase = true
-                        )
-                    ) continue
-                    val entry = TerminalFileEntry(child.name, child.isDirectory)
-                    if (matches.size < maxMatchingEntries) {
-                        matches += entry
-                    } else if (ENTRY_ORDER.compare(entry, matches.peek()) < 0) {
-                        matches.remove()
-                        matches += entry
-                    }
+                    if (!fileIndex.isInContent(child)) continue
+                    entries += TerminalFileEntry(child.name, child.isDirectory)
                 }
-                ArrayList(matches).apply { sortWith(ENTRY_ORDER) }
+                val snapshotEntries = TerminalDirectoryEntrySnapshot(entries)
+                val finalVersion =
+                    version.copy(
+                        modificationStamp = virtualDirectory.modificationStamp,
+                        projectRootsModificationCount = ProjectRootManager.getInstance(project).modificationCount,
+                    )
+                if (children.size <= maxVisitedEntries && finalVersion == version) {
+                    cachedSnapshot = VfsDirectorySnapshot(version, snapshotEntries)
+                }
+                snapshotEntries.matching(entryNamePrefix, maxMatchingEntries)
             }
         return projectEntries ?: fallback.scan(directory, entryNamePrefix)
     }
@@ -103,8 +113,16 @@ internal class IntellijProjectDirectoryScanner(
     private companion object {
         private const val DEFAULT_MAX_VISITED_ENTRIES = 8_192
         private const val DEFAULT_MAX_MATCHING_ENTRIES = 256
-        private val ENTRY_ORDER =
-            compareBy<TerminalFileEntry, String>(String.CASE_INSENSITIVE_ORDER) { it.name }
-                .thenBy { it.name }
     }
+
+    private data class VfsDirectoryVersion(
+        val directoryUrl: String,
+        val modificationStamp: Long,
+        val projectRootsModificationCount: Long,
+    )
+
+    private data class VfsDirectorySnapshot(
+        val version: VfsDirectoryVersion,
+        val entries: TerminalDirectoryEntrySnapshot,
+    )
 }

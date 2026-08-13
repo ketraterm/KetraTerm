@@ -47,6 +47,7 @@ import kotlinx.coroutines.flow.filter
 import java.awt.*
 import java.awt.event.*
 import java.lang.Runnable
+import java.util.concurrent.CopyOnWriteArraySet
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import javax.swing.Timer
@@ -100,6 +101,7 @@ class SwingTerminal
             CoroutineScope(componentJob + uiCoroutineDispatcher + CoroutineName("swing-terminal"))
         private var bindingJob: Job? = null
         private var suggestionJob: Job? = null
+        private val suggestionInvalidationListeners = CopyOnWriteArraySet<SwingShellSuggestionInvalidationListener>()
 
         internal val hasActiveRenderBinding: Boolean
             get() = bindingJob?.isActive == true
@@ -332,6 +334,10 @@ class SwingTerminal
                     override fun repaint() = this@SwingTerminal.repaint()
 
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
+
+                    override fun invalidateSuggestions() {
+                        invalidateShellSuggestionsOnEdt()
+                    }
                 },
                 hostServices.shellSuggestionViewFactory,
             )
@@ -360,6 +366,10 @@ class SwingTerminal
 
                     override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean =
                         shellSuggestionController.handleKeyPressed(event)
+
+                    override fun invalidateShellSuggestions() {
+                        invalidateShellSuggestionsOnEdt()
+                    }
 
                     override fun hideShellSuggestions() {
                         this@SwingTerminal.hideShellSuggestions()
@@ -1077,6 +1087,8 @@ class SwingTerminal
         private fun unbindOnEdt() {
             bindingJob?.cancel(CancellationException("Terminal session unbound"))
             bindingJob = null
+            suggestionJob?.cancel(CancellationException("Terminal session unbound"))
+            suggestionJob = null
             session = null
             resetScrollbackState()
             selectionController.clearSelection()
@@ -1106,6 +1118,7 @@ class SwingTerminal
             hyperlinkDiscoveryController.dispose()
             suggestionJob?.cancel(CancellationException("Swing terminal disposed"))
             suggestionJob = null
+            suggestionInvalidationListeners.clear()
             shellSuggestionController.close()
             componentScope.cancel(CancellationException("Swing terminal disposed"))
         }
@@ -1361,6 +1374,16 @@ class SwingTerminal
             )
         }
 
+        /** Registers an EDT callback for shell-bound input invalidation. */
+        fun addShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
+            suggestionInvalidationListeners += listener
+        }
+
+        /** Removes a callback previously registered with [addShellSuggestionInvalidationListener]. */
+        fun removeShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
+            suggestionInvalidationListeners -= listener
+        }
+
         /**
          * Returns the current shell suggestion popup state.
          *
@@ -1486,7 +1509,9 @@ class SwingTerminal
         fun pasteClipboardText(): Boolean {
             val text = hostServices.clipboardHandler.readText() ?: return false
             if (text.isEmpty()) return false
-            session?.encodePaste(TerminalPasteEvent(text))
+            val boundSession = session ?: return false
+            invalidateShellSuggestionsOnEdt()
+            boundSession.encodePaste(TerminalPasteEvent(text))
             return true
         }
 
@@ -1495,6 +1520,8 @@ class SwingTerminal
             automatic: Boolean = true,
         ) {
             suggestionJob?.cancel(CancellationException("Shell suggestion request replaced"))
+            suggestionJob = null
+            shellSuggestionController.hide()
             if (automatic && !settings.shellSuggestionsEnabled) {
                 suggestionJob = null
                 shellSuggestionController.hide()
@@ -1502,19 +1529,23 @@ class SwingTerminal
             }
             suggestionJob =
                 componentScope.launch {
-                    val suggestions =
-                        try {
-                            withContext(Dispatchers.Default) {
-                                hostServices.shellSuggestionProvider.suggestions(request)
-                            }
-                        } catch (cancellation: CancellationException) {
-                            throw cancellation
-                        } catch (exception: Exception) {
-                            System.err.println("Shell suggestion provider failed: ${exception.message}")
-                            emptyList()
+                    try {
+                        withContext(Dispatchers.Default) {
+                            hostServices.shellSuggestionProvider
+                                .suggestions(request)
+                                .collect { suggestions ->
+                                    withContext(uiCoroutineDispatcher) {
+                                        ensureActive()
+                                        shellSuggestionController.show(request, suggestions, selectedIndex = -1)
+                                    }
+                                }
                         }
-                    ensureActive()
-                    shellSuggestionController.show(request, suggestions, selectedIndex = -1)
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (exception: Exception) {
+                        System.err.println("Shell suggestion provider failed: ${exception.message}")
+                        shellSuggestionController.hide()
+                    }
                 }
         }
 
@@ -1533,8 +1564,18 @@ class SwingTerminal
             val boundSession = session ?: return false
             selectionController.clearSelection()
             searchController.clear()
+            invalidateShellSuggestionsOnEdt()
             boundSession.encodeKey(CLEAR_SCREEN_KEY_EVENT)
             return true
+        }
+
+        private fun invalidateShellSuggestionsOnEdt() {
+            suggestionJob?.cancel(CancellationException("Shell suggestions invalidated by input"))
+            suggestionJob = null
+            shellSuggestionController.hide()
+            suggestionInvalidationListeners.forEach { listener ->
+                runCatching(listener::onShellSuggestionsInvalidated)
+            }
         }
 
         private fun handleContextMenuMouseEvent(

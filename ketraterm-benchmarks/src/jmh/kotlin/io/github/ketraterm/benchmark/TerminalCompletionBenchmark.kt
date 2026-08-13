@@ -20,6 +20,7 @@ import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
@@ -64,7 +65,6 @@ open class TerminalCompletionBenchmark {
             TerminalCompletionRequest(
                 commandLine = "git switch ma",
                 cursorOffset = "git switch ma".length,
-                maxCandidates = 8,
                 profileId = "benchmark",
                 workingDirectoryUri = "file:///repo",
                 shellCapabilities = TerminalShellCapabilities.POSIX,
@@ -116,7 +116,7 @@ open class TerminalCompletionBenchmark {
                 commandSpecs = commandSpecs,
                 learningStore = persistedStatsSource,
             )
-        runBlocking { indexedPersistedHistoryEngine.complete(fusionRequest) }
+        runBlocking { indexedPersistedHistoryEngine.completions(fusionRequest).last() }
         duplicateFusionEngine = TerminalCompletionEngines.fromSources(List(8) { sourceEntry(it, 32, duplicateMain = true) }, commandSpecs)
         hostileFusionEngine = TerminalCompletionEngines.fromSources(List(10) { sourceEntry(it, 256, duplicateMain = false) }, commandSpecs)
         val fuzzyPaths =
@@ -143,7 +143,6 @@ open class TerminalCompletionBenchmark {
             TerminalCompletionRequest(
                 commandLine = "git add GenF327",
                 cursorOffset = "git add GenF327".length,
-                maxCandidates = 8,
                 profileId = "benchmark",
                 workingDirectoryUri = "file:///repo",
                 shellCapabilities = TerminalShellCapabilities.POSIX,
@@ -152,22 +151,22 @@ open class TerminalCompletionBenchmark {
 
     @Benchmark
     open fun completeChainedCommand(blackhole: Blackhole) {
-        blackhole.consume(runBlocking { engine.complete(chainedRequest) })
+        blackhole.consume(runBlocking { engine.completions(chainedRequest).last() })
     }
 
     @Benchmark
     open fun completeUnclosedQuote(blackhole: Blackhole) {
-        blackhole.consume(runBlocking { engine.complete(unclosedQuoteRequest) })
+        blackhole.consume(runBlocking { engine.completions(unclosedQuoteRequest).last() })
     }
 
     @Benchmark
     open fun completeColdStartFusion(blackhole: Blackhole) {
-        blackhole.consume(runBlocking { coldStartFusionEngine.complete(fusionRequest) })
+        blackhole.consume(runBlocking { coldStartFusionEngine.completions(fusionRequest).last() })
     }
 
     @Benchmark
     open fun completeLearnedFusion(blackhole: Blackhole) {
-        blackhole.consume(runBlocking { learnedFusionEngine.complete(fusionRequest) })
+        blackhole.consume(runBlocking { learnedFusionEngine.completions(fusionRequest).last() })
     }
 
     /** Measures cold construction of the 2,048-row learned-evidence index and one ranked completion. */
@@ -179,29 +178,29 @@ open class TerminalCompletionBenchmark {
                 commandSpecs = commandSpecs,
                 learningStore = TerminalCompletionLearningStore(commandSpecs = commandSpecs).apply { replaceSnapshot(learnedSnapshot) },
             )
-        blackhole.consume(runBlocking { coldEngine.complete(fusionRequest) })
+        blackhole.consume(runBlocking { coldEngine.completions(fusionRequest).last() })
     }
 
     /** Measures hot indexed lookup across a full 2,048-row learned snapshot. */
     @Benchmark
     open fun completeIndexedPersistedHistory(blackhole: Blackhole) {
-        blackhole.consume(runBlocking { indexedPersistedHistoryEngine.complete(fusionRequest) })
+        blackhole.consume(runBlocking { indexedPersistedHistoryEngine.completions(fusionRequest).last() })
     }
 
     @Benchmark
     open fun completeDuplicateHeavyFusion(blackhole: Blackhole) {
-        blackhole.consume(runBlocking { duplicateFusionEngine.complete(fusionRequest) })
+        blackhole.consume(runBlocking { duplicateFusionEngine.completions(fusionRequest).last() })
     }
 
     @Benchmark
     open fun completeHostileFusion(blackhole: Blackhole) {
-        blackhole.consume(runBlocking { hostileFusionEngine.complete(fusionRequest) })
+        blackhole.consume(runBlocking { hostileFusionEngine.completions(fusionRequest).last() })
     }
 
     /** Measures allocation and throughput while scanning a realistic immutable project-path snapshot. */
     @Benchmark
     open fun completeFuzzyProjectPath(blackhole: Blackhole) {
-        blackhole.consume(runBlocking { fuzzyPathEngine.complete(fuzzyPathRequest) })
+        blackhole.consume(runBlocking { fuzzyPathEngine.completions(fuzzyPathRequest).last() })
     }
 
     private fun sourceEntry(

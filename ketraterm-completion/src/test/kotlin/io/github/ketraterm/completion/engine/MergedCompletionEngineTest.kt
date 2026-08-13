@@ -18,15 +18,140 @@ package io.github.ketraterm.completion.engine
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.toList
+import kotlin.test.*
 
 class MergedCompletionEngineTest {
+    @Test
+    fun `fast source publishes before slow source and final emission reranks all results`(): Unit =
+        runBlocking {
+            val fastCompleted = CompletableDeferred<Unit>()
+            val slowStarted = CompletableDeferred<Unit>()
+            val releaseSlow = CompletableDeferred<Unit>()
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            entry(
+                                TerminalCompletionSource { _, _, _ ->
+                                    fastCompleted.complete(Unit)
+                                    listOf(candidate("fast", source = "fast"))
+                                },
+                                priority = 0,
+                            ),
+                            entry(
+                                TerminalCompletionSource { _, _, _ ->
+                                    slowStarted.complete(Unit)
+                                    releaseSlow.await()
+                                    listOf(candidate("slow", source = "slow"))
+                                },
+                                priority = 100,
+                            ),
+                        ),
+                    commandSpecs = emptyList(),
+                )
+
+            val collected = async { engine.completions(request()).toList() }
+            fastCompleted.await()
+            slowStarted.await()
+            yield()
+            assertFalse(collected.isCompleted)
+            releaseSlow.complete(Unit)
+
+            val emissions = collected.await()
+            assertEquals(listOf("fast"), emissions.first().map { it.replacementText })
+            assertEquals(listOf("slow", "fast"), emissions.last().map { it.replacementText })
+        }
+
+    @Test
+    fun `source failure is isolated from progressive results`() =
+        runBlocking {
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            entry(TerminalCompletionSource { _, _, _ -> error("failed source") }, 100),
+                            entry(source(candidate("available")), 0),
+                        ),
+                    commandSpecs = emptyList(),
+                )
+
+            assertEquals(listOf("available"), engine.complete(request()).map { it.replacementText })
+        }
+
+    @Test
+    fun `source cancellation terminates the request and cancels siblings`() =
+        runBlocking {
+            val siblingStarted = CompletableDeferred<Unit>()
+            val siblingCancelled = CompletableDeferred<Unit>()
+            val cancelSource = CompletableDeferred<Unit>()
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            entry(
+                                TerminalCompletionSource { _, _, _ ->
+                                    cancelSource.await()
+                                    throw CancellationException("source cancelled")
+                                },
+                                0,
+                            ),
+                            entry(
+                                TerminalCompletionSource { _, _, _ ->
+                                    siblingStarted.complete(Unit)
+                                    try {
+                                        awaitCancellation()
+                                    } finally {
+                                        siblingCancelled.complete(Unit)
+                                    }
+                                },
+                                0,
+                            ),
+                        ),
+                    commandSpecs = emptyList(),
+                )
+
+            val collection = async { engine.completions(request()).toList() }
+            siblingStarted.await()
+            cancelSource.complete(Unit)
+
+            assertFailsWith<CancellationException> { collection.await() }
+            siblingCancelled.await()
+        }
+
+    @Test
+    fun `cancelling collection cancels every source child`(): Unit =
+        runBlocking {
+            val bothStarted = CompletableDeferred<Unit>()
+            val bothCancelled = CompletableDeferred<Unit>()
+            var started = 0
+            var cancelled = 0
+            val source =
+                TerminalCompletionSource { _, _, _ ->
+                    started++
+                    if (started == 2) bothStarted.complete(Unit)
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        cancelled++
+                        if (cancelled == 2) bothCancelled.complete(Unit)
+                    }
+                }
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources = listOf(entry(source, 0), entry(source, 0)),
+                    commandSpecs = emptyList(),
+                )
+
+            val collection = launch { engine.completions(request()).collect {} }
+            bothStarted.await()
+            collection.cancelAndJoin()
+
+            bothCancelled.await()
+            assertEquals(2, cancelled)
+        }
+
     @Test
     fun `merged engine starts sources in parallel within the request scope`(): Unit =
         runBlocking {
@@ -46,7 +171,7 @@ class MergedCompletionEngineTest {
                     commandSpecs = emptyList(),
                 )
 
-            val completion = async { engine.complete(request(maxCandidates = 8)) }
+            val completion = async { engine.complete(request()) }
             bothStarted.await()
             assertEquals(2, started)
             release.complete(Unit)
@@ -64,7 +189,7 @@ class MergedCompletionEngineTest {
                     ),
                 )
 
-            val candidates = engine.complete(request(maxCandidates = 8))
+            val candidates = engine.complete(request())
 
             assertEquals(listOf("switch", "status"), candidates.map { it.replacementText })
             assertEquals(listOf("mru", "spec"), candidates.map { it.source })
@@ -81,7 +206,7 @@ class MergedCompletionEngineTest {
                     ),
                 )
 
-            val candidates = engine.complete(request(maxCandidates = 8))
+            val candidates = engine.complete(request())
 
             assertEquals(listOf("status"), candidates.map { it.replacementText })
             assertEquals("recent", candidates.single().detail)
@@ -99,14 +224,14 @@ class MergedCompletionEngineTest {
                     ),
                 )
 
-            val candidates = engine.complete(request(maxCandidates = 8))
+            val candidates = engine.complete(request())
 
             assertEquals(listOf("left", "right"), candidates.map { it.source })
             assertEquals(listOf(0, 4), candidates.map { it.replacementStartOffset })
         }
 
     @Test
-    fun `applies max candidates after merging and sorting`() =
+    fun `returns the complete bounded source union after merging and sorting`() =
         runBlocking {
             val engine =
                 TerminalCompletionEngines.fromSources(
@@ -122,13 +247,13 @@ class MergedCompletionEngineTest {
                     ),
                 )
 
-            val candidates = engine.complete(request(maxCandidates = 2))
+            val candidates = engine.complete(request())
 
-            assertEquals(listOf("bravo", "charlie"), candidates.map { it.replacementText })
+            assertEquals(listOf("bravo", "charlie", "alpha"), candidates.map { it.replacementText })
         }
 
     @Test
-    fun `collects bounded surplus before context ranking applies final maximum`() =
+    fun `collects fixed source budget before global context ranking`() =
         runBlocking {
             val rawCandidates =
                 buildList {
@@ -162,12 +287,37 @@ class MergedCompletionEngineTest {
                     },
                 )
 
-            val candidates = engine.complete(request(commandLine = "git s", maxCandidates = 8))
+            val candidates = engine.complete(request(commandLine = "git s"))
 
-            assertEquals(32, collectionLimit)
-            assertEquals(8, candidates.size)
+            assertEquals(256, collectionLimit)
+            assertEquals(11, candidates.size)
             assertEquals("spec", candidates.first().source)
             assertEquals(TerminalCompletionCandidateKind.SUBCOMMAND, candidates.first().kind)
+        }
+
+    @Test
+    fun `each source receives the fixed safety budget and ranked union is not UI limited`() =
+        runBlocking {
+            var suppliedLimit = 0
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            entry(
+                                TerminalCompletionSource { _, _, limit ->
+                                    suppliedLimit = limit
+                                    List(300) { candidate("candidate-$it", score = 300 - it) }
+                                },
+                                0,
+                            ),
+                        ),
+                    commandSpecs = emptyList(),
+                )
+
+            val candidates = engine.complete(request())
+
+            assertEquals(256, suppliedLimit)
+            assertEquals(256, candidates.size)
         }
 
     @Test
@@ -189,14 +339,15 @@ class MergedCompletionEngineTest {
                 }
             val engine = TerminalCompletionEngines.fromSources(TerminalCompletionSource { _, _, _ -> candidates })
 
-            val actual = engine.complete(request(maxCandidates = 8))
+            val actual = engine.complete(request())
             val expected =
                 candidates
+                    .take(256)
                     .sortedWith(
                         compareByDescending<TerminalCompletionCandidate> { it.score }
                             .thenBy { it.displayText }
                             .thenBy { it.replacementText },
-                    ).take(8)
+                    )
 
             assertEquals(expected.map { it.replacementText }, actual.map { it.replacementText })
             assertEquals(actual.map { it.score }.sortedDescending(), actual.map { it.score })
@@ -213,7 +364,7 @@ class MergedCompletionEngineTest {
                     ),
                 )
 
-            val candidates = engine.complete(request(maxCandidates = 8))
+            val candidates = engine.complete(request())
 
             assertEquals(listOf("alpha", "zeta"), candidates.map { it.replacementText })
         }
@@ -251,7 +402,7 @@ class MergedCompletionEngineTest {
                     ),
                 )
 
-            val candidates = engine.complete(request(commandLine = "cd ", maxCandidates = 8))
+            val candidates = engine.complete(request(commandLine = "cd "))
 
             assertEquals(listOf("src/", "cd remembered"), candidates.map { it.replacementText })
         }
@@ -301,7 +452,7 @@ class MergedCompletionEngineTest {
                     ),
                 )
 
-            val candidates = engine.complete(request(commandLine = "git s", maxCandidates = 8))
+            val candidates = engine.complete(request(commandLine = "git s"))
 
             assertEquals(TerminalCompletionCandidateKind.SUBCOMMAND, candidates.first().kind)
         }
@@ -339,7 +490,7 @@ class MergedCompletionEngineTest {
                     ),
                 )
 
-            val candidates = engine.complete(request(commandLine = "aws --output t", maxCandidates = 8))
+            val candidates = engine.complete(request(commandLine = "aws --output t"))
 
             assertEquals(listOf("table", "text"), candidates.map { it.replacementText })
             assertTrue(candidates.all { it.source == "spec" })
@@ -390,7 +541,7 @@ class MergedCompletionEngineTest {
                     ),
                 )
 
-            val candidates = engine.complete(request(commandLine = "git -", maxCandidates = 8))
+            val candidates = engine.complete(request(commandLine = "git -"))
 
             assertEquals("--help", candidates.first().replacementText)
         }
@@ -441,7 +592,7 @@ class MergedCompletionEngineTest {
                     ),
                 )
 
-            val candidates = engine.complete(request(commandLine = "git switch mai", maxCandidates = 8))
+            val candidates = engine.complete(request(commandLine = "git switch mai"))
 
             assertEquals("main", candidates.first().replacementText)
             assertEquals("git-branches", candidates.first().source)
@@ -481,7 +632,7 @@ class MergedCompletionEngineTest {
                     ),
                 )
 
-            val candidates = engine.complete(request(commandLine = "kubectl --namespace def", maxCandidates = 8))
+            val candidates = engine.complete(request(commandLine = "kubectl --namespace def"))
 
             assertEquals(listOf("default", "default-history"), candidates.map { it.replacementText })
         }
@@ -493,7 +644,7 @@ class MergedCompletionEngineTest {
 
             assertEquals(
                 listOf("status", "stash", "switch"),
-                engine.complete(request(commandLine = "git s", maxCandidates = 8)).map { it.replacementText },
+                engine.complete(request(commandLine = "git s")).map { it.replacementText },
             )
         }
 
@@ -539,7 +690,7 @@ class MergedCompletionEngineTest {
                     commandSpecs = specs,
                 )
 
-            engine.complete(request(commandLine = "git --", maxCandidates = 8))
+            engine.complete(request(commandLine = "git --"))
 
             assertEquals(2, contexts.size)
             assertSame(contexts[0], contexts[1])
@@ -580,13 +731,9 @@ class MergedCompletionEngineTest {
             valueDomain = valueDomain,
         )
 
-    private fun request(
-        commandLine: String = "s",
-        maxCandidates: Int,
-    ): TerminalCompletionRequest =
+    private fun request(commandLine: String = "s"): TerminalCompletionRequest =
         TerminalCompletionRequest(
             commandLine = commandLine,
             cursorOffset = commandLine.length,
-            maxCandidates = maxCandidates,
         )
 }

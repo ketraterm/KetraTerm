@@ -24,6 +24,8 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Insets
@@ -34,6 +36,7 @@ import java.util.concurrent.TimeUnit
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import kotlin.coroutines.ContinuationInterceptor
+import kotlin.time.Duration.Companion.milliseconds
 
 class SwingTerminalShellSuggestionTest {
     @Test
@@ -48,15 +51,17 @@ class SwingTerminalShellSuggestionTest {
                     SwingHostServices(
                         shellSuggestionProvider =
                             SwingShellSuggestionProvider { request ->
-                                if (request.commandText == "first") {
-                                    firstStarted.complete(Unit)
-                                    try {
-                                        awaitCancellation()
-                                    } finally {
-                                        firstCancelled.complete(Unit)
+                                flow {
+                                    if (request.commandText == "first") {
+                                        firstStarted.complete(Unit)
+                                        try {
+                                            awaitCancellation()
+                                        } finally {
+                                            firstCancelled.complete(Unit)
+                                        }
                                     }
+                                    emit(suggestions(request.commandText))
                                 }
-                                suggestions(request.commandText)
                             },
                         shellSuggestionViewFactory = view.factory(),
                     ),
@@ -92,9 +97,11 @@ class SwingTerminalShellSuggestionTest {
                     SwingHostServices(
                         shellSuggestionProvider =
                             SwingShellSuggestionProvider { request ->
-                                providerWasOnEdt.complete(SwingUtilities.isEventDispatchThread())
-                                providerDispatcher.complete(currentCoroutineContext()[ContinuationInterceptor])
-                                suggestions(request.commandText)
+                                flow {
+                                    providerWasOnEdt.complete(SwingUtilities.isEventDispatchThread())
+                                    providerDispatcher.complete(currentCoroutineContext()[ContinuationInterceptor])
+                                    emit(suggestions(request.commandText))
+                                }
                             },
                         shellSuggestionViewFactory = view.factory(),
                     ),
@@ -113,6 +120,86 @@ class SwingTerminalShellSuggestionTest {
             assertTrue(component.currentShellSuggestionState().visible)
             component.dispose()
         }
+    }
+
+    @Test
+    fun `replaced progressive flow cannot publish after newer request`() {
+        val firstRelease = CompletableDeferred<Unit>()
+        val view = RecordingSuggestionView()
+        val component =
+            SwingTerminal(
+                settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
+                hostServices =
+                    SwingHostServices(
+                        shellSuggestionProvider =
+                            SwingShellSuggestionProvider { request ->
+                                flow {
+                                    emit(suggestions(request.commandText))
+                                    if (request.commandText == "first") {
+                                        firstRelease.await()
+                                        emit(listOf(suggestion("stale", commandText = request.commandText)))
+                                    }
+                                }
+                            },
+                        shellSuggestionViewFactory = view.factory(),
+                    ),
+            )
+
+        SwingUtilities.invokeAndWait {
+            component.size = component.preferredGridSize(12, 4)
+            component.requestShellSuggestions("first", 5, 0, 0)
+        }
+        view.awaitUpdate()
+        SwingUtilities.invokeAndWait { component.requestShellSuggestions("second", 6, 0, 0) }
+        view.awaitUpdate()
+        firstRelease.complete(Unit)
+
+        runBlocking { delay(100.milliseconds) }
+        SwingUtilities.invokeAndWait {
+            assertTrue(component.currentShellSuggestionState().visible)
+            assertEquals(2, component.currentShellSuggestionState().count)
+            component.dispose()
+        }
+    }
+
+    @Test
+    fun `shell input hides popup before invalidation listeners run`() {
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
+        val visibleDuringInvalidation = ArrayList<Boolean>()
+        val listener =
+            SwingShellSuggestionInvalidationListener {
+                visibleDuringInvalidation += component.currentShellSuggestionState().visible
+            }
+        SwingUtilities.invokeAndWait {
+            component.size = component.preferredGridSize(12, 4)
+            component.addShellSuggestionInvalidationListener(listener)
+            component.showShellSuggestions(request(), suggestions())
+            component.keyListeners.forEach { it.keyPressed(keyPressed(component, KeyEvent.VK_BACK_SPACE)) }
+        }
+
+        assertEquals(listOf(false), visibleDuringInvalidation)
+        SwingUtilities.invokeAndWait { component.dispose() }
+    }
+
+    @Test
+    fun `clear screen hides popup before command bytes are submitted`() {
+        val session = activeSuggestionSession(RecordingConnector())
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
+        val visibleDuringInvalidation = ArrayList<Boolean>()
+        SwingUtilities.invokeAndWait {
+            component.size = component.preferredGridSize(12, 4)
+            component.bind(session)
+            component.addShellSuggestionInvalidationListener {
+                visibleDuringInvalidation += component.currentShellSuggestionState().visible
+            }
+            component.showShellSuggestions(request(), suggestions())
+
+            assertTrue(component.clearScreen())
+        }
+
+        assertEquals(listOf(false), visibleDuringInvalidation)
+        SwingUtilities.invokeAndWait { component.dispose() }
+        session.close()
     }
 
     @Test
@@ -164,7 +251,7 @@ class SwingTerminalShellSuggestionTest {
                         shellSuggestionProvider =
                             SwingShellSuggestionProvider { request ->
                                 providerRequests += request
-                                suggestions(request.commandText)
+                                flowOf(suggestions(request.commandText))
                             },
                         shellSuggestionHandler =
                             SwingShellSuggestionHandler { acceptance ->
@@ -217,7 +304,7 @@ class SwingTerminalShellSuggestionTest {
                 settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
                 hostServices =
                     SwingHostServices(
-                        shellSuggestionProvider = SwingShellSuggestionProvider { emptyList() },
+                        shellSuggestionProvider = SwingShellSuggestionProvider { flowOf(emptyList()) },
                         shellSuggestionViewFactory = view.factory(),
                     ),
             )
@@ -254,7 +341,7 @@ class SwingTerminalShellSuggestionTest {
                         shellSuggestionProvider =
                             SwingShellSuggestionProvider { request ->
                                 providerRequests += request
-                                suggestions(request.commandText)
+                                flowOf(suggestions(request.commandText))
                             },
                         shellSuggestionViewFactory = view.factory(),
                     ),
@@ -298,7 +385,8 @@ class SwingTerminalShellSuggestionTest {
                 settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
                 hostServices =
                     SwingHostServices(
-                        shellSuggestionProvider = SwingShellSuggestionProvider { request -> suggestions(request.commandText) },
+                        shellSuggestionProvider =
+                            SwingShellSuggestionProvider { request -> flowOf(suggestions(request.commandText)) },
                     ),
             )
 
@@ -323,7 +411,7 @@ class SwingTerminalShellSuggestionTest {
                 settingsProvider = { SwingSettings(shellSuggestionsEnabled = false) },
                 hostServices =
                     SwingHostServices(
-                        shellSuggestionProvider = SwingShellSuggestionProvider { suggestions(it.commandText) },
+                        shellSuggestionProvider = SwingShellSuggestionProvider { flowOf(suggestions(it.commandText)) },
                     ),
             )
 
@@ -349,7 +437,7 @@ class SwingTerminalShellSuggestionTest {
                         shellSuggestionProvider =
                             SwingShellSuggestionProvider { request ->
                                 providerRequests += request
-                                suggestions(request.commandText)
+                                flowOf(suggestions(request.commandText))
                             },
                         shellSuggestionViewFactory = view.factory(),
                     ),

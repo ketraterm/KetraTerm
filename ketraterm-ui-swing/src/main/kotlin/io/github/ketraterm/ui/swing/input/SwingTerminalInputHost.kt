@@ -35,6 +35,9 @@ internal interface SwingTerminalInputHost {
 
     fun handleShellSuggestionKeyPressed(event: java.awt.event.KeyEvent): Boolean
 
+    /** Cancels and hides suggestions before shell-bound input changes command state. */
+    fun invalidateShellSuggestions()
+
     /**
      * Hides the shell suggestion popup.
      */

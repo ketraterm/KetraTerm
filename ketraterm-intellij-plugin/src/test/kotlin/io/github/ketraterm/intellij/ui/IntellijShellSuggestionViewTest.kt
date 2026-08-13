@@ -72,15 +72,15 @@ class IntellijShellSuggestionViewTest : BasePlatformTestCase() {
         }
     }
 
-    fun testViewCapsSnapshotsAndRejectsSelectionOutsideVisibleRows() {
+    fun testViewRendersControllerViewportAndRejectsInvalidLocalSelection() {
         val view = IntellijShellSuggestionView(RecordingListener())
-        view.update(suggestions(20), selectedIndex = 19)
+        view.update(suggestions(8), selectedIndex = 19)
 
         try {
             assertEquals(8, view.suggestionList.model.size)
             assertEquals(-1, view.suggestionList.selectedIndex)
 
-            view.update(suggestions(20), selectedIndex = 7)
+            view.update(suggestions(8), selectedIndex = 7)
             assertEquals(7, view.suggestionList.selectedIndex)
         } finally {
             view.close()

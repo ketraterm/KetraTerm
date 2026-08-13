@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.completion.api
 
+import kotlinx.coroutines.flow.Flow
+
 /**
  * Pure completion engine contract.
  *
@@ -25,14 +27,14 @@ package io.github.ketraterm.completion.api
  */
 fun interface TerminalCompletionEngine {
     /**
-     * Returns a bounded, best-first candidate list for [request].
+     * Returns a cold progressive stream of best-first rankings for [request].
      *
-     * Implementations must not mutate terminal state or perform UI work.
-     * Suspending source work must cooperate with cancellation and return a
-     * bounded result.
+     * Each emission contains the globally reranked union of every source that
+     * has completed so far. Implementations must not mutate terminal state or
+     * perform UI work. Cancelling collection must cancel all source work.
      *
      * @param request command-line completion context.
-     * @return ordered completion candidates.
+     * @return cold stream of ordered completion snapshots.
      */
-    suspend fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate>
+    fun completions(request: TerminalCompletionRequest): Flow<List<TerminalCompletionCandidate>>
 }

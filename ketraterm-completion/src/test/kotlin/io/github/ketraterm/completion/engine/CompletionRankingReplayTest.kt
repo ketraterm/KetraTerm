@@ -105,7 +105,6 @@ class CompletionRankingReplayTest {
             TerminalCompletionRequest(
                 commandLine = commandLine,
                 cursorOffset = commandLine.length,
-                maxCandidates = 8,
                 profileId = PROFILE,
                 workingDirectoryUri = WORKING_DIRECTORY,
                 shellCapabilities = TerminalShellCapabilities.POSIX,

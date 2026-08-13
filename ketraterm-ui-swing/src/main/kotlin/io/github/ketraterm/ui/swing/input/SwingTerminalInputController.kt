@@ -53,6 +53,7 @@ internal class SwingTerminalInputController(
                 host.resetCursorBlink(forceRepaint = true)
 
                 val keyEvent = keyMapper.keyPressed(event) ?: return
+                host.invalidateShellSuggestions()
                 host.session?.encodeKey(keyEvent)
                 event.consume()
             }
@@ -75,6 +76,7 @@ internal class SwingTerminalInputController(
                     return
                 }
                 val keyEvent = keyMapper.keyTyped(event) ?: return
+                host.invalidateShellSuggestions()
                 host.session?.encodeKey(keyEvent)
                 event.consume()
             }

@@ -279,14 +279,6 @@ class SpecCompletionEngineTest {
         }
 
     @Test
-    fun `max candidates caps returned results after ranking`() =
-        runBlocking {
-            val candidates = engine().complete(request("git ", maxCandidates = 2))
-
-            assertEquals(listOf("status", "commit"), candidates.map { it.replacementText })
-        }
-
-    @Test
     fun `unknown command returns no command-body suggestions`() =
         runBlocking {
             assertTrue(engine().complete(request("unknown --")).isEmpty())
@@ -408,11 +400,9 @@ class SpecCompletionEngineTest {
     private fun request(
         commandLine: String,
         cursorOffset: Int = commandLine.length,
-        maxCandidates: Int = 8,
     ): TerminalCompletionRequest =
         TerminalCompletionRequest(
             commandLine = commandLine,
             cursorOffset = cursorOffset,
-            maxCandidates = maxCandidates,
         )
 }

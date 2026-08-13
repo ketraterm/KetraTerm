@@ -13,24 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.completion.internal
+package io.github.ketraterm.intellij.services
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
+import io.github.ketraterm.completion.api.TerminalCompletionCandidate
+import io.github.ketraterm.completion.api.TerminalCompletionEngine
+import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import kotlinx.coroutines.flow.last
 
-class TerminalCompletionCollectionBudgetTest {
-    @Test
-    fun `small final limit receives bounded reranking surplus`() {
-        assertEquals(32, completionCollectionLimit(8))
-    }
-
-    @Test
-    fun `large final limit caps additional collection work`() {
-        assertEquals(1_256, completionCollectionLimit(1_000))
-    }
-
-    @Test
-    fun `maximum integer final limit does not overflow`() {
-        assertEquals(Int.MAX_VALUE, completionCollectionLimit(Int.MAX_VALUE))
-    }
-}
+/** Collects the final progressive result for settled IntelliJ source assertions. */
+internal suspend fun TerminalCompletionEngine.complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
+    completions(request).last()

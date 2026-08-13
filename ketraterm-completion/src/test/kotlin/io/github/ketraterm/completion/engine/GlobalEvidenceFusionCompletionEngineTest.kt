@@ -675,7 +675,6 @@ class GlobalEvidenceFusionCompletionEngineTest {
                 TerminalCompletionRequest(
                     commandLine = commandLine,
                     cursorOffset = "git st".length,
-                    maxCandidates = 8,
                     shellCapabilities = TerminalShellCapabilities.POSIX,
                 )
             val candidates =
@@ -904,7 +903,6 @@ class GlobalEvidenceFusionCompletionEngineTest {
     ) = TerminalCompletionRequest(
         commandLine = commandLine,
         cursorOffset = commandLine.length,
-        maxCandidates = 8,
         profileId = "profile",
         workingDirectoryUri = workingDirectoryUri,
         shellCapabilities = TerminalShellCapabilities.POSIX,

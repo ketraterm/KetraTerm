@@ -19,6 +19,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInvalidationListener
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -44,7 +45,7 @@ import java.awt.event.FocusListener
  */
 class SwingLiveCompletionBinding
     internal constructor(
-        activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
+        private val activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
         private val renderGenerations: Flow<Long>,
         suggestionsEnabled: () -> Boolean,
         rankingContextKey: () -> String?,
@@ -54,6 +55,8 @@ class SwingLiveCompletionBinding
     ) : AutoCloseable {
         private var target: SwingLiveCompletionTarget? = null
         private var observationJob: Job? = null
+        private var invalidatedCommand: CommandSnapshotIdentity? = null
+        private var awaitingSnapshotChange = false
         private val lifecycleLock = Any()
 
         @Volatile
@@ -78,6 +81,16 @@ class SwingLiveCompletionBinding
                 }
 
                 override fun focusLost(event: FocusEvent) {
+                    triggerController.cancelAndHide()
+                }
+            }
+
+        private val invalidationListener =
+            SwingShellSuggestionInvalidationListener {
+                synchronized(lifecycleLock) {
+                    if (closed) return@SwingShellSuggestionInvalidationListener
+                    invalidatedCommand = activeCommandLine()?.identity()
+                    awaitingSnapshotChange = true
                     triggerController.cancelAndHide()
                 }
             }
@@ -139,16 +152,18 @@ class SwingLiveCompletionBinding
             try {
                 target.addFocusListener(focusListener)
                 focusListenerAttached = true
+                target.addInvalidationListener(invalidationListener)
                 observationJob =
                     observationScope.launch(CoroutineName("swing-live-completion")) {
                         renderGenerations.collect {
-                            scheduleRefresh()
+                            onRenderPublication()
                         }
                     }
             } catch (failure: Throwable) {
                 observationJob?.cancel()
                 observationJob = null
                 if (focusListenerAttached) runCatching { target.removeFocusListener(focusListener) }
+                runCatching { target.removeInvalidationListener(invalidationListener) }
                 this.target = null
                 throw failure
             }
@@ -181,7 +196,24 @@ class SwingLiveCompletionBinding
                 observationJob = null
                 triggerController.cancelAndHide()
                 target?.removeFocusListener(focusListener)
+                target?.removeInvalidationListener(invalidationListener)
                 target = null
+            }
+        }
+
+        private fun onRenderPublication() {
+            synchronized(lifecycleLock) {
+                if (closed) return
+                if (awaitingSnapshotChange) {
+                    val current = activeCommandLine()?.identity()
+                    if (current == invalidatedCommand) return
+                    invalidatedCommand = null
+                    awaitingSnapshotChange = false
+                }
+                if (triggerController.hasRequestedSnapshotChanged()) {
+                    target?.hideSuggestions()
+                }
+                triggerController.scheduleRefresh()
             }
         }
 
@@ -189,6 +221,14 @@ class SwingLiveCompletionBinding
             private const val DEFAULT_DEBOUNCE_MILLIS = 75
             private const val DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS = 2
         }
+
+        private fun TerminalShellCommandLineSnapshot.identity(): CommandSnapshotIdentity =
+            CommandSnapshotIdentity(commandText, cursorOffset)
+
+        private data class CommandSnapshotIdentity(
+            val commandText: String,
+            val cursorOffset: Int,
+        )
     }
 
 internal interface SwingLiveCompletionTarget {
@@ -199,6 +239,10 @@ internal interface SwingLiveCompletionTarget {
     fun addFocusListener(listener: FocusListener)
 
     fun removeFocusListener(listener: FocusListener)
+
+    fun addInvalidationListener(listener: SwingShellSuggestionInvalidationListener)
+
+    fun removeInvalidationListener(listener: SwingShellSuggestionInvalidationListener)
 
     fun isFocusOwner(): Boolean
 }
@@ -225,6 +269,14 @@ private class SwingTerminalLiveCompletionTarget(
 
     override fun removeFocusListener(listener: FocusListener) {
         terminal.removeFocusListener(listener)
+    }
+
+    override fun addInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
+        terminal.addShellSuggestionInvalidationListener(listener)
+    }
+
+    override fun removeInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
+        terminal.removeShellSuggestionInvalidationListener(listener)
     }
 
     override fun isFocusOwner(): Boolean = terminal.isFocusOwner

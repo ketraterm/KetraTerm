@@ -436,7 +436,6 @@ class TerminalSessionMruCompletionSourceTest {
             cursorOffset = commandLine.length,
             profileId = profileId,
             workingDirectoryUri = workingDirectoryUri,
-            maxCandidates = 8,
             shellCapabilities = shellCapabilities,
         )
 

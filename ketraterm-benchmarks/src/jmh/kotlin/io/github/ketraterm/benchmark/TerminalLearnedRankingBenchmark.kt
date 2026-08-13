@@ -17,6 +17,7 @@ package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.*
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
@@ -71,18 +72,17 @@ open class TerminalLearnedRankingBenchmark {
             TerminalCompletionRequest(
                 commandLine = "unknown value",
                 cursorOffset = "unknown value".length,
-                maxCandidates = 8,
             )
     }
 
     @Benchmark
     open fun completeWithFullLearnedSnapshots(blackhole: Blackhole) {
-        blackhole.consume(runBlocking { learnedEngine.complete(learnedRequest) })
+        blackhole.consume(runBlocking { learnedEngine.completions(learnedRequest).last() })
     }
 
     @Benchmark
     open fun mergeHostileProviderResultsIntoTopEight(blackhole: Blackhole) {
-        blackhole.consume(runBlocking { hostileMergeEngine.complete(hostileMergeRequest) })
+        blackhole.consume(runBlocking { hostileMergeEngine.completions(hostileMergeRequest).last() })
     }
 
     @Benchmark

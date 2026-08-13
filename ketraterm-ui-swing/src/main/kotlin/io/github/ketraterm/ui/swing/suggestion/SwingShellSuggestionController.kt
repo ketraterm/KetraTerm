@@ -24,17 +24,18 @@ internal class SwingShellSuggestionController(
 ) {
     private var suggestions: List<SwingShellSuggestion> = emptyList()
     private var selectedIndex: Int = NO_SELECTION
+    private var viewportStartIndex: Int = 0
     private var request: SwingShellSuggestionRequest = SwingShellSuggestionRequest.EMPTY
 
     private val view: SwingShellSuggestionView =
         viewFactory.create(
             object : SwingShellSuggestionViewListener {
                 override fun onSuggestionHovered(index: Int) {
-                    select(index)
+                    select(viewportStartIndex + index)
                 }
 
                 override fun onSuggestionClicked(index: Int) {
-                    select(index)
+                    select(viewportStartIndex + index)
                     acceptSelected()
                 }
             },
@@ -51,10 +52,20 @@ internal class SwingShellSuggestionController(
             hide()
             return false
         }
-        this.suggestions = retainVisibleSuggestions(suggestions)
+        val selectedOutcome =
+            this.suggestions
+                .getOrNull(this.selectedIndex)
+                ?.outcomeKey()
+                ?.takeIf { this.request == request }
+        this.suggestions = suggestions.toList()
         this.request = request
-        this.selectedIndex = selectedIndex.takeIf { it in this.suggestions.indices } ?: NO_SELECTION
-        view.update(this.suggestions, this.selectedIndex)
+        this.selectedIndex =
+            selectedIndex.takeIf { it in this.suggestions.indices }
+                ?: selectedOutcome
+                    ?.let { outcome -> this.suggestions.indexOfFirst { it.outcomeKey() == outcome } }
+                    ?.takeIf { it >= 0 }
+                ?: NO_SELECTION
+        updateViewport()
         view.component.isVisible = true
         host.revalidate()
         host.repaint()
@@ -65,8 +76,9 @@ internal class SwingShellSuggestionController(
         if (!view.component.isVisible && suggestions.isEmpty()) return false
         suggestions = emptyList()
         selectedIndex = NO_SELECTION
+        viewportStartIndex = 0
         request = SwingShellSuggestionRequest.EMPTY
-        view.update(suggestions, selectedIndex)
+        view.update(emptyList(), NO_SELECTION)
         view.component.isVisible = false
         host.revalidate()
         host.repaint()
@@ -102,8 +114,8 @@ internal class SwingShellSuggestionController(
             SwingShellSuggestionAction.SELECT_PREVIOUS -> selectRelative(-1)
             SwingShellSuggestionAction.SELECT_FIRST -> select(0)
             SwingShellSuggestionAction.SELECT_LAST -> select(suggestions.lastIndex)
-            SwingShellSuggestionAction.SELECT_NEXT_PAGE -> selectRelative(PAGE_STEP)
-            SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE -> selectRelative(-PAGE_STEP)
+            SwingShellSuggestionAction.SELECT_NEXT_PAGE -> selectRelative(POPUP_MAX_VISIBLE_ROWS)
+            SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE -> selectRelative(-POPUP_MAX_VISIBLE_ROWS)
             SwingShellSuggestionAction.ACCEPT -> selectFirstOrAccept()
             SwingShellSuggestionAction.ACCEPT_SELECTED -> acceptSelected()
             SwingShellSuggestionAction.DISMISS -> dismissSelected()
@@ -146,7 +158,7 @@ internal class SwingShellSuggestionController(
         if (index !in suggestions.indices) return false
         if (selectedIndex == index) return true
         selectedIndex = index
-        view.update(suggestions, selectedIndex)
+        updateViewport()
         host.repaint()
         return true
     }
@@ -157,6 +169,7 @@ internal class SwingShellSuggestionController(
         val index = selectedIndex
         val acceptedRequest = request
         hide()
+        host.invalidateSuggestions()
         host.suggestionFeedbackHandler.onSuggestionFeedback(
             SwingShellSuggestionFeedback(
                 kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
@@ -182,6 +195,7 @@ internal class SwingShellSuggestionController(
         val index = selectedIndex
         val dismissedRequest = request
         hide()
+        host.invalidateSuggestions()
         host.suggestionFeedbackHandler.onSuggestionFeedback(
             SwingShellSuggestionFeedback(
                 kind = SwingShellSuggestionFeedbackKind.DISMISSED,
@@ -194,20 +208,36 @@ internal class SwingShellSuggestionController(
         return true
     }
 
-    private fun retainVisibleSuggestions(suggestions: List<SwingShellSuggestion>): List<SwingShellSuggestion> =
-        if (suggestions.size <=
-            MAX_RETAINED_SUGGESTIONS
-        ) {
-            suggestions.toList()
-        } else {
-            suggestions.subList(0, MAX_RETAINED_SUGGESTIONS).toList()
-        }
+    private fun updateViewport() {
+        viewportStartIndex =
+            when {
+                suggestions.size <= POPUP_MAX_VISIBLE_ROWS -> 0
+                selectedIndex < 0 -> viewportStartIndex.coerceIn(0, suggestions.size - POPUP_MAX_VISIBLE_ROWS)
+                selectedIndex < viewportStartIndex -> selectedIndex
+                selectedIndex >= viewportStartIndex + POPUP_MAX_VISIBLE_ROWS ->
+                    selectedIndex - POPUP_MAX_VISIBLE_ROWS + 1
+                else -> viewportStartIndex
+            }
+        val viewportEnd = minOf(suggestions.size, viewportStartIndex + POPUP_MAX_VISIBLE_ROWS)
+        val visible = suggestions.subList(viewportStartIndex, viewportEnd)
+        val localSelection = selectedIndex.takeIf { it in viewportStartIndex until viewportEnd }?.minus(viewportStartIndex) ?: NO_SELECTION
+        view.update(visible, localSelection)
+        host.revalidate()
+        host.repaint()
+    }
+
+    private fun SwingShellSuggestion.outcomeKey(): SuggestionOutcomeKey =
+        SuggestionOutcomeKey(replacementStartOffset, replacementEndOffset, replacementText)
 
     private companion object {
         private const val NO_SELECTION = -1
-        private const val PAGE_STEP = 5
-        private const val MAX_RETAINED_SUGGESTIONS = 8
     }
+
+    private data class SuggestionOutcomeKey(
+        val replacementStartOffset: Int,
+        val replacementEndOffset: Int,
+        val replacementText: String,
+    )
 }
 
 internal interface SwingShellSuggestionHost {
@@ -221,4 +251,6 @@ internal interface SwingShellSuggestionHost {
     fun repaint()
 
     fun requestFocusInWindow(): Boolean
+
+    fun invalidateSuggestions()
 }

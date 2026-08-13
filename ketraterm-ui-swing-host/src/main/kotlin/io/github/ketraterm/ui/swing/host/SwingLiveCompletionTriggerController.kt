@@ -59,6 +59,13 @@ internal class SwingLiveCompletionTriggerController(
         lastRequest = null
     }
 
+    /** Returns whether the latest shell snapshot differs from the active request. */
+    fun hasRequestedSnapshotChanged(): Boolean {
+        val previous = lastRequest ?: return false
+        val current = activeCommandLine() ?: return true
+        return previous.commandText != current.commandText || previous.cursorOffset != current.cursorOffset
+    }
+
     /** Applies cheap UX gating and requests completion for the latest snapshot. */
     internal fun refreshNow() {
         if (!suggestionsEnabled()) {

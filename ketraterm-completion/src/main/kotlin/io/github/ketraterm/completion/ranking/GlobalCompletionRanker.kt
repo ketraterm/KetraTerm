@@ -60,10 +60,9 @@ internal class GlobalCompletionRanker(
             fused += aggregate.finish(learnedIndex, learningContext, now)
         }
         fused.sortWith(FUSED_ORDER)
-        val resultCount = minOf(fused.size, request.maxCandidates)
-        val result = ArrayList<TerminalCompletionCandidate>(resultCount)
+        val result = ArrayList<TerminalCompletionCandidate>(fused.size)
         var index = 0
-        while (index < resultCount) {
+        while (index < fused.size) {
             result += fused[index].toPublicCandidate()
             index++
         }

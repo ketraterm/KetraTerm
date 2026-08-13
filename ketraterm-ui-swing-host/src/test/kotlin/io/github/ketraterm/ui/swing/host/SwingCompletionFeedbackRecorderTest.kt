@@ -23,6 +23,7 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -126,7 +127,8 @@ class SwingCompletionFeedbackRecorderTest {
                                 ),
                             ),
                         commandSpecs = emptyList(),
-                    ).complete(completionRequest("git s"))
+                    ).completions(completionRequest("git s"))
+                    .last()
                     .isEmpty(),
             )
         }

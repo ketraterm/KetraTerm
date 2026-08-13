@@ -78,6 +78,7 @@ class SwingTerminalInputControllerTest {
 
             assertEquals(1, host.shellSuggestionKeyPressCount)
             assertTrue(event.isConsumed)
+            assertEquals(0, host.invalidationCount)
         }
 
         @Test
@@ -89,6 +90,7 @@ class SwingTerminalInputControllerTest {
 
             assertEquals(1, host.shellSuggestionKeyPressCount)
             assertEquals(0, host.hostKeyPressCount)
+            assertEquals(0, host.invalidationCount)
         }
 
         @Test
@@ -110,6 +112,42 @@ class SwingTerminalInputControllerTest {
             assertTrue(repeat.isConsumed)
             assertTrue(typed.isConsumed)
             assertTrue(release.isConsumed)
+        }
+    }
+
+    @Nested
+    inner class SuggestionInvalidation {
+        @Test
+        fun `printable typing invalidates suggestions`() {
+            val host = RecordingInputHost()
+            val controller = SwingTerminalInputController(host)
+
+            controller.keyListener.keyTyped(keyTyped('x'))
+
+            assertEquals(1, host.invalidationCount)
+        }
+
+        @Test
+        fun `edit and cursor keys invalidate suggestions`() {
+            val host = RecordingInputHost()
+            val controller = SwingTerminalInputController(host)
+
+            controller.keyListener.keyPressed(keyPressed(KeyEvent.VK_BACK_SPACE, 0))
+            controller.keyListener.keyPressed(keyPressed(KeyEvent.VK_DELETE, 0))
+            controller.keyListener.keyPressed(keyPressed(KeyEvent.VK_LEFT, 0))
+            controller.keyListener.keyPressed(keyPressed(KeyEvent.VK_RIGHT, 0))
+
+            assertEquals(4, host.invalidationCount)
+        }
+
+        @Test
+        fun `key release never invalidates suggestions`() {
+            val host = RecordingInputHost()
+            val controller = SwingTerminalInputController(host)
+
+            controller.keyListener.keyReleased(keyReleased(KeyEvent.VK_LEFT, 0))
+
+            assertEquals(0, host.invalidationCount)
         }
     }
 
@@ -176,6 +214,7 @@ class SwingTerminalInputControllerTest {
         var cursorRepaints = 0
         var hostKeyPressCount = 0
         var shellSuggestionKeyPressCount = 0
+        var invalidationCount = 0
 
         override fun updateHyperlinkActivationHover(active: Boolean) {
             hyperlinkHoverUpdates += active
@@ -202,6 +241,10 @@ class SwingTerminalInputControllerTest {
             shellSuggestionKeyPressCount++
             if (shellSuggestionKeyHandled) event.consume()
             return shellSuggestionKeyHandled
+        }
+
+        override fun invalidateShellSuggestions() {
+            invalidationCount++
         }
 
         var hideShellSuggestionsCount = 0

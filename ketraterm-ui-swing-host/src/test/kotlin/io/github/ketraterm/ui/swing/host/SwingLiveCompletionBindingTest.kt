@@ -124,6 +124,63 @@ class SwingLiveCompletionBindingTest {
         }
 
     @Test
+    fun `input invalidation rejects unchanged command snapshots until command changes`() =
+        runTest {
+            val generations = MutableStateFlow(-1L)
+            val scheduler = RecordingScheduler()
+            val target = RecordingTarget()
+            var active = snapshot("git s")
+            val binding = binding(backgroundScope, generations, scheduler, { active })
+            binding.attach(target)
+            runCurrent()
+            scheduler.fire()
+            assertEquals(1, target.requests.size)
+
+            target.invalidateSuggestions()
+            generations.value = 1L
+            runCurrent()
+            scheduler.fire()
+            assertEquals(1, target.requests.size)
+
+            active = TerminalShellCommandLineSnapshot("git s", 5, 18, cursorRow = 9)
+            generations.value = 2L
+            runCurrent()
+            scheduler.fire()
+            assertEquals(1, target.requests.size)
+
+            active = snapshot("git st")
+            generations.value = 3L
+            runCurrent()
+            scheduler.fire()
+            assertEquals(listOf(snapshot("git s"), snapshot("git st")), target.requests)
+            binding.close()
+        }
+
+    @Test
+    fun `changed shell snapshot hides old popup before debounce fires`() =
+        runTest {
+            val generations = MutableStateFlow(-1L)
+            val scheduler = RecordingScheduler()
+            val target = RecordingTarget()
+            var active = snapshot("git s")
+            val binding = binding(backgroundScope, generations, scheduler, { active })
+            binding.attach(target)
+            runCurrent()
+            scheduler.fire()
+            val hidesBeforeChange = target.hideCount
+
+            active = snapshot("git st")
+            generations.value = 1L
+            runCurrent()
+
+            assertEquals(hidesBeforeChange + 1, target.hideCount)
+            assertEquals(1, target.requests.size)
+            scheduler.fire()
+            assertEquals(2, target.requests.size)
+            binding.close()
+        }
+
+    @Test
     fun `binding rejects duplicate attachment and attachment after close`() =
         runTest {
             val binding = binding(backgroundScope)
@@ -189,6 +246,7 @@ class SwingLiveCompletionBindingTest {
         var hideCount = 0
         var removeFocusListenerCount = 0
         private var focusListener: FocusListener? = null
+        private var invalidationListener: SwingShellSuggestionInvalidationListener? = null
         private var focused = true
 
         override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) {
@@ -209,6 +267,14 @@ class SwingLiveCompletionBindingTest {
             removeFocusListenerCount++
         }
 
+        override fun addInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
+            invalidationListener = listener
+        }
+
+        override fun removeInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
+            if (invalidationListener === listener) invalidationListener = null
+        }
+
         override fun isFocusOwner(): Boolean = focused
 
         fun loseFocus() {
@@ -219,6 +285,10 @@ class SwingLiveCompletionBindingTest {
         fun gainFocus() {
             focused = true
             focusListener?.focusGained(FocusEvent(JPanel(), FocusEvent.FOCUS_GAINED))
+        }
+
+        fun invalidateSuggestions() {
+            invalidationListener?.onShellSuggestionsInvalidated()
         }
     }
 

@@ -16,8 +16,6 @@
 package io.github.ketraterm.completion.api
 
 import io.github.ketraterm.completion.api.TerminalShellCapabilities.Companion.PLAIN
-import io.github.ketraterm.completion.api.TerminalShellCapabilities.Companion.POSIX
-import io.github.ketraterm.completion.api.TerminalShellCapabilities.Companion.POWERSHELL
 import io.github.ketraterm.completion.internal.isTerminalCompletionUtf16Boundary
 
 /**
@@ -114,10 +112,9 @@ data class TerminalShellCapabilities
  * must be a scalar boundary and must not split a surrogate pair.
  * @property workingDirectoryUri optional current working directory URI.
  * @property profileId optional host profile id used by host-owned ranking data.
- * @property maxCandidates maximum number of candidates to return.
  * @property shellCapabilities resolved shell lexical and replacement policy.
  * @throws IllegalArgumentException if [cursorOffset] is outside [commandLine],
- * splits a UTF-16 surrogate pair, or [maxCandidates] is not positive.
+ * or splits a UTF-16 surrogate pair.
  */
 data class TerminalCompletionRequest
     @JvmOverloads
@@ -126,7 +123,6 @@ data class TerminalCompletionRequest
         val cursorOffset: Int,
         val workingDirectoryUri: String? = null,
         val profileId: String? = null,
-        val maxCandidates: Int = DEFAULT_MAX_CANDIDATES,
         val shellCapabilities: TerminalShellCapabilities = PLAIN,
     ) {
         init {
@@ -136,13 +132,5 @@ data class TerminalCompletionRequest
             require(commandLine.isTerminalCompletionUtf16Boundary(cursorOffset)) {
                 "cursorOffset must not split a UTF-16 surrogate pair, was $cursorOffset"
             }
-            require(maxCandidates > 0) { "maxCandidates must be > 0, was $maxCandidates" }
-        }
-
-        companion object {
-            /**
-             * Default number of candidates returned to host UI popups.
-             */
-            const val DEFAULT_MAX_CANDIDATES: Int = 8
         }
     }

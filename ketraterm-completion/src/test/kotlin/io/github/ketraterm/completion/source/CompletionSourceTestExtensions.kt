@@ -24,7 +24,7 @@ internal suspend fun TerminalCompletionSource.complete(request: TerminalCompleti
     complete(
         request = request,
         context = request.resolveCompletionContext(TEST_COMMAND_SPECS),
-        limit = request.maxCandidates,
+        limit = 256,
     )
 
 private val TEST_COMMAND_SPECS =

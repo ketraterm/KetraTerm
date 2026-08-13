@@ -19,6 +19,7 @@ import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import kotlin.test.Test
@@ -43,7 +44,7 @@ class StandaloneCompletionRegistryTest {
                 workingDirectoryUri = "file:///repo",
             )
 
-            val suggestions = provider.suggestions(request("git s"))
+            val suggestions = provider.suggestions(request("git s")).last()
 
             val mruSuggestion = suggestions.first()
             assertEquals("switch main", mruSuggestion.replacementText)
@@ -75,7 +76,7 @@ class StandaloneCompletionRegistryTest {
                     workingDirectoryUri = directory.toUri().toString(),
                 )
 
-                val suggestions = provider.suggestions(request("cd "))
+                val suggestions = provider.suggestions(request("cd ")).last()
 
                 assertEquals("alpha/", suggestions.first().replacementText)
                 assertEquals("path", suggestions.first().source)
@@ -119,7 +120,7 @@ class StandaloneCompletionRegistryTest {
                         workingDirectoryUriProvider = { directory.toUri().toString() },
                     )
 
-                val suggestions = provider.suggestions(request("cd I"))
+                val suggestions = provider.suggestions(request("cd I")).last()
 
                 assertEquals("IdeaProjects/KetraTerm/", suggestions.first().replacementText)
                 assertEquals("IdeaProjects/KetraTerm/", suggestions.first().displayText)
@@ -145,7 +146,7 @@ class StandaloneCompletionRegistryTest {
                         workingDirectoryUriProvider = { directory.toUri().toString() },
                     )
 
-                val suggestions = provider.suggestions(request("git s"))
+                val suggestions = provider.suggestions(request("git s")).last()
 
                 assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
                 assertTrue(suggestions.none { it.source == "path" })
@@ -180,7 +181,7 @@ class StandaloneCompletionRegistryTest {
             )
 
             val request = request("git s")
-            val suggestions = provider.suggestions(request)
+            val suggestions = provider.suggestions(request).last()
             val outcomes = suggestions.mapNotNull { it.commandTextAfterReplacement(request) }
 
             assertTrue("git switch main" in outcomes)
@@ -205,8 +206,8 @@ class StandaloneCompletionRegistryTest {
             val first = registry.createProvider("session-1", profileId = "bash") { "file:///repo" }
             val second = registry.createProvider("session-2", profileId = "bash") { "file:///repo" }
 
-            assertEquals(listOf("npm test"), first.suggestions(request("npm")).map { it.replacementText })
-            assertEquals(listOf("npm test"), second.suggestions(request("npm")).map { it.replacementText })
+            assertEquals(listOf("npm test"), first.suggestions(request("npm")).last().map { it.replacementText })
+            assertEquals(listOf("npm test"), second.suggestions(request("npm")).last().map { it.replacementText })
         }
 
     @Test
@@ -240,7 +241,7 @@ class StandaloneCompletionRegistryTest {
                         workingDirectoryUriProvider = { "file:///repo" },
                     )
 
-            val suggestions = provider.suggestions(request("git "))
+            val suggestions = provider.suggestions(request("git ")).last()
 
             assertEquals(listOf("switch", "status"), suggestions.map { it.replacementText }.take(2))
             assertTrue(suggestions.take(2).all { it.source == "spec" })
@@ -271,7 +272,7 @@ class StandaloneCompletionRegistryTest {
                         workingDirectoryUriProvider = { "file:///repo" },
                     )
 
-            val suggestions = provider.suggestions(request("git "))
+            val suggestions = provider.suggestions(request("git ")).last()
 
             assertEquals("switch", suggestions.first().replacementText)
             assertEquals("spec", suggestions.first().source)
@@ -301,7 +302,7 @@ class StandaloneCompletionRegistryTest {
             )
 
             val request = request("git s")
-            val suggestions = provider.suggestions(request)
+            val suggestions = provider.suggestions(request).last()
 
             assertEquals(
                 listOf("git switch main", "git status"),
@@ -336,7 +337,7 @@ class StandaloneCompletionRegistryTest {
             workingDirectoryUri = "file:///other"
 
             val request = request("git s")
-            val suggestions = provider.suggestions(request)
+            val suggestions = provider.suggestions(request).last()
 
             assertEquals("git status", suggestions.first().commandTextAfterReplacement(request))
         }
@@ -355,8 +356,8 @@ class StandaloneCompletionRegistryTest {
                 workingDirectoryUri = null,
             )
 
-            assertEquals(listOf("git status"), first.suggestions(request("git")).map { it.replacementText })
-            assertTrue(second.suggestions(request("git")).isEmpty())
+            assertEquals(listOf("git status"), first.suggestions(request("git")).last().map { it.replacementText })
+            assertTrue(second.suggestions(request("git")).last().isEmpty())
         }
 
     @Test
@@ -373,7 +374,7 @@ class StandaloneCompletionRegistryTest {
 
             registry.removeSession("session-1")
 
-            assertTrue(provider.suggestions(request("git")).isEmpty())
+            assertTrue(provider.suggestions(request("git")).last().isEmpty())
         }
 
     @Test
@@ -389,7 +390,7 @@ class StandaloneCompletionRegistryTest {
             )
 
             val provider = registry.createProvider("session-1")
-            assertTrue(provider.suggestions(request("git")).isEmpty())
+            assertTrue(provider.suggestions(request("git")).last().isEmpty())
         }
 
     private fun registry(

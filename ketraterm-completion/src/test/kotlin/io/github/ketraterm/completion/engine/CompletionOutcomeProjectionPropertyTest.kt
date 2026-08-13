@@ -208,7 +208,6 @@ class CompletionOutcomeProjectionPropertyTest {
         TerminalCompletionRequest(
             commandLine = commandLine,
             cursorOffset = commandLine.length,
-            maxCandidates = 8,
             shellCapabilities =
                 when (shellSyntax) {
                     TerminalShellSyntax.PLAIN -> TerminalShellCapabilities.PLAIN

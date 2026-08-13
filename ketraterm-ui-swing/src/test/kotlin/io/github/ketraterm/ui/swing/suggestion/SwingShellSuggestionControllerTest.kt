@@ -121,15 +121,68 @@ class SwingShellSuggestionControllerTest {
     }
 
     @Test
-    fun `up from a passive popup selects the last visible suggestion`() {
+    fun `up from a passive popup selects the last retained suggestion`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)
 
         controller.show(request(), suggestions(20), selectedIndex = -1)
         controller.handleKeyPressed(keyPressed(KeyEvent.VK_UP))
 
-        assertEquals(8, controller.state().count)
-        assertEquals(7, controller.state().selectedIndex)
+        assertEquals(20, controller.state().count)
+        assertEquals(19, controller.state().selectedIndex)
+    }
+
+    @Test
+    fun `controller retains full ranking while view receives eight rows`() {
+        lateinit var view: RecordingSuggestionView
+        val controller =
+            SwingShellSuggestionController(
+                host = RecordingSuggestionHost(),
+                viewFactory = SwingShellSuggestionViewFactory { listener -> RecordingSuggestionView(listener).also { view = it } },
+            )
+
+        controller.show(request(), suggestions(80), selectedIndex = -1)
+
+        assertEquals(80, controller.state().count)
+        assertEquals(8, view.suggestions.size)
+        assertEquals((0..7).map { "command-$it" }, view.suggestions.map { it.replacementText })
+    }
+
+    @Test
+    fun `navigation scrolls viewport and mouse acceptance resolves global rank`() {
+        lateinit var view: RecordingSuggestionView
+        val host = RecordingSuggestionHost()
+        val controller =
+            SwingShellSuggestionController(
+                host = host,
+                viewFactory = SwingShellSuggestionViewFactory { listener -> RecordingSuggestionView(listener).also { view = it } },
+            )
+        val items = suggestions(20)
+        controller.show(request(), items, selectedIndex = -1)
+
+        repeat(10) { controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN)) }
+
+        assertEquals(9, controller.state().selectedIndex)
+        assertEquals(7, view.selectedIndex)
+        assertEquals((2..9).map { "command-$it" }, view.suggestions.map { it.replacementText })
+        view.listener.onSuggestionClicked(3)
+        assertEquals(listOf(5), host.acceptedIndexes)
+        assertEquals(listOf(items[5]), host.acceptedSuggestions)
+    }
+
+    @Test
+    fun `progressive reranking preserves selected outcome only for the same request`() {
+        val controller = SwingShellSuggestionController(RecordingSuggestionHost())
+        val request = request(commandText = "git s")
+        val first = suggestions(3, endOffset = request.commandText.length)
+        controller.show(request, first, selectedIndex = 1)
+
+        controller.show(request, listOf(first[2], first[1], first[0]), selectedIndex = -1)
+        assertEquals(1, controller.state().selectedIndex)
+        assertSame(first[1], controller.state().selectedSuggestion)
+
+        controller.show(request(commandText = "git st"), first, selectedIndex = -1)
+        assertEquals(-1, controller.state().selectedIndex)
     }
 
     @Test
@@ -356,6 +409,7 @@ class SwingShellSuggestionControllerTest {
         var focusRequests = 0
         var revalidations = 0
         var repaints = 0
+        var invalidations = 0
 
         override val suggestionHandler: SwingShellSuggestionHandler =
             SwingShellSuggestionHandler { acceptance ->
@@ -381,6 +435,10 @@ class SwingShellSuggestionControllerTest {
         override fun requestFocusInWindow(): Boolean {
             focusRequests++
             return true
+        }
+
+        override fun invalidateSuggestions() {
+            invalidations++
         }
     }
 

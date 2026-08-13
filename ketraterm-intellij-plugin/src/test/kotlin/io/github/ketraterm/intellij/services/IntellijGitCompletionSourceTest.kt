@@ -88,9 +88,9 @@ class IntellijGitCompletionSourceTest {
         runBlocking {
             val engine = engine { snapshot() }
 
-            val candidates = engine.complete(request("git checkout ", maxCandidates = 2))
+            val candidates = engine.complete(request("git checkout "))
 
-            assertEquals(2, candidates.size)
+            assertEquals(3, candidates.size)
         }
 
     private fun engine(loader: suspend (String?) -> IntellijGitCompletionSnapshot): TerminalCompletionEngine =
@@ -111,14 +111,10 @@ class IntellijGitCompletionSourceTest {
             tags = listOf(TerminalCompletionDomainValue("v1.0", detail = "tag")),
         )
 
-    private fun request(
-        command: String,
-        maxCandidates: Int = 16,
-    ) = TerminalCompletionRequest(
+    private fun request(command: String) = TerminalCompletionRequest(
         commandLine = command,
         cursorOffset = command.length,
         workingDirectoryUri = "file:///repo",
-        maxCandidates = maxCandidates,
         shellCapabilities = TerminalShellCapabilities.POSIX,
     )
 }

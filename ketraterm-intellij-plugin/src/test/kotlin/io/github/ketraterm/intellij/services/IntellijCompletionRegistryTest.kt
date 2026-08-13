@@ -23,6 +23,7 @@ import io.github.ketraterm.completion.host.TerminalDirectoryScanner
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -46,7 +47,7 @@ class IntellijCompletionRegistryTest {
                     ),
                 )
 
-            val suggestions = session.provider.suggestions(request("cd s"))
+            val suggestions = session.provider.suggestions(request("cd s")).last()
 
             assertEquals(1, scans)
             assertEquals("src/", suggestions.first { it.source == "path" }.replacementText)
@@ -70,7 +71,7 @@ class IntellijCompletionRegistryTest {
             val registry = IntellijCompletionRegistry(coroutineScope = this)
             val session = registry.openSession(context(additionalSources = listOf(TerminalCompletionSourceEntry(source, 20))))
 
-            session.provider.suggestions(request("git switch m"))
+            session.provider.suggestions(request("git switch m")).last()
 
             assertEquals(1, loads)
             session.close()
@@ -97,7 +98,7 @@ class IntellijCompletionRegistryTest {
                 ),
             )
 
-            assertTrue(first.provider.suggestions(request("git s")).any { it.source == "mru" })
+            assertTrue(first.provider.suggestions(request("git s")).last().any { it.source == "mru" })
             first.close()
             second.close()
             registry.close()

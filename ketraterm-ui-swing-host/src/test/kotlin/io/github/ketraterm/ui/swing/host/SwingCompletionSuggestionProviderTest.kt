@@ -17,6 +17,8 @@ package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,15 +34,17 @@ class SwingCompletionSuggestionProviderTest {
                     engine =
                         TerminalCompletionEngine { request ->
                             captured = request
-                            listOf(
-                                TerminalCompletionCandidate(
-                                    replacementText = "status",
-                                    replacementStartOffset = 4,
-                                    replacementEndOffset = 7,
-                                    source = "spec",
-                                    kind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                                    displayText = "status",
-                                    detail = "show status",
+                            flowOf(
+                                listOf(
+                                    TerminalCompletionCandidate(
+                                        replacementText = "status",
+                                        replacementStartOffset = 4,
+                                        replacementEndOffset = 7,
+                                        source = "spec",
+                                        kind = TerminalCompletionCandidateKind.SUBCOMMAND,
+                                        displayText = "status",
+                                        detail = "show status",
+                                    ),
                                 ),
                             )
                         },
@@ -53,7 +57,7 @@ class SwingCompletionSuggestionProviderTest {
                     },
                 )
 
-            val suggestions = provider.suggestions(request("git ste", cursorOffset = 6))
+            val suggestions = provider.suggestions(request("git ste", cursorOffset = 6)).last()
 
             assertEquals("bash", captured.profileId)
             assertEquals("file:///repo", captured.workingDirectoryUri)
@@ -73,11 +77,11 @@ class SwingCompletionSuggestionProviderTest {
                 SwingCompletionSuggestionProvider(
                     TerminalCompletionEngine {
                         invoked = true
-                        emptyList()
+                        flowOf(emptyList())
                     },
                 )
 
-            assertTrue(provider.suggestions(request("😀", cursorOffset = 1)).isEmpty())
+            assertTrue(provider.suggestions(request("😀", cursorOffset = 1)).last().isEmpty())
             assertEquals(false, invoked)
         }
 

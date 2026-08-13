@@ -92,13 +92,12 @@ internal class IntellijShellSuggestionView(
     ) {
         check(!closed) { "Suggestion view is closed" }
         host.synchronizeAppearance()
-        val visibleSuggestions = suggestions.take(MAX_VISIBLE_ROWS)
-        if (this.suggestions != visibleSuggestions) {
-            this.suggestions = visibleSuggestions
+        if (this.suggestions != suggestions) {
+            this.suggestions = suggestions
             model.removeAllElements()
-            visibleSuggestions.forEach(model::addElement)
+            suggestions.forEach(model::addElement)
         }
-        suggestionList.selectedIndex = selectedIndex.takeIf { it in visibleSuggestions.indices } ?: NO_SELECTION
+        suggestionList.selectedIndex = selectedIndex.takeIf { it in suggestions.indices } ?: NO_SELECTION
         if (suggestionList.selectedIndex >= 0) {
             suggestionList.ensureIndexIsVisible(suggestionList.selectedIndex)
         }
