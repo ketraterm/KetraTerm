@@ -19,11 +19,11 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
 import io.github.ketraterm.completion.internal.completionCollectionLimit
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.ranking.CompletionSourceCandidates
 import io.github.ketraterm.completion.ranking.GlobalCompletionRanker
+import io.github.ketraterm.completion.spec.SpecCompletionSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -32,12 +32,23 @@ import kotlinx.coroutines.coroutineScope
 internal class MergedCompletionEngine(
     sources: List<TerminalCompletionSourceEntry>,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    learnedStatsProvider: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot.EMPTY },
+    learningStore: TerminalCompletionLearningStore? = null,
     clockEpochMillis: () -> Long = System::currentTimeMillis,
 ) : TerminalCompletionEngine {
-    private val sources = sources.toList()
     private val commandSpecs = commandSpecs.toList()
-    private val ranker = GlobalCompletionRanker(this.commandSpecs, learnedStatsProvider, clockEpochMillis)
+    private val sources =
+        buildList(sources.size + 1) {
+            if (this@MergedCompletionEngine.commandSpecs.isNotEmpty()) {
+                add(
+                    TerminalCompletionSourceEntry(
+                        source = SpecCompletionSource(this@MergedCompletionEngine.commandSpecs),
+                        priority = TerminalCompletionSourcePrior.STATIC_SPECIFICATION,
+                    ),
+                )
+            }
+            addAll(sources)
+        }
+    private val ranker = GlobalCompletionRanker(this.commandSpecs, learningStore, clockEpochMillis)
 
     override suspend fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate> =
         coroutineScope {

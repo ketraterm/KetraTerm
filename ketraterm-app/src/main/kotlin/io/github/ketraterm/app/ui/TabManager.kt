@@ -19,7 +19,7 @@ import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
 import io.github.ketraterm.app.completion.StandaloneCompletionStatisticsCoordinator
 import io.github.ketraterm.app.completion.completionShellCapabilities
 import io.github.ketraterm.app.config.KetraTermSettings
-import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
@@ -59,7 +59,7 @@ internal class TabManager(
     private val tabRoots = HashMap<String, SplitNode>()
     private val tabContainers = HashMap<String, JPanel>()
     private val completionSpecs = TerminalCommandSpecs.defaults()
-    private val commandCompletionStatsSource = TerminalCompletionSources.learningStore(commandSpecs = completionSpecs)
+    private val commandCompletionStatsSource = TerminalCompletionLearningStore(commandSpecs = completionSpecs)
     private val completionScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("standalone-completion"))
     private val completionStatistics =

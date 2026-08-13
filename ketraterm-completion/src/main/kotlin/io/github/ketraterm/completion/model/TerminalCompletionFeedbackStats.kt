@@ -33,62 +33,6 @@ enum class TerminalCompletionFeedbackKind {
 }
 
 /**
- * Position of a completion candidate within the command line that produced it.
- */
-enum class TerminalCompletionTokenPosition {
-    /**
-     * Candidate replaces or completes the executable token.
-     */
-    COMMAND,
-
-    /**
-     * Candidate replaces or completes a command-specific subcommand token.
-     */
-    SUBCOMMAND,
-
-    /**
-     * Candidate replaces or completes an option or flag token.
-     */
-    OPTION,
-
-    /**
-     * Candidate replaces or completes a positional argument or option value.
-     */
-    ARGUMENT,
-
-    /**
-     * Candidate position could not be classified safely.
-     */
-    UNKNOWN,
-
-    ;
-
-    companion object {
-        /**
-         * Maps a candidate kind to its default command-line token position.
-         *
-         * Hosts may override the position when they have richer parser context,
-         * but this mapping is the shared fallback used by generic completion
-         * sources and host adapters.
-         *
-         * @param candidateKind semantic candidate kind.
-         * @return default token position for [candidateKind].
-         */
-        @JvmStatic
-        fun fromCandidateKind(candidateKind: TerminalCompletionCandidateKind): TerminalCompletionTokenPosition =
-            when (candidateKind) {
-                TerminalCompletionCandidateKind.COMMAND -> COMMAND
-                TerminalCompletionCandidateKind.SUBCOMMAND -> SUBCOMMAND
-                TerminalCompletionCandidateKind.OPTION -> OPTION
-                TerminalCompletionCandidateKind.ARGUMENT,
-                TerminalCompletionCandidateKind.PATH,
-                -> ARGUMENT
-                TerminalCompletionCandidateKind.HISTORY -> UNKNOWN
-            }
-    }
-}
-
-/**
  * Source-specific context attached to suggestion feedback.
  *
  * This model deliberately stores provider and candidate metadata, not raw
@@ -98,31 +42,26 @@ enum class TerminalCompletionTokenPosition {
  *
  * @property source compact provider/source label from the candidate.
  * @property candidateKind semantic kind of candidate that received feedback.
- * @property tokenPosition classified command-line position of the candidate.
  * @throws IllegalArgumentException if [source] is blank.
  */
-data class TerminalCompletionFeedbackContext
-    @JvmOverloads
-    constructor(
-        val source: String,
-        val candidateKind: TerminalCompletionCandidateKind,
-        val tokenPosition: TerminalCompletionTokenPosition = TerminalCompletionTokenPosition.UNKNOWN,
-    ) {
-        init {
-            require(source.isNotBlank()) { "source must not be blank" }
-        }
+data class TerminalCompletionFeedbackContext(
+    val source: String,
+    val candidateKind: TerminalCompletionCandidateKind,
+) {
+    init {
+        require(source.isNotBlank()) { "source must not be blank" }
     }
+}
 
 /**
  * Aggregated source-specific feedback counters.
  *
- * Rows are keyed by provider source, candidate kind, token position, host
- * profile, and working directory. They do not contain command text, raw
- * argument values, or request-specific replacement ranges.
+ * Rows are keyed by provider source, candidate kind, host profile, and working
+ * directory. They do not contain command text, raw argument values, or
+ * request-specific replacement ranges.
  *
  * @property source compact provider/source label from the displayed candidate.
  * @property candidateKind semantic kind of candidate that received feedback.
- * @property tokenPosition classified command-line position of the candidate.
  * @property profileId optional host profile id associated with this row.
  * @property workingDirectoryUri optional working directory URI associated with
  * this row.
@@ -137,7 +76,6 @@ data class TerminalCompletionFeedbackStats
     constructor(
         val source: String,
         val candidateKind: TerminalCompletionCandidateKind,
-        val tokenPosition: TerminalCompletionTokenPosition = TerminalCompletionTokenPosition.UNKNOWN,
         val profileId: String? = null,
         val workingDirectoryUri: String? = null,
         val acceptedCount: Int = 0,

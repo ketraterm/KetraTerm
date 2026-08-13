@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.stats
 
 import io.github.ketraterm.completion.commandline.TerminalCommandLineClassifier
 import io.github.ketraterm.completion.internal.BoundedStatsRowIndex
+import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.TERMINAL_COMMAND_SHAPE_STATS_ORDER
 import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncrement
 import io.github.ketraterm.completion.model.TerminalCommandLineShape
@@ -43,7 +44,9 @@ internal class CommandShapeStatsIndex(
         )
     private val commandSpecs = commandSpecs.toList()
 
-    fun replaceAll(records: List<TerminalCommandShapeStats>) = rows.replaceAll(records)
+    fun replaceAll(records: List<TerminalCommandShapeStats>) = rows.replaceAll(records.map(::canonicalizeContext))
+
+    fun mergeAll(records: List<TerminalCommandShapeStats>) = rows.mergeAll(records.map(::canonicalizeContext), ::mergeStats)
 
     fun snapshot(): List<TerminalCommandShapeStats> = rows.snapshot()
 
@@ -99,13 +102,14 @@ internal class CommandShapeStatsIndex(
         update: (TerminalCommandShapeStats) -> TerminalCommandShapeStats,
     ) {
         val shape = shapeFor(commandLine) ?: return
+        val context = CompletionLearningContextKey.of(profileId, workingDirectoryUri)
         rows.mutate(
-            key = CommandShapeStatsKey(shape.normalizedShapeKey, profileId, workingDirectoryUri),
+            key = CommandShapeStatsKey(shape.normalizedShapeKey, context),
             initialRow = {
                 TerminalCommandShapeStats(
                     shape = shape,
-                    profileId = profileId,
-                    workingDirectoryUri = workingDirectoryUri,
+                    profileId = context.profileId,
+                    workingDirectoryUri = context.workingDirectoryUri,
                 )
             },
             update = update,
@@ -119,14 +123,38 @@ internal class CommandShapeStatsIndex(
 
     private data class CommandShapeStatsKey(
         val normalizedShapeKey: String,
-        val profileId: String?,
-        val workingDirectoryUri: String?,
+        val context: CompletionLearningContextKey,
     )
 
     private fun TerminalCommandShapeStats.key(): CommandShapeStatsKey =
         CommandShapeStatsKey(
             normalizedShapeKey = shape.normalizedShapeKey,
-            profileId = profileId,
-            workingDirectoryUri = workingDirectoryUri,
+            context = CompletionLearningContextKey.of(profileId, workingDirectoryUri),
         )
+
+    private fun canonicalizeContext(record: TerminalCommandShapeStats): TerminalCommandShapeStats {
+        val context = CompletionLearningContextKey.of(record.profileId, record.workingDirectoryUri)
+        return record.copy(
+            profileId = context.profileId,
+            workingDirectoryUri = context.workingDirectoryUri,
+        )
+    }
+
+    private fun mergeStats(
+        current: TerminalCommandShapeStats,
+        incoming: TerminalCommandShapeStats,
+    ): TerminalCommandShapeStats {
+        val newest = if (incoming.lastUsedEpochMillis >= current.lastUsedEpochMillis) incoming else current
+        val context = CompletionLearningContextKey.of(current.profileId, current.workingDirectoryUri)
+        return newest.copy(
+            profileId = context.profileId,
+            workingDirectoryUri = context.workingDirectoryUri,
+            useCount = saturatedCounterSum(current.useCount, incoming.useCount),
+            successCount = saturatedCounterSum(current.successCount, incoming.successCount),
+            failureCount = saturatedCounterSum(current.failureCount, incoming.failureCount),
+            acceptedCount = saturatedCounterSum(current.acceptedCount, incoming.acceptedCount),
+            dismissedCount = saturatedCounterSum(current.dismissedCount, incoming.dismissedCount),
+            lastUsedEpochMillis = maxOf(current.lastUsedEpochMillis, incoming.lastUsedEpochMillis),
+        )
+    }
 }

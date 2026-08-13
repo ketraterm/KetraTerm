@@ -16,8 +16,8 @@
 package io.github.ketraterm.completion.ranking
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
@@ -38,7 +38,7 @@ internal data class CompletionSourceCandidates(
  */
 internal class GlobalCompletionRanker(
     commandSpecs: List<TerminalCommandSpec>,
-    private val learnedStatsProvider: () -> TerminalCommandCompletionStatsSnapshot,
+    private val learningStore: TerminalCompletionLearningStore?,
     private val clockEpochMillis: () -> Long,
 ) {
     private val commandSpecs = commandSpecs.toList()
@@ -52,15 +52,12 @@ internal class GlobalCompletionRanker(
         val aggregates = groupByOutcome(request, context, sourceCandidates)
         if (aggregates.isEmpty()) return emptyList()
 
-        val learnedIndex =
-            learnedStatsProvider()
-                .compiledLearning
-                .indexesFor(request.shellCapabilities.syntax, commandSpecs)
-                .evidence
+        val learnedIndex = learningStore?.indexesFor(request.shellCapabilities.syntax, commandSpecs)?.evidence
+        val learningContext = CompletionLearningContextKey.from(request)
         val now = clockEpochMillis().coerceAtLeast(0L)
         val fused = ArrayList<FusedCandidate>(aggregates.size)
         for (aggregate in aggregates.values) {
-            fused += aggregate.finish(request, learnedIndex, now)
+            fused += aggregate.finish(learnedIndex, learningContext, now)
         }
         fused.sortWith(FUSED_ORDER)
         val resultCount = minOf(fused.size, request.maxCandidates)
@@ -113,8 +110,8 @@ internal class GlobalCompletionRanker(
         }
 
         fun finish(
-            request: TerminalCompletionRequest,
-            learnedIndex: LearnedCompletionEvidenceIndex,
+            learnedIndex: LearnedCompletionEvidenceIndex?,
+            learningContext: CompletionLearningContextKey,
             now: Long,
         ): FusedCandidate {
             val representative = contributions.minWith(REPRESENTATIVE_ORDER)
@@ -125,13 +122,13 @@ internal class GlobalCompletionRanker(
             for (contribution in contributions) {
                 reciprocalRankScore += reciprocalRank(contribution.localRank)
                 sourcePriorScore += contribution.sourcePrior
-                providerLearningScore += learnedIndex.providerAdjustment(contribution.candidate, request)
+                providerLearningScore += learnedIndex?.providerAdjustment(contribution.candidate, learningContext) ?: 0
                 strongestContext = maxOf(strongestContext, contribution.contextAdjustment)
             }
             val exactLearningScore =
-                representative.resolved?.let { learnedIndex.exactAdjustment(it.learnedKey, request, now) } ?: 0
+                representative.resolved?.let { learnedIndex?.exactAdjustment(it.learnedKey, learningContext, now) } ?: 0
             val shapeLearningScore =
-                representative.resolved?.let { learnedIndex.shapeAdjustment(it.shape, request) } ?: 0
+                representative.resolved?.let { learnedIndex?.shapeAdjustment(it.shape, learningContext) } ?: 0
             val score =
                 CompletionScoreComponents(
                     reciprocalRank = reciprocalRankScore,

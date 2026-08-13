@@ -190,6 +190,71 @@ class CompletionStatsIndexesTest {
         assertEquals(3L, index.snapshot()[1].lastUsedEpochMillis)
     }
 
+    @Test
+    fun `all learning indexes deduplicate canonical directory variants`() {
+        val commandIndex = CommandCompletionStatsIndex(capacity = 8)
+        commandIndex.replaceAll(
+            listOf(
+                TerminalCommandCompletionStats(
+                    commandLine = "git status",
+                    profileId = "profile",
+                    workingDirectoryUri = "file:///repo/",
+                    lastUsedEpochMillis = 1,
+                ),
+                TerminalCommandCompletionStats(
+                    commandLine = "git status",
+                    profileId = "profile",
+                    workingDirectoryUri = "file:///repo",
+                    lastUsedEpochMillis = 2,
+                ),
+            ),
+        )
+        val shape = requireNotNull(classifyGenericCommandLineShape("git status"))
+        val shapeIndex = CommandShapeStatsIndex(capacity = 8, commandSpecs = emptyList())
+        shapeIndex.replaceAll(
+            listOf(
+                TerminalCommandShapeStats(
+                    shape = shape,
+                    profileId = "profile",
+                    workingDirectoryUri = "file:///repo/",
+                    lastUsedEpochMillis = 1,
+                ),
+                TerminalCommandShapeStats(
+                    shape = shape,
+                    profileId = "profile",
+                    workingDirectoryUri = "file:///repo",
+                    lastUsedEpochMillis = 2,
+                ),
+            ),
+        )
+        val feedbackIndex = CompletionFeedbackStatsIndex(capacity = 8)
+        feedbackIndex.replaceAll(
+            listOf(
+                TerminalCompletionFeedbackStats(
+                    source = "spec",
+                    candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
+                    profileId = "profile",
+                    workingDirectoryUri = "file:///repo/",
+                    lastUsedEpochMillis = 1,
+                ),
+                TerminalCompletionFeedbackStats(
+                    source = "spec",
+                    candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
+                    profileId = "profile",
+                    workingDirectoryUri = "file:///repo",
+                    lastUsedEpochMillis = 2,
+                ),
+            ),
+        )
+
+        assertEquals(listOf(2L), commandIndex.snapshot().map { it.lastUsedEpochMillis })
+        assertEquals(listOf(2L), shapeIndex.snapshot().map { it.lastUsedEpochMillis })
+        assertEquals(listOf(2L), feedbackIndex.snapshot().map { it.lastUsedEpochMillis })
+        assertEquals(listOf("file:///repo/"), commandIndex.snapshot().map { it.workingDirectoryUri })
+        assertEquals(listOf("file:///repo/"), shapeIndex.snapshot().map { it.workingDirectoryUri })
+        assertEquals(listOf("file:///repo/"), feedbackIndex.snapshot().map { it.workingDirectoryUri })
+    }
+
     private fun commandStats(
         commandLine: String,
         lastUsedEpochMillis: Long,
@@ -214,7 +279,6 @@ class CompletionStatsIndexesTest {
         TerminalCompletionFeedbackContext(
             source = source,
             candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-            tokenPosition = TerminalCompletionTokenPosition.SUBCOMMAND,
         )
 
     private fun feedbackStats(
@@ -226,7 +290,6 @@ class CompletionStatsIndexesTest {
         TerminalCompletionFeedbackStats(
             source = source,
             candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-            tokenPosition = TerminalCompletionTokenPosition.SUBCOMMAND,
             acceptedCount = acceptedCount,
             dismissedCount = dismissedCount,
             lastUsedEpochMillis = lastUsedEpochMillis,

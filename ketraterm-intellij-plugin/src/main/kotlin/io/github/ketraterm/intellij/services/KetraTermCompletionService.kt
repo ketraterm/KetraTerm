@@ -27,7 +27,6 @@ import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
-import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
@@ -53,7 +52,7 @@ internal class KetraTermCompletionService(
     coroutineScope: CoroutineScope,
 ) : Disposable {
     private val settings = KetraTermIntellijSettings.getInstance()
-    private val learningStore = TerminalCompletionSources.learningStore()
+    private val learningStore = TerminalCompletionLearningStore()
     private val learningRepository =
         TerminalCompletionLearningRepository(
             learningStore = learningStore,
@@ -61,7 +60,7 @@ internal class KetraTermCompletionService(
             PathManager
                 .getSystemDir()
                 .resolve("ketraterm")
-                .resolve(TerminalCompletionStatsStore.currentFileName()),
+                .resolve(TerminalCompletionLearningRepository.currentFileName()),
             persistenceEnabled = settings.completionLearningPersistenceEnabled(),
         )
     private val registry =
@@ -179,7 +178,7 @@ internal class KetraTermCompletionService(
  */
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    private val statsSource: TerminalCompletionLearningStore = TerminalCompletionSources.learningStore(commandSpecs = specs),
+    private val statsSource: TerminalCompletionLearningStore = TerminalCompletionLearningStore(commandSpecs = specs),
     learningRepository: TerminalCompletionLearningRepository = TerminalCompletionLearningRepository(statsSource),
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
     coroutineScope: CoroutineScope? = null,
@@ -200,7 +199,6 @@ internal class IntellijCompletionRegistry(
             repository = learningRepository,
             coroutineScope = completionScope,
         )
-    private val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
 
     /**
      * Creates and registers all completion sources for one terminal session.
@@ -229,7 +227,7 @@ internal class IntellijCompletionRegistry(
             TerminalCompletionSources.sessionMru(
                 capacity = sessionMruCapacity,
                 commandSpecs = commandSpecs,
-                learnedStatsProvider = statsSource::snapshotAll,
+                learningStore = statsSource,
             )
         try {
             val fileSystemProvider = TerminalLocalFileSystemProvider(scanner = context.directoryScanner)
@@ -240,12 +238,6 @@ internal class IntellijCompletionRegistry(
                             mruSource,
                             priority = TerminalCompletionSourcePrior.SESSION_MRU
                         )
-                    )
-                    add(
-                        TerminalCompletionSourceEntry(
-                            specSource,
-                            priority = TerminalCompletionSourcePrior.STATIC_SPECIFICATION,
-                        ),
                     )
                     add(
                         TerminalCompletionSourceEntry(
@@ -263,7 +255,7 @@ internal class IntellijCompletionRegistry(
                         TerminalCompletionEngines.fromSources(
                             sources = sources,
                             commandSpecs = commandSpecs,
-                            learnedStatsProvider = statsSource::snapshotAll,
+                            learningStore = statsSource,
                         ),
                     contextProvider = { context.swingContext() },
                 )

@@ -36,7 +36,7 @@ open class TerminalCompletionBenchmark {
     private val commandSpecs = TerminalCommandSpecs.defaults()
     private val engine =
         TerminalCompletionEngines.fromSources(
-            sources = listOf(TerminalCompletionSourceEntry(TerminalCompletionSources.fromSpecs(commandSpecs))),
+            sources = emptyList(),
             commandSpecs = commandSpecs,
         )
 
@@ -90,14 +90,14 @@ open class TerminalCompletionBenchmark {
             TerminalCompletionEngines.fromSources(
                 realisticSources,
                 commandSpecs,
-                learnedStatsProvider = { learnedSnapshot },
+                learningStore = TerminalCompletionLearningStore(commandSpecs = commandSpecs).apply { replaceSnapshot(learnedSnapshot) },
             )
-        val persistedStatsSource = TerminalCompletionSources.learningStore(capacity = 2_048, commandSpecs = commandSpecs)
+        val persistedStatsSource = TerminalCompletionLearningStore(capacity = 2_048, commandSpecs = commandSpecs)
         persistedStatsSource.replaceSnapshot(learnedSnapshot)
         val sessionMru =
             TerminalCompletionSources.sessionMru(
                 commandSpecs = commandSpecs,
-                learnedStatsProvider = persistedStatsSource::snapshotAll,
+                learningStore = persistedStatsSource,
             )
         sessionMru.recordSuccessfulCommand(
             commandLine = "git switch main",
@@ -114,7 +114,7 @@ open class TerminalCompletionBenchmark {
                         ),
                     ),
                 commandSpecs = commandSpecs,
-                learnedStatsProvider = persistedStatsSource::snapshotAll,
+                learningStore = persistedStatsSource,
             )
         runBlocking { indexedPersistedHistoryEngine.complete(fusionRequest) }
         duplicateFusionEngine = TerminalCompletionEngines.fromSources(List(8) { sourceEntry(it, 32, duplicateMain = true) }, commandSpecs)
@@ -177,7 +177,7 @@ open class TerminalCompletionBenchmark {
             TerminalCompletionEngines.fromSources(
                 sources = realisticSources,
                 commandSpecs = commandSpecs,
-                learnedStatsProvider = { learnedSnapshot },
+                learningStore = TerminalCompletionLearningStore(commandSpecs = commandSpecs).apply { replaceSnapshot(learnedSnapshot) },
             )
         blackhole.consume(runBlocking { coldEngine.complete(fusionRequest) })
     }

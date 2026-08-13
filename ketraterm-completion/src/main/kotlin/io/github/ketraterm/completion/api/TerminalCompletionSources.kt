@@ -20,19 +20,9 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.source.*
-import io.github.ketraterm.completion.spec.SpecCompletionSource
 
 /** Factories for dependency-free, host-composable completion sources. */
 object TerminalCompletionSources {
-    /**
-     * Creates a deterministic source backed by static command specs.
-     *
-     * @param specs top-level command specs.
-     * @return completion source that evaluates [specs] without shell I/O.
-     */
-    @JvmStatic
-    fun fromSpecs(specs: List<TerminalCommandSpec>): TerminalCompletionSource = SpecCompletionSource(specs)
-
     /**
      * Creates a bounded in-memory source for commands observed in the current
      * terminal session.
@@ -42,9 +32,9 @@ object TerminalCompletionSources {
      * @param commandSpecs static command specs whose known command families are
      * excluded from observed-token learning because specs are authoritative for
      * those commands.
-     * @param learnedStatsProvider immutable learned-statistics snapshot used to
-     * recover positive commands across sessions. These rows contribute through
-     * this single learned source and are not a separate completion provider.
+     * @param learningStore optional shared learning store used to recover
+     * positive commands across sessions. Its rows contribute through this
+     * single learned source and are not a separate completion provider.
      * @return mutable session MRU completion source.
      * @throws IllegalArgumentException if [capacity] is not positive.
      */
@@ -53,38 +43,12 @@ object TerminalCompletionSources {
     fun sessionMru(
         capacity: Int = 128,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-        learnedStatsProvider: () -> io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot = {
-            io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot.EMPTY
-        },
+        learningStore: TerminalCompletionLearningStore? = null,
     ): TerminalSessionMruCompletionSource =
         SessionMruCompletionSourceImpl(
             capacity = capacity,
             commandSpecs = commandSpecs,
-            learnedStatsProvider = learnedStatsProvider,
-        )
-
-    /**
-     * Creates a bounded in-memory store for aggregated command statistics.
-     *
-     * Hosts should feed this store from compact persisted snapshots and live
-     * suggestion feedback. The store performs no persistence or I/O and is not
-     * itself a [TerminalCompletionSource].
-     *
-     * @param capacity maximum distinct command/profile/directory rows retained.
-     * @param commandSpecs command specifications used to classify
-     * privacy-preserving command-family shapes.
-     * @return mutable command-statistics store for ranking and learned fallback evidence.
-     * @throws IllegalArgumentException if [capacity] is not positive.
-     */
-    @JvmStatic
-    @JvmOverloads
-    fun learningStore(
-        capacity: Int = 2048,
-        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    ): TerminalCompletionLearningStore =
-        CompletionLearningStoreImpl(
-            capacity = capacity,
-            commandSpecs = commandSpecs,
+            learningStore = learningStore,
         )
 
     /**

@@ -24,22 +24,22 @@ class TerminalCompletionLearningStoreTest {
     @Test
     fun `complete snapshot identity remains stable until mutation`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
 
-            val before = source.snapshotAll()
-            assertSame(before, source.snapshotAll())
+            val before = source.snapshot()
+            assertSame(before, source.snapshot())
 
             source.recordCommandResult("git status", true, null, null, 1)
 
-            val after = source.snapshotAll()
+            val after = source.snapshot()
             assertNotSame(before, after)
-            assertSame(after, source.snapshotAll())
+            assertSame(after, source.snapshot())
         }
 
     @Test
     fun `successful command result supplies token-local learned history evidence`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
             source.recordCommandResult(
                 commandLine = "git status",
                 successful = true,
@@ -61,7 +61,7 @@ class TerminalCompletionLearningStoreTest {
     @Test
     fun `records compact success and failure counts for one normalized command`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
 
             source.recordCommandResult(
                 "Git Status",
@@ -92,14 +92,14 @@ class TerminalCompletionLearningStoreTest {
                         lastUsedEpochMillis = 20,
                     ),
                 ),
-                source.snapshot(),
+                source.snapshot().commandStats,
             )
         }
 
     @Test
     fun `accepted feedback boosts candidate above dismissed candidate`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
             source.recordCommandResult(
                 "git status",
                 successful = true,
@@ -143,7 +143,7 @@ class TerminalCompletionLearningStoreTest {
     @Test
     fun `exact command ranking caps learned counter contribution`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
             source.replaceSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     commandStats =
@@ -175,7 +175,7 @@ class TerminalCompletionLearningStoreTest {
     @Test
     fun `profile and working directory matches affect ranking`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
             source.recordCommandResult(
                 "npm test",
                 successful = true,
@@ -203,7 +203,7 @@ class TerminalCompletionLearningStoreTest {
     @Test
     fun `exact command prefix is not suggested`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
             source.recordCommandResult(
                 "git status",
                 successful = true,
@@ -218,7 +218,7 @@ class TerminalCompletionLearningStoreTest {
     @Test
     fun `does not replace a chained command segment with whole-line history`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
             source.recordCommandResult(
                 "git status",
                 successful = true,
@@ -241,7 +241,7 @@ class TerminalCompletionLearningStoreTest {
     @Test
     fun `failure only and dismissed only rows are tracked but not suggested`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
             source.recordCommandResult(
                 "git status",
                 successful = false,
@@ -257,14 +257,15 @@ class TerminalCompletionLearningStoreTest {
                 feedbackAtEpochMillis = 200,
             )
 
-            assertEquals(listOf("git switch main", "git status"), source.snapshot().map { it.commandLine })
+            assertEquals(listOf("git switch main", "git status"), source.snapshot().commandStats.map { it.commandLine })
             assertTrue(learnedHistory(source).complete(request("git s")).isEmpty())
         }
 
     @Test
     fun `blank multiline and negative timestamp events are ignored`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
+            val before = source.snapshot()
 
             source.recordCommandResult(
                 "   ",
@@ -287,14 +288,16 @@ class TerminalCompletionLearningStoreTest {
                 workingDirectoryUri = null,
                 feedbackAtEpochMillis = -1,
             )
+            source.mergeSnapshot(TerminalCommandCompletionStatsSnapshot.EMPTY)
 
-            assertTrue(source.snapshot().isEmpty())
+            assertTrue(source.snapshot().commandStats.isEmpty())
+            assertSame(before, source.snapshot())
         }
 
     @Test
     fun `capacity keeps most relevant recent records`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore(capacity = 2)
+            val source = TerminalCompletionLearningStore(capacity = 2)
 
             source.recordCommandResult(
                 "one",
@@ -318,13 +321,13 @@ class TerminalCompletionLearningStoreTest {
                 usedAtEpochMillis = 3,
             )
 
-            assertEquals(listOf("three", "two"), source.snapshot().map { it.commandLine })
+            assertEquals(listOf("three", "two"), source.snapshot().commandStats.map { it.commandLine })
         }
 
     @Test
     fun `replace snapshot deduplicates by normalized command profile and directory`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
 
             source.replaceSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
@@ -354,17 +357,17 @@ class TerminalCompletionLearningStoreTest {
 
             assertEquals(
                 listOf(
-                    stats("git status", profileId = "bash", workingDirectoryUri = "file:///repo", lastUsedEpochMillis = 20),
-                    stats("git status", profileId = "pwsh", workingDirectoryUri = "file:///repo", lastUsedEpochMillis = 5),
+                    stats("git status", profileId = "bash", workingDirectoryUri = "file:///repo/", lastUsedEpochMillis = 20),
+                    stats("git status", profileId = "pwsh", workingDirectoryUri = "file:///repo/", lastUsedEpochMillis = 5),
                 ),
-                source.snapshot(),
+                source.snapshot().commandStats,
             )
         }
 
     @Test
-    fun `factory creates command stats source`() =
+    fun `constructor creates bounded command stats store`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore(capacity = 1)
+            val source = TerminalCompletionLearningStore(capacity = 1)
 
             source.recordCommandResult(
                 "git status",
@@ -374,14 +377,14 @@ class TerminalCompletionLearningStoreTest {
                 usedAtEpochMillis = 1,
             )
 
-            assertEquals(listOf("git status"), source.snapshot().map { it.commandLine })
+            assertEquals(listOf("git status"), source.snapshot().commandStats.map { it.commandLine })
         }
 
     @Test
     fun `custom command specs classify nested command shapes`() =
         runBlocking {
             val source =
-                TerminalCompletionSources.learningStore(
+                TerminalCompletionLearningStore(
                     commandSpecs =
                         listOf(
                             TerminalCommandSpec(
@@ -405,7 +408,12 @@ class TerminalCompletionLearningStoreTest {
                 usedAtEpochMillis = 1,
             )
 
-            val shape = source.shapeSnapshot().single().shape
+            val shape =
+                source
+                    .snapshot()
+                    .shapeStats
+                    .single()
+                    .shape
             assertEquals("tool", shape.executable)
             assertEquals(listOf("alpha", "beta"), shape.subcommands)
             assertEquals(1, shape.positionalArgumentCount)
@@ -416,7 +424,7 @@ class TerminalCompletionLearningStoreTest {
     fun `custom command specs canonicalize aliased subcommands`() =
         runBlocking {
             val source =
-                TerminalCompletionSources.learningStore(
+                TerminalCompletionLearningStore(
                     commandSpecs =
                         listOf(
                             TerminalCommandSpec(
@@ -434,7 +442,12 @@ class TerminalCompletionLearningStoreTest {
                 usedAtEpochMillis = 1,
             )
 
-            val shape = source.shapeSnapshot().single().shape
+            val shape =
+                source
+                    .snapshot()
+                    .shapeStats
+                    .single()
+                    .shape
             assertEquals(listOf("checkout"), shape.subcommands)
             assertEquals(1, shape.positionalArgumentCount)
             assertTrue("main" !in shape.normalizedShapeKey)
@@ -443,7 +456,7 @@ class TerminalCompletionLearningStoreTest {
     @Test
     fun `empty command specs fall back to generic private shape classification`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
+            val source = TerminalCompletionLearningStore(commandSpecs = emptyList())
 
             source.recordCommandResult(
                 commandLine = "docker compose up secret-project",
@@ -453,7 +466,12 @@ class TerminalCompletionLearningStoreTest {
                 usedAtEpochMillis = 1,
             )
 
-            val shape = source.shapeSnapshot().single().shape
+            val shape =
+                source
+                    .snapshot()
+                    .shapeStats
+                    .single()
+                    .shape
             assertEquals("docker", shape.executable)
             assertEquals(listOf("compose"), shape.subcommands)
             assertEquals(2, shape.positionalArgumentCount)
@@ -463,7 +481,7 @@ class TerminalCompletionLearningStoreTest {
     @Test
     fun `records source-specific feedback context without command text`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
 
             source.recordSuggestionFeedback(
                 commandLine = "git status",
@@ -475,7 +493,6 @@ class TerminalCompletionLearningStoreTest {
                     TerminalCompletionFeedbackContext(
                         source = "spec",
                         candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                        tokenPosition = TerminalCompletionTokenPosition.SUBCOMMAND,
                     ),
             )
             source.recordSuggestionFeedback(
@@ -488,7 +505,6 @@ class TerminalCompletionLearningStoreTest {
                     TerminalCompletionFeedbackContext(
                         source = "spec",
                         candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                        tokenPosition = TerminalCompletionTokenPosition.SUBCOMMAND,
                     ),
             )
 
@@ -497,23 +513,28 @@ class TerminalCompletionLearningStoreTest {
                     TerminalCompletionFeedbackStats(
                         source = "spec",
                         candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                        tokenPosition = TerminalCompletionTokenPosition.SUBCOMMAND,
                         profileId = "bash",
-                        workingDirectoryUri = "file:///repo",
+                        workingDirectoryUri = "file:///repo/",
                         acceptedCount = 1,
                         dismissedCount = 1,
                         lastUsedEpochMillis = 200,
                     ),
                 ),
-                source.feedbackSnapshot(),
+                source.snapshot().feedbackStats,
             )
-            assertTrue(source.feedbackSnapshot().single().source != "git status")
+            assertTrue(
+                source
+                    .snapshot()
+                    .feedbackStats
+                    .single()
+                    .source != "git status",
+            )
         }
 
     @Test
     fun `replace snapshot keeps newest duplicate feedback context`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
 
             source.replaceSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
@@ -526,14 +547,14 @@ class TerminalCompletionLearningStoreTest {
                 ),
             )
 
-            assertEquals(listOf(20L, 5L), source.feedbackSnapshot().map { it.lastUsedEpochMillis })
-            assertEquals(listOf("spec", "stats"), source.feedbackSnapshot().map { it.source })
+            assertEquals(listOf(20L, 5L), source.snapshot().feedbackStats.map { it.lastUsedEpochMillis })
+            assertEquals(listOf("spec", "stats"), source.snapshot().feedbackStats.map { it.source })
         }
 
     @Test
     fun `recorded counters saturate at integer maximum`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
             source.replaceSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     commandStats =
@@ -564,7 +585,7 @@ class TerminalCompletionLearningStoreTest {
                 feedbackAtEpochMillis = 30,
             )
 
-            val stats = source.snapshot().single()
+            val stats = source.snapshot().commandStats.single()
             assertEquals(Int.MAX_VALUE, stats.useCount)
             assertEquals(Int.MAX_VALUE, stats.successCount)
             assertEquals(Int.MAX_VALUE, stats.acceptedCount)
@@ -584,8 +605,7 @@ class TerminalCompletionLearningStoreTest {
             shellCapabilities = shellCapabilities,
         )
 
-    private fun learnedHistory(source: TerminalCompletionLearningStore) =
-        TerminalCompletionSources.sessionMru(learnedStatsProvider = source::snapshotAll)
+    private fun learnedHistory(source: TerminalCompletionLearningStore) = TerminalCompletionSources.sessionMru(learningStore = source)
 
     private fun stats(
         commandLine: String,
@@ -614,7 +634,6 @@ class TerminalCompletionLearningStoreTest {
         TerminalCompletionFeedbackStats(
             source = source,
             candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-            tokenPosition = TerminalCompletionTokenPosition.SUBCOMMAND,
             profileId = "bash",
             workingDirectoryUri = "file:///repo",
             acceptedCount = acceptedCount,

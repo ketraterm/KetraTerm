@@ -50,12 +50,14 @@ completion engine:
 KetraTerm_COMMAND_COMPLETION_STATS	1
 C	<commandBase64>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
 S	<executableBase64>	<subcommandsBase64List>	<optionNamesBase64List>	<positionalArgumentCount>	<optionValueCount>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
-F	<sourceBase64>	<candidateKind>	<tokenPosition>	<profileBase64>	<cwdBase64>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
+F	<sourceBase64>	<candidateKind>	<profileBase64>	<cwdBase64>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
 ```
 
 Text fields are Base64URL-encoded without padding so tabs and Unicode text do not corrupt the TSV layout. The optional
 `ketraterm-completion-persistence`
-module owns this file through `TerminalCompletionStatsStore`; workspace state has no dependency on completion learning.
+module owns this file through `TerminalCompletionLearningRepository`; its codec and bounded raw file store are internal,
+and workspace state has no dependency on completion learning. Legacy nine-field feedback rows containing a redundant
+token-position column are accepted when loading existing version-1 files, but new writes use the eight-field row above.
 One suspending `TerminalCompletionLearningRepository` serializes learning and file replacement with a mutex and moves
 file access to `Dispatchers.IO`. Loads, rows, line sizes, and total file bytes are bounded before decoding or encoding,
 so neither startup nor settings changes read this file on the Swing event-dispatch thread. Derived

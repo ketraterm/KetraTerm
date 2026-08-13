@@ -15,8 +15,9 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.api.TerminalCompletionSources
-import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
@@ -30,17 +31,17 @@ class StandaloneCompletionStatisticsCoordinatorTest {
     fun `command learning uses the lifecycle scope and repository`(
         @TempDir directory: Path,
     ) = runBlocking {
-        val path = directory.resolve(TerminalCompletionStatsStore.currentFileName())
-        val learning = TerminalCompletionSources.learningStore()
+        val path = directory.resolve(TerminalCompletionLearningRepository.currentFileName())
+        val learning = TerminalCompletionLearningStore()
         val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, this)
 
         coordinator.recordFinishedCommand("git status", true, "bash", "file:///repo", 42L)
         coroutineContext[Job]?.children?.toList()?.joinAll()
 
-        assertEquals(listOf("git status"), learning.snapshot().map { it.commandLine })
+        assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
         assertEquals(
             listOf("git status"),
-            TerminalCompletionStatsStore(path).loadSnapshot().commandStats.map { it.commandLine },
+            persistedSnapshot(path).commandStats.map { it.commandLine },
         )
     }
 
@@ -48,18 +49,31 @@ class StandaloneCompletionStatisticsCoordinatorTest {
     fun `null persistence path keeps later learning in memory only`(
         @TempDir directory: Path,
     ) = runBlocking {
-        val path = directory.resolve(TerminalCompletionStatsStore.currentFileName())
-        val learning = TerminalCompletionSources.learningStore()
+        val path = directory.resolve(TerminalCompletionLearningRepository.currentFileName())
+        val learning = TerminalCompletionLearningStore()
         val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, this)
         coordinator.recordFinishedCommand("git status", true, null, null, 1L)
         coordinator.setPersistencePath(null)
         coordinator.recordFinishedCommand("npm test", true, null, null, 2L)
         coroutineContext[Job]?.children?.toList()?.joinAll()
 
-        assertEquals(setOf("git status", "npm test"), learning.snapshot().map { it.commandLine }.toSet())
+        assertEquals(
+            setOf("git status", "npm test"),
+            learning
+                .snapshot()
+                .commandStats
+                .map { it.commandLine }
+                .toSet(),
+        )
         assertEquals(
             listOf("git status"),
-            TerminalCompletionStatsStore(path).loadSnapshot().commandStats.map { it.commandLine },
+            persistedSnapshot(path).commandStats.map { it.commandLine },
         )
+    }
+
+    private suspend fun persistedSnapshot(path: Path): TerminalCommandCompletionStatsSnapshot {
+        val learning = TerminalCompletionLearningStore()
+        TerminalCompletionLearningRepository(learning, path).initialize()
+        return learning.snapshot()
     }
 }

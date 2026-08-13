@@ -16,7 +16,6 @@
 package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -38,19 +37,46 @@ import java.nio.file.Path
  * @param onPersistenceFailure optional diagnostic callback for failed file access.
  */
 class TerminalCompletionLearningRepository
-    @JvmOverloads
-    constructor(
+    internal constructor(
         val learningStore: TerminalCompletionLearningStore,
-        initialPersistencePath: Path? = null,
-        persistenceEnabled: Boolean = true,
-        private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-        private val onPersistenceFailure: (Throwable) -> Unit = {},
+        initialPersistencePath: Path?,
+        persistenceEnabled: Boolean,
+        private val ioDispatcher: CoroutineDispatcher,
+        private val onPersistenceFailure: (Throwable) -> Unit,
+        private val fileStoreFactory: (Path, (Throwable) -> Unit) -> CompletionLearningFileStore,
     ) {
+        /**
+         * Creates a repository backed by the standard bounded local-file store.
+         *
+         * @param learningStore bounded in-memory learning index used by ranking.
+         * @param initialPersistencePath initial snapshot path, or `null` for memory-only learning.
+         * @param persistenceEnabled whether the initial path may be read and written.
+         * @param ioDispatcher dispatcher used for local-file access.
+         * @param onPersistenceFailure optional diagnostic callback for failed file access.
+         */
+        @JvmOverloads
+        constructor(
+            learningStore: TerminalCompletionLearningStore,
+            initialPersistencePath: Path? = null,
+            persistenceEnabled: Boolean = true,
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            onPersistenceFailure: (Throwable) -> Unit = {},
+        ) : this(
+            learningStore = learningStore,
+            initialPersistencePath = initialPersistencePath,
+            persistenceEnabled = persistenceEnabled,
+            ioDispatcher = ioDispatcher,
+            onPersistenceFailure = onPersistenceFailure,
+            fileStoreFactory = { path, onFailure -> CompletionLearningFileStore(path, onFailure) },
+        )
+
         private val mutex = Mutex()
         private var configuredPersistencePath: Path? = initialPersistencePath
         private var persistencePath: Path? = initialPersistencePath.takeIf { persistenceEnabled }
-        private var initializedPath: Path? = null
+        private var initializedPathIdentity: Path? = null
         private var initialized = false
+        private val importedPathIdentities = mutableSetOf<Path>()
+        private var writeBlockedPathIdentity: Path? = null
 
         /** Loads the configured snapshot once and merges it with live learning. */
         suspend fun initialize() {
@@ -94,38 +120,64 @@ class TerminalCompletionLearningRepository
         }
 
         private suspend fun ensureInitializedLocked() {
-            if (initialized && initializedPath == persistencePath) return
+            val pathIdentity = persistencePath?.identity()
+            if (initialized && initializedPathIdentity == pathIdentity) return
             loadConfiguredPath()
-            initializedPath = persistencePath
+            initializedPathIdentity = pathIdentity
             initialized = true
         }
 
         private suspend fun loadConfiguredPath() {
             val path = persistencePath
             if (path == null) return
-            val store = TerminalCompletionStatsStore(path, onPersistenceFailure)
-            val loaded = withContext(ioDispatcher) { store.loadSnapshot() }
-            learningStore.replaceSnapshot(mergeSnapshots(loaded, learningStore.snapshotAll()))
-            withContext(ioDispatcher) { store.persist(learningStore.snapshotAll()) }
+            val pathIdentity = path.identity()
+            writeBlockedPathIdentity = null
+            if (pathIdentity in importedPathIdentities) {
+                persistCurrentSnapshot()
+                return
+            }
+
+            val store = fileStoreFactory(path, onPersistenceFailure)
+            when (val outcome = withContext(ioDispatcher) { store.loadSnapshot() }) {
+                CompletionLearningFileLoadOutcome.Missing -> {
+                    importedPathIdentities.add(pathIdentity)
+                    withContext(ioDispatcher) { store.persist(learningStore.snapshot()) }
+                }
+
+                is CompletionLearningFileLoadOutcome.Loaded -> {
+                    learningStore.mergeSnapshot(outcome.snapshot)
+                    importedPathIdentities.add(pathIdentity)
+                    withContext(ioDispatcher) { store.persist(learningStore.snapshot()) }
+                }
+
+                CompletionLearningFileLoadOutcome.Rejected,
+                CompletionLearningFileLoadOutcome.Failed,
+                -> writeBlockedPathIdentity = pathIdentity
+            }
         }
 
         private suspend fun persistCurrentSnapshot() {
             val path = persistencePath ?: return
-            val snapshot = learningStore.snapshotAll()
+            val pathIdentity = path.identity()
+            if (writeBlockedPathIdentity == pathIdentity || pathIdentity !in importedPathIdentities) return
+            val snapshot = learningStore.snapshot()
             withContext(ioDispatcher) {
-                TerminalCompletionStatsStore(path, onPersistenceFailure).persist(snapshot)
+                fileStoreFactory(path, onPersistenceFailure).persist(snapshot)
             }
         }
 
-        private companion object {
-            private fun mergeSnapshots(
-                loaded: TerminalCommandCompletionStatsSnapshot,
-                live: TerminalCommandCompletionStatsSnapshot,
-            ): TerminalCommandCompletionStatsSnapshot =
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats = loaded.commandStats + live.commandStats,
-                    shapeStats = loaded.shapeStats + live.shapeStats,
-                    feedbackStats = loaded.feedbackStats + live.feedbackStats,
-                )
+        private fun Path.identity(): Path = toAbsolutePath().normalize()
+
+        companion object {
+            /**
+             * Returns the versioned filename used for persisted learning.
+             *
+             * Hosts choose the parent directory while the persistence module
+             * owns the file-format identity.
+             *
+             * @return current completion-learning filename.
+             */
+            @JvmStatic
+            fun currentFileName(): String = CompletionLearningSnapshotCodec.currentFileName()
         }
     }

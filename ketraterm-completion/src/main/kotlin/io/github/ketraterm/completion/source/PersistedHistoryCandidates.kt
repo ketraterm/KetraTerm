@@ -69,7 +69,11 @@ private fun TerminalCommandCompletionStats.localScore(
             counterScore(dismissedCount, -DISMISSED_COUNT_PENALTY) +
             LearnedEvidenceScoring.recencyBoost(nowEpochMillis, lastUsedEpochMillis)
     if (profileId != null && profileId == request.profileId) score += PROFILE_MATCH_SCORE
-    if (workingDirectoryUri != null && workingDirectoryUri == request.workingDirectoryUri) {
+    if (workingDirectoryUri != null &&
+        request.workingDirectoryUri != null &&
+        canonicalizeWorkingDirectoryUri(workingDirectoryUri) ==
+        canonicalizeWorkingDirectoryUri(request.workingDirectoryUri)
+    ) {
         score += WORKING_DIRECTORY_MATCH_SCORE
     }
     return score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()

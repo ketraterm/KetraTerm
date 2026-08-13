@@ -43,3 +43,8 @@ internal fun incrementDismissed(
     } else {
         value
     }
+
+internal fun saturatedCounterSum(
+    left: Int,
+    right: Int,
+): Int = minOf(Int.MAX_VALUE.toLong(), left.toLong() + right.toLong()).toInt()

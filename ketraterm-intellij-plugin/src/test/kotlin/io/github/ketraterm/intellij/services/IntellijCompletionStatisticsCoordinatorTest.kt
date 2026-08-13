@@ -15,9 +15,9 @@
  */
 package io.github.ketraterm.intellij.services
 
-import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
-import io.github.ketraterm.completion.persistence.TerminalCompletionStatsStore
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import kotlinx.coroutines.Job
@@ -26,14 +26,15 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.nio.file.Files
+import java.nio.file.Path
 
 class IntellijCompletionStatisticsCoordinatorTest {
     @Test
     fun `finished command is serialized and persisted by the repository`() =
         runBlocking {
             val directory = Files.createTempDirectory("intellij-completion-learning")
-            val path = directory.resolve(TerminalCompletionStatsStore.currentFileName())
-            val learning = TerminalCompletionSources.learningStore()
+            val path = directory.resolve(TerminalCompletionLearningRepository.currentFileName())
+            val learning = TerminalCompletionLearningStore()
             val coordinator =
                 IntellijCompletionStatisticsCoordinator(
                     TerminalCompletionLearningRepository(learning, path),
@@ -53,10 +54,16 @@ class IntellijCompletionStatisticsCoordinatorTest {
             )
             coroutineContext[Job]?.children?.toList()?.joinAll()
 
-            assertEquals(listOf("git status"), learning.snapshot().map { it.commandLine })
+            assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
             assertEquals(
                 listOf("git status"),
-                TerminalCompletionStatsStore(path).loadSnapshot().commandStats.map { it.commandLine },
+                persistedSnapshot(path).commandStats.map { it.commandLine },
             )
         }
+
+    private suspend fun persistedSnapshot(path: Path): TerminalCommandCompletionStatsSnapshot {
+        val learning = TerminalCompletionLearningStore()
+        TerminalCompletionLearningRepository(learning, path).initialize()
+        return learning.snapshot()
+    }
 }

@@ -13,10 +13,12 @@ External modules should import only:
 - `io.github.ketraterm.completion.model`
 
 The `api` package exposes host-facing engines, source factories, request and
-candidate contracts, a mutable session-history source, and a separate mutable
-statistics contract. Factory methods are intentionally narrow: hosts create
-spec, session-MRU, path, and host-backed sources, then give both the MRU
-source and merged engine one immutable learned-stats supplier. Statistics are
+candidate contracts, a mutable session-history source, and one concrete bounded
+learning store. Factory methods are intentionally narrow: hosts create
+session-MRU, path, and host-backed sources, then give both the MRU source and
+merged engine the same learning store. The engine automatically evaluates its
+command specs as one static source, so hosts cannot wire parsing specs and
+static candidates inconsistently. Statistics are
 ranking evidence and persisted fallback data; they are never composed as an
 independent candidate provider or ranking vote.
 
@@ -36,7 +38,6 @@ or construct:
 - `TerminalCommandShapeStats` and `TerminalCommandLineShape`
 - `TerminalCompletionFeedbackStats` and feedback vocabulary
 - `TerminalCommandCompletionStatsSnapshot`
-- `TerminalCommandCompletionStatsSnapshotCodec`
 
 `TerminalCompletionPersistencePolicy` is the reviewed host-facing privacy facade. It answers whether an exact command
 may be persisted and sanitizes a complete snapshot before a host crosses a storage boundary. Detailed rejection
@@ -112,9 +113,10 @@ option values, and positional arguments for both live completion and learned
 command-shape classification. Session MRU coordinates bounded command-history
 and observed-token indexes, projects learned commands into the active
 replacement range, and recovers positive persisted commands as one learned
-fallback stream. Each immutable learning snapshot owns one compiled view that
-contains both learned-history buckets and exact, shape, and provider evidence
-indexes. One scoring policy owns bounded counter math. Global fusion owns
+fallback stream. The shared learning store publishes one immutable aggregate
+snapshot and owns the identity-aware compiled-index cache reused by learned
+history and ranking. Snapshot models remain pure persistence data. One scoring
+policy owns bounded counter math. Global fusion owns
 outcome grouping, explicit score components, semantic relevance,
 representative selection, and deterministic final ordering.
 Public directory path resolution, scan contracts, and bounded scan
@@ -129,10 +131,10 @@ read files, scan raw shell history, spawn shells, or talk to UI frameworks.
 
 Optional disk I/O belongs to the separately published
 `ketraterm-completion-persistence` module. Its
-`TerminalCompletionStatsStore` sanitizes again at the storage boundary, applies byte/line/row bounds before decoding or
-encoding, and performs one atomic file replacement on its caller. One
-`TerminalCompletionLearningRepository` serializes mutation, loading, and persistence with a `Mutex` and moves file I/O
-to `Dispatchers.IO`. Product hosts launch its suspending operations in their existing lifecycle scopes. There are no
+`TerminalCompletionLearningRepository` owns an internal codec and bounded file store that sanitize again at the storage
+boundary, apply byte/line/row bounds before decoding or encoding, and perform atomic file replacement. The repository
+serializes mutation, loading, and persistence with a `Mutex` and moves file I/O to `Dispatchers.IO`. Product hosts launch
+its suspending operations in their existing lifecycle scopes. There are no
 statistics executors, coalescing queues, flush barriers, or shutdown timeouts. Product hosts own the
 destination path, enablement policy, diagnostics, and store lifecycle.
 Completion persistence is not a workspace responsibility.
@@ -329,13 +331,13 @@ replacement ranges and never be called from the shared completion hot path.
 
 The compatibility contract is deliberately explicit:
 
-| Capability | POSIX | PowerShell | Plain fallback |
-| --- | --- | --- | --- |
-| Command separators | `;`, `&`, `&&`, `|`, `||` | `;`, `&&`, `|`, `||` | none inferred |
-| Escape outside single quotes | backslash | backtick | backslash tokenization only |
-| Quote recovery | single and double | single and double, including doubled quotes | conservative tokenization |
-| Safe unquoted path escaping | backslash | single-quoted literal | only values needing no dialect escape |
-| Native shell callbacks | host-owned, not invoked synchronously | host-owned, not invoked synchronously | unavailable |
+| Capability                   | POSIX                                 | PowerShell                                  | Plain fallback                        |
+|------------------------------|---------------------------------------|---------------------------------------------|---------------------------------------|
+| Command separators           | `;`, `&`, `&&`, `\|`, `\|\|`          | `;`, `&&`, `\|`, `\|\|`                     | none inferred                         |
+| Escape outside single quotes | backslash                             | backtick                                    | backslash tokenization only           |
+| Quote recovery               | single and double                     | single and double, including doubled quotes | conservative tokenization             |
+| Safe unquoted path escaping  | backslash                             | single-quoted literal                       | only values needing no dialect escape |
+| Native shell callbacks       | host-owned, not invoked synchronously | host-owned, not invoked synchronously       | unavailable                           |
 
 Command Prompt, Fish, Nushell, and unknown dialects remain on the plain
 fallback until each has a tested lexical and quoting contract. This avoids
@@ -397,6 +399,6 @@ Performance changes must also run `TerminalCompletionBenchmark`. The benchmark
 includes eight-provider fusion, 2,048 learned rows, duplicate-heavy evidence,
 hostile collection-cap input, and a real session-MRU lookup backed by the full
 persisted snapshot. The persisted-history case is prewarmed deliberately: it
-measures the normal snapshot-owned compiled-view cache hit, while index
+measures the normal learning-store-owned compiled-index cache hit, while index
 construction stays bounded to snapshot mutation or first use for a new shell
 syntax and command-spec set.

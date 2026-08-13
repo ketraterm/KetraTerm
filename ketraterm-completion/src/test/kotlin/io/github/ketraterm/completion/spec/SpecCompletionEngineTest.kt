@@ -18,7 +18,6 @@ package io.github.ketraterm.completion.spec
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalArgumentSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalOptionSpec
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -131,7 +130,7 @@ class SpecCompletionEngineTest {
                 )
             val engine =
                 TerminalCompletionEngines.fromSources(
-                    sources = listOf(TerminalCompletionSourceEntry(TerminalCompletionSources.fromSpecs(specs))),
+                    sources = emptyList(),
                     commandSpecs = specs,
                 )
 
@@ -178,7 +177,7 @@ class SpecCompletionEngineTest {
                 )
             val engine =
                 TerminalCompletionEngines.fromSources(
-                    sources = listOf(TerminalCompletionSourceEntry(TerminalCompletionSources.fromSpecs(specs))),
+                    sources = emptyList(),
                     commandSpecs = specs,
                 )
 
@@ -189,10 +188,7 @@ class SpecCompletionEngineTest {
     @Test
     fun `default specs expose static option value domains`() =
         runBlocking {
-            val engine =
-                TerminalCompletionEngines.fromSources(
-                    TerminalCompletionSources.fromSpecs(TerminalCommandSpecs.defaults()),
-                )
+            val engine = TerminalCompletionEngines.fromSources(emptyList<TerminalCompletionSourceEntry>())
 
             val candidates = engine.complete(request("aws --output t"))
 
@@ -321,7 +317,8 @@ class SpecCompletionEngineTest {
                 )
             val engine =
                 TerminalCompletionEngines.fromSources(
-                    TerminalCompletionSources.fromSpecs(listOf(dockerSpec)),
+                    sources = emptyList(),
+                    commandSpecs = listOf(dockerSpec),
                 )
 
             val candidates = engine.complete(request("docker compose --context my-context p"))
@@ -331,10 +328,7 @@ class SpecCompletionEngineTest {
     @Test
     fun `default specs registration and matching`() =
         runBlocking {
-            val engine =
-                TerminalCompletionEngines.fromSources(
-                    TerminalCompletionSources.fromSpecs(TerminalCommandSpecs.defaults()),
-                )
+            val engine = TerminalCompletionEngines.fromSources(emptyList<TerminalCompletionSourceEntry>())
 
             // Test cargo matching
             val cargoCandidates = engine.complete(request("cargo bui"))
@@ -406,7 +400,7 @@ class SpecCompletionEngineTest {
                 ),
             )
         return TerminalCompletionEngines.fromSources(
-            sources = listOf(TerminalCompletionSourceEntry(TerminalCompletionSources.fromSpecs(specs))),
+            sources = emptyList(),
             commandSpecs = specs,
         )
     }

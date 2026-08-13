@@ -17,38 +17,9 @@ package io.github.ketraterm.completion.model
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class TerminalCompletionFeedbackStatsTest {
-    @Test
-    fun `token position maps every candidate kind`() {
-        assertEquals(
-            TerminalCompletionTokenPosition.COMMAND,
-            TerminalCompletionTokenPosition.fromCandidateKind(TerminalCompletionCandidateKind.COMMAND),
-        )
-        assertEquals(
-            TerminalCompletionTokenPosition.SUBCOMMAND,
-            TerminalCompletionTokenPosition.fromCandidateKind(TerminalCompletionCandidateKind.SUBCOMMAND),
-        )
-        assertEquals(
-            TerminalCompletionTokenPosition.OPTION,
-            TerminalCompletionTokenPosition.fromCandidateKind(TerminalCompletionCandidateKind.OPTION),
-        )
-        assertEquals(
-            TerminalCompletionTokenPosition.ARGUMENT,
-            TerminalCompletionTokenPosition.fromCandidateKind(TerminalCompletionCandidateKind.ARGUMENT),
-        )
-        assertEquals(
-            TerminalCompletionTokenPosition.ARGUMENT,
-            TerminalCompletionTokenPosition.fromCandidateKind(TerminalCompletionCandidateKind.PATH),
-        )
-        assertEquals(
-            TerminalCompletionTokenPosition.UNKNOWN,
-            TerminalCompletionTokenPosition.fromCandidateKind(TerminalCompletionCandidateKind.HISTORY),
-        )
-    }
-
     @Test
     fun `feedback context rejects blank source`() {
         assertFailsWith<IllegalArgumentException> {

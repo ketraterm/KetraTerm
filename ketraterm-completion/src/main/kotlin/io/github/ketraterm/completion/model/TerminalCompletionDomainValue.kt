@@ -15,15 +15,12 @@
  */
 package io.github.ketraterm.completion.model
 
-import io.github.ketraterm.completion.model.TerminalCompletionDomainValue.Companion.MAX_SCORE_ADJUSTMENT
-import io.github.ketraterm.completion.model.TerminalCompletionDomainValue.Companion.MIN_SCORE_ADJUSTMENT
-
 /**
  * Immutable host-provided value for one dynamic completion domain.
  *
- * Hosts publish bounded snapshots of these values from their own caches. The
- * shared engine performs prefix matching, replacement-range selection, shell
- * quoting, and ranking without invoking host I/O.
+ * Suspended host sources return bounded lists of these values. The shared
+ * engine then performs prefix matching, replacement-range selection, shell
+ * quoting, and ranking without retaining host resources.
  *
  * @property value literal value inserted into the command line.
  * @property displayText popup label, independent from inserted text.

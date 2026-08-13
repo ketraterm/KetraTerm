@@ -15,14 +15,10 @@
  */
 package io.github.ketraterm.completion.source
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionContext
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalSessionMruCompletionSource
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineCursorRegion
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 
@@ -38,7 +34,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
 internal class SessionMruCompletionSourceImpl(
     capacity: Int = DEFAULT_CAPACITY,
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    private val learnedStatsProvider: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot.EMPTY },
+    private val learningStore: TerminalCompletionLearningStore? = null,
     private val clockEpochMillis: () -> Long = System::currentTimeMillis,
 ) : TerminalSessionMruCompletionSource {
     private val lock = Any()
@@ -86,18 +82,16 @@ internal class SessionMruCompletionSourceImpl(
             commandHistory.appendCandidates(request, context, candidates)
             observedTokens.appendCandidates(request, commandLineContext, candidates)
         }
-        val learnedSnapshot = learnedStatsProvider()
-        appendPersistedHistoryCandidates(
-            request = request,
-            lineContext = commandLineContext,
-            completionContext = context,
-            index =
-                learnedSnapshot.compiledLearning
-                    .indexesFor(request.shellCapabilities.syntax, commandSpecs)
-                    .history,
-            nowEpochMillis = clockEpochMillis().coerceAtLeast(0L),
-            destination = candidates,
-        )
+        learningStore?.indexesFor(request.shellCapabilities.syntax, commandSpecs)?.history?.let { learnedHistory ->
+            appendPersistedHistoryCandidates(
+                request = request,
+                lineContext = commandLineContext,
+                completionContext = context,
+                index = learnedHistory,
+                nowEpochMillis = clockEpochMillis().coerceAtLeast(0L),
+                destination = candidates,
+            )
+        }
         return candidates
             .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
             .take(limit)

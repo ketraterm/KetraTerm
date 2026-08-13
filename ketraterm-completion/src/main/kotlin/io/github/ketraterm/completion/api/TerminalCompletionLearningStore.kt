@@ -15,92 +15,202 @@
  */
 package io.github.ketraterm.completion.api
 
+import io.github.ketraterm.completion.internal.CompletionLearningIndexCache
+import io.github.ketraterm.completion.internal.CompletionLearningIndexes
+import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.stats.CommandCompletionStatsIndex
+import io.github.ketraterm.completion.stats.CommandShapeStatsIndex
+import io.github.ketraterm.completion.stats.CompletionFeedbackStatsIndex
 
 /**
- * Mutable, bounded store for aggregated completion-learning statistics.
+ * Mutable, bounded in-memory store for aggregated completion learning.
  *
- * This is the public host-facing learning contract. Hosts may load and persist
- * snapshots, record command lifecycle outcomes, and feed explicit popup
- * feedback. The store does not emit candidates: hosts expose [snapshotAll] to
- * the global ranker and learned-history source so one evidence set cannot appear
- * as a second provider vote. Implementations must stay dependency-free,
- * bounded, thread-safe, and must not scan raw shell history.
+ * Hosts may load and persist [snapshot] values, record command lifecycle
+ * outcomes, and feed explicit popup feedback. The store performs no I/O and
+ * does not emit candidates. All operations are thread-safe, and repeated
+ * [snapshot] calls return the same immutable object until the next mutation.
+ *
+ * @param capacity maximum distinct rows retained in each statistics family.
+ * @param commandSpecs command specifications used to classify
+ * privacy-preserving command-family shapes.
+ * @throws IllegalArgumentException if [capacity] is not positive.
  */
-interface TerminalCompletionLearningStore {
-    /**
-     * Replaces all retained statistics with [snapshot].
-     *
-     * Implementations compact duplicate keys independently for exact command,
-     * command-shape, and source-specific feedback rows, then retain only their
-     * bounded capacity. Hosts should pass already privacy-filtered snapshots
-     * when loading from disk.
-     *
-     * @param snapshot compact completion stats snapshot loaded by a host.
-     */
-    fun replaceSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot)
+class TerminalCompletionLearningStore
+    @JvmOverloads
+    constructor(
+        capacity: Int = DEFAULT_CAPACITY,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    ) {
+        init {
+            require(capacity > 0) { "capacity must be > 0, was $capacity" }
+        }
 
-    /**
-     * Returns exact command stats sorted by ranking relevance.
-     *
-     * @return stable exact command snapshot for host persistence.
-     */
-    fun snapshot(): List<TerminalCommandCompletionStats>
+        private val lock = Any()
+        private val commandStats = CommandCompletionStatsIndex(capacity)
+        private val shapeStats = CommandShapeStatsIndex(capacity, commandSpecs)
+        private val feedbackStats = CompletionFeedbackStatsIndex(capacity)
+        private val learningIndexCache = CompletionLearningIndexCache()
+        private var publishedSnapshot = TerminalCommandCompletionStatsSnapshot.EMPTY
 
-    /**
-     * Returns command-shape stats sorted by ranking relevance.
-     *
-     * @return stable command-shape snapshot for host persistence.
-     */
-    fun shapeSnapshot(): List<TerminalCommandShapeStats>
+        /**
+         * Replaces all retained statistics with [snapshot].
+         *
+         * Each statistics family independently compacts duplicate keys,
+         * rejects malformed rows, and applies the configured capacity.
+         *
+         * @param snapshot compact completion-learning snapshot loaded by a host.
+         */
+        fun replaceSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot) {
+            synchronized(lock) {
+                commandStats.replaceAll(snapshot.commandStats)
+                shapeStats.replaceAll(snapshot.shapeStats)
+                feedbackStats.replaceAll(snapshot.feedbackStats)
+                publishSnapshot()
+            }
+        }
 
-    /**
-     * Returns source-specific feedback stats sorted by ranking relevance.
-     *
-     * @return stable feedback snapshot for host persistence.
-     */
-    fun feedbackSnapshot(): List<TerminalCompletionFeedbackStats>
+        /**
+         * Adds distinct aggregate events from [snapshot] to retained learning.
+         *
+         * Rows sharing a canonical exact, shape, or provider context key have
+         * their counters added with saturation and retain the newest timestamp.
+         * Callers must not merge the same aggregate event set more than once.
+         *
+         * @param snapshot aggregate events not already represented by this store.
+         */
+        fun mergeSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot) {
+            synchronized(lock) {
+                commandStats.mergeAll(snapshot.commandStats)
+                shapeStats.mergeAll(snapshot.shapeStats)
+                feedbackStats.mergeAll(snapshot.feedbackStats)
+                publishSnapshot()
+            }
+        }
 
-    /**
-     * Returns every retained stats family in one immutable snapshot.
-     *
-     * @return exact command, command-shape, and feedback stats snapshot.
-     */
-    fun snapshotAll(): TerminalCommandCompletionStatsSnapshot
+        /**
+         * Returns every retained statistics family in one immutable snapshot.
+         *
+         * @return exact command, command-shape, and provider-feedback statistics.
+         */
+        fun snapshot(): TerminalCommandCompletionStatsSnapshot =
+            synchronized(lock) {
+                publishedSnapshot
+            }
 
-    /**
-     * Records a completed command execution.
-     *
-     * @param commandLine command text executed by the shell.
-     * @param successful whether the command exited successfully.
-     * @param profileId optional host profile id.
-     * @param workingDirectoryUri optional working-directory URI.
-     * @param usedAtEpochMillis host timestamp for the execution event.
-     */
-    fun recordCommandResult(
-        commandLine: String,
-        successful: Boolean,
-        profileId: String?,
-        workingDirectoryUri: String?,
-        usedAtEpochMillis: Long,
-    )
+        /** Returns identity-cached learned indexes shared by ranking and history recovery. */
+        internal fun indexesFor(
+            shellSyntax: TerminalShellSyntax,
+            commandSpecs: List<TerminalCommandSpec>,
+        ): CompletionLearningIndexes =
+            synchronized(lock) {
+                learningIndexCache.indexesFor(publishedSnapshot, shellSyntax, commandSpecs)
+            }
 
-    /**
-     * Records explicit user feedback for a displayed suggestion.
-     *
-     * @param commandLine command text represented after applying the suggestion.
-     * @param feedback accepted or dismissed feedback kind.
-     * @param profileId optional host profile id.
-     * @param workingDirectoryUri optional working-directory URI.
-     * @param feedbackAtEpochMillis host timestamp for the feedback event.
-     * @param context optional source-specific candidate context.
-     */
-    fun recordSuggestionFeedback(
-        commandLine: String,
-        feedback: TerminalCompletionFeedbackKind,
-        profileId: String?,
-        workingDirectoryUri: String?,
-        feedbackAtEpochMillis: Long,
-        context: TerminalCompletionFeedbackContext? = null,
-    )
-}
+        /**
+         * Records a completed command execution.
+         *
+         * Blank, multiline, and otherwise non-recordable commands are ignored
+         * by the bounded indexes.
+         *
+         * @param commandLine command text executed by the shell.
+         * @param successful whether the command exited successfully.
+         * @param profileId optional host profile id.
+         * @param workingDirectoryUri optional working-directory URI.
+         * @param usedAtEpochMillis host timestamp for the execution event.
+         */
+        fun recordCommandResult(
+            commandLine: String,
+            successful: Boolean,
+            profileId: String?,
+            workingDirectoryUri: String?,
+            usedAtEpochMillis: Long,
+        ) {
+            synchronized(lock) {
+                commandStats.recordCommandResult(
+                    commandLine = commandLine,
+                    successful = successful,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    usedAtEpochMillis = usedAtEpochMillis,
+                )
+                shapeStats.recordCommandResult(
+                    commandLine = commandLine,
+                    successful = successful,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    usedAtEpochMillis = usedAtEpochMillis,
+                )
+                publishSnapshot()
+            }
+        }
+
+        /**
+         * Records explicit user feedback for a displayed suggestion.
+         *
+         * @param commandLine command text represented after applying the suggestion.
+         * @param feedback accepted or dismissed feedback kind.
+         * @param profileId optional host profile id.
+         * @param workingDirectoryUri optional working-directory URI.
+         * @param feedbackAtEpochMillis host timestamp for the feedback event.
+         * @param context optional source-specific candidate context.
+         */
+        @JvmOverloads
+        fun recordSuggestionFeedback(
+            commandLine: String,
+            feedback: TerminalCompletionFeedbackKind,
+            profileId: String?,
+            workingDirectoryUri: String?,
+            feedbackAtEpochMillis: Long,
+            context: TerminalCompletionFeedbackContext? = null,
+        ) {
+            synchronized(lock) {
+                commandStats.recordSuggestionFeedback(
+                    commandLine = commandLine,
+                    feedback = feedback,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    feedbackAtEpochMillis = feedbackAtEpochMillis,
+                )
+                shapeStats.recordSuggestionFeedback(
+                    commandLine = commandLine,
+                    feedback = feedback,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    feedbackAtEpochMillis = feedbackAtEpochMillis,
+                )
+                if (isRecordableTerminalCompletionCommand(commandLine) && context != null) {
+                    feedbackStats.recordSuggestionFeedback(
+                        context = context,
+                        feedback = feedback,
+                        profileId = profileId,
+                        workingDirectoryUri = workingDirectoryUri,
+                        feedbackAtEpochMillis = feedbackAtEpochMillis,
+                    )
+                }
+                publishSnapshot()
+            }
+        }
+
+        private fun publishSnapshot() {
+            val nextCommandStats = commandStats.snapshot()
+            val nextShapeStats = shapeStats.snapshot()
+            val nextFeedbackStats = feedbackStats.snapshot()
+            if (publishedSnapshot.commandStats == nextCommandStats &&
+                publishedSnapshot.shapeStats == nextShapeStats &&
+                publishedSnapshot.feedbackStats == nextFeedbackStats
+            ) {
+                return
+            }
+            publishedSnapshot =
+                TerminalCommandCompletionStatsSnapshot(
+                    commandStats = nextCommandStats,
+                    shapeStats = nextShapeStats,
+                    feedbackStats = nextFeedbackStats,
+                )
+        }
+
+        private companion object {
+            private const val DEFAULT_CAPACITY = 2048
+        }
+    }

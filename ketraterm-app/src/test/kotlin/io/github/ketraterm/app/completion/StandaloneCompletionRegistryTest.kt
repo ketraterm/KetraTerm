@@ -16,7 +16,6 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
-import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
@@ -95,7 +94,7 @@ class StandaloneCompletionRegistryTest {
             val directory = Files.createTempDirectory("ketraterm-learned-directory")
             try {
                 Files.createDirectories(directory.resolve("IdeaProjects/KetraTerm"))
-                val persistentStats = TerminalCompletionSources.learningStore()
+                val persistentStats = TerminalCompletionLearningStore()
                 persistentStats.replaceSnapshot(
                     TerminalCommandCompletionStatsSnapshot(
                         commandStats =
@@ -158,7 +157,7 @@ class StandaloneCompletionRegistryTest {
     @Test
     fun `persistent stats supply learned fallback without a standalone stats source`() =
         runBlocking {
-            val persistentStats = TerminalCompletionSources.learningStore()
+            val persistentStats = TerminalCompletionLearningStore()
             persistentStats.recordCommandResult(
                 commandLine = "git show --stat",
                 successful = true,
@@ -194,7 +193,7 @@ class StandaloneCompletionRegistryTest {
     @Test
     fun `persistent stats source is shared across provider sessions`() =
         runBlocking {
-            val persistentStats = TerminalCompletionSources.learningStore()
+            val persistentStats = TerminalCompletionLearningStore()
             persistentStats.recordCommandResult(
                 commandLine = "npm test",
                 successful = true,
@@ -213,7 +212,7 @@ class StandaloneCompletionRegistryTest {
     @Test
     fun `shape stats boost matching static spec suggestions`() =
         runBlocking {
-            val persistentStats = TerminalCompletionSources.learningStore()
+            val persistentStats = TerminalCompletionLearningStore()
             persistentStats.replaceSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     shapeStats =
@@ -250,7 +249,7 @@ class StandaloneCompletionRegistryTest {
     @Test
     fun `shape stats demote repeatedly dismissed static spec suggestions`() =
         runBlocking {
-            val persistentStats = TerminalCompletionSources.learningStore()
+            val persistentStats = TerminalCompletionLearningStore()
             persistentStats.replaceSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     shapeStats =

@@ -40,7 +40,11 @@ class MergedCompletionEngineTest {
                     release.await()
                     emptyList()
                 }
-            val engine = TerminalCompletionEngines.fromSources(source, source)
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources = listOf(entry(source, 0), entry(source, 0)),
+                    commandSpecs = emptyList(),
+                )
 
             val completion = async { engine.complete(request(maxCandidates = 8)) }
             bothStarted.await()
@@ -162,7 +166,8 @@ class MergedCompletionEngineTest {
 
             assertEquals(32, collectionLimit)
             assertEquals(8, candidates.size)
-            assertEquals("status", candidates.first().replacementText)
+            assertEquals("spec", candidates.first().source)
+            assertEquals(TerminalCompletionCandidateKind.SUBCOMMAND, candidates.first().kind)
         }
 
     @Test
@@ -298,7 +303,7 @@ class MergedCompletionEngineTest {
 
             val candidates = engine.complete(request(commandLine = "git s", maxCandidates = 8))
 
-            assertEquals("status", candidates.first().replacementText)
+            assertEquals(TerminalCompletionCandidateKind.SUBCOMMAND, candidates.first().kind)
         }
 
     @Test
@@ -336,7 +341,8 @@ class MergedCompletionEngineTest {
 
             val candidates = engine.complete(request(commandLine = "aws --output t", maxCandidates = 8))
 
-            assertEquals(listOf("text", "aws --output table"), candidates.map { it.replacementText })
+            assertEquals(listOf("table", "text"), candidates.map { it.replacementText })
+            assertTrue(candidates.all { it.source == "spec" })
         }
 
     @Test
@@ -481,11 +487,14 @@ class MergedCompletionEngineTest {
         }
 
     @Test
-    fun `empty source list returns no candidates`() =
+    fun `empty host source list still composes static specifications`() =
         runBlocking {
             val engine = TerminalCompletionEngines.fromSources(emptyList<TerminalCompletionSourceEntry>())
 
-            assertTrue(engine.complete(request(maxCandidates = 8)).isEmpty())
+            assertEquals(
+                listOf("status", "stash", "switch"),
+                engine.complete(request(commandLine = "git s", maxCandidates = 8)).map { it.replacementText },
+            )
         }
 
     @Test

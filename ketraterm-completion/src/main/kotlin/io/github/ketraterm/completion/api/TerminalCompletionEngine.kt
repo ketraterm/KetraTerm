@@ -19,27 +19,20 @@ package io.github.ketraterm.completion.api
  * Pure completion engine contract.
  *
  * Engines merge and rank one or more [TerminalCompletionSource] instances for a
- * host request. Implementations are deterministic and perform no shell, UI,
- * disk, or network work.
+ * host request. The engine owns no shell, UI, disk, or network infrastructure;
+ * host-backed sources may perform bounded suspending work inside the request
+ * scope.
  */
 fun interface TerminalCompletionEngine {
     /**
      * Returns a bounded, best-first candidate list for [request].
      *
-     * Implementations must not mutate terminal state, block on shell I/O, or
-     * perform UI work. Slow sources should maintain a ready in-memory index and
-     * answer from that index.
+     * Implementations must not mutate terminal state or perform UI work.
+     * Suspending source work must cooperate with cancellation and return a
+     * bounded result.
      *
      * @param request command-line completion context.
      * @return ordered completion candidates.
      */
     suspend fun complete(request: TerminalCompletionRequest): List<TerminalCompletionCandidate>
-
-    companion object {
-        /**
-         * Engine that returns no candidates.
-         */
-        @JvmField
-        val NONE: TerminalCompletionEngine = TerminalCompletionEngine { emptyList() }
-    }
 }

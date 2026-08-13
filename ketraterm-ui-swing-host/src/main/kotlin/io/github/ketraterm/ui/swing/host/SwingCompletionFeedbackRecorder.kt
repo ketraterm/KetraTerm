@@ -20,7 +20,6 @@ import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackContext
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
-import io.github.ketraterm.completion.model.TerminalCompletionTokenPosition
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
@@ -83,7 +82,7 @@ class SwingCompletionFeedbackRecorder
                     feedbackAtEpochMillis = clockEpochMillis(),
                     context = completionContext,
                 )
-                afterMutation?.invoke(statsSource.snapshotAll())
+                afterMutation?.invoke(statsSource.snapshot())
             }
         }
 
@@ -101,7 +100,6 @@ class SwingCompletionFeedbackRecorder
                 return TerminalCompletionFeedbackContext(
                     source = source,
                     candidateKind = candidateKind,
-                    tokenPosition = TerminalCompletionTokenPosition.fromCandidateKind(candidateKind),
                 )
             }
         }

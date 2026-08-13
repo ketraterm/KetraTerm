@@ -17,11 +17,11 @@ package io.github.ketraterm.completion.stats
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.internal.BoundedStatsRowIndex
+import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackContext
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
-import io.github.ketraterm.completion.model.TerminalCompletionTokenPosition
 
 /**
  * Bounded source-specific feedback stats index.
@@ -40,7 +40,9 @@ internal class CompletionFeedbackStatsIndex(
             shouldReplace = { current, candidate -> candidate.lastUsedEpochMillis >= current.lastUsedEpochMillis },
         )
 
-    fun replaceAll(records: List<TerminalCompletionFeedbackStats>) = rows.replaceAll(records)
+    fun replaceAll(records: List<TerminalCompletionFeedbackStats>) = rows.replaceAll(records.map(::canonicalizeContext))
+
+    fun mergeAll(records: List<TerminalCompletionFeedbackStats>) = rows.mergeAll(records.map(::canonicalizeContext), ::mergeStats)
 
     fun snapshot(): List<TerminalCompletionFeedbackStats> = rows.snapshot()
 
@@ -52,15 +54,15 @@ internal class CompletionFeedbackStatsIndex(
         feedbackAtEpochMillis: Long,
     ) {
         if (feedbackAtEpochMillis < 0L) return
+        val learningContext = CompletionLearningContextKey.of(profileId, workingDirectoryUri)
         rows.mutate(
-            key = context.key(profileId, workingDirectoryUri),
+            key = context.key(learningContext),
             initialRow = {
                 TerminalCompletionFeedbackStats(
                     source = context.source,
                     candidateKind = context.candidateKind,
-                    tokenPosition = context.tokenPosition,
-                    profileId = profileId,
-                    workingDirectoryUri = workingDirectoryUri,
+                    profileId = learningContext.profileId,
+                    workingDirectoryUri = learningContext.workingDirectoryUri,
                 )
             },
             update = { previous ->
@@ -76,29 +78,43 @@ internal class CompletionFeedbackStatsIndex(
     private data class CompletionFeedbackStatsKey(
         val source: String,
         val candidateKind: TerminalCompletionCandidateKind,
-        val tokenPosition: TerminalCompletionTokenPosition,
-        val profileId: String?,
-        val workingDirectoryUri: String?,
+        val context: CompletionLearningContextKey,
     )
 
     private fun TerminalCompletionFeedbackStats.key(): CompletionFeedbackStatsKey =
         CompletionFeedbackStatsKey(
             source = source,
             candidateKind = candidateKind,
-            tokenPosition = tokenPosition,
-            profileId = profileId,
-            workingDirectoryUri = workingDirectoryUri,
+            context = CompletionLearningContextKey.of(profileId, workingDirectoryUri),
         )
 
-    private fun TerminalCompletionFeedbackContext.key(
-        profileId: String?,
-        workingDirectoryUri: String?,
-    ): CompletionFeedbackStatsKey =
+    private fun canonicalizeContext(record: TerminalCompletionFeedbackStats): TerminalCompletionFeedbackStats {
+        val context = CompletionLearningContextKey.of(record.profileId, record.workingDirectoryUri)
+        return record.copy(
+            profileId = context.profileId,
+            workingDirectoryUri = context.workingDirectoryUri,
+        )
+    }
+
+    private fun TerminalCompletionFeedbackContext.key(context: CompletionLearningContextKey): CompletionFeedbackStatsKey =
         CompletionFeedbackStatsKey(
             source = source,
             candidateKind = candidateKind,
-            tokenPosition = tokenPosition,
-            profileId = profileId,
-            workingDirectoryUri = workingDirectoryUri,
+            context = context,
         )
+
+    private fun mergeStats(
+        current: TerminalCompletionFeedbackStats,
+        incoming: TerminalCompletionFeedbackStats,
+    ): TerminalCompletionFeedbackStats {
+        val newest = if (incoming.lastUsedEpochMillis >= current.lastUsedEpochMillis) incoming else current
+        val context = CompletionLearningContextKey.of(current.profileId, current.workingDirectoryUri)
+        return newest.copy(
+            profileId = context.profileId,
+            workingDirectoryUri = context.workingDirectoryUri,
+            acceptedCount = saturatedCounterSum(current.acceptedCount, incoming.acceptedCount),
+            dismissedCount = saturatedCounterSum(current.dismissedCount, incoming.dismissedCount),
+            lastUsedEpochMillis = maxOf(current.lastUsedEpochMillis, incoming.lastUsedEpochMillis),
+        )
+    }
 }

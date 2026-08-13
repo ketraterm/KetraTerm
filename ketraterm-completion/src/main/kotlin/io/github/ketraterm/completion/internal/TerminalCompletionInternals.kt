@@ -46,7 +46,6 @@ internal val TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER: Comparator<TerminalComple
         .thenBy { it.dismissedCount }
         .thenBy { it.source }
         .thenBy { it.candidateKind.name }
-        .thenBy { it.tokenPosition.name }
 
 internal fun isRecordableTerminalCompletionCommand(commandLine: String): Boolean =
     commandLine.isNotBlank() && !commandLine.hasTerminalCompletionLineBreak()

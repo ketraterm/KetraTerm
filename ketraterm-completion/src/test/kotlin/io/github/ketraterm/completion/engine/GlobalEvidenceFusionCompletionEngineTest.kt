@@ -85,9 +85,10 @@ class GlobalEvidenceFusionCompletionEngineTest {
                             ),
                         ),
                 )
+            val learningStore = TerminalCompletionLearningStore().apply { replaceSnapshot(snapshot) }
             val learnedSource =
                 TerminalCompletionSources.sessionMru(
-                    learnedStatsProvider = { snapshot },
+                    learningStore = learningStore,
                 )
             learnedSource.recordSuccessfulCommand(
                 commandLine = "cd IdeaProjects/KetraTerm",
@@ -97,7 +98,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                 TerminalCompletionEngines.fromSources(
                     sources = listOf(entry(learnedSource, 8)),
                     commandSpecs = TerminalCommandSpecs.defaults(),
-                    learnedStatsProvider = { snapshot },
+                    learningStore = learningStore,
                 )
 
             val candidates = engine.complete(request("cd ", workingDirectoryUri = "file:///home"))
@@ -381,6 +382,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                             entry(source(candidate("src/", 3, 3, "path", TerminalCompletionCandidateKind.PATH)), 12),
                         ),
                     snapshot = snapshot,
+                    commandSpecs = TerminalCommandSpecs.defaults(),
                 ).complete(request("cd "))
 
             assertEquals("src/", candidates.first().replacementText)
@@ -427,14 +429,12 @@ class GlobalEvidenceFusionCompletionEngineTest {
                             TerminalCompletionFeedbackStats(
                                 source = "branches",
                                 candidateKind = TerminalCompletionCandidateKind.ARGUMENT,
-                                tokenPosition = TerminalCompletionTokenPosition.ARGUMENT,
                                 profileId = "profile",
                                 acceptedCount = 20,
                             ),
                             TerminalCompletionFeedbackStats(
                                 source = "other",
                                 candidateKind = TerminalCompletionCandidateKind.ARGUMENT,
-                                tokenPosition = TerminalCompletionTokenPosition.ARGUMENT,
                                 profileId = "profile",
                                 dismissedCount = 20,
                             ),
@@ -478,7 +478,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
         }
 
     @Test
-    fun `provider feedback uses only the most specific matching kind position profile and directory`() =
+    fun `provider feedback uses only the most specific matching kind profile and directory`() =
         runBlocking {
             val snapshot =
                 TerminalCommandCompletionStatsSnapshot(
@@ -494,14 +494,6 @@ class GlobalEvidenceFusionCompletionEngineTest {
                             feedback(
                                 source = "target",
                                 candidateKind = TerminalCompletionCandidateKind.COMMAND,
-                                tokenPosition = TerminalCompletionTokenPosition.COMMAND,
-                                profileId = "profile",
-                                workingDirectoryUri = "file:///repo",
-                                dismissedCount = Int.MAX_VALUE,
-                            ),
-                            feedback(
-                                source = "target",
-                                tokenPosition = TerminalCompletionTokenPosition.OPTION,
                                 profileId = "profile",
                                 workingDirectoryUri = "file:///repo",
                                 dismissedCount = Int.MAX_VALUE,
@@ -831,10 +823,12 @@ class GlobalEvidenceFusionCompletionEngineTest {
     private fun engine(
         sources: List<TerminalCompletionSourceEntry>,
         snapshot: TerminalCommandCompletionStatsSnapshot = TerminalCommandCompletionStatsSnapshot.EMPTY,
+        commandSpecs: List<TerminalCommandSpec> = emptyList(),
     ): TerminalCompletionEngine =
         MergedCompletionEngine(
             sources = sources,
-            learnedStatsProvider = { snapshot },
+            commandSpecs = commandSpecs,
+            learningStore = TerminalCompletionLearningStore().apply { replaceSnapshot(snapshot) },
             clockEpochMillis = { NOW },
         )
 
@@ -882,7 +876,6 @@ class GlobalEvidenceFusionCompletionEngineTest {
     private fun feedback(
         source: String,
         candidateKind: TerminalCompletionCandidateKind = TerminalCompletionCandidateKind.ARGUMENT,
-        tokenPosition: TerminalCompletionTokenPosition = TerminalCompletionTokenPosition.ARGUMENT,
         profileId: String? = null,
         workingDirectoryUri: String? = null,
         acceptedCount: Int = 0,
@@ -891,7 +884,6 @@ class GlobalEvidenceFusionCompletionEngineTest {
         TerminalCompletionFeedbackStats(
             source = source,
             candidateKind = candidateKind,
-            tokenPosition = tokenPosition,
             profileId = profileId,
             workingDirectoryUri = workingDirectoryUri,
             acceptedCount = acceptedCount,

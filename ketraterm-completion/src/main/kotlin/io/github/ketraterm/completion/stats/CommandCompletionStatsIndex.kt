@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.completion.stats
 
-import io.github.ketraterm.completion.internal.BoundedStatsRowIndex
-import io.github.ketraterm.completion.internal.TERMINAL_COMMAND_COMPLETION_STATS_ORDER
-import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
-import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncrement
+import io.github.ketraterm.completion.internal.*
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 
@@ -39,11 +36,11 @@ internal class CommandCompletionStatsIndex(
             shouldReplace = { current, candidate -> candidate.lastUsedEpochMillis >= current.lastUsedEpochMillis },
         )
 
-    fun replaceAll(records: List<TerminalCommandCompletionStats>) = rows.replaceAll(records)
+    fun replaceAll(records: List<TerminalCommandCompletionStats>) = rows.replaceAll(records.map(::canonicalizeContext))
+
+    fun mergeAll(records: List<TerminalCommandCompletionStats>) = rows.mergeAll(records.map(::canonicalizeContext), ::mergeStats)
 
     fun snapshot(): List<TerminalCommandCompletionStats> = rows.snapshot()
-
-    fun rawRows(): List<TerminalCommandCompletionStats> = rows.rawRows()
 
     fun recordCommandResult(
         commandLine: String,
@@ -100,13 +97,14 @@ internal class CommandCompletionStatsIndex(
     ) {
         val canonical = commandLine.trim()
         val normalized = normalizeTerminalCommandLine(canonical)
+        val context = CompletionLearningContextKey.of(profileId, workingDirectoryUri)
         rows.mutate(
-            key = CommandCompletionStatsKey(normalized, profileId, workingDirectoryUri),
+            key = CommandCompletionStatsKey(normalized, context),
             initialRow = {
                 TerminalCommandCompletionStats(
                     commandLine = canonical,
-                    profileId = profileId,
-                    workingDirectoryUri = workingDirectoryUri,
+                    profileId = context.profileId,
+                    workingDirectoryUri = context.workingDirectoryUri,
                 )
             },
             update = { update(it, canonical) },
@@ -115,14 +113,38 @@ internal class CommandCompletionStatsIndex(
 
     private data class CommandCompletionStatsKey(
         val normalizedCommandLine: String,
-        val profileId: String?,
-        val workingDirectoryUri: String?,
+        val context: CompletionLearningContextKey,
     )
 
     private fun TerminalCommandCompletionStats.key(): CommandCompletionStatsKey =
         CommandCompletionStatsKey(
             normalizedCommandLine = normalizedCommandLine,
-            profileId = profileId,
-            workingDirectoryUri = workingDirectoryUri,
+            context = CompletionLearningContextKey.of(profileId, workingDirectoryUri),
         )
+
+    private fun canonicalizeContext(record: TerminalCommandCompletionStats): TerminalCommandCompletionStats {
+        val context = CompletionLearningContextKey.of(record.profileId, record.workingDirectoryUri)
+        return record.copy(
+            profileId = context.profileId,
+            workingDirectoryUri = context.workingDirectoryUri,
+        )
+    }
+
+    private fun mergeStats(
+        current: TerminalCommandCompletionStats,
+        incoming: TerminalCommandCompletionStats,
+    ): TerminalCommandCompletionStats {
+        val newest = if (incoming.lastUsedEpochMillis >= current.lastUsedEpochMillis) incoming else current
+        val context = CompletionLearningContextKey.of(current.profileId, current.workingDirectoryUri)
+        return newest.copy(
+            profileId = context.profileId,
+            workingDirectoryUri = context.workingDirectoryUri,
+            useCount = saturatedCounterSum(current.useCount, incoming.useCount),
+            successCount = saturatedCounterSum(current.successCount, incoming.successCount),
+            failureCount = saturatedCounterSum(current.failureCount, incoming.failureCount),
+            acceptedCount = saturatedCounterSum(current.acceptedCount, incoming.acceptedCount),
+            dismissedCount = saturatedCounterSum(current.dismissedCount, incoming.dismissedCount),
+            lastUsedEpochMillis = maxOf(current.lastUsedEpochMillis, incoming.lastUsedEpochMillis),
+        )
+    }
 }

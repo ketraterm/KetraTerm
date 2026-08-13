@@ -198,6 +198,7 @@ class CompletionOutcomeProjectionPropertyTest {
                         priority = index,
                     )
                 },
+            commandSpecs = emptyList(),
         )
 
     private fun request(

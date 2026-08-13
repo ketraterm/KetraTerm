@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.completion.model
 
-import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.commandline.classifyGenericCommandLineShape
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -57,7 +57,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `source records command results into matching shape stats`() {
-        val source = TerminalCompletionSources.learningStore()
+        val source = TerminalCompletionLearningStore()
 
         source.recordCommandResult(
             commandLine = "git log --stat main",
@@ -74,7 +74,7 @@ class TerminalCommandShapeStatsTest {
             usedAtEpochMillis = 200,
         )
 
-        val stats = source.shapeSnapshot().single()
+        val stats = source.snapshot().shapeStats.single()
         assertEquals("git", stats.shape.executable)
         assertEquals(listOf("log"), stats.shape.subcommands)
         assertEquals(listOf("--stat"), stats.shape.optionNames)
@@ -87,7 +87,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `source records spec aware nested command family shapes`() {
-        val source = TerminalCompletionSources.learningStore()
+        val source = TerminalCompletionLearningStore()
 
         source.recordCommandResult(
             commandLine = "docker compose up",
@@ -97,7 +97,7 @@ class TerminalCommandShapeStatsTest {
             usedAtEpochMillis = 100,
         )
 
-        val stats = source.shapeSnapshot().single()
+        val stats = source.snapshot().shapeStats.single()
         assertEquals("docker", stats.shape.executable)
         assertEquals(listOf("compose", "up"), stats.shape.subcommands)
         assertEquals(0, stats.shape.positionalArgumentCount)
@@ -105,7 +105,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `source records accepted and dismissed feedback into shape stats`() {
-        val source = TerminalCompletionSources.learningStore()
+        val source = TerminalCompletionLearningStore()
 
         source.recordSuggestionFeedback(
             commandLine = "npm test -- --watch",
@@ -122,7 +122,7 @@ class TerminalCommandShapeStatsTest {
             feedbackAtEpochMillis = 200,
         )
 
-        val stats = source.shapeSnapshot().single()
+        val stats = source.snapshot().shapeStats.single()
         assertEquals(1, stats.acceptedCount)
         assertEquals(1, stats.dismissedCount)
         assertEquals(200, stats.lastUsedEpochMillis)
@@ -130,7 +130,7 @@ class TerminalCommandShapeStatsTest {
 
     @Test
     fun `replace snapshot deduplicates by shape profile and directory`() {
-        val source = TerminalCompletionSources.learningStore()
+        val source = TerminalCompletionLearningStore()
         val shape = classifyGenericCommandLineShape("git status")!!
 
         source.replaceSnapshot(
@@ -159,6 +159,6 @@ class TerminalCommandShapeStatsTest {
             ),
         )
 
-        assertEquals(listOf(20L, 5L), source.shapeSnapshot().map { it.lastUsedEpochMillis })
+        assertEquals(listOf(20L, 5L), source.snapshot().shapeStats.map { it.lastUsedEpochMillis })
     }
 }

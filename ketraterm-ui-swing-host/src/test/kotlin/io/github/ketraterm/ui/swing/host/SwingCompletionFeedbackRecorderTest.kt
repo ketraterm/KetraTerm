@@ -19,7 +19,6 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
-import io.github.ketraterm.completion.model.TerminalCompletionTokenPosition
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
@@ -32,7 +31,7 @@ import kotlin.test.assertTrue
 class SwingCompletionFeedbackRecorderTest {
     @Test
     fun `accepted range suggestion records resulting command and publishes snapshot`() {
-        val source = TerminalCompletionSources.learningStore()
+        val source = TerminalCompletionLearningStore()
         val published = ArrayList<TerminalCommandCompletionStatsSnapshot>()
         val recorder = recorder(source, afterMutation = published::add, clockEpochMillis = { 1_000L })
 
@@ -53,14 +52,14 @@ class SwingCompletionFeedbackRecorderTest {
                 TerminalCommandCompletionStats(
                     commandLine = "git status",
                     profileId = "bash",
-                    workingDirectoryUri = "file:///repo",
+                    workingDirectoryUri = "file:///repo/",
                     acceptedCount = 1,
                     lastUsedEpochMillis = 1_000L,
                 ),
             ),
-            source.snapshotAll().commandStats,
+            source.snapshot().commandStats,
         )
-        assertEquals(source.snapshotAll(), published.single())
+        assertEquals(source.snapshot(), published.single())
         assertEquals(
             "git",
             published
@@ -74,9 +73,8 @@ class SwingCompletionFeedbackRecorderTest {
                 TerminalCompletionFeedbackStats(
                     source = "spec",
                     candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                    tokenPosition = TerminalCompletionTokenPosition.SUBCOMMAND,
                     profileId = "bash",
-                    workingDirectoryUri = "file:///repo",
+                    workingDirectoryUri = "file:///repo/",
                     acceptedCount = 1,
                     lastUsedEpochMillis = 1_000L,
                 ),
@@ -88,7 +86,7 @@ class SwingCompletionFeedbackRecorderTest {
     @Test
     fun `dismissed token suggestion records resulting command without making it suggestible`() =
         runBlocking {
-            val source = TerminalCompletionSources.learningStore()
+            val source = TerminalCompletionLearningStore()
             val recorder = recorder(source, clockEpochMillis = { 2_000L })
 
             recorder.record(
@@ -108,24 +106,34 @@ class SwingCompletionFeedbackRecorderTest {
                     TerminalCommandCompletionStats(
                         commandLine = "git status",
                         profileId = "bash",
-                        workingDirectoryUri = "file:///repo",
+                        workingDirectoryUri = "file:///repo/",
                         dismissedCount = 1,
                         lastUsedEpochMillis = 2_000L,
                     ),
                 ),
-                source.snapshotAll().commandStats,
+                source.snapshot().commandStats,
             )
             assertTrue(
                 TerminalCompletionEngines
-                    .fromSources(TerminalCompletionSources.sessionMru(learnedStatsProvider = source::snapshotAll))
-                    .complete(completionRequest("git s"))
+                    .fromSources(
+                        sources =
+                            listOf(
+                                TerminalCompletionSourceEntry(
+                                    TerminalCompletionSources.sessionMru(
+                                        commandSpecs = emptyList(),
+                                        learningStore = source,
+                                    ),
+                                ),
+                            ),
+                        commandSpecs = emptyList(),
+                    ).complete(completionRequest("git s"))
                     .isEmpty(),
             )
         }
 
     @Test
     fun `unknown suggestion kind records command feedback without source-specific row`() {
-        val source = TerminalCompletionSources.learningStore()
+        val source = TerminalCompletionLearningStore()
         val recorder = recorder(source, clockEpochMillis = { 1_500L })
 
         recorder.record(
@@ -144,17 +152,17 @@ class SwingCompletionFeedbackRecorderTest {
         assertEquals(
             1,
             source
-                .snapshotAll()
+                .snapshot()
                 .commandStats
                 .single()
                 .acceptedCount,
         )
-        assertTrue(source.snapshotAll().feedbackStats.isEmpty())
+        assertTrue(source.snapshot().feedbackStats.isEmpty())
     }
 
     @Test
     fun `invalid replacement range is ignored and does not publish`() {
-        val source = TerminalCompletionSources.learningStore()
+        val source = TerminalCompletionLearningStore()
         var publishCount = 0
         val recorder = recorder(source, afterMutation = { publishCount++ })
 
@@ -170,13 +178,13 @@ class SwingCompletionFeedbackRecorderTest {
             context = context(),
         )
 
-        assertTrue(source.snapshotAll().commandStats.isEmpty())
+        assertTrue(source.snapshot().commandStats.isEmpty())
         assertEquals(0, publishCount)
     }
 
     @Test
     fun `explicit Unicode range records same command accepted by Swing handler`() {
-        val source = TerminalCompletionSources.learningStore()
+        val source = TerminalCompletionLearningStore()
         val published = ArrayList<TerminalCommandCompletionStatsSnapshot>()
         val recorder = recorder(source, afterMutation = published::add, clockEpochMillis = { 2_500L })
 
@@ -196,7 +204,7 @@ class SwingCompletionFeedbackRecorderTest {
         assertEquals(
             "echo ok",
             source
-                .snapshotAll()
+                .snapshot()
                 .commandStats
                 .single()
                 .commandLine,
@@ -213,7 +221,7 @@ class SwingCompletionFeedbackRecorderTest {
 
     @Test
     fun `explicit Unicode range with malformed cursor is ignored`() {
-        val source = TerminalCompletionSources.learningStore()
+        val source = TerminalCompletionLearningStore()
         var publishCount = 0
         val recorder = recorder(source, afterMutation = { publishCount++ })
 
@@ -231,13 +239,13 @@ class SwingCompletionFeedbackRecorderTest {
             context = context(),
         )
 
-        assertTrue(source.snapshotAll().commandStats.isEmpty())
+        assertTrue(source.snapshot().commandStats.isEmpty())
         assertEquals(0, publishCount)
     }
 
     @Test
     fun `sensitive resulting command is ignored and does not publish`() {
-        val source = TerminalCompletionSources.learningStore()
+        val source = TerminalCompletionLearningStore()
         var publishCount = 0
         val recorder = recorder(source, afterMutation = { publishCount++ })
 
@@ -253,13 +261,13 @@ class SwingCompletionFeedbackRecorderTest {
             context = context(),
         )
 
-        assertEquals(TerminalCommandCompletionStatsSnapshot.EMPTY, source.snapshotAll())
+        assertEquals(TerminalCommandCompletionStatsSnapshot.EMPTY, source.snapshot())
         assertEquals(0, publishCount)
     }
 
     @Test
     fun `created handler reads latest context`() {
-        val source = TerminalCompletionSources.learningStore()
+        val source = TerminalCompletionLearningStore()
         val recorder = recorder(source, clockEpochMillis = { 3_000L })
         var workingDirectoryUri = "file:///first"
         val handler =
@@ -279,17 +287,17 @@ class SwingCompletionFeedbackRecorderTest {
         )
 
         assertEquals(
-            "file:///second",
+            "file:///second/",
             source
-                .snapshotAll()
+                .snapshot()
                 .commandStats
                 .single()
                 .workingDirectoryUri,
         )
         assertEquals(
-            "file:///second",
+            "file:///second/",
             source
-                .snapshotAll()
+                .snapshot()
                 .shapeStats
                 .single()
                 .workingDirectoryUri,
@@ -298,7 +306,7 @@ class SwingCompletionFeedbackRecorderTest {
 
     @Test
     fun `privacy policy sees leading whitespace before feedback is learned`() {
-        val source = TerminalCompletionSources.learningStore(commandSpecs = emptyList())
+        val source = TerminalCompletionLearningStore(commandSpecs = emptyList())
         val recorder = recorder(source)
 
         recorder.record(
@@ -313,7 +321,7 @@ class SwingCompletionFeedbackRecorderTest {
             context = SwingCompletionContext(profileId = "bash"),
         )
 
-        assertEquals(TerminalCommandCompletionStatsSnapshot.EMPTY, source.snapshotAll())
+        assertEquals(TerminalCommandCompletionStatsSnapshot.EMPTY, source.snapshot())
     }
 
     private fun recorder(

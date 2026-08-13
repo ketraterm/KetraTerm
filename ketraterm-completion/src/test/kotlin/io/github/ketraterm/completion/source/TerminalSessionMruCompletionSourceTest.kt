@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.completion.source
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalCompletionSources
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import kotlinx.coroutines.runBlocking
@@ -310,7 +307,7 @@ class TerminalSessionMruCompletionSourceTest {
     @Test
     fun `persisted statistics recover one token-local learned fallback`() =
         runBlocking {
-            val stats = TerminalCompletionSources.learningStore()
+            val stats = TerminalCompletionLearningStore()
             stats.recordCommandResult(
                 commandLine = "cd IdeaProjects/KetraTerm/",
                 successful = true,
@@ -318,7 +315,7 @@ class TerminalSessionMruCompletionSourceTest {
                 workingDirectoryUri = "file:///C:/Users/gagik",
                 usedAtEpochMillis = 1_000,
             )
-            val source = TerminalCompletionSources.sessionMru(learnedStatsProvider = stats::snapshotAll)
+            val source = TerminalCompletionSources.sessionMru(learningStore = stats)
 
             val candidates =
                 source.complete(
@@ -333,6 +330,38 @@ class TerminalSessionMruCompletionSourceTest {
             assertEquals(listOf("mru"), candidates.map { it.source })
             assertEquals(listOf(TerminalCompletionCandidateKind.PATH), candidates.map { it.kind })
             assertEquals(listOf("learned directory"), candidates.map { it.detail })
+        }
+
+    @Test
+    fun `persisted history applies directory boost across canonical URI variants`() =
+        runBlocking {
+            val stats = TerminalCompletionLearningStore(commandSpecs = emptyList())
+            stats.recordCommandResult(
+                commandLine = "tool z-match",
+                successful = true,
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo",
+                usedAtEpochMillis = 1_000,
+            )
+            stats.recordCommandResult(
+                commandLine = "tool a-other",
+                successful = true,
+                profileId = "bash",
+                workingDirectoryUri = "file:///other",
+                usedAtEpochMillis = 1_000,
+            )
+            val source = TerminalCompletionSources.sessionMru(commandSpecs = emptyList(), learningStore = stats)
+
+            val candidates =
+                source.complete(
+                    request(
+                        commandLine = "tool ",
+                        profileId = "bash",
+                        workingDirectoryUri = "file:///repo",
+                    ),
+                )
+
+            assertEquals(listOf("z-match", "a-other"), candidates.map { it.replacementText })
         }
 
     @Test
@@ -387,7 +416,7 @@ class TerminalSessionMruCompletionSourceTest {
             val source =
                 SessionMruCompletionSourceImpl(
                     commandSpecs = emptyList(),
-                    learnedStatsProvider = { snapshot },
+                    learningStore = TerminalCompletionLearningStore(commandSpecs = emptyList()).apply { replaceSnapshot(snapshot) },
                     clockEpochMillis = { now },
                 )
 
@@ -412,7 +441,7 @@ class TerminalSessionMruCompletionSourceTest {
         )
 
     private suspend fun observedCandidates(
-        source: io.github.ketraterm.completion.api.TerminalSessionMruCompletionSource,
+        source: TerminalSessionMruCompletionSource,
         request: TerminalCompletionRequest,
     ) = source.complete(request).filter { it.source == "observed" }
 }

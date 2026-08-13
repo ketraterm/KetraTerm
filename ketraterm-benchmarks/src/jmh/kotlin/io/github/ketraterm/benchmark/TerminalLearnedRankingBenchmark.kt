@@ -39,14 +39,13 @@ open class TerminalLearnedRankingBenchmark {
     @Setup
     open fun setUp() {
         val commandSpecs = TerminalCommandSpecs.defaults()
-        statsSource = TerminalCompletionSources.learningStore(capacity = STATS_CAPACITY, commandSpecs = commandSpecs)
+        statsSource = TerminalCompletionLearningStore(capacity = STATS_CAPACITY, commandSpecs = commandSpecs)
         statsSource.replaceSnapshot(fullLearnedSnapshot())
-        val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
         learnedEngine =
             TerminalCompletionEngines.fromSources(
-                sources = listOf(TerminalCompletionSourceEntry(specSource)),
+                sources = emptyList(),
                 commandSpecs = commandSpecs,
-                learnedStatsProvider = statsSource::snapshotAll,
+                learningStore = statsSource,
             )
         learnedRequest =
             TerminalCompletionRequest(
@@ -88,9 +87,7 @@ open class TerminalLearnedRankingBenchmark {
 
     @Benchmark
     open fun readPublishedLearnedSnapshots(blackhole: Blackhole) {
-        blackhole.consume(statsSource.shapeSnapshot())
-        blackhole.consume(statsSource.feedbackSnapshot())
-        blackhole.consume(statsSource.snapshotAll())
+        blackhole.consume(statsSource.snapshot())
     }
 
     private fun fullLearnedSnapshot(): TerminalCommandCompletionStatsSnapshot {
@@ -110,7 +107,6 @@ open class TerminalLearnedRankingBenchmark {
                 TerminalCompletionFeedbackStats(
                     source = "provider-$index",
                     candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                    tokenPosition = TerminalCompletionTokenPosition.SUBCOMMAND,
                     profileId = "profile-$index",
                     workingDirectoryUri = "file:///workspace/$index",
                     acceptedCount = 1,
@@ -130,7 +126,6 @@ open class TerminalLearnedRankingBenchmark {
             TerminalCompletionFeedbackStats(
                 source = "spec",
                 candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                tokenPosition = TerminalCompletionTokenPosition.SUBCOMMAND,
                 profileId = TARGET_PROFILE,
                 workingDirectoryUri = TARGET_DIRECTORY,
                 acceptedCount = 8,

@@ -16,7 +16,6 @@
 package io.github.ketraterm.completion.api
 
 import io.github.ketraterm.completion.engine.MergedCompletionEngine
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 
@@ -33,8 +32,8 @@ object TerminalCompletionEngines {
      * @param sources prioritized source registrations.
      * @param commandSpecs command specs used to classify the active command-line
      * position for ranking.
-     * @param learnedStatsProvider supplier for the latest immutable learned
-     * statistics snapshot. It must perform no host I/O.
+     * @param learningStore optional shared in-memory learning store. The engine
+     * reads its immutable published snapshot and performs no host I/O.
      * @return merged completion engine.
      */
     @JvmStatic
@@ -42,17 +41,13 @@ object TerminalCompletionEngines {
     fun fromSources(
         sources: List<TerminalCompletionSourceEntry>,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-        learnedStatsProvider: () -> TerminalCommandCompletionStatsSnapshot = { TerminalCommandCompletionStatsSnapshot.EMPTY },
+        learningStore: TerminalCompletionLearningStore? = null,
     ): TerminalCompletionEngine =
-        if (sources.isEmpty()) {
-            TerminalCompletionEngine.NONE
-        } else {
-            MergedCompletionEngine(
-                sources = sources,
-                commandSpecs = commandSpecs,
-                learnedStatsProvider = learnedStatsProvider,
-            )
-        }
+        MergedCompletionEngine(
+            sources = sources,
+            commandSpecs = commandSpecs,
+            learningStore = learningStore,
+        )
 
     /**
      * Creates a deterministic merged engine from equal-priority sources.

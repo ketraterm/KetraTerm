@@ -49,7 +49,6 @@ internal class StandaloneCompletionRegistry(
     /** Immutable command specs shared by standalone completion integration. */
     private val commandSpecs = specs.toList()
     private val lock = Any()
-    private val specSource = TerminalCompletionSources.fromSpecs(commandSpecs)
     private val sessionStates = HashMap<String, SessionCompletionState>()
 
     /**
@@ -76,9 +75,7 @@ internal class StandaloneCompletionRegistry(
             TerminalCompletionSources.sessionMru(
                 capacity = sessionMruCapacity,
                 commandSpecs = commandSpecs,
-                learnedStatsProvider =
-                    persistentStatsSource?.let { it::snapshotAll }
-                        ?: { io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot.EMPTY },
+                learningStore = persistentStatsSource,
             )
         val previous =
             synchronized(lock) {
@@ -88,7 +85,6 @@ internal class StandaloneCompletionRegistry(
         val sources =
             ArrayList<TerminalCompletionSourceEntry>(COMPOSED_SOURCE_CAPACITY).apply {
                 add(TerminalCompletionSourceEntry(mruSource, priority = TerminalCompletionSourcePrior.SESSION_MRU))
-                add(TerminalCompletionSourceEntry(specSource, priority = TerminalCompletionSourcePrior.STATIC_SPECIFICATION))
                 add(
                     TerminalCompletionSourceEntry(
                         TerminalCompletionSources.path(
@@ -103,9 +99,7 @@ internal class StandaloneCompletionRegistry(
                 TerminalCompletionEngines.fromSources(
                     sources = sources,
                     commandSpecs = commandSpecs,
-                    learnedStatsProvider =
-                        persistentStatsSource?.let { it::snapshotAll }
-                            ?: { io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot.EMPTY },
+                    learningStore = persistentStatsSource,
                 ),
             contextProvider = {
                 SwingCompletionContext(
@@ -179,6 +173,6 @@ internal class StandaloneCompletionRegistry(
 
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
-        private const val COMPOSED_SOURCE_CAPACITY = 3
+        private const val COMPOSED_SOURCE_CAPACITY = 2
     }
 }

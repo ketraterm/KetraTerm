@@ -17,75 +17,62 @@ package io.github.ketraterm.completion.ranking
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
-import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
+import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.model.*
 
 /** Immutable direct-lookup view of every learned ranking signal in one snapshot. */
 internal class LearnedCompletionEvidenceIndex private constructor(
-    private val exactRows: Map<LearnedCompletionOutcomeKey, List<TerminalCommandCompletionStats>>,
-    private val shapeRows: Map<String, List<TerminalCommandShapeStats>>,
-    private val feedbackRows: Map<FeedbackKey, List<TerminalCompletionFeedbackStats>>,
+    private val exactEvidence: Map<ExactEvidenceKey, LearnedEvidenceCounts>,
+    private val shapeRows: Map<ShapeEvidenceKey, List<TerminalCommandShapeStats>>,
+    private val providerEvidence: Map<ProviderEvidenceKey, LearnedEvidenceCounts>,
 ) {
     fun exactAdjustment(
         key: LearnedCompletionOutcomeKey,
-        request: TerminalCompletionRequest,
+        requestContext: CompletionLearningContextKey,
         nowEpochMillis: Long,
     ): Int {
-        val rows = mostSpecific(exactRows[key].orEmpty(), request, TerminalCommandCompletionStats::evidenceContext)
-        if (rows.isEmpty()) return 0
+        val match =
+            requestContext.mostSpecific { context ->
+                exactEvidence[ExactEvidenceKey(key, context)]
+            } ?: return 0
         return LearnedEvidenceScoring.exact(
-            counts = LearnedEvidenceCounts.fromCommands(rows),
-            contextBoost = rows.first().evidenceContext().boost(request, profile = 20, directory = 30),
+            counts = match.value,
+            contextBoost = match.context.boost(profile = 20, directory = 30),
             nowEpochMillis = nowEpochMillis,
         )
     }
 
     fun shapeAdjustment(
         candidateShape: TerminalCommandLineShape?,
-        request: TerminalCompletionRequest,
+        requestContext: CompletionLearningContextKey,
     ): Int {
         if (candidateShape == null) return 0
-        val matchingRows = shapeRows[candidateShape.executable].orEmpty().filter { it.shape.supports(candidateShape) }
-        val rows = mostSpecific(matchingRows, request, TerminalCommandShapeStats::evidenceContext)
-        if (rows.isEmpty()) return 0
+        val match =
+            requestContext.mostSpecific { context ->
+                val rows = shapeRows[ShapeEvidenceKey(candidateShape.executable, context)] ?: return@mostSpecific null
+                val matchingRows = rows.filter { it.shape.supports(candidateShape) }
+                if (matchingRows.isEmpty()) null else LearnedEvidenceCounts.fromShapes(matchingRows)
+            } ?: return 0
         return LearnedEvidenceScoring.shape(
-            counts = LearnedEvidenceCounts.fromShapes(rows),
-            contextBoost = rows.first().evidenceContext().boost(request, profile = 10, directory = 15),
+            counts = match.value,
+            contextBoost = match.context.boost(profile = 10, directory = 15),
         )
     }
 
     fun providerAdjustment(
         candidate: TerminalCompletionCandidate,
-        request: TerminalCompletionRequest,
+        requestContext: CompletionLearningContextKey,
     ): Int {
-        val rows = feedbackRows(candidate, request)
-        if (rows.isEmpty()) return 0
+        val match =
+            requestContext.mostSpecific { context ->
+                providerEvidence[ProviderEvidenceKey(candidate.source, candidate.kind, context)]
+            } ?: return 0
         return LearnedEvidenceScoring.provider(
-            counts = LearnedEvidenceCounts.fromFeedback(rows),
-            contextBoost = rows.first().evidenceContext().boost(request, profile = 10, directory = 15),
+            counts = match.value,
+            contextBoost = match.context.boost(profile = 10, directory = 15),
         )
-    }
-
-    private fun feedbackRows(
-        candidate: TerminalCompletionCandidate,
-        request: TerminalCompletionRequest,
-    ): List<TerminalCompletionFeedbackStats> {
-        val position = TerminalCompletionTokenPosition.fromCandidateKind(candidate.kind)
-        val directory = request.workingDirectoryUri.canonicalDirectory()
-        val contexts =
-            arrayOf(
-                FeedbackContext(request.profileId, directory),
-                FeedbackContext(null, directory),
-                FeedbackContext(request.profileId, null),
-                FeedbackContext(null, null),
-            )
-        for (context in contexts) {
-            feedbackRows[FeedbackKey(candidate.source, candidate.kind, position, context)]?.let { return it }
-        }
-        return emptyList()
     }
 
     private fun TerminalCommandLineShape.supports(candidate: TerminalCommandLineShape): Boolean =
@@ -107,36 +94,38 @@ internal class LearnedCompletionEvidenceIndex private constructor(
             shellSyntax: TerminalShellSyntax,
             outcomeResolver: TerminalCompletionOutcomeKeyResolver,
         ): LearnedCompletionEvidenceIndex {
-            val exactRows = HashMap<LearnedCompletionOutcomeKey, MutableList<TerminalCommandCompletionStats>>()
+            val exactRows = HashMap<ExactEvidenceKey, MutableList<TerminalCommandCompletionStats>>()
             for (row in snapshot.commandStats) {
                 val tokens = TerminalCommandLineTokenizer.parse(row.commandLine, row.commandLine.length, shellSyntax).tokens
                 if (tokens.isEmpty()) continue
+                val context = CompletionLearningContextKey.of(row.profileId, row.workingDirectoryUri)
                 outcomeResolver.learnedKey(tokens, NO_PATH_TOKEN, pathAware = false)?.let { key ->
-                    exactRows.getOrPut(key, ::ArrayList).add(row)
+                    exactRows.getOrPut(ExactEvidenceKey(key, context), ::ArrayList).add(row)
                 }
                 for (tokenIndex in tokens.indices) {
                     outcomeResolver.learnedKey(tokens, tokenIndex, pathAware = true)?.let { key ->
-                        exactRows.getOrPut(key, ::ArrayList).add(row)
+                        exactRows.getOrPut(ExactEvidenceKey(key, context), ::ArrayList).add(row)
                     }
                 }
             }
 
-            val shapeRows = HashMap<String, MutableList<TerminalCommandShapeStats>>()
+            val shapeRows = HashMap<ShapeEvidenceKey, MutableList<TerminalCommandShapeStats>>()
             for (row in snapshot.shapeStats) {
-                shapeRows.getOrPut(row.shape.executable, ::ArrayList).add(row)
+                val context = CompletionLearningContextKey.of(row.profileId, row.workingDirectoryUri)
+                shapeRows.getOrPut(ShapeEvidenceKey(row.shape.executable, context), ::ArrayList).add(row)
             }
 
-            val feedbackRows = HashMap<FeedbackKey, MutableList<TerminalCompletionFeedbackStats>>()
+            val providerRows = HashMap<ProviderEvidenceKey, MutableList<TerminalCompletionFeedbackStats>>()
             for (row in snapshot.feedbackStats) {
-                val context = FeedbackContext(row.profileId, row.workingDirectoryUri.canonicalDirectory())
-                val key = FeedbackKey(row.source, row.candidateKind, row.tokenPosition, context)
-                feedbackRows.getOrPut(key, ::ArrayList).add(row)
+                val context = CompletionLearningContextKey.of(row.profileId, row.workingDirectoryUri)
+                val key = ProviderEvidenceKey(row.source, row.candidateKind, context)
+                providerRows.getOrPut(key, ::ArrayList).add(row)
             }
 
             return LearnedCompletionEvidenceIndex(
-                exactRows = exactRows.freeze(),
-                shapeRows = shapeRows.freeze(),
-                feedbackRows = feedbackRows.freeze(),
+                exactEvidence = exactRows.mapValues { (_, rows) -> LearnedEvidenceCounts.fromCommands(rows) },
+                shapeRows = shapeRows.mapValues { (_, rows) -> rows.toList() },
+                providerEvidence = providerRows.mapValues { (_, rows) -> LearnedEvidenceCounts.fromFeedback(rows) },
             )
         }
 
@@ -144,84 +133,18 @@ internal class LearnedCompletionEvidenceIndex private constructor(
     }
 }
 
-private data class EvidenceContext(
-    val profileId: String?,
-    val workingDirectoryUri: String?,
-) {
-    fun specificity(request: TerminalCompletionRequest): Int {
-        var value = 0
-        if (profileId != null) {
-            if (profileId != request.profileId) return NO_MATCH
-            value += PROFILE_SPECIFICITY
-        }
-        if (workingDirectoryUri != null) {
-            if (workingDirectoryUri != request.workingDirectoryUri.canonicalDirectory()) return NO_MATCH
-            value += DIRECTORY_SPECIFICITY
-        }
-        return value
-    }
-
-    fun boost(
-        request: TerminalCompletionRequest,
-        profile: Int,
-        directory: Int,
-    ): Int {
-        var score = 0
-        if (profileId != null && profileId == request.profileId) score += profile
-        if (workingDirectoryUri != null && workingDirectoryUri == request.workingDirectoryUri.canonicalDirectory()) score += directory
-        return score
-    }
-
-    private companion object {
-        private const val NO_MATCH = -1
-        private const val PROFILE_SPECIFICITY = 1
-        private const val DIRECTORY_SPECIFICITY = 2
-    }
-}
-
-private data class FeedbackContext(
-    val profileId: String?,
-    val workingDirectoryUri: String?,
+private data class ExactEvidenceKey(
+    val outcome: LearnedCompletionOutcomeKey,
+    val context: CompletionLearningContextKey,
 )
 
-private data class FeedbackKey(
+private data class ShapeEvidenceKey(
+    val executable: String,
+    val context: CompletionLearningContextKey,
+)
+
+private data class ProviderEvidenceKey(
     val source: String,
     val candidateKind: TerminalCompletionCandidateKind,
-    val tokenPosition: TerminalCompletionTokenPosition,
-    val context: FeedbackContext,
+    val context: CompletionLearningContextKey,
 )
-
-private fun TerminalCommandCompletionStats.evidenceContext(): EvidenceContext =
-    EvidenceContext(profileId, workingDirectoryUri.canonicalDirectory())
-
-private fun TerminalCommandShapeStats.evidenceContext(): EvidenceContext =
-    EvidenceContext(profileId, workingDirectoryUri.canonicalDirectory())
-
-private fun TerminalCompletionFeedbackStats.evidenceContext(): EvidenceContext =
-    EvidenceContext(profileId, workingDirectoryUri.canonicalDirectory())
-
-private fun String?.canonicalDirectory(): String? = this?.let(::canonicalizeWorkingDirectoryUri)
-
-private fun <T> mostSpecific(
-    rows: List<T>,
-    request: TerminalCompletionRequest,
-    context: (T) -> EvidenceContext,
-): List<T> {
-    var bestSpecificity = -1
-    val selected = ArrayList<T>()
-    for (row in rows) {
-        val specificity = context(row).specificity(request)
-        if (specificity < 0) continue
-        when {
-            specificity > bestSpecificity -> {
-                bestSpecificity = specificity
-                selected.clear()
-                selected += row
-            }
-            specificity == bestSpecificity -> selected += row
-        }
-    }
-    return selected
-}
-
-private fun <K, V> Map<K, MutableList<V>>.freeze(): Map<K, List<V>> = mapValues { (_, rows) -> rows.toList() }

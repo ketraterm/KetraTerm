@@ -60,7 +60,6 @@ class CommandCompletionStatsSanitizerTest {
             TerminalCompletionFeedbackStats(
                 source = "spec",
                 candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                tokenPosition = TerminalCompletionTokenPosition.SUBCOMMAND,
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo",
                 acceptedCount = 2,

@@ -53,6 +53,23 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
         publishSnapshot()
     }
 
+    fun mergeAll(
+        records: List<Row>,
+        merge: (current: Row, incoming: Row) -> Row,
+    ) {
+        for (record in records) {
+            val index = entries.indexOfKey(keySelector(record), keySelector)
+            if (index >= 0) {
+                entries[index] = merge(entries[index], record)
+            } else {
+                entries += record
+            }
+        }
+        entries.sortWith(order)
+        if (entries.size > capacity) entries.subList(capacity, entries.size).clear()
+        publishSnapshot()
+    }
+
     fun snapshot(): List<Row> = publishedSnapshot
 
     fun rawRows(): List<Row> = entries
