@@ -57,6 +57,9 @@ in implementation packages and must stay `internal`.
 shell quoting policy, and emits domain-tagged argument candidates. A provider may perform bounded host I/O and must
 cooperate with cancellation. A provider may additionally restrict itself to canonical command/subcommand names when a
 value domain has command-specific validity.
+Aggregate host sources that load several provider groups in one operation use
+`TerminalCompletionSources.valueDomainCandidates(...)` to project each already-loaded group through the identical
+matching, quoting, replacement, and scoring policy without constructing nested source adapters per request.
 
 `TerminalCompletionSources.fuzzyPath(...)` adapts either a suspending bounded host path loader or a query-aware
 `TerminalFuzzyPathProvider` for context-aware fuzzy path completion. Bounded list loaders use the shared dependency-free
@@ -133,8 +136,9 @@ Optional disk I/O belongs to the separately published
 `ketraterm-completion-persistence` module. Its
 `TerminalCompletionLearningRepository` owns an internal codec and bounded file store that sanitize again at the storage
 boundary, apply byte/line/row bounds before decoding or encoding, and perform atomic file replacement. The repository
-serializes mutation, loading, and persistence with a `Mutex` and moves file I/O to `Dispatchers.IO`. Product hosts launch
-its suspending operations in their existing lifecycle scopes. There are no
+serializes mutation, loading, and persistence with a `Mutex` and moves file I/O to `Dispatchers.IO`.
+`TerminalCompletionLearningCoordinator` launches those operations in a caller-owned lifecycle scope and centralizes the
+shared command privacy check; it owns no scope or executor. There are no
 statistics executors, coalescing queues, flush barriers, or shutdown timeouts. Product hosts own the
 destination path, enablement policy, diagnostics, and store lifecycle.
 Completion persistence is not a workspace responsibility.

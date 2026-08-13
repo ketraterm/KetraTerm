@@ -66,67 +66,71 @@ internal class ValueDomainCompletionSource(
             return emptyList()
         }
 
-        val prefix = context.activePrefix
         val values = valuesProvider()
-        if (values.isEmpty()) return emptyList()
-        val candidates = ArrayList<TerminalCompletionCandidate>(minOf(values.size, limit))
-        for (index in values.indices) {
-            val value = values[index]
-            if (!matchesCompletablePrefix(value.value, prefix)) continue
-            val replacement =
-                ShellReplacementText.encode(
-                    value = value.value,
-                    activeTokenQuote = context.activeTokenQuote,
-                    policy = request.shellCapabilities.quoting,
-                ) ?: continue
-            candidates +=
-                TerminalCompletionCandidate(
-                    replacementText = replacement,
-                    replacementStartOffset = context.replacementStartOffset,
-                    replacementEndOffset = context.replacementEndOffset,
-                    displayText = value.displayText,
-                    detail = value.detail,
-                    source = sourceId,
-                    kind = TerminalCompletionCandidateKind.ARGUMENT,
-                    score = score(value, prefix, index),
-                    valueDomain = domain,
-                )
-        }
-        candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-        return candidates.boundedTo(limit)
-    }
-
-    private companion object {
-        private const val BASE_SCORE = 260
-
-        private fun matchesCompletablePrefix(
-            value: String,
-            prefix: String,
-        ): Boolean =
-            prefix.isEmpty() ||
-                (
-                    value.startsWith(prefix, ignoreCase = true) &&
-                        !value.equals(
-                            prefix,
-                            ignoreCase = true,
-                        )
-                )
-
-        private fun score(
-            value: TerminalCompletionDomainValue,
-            prefix: String,
-            orderIndex: Int,
-        ): Int {
-            val caseBonus =
-                if (prefix.isEmpty()) {
-                    0
-                } else if (value.value.startsWith(prefix)) {
-                    40
-                } else {
-                    20
-                }
-            val lengthPenalty = value.value.length - prefix.length
-            return BASE_SCORE + caseBonus - lengthPenalty - orderIndex + value.scoreAdjustment
-        }
+        return projectValueDomainCandidates(request, context, domain, sourceId, values, limit)
     }
 }
+
+/** Projects already-loaded dynamic values through the shared matching and quoting policy. */
+internal fun projectValueDomainCandidates(
+    request: TerminalCompletionRequest,
+    context: TerminalCompletionContext,
+    domain: TerminalCompletionValueDomain,
+    sourceId: String,
+    values: List<TerminalCompletionDomainValue>,
+    limit: Int,
+): List<TerminalCompletionCandidate> {
+    if (context.expectedValueDomain != domain || values.isEmpty()) return emptyList()
+    val prefix = context.activePrefix
+    val candidates = ArrayList<TerminalCompletionCandidate>(minOf(values.size, limit))
+    for (index in values.indices) {
+        val value = values[index]
+        if (!matchesCompletablePrefix(value.value, prefix)) continue
+        val replacement =
+            ShellReplacementText.encode(
+                value = value.value,
+                activeTokenQuote = context.activeTokenQuote,
+                policy = request.shellCapabilities.quoting,
+            ) ?: continue
+        candidates +=
+            TerminalCompletionCandidate(
+                replacementText = replacement,
+                replacementStartOffset = context.replacementStartOffset,
+                replacementEndOffset = context.replacementEndOffset,
+                displayText = value.displayText,
+                detail = value.detail,
+                source = sourceId,
+                kind = TerminalCompletionCandidateKind.ARGUMENT,
+                score = valueDomainScore(value, prefix, index),
+                valueDomain = domain,
+            )
+    }
+    candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
+    return candidates.boundedTo(limit)
+}
+
+private fun matchesCompletablePrefix(
+    value: String,
+    prefix: String,
+): Boolean =
+    prefix.isEmpty() ||
+        (value.startsWith(prefix, ignoreCase = true) && !value.equals(prefix, ignoreCase = true))
+
+private fun valueDomainScore(
+    value: TerminalCompletionDomainValue,
+    prefix: String,
+    orderIndex: Int,
+): Int {
+    val caseBonus =
+        if (prefix.isEmpty()) {
+            0
+        } else if (value.value.startsWith(prefix)) {
+            40
+        } else {
+            20
+        }
+    val lengthPenalty = value.value.length - prefix.length
+    return VALUE_DOMAIN_BASE_SCORE + caseBonus - lengthPenalty - orderIndex + value.scoreAdjustment
+}
+
+private const val VALUE_DOMAIN_BASE_SCORE = 260

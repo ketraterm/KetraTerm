@@ -16,9 +16,7 @@
 package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.project.Project
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionSource
-import io.github.ketraterm.completion.api.TerminalCompletionSources
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 
@@ -97,30 +95,30 @@ internal fun intellijGitCompletionSource(
         val commandName = context.currentCommand?.name
         val snapshot = loader(request.workingDirectoryUri)
         val candidates = ArrayList<TerminalCompletionCandidate>(limit)
-        candidates +=
-            valueSource(LOCAL_SOURCE_ID, snapshot.localBranches)
-                .complete(request, context, limit)
+        candidates += projectValues(request, context, LOCAL_SOURCE_ID, snapshot.localBranches, limit)
         if (commandName in REMOTE_REFERENCE_COMMANDS) {
-            candidates +=
-                valueSource(REMOTE_SOURCE_ID, snapshot.remoteBranches)
-                    .complete(request, context, limit)
-            candidates +=
-                valueSource(TAG_SOURCE_ID, snapshot.tags)
-                    .complete(request, context, limit)
+            candidates += projectValues(request, context, REMOTE_SOURCE_ID, snapshot.remoteBranches, limit)
+            candidates += projectValues(request, context, TAG_SOURCE_ID, snapshot.tags, limit)
         }
         candidates
             .sortedWith(CANDIDATE_ORDER)
             .take(limit)
     }
 
-private fun valueSource(
+private fun projectValues(
+    request: TerminalCompletionRequest,
+    context: TerminalCompletionContext,
     sourceId: String,
     values: List<TerminalCompletionDomainValue>,
-): TerminalCompletionSource =
-    TerminalCompletionSources.valueDomain(
+    limit: Int,
+): List<TerminalCompletionCandidate> =
+    TerminalCompletionSources.valueDomainCandidates(
+        request = request,
+        context = context,
         domain = TerminalCompletionValueDomain.GIT_BRANCH,
         sourceId = sourceId,
-        valuesProvider = { values },
+        values = values,
+        limit = limit,
     )
 
 private const val LOCAL_SOURCE_ID = "intellij-git-branch"

@@ -17,41 +17,41 @@ package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import java.nio.file.Path
 
 /**
  * Standalone owner of serialized completion learning and optional persistence.
  *
- * The shared suspending repository serializes mutations and disk I/O. This
- * adapter only launches infrequent UI events in the application's lifecycle
- * scope.
+ * The shared learning coordinator serializes and launches repository work in
+ * the application's lifecycle scope. This adapter only maps standalone context
+ * and Swing feedback vocabulary.
  */
 internal class StandaloneCompletionStatisticsCoordinator(
     statsSource: TerminalCompletionLearningStore,
     initialPersistencePath: Path?,
-    private val coroutineScope: CoroutineScope,
+    coroutineScope: CoroutineScope,
 ) {
-    private val repository =
-        TerminalCompletionLearningRepository(
-            learningStore = statsSource,
-            initialPersistencePath = initialPersistencePath,
+    private val learning =
+        TerminalCompletionLearningCoordinator(
+            repository =
+                TerminalCompletionLearningRepository(
+                    learningStore = statsSource,
+                    initialPersistencePath = initialPersistencePath,
+                ),
+            coroutineScope = coroutineScope,
         )
     private val feedbackRecorder =
         SwingCompletionFeedbackRecorder(
             statsSource = statsSource,
-            submitMutation = ::executeMutation,
+            submitMutation = learning::submit,
             allowsCommand = TerminalCompletionPersistencePolicy::allowsCommand,
         )
-
-    init {
-        coroutineScope.launch { repository.initialize() }
-    }
 
     /** Creates a feedback handler whose mutations are serialized by this owner. */
     fun createFeedbackHandler(
@@ -73,26 +73,17 @@ internal class StandaloneCompletionStatisticsCoordinator(
         workingDirectoryUri: String?,
         usedAtEpochMillis: Long,
     ) {
-        if (!TerminalCompletionPersistencePolicy.allowsCommand(commandLine)) return
-        coroutineScope.launch {
-            repository.mutate {
-                recordCommandResult(
-                    commandLine = commandLine,
-                    successful = successful,
-                    profileId = profileId,
-                    workingDirectoryUri = workingDirectoryUri,
-                    usedAtEpochMillis = usedAtEpochMillis,
-                )
-            }
-        }
+        learning.recordCommandResult(
+            commandLine = commandLine,
+            successful = successful,
+            profileId = profileId,
+            workingDirectoryUri = workingDirectoryUri,
+            usedAtEpochMillis = usedAtEpochMillis,
+        )
     }
 
     /** Enables, switches, or disables the persistence store asynchronously. */
     fun setPersistencePath(path: Path?) {
-        coroutineScope.launch { repository.setPersistencePath(path) }
-    }
-
-    private fun executeMutation(mutation: () -> Unit) {
-        coroutineScope.launch { repository.mutate { mutation() } }
+        learning.setPersistencePath(path)
     }
 }

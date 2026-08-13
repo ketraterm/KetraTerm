@@ -59,7 +59,8 @@ module owns this file through `TerminalCompletionLearningRepository`; its codec 
 and workspace state has no dependency on completion learning. Legacy nine-field feedback rows containing a redundant
 token-position column are accepted when loading existing version-1 files, but new writes use the eight-field row above.
 One suspending `TerminalCompletionLearningRepository` serializes learning and file replacement with a mutex and moves
-file access to `Dispatchers.IO`. Loads, rows, line sizes, and total file bytes are bounded before decoding or encoding,
+file access to `Dispatchers.IO`. Hosts share `TerminalCompletionLearningCoordinator` to launch those operations in
+their own lifecycle scopes without duplicating scheduling or privacy-filtering code. Loads, rows, line sizes, and total file bytes are bounded before decoding or encoding,
 so neither startup nor settings changes read this file on the Swing event-dispatch thread. Derived
 matching keys, such as normalized command text and normalized command-shape
 keys, are recomputed by the completion models and are not stored as separate

@@ -17,6 +17,7 @@ package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
@@ -24,32 +25,29 @@ import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 /**
  * IntelliJ adapter for learned completion statistics.
  *
- * The shared suspending repository owns serialization and disk I/O; this class
- * maps IntelliJ lifecycle and Swing feedback events into that repository.
+ * The shared learning coordinator owns lifecycle-scope dispatch into the
+ * suspending repository; this class only maps IntelliJ lifecycle and Swing
+ * feedback events.
  *
  * @param repository shared learning and persistence repository.
  * @param coroutineScope IntelliJ lifecycle scope used to launch infrequent events.
  */
 internal class IntellijCompletionStatisticsCoordinator(
     private val repository: TerminalCompletionLearningRepository,
-    private val coroutineScope: CoroutineScope,
+    coroutineScope: CoroutineScope,
 ) {
-    val statsSource: TerminalCompletionLearningStore = repository.learningStore
+    private val learning = TerminalCompletionLearningCoordinator(repository, coroutineScope)
+    val statsSource: TerminalCompletionLearningStore = learning.learningStore
     private val feedbackRecorder =
         SwingCompletionFeedbackRecorder(
             statsSource = statsSource,
-            submitMutation = ::executeMutation,
+            submitMutation = learning::submit,
             allowsCommand = TerminalCompletionPersistencePolicy::allowsCommand,
         )
-
-    init {
-        coroutineScope.launch { repository.initialize() }
-    }
 
     /**
      * Enables or disables disk-backed learned completion statistics.
@@ -61,7 +59,7 @@ internal class IntellijCompletionStatisticsCoordinator(
      * @param enabled `true` to permit snapshot reads and writes.
      */
     fun setPersistenceEnabled(enabled: Boolean) {
-        coroutineScope.launch { repository.setPersistenceEnabled(enabled) }
+        learning.setPersistenceEnabled(enabled)
     }
 
     /** Creates a shared Swing feedback handler for one live session context. */
@@ -74,19 +72,12 @@ internal class IntellijCompletionStatisticsCoordinator(
         metadata: TerminalShellIntegrationCommandMetadata,
     ) {
         val command = metadata.commandText ?: return
-        if (!TerminalCompletionPersistencePolicy.allowsCommand(command)) return
-        executeMutation {
-            statsSource.recordCommandResult(
-                commandLine = command,
-                successful = metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
-                profileId = profileId,
-                workingDirectoryUri = metadata.workingDirectoryUri,
-                usedAtEpochMillis = metadata.finishedAtEpochMillis ?: System.currentTimeMillis(),
-            )
-        }
-    }
-
-    private fun executeMutation(mutation: () -> Unit) {
-        coroutineScope.launch { repository.mutate { mutation() } }
+        learning.recordCommandResult(
+            commandLine = command,
+            successful = metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+            profileId = profileId,
+            workingDirectoryUri = metadata.workingDirectoryUri,
+            usedAtEpochMillis = metadata.finishedAtEpochMillis ?: System.currentTimeMillis(),
+        )
     }
 }

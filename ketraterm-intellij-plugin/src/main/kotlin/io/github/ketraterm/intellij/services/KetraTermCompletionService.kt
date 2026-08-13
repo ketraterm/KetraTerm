@@ -36,9 +36,6 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandl
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -172,8 +169,7 @@ internal class KetraTermCompletionService(
  * @param statsSource bounded learned-statistics source.
  * @param learningRepository serialized learning and persistence owner.
  * @param sessionMruCapacity positive per-session MRU capacity.
- * @param coroutineScope host lifecycle scope that parents completion work, or
- * `null` for a registry-owned test scope.
+ * @param coroutineScope host lifecycle scope that parents completion work.
  * @throws IllegalArgumentException if [sessionMruCapacity] is not positive.
  */
 internal class IntellijCompletionRegistry(
@@ -181,7 +177,7 @@ internal class IntellijCompletionRegistry(
     private val statsSource: TerminalCompletionLearningStore = TerminalCompletionLearningStore(commandSpecs = specs),
     learningRepository: TerminalCompletionLearningRepository = TerminalCompletionLearningRepository(statsSource),
     private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
-    coroutineScope: CoroutineScope? = null,
+    coroutineScope: CoroutineScope,
 ) : AutoCloseable {
     init {
         require(sessionMruCapacity > 0) { "sessionMruCapacity must be > 0, was $sessionMruCapacity" }
@@ -192,12 +188,10 @@ internal class IntellijCompletionRegistry(
     private val lock = Any()
     private val closed = AtomicBoolean()
     private val sessionStates = HashMap<String, SessionState>()
-    private val ownedScope = if (coroutineScope == null) CoroutineScope(SupervisorJob() + Dispatchers.Default) else null
-    private val completionScope = coroutineScope ?: requireNotNull(ownedScope)
     private val statistics =
         IntellijCompletionStatisticsCoordinator(
             repository = learningRepository,
-            coroutineScope = completionScope,
+            coroutineScope = coroutineScope,
         )
 
     /**
@@ -326,7 +320,6 @@ internal class IntellijCompletionRegistry(
                 copy
             }
         states.forEach(SessionState::close)
-        ownedScope?.cancel()
     }
 
     /** Session resources retained by the registry until replacement or closure. */

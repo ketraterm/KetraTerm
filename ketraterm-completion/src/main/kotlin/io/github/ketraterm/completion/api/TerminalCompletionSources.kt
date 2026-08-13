@@ -190,4 +190,35 @@ object TerminalCompletionSources {
             valuesProvider = valuesProvider,
             allowedCommandNames = allowedCommandNames.toSet(),
         )
+
+    /**
+     * Projects one already-loaded dynamic-value group into completion candidates.
+     *
+     * This is intended for aggregate host sources that load several provider
+     * groups in one host operation. It applies the same prefix matching, shell
+     * quoting, replacement ranges, and local scoring as [valueDomain] without
+     * allocating nested source adapters per request.
+     *
+     * @param request immutable completion request supplied to the aggregate source.
+     * @param context engine-resolved context supplied to the aggregate source.
+     * @param domain dynamic value domain represented by [values].
+     * @param sourceId stable provider id attached to projected candidates.
+     * @param values bounded values already loaded by the aggregate source.
+     * @param limit maximum candidates returned for this group.
+     * @return projected candidates, or an empty list for an ineligible context.
+     */
+    @JvmStatic
+    fun valueDomainCandidates(
+        request: TerminalCompletionRequest,
+        context: TerminalCompletionContext,
+        domain: TerminalCompletionValueDomain,
+        sourceId: String,
+        values: List<TerminalCompletionDomainValue>,
+        limit: Int,
+    ): List<TerminalCompletionCandidate> {
+        require(domain != TerminalCompletionValueDomain.NONE) { "domain must not be NONE" }
+        require(sourceId.isNotBlank()) { "sourceId must not be blank" }
+        require(limit > 0) { "limit must be > 0, was $limit" }
+        return projectValueDomainCandidates(request, context, domain, sourceId, values, limit)
+    }
 }
