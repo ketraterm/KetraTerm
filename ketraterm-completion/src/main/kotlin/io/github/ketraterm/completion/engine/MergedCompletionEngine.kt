@@ -38,6 +38,8 @@ internal class MergedCompletionEngine(
     commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     learningStore: TerminalCompletionLearningStore? = null,
     clockEpochMillis: () -> Long = System::currentTimeMillis,
+    private val sourceFailureHandler: TerminalCompletionSourceFailureHandler =
+        TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
 ) : TerminalCompletionEngine {
     private val commandSpecs = commandSpecs.toList()
     private val sources =
@@ -99,7 +101,8 @@ internal class MergedCompletionEngine(
                                 } catch (cancellation: CancellationException) {
                                     completions.close(cancellation)
                                     return@launch
-                                } catch (_: Exception) {
+                                } catch (failure: Exception) {
+                                    reportSourceFailure(sourceIndex, entry, failure)
                                     emptyList()
                                 }
                             completions.send(SourceCompletion(sourceIndex, entry.priority, candidates))
@@ -128,6 +131,19 @@ internal class MergedCompletionEngine(
                 completions.cancel()
             }
         }
+
+    private fun reportSourceFailure(
+        sourceIndex: Int,
+        source: TerminalCompletionSourceEntry,
+        failure: Throwable,
+    ) {
+        try {
+            sourceFailureHandler.sourceFailed(sourceIndex, source, failure)
+        } catch (diagnosticFailure: RuntimeException) {
+            diagnosticFailure.addSuppressed(failure)
+            TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER.sourceFailed(sourceIndex, source, diagnosticFailure)
+        }
+    }
 
     private data class SourceCompletion(
         val sourceIndex: Int,

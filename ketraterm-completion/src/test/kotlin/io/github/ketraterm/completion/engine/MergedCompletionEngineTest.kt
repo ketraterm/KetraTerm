@@ -67,17 +67,27 @@ class MergedCompletionEngineTest {
     @Test
     fun `source failure is isolated from progressive results`() =
         runBlocking {
+            val failedSource = TerminalCompletionSource { _, _, _ -> error("failed source") }
+            val failureEvents = mutableListOf<RecordedSourceFailure>()
             val engine =
                 TerminalCompletionEngines.fromSources(
                     sources =
                         listOf(
-                            entry(TerminalCompletionSource { _, _, _ -> error("failed source") }, 100),
+                            entry(failedSource, 100),
                             entry(source(candidate("available")), 0),
                         ),
                     commandSpecs = emptyList(),
+                    sourceFailureHandler =
+                        TerminalCompletionSourceFailureHandler { index, source, failure ->
+                            failureEvents += RecordedSourceFailure(index, source, failure)
+                        },
                 )
 
             assertEquals(listOf("available"), engine.complete(request()).map { it.replacementText })
+            assertEquals(1, failureEvents.size)
+            assertEquals(0, failureEvents.single().sourceIndex)
+            assertSame(failedSource, failureEvents.single().source.source)
+            assertEquals("failed source", failureEvents.single().failure.message)
         }
 
     @Test
@@ -764,6 +774,12 @@ class MergedCompletionEngineTest {
             assertEquals(2, contexts.size)
             assertSame(contexts[0], contexts[1])
         }
+
+    private data class RecordedSourceFailure(
+        val sourceIndex: Int,
+        val source: TerminalCompletionSourceEntry,
+        val failure: Throwable,
+    )
 
     private fun entry(
         source: TerminalCompletionSource,

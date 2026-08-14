@@ -24,6 +24,7 @@ import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class StandaloneCompletionRegistryTest {
@@ -392,6 +393,16 @@ class StandaloneCompletionRegistryTest {
             val provider = registry.createProvider("session-1")
             assertTrue(provider.suggestions(request("git")).last().isEmpty())
         }
+
+    @Test
+    fun `closed registry rejects new providers`() {
+        val registry = registry(emptyList())
+
+        registry.close()
+        registry.close()
+
+        assertFailsWith<IllegalStateException> { registry.createProvider("late-session") }
+    }
 
     private fun registry(
         specs: List<TerminalCommandSpec> = specs(),

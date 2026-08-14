@@ -25,8 +25,7 @@ import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Test
 import java.nio.file.Files
 import java.nio.file.Path
@@ -108,6 +107,50 @@ class IntellijCompletionRegistryTest {
             first.close()
             second.close()
             registry.close()
+        }
+
+    @Test
+    fun `closing a replaced session cannot remove its replacement`() =
+        runBlocking {
+            val registry = IntellijCompletionRegistry(specs = emptyList(), coroutineScope = this)
+            val previous = registry.openSession(context(sessionId = "session"))
+            val replacement = registry.openSession(context(sessionId = "session"))
+
+            previous.close()
+            registry.recordFinishedCommand(
+                "session",
+                "bash",
+                TerminalShellIntegrationCommandMetadata(
+                    recordId = 1,
+                    commandText = "git status",
+                    lifecycle = TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                    workingDirectoryUri = "file:///repo",
+                    exitCode = 0,
+                    startedAtEpochMillis = 1L,
+                    finishedAtEpochMillis = 2L,
+                ),
+            )
+
+            assertEquals(
+                listOf("git status"),
+                replacement.provider
+                    .suggestions(request("git"))
+                    .last()
+                    .map { it.replacementText },
+            )
+            replacement.close()
+            registry.close()
+        }
+
+    @Test
+    fun `closed registry rejects new sessions`(): Unit =
+        runBlocking {
+            val registry = IntellijCompletionRegistry(coroutineScope = this)
+
+            registry.close()
+            registry.close()
+
+            assertThrows(IllegalStateException::class.java) { registry.openSession(context()) }
         }
 
     @Test

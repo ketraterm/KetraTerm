@@ -15,7 +15,8 @@
  */
 package io.github.ketraterm.intellij.services
 
-import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
+import io.github.ketraterm.completion.api.TerminalCompletionSessionRegistry
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -24,10 +25,9 @@ import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 import kotlinx.coroutines.CoroutineScope
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Plugin-owned composition of shared completion sources and learned statistics.
+ * Plugin-owned bridge from IntelliJ session context to shared completion sessions and learned statistics.
  *
  * Session registration is synchronized and replacing an existing session id
  * clears its previous session-local learning.
@@ -41,20 +41,19 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    private val statsSource: TerminalCompletionLearningStore = TerminalCompletionLearningStore(commandSpecs = specs),
+    statsSource: TerminalCompletionLearningStore = TerminalCompletionLearningStore(commandSpecs = specs),
     learningRepository: TerminalCompletionLearningRepository = TerminalCompletionLearningRepository(statsSource),
-    private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
+    sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
     coroutineScope: CoroutineScope,
 ) : AutoCloseable {
-    init {
-        require(sessionMruCapacity > 0) { "sessionMruCapacity must be > 0, was $sessionMruCapacity" }
-    }
-
-    /** Defensive immutable copy of the command specifications used by sessions. */
-    private val commandSpecs: List<TerminalCommandSpec> = specs.toList()
     private val lock = Any()
-    private val closed = AtomicBoolean()
-    private val sessionStates = HashMap<String, SessionState>()
+    private var closed = false
+    private val sessions =
+        TerminalCompletionSessionRegistry(
+            commandSpecs = specs,
+            learningStore = statsSource,
+            sessionMruCapacity = sessionMruCapacity,
+        )
     private val statistics =
         IntellijCompletionStatisticsCoordinator(
             repository = learningRepository,
@@ -69,67 +68,33 @@ internal class IntellijCompletionRegistry(
      * @throws IllegalStateException if this registry is closed.
      */
     fun openSession(context: IntellijCompletionSessionContext): IntellijCompletionSession {
-        val opened =
-            synchronized(lock) {
-                check(!closed.get()) { "IntelliJ completion registry is closed" }
-                createSession(context)
-            }
-        try {
-            opened.previous?.close()
-        } catch (failure: Throwable) {
-            runCatching(opened.session::close).exceptionOrNull()?.let(failure::addSuppressed)
-            throw failure
+        synchronized(lock) {
+            check(!closed) { "IntelliJ completion registry is closed" }
+            return createSession(context)
         }
-        return opened.session
     }
 
-    private fun createSession(context: IntellijCompletionSessionContext): OpenedSession {
-        val mruSource =
-            TerminalCompletionSources.sessionMru(
-                capacity = sessionMruCapacity,
-                commandSpecs = commandSpecs,
-                learningStore = statsSource,
+    private fun createSession(context: IntellijCompletionSessionContext): IntellijCompletionSession {
+        val fileSystemProvider = TerminalLocalFileSystemProvider(scanner = context.directoryScanner)
+        val completionSession =
+            sessions.openSession(
+                sessionId = context.sessionId,
+                fileSystemProvider = fileSystemProvider,
+                additionalSources = context.additionalSources,
             )
         try {
-            val fileSystemProvider = TerminalLocalFileSystemProvider(scanner = context.directoryScanner)
-            val sources =
-                buildList {
-                    add(
-                        TerminalCompletionSourceEntry(
-                            mruSource,
-                            priority = TerminalCompletionSourcePrior.SESSION_MRU,
-                        ),
-                    )
-                    add(
-                        TerminalCompletionSourceEntry(
-                            TerminalCompletionSources.path(
-                                fileSystemProvider = fileSystemProvider,
-                            ),
-                            priority = TerminalCompletionSourcePrior.DIRECTORY_PATH,
-                        ),
-                    )
-                    addAll(context.additionalSources)
-                }
             val provider =
                 SwingCompletionSuggestionProvider(
-                    engine =
-                        TerminalCompletionEngines.fromSources(
-                            sources = sources,
-                            commandSpecs = commandSpecs,
-                            learningStore = statsSource,
-                        ),
+                    engine = completionSession.engine,
                     contextProvider = { context.swingContext() },
                 )
-            val state = SessionState(mruSource)
-            val session =
-                IntellijCompletionSession(
-                    provider = provider,
-                    feedbackHandler = statistics.createFeedbackHandler(context::swingContext),
-                    closeAction = { removeSession(context.sessionId, state) },
-                )
-            return OpenedSession(session, sessionStates.put(context.sessionId, state))
+            return IntellijCompletionSession(
+                provider = provider,
+                feedbackHandler = statistics.createFeedbackHandler(context::swingContext),
+                closeAction = completionSession::close,
+            )
         } catch (failure: Throwable) {
-            mruSource.clear()
+            completionSession.close()
             throw failure
         }
     }
@@ -149,12 +114,13 @@ internal class IntellijCompletionRegistry(
         val command = metadata.commandText ?: return
         val successful = metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED
         synchronized(lock) {
-            if (closed.get()) return
+            if (closed) return
             if (successful) {
-                sessionStates[sessionId]?.mruSource?.recordSuccessfulCommand(
-                    command,
-                    profileId,
-                    metadata.workingDirectoryUri,
+                sessions.recordSuccessfulCommand(
+                    sessionId = sessionId,
+                    commandLine = command,
+                    profileId = profileId,
+                    workingDirectoryUri = metadata.workingDirectoryUri,
                 )
             }
             statistics.recordFinishedCommand(profileId, metadata)
@@ -167,54 +133,30 @@ internal class IntellijCompletionRegistry(
      * @param enabled `true` to persist sanitized learning across IDE restarts.
      */
     fun setPersistenceEnabled(enabled: Boolean) {
-        statistics.setPersistenceEnabled(enabled)
-    }
-
-    private fun removeSession(
-        sessionId: String,
-        expected: SessionState,
-    ) {
-        val removed =
-            synchronized(lock) {
-                if (sessionStates[sessionId] !== expected) null else sessionStates.remove(sessionId)
-            }
-        removed?.close()
+        synchronized(lock) {
+            if (closed) return
+            statistics.setPersistenceEnabled(enabled)
+        }
     }
 
     /** Clears sessions and releases learning resources. Closing is idempotent. */
     override fun close() {
-        closeSessionStates().forEach(SessionState::close)
+        if (beginClose()) sessions.close()
         statistics.close()
     }
 
     /** Clears sessions, drains queued learning, and waits for the final persistence write. */
     suspend fun closeAndFlush() {
-        closeSessionStates().forEach(SessionState::close)
+        if (beginClose()) sessions.close()
         statistics.closeAndFlush()
     }
 
-    private fun closeSessionStates(): List<SessionState> =
+    private fun beginClose(): Boolean =
         synchronized(lock) {
-            if (!closed.compareAndSet(false, true)) return@synchronized emptyList()
-            val copy = sessionStates.values.toList()
-            sessionStates.clear()
-            copy
+            if (closed) return@synchronized false
+            closed = true
+            true
         }
-
-    /** Session resources retained by the registry until replacement or closure. */
-    private data class OpenedSession(
-        val session: IntellijCompletionSession,
-        val previous: SessionState?,
-    )
-
-    private data class SessionState(
-        val mruSource: TerminalSessionMruCompletionSource,
-    ) : AutoCloseable {
-        /** Clears session-local learning. */
-        override fun close() {
-            mruSource.clear()
-        }
-    }
 
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128

@@ -34,6 +34,8 @@ object TerminalCompletionEngines {
      * position for ranking.
      * @param learningStore optional shared in-memory learning store. The engine
      * reads its immutable published snapshot and performs no host I/O.
+     * @param sourceFailureHandler diagnostic sink for isolated non-cancellation
+     * source failures.
      * @return merged completion engine.
      */
     @JvmStatic
@@ -42,11 +44,13 @@ object TerminalCompletionEngines {
         sources: List<TerminalCompletionSourceEntry>,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
         learningStore: TerminalCompletionLearningStore? = null,
+        sourceFailureHandler: TerminalCompletionSourceFailureHandler = TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
     ): TerminalCompletionEngine =
         MergedCompletionEngine(
             sources = sources,
             commandSpecs = commandSpecs,
             learningStore = learningStore,
+            sourceFailureHandler = sourceFailureHandler,
         )
 
     /**

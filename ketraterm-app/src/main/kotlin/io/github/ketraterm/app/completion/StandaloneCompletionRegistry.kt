@@ -15,7 +15,9 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
+import io.github.ketraterm.completion.api.TerminalCompletionSessionRegistry
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -25,12 +27,8 @@ import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 /**
  * Standalone completion wiring for one application window.
  *
- * The registry owns host-specific source composition. It creates one
- * [SwingCompletionSuggestionProvider] per terminal session, pairs that
- * provider with a session-scoped MRU source, then globally fuses every source
- * with shared learned evidence. It deliberately lives in `ketraterm-app`; plugin
- * integration should build its own host registry over the shared
- * `ketraterm-completion` sources.
+ * The registry supplies standalone context and local-file access around the
+ * shared [TerminalCompletionSessionRegistry].
  *
  * @param specs static command specs shared by providers created from this registry.
  * @param persistentStatsSource optional cross-session indexed statistics store
@@ -39,17 +37,15 @@ import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
  */
 internal class StandaloneCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    private val persistentStatsSource: TerminalCompletionLearningStore? = null,
-    private val sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
+    persistentStatsSource: TerminalCompletionLearningStore? = null,
+    sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
 ) : AutoCloseable {
-    init {
-        require(sessionMruCapacity > 0) { "sessionMruCapacity must be > 0, was $sessionMruCapacity" }
-    }
-
-    /** Immutable command specs shared by standalone completion integration. */
-    private val commandSpecs = specs.toList()
-    private val lock = Any()
-    private val sessionStates = HashMap<String, SessionCompletionState>()
+    private val sessions =
+        TerminalCompletionSessionRegistry(
+            commandSpecs = specs,
+            learningStore = persistentStatsSource,
+            sessionMruCapacity = sessionMruCapacity,
+        )
 
     /**
      * Creates a standalone Swing suggestion provider for one terminal session.
@@ -63,6 +59,7 @@ internal class StandaloneCompletionRegistry(
      * @param shellCapabilities shell lexical and replacement rules selected from the profile.
      * @param workingDirectoryUriProvider supplier for the latest current-working-directory URI.
      * @return standalone Swing suggestion provider for the session.
+     * @throws IllegalStateException if this registry is closed.
      */
     fun createProvider(
         sessionId: String,
@@ -70,45 +67,22 @@ internal class StandaloneCompletionRegistry(
         shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
         workingDirectoryUriProvider: () -> String? = { null },
     ): SwingCompletionSuggestionProvider {
-        require(sessionId.isNotBlank()) { "sessionId must not be blank" }
-        val mruSource =
-            TerminalCompletionSources.sessionMru(
-                capacity = sessionMruCapacity,
-                commandSpecs = commandSpecs,
-                learningStore = persistentStatsSource,
+        val session = sessions.openSession(sessionId, TerminalLocalFileSystemProvider())
+        return try {
+            SwingCompletionSuggestionProvider(
+                engine = session.engine,
+                contextProvider = {
+                    SwingCompletionContext(
+                        profileId = profileId,
+                        workingDirectoryUri = workingDirectoryUriProvider(),
+                        shellCapabilities = shellCapabilities,
+                    )
+                },
             )
-        val previous =
-            synchronized(lock) {
-                sessionStates.put(sessionId, SessionCompletionState(mruSource))
-            }
-        previous?.close()
-        val sources =
-            ArrayList<TerminalCompletionSourceEntry>(COMPOSED_SOURCE_CAPACITY).apply {
-                add(TerminalCompletionSourceEntry(mruSource, priority = TerminalCompletionSourcePrior.SESSION_MRU))
-                add(
-                    TerminalCompletionSourceEntry(
-                        TerminalCompletionSources.path(
-                            fileSystemProvider = TerminalLocalFileSystemProvider(),
-                        ),
-                        priority = TerminalCompletionSourcePrior.DIRECTORY_PATH,
-                    ),
-                )
-            }
-        return SwingCompletionSuggestionProvider(
-            engine =
-                TerminalCompletionEngines.fromSources(
-                    sources = sources,
-                    commandSpecs = commandSpecs,
-                    learningStore = persistentStatsSource,
-                ),
-            contextProvider = {
-                SwingCompletionContext(
-                    profileId = profileId,
-                    workingDirectoryUri = workingDirectoryUriProvider(),
-                    shellCapabilities = shellCapabilities,
-                )
-            },
-        )
+        } catch (failure: Throwable) {
+            session.close()
+            throw failure
+        }
     }
 
     /**
@@ -128,11 +102,8 @@ internal class StandaloneCompletionRegistry(
         profileId: String?,
         workingDirectoryUri: String?,
     ) {
-        val source =
-            synchronized(lock) {
-                sessionStates[sessionId]?.mruSource
-            } ?: return
-        source.recordSuccessfulCommand(
+        sessions.recordSuccessfulCommand(
+            sessionId = sessionId,
             commandLine = commandLine,
             profileId = profileId,
             workingDirectoryUri = workingDirectoryUri,
@@ -145,34 +116,15 @@ internal class StandaloneCompletionRegistry(
      * @param sessionId workspace tab/session id to remove.
      */
     fun removeSession(sessionId: String) {
-        val state =
-            synchronized(lock) {
-                sessionStates.remove(sessionId)
-            }
-        state?.close()
+        sessions.removeSession(sessionId)
     }
 
-    /** Clears the in-memory MRU completion state retained for every open session. */
+    /** Permanently closes the registry and clears every session MRU. */
     override fun close() {
-        val states =
-            synchronized(lock) {
-                val copy = sessionStates.values.toList()
-                sessionStates.clear()
-                copy
-            }
-        states.forEach(SessionCompletionState::close)
-    }
-
-    private data class SessionCompletionState(
-        val mruSource: TerminalSessionMruCompletionSource,
-    ) {
-        fun close() {
-            mruSource.clear()
-        }
+        sessions.close()
     }
 
     private companion object {
         private const val DEFAULT_SESSION_MRU_CAPACITY = 128
-        private const val COMPOSED_SOURCE_CAPACITY = 2
     }
 }

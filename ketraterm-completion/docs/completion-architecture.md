@@ -13,10 +13,10 @@ External modules should import only:
 - `io.github.ketraterm.completion.model`
 
 The `api` package exposes host-facing engines, source factories, request and
-candidate contracts, a mutable session-history source, and one concrete bounded
-learning store. Factory methods are intentionally narrow: hosts create
-session-MRU, path, and host-backed sources, then give both the MRU source and
-merged engine the same learning store. The engine automatically evaluates its
+candidate contracts, a mutable session-history source, a shared session registry,
+and one concrete bounded learning store. The registry owns the lifecycle and
+composition of each session MRU, path source, and merged engine while hosts
+supply file-system access and additional product sources. The engine automatically evaluates its
 command specs as one static source, so hosts cannot wire parsing specs and
 static candidates inconsistently. Statistics are
 ranking evidence and persisted fallback data; they are never composed as an
@@ -137,10 +137,10 @@ Optional disk I/O belongs to the separately published
 `TerminalCompletionLearningRepository` owns an internal codec and bounded file store that sanitize again at the storage
 boundary, apply byte/line/row bounds before decoding or encoding, and perform atomic file replacement. The repository
 serializes mutation, loading, and persistence with a `Mutex` and moves file I/O to `Dispatchers.IO`.
-`TerminalCompletionLearningCoordinator` launches those operations in a caller-owned lifecycle scope and centralizes the
-shared command privacy check; it owns no scope or executor. There are no
-statistics executors, coalescing queues, flush barriers, or shutdown timeouts. Product hosts own the
-destination path, enablement policy, diagnostics, and store lifecycle.
+`TerminalCompletionLearningCoordinator` owns one ordered command worker parented by a caller-owned lifecycle scope and
+centralizes the shared command privacy check. Its explicit flush barrier lets product disposal wait for all accepted
+mutations and writes before the lifecycle scope is cancelled. Product hosts own the destination path, enablement policy,
+diagnostics, and the point at which graceful shutdown becomes blocking.
 Completion persistence is not a workspace responsibility.
 
 The standalone app and IntelliJ plugin should compose completion sources through
@@ -307,8 +307,8 @@ supplies changed and
 untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Git process.
 
 IntelliJ dynamic completion is composed from ordinary source-producing functions and explicit prioritized source
-entries. There is no provider-factory or registration framework and no closeable provider state. The registry owns
-session composition; a thin statistics adapter
+entries. There is no provider-factory or registration framework. The shared completion session registry owns
+session MRU/path/engine composition and strict close semantics; a thin IntelliJ statistics adapter
 maps host events into the shared learning repository. Standalone uses the same repository path so completion files are
 never loaded on the Swing event-dispatch thread.
 
@@ -393,8 +393,8 @@ once, resolves one context, launches one child per source under a supervisor,
 and serially incorporates completed-source events in the parent. Each changed
 global ranking is emitted immediately, so a slow Git or index source cannot
 block a fast spec, MRU, or direct-path result. Individual sources remain
-ordinary suspending functions and never own scopes or child jobs. A source
-failure contributes an empty result, request cancellation reaches every child,
+ordinary suspending functions and never own scopes or child jobs. A non-cancellation source failure is reported through
+`TerminalCompletionSourceFailureHandler` and contributes an empty result; request cancellation reaches every child,
 and source declaration order remains the deterministic final-fusion tie-breaker.
 
 ## Ranking Calibration
