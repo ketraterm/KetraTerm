@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.host
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEligibilityListener
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInvalidationListener
 import kotlinx.coroutines.CoroutineName
@@ -28,11 +29,14 @@ import kotlinx.coroutines.launch
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
 import java.awt.event.FocusListener
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import javax.swing.SwingUtilities
 
 /**
  * Binds host-neutral live-completion behavior to one Swing terminal.
  *
- * The binding observes render publications, applies the shared debounce policy,
+ * The binding observes dedicated shell-edit revisions, applies the shared debounce policy,
  * adapts shell snapshots to Swing requests, hides suggestions when focus leaves
  * the terminal, and invalidates request deduplication after user feedback. It
  * owns only its observation job; completion providers, enablement, ranking
@@ -46,21 +50,27 @@ import java.awt.event.FocusListener
 class SwingLiveCompletionBinding
     internal constructor(
         private val activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
-        private val renderGenerations: Flow<Long>,
-        suggestionsEnabled: () -> Boolean,
+        private val shellCommandLineRevisions: Flow<Long>,
+        private val suggestionsEnabled: () -> Boolean,
         rankingContextKey: () -> String?,
         feedbackHandler: SwingShellSuggestionFeedbackHandler,
         scheduler: SwingLiveCompletionScheduler,
         private val observationScope: CoroutineScope,
+        private val edtDispatcher: SwingLiveCompletionEdtDispatcher = SwingLiveCompletionSwingEdtDispatcher,
     ) : AutoCloseable {
         private var target: SwingLiveCompletionTarget? = null
         private var observationJob: Job? = null
-        private var invalidatedCommand: CommandSnapshotIdentity? = null
-        private var awaitingSnapshotChange = false
-        private val lifecycleLock = Any()
+        private var invalidatedRevision = NO_SHELL_COMMAND_LINE_REVISION
+        private var awaitingShellCommandLineRevision = false
+        private val latestRevision = AtomicLong(NO_SHELL_COMMAND_LINE_REVISION)
+        private val revisionDispatchQueued = AtomicBoolean()
 
         @Volatile
         private var closed = false
+
+        private val revisionDrain = Runnable(::drainShellCommandLineRevisionOnEdt)
+        private val scheduleRefreshTask = Runnable { scheduleRefreshOnEdt() }
+        private val cancelAndHideTask = Runnable { cancelAndHideOnEdt() }
 
         private val triggerController =
             SwingLiveCompletionTriggerController(
@@ -68,7 +78,7 @@ class SwingLiveCompletionBinding
                 requestSuggestions = { snapshot -> target?.requestSuggestions(snapshot) },
                 hideSuggestions = { target?.hideSuggestions() },
                 rankingContextKey = rankingContextKey,
-                suggestionsEnabled = { !closed && target?.isFocusOwner() == true && suggestionsEnabled() },
+                suggestionsEnabled = ::isEligibleOnEdt,
                 scheduler = scheduler,
                 debounceMillis = DEFAULT_DEBOUNCE_MILLIS,
                 minimumNonWhitespaceCharacters = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
@@ -77,21 +87,36 @@ class SwingLiveCompletionBinding
         private val focusListener =
             object : FocusAdapter() {
                 override fun focusGained(event: FocusEvent) {
-                    scheduleRefresh()
+                    scheduleRefreshOnEdt()
                 }
 
                 override fun focusLost(event: FocusEvent) {
-                    triggerController.cancelAndHide()
+                    cancelAndHideOnEdt()
                 }
             }
 
         private val invalidationListener =
             SwingShellSuggestionInvalidationListener {
-                synchronized(lifecycleLock) {
-                    if (closed) return@SwingShellSuggestionInvalidationListener
-                    invalidatedCommand = activeCommandLine()?.identity()
-                    awaitingSnapshotChange = true
-                    triggerController.cancelAndHide()
+                check(edtDispatcher.isDispatchThread()) { "shell suggestion invalidation must run on the EDT" }
+                if (closed) return@SwingShellSuggestionInvalidationListener
+                invalidatedRevision = latestRevision.get()
+                awaitingShellCommandLineRevision = true
+                triggerController.cancelAndHide()
+            }
+
+        private val eligibilityListener =
+            SwingShellSuggestionEligibilityListener { eligible ->
+                check(edtDispatcher.isDispatchThread()) { "shell suggestion eligibility must run on the EDT" }
+                if (closed) return@SwingShellSuggestionEligibilityListener
+                if (eligible && isEligibleOnEdt() && !awaitingShellCommandLineRevision) {
+                    triggerController.invalidateLastRequest()
+                    triggerController.scheduleRefresh()
+                } else {
+                    // SwingTerminal synchronously cancels and hides only the
+                    // ineligible automatic presentation before publishing this
+                    // callback. Do not hide an explicitly requested popup when
+                    // settings disable automatic completion.
+                    triggerController.automaticEligibilityLost()
                 }
             }
 
@@ -103,6 +128,7 @@ class SwingLiveCompletionBinding
          */
         val suggestionFeedbackHandler =
             SwingShellSuggestionFeedbackHandler { feedback ->
+                check(edtDispatcher.isDispatchThread()) { "shell suggestion feedback must run on the EDT" }
                 triggerController.invalidateLastRequest()
                 feedbackHandler.onSuggestionFeedback(feedback)
             }
@@ -124,7 +150,7 @@ class SwingLiveCompletionBinding
             feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
         ) : this(
             activeCommandLine = session::activeShellCommandLine,
-            renderGenerations = session.renderGeneration,
+            shellCommandLineRevisions = session.activeShellCommandLineRevision,
             suggestionsEnabled = suggestionsEnabled,
             rankingContextKey = rankingContextKey,
             feedbackHandler = feedbackHandler,
@@ -145,6 +171,7 @@ class SwingLiveCompletionBinding
         }
 
         internal fun attach(target: SwingLiveCompletionTarget) {
+            check(edtDispatcher.isDispatchThread()) { "live completion must be attached on the EDT" }
             check(!closed) { "live completion binding is closed" }
             check(this.target == null) { "live completion binding is already attached" }
             this.target = target
@@ -153,10 +180,11 @@ class SwingLiveCompletionBinding
                 target.addFocusListener(focusListener)
                 focusListenerAttached = true
                 target.addInvalidationListener(invalidationListener)
+                target.addEligibilityListener(eligibilityListener)
                 observationJob =
                     observationScope.launch(CoroutineName("swing-live-completion")) {
-                        renderGenerations.collect {
-                            onRenderPublication()
+                        shellCommandLineRevisions.collect { revision ->
+                            if (revision >= 0L) enqueueShellCommandLineRevision(revision)
                         }
                     }
             } catch (failure: Throwable) {
@@ -164,6 +192,7 @@ class SwingLiveCompletionBinding
                 observationJob = null
                 if (focusListenerAttached) runCatching { target.removeFocusListener(focusListener) }
                 runCatching { target.removeInvalidationListener(invalidationListener) }
+                runCatching { target.removeEligibilityListener(eligibilityListener) }
                 this.target = null
                 throw failure
             }
@@ -171,64 +200,86 @@ class SwingLiveCompletionBinding
 
         /** Re-evaluates live completion after the shared debounce interval. */
         fun scheduleRefresh() {
-            synchronized(lifecycleLock) {
-                if (!closed) triggerController.scheduleRefresh()
-            }
+            edtDispatcher.dispatch(scheduleRefreshTask)
         }
 
         /** Cancels pending live completion and hides the current popup. */
         fun cancelAndHide() {
-            synchronized(lifecycleLock) {
-                if (!closed) triggerController.cancelAndHide()
-            }
+            edtDispatcher.dispatch(cancelAndHideTask)
         }
 
         internal fun refreshNow() {
-            if (!closed) triggerController.refreshNow()
+            check(edtDispatcher.isDispatchThread()) { "live completion must refresh on the EDT" }
+            if (!closed && isEligibleOnEdt()) triggerController.refreshNow()
         }
 
         /** Stops observation, removes focus wiring, and hides suggestions. */
         override fun close() {
-            synchronized(lifecycleLock) {
-                if (closed) return
-                closed = true
-                observationJob?.cancel()
-                observationJob = null
-                triggerController.cancelAndHide()
-                target?.removeFocusListener(focusListener)
-                target?.removeInvalidationListener(invalidationListener)
-                target = null
+            check(edtDispatcher.isDispatchThread()) { "live completion must be closed on the EDT" }
+            if (closed) return
+            closed = true
+            observationJob?.cancel()
+            observationJob = null
+            triggerController.cancelAndHide()
+            target?.removeFocusListener(focusListener)
+            target?.removeInvalidationListener(invalidationListener)
+            target?.removeEligibilityListener(eligibilityListener)
+            target = null
+        }
+
+        private fun enqueueShellCommandLineRevision(revision: Long) {
+            latestRevision.set(revision)
+            if (revisionDispatchQueued.compareAndSet(false, true)) {
+                edtDispatcher.dispatch(revisionDrain)
             }
         }
 
-        private fun onRenderPublication() {
-            synchronized(lifecycleLock) {
-                if (closed) return
-                if (awaitingSnapshotChange) {
-                    val current = activeCommandLine()?.identity()
-                    if (current == invalidatedCommand) return
-                    invalidatedCommand = null
-                    awaitingSnapshotChange = false
-                }
-                if (triggerController.hasRequestedSnapshotChanged()) {
-                    target?.hideSuggestions()
-                }
+        private fun drainShellCommandLineRevisionOnEdt() {
+            check(edtDispatcher.isDispatchThread()) { "shell command-line revisions must drain on the EDT" }
+            while (true) {
+                val revision = latestRevision.get()
+                onShellCommandLineRevisionOnEdt(revision)
+                revisionDispatchQueued.set(false)
+                if (latestRevision.get() == revision || !revisionDispatchQueued.compareAndSet(false, true)) return
+            }
+        }
+
+        private fun onShellCommandLineRevisionOnEdt(revision: Long) {
+            if (closed) return
+            if (awaitingShellCommandLineRevision) {
+                if (revision == invalidatedRevision) return
+                awaitingShellCommandLineRevision = false
+                invalidatedRevision = NO_SHELL_COMMAND_LINE_REVISION
+            }
+            if (!isEligibleOnEdt()) {
+                triggerController.cancelAndHide()
+                return
+            }
+            triggerController.commandLineChanged()
+            triggerController.scheduleRefresh()
+        }
+
+        private fun scheduleRefreshOnEdt() {
+            if (!closed && !awaitingShellCommandLineRevision && isEligibleOnEdt()) {
                 triggerController.scheduleRefresh()
             }
         }
 
+        private fun cancelAndHideOnEdt() {
+            if (!closed) triggerController.cancelAndHide()
+        }
+
+        private fun isEligibleOnEdt(): Boolean =
+            !closed &&
+                target?.isFocusOwner() == true &&
+                target?.isAutomaticSuggestionEligible() == true &&
+                suggestionsEnabled()
+
         private companion object {
             private const val DEFAULT_DEBOUNCE_MILLIS = 75
             private const val DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS = 2
+            private const val NO_SHELL_COMMAND_LINE_REVISION = -1L
         }
-
-        private fun TerminalShellCommandLineSnapshot.identity(): CommandSnapshotIdentity =
-            CommandSnapshotIdentity(commandText, cursorOffset)
-
-        private data class CommandSnapshotIdentity(
-            val commandText: String,
-            val cursorOffset: Int,
-        )
     }
 
 internal interface SwingLiveCompletionTarget {
@@ -244,7 +295,13 @@ internal interface SwingLiveCompletionTarget {
 
     fun removeInvalidationListener(listener: SwingShellSuggestionInvalidationListener)
 
+    fun addEligibilityListener(listener: SwingShellSuggestionEligibilityListener)
+
+    fun removeEligibilityListener(listener: SwingShellSuggestionEligibilityListener)
+
     fun isFocusOwner(): Boolean
+
+    fun isAutomaticSuggestionEligible(): Boolean
 }
 
 private class SwingTerminalLiveCompletionTarget(
@@ -279,5 +336,29 @@ private class SwingTerminalLiveCompletionTarget(
         terminal.removeShellSuggestionInvalidationListener(listener)
     }
 
+    override fun addEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
+        terminal.addShellSuggestionEligibilityListener(listener)
+    }
+
+    override fun removeEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
+        terminal.removeShellSuggestionEligibilityListener(listener)
+    }
+
     override fun isFocusOwner(): Boolean = terminal.isFocusOwner
+
+    override fun isAutomaticSuggestionEligible(): Boolean = terminal.isAutomaticShellSuggestionEligible()
+}
+
+internal interface SwingLiveCompletionEdtDispatcher {
+    fun isDispatchThread(): Boolean
+
+    fun dispatch(task: Runnable)
+}
+
+private object SwingLiveCompletionSwingEdtDispatcher : SwingLiveCompletionEdtDispatcher {
+    override fun isDispatchThread(): Boolean = SwingUtilities.isEventDispatchThread()
+
+    override fun dispatch(task: Runnable) {
+        if (SwingUtilities.isEventDispatchThread()) task.run() else SwingUtilities.invokeLater(task)
+    }
 }

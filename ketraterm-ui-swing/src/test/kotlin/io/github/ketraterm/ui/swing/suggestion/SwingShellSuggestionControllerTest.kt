@@ -50,7 +50,7 @@ class SwingShellSuggestionControllerTest {
             SwingShellSuggestionController(
                 host = RecordingSuggestionHost(),
                 viewFactory =
-                    SwingShellSuggestionViewFactory { listener ->
+                    { listener ->
                         RecordingSuggestionView(listener).also { view = it }
                     },
             )
@@ -138,7 +138,7 @@ class SwingShellSuggestionControllerTest {
         val controller =
             SwingShellSuggestionController(
                 host = RecordingSuggestionHost(),
-                viewFactory = SwingShellSuggestionViewFactory { listener -> RecordingSuggestionView(listener).also { view = it } },
+                viewFactory = { listener -> RecordingSuggestionView(listener).also { view = it } },
             )
 
         controller.show(request(), suggestions(80), selectedIndex = -1)
@@ -155,7 +155,7 @@ class SwingShellSuggestionControllerTest {
         val controller =
             SwingShellSuggestionController(
                 host = host,
-                viewFactory = SwingShellSuggestionViewFactory { listener -> RecordingSuggestionView(listener).also { view = it } },
+                viewFactory = { listener -> RecordingSuggestionView(listener).also { view = it } },
             )
         val items = suggestions(20)
         controller.show(request(), items, selectedIndex = -1)
@@ -284,19 +284,6 @@ class SwingShellSuggestionControllerTest {
         assertEquals(listOf(items[0]), host.feedbackSuggestions)
         assertEquals(1, host.focusRequests)
         assertTrue(escape.isConsumed)
-    }
-
-    @Test
-    fun `reload settings hides visible popup when setting is disabled`() {
-        val host = RecordingSuggestionHost()
-        val controller = SwingShellSuggestionController(host)
-        controller.show(request(), suggestions(2), selectedIndex = 0)
-
-        host.settings = SwingSettings(shellSuggestionsEnabled = false)
-        controller.reloadSettings()
-
-        assertFalse(controller.state().visible)
-        assertTrue(host.feedbackKinds.isEmpty())
     }
 
     @Test

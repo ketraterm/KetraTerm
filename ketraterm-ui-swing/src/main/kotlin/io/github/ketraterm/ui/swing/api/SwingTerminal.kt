@@ -48,6 +48,7 @@ import java.awt.*
 import java.awt.event.*
 import java.lang.Runnable
 import java.util.concurrent.CopyOnWriteArraySet
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import javax.swing.Timer
@@ -101,7 +102,10 @@ class SwingTerminal
             CoroutineScope(componentJob + uiCoroutineDispatcher + CoroutineName("swing-terminal"))
         private var bindingJob: Job? = null
         private var suggestionJob: Job? = null
+        private var activeSuggestionIsAutomatic: Boolean = false
         private val suggestionInvalidationListeners = CopyOnWriteArraySet<SwingShellSuggestionInvalidationListener>()
+        private val suggestionEligibilityListeners = CopyOnWriteArraySet<SwingShellSuggestionEligibilityListener>()
+        private val automaticSuggestionEligible = AtomicBoolean(settings.shellSuggestionsEnabled)
 
         internal val hasActiveRenderBinding: Boolean
             get() = bindingJob?.isActive == true
@@ -654,11 +658,9 @@ class SwingTerminal
          * be rebound to another session.
          */
         fun dispose() {
-            runOnEdt(
-                Runnable {
-                    disposeOnEdt()
-                },
-            )
+            runOnEdt {
+                disposeOnEdt()
+            }
         }
 
         /**
@@ -684,11 +686,9 @@ class SwingTerminal
          * may be called from any thread; animation state is updated on the EDT.
          */
         fun showVisualBell() {
-            runOnEdt(
-                Runnable {
-                    visualBellController.trigger()
-                },
-            )
+            runOnEdt {
+                visualBellController.trigger()
+            }
         }
 
         /**
@@ -747,11 +747,9 @@ class SwingTerminal
          * @param scrollbackOffset requested whole-row offset from live output.
          */
         fun scrollToScrollbackOffset(scrollbackOffset: Int) {
-            runOnEdt(
-                Runnable {
-                    scrollViewportToOnEdt(scrollbackOffset)
-                },
-            )
+            runOnEdt {
+                scrollViewportToOnEdt(scrollbackOffset)
+            }
         }
 
         /**
@@ -766,11 +764,9 @@ class SwingTerminal
          */
         fun scrollViewportBy(deltaLines: Double) {
             require(deltaLines.isFinite()) { "deltaLines must be finite, was $deltaLines" }
-            runOnEdt(
-                Runnable {
-                    rowScroller.scrollByPreciseRows(deltaLines)
-                },
-            )
+            runOnEdt {
+                rowScroller.scrollByPreciseRows(deltaLines)
+            }
         }
 
         override fun scrollFromScrollbar(
@@ -782,11 +778,9 @@ class SwingTerminal
                 scrollFromScrollbarOnEdt(scrollbackOffset, valueIsAdjusting)
                 return
             }
-            runOnEdt(
-                Runnable {
-                    scrollFromScrollbarOnEdt(scrollbackOffset, valueIsAdjusting)
-                },
-            )
+            runOnEdt {
+                scrollFromScrollbarOnEdt(scrollbackOffset, valueIsAdjusting)
+            }
         }
 
         private fun scrollFromScrollbarOnEdt(
@@ -809,11 +803,9 @@ class SwingTerminal
          * is updated asynchronously on the EDT.
          */
         fun scrollToPreviousCommand() {
-            runOnEdt(
-                Runnable {
-                    commandInteractionController.scrollToCommand(previous = true)
-                },
-            )
+            runOnEdt {
+                commandInteractionController.scrollToCommand(previous = true)
+            }
         }
 
         /**
@@ -825,11 +817,9 @@ class SwingTerminal
          * is updated asynchronously on the EDT.
          */
         fun scrollToNextCommand() {
-            runOnEdt(
-                Runnable {
-                    commandInteractionController.scrollToCommand(previous = false)
-                },
-            )
+            runOnEdt {
+                commandInteractionController.scrollToCommand(previous = false)
+            }
         }
 
         /**
@@ -1050,7 +1040,7 @@ class SwingTerminal
             resetScrollbackState()
             selectionController.clearSelection()
             searchController.reset(renderCache.rows)
-            shellSuggestionController.hide()
+            cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
             shellIntegrationDecorations.reset()
             if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
             visualGeometry.reset()
@@ -1087,13 +1077,11 @@ class SwingTerminal
         private fun unbindOnEdt() {
             bindingJob?.cancel(CancellationException("Terminal session unbound"))
             bindingJob = null
-            suggestionJob?.cancel(CancellationException("Terminal session unbound"))
-            suggestionJob = null
+            cancelAndHideShellSuggestionsOnEdt("Terminal session unbound")
             session = null
             resetScrollbackState()
             selectionController.clearSelection()
             searchController.reset(renderCache.rows)
-            shellSuggestionController.hide()
             shellIntegrationDecorations.reset()
             if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
             visualGeometry.reset()
@@ -1119,6 +1107,7 @@ class SwingTerminal
             suggestionJob?.cancel(CancellationException("Swing terminal disposed"))
             suggestionJob = null
             suggestionInvalidationListeners.clear()
+            suggestionEligibilityListeners.clear()
             shellSuggestionController.close()
             componentScope.cancel(CancellationException("Swing terminal disposed"))
         }
@@ -1134,7 +1123,6 @@ class SwingTerminal
             preferredSize = preferredGridSize(settings.columns, settings.rows)
             configureCursorTimerOnEdt()
             configureVisualBellOnEdt()
-            shellSuggestionController.reloadSettings()
             session?.let {
                 updateMinimizedStateFromAncestor()
                 applySettingsToSession(it, settings)
@@ -1196,44 +1184,36 @@ class SwingTerminal
          * @param query literal text to find.
          */
         fun search(query: String) {
-            runOnEdt(
-                Runnable {
-                    searchController.search(query)
-                },
-            )
+            runOnEdt {
+                searchController.search(query)
+            }
         }
 
         /**
          * Clears the current terminal-buffer search query and highlights.
          */
         fun clearSearch() {
-            runOnEdt(
-                Runnable {
-                    searchController.clear()
-                },
-            )
+            runOnEdt {
+                searchController.clear()
+            }
         }
 
         /**
          * Selects the next search result when a search query is active.
          */
         fun selectNextSearchResult() {
-            runOnEdt(
-                Runnable {
-                    searchController.findNext()
-                },
-            )
+            runOnEdt {
+                searchController.findNext()
+            }
         }
 
         /**
          * Selects the previous search result when a search query is active.
          */
         fun selectPreviousSearchResult() {
-            runOnEdt(
-                Runnable {
-                    searchController.findPrevious()
-                },
-            )
+            runOnEdt {
+                searchController.findPrevious()
+            }
         }
 
         /**
@@ -1243,11 +1223,9 @@ class SwingTerminal
          * case-insensitive search.
          */
         fun setSearchCaseSensitive(caseSensitive: Boolean) {
-            runOnEdt(
-                Runnable {
-                    searchController.setIgnoreCase(!caseSensitive)
-                },
-            )
+            runOnEdt {
+                searchController.setIgnoreCase(!caseSensitive)
+            }
         }
 
         /**
@@ -1283,6 +1261,14 @@ class SwingTerminal
             val snapshot = suggestions.toList()
             runOnEdt(
                 Runnable {
+                    if (!isLiveViewportOnEdt()) {
+                        cancelAndHideShellSuggestionsOnEdt("Suggestions require the live viewport")
+                        doLayout()
+                        return@Runnable
+                    }
+                    suggestionJob?.cancel(CancellationException("Explicit suggestions replaced provider request"))
+                    suggestionJob = null
+                    activeSuggestionIsAutomatic = false
                     shellSuggestionController.show(request, snapshot, selectedIndex)
                     doLayout()
                 },
@@ -1318,12 +1304,10 @@ class SwingTerminal
                     anchorColumn = anchorColumn,
                     anchorRow = anchorRow,
                 )
-            runOnEdt(
-                Runnable {
-                    requestShellSuggestionsOnEdt(request)
-                    doLayout()
-                },
-            )
+            runOnEdt {
+                requestShellSuggestionsOnEdt(request)
+                doLayout()
+            }
         }
 
         /**
@@ -1365,13 +1349,9 @@ class SwingTerminal
          * asynchronously on the EDT.
          */
         fun hideShellSuggestions() {
-            runOnEdt(
-                Runnable {
-                    suggestionJob?.cancel(CancellationException("Shell suggestions hidden"))
-                    suggestionJob = null
-                    shellSuggestionController.hide()
-                },
-            )
+            runOnEdt {
+                cancelAndHideShellSuggestionsOnEdt("Shell suggestions hidden")
+            }
         }
 
         /** Registers an EDT callback for shell-bound input invalidation. */
@@ -1383,6 +1363,24 @@ class SwingTerminal
         fun removeShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
             suggestionInvalidationListeners -= listener
         }
+
+        /** Registers an EDT callback for automatic-suggestion eligibility changes. */
+        fun addShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
+            suggestionEligibilityListeners += listener
+        }
+
+        /** Removes a callback previously registered with [addShellSuggestionEligibilityListener]. */
+        fun removeShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
+            suggestionEligibilityListeners -= listener
+        }
+
+        /**
+         * Returns whether automatic suggestions are enabled at the live viewport.
+         *
+         * This method is safe to call from any thread and returns the last state
+         * published by the EDT without blocking it.
+         */
+        fun isAutomaticShellSuggestionEligible(): Boolean = automaticSuggestionEligible.get()
 
         /**
          * Returns the current shell suggestion popup state.
@@ -1519,14 +1517,11 @@ class SwingTerminal
             request: SwingShellSuggestionRequest,
             automatic: Boolean = true,
         ) {
-            suggestionJob?.cancel(CancellationException("Shell suggestion request replaced"))
-            suggestionJob = null
-            shellSuggestionController.hide()
-            if (automatic && !settings.shellSuggestionsEnabled) {
-                suggestionJob = null
-                shellSuggestionController.hide()
+            cancelAndHideShellSuggestionsOnEdt("Shell suggestion request replaced")
+            if (!isLiveViewportOnEdt() || automatic && !settings.shellSuggestionsEnabled) {
                 return
             }
+            activeSuggestionIsAutomatic = automatic
             suggestionJob =
                 componentScope.launch {
                     try {
@@ -1570,9 +1565,7 @@ class SwingTerminal
         }
 
         private fun invalidateShellSuggestionsOnEdt() {
-            suggestionJob?.cancel(CancellationException("Shell suggestions invalidated by input"))
-            suggestionJob = null
-            shellSuggestionController.hide()
+            cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input")
             suggestionInvalidationListeners.forEach { listener ->
                 runCatching(listener::onShellSuggestionsInvalidated)
             }
@@ -1784,6 +1777,30 @@ class SwingTerminal
                 notifyListener = notifyListener,
                 notifyPrimitiveListener = notifyPrimitiveListener,
             )
+            updateAutomaticSuggestionEligibilityOnEdt()
+        }
+
+        private fun updateAutomaticSuggestionEligibilityOnEdt() {
+            val liveViewport = isLiveViewportOnEdt()
+            if (!liveViewport || !settings.shellSuggestionsEnabled && activeSuggestionIsAutomatic) {
+                cancelAndHideShellSuggestionsOnEdt(
+                    if (liveViewport) "Automatic suggestions disabled by settings" else "Viewport left live output",
+                )
+            }
+            val eligible = !disposed && liveViewport && settings.shellSuggestionsEnabled
+            if (automaticSuggestionEligible.getAndSet(eligible) == eligible) return
+            suggestionEligibilityListeners.forEach { listener ->
+                runCatching { listener.onAutomaticShellSuggestionEligibilityChanged(eligible) }
+            }
+        }
+
+        private fun isLiveViewportOnEdt(): Boolean = viewportController.preciseOffset == 0.0
+
+        private fun cancelAndHideShellSuggestionsOnEdt(reason: String) {
+            suggestionJob?.cancel(CancellationException(reason))
+            suggestionJob = null
+            activeSuggestionIsAutomatic = false
+            shellSuggestionController.hide()
         }
 
         fun preferredGridSize(

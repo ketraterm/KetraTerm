@@ -16,7 +16,6 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
-import java.util.concurrent.atomic.AtomicLong
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 
@@ -41,6 +40,7 @@ internal class SwingLiveCompletionTriggerController(
     private val minimumNonWhitespaceCharacters: Int,
 ) {
     private var lastRequest: RequestKey? = null
+    private val refreshAction = ::refreshNow
 
     init {
         require(debounceMillis >= 0) { "debounceMillis must be >= 0, was $debounceMillis" }
@@ -51,7 +51,7 @@ internal class SwingLiveCompletionTriggerController(
 
     /** Replaces any pending refresh with one based on the latest snapshot. */
     fun scheduleRefresh() {
-        scheduler.restart(debounceMillis, ::refreshNow)
+        scheduler.restart(debounceMillis, refreshAction)
     }
 
     /** Allows the same visible command to be requested after context changes. */
@@ -59,11 +59,17 @@ internal class SwingLiveCompletionTriggerController(
         lastRequest = null
     }
 
-    /** Returns whether the latest shell snapshot differs from the active request. */
-    fun hasRequestedSnapshotChanged(): Boolean {
-        val previous = lastRequest ?: return false
-        val current = activeCommandLine() ?: return true
-        return previous.commandText != current.commandText || previous.cursorOffset != current.cursorOffset
+    /** Cancels stale work and hides the popup after a shell-edit revision. */
+    fun commandLineChanged() {
+        scheduler.cancel()
+        invalidateLastRequest()
+        hideSuggestions()
+    }
+
+    /** Cancels only automatic trigger state; the terminal owns eligibility cleanup. */
+    fun automaticEligibilityLost() {
+        scheduler.cancel()
+        invalidateLastRequest()
     }
 
     /** Applies cheap UX gating and requests completion for the latest snapshot. */
@@ -131,7 +137,7 @@ internal class SwingLiveCompletionTriggerController(
     }
 }
 
-/** Replaceable delayed-action seam for Swing live completion refreshes. */
+/** EDT-confined replaceable delayed-action seam for Swing live completion refreshes. */
 internal interface SwingLiveCompletionScheduler {
     /** Replaces pending work and invokes [action] after [delayMillis]. */
     fun restart(
@@ -143,43 +149,33 @@ internal interface SwingLiveCompletionScheduler {
     fun cancel()
 }
 
-/** One-shot Swing timer scheduler with EDT-confined timer state and cross-thread cancellation ordering. */
+/** Reusable one-shot Swing timer whose state is confined to the EDT. */
 internal class SwingTimerLiveCompletionScheduler : SwingLiveCompletionScheduler {
-    private val generation = AtomicLong()
-    private var timer: Timer? = null
+    private var pendingAction: (() -> Unit)? = null
+    private val timer =
+        Timer(0) {
+            val action = pendingAction
+            pendingAction = null
+            action?.invoke()
+        }.apply {
+            isRepeats = false
+        }
 
     /** Replaces the current one-shot timer. */
     override fun restart(
         delayMillis: Int,
         action: () -> Unit,
     ) {
-        val scheduledGeneration = generation.incrementAndGet()
-        runOnEdt {
-            if (scheduledGeneration != generation.get()) return@runOnEdt
-            timer?.stop()
-            timer =
-                Timer(delayMillis) {
-                    if (scheduledGeneration != generation.get()) return@Timer
-                    timer = null
-                    action()
-                }.apply {
-                    isRepeats = false
-                    start()
-                }
-        }
+        check(SwingUtilities.isEventDispatchThread()) { "live-completion timer must be updated on the EDT" }
+        pendingAction = action
+        timer.initialDelay = delayMillis
+        timer.restart()
     }
 
-    /** Stops and releases the current timer. */
+    /** Stops the current timer and releases its pending action. */
     override fun cancel() {
-        val cancelledGeneration = generation.incrementAndGet()
-        runOnEdt {
-            if (cancelledGeneration != generation.get()) return@runOnEdt
-            timer?.stop()
-            timer = null
-        }
-    }
-
-    private fun runOnEdt(action: () -> Unit) {
-        if (SwingUtilities.isEventDispatchThread()) action() else SwingUtilities.invokeLater(action)
+        check(SwingUtilities.isEventDispatchThread()) { "live-completion timer must be cancelled on the EDT" }
+        timer.stop()
+        pendingAction = null
     }
 }

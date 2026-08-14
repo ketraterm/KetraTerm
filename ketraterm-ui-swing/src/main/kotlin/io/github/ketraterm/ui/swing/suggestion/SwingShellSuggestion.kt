@@ -354,6 +354,24 @@ fun interface SwingShellSuggestionInvalidationListener {
 }
 
 /**
+ * Listener for automatic shell-suggestion eligibility changes.
+ *
+ * Eligibility is false while the terminal is outside its live viewport or the
+ * current Swing settings disable automatic suggestions. Callbacks are invoked
+ * synchronously on the Swing Event Dispatch Thread after ineligible component
+ * work has been cancelled and hidden.
+ */
+fun interface SwingShellSuggestionEligibilityListener {
+    /**
+     * Reports the latest automatic-suggestion eligibility.
+     *
+     * @param eligible `true` only when automatic suggestions are enabled and
+     * the terminal is displaying its live viewport.
+     */
+    fun onAutomaticShellSuggestionEligibilityChanged(eligible: Boolean)
+}
+
+/**
  * Host callback invoked for suggestion acceptance and explicit dismissal.
  */
 fun interface SwingShellSuggestionFeedbackHandler {

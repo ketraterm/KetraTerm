@@ -85,12 +85,6 @@ internal class SwingShellSuggestionController(
         return true
     }
 
-    fun reloadSettings() {
-        if (!host.settings.shellSuggestionsEnabled) {
-            hide()
-        }
-    }
-
     fun close() {
         hide()
         view.close()

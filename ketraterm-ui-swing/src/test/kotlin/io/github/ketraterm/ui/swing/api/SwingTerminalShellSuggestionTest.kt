@@ -24,6 +24,7 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Assertions.*
@@ -455,6 +456,81 @@ class SwingTerminalShellSuggestionTest {
         }
 
         assertEquals(1, providerRequests.size)
+        session.close()
+    }
+
+    @Test
+    fun `disabling automatic suggestions cancels a suspended provider before publishing eligibility`() {
+        var currentSettings = SwingSettings(shellSuggestionsEnabled = true)
+        val providerStarted = CompletableDeferred<Unit>()
+        val providerCancelled = CompletableDeferred<Unit>()
+        val eligibilityDuringCallback = ArrayList<Boolean>()
+        val component =
+            SwingTerminal(
+                settingsProvider = { currentSettings },
+                hostServices =
+                    SwingHostServices(
+                        shellSuggestionProvider =
+                            SwingShellSuggestionProvider {
+                                flow {
+                                    providerStarted.complete(Unit)
+                                    try {
+                                        awaitCancellation()
+                                    } finally {
+                                        providerCancelled.complete(Unit)
+                                    }
+                                }
+                            },
+                    ),
+            )
+
+        SwingUtilities.invokeAndWait {
+            component.addShellSuggestionEligibilityListener { eligible ->
+                eligibilityDuringCallback += component.currentShellSuggestionState().visible
+                assertEquals(eligible, component.isAutomaticShellSuggestionEligible())
+            }
+            component.requestShellSuggestions("git s", 5, 5, 0)
+        }
+        runBlocking { providerStarted.await() }
+
+        currentSettings = SwingSettings(shellSuggestionsEnabled = false)
+        SwingUtilities.invokeAndWait { component.reloadSettings() }
+        runBlocking { providerCancelled.await() }
+
+        SwingUtilities.invokeAndWait {
+            assertFalse(component.isAutomaticShellSuggestionEligible())
+            assertFalse(component.currentShellSuggestionState().visible)
+            assertEquals(listOf(false), eligibilityDuringCallback)
+            component.dispose()
+        }
+    }
+
+    @Test
+    fun `leaving live viewport hides suggestions before publishing ineligibility`() {
+        val connector = RecordingConnector()
+        val session = activeSuggestionSession(connector)
+        connector.feedFromHost((1..8).joinToString("") { "line$it\r\n" }.utf8())
+        runBlocking { withTimeout(1_000.milliseconds) { session.renderGeneration.first { it >= 0L } } }
+        val visibleDuringCallback = ArrayList<Boolean>()
+        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) })
+
+        SwingUtilities.invokeAndWait {
+            component.size = component.preferredGridSize(30, 4)
+            component.bind(session)
+            component.addShellSuggestionEligibilityListener {
+                visibleDuringCallback += component.currentShellSuggestionState().visible
+            }
+            assertTrue(component.viewportState().historySize > 0)
+            component.showShellSuggestions(request(), suggestions())
+            assertTrue(component.currentShellSuggestionState().visible)
+
+            component.scrollToScrollbackOffset(1)
+
+            assertFalse(component.currentShellSuggestionState().visible)
+            assertFalse(component.isAutomaticShellSuggestionEligible())
+            assertEquals(listOf(false), visibleDuringCallback)
+            component.dispose()
+        }
         session.close()
     }
 

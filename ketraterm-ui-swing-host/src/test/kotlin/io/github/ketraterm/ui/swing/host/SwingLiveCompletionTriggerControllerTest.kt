@@ -18,7 +18,6 @@ package io.github.ketraterm.ui.swing.host
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.SwingUtilities
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -158,34 +157,30 @@ class SwingLiveCompletionTriggerControllerTest {
     }
 
     @Test
-    fun `timer cancellation invalidates restart already queued for the EDT`() {
+    fun `timer rejects restart outside the EDT`() {
         val scheduler = SwingTimerLiveCompletionScheduler()
-        val actions = AtomicInteger()
+        var failure: Throwable? = null
+        val background = Thread { failure = runCatching { scheduler.restart(0) {} }.exceptionOrNull() }
+        background.start()
+        background.join()
 
-        SwingUtilities.invokeAndWait {
-            val background = Thread { scheduler.restart(0) { actions.incrementAndGet() } }
-            background.start()
-            background.join()
-            scheduler.cancel()
-        }
-        SwingUtilities.invokeAndWait { }
-
-        assertEquals(0, actions.get())
+        assertTrue(failure is IllegalStateException)
     }
 
     @Test
-    fun `queued cancellation does not stop a newer restart`() {
+    fun `EDT cancellation followed by restart runs only the newer action`() {
         val scheduler = SwingTimerLiveCompletionScheduler()
         val actionFired = CountDownLatch(1)
+        var cancelledActionFired = false
 
         SwingUtilities.invokeAndWait {
-            val background = Thread(scheduler::cancel)
-            background.start()
-            background.join()
+            scheduler.restart(0) { cancelledActionFired = true }
+            scheduler.cancel()
             scheduler.restart(0, actionFired::countDown)
         }
 
         assertTrue(actionFired.await(2, TimeUnit.SECONDS))
+        assertEquals(false, cancelledActionFired)
     }
 
     private fun controller(

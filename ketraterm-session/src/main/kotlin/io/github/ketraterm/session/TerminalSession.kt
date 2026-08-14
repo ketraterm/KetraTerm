@@ -45,6 +45,11 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.milliseconds
 
+private const val SHELL_COMMAND_LINE_CONTEXT_LONGS = 3
+private const val SHELL_COMMAND_LINE_CONTEXT_LINE_ID_INDEX = 0
+private const val SHELL_COMMAND_LINE_CONTEXT_COLUMN_INDEX = 1
+private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
+
 /**
  * Runtime terminal session that binds core, parser, input encoding, and a
  * transport connector.
@@ -95,8 +100,17 @@ class TerminalSession(
         )
     private val mutableState = MutableStateFlow<TerminalSessionState>(TerminalSessionState.Created)
     private val mutableRenderGeneration = MutableStateFlow(NO_RENDER_GENERATION)
+    private val mutableActiveShellCommandLineRevision = MutableStateFlow(NO_SHELL_COMMAND_LINE_REVISION)
 
     private var activeShellCommandLineProvider: (() -> TerminalShellCommandLineSnapshot?)? = null
+    private var activeShellCommandLineContextProvider: ((LongArray) -> Long)? = null
+    private val shellCommandLineContextScratch = LongArray(SHELL_COMMAND_LINE_CONTEXT_LONGS)
+    private val shellCommandLineFingerprintScratch = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+    private val lastShellCommandLineFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+    private val shellCommandLineFingerprintExtractor = ShellIntegrationCommandTextExtractor()
+    private var lastShellCommandLineFingerprintAvailable = false
+    private var lastShellCommandLineCursorRow = 0
+    private var lastShellCommandLineCursorColumn = 0
 
     /** Lifecycle state retained for current and future collectors. */
     val state: StateFlow<TerminalSessionState> = mutableState.asStateFlow()
@@ -106,6 +120,20 @@ class TerminalSession(
      * first frame is available.
      */
     val renderGeneration: StateFlow<Long> = mutableRenderGeneration.asStateFlow()
+
+    /**
+     * Allocation-free revision of the authoritative active shell command line.
+     *
+     * The value changes only when the command text, cursor anchor, or snapshot
+     * availability changes. Ordinary render publications, theme changes, and
+     * unrelated terminal output leave it unchanged. Consumers should debounce
+     * this primitive signal and call [activeShellCommandLine] only when they
+     * actually need an immutable command snapshot.
+     *
+     * The initial value is `-1` until the first active OSC 133 command line is
+     * observed. As a [StateFlow], intermediate revisions may be conflated.
+     */
+    val activeShellCommandLineRevision: StateFlow<Long> = mutableActiveShellCommandLineRevision.asStateFlow()
 
     internal val isCoroutineScopeActive: Boolean
         get() = sessionJob.isActive
@@ -489,6 +517,7 @@ class TerminalSession(
 
             try {
                 renderPublisher.updateAndPublish(this, offset, rows)
+                if (offset == 0) updateActiveShellCommandLineRevision()
                 publishedGeneration = generation
                 currentCoroutineContext().ensureActive()
                 mutableRenderGeneration.value = generation
@@ -507,6 +536,133 @@ class TerminalSession(
                 immediateRenderRequests.receiveCatching()
             }
         }
+    }
+
+    private fun updateActiveShellCommandLineRevision() {
+        val contextProvider = activeShellCommandLineContextProvider ?: return
+        val contextRevision =
+            synchronized(mutationLock) {
+                contextProvider(shellCommandLineContextScratch)
+            }
+        val promptEndLineId = shellCommandLineContextScratch[SHELL_COMMAND_LINE_CONTEXT_LINE_ID_INDEX]
+        val promptEndColumn = shellCommandLineContextScratch[SHELL_COMMAND_LINE_CONTEXT_COLUMN_INDEX].toInt()
+        val active = shellCommandLineContextScratch[SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX] != 0L
+
+        var status = TerminalShellCommandFingerprintStatus.INVALID
+        var cursorRow = 0
+        var cursorColumn = 0
+        var historySize = 0
+        var liveRows = 0
+        if (active) {
+            renderPublisher.readCurrent { frame ->
+                historySize = frame.historySize
+                liveRows = frame.rows
+                cursorRow = frame.cursorRow
+                cursorColumn = frame.cursorColumn
+                status =
+                    shellCommandLineFingerprintExtractor.fingerprint(
+                        cache = frame,
+                        promptEndLineId = promptEndLineId,
+                        promptEndColumn = promptEndColumn,
+                        cursorRow = cursorRow,
+                        cursorColumn = cursorColumn,
+                        destination = shellCommandLineFingerprintScratch,
+                    )
+            }
+
+            if (status == TerminalShellCommandFingerprintStatus.MISSING_START_LINE && historySize > 0) {
+                val historyRows = minOf(historySize, MAX_SHELL_INTEGRATION_COMMAND_ROWS)
+                synchronized(mutationLock) {
+                    if (
+                        !shellCommandLineContextMatches(
+                            contextProvider,
+                            contextRevision,
+                            promptEndLineId,
+                            promptEndColumn,
+                            expectedActive = true,
+                        )
+                    ) {
+                        return
+                    }
+                    renderReader.readRenderFrame(
+                        scrollbackOffset = historyRows,
+                        viewportRows = liveRows + historyRows,
+                    ) { frame ->
+                        cursorRow = frame.cursor.row
+                        cursorColumn = frame.cursor.column
+                        status =
+                            shellCommandLineFingerprintExtractor.fingerprint(
+                                frame = frame,
+                                promptEndLineId = promptEndLineId,
+                                promptEndColumn = promptEndColumn,
+                                cursorRow = cursorRow,
+                                cursorColumn = cursorColumn,
+                                destination = shellCommandLineFingerprintScratch,
+                            )
+                    }
+                }
+            }
+        }
+
+        synchronized(mutationLock) {
+            if (
+                !shellCommandLineContextMatches(
+                    contextProvider,
+                    contextRevision,
+                    promptEndLineId,
+                    promptEndColumn,
+                    expectedActive = active,
+                )
+            ) {
+                return
+            }
+        }
+        publishActiveShellCommandLineFingerprint(
+            available = active && status == TerminalShellCommandFingerprintStatus.COMPLETE,
+            cursorRow = cursorRow,
+            cursorColumn = cursorColumn,
+        )
+    }
+
+    private fun shellCommandLineContextMatches(
+        contextProvider: (LongArray) -> Long,
+        expectedRevision: Long,
+        expectedLineId: Long,
+        expectedColumn: Int,
+        expectedActive: Boolean,
+    ): Boolean {
+        val revision = contextProvider(shellCommandLineContextScratch)
+        return revision == expectedRevision &&
+            shellCommandLineContextScratch[SHELL_COMMAND_LINE_CONTEXT_LINE_ID_INDEX] == expectedLineId &&
+            shellCommandLineContextScratch[SHELL_COMMAND_LINE_CONTEXT_COLUMN_INDEX].toInt() == expectedColumn &&
+            (shellCommandLineContextScratch[SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX] != 0L) == expectedActive
+    }
+
+    private fun publishActiveShellCommandLineFingerprint(
+        available: Boolean,
+        cursorRow: Int,
+        cursorColumn: Int,
+    ) {
+        val changed =
+            if (!available) {
+                lastShellCommandLineFingerprintAvailable
+            } else {
+                !lastShellCommandLineFingerprintAvailable ||
+                    lastShellCommandLineCursorRow != cursorRow ||
+                    lastShellCommandLineCursorColumn != cursorColumn ||
+                    !lastShellCommandLineFingerprint.contentEquals(shellCommandLineFingerprintScratch)
+            }
+        if (!changed) return
+
+        lastShellCommandLineFingerprintAvailable = available
+        if (available) {
+            shellCommandLineFingerprintScratch.copyInto(lastShellCommandLineFingerprint)
+            lastShellCommandLineCursorRow = cursorRow
+            lastShellCommandLineCursorColumn = cursorColumn
+        }
+        val previous = mutableActiveShellCommandLineRevision.value
+        mutableActiveShellCommandLineRevision.value =
+            if (previous == Long.MAX_VALUE) FIRST_SHELL_COMMAND_LINE_REVISION else previous + 1L
     }
 
     /**
@@ -655,6 +811,8 @@ class TerminalSession(
             AtomicInteger(1)
         private const val RESPONSE_BUFFER_SIZE: Int = 1024
         private const val NO_RENDER_GENERATION: Long = -1L
+        private const val NO_SHELL_COMMAND_LINE_REVISION: Long = -1L
+        private const val FIRST_SHELL_COMMAND_LINE_REVISION: Long = 0L
         internal const val RENDER_PUBLICATION_INTERVAL_MS: Long = 16L
         private const val SYNCHRONIZED_OUTPUT_TIMEOUT_MS: Long = 100L
 
@@ -728,6 +886,7 @@ class TerminalSession(
                     workerDispatcher = workerDispatcher,
                 )
             session.activeShellCommandLineProvider = recordingHostEvents::activeCommandLine
+            session.activeShellCommandLineContextProvider = recordingHostEvents::copyActiveCommandLineContext
             return session
         }
     }
@@ -747,6 +906,7 @@ private class ShellIntegrationRecordingHostEventSink(
     private var promptScanCodeWords = IntArray(0)
     private var promptScanAttrWords = LongArray(0)
     private var promptScanFlags = IntArray(0)
+    private var activeCommandLineContextRevision = 0L
 
     override fun bell() {
         delegate.bell()
@@ -904,8 +1064,20 @@ private class ShellIntegrationRecordingHostEventSink(
                 }
             }
         }
+        activeCommandLineContextRevision++
 
         delegate.shellIntegrationMarker(event)
+    }
+
+    fun copyActiveCommandLineContext(destination: LongArray): Long {
+        require(destination.size >= SHELL_COMMAND_LINE_CONTEXT_LONGS) {
+            "destination must contain at least $SHELL_COMMAND_LINE_CONTEXT_LONGS longs"
+        }
+        destination[SHELL_COMMAND_LINE_CONTEXT_LINE_ID_INDEX] = promptEndLineId
+        destination[SHELL_COMMAND_LINE_CONTEXT_COLUMN_INDEX] = promptEndColumn.toLong()
+        destination[SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX] =
+            if (promptStartedForCommandText && promptEndLineId != NO_LINE_ID) 1L else 0L
+        return activeCommandLineContextRevision
     }
 
     /**

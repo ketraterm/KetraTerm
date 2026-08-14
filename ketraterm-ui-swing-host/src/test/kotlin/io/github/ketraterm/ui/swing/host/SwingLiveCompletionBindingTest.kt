@@ -33,22 +33,22 @@ import kotlin.test.assertSame
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingLiveCompletionBindingTest {
     @Test
-    fun `render publications debounce the latest shell snapshot`() =
+    fun `shell edit revisions debounce the latest shell snapshot`() =
         runTest {
-            val generations = MutableStateFlow(-1L)
+            val revisions = MutableStateFlow(-1L)
             val scheduler = RecordingScheduler()
             val target = RecordingTarget()
             var active = snapshot("git s")
-            val binding = binding(backgroundScope, generations, scheduler, { active })
+            val binding = binding(backgroundScope, revisions, scheduler, { active })
 
             binding.attach(target)
             runCurrent()
             active = snapshot("git st")
-            generations.value = 1L
+            revisions.value = 1L
             runCurrent()
             scheduler.fire()
 
-            assertEquals(2, scheduler.restartCount)
+            assertEquals(1, scheduler.restartCount)
             assertEquals(listOf(snapshot("git st")), target.requests)
             binding.close()
         }
@@ -80,17 +80,17 @@ class SwingLiveCompletionBindingTest {
     @Test
     fun `focus loss hides suggestions and close removes all lifecycle wiring`() =
         runTest {
-            val generations = MutableStateFlow(-1L)
+            val revisions = MutableStateFlow(-1L)
             val scheduler = RecordingScheduler()
             val target = RecordingTarget()
-            val binding = binding(backgroundScope, generations, scheduler)
+            val binding = binding(backgroundScope, revisions, scheduler)
             binding.attach(target)
             runCurrent()
 
             target.loseFocus()
             binding.close()
             val restartsBeforeClosedPublication = scheduler.restartCount
-            generations.value = 2L
+            revisions.value = 2L
             binding.scheduleRefresh()
             runCurrent()
 
@@ -100,19 +100,20 @@ class SwingLiveCompletionBindingTest {
         }
 
     @Test
-    fun `render publications cannot reopen suggestions until focus returns`() =
+    fun `shell edit revisions cannot reopen suggestions until focus returns`() =
         runTest {
-            val generations = MutableStateFlow(-1L)
+            val revisions = MutableStateFlow(-1L)
             val scheduler = RecordingScheduler()
             val target = RecordingTarget()
-            val binding = binding(backgroundScope, generations, scheduler)
+            val binding = binding(backgroundScope, revisions, scheduler)
             binding.attach(target)
+            revisions.value = 0L
             runCurrent()
             scheduler.fire()
             assertEquals(1, target.requests.size)
 
             target.loseFocus()
-            generations.value = 1L
+            revisions.value = 1L
             runCurrent()
             scheduler.fire()
             assertEquals(1, target.requests.size)
@@ -126,30 +127,35 @@ class SwingLiveCompletionBindingTest {
     @Test
     fun `input invalidation rejects unchanged command snapshots until command changes`() =
         runTest {
-            val generations = MutableStateFlow(-1L)
+            val revisions = MutableStateFlow(-1L)
             val scheduler = RecordingScheduler()
             val target = RecordingTarget()
             var active = snapshot("git s")
-            val binding = binding(backgroundScope, generations, scheduler, { active })
+            val binding = binding(backgroundScope, revisions, scheduler, { active })
             binding.attach(target)
+            revisions.value = 0L
             runCurrent()
             scheduler.fire()
             assertEquals(1, target.requests.size)
 
             target.invalidateSuggestions()
-            generations.value = 1L
+            val restartsBeforeFocusCycle = scheduler.restartCount
+            target.loseFocus()
+            target.gainFocus()
+            assertEquals(restartsBeforeFocusCycle, scheduler.restartCount)
+            revisions.value = 0L
             runCurrent()
             scheduler.fire()
             assertEquals(1, target.requests.size)
 
             active = TerminalShellCommandLineSnapshot("git s", 5, 18, cursorRow = 9)
-            generations.value = 2L
+            revisions.value = 0L
             runCurrent()
             scheduler.fire()
             assertEquals(1, target.requests.size)
 
             active = snapshot("git st")
-            generations.value = 3L
+            revisions.value = 1L
             runCurrent()
             scheduler.fire()
             assertEquals(listOf(snapshot("git s"), snapshot("git st")), target.requests)
@@ -159,18 +165,19 @@ class SwingLiveCompletionBindingTest {
     @Test
     fun `changed shell snapshot hides old popup before debounce fires`() =
         runTest {
-            val generations = MutableStateFlow(-1L)
+            val revisions = MutableStateFlow(-1L)
             val scheduler = RecordingScheduler()
             val target = RecordingTarget()
             var active = snapshot("git s")
-            val binding = binding(backgroundScope, generations, scheduler, { active })
+            val binding = binding(backgroundScope, revisions, scheduler, { active })
             binding.attach(target)
+            revisions.value = 0L
             runCurrent()
             scheduler.fire()
             val hidesBeforeChange = target.hideCount
 
             active = snapshot("git st")
-            generations.value = 1L
+            revisions.value = 1L
             runCurrent()
 
             assertEquals(hidesBeforeChange + 1, target.hideCount)
@@ -202,21 +209,43 @@ class SwingLiveCompletionBindingTest {
             binding.close()
         }
 
+    @Test
+    fun `ineligible viewport cancels automatic trigger and live viewport reschedules`() =
+        runTest {
+            val revisions = MutableStateFlow(-1L)
+            val scheduler = RecordingScheduler()
+            val target = RecordingTarget()
+            val binding = binding(backgroundScope, revisions, scheduler)
+            binding.attach(target)
+            revisions.value = 0L
+            runCurrent()
+
+            target.setAutomaticSuggestionEligible(false)
+            scheduler.fire()
+            assertEquals(0, target.requests.size)
+
+            target.setAutomaticSuggestionEligible(true)
+            scheduler.fire()
+            assertEquals(1, target.requests.size)
+            binding.close()
+        }
+
     private fun binding(
         scope: CoroutineScope,
-        generations: MutableStateFlow<Long> = MutableStateFlow(-1L),
+        revisions: MutableStateFlow<Long> = MutableStateFlow(-1L),
         scheduler: RecordingScheduler = RecordingScheduler(),
         activeCommandLine: () -> TerminalShellCommandLineSnapshot? = { snapshot("git s") },
         feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
     ): SwingLiveCompletionBinding =
         SwingLiveCompletionBinding(
             activeCommandLine = activeCommandLine,
-            renderGenerations = generations,
+            shellCommandLineRevisions = revisions,
             suggestionsEnabled = { true },
             rankingContextKey = { "file:///workspace" },
             feedbackHandler = feedbackHandler,
             scheduler = scheduler,
             observationScope = scope,
+            edtDispatcher = ImmediateEdtDispatcher,
         )
 
     private fun snapshot(command: String): TerminalShellCommandLineSnapshot =
@@ -247,7 +276,9 @@ class SwingLiveCompletionBindingTest {
         var removeFocusListenerCount = 0
         private var focusListener: FocusListener? = null
         private var invalidationListener: SwingShellSuggestionInvalidationListener? = null
+        private var eligibilityListener: SwingShellSuggestionEligibilityListener? = null
         private var focused = true
+        private var automaticSuggestionEligible = true
 
         override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) {
             requests += snapshot
@@ -275,7 +306,17 @@ class SwingLiveCompletionBindingTest {
             if (invalidationListener === listener) invalidationListener = null
         }
 
+        override fun addEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
+            eligibilityListener = listener
+        }
+
+        override fun removeEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
+            if (eligibilityListener === listener) eligibilityListener = null
+        }
+
         override fun isFocusOwner(): Boolean = focused
+
+        override fun isAutomaticSuggestionEligible(): Boolean = automaticSuggestionEligible
 
         fun loseFocus() {
             focused = false
@@ -289,6 +330,11 @@ class SwingLiveCompletionBindingTest {
 
         fun invalidateSuggestions() {
             invalidationListener?.onShellSuggestionsInvalidated()
+        }
+
+        fun setAutomaticSuggestionEligible(eligible: Boolean) {
+            automaticSuggestionEligible = eligible
+            eligibilityListener?.onAutomaticShellSuggestionEligibilityChanged(eligible)
         }
     }
 
@@ -313,5 +359,11 @@ class SwingLiveCompletionBindingTest {
             pending = null
             action?.invoke()
         }
+    }
+
+    private object ImmediateEdtDispatcher : SwingLiveCompletionEdtDispatcher {
+        override fun isDispatchThread(): Boolean = true
+
+        override fun dispatch(task: Runnable) = task.run()
     }
 }
