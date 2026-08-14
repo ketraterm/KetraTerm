@@ -15,10 +15,14 @@
  */
 package io.github.ketraterm.intellij.services
 
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.CoroutineContext
 
 /** Immutable Git references captured from one IntelliJ repository read action. */
 internal data class IntellijGitCompletionSnapshot(
@@ -35,46 +39,58 @@ internal data class IntellijGitCompletionSnapshot(
 internal class IntellijGitCompletionLoader(
     private val project: Project,
 ) {
-    suspend fun load(workingDirectoryUri: String?): IntellijGitCompletionSnapshot =
-        readIntellijGitRepository(project, workingDirectoryUri) { repository, _ ->
+    suspend fun load(workingDirectoryUri: String?): IntellijGitCompletionSnapshot {
+        val cancellationContext = currentCoroutineContext()
+        cancellationContext.ensureActive()
+        return readIntellijGitRepository(project, workingDirectoryUri) { repository, _ ->
             val currentBranchName = repository.currentBranch?.name
             IntellijGitCompletionSnapshot(
                 localBranches =
-                    repository.branches.localBranches
-                        .asSequence()
-                        .filterNot { branch -> branch.name == currentBranchName }
-                        .map { branch ->
+                    collectValues(repository.branches.localBranches, cancellationContext) { branch ->
+                        if (branch.name == currentBranchName) {
+                            null
+                        } else {
                             TerminalCompletionDomainValue(
                                 value = branch.name,
                                 detail = "local branch",
                                 scoreAdjustment = LOCAL_SCORE_ADJUSTMENT,
                             )
-                        }.sortedWith(VALUE_ORDER)
-                        .take(MAX_VALUES_PER_GROUP)
-                        .toList(),
+                        }
+                    },
                 remoteBranches =
-                    repository.branches.remoteBranches
-                        .asSequence()
-                        .map { branch ->
-                            TerminalCompletionDomainValue(
-                                value = branch.name,
-                                detail = "remote branch",
-                                scoreAdjustment = REMOTE_SCORE_ADJUSTMENT,
-                            )
-                        }.sortedWith(VALUE_ORDER)
-                        .take(MAX_VALUES_PER_GROUP)
-                        .toList(),
+                    collectValues(repository.branches.remoteBranches, cancellationContext) { branch ->
+                        TerminalCompletionDomainValue(
+                            value = branch.name,
+                            detail = "remote branch",
+                            scoreAdjustment = REMOTE_SCORE_ADJUSTMENT,
+                        )
+                    },
                 tags =
-                    repository.tagsHolder.state.value.tagsToCommitHashes.keys
-                        .asSequence()
-                        .map { tag -> TerminalCompletionDomainValue(tag.name, detail = "tag") }
-                        .sortedWith(VALUE_ORDER)
-                        .take(MAX_VALUES_PER_GROUP)
-                        .toList(),
+                    collectValues(repository.tagsHolder.state.value.tagsToCommitHashes.keys, cancellationContext) { tag ->
+                        TerminalCompletionDomainValue(tag.name, detail = "tag")
+                    },
             )
         } ?: IntellijGitCompletionSnapshot.EMPTY
+    }
+
+    private inline fun <T> collectValues(
+        values: Iterable<T>,
+        cancellationContext: CoroutineContext,
+        toValue: (T) -> TerminalCompletionDomainValue?,
+    ): List<TerminalCompletionDomainValue> {
+        val retained = BoundedSnapshotCollector(MAX_VALUES_PER_GROUP, VALUE_ORDER)
+        var visited = 0
+        for (value in values) {
+            cancellationContext.ensureActive()
+            ProgressManager.checkCanceled()
+            if (visited++ >= MAX_VISITED_VALUES_PER_GROUP) break
+            toValue(value)?.let(retained::add)
+        }
+        return retained.toSortedList()
+    }
 
     private companion object {
+        private const val MAX_VISITED_VALUES_PER_GROUP = 8_192
         private const val MAX_VALUES_PER_GROUP = 2_048
         private const val LOCAL_SCORE_ADJUSTMENT = 2
         private const val REMOTE_SCORE_ADJUSTMENT = 1

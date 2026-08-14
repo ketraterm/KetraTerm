@@ -281,11 +281,17 @@ internal class IntellijCompletionRegistry(
     ) {
         val command = metadata.commandText ?: return
         val successful = metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED
-        if (successful) {
-            synchronized(lock) { sessionStates[sessionId]?.mruSource }
-                ?.recordSuccessfulCommand(command, profileId, metadata.workingDirectoryUri)
+        synchronized(lock) {
+            if (closed.get()) return
+            if (successful) {
+                sessionStates[sessionId]?.mruSource?.recordSuccessfulCommand(
+                    command,
+                    profileId,
+                    metadata.workingDirectoryUri,
+                )
+            }
+            statistics.recordFinishedCommand(profileId, metadata)
         }
-        statistics.recordFinishedCommand(profileId, metadata)
     }
 
     /**
@@ -318,8 +324,9 @@ internal class IntellijCompletionRegistry(
                 val copy = sessionStates.values.toList()
                 sessionStates.clear()
                 copy
-            }
+        }
         states.forEach(SessionState::close)
+        statistics.close()
     }
 
     /** Session resources retained by the registry until replacement or closure. */

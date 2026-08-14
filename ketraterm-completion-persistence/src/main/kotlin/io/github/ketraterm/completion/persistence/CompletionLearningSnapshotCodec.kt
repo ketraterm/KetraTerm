@@ -55,7 +55,7 @@ internal object CompletionLearningSnapshotCodec {
         )
     }
 
-    private fun encodeCommandRow(record: TerminalCommandCompletionStats): String =
+    fun encodeCommandRow(record: TerminalCommandCompletionStats): String =
         listOf(
             ROW_COMMAND,
             encodeText(record.commandLine),
@@ -69,7 +69,7 @@ internal object CompletionLearningSnapshotCodec {
             record.lastUsedEpochMillis.toString(),
         ).joinToString("\t")
 
-    private fun encodeShapeRow(record: TerminalCommandShapeStats): String =
+    fun encodeShapeRow(record: TerminalCommandShapeStats): String =
         listOf(
             ROW_SHAPE,
             encodeText(record.shape.executable),
@@ -87,7 +87,7 @@ internal object CompletionLearningSnapshotCodec {
             record.lastUsedEpochMillis.toString(),
         ).joinToString("\t")
 
-    private fun encodeFeedbackRow(record: TerminalCompletionFeedbackStats): String =
+    fun encodeFeedbackRow(record: TerminalCompletionFeedbackStats): String =
         listOf(
             ROW_FEEDBACK,
             encodeText(record.source),

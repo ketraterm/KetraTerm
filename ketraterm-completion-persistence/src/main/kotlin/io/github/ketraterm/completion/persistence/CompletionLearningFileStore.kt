@@ -47,6 +47,7 @@ internal class CompletionLearningFileStore(
     private val path: Path,
     private val onFailure: (Throwable) -> Unit = {},
     private val openInput: (Path) -> InputStream = { Files.newInputStream(it) },
+    private val createTemporaryFile: (Path, String, String) -> Path = Files::createTempFile,
 ) {
     fun loadSnapshot(): CompletionLearningFileLoadOutcome =
         try {
@@ -79,28 +80,49 @@ internal class CompletionLearningFileStore(
 
     private fun writeSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot) {
         runCatching {
-            path.parent?.let(Files::createDirectories)
-            val temporary = path.resolveSibling("${path.fileName}.tmp")
-            Files.newBufferedWriter(temporary, StandardCharsets.UTF_8).use { writer ->
-                var writtenBytes = 0
-                for (line in CompletionLearningSnapshotCodec.encode(snapshot)) {
-                    val lineBytes = line.toByteArray(StandardCharsets.UTF_8).size
-                    if (lineBytes > MAX_LINE_BYTES || writtenBytes + lineBytes + MAX_NEWLINE_BYTES > MAX_FILE_BYTES) break
-                    writer.appendLine(line)
-                    writtenBytes += lineBytes + MAX_NEWLINE_BYTES
-                }
-            }
+            val lines = CompletionLearningSnapshotCodec.encode(snapshot)
+            requireEncodedBounds(lines)
+            val absolutePath = path.toAbsolutePath().normalize()
+            val parent = requireNotNull(absolutePath.parent) { "persistence path must have a parent: $path" }
+            Files.createDirectories(parent)
+            val temporary = createTemporaryFile(parent, ".${absolutePath.fileName}.", ".tmp")
             try {
-                Files.move(
-                    temporary,
-                    path,
-                    StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING,
-                )
-            } catch (_: AtomicMoveNotSupportedException) {
-                Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING)
+                Files.newBufferedWriter(temporary, StandardCharsets.UTF_8).use { writer ->
+                    for (line in lines) {
+                        writer.appendLine(line)
+                    }
+                }
+                replaceAtomically(temporary, absolutePath)
+            } finally {
+                Files.deleteIfExists(temporary)
             }
         }.onFailure(onFailure)
+    }
+
+    private fun requireEncodedBounds(lines: List<String>) {
+        var writtenBytes = 0
+        for (line in lines) {
+            val lineBytes = line.toByteArray(StandardCharsets.UTF_8).size
+            require(lineBytes <= MAX_LINE_BYTES) { "encoded persistence row exceeds $MAX_LINE_BYTES bytes" }
+            writtenBytes += lineBytes + MAX_NEWLINE_BYTES
+            require(writtenBytes <= MAX_FILE_BYTES) { "encoded persistence snapshot exceeds $MAX_FILE_BYTES bytes" }
+        }
+    }
+
+    private fun replaceAtomically(
+        temporary: Path,
+        target: Path,
+    ) {
+        try {
+            Files.move(
+                temporary,
+                target,
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 
     private fun readBoundedLines(): List<String>? {
@@ -150,42 +172,55 @@ internal class CompletionLearningFileStore(
         rowSize: (T) -> Int?,
     ): List<T> {
         val retained = ArrayList<T>(minOf(rows.size, MAX_ROWS_PER_FAMILY))
-        var retainedChars = 0
+        var retainedBytes = 0
         for (row in rows) {
             val size = rowSize(row) ?: continue
-            if (retainedChars + size > MAX_RAW_CHARS_PER_FAMILY) continue
+            if (retainedBytes + size + MAX_NEWLINE_BYTES > MAX_ENCODED_BYTES_PER_FAMILY) continue
             retained += row
-            retainedChars += size
+            retainedBytes += size + MAX_NEWLINE_BYTES
             if (retained.size == MAX_ROWS_PER_FAMILY) break
         }
         return retained
     }
 
     private fun commandRowSize(row: TerminalCommandCompletionStats): Int? =
-        boundedTextSize(row.commandLine, row.profileId, row.workingDirectoryUri)
+        encodedRowSize(row.commandLine, row.profileId, row.workingDirectoryUri) {
+            CompletionLearningSnapshotCodec.encodeCommandRow(row)
+        }
 
     private fun shapeRowSize(row: TerminalCommandShapeStats): Int? {
         if (row.shape.subcommands.size > MAX_SHAPE_TOKENS || row.shape.optionNames.size > MAX_SHAPE_TOKENS) return null
-        return boundedTextSize(
+        return encodedRowSize(
             row.shape.executable,
             row.profileId,
             row.workingDirectoryUri,
             *row.shape.subcommands.toTypedArray(),
             *row.shape.optionNames.toTypedArray(),
-        )
+        ) { CompletionLearningSnapshotCodec.encodeShapeRow(row) }
     }
 
     private fun feedbackRowSize(row: TerminalCompletionFeedbackStats): Int? =
-        boundedTextSize(row.source, row.profileId, row.workingDirectoryUri)
+        encodedRowSize(row.source, row.profileId, row.workingDirectoryUri) {
+            CompletionLearningSnapshotCodec.encodeFeedbackRow(row)
+        }
 
-    private fun boundedTextSize(vararg values: String?): Int? {
+    private inline fun encodedRowSize(
+        vararg values: String?,
+        encode: () -> String,
+    ): Int? {
+        if (!hasBoundedText(values)) return null
+        val encodedBytes = encode().toByteArray(StandardCharsets.UTF_8).size
+        return encodedBytes.takeIf { it <= MAX_LINE_BYTES }
+    }
+
+    private fun hasBoundedText(values: Array<out String?>): Boolean {
         var total = 0
         for (value in values) {
             val length = value?.length ?: continue
-            if (length > MAX_TEXT_CHARS || total + length > MAX_ROW_RAW_CHARS) return null
+            if (length > MAX_TEXT_CHARS || total + length > MAX_ROW_RAW_CHARS) return false
             total += length
         }
-        return total
+        return true
     }
 
     private companion object {
@@ -194,7 +229,7 @@ internal class CompletionLearningFileStore(
         private const val MAX_FILE_LINES = 1 + 3 * MAX_ROWS_PER_FAMILY
         private const val MAX_LINE_BYTES = 16 * 1024
         private const val MAX_NEWLINE_BYTES = 2
-        private const val MAX_RAW_CHARS_PER_FAMILY = 750_000
+        private const val MAX_ENCODED_BYTES_PER_FAMILY = 1_000_000
         private const val MAX_ROW_RAW_CHARS = 8 * 1024
         private const val MAX_TEXT_CHARS = 4 * 1024
         private const val MAX_SHAPE_TOKENS = 128

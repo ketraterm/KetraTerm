@@ -19,8 +19,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.attribute.FileTime
-import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -30,7 +28,7 @@ class TerminalBoundedDirectoryScannerTest {
     lateinit var directory: Path
 
     @Test
-    fun `narrowing reuses raw snapshot and exposes entries outside an earlier result window`() =
+    fun `scan observes deletion even when directory timestamp is restored`() =
         runTest {
             repeat(300) { index -> Files.createFile(directory.resolve("alpha-${index.toString().padStart(3, '0')}")) }
             val target = Files.createFile(directory.resolve("zebra-target"))
@@ -43,22 +41,17 @@ class TerminalBoundedDirectoryScannerTest {
             val narrow = scanner.scan(directory, "zebra")
 
             assertEquals(256, broad.size)
-            assertEquals(listOf("zebra-target"), narrow.map { it.name })
+            assertEquals(emptyList(), narrow)
         }
 
     @Test
-    fun `directory version change replaces cached raw snapshot`() =
+    fun `each scan observes current directory contents`() =
         runTest {
             Files.createFile(directory.resolve("alpha"))
             val scanner = scanner()
             assertEquals(listOf("alpha"), scanner.scan(directory, "").map { it.name })
 
             Files.createFile(directory.resolve("beta"))
-            Files.setLastModifiedTime(
-                directory,
-                FileTime.from(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(2), TimeUnit.MILLISECONDS),
-            )
-
             assertEquals(listOf("alpha", "beta"), scanner.scan(directory, "").map { it.name })
         }
 

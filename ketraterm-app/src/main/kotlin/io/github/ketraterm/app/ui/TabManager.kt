@@ -297,6 +297,7 @@ internal class TabManager(
         }
         completionRegistry.close()
         workspace.close()
+        runBlocking { completionStatistics.closeAndFlush() }
         completionScope.cancel()
     }
 

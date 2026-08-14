@@ -16,10 +16,13 @@
 package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import git4idea.repo.GitRepository
 import git4idea.repo.GitRepositoryManager
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.nio.file.Path
 
 /** Selects the deepest Git repository containing a terminal working directory. */
@@ -29,6 +32,7 @@ internal fun selectIntellijGitRepository(
 ): GitRepository? =
     repositories
         .asSequence()
+        .take(MAX_VISITED_REPOSITORIES)
         .filter { repository -> workingDirectory.startsWith(repository.root.toNioPath()) }
         .maxByOrNull { repository -> repository.root.path.length }
 
@@ -43,12 +47,16 @@ internal suspend fun <T> readIntellijGitRepository(
     workingDirectoryUri: String?,
     reader: (repository: GitRepository, workingDirectory: Path) -> T,
 ): T? {
+    val cancellationContext = currentCoroutineContext()
+    cancellationContext.ensureActive()
     if (project.isDisposed) return null
     val workingDirectory =
         TerminalLocalFileUriResolver.resolve(workingDirectoryUri)
             ?: project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
             ?: return null
     return readAction {
+        cancellationContext.ensureActive()
+        ProgressManager.checkCanceled()
         if (project.isDisposed) return@readAction null
         val repository =
             selectIntellijGitRepository(GitRepositoryManager.getInstance(project).repositories, workingDirectory)
@@ -56,3 +64,5 @@ internal suspend fun <T> readIntellijGitRepository(
         reader(repository, workingDirectory)
     }
 }
+
+private const val MAX_VISITED_REPOSITORIES = 1_024

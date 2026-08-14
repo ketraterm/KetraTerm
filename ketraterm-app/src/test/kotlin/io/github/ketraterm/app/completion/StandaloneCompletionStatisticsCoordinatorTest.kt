@@ -18,8 +18,6 @@ package io.github.ketraterm.app.completion
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
@@ -36,13 +34,14 @@ class StandaloneCompletionStatisticsCoordinatorTest {
         val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, this)
 
         coordinator.recordFinishedCommand("git status", true, "bash", "file:///repo", 42L)
-        coroutineContext[Job]?.children?.toList()?.joinAll()
+        coordinator.flush()
 
         assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
         assertEquals(
             listOf("git status"),
             persistedSnapshot(path).commandStats.map { it.commandLine },
         )
+        coordinator.closeAndFlush()
     }
 
     @Test
@@ -55,7 +54,7 @@ class StandaloneCompletionStatisticsCoordinatorTest {
         coordinator.recordFinishedCommand("git status", true, null, null, 1L)
         coordinator.setPersistencePath(null)
         coordinator.recordFinishedCommand("npm test", true, null, null, 2L)
-        coroutineContext[Job]?.children?.toList()?.joinAll()
+        coordinator.flush()
 
         assertEquals(
             setOf("git status", "npm test"),
@@ -69,6 +68,7 @@ class StandaloneCompletionStatisticsCoordinatorTest {
             listOf("git status"),
             persistedSnapshot(path).commandStats.map { it.commandLine },
         )
+        coordinator.closeAndFlush()
     }
 
     private suspend fun persistedSnapshot(path: Path): TerminalCommandCompletionStatsSnapshot {

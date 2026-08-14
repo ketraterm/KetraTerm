@@ -15,8 +15,10 @@
  */
 package io.github.ketraterm.completion.persistence
 
+import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
 import java.io.IOException
 import java.nio.file.Files
 import kotlin.io.path.createTempDirectory
@@ -51,6 +53,59 @@ class CompletionLearningFileStoreTest {
         )
 
         assertEquals(listOf(record("git status")), store.loadSnapshot().loadedSnapshot().commandStats)
+    }
+
+    @Test
+    fun `encoded byte bound rejects a multibyte row without dropping later families`() {
+        val path = createTempDirectory("completion-store-encoded-bound").resolve(TerminalCompletionLearningRepository.currentFileName())
+        val feedback =
+            TerminalCompletionFeedbackStats(
+                source = "history",
+                candidateKind = TerminalCompletionCandidateKind.HISTORY,
+                acceptedCount = 1,
+            )
+
+        CompletionLearningFileStore(path).persist(
+            TerminalCommandCompletionStatsSnapshot(
+                commandStats = listOf(record("界".repeat(4_096))),
+                feedbackStats = listOf(feedback),
+            ),
+        )
+
+        val loaded = CompletionLearningFileStore(path).loadSnapshot().loadedSnapshot()
+        assertEquals(emptyList(), loaded.commandStats)
+        assertEquals(listOf(feedback), loaded.feedbackStats)
+        assertTrue(Files.readAllLines(path).all { it.toByteArray().size <= MAX_LINE_BYTES })
+    }
+
+    @Test
+    fun `each write uses a unique same-directory temporary file and cleans it`() {
+        val directory = createTempDirectory("completion-store-temporary")
+        val path = directory.resolve(TerminalCompletionLearningRepository.currentFileName())
+        val temporaryFiles = mutableListOf<java.nio.file.Path>()
+        val store =
+            CompletionLearningFileStore(
+                path = path,
+                createTemporaryFile = { parent, prefix, suffix ->
+                    Files.createTempFile(parent, prefix, suffix).also(temporaryFiles::add)
+                },
+            )
+
+        store.persist(snapshot("command-1"))
+        store.persist(snapshot("command-2"))
+
+        assertEquals(2, temporaryFiles.distinct().size)
+        assertTrue(temporaryFiles.all { it.parent == directory.toAbsolutePath().normalize() })
+        assertTrue(temporaryFiles.none(Files::exists))
+        assertEquals(
+            "command-2",
+            CompletionLearningFileStore(path)
+                .loadSnapshot()
+                .loadedSnapshot()
+                .commandStats
+                .single()
+                .commandLine,
+        )
     }
 
     @Test

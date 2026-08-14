@@ -16,6 +16,7 @@
 package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.VirtualFile
@@ -24,6 +25,8 @@ import io.github.ketraterm.completion.api.TerminalFileEntry
 import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner
 import io.github.ketraterm.completion.host.TerminalDirectoryEntrySnapshot
 import io.github.ketraterm.completion.host.TerminalDirectoryScanner
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.nio.file.Path
 
 /**
@@ -71,9 +74,13 @@ internal class IntellijProjectDirectoryScanner(
         directory: Path,
         entryNamePrefix: String,
     ): List<TerminalFileEntry> {
+        val cancellationContext = currentCoroutineContext()
+        cancellationContext.ensureActive()
         if (project.isDisposed) return emptyList()
         val projectEntries =
             readAction<List<TerminalFileEntry>?> {
+                cancellationContext.ensureActive()
+                ProgressManager.checkCanceled()
                 if (project.isDisposed) return@readAction emptyList()
                 val virtualDirectory = virtualFileResolver(directory) ?: return@readAction null
                 if (!virtualDirectory.isDirectory) return@readAction emptyList()
@@ -92,6 +99,8 @@ internal class IntellijProjectDirectoryScanner(
                 val children = virtualDirectory.children
                 val limit = minOf(children.size, maxVisitedEntries)
                 for (index in 0 until limit) {
+                    cancellationContext.ensureActive()
+                    ProgressManager.checkCanceled()
                     val child = children[index]
                     if (!fileIndex.isInContent(child)) continue
                     entries += TerminalFileEntry(child.name, child.isDirectory)

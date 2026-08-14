@@ -17,9 +17,10 @@ This module must not:
 - depend on Swing, IntelliJ Platform, workspace, session, or application modules.
 - cache merged or prefix-filtered request results or own completion jobs.
 
-A direct scanner may retain one immutable raw directory snapshot when it has
-an authoritative filesystem version key. That snapshot is replaced only after
-a complete, successful, version-stable scan; prefix filtering remains per request.
+Direct NIO scanners must not cache directory snapshots from heuristic metadata
+such as file keys and last-modified timestamps. Filesystem timestamp granularity
+is not an authoritative directory-content version; scan each request within the
+configured time, visit, and result bounds.
 
 Hosts remain responsible for invoking environment-specific APIs. The Swing terminal owns request replacement and
 cancellation; the merged engine owns source parallelism.

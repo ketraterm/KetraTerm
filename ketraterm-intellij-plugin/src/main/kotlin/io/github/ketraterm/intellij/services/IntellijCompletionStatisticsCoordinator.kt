@@ -29,7 +29,7 @@ import kotlinx.coroutines.CoroutineScope
 /**
  * IntelliJ adapter for learned completion statistics.
  *
- * The shared learning coordinator owns lifecycle-scope dispatch into the
+ * The shared learning coordinator owns one lifecycle-scope worker for the
  * suspending repository; this class only maps IntelliJ lifecycle and Swing
  * feedback events.
  *
@@ -79,5 +79,20 @@ internal class IntellijCompletionStatisticsCoordinator(
             workingDirectoryUri = metadata.workingDirectoryUri,
             usedAtEpochMillis = metadata.finishedAtEpochMillis ?: System.currentTimeMillis(),
         )
+    }
+
+    /** Waits until all previously submitted learning and persistence work completes. */
+    suspend fun flush() {
+        learning.flush()
+    }
+
+    /** Gracefully flushes and stops the statistics worker. */
+    suspend fun closeAndFlush() {
+        learning.closeAndFlush()
+    }
+
+    /** Stops accepting statistics and drains queued work in the lifecycle scope. */
+    fun close() {
+        learning.close()
     }
 }

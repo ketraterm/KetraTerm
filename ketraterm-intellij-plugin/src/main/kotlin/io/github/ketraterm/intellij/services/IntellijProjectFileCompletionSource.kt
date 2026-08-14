@@ -61,7 +61,8 @@ internal class IntellijProjectFileLoader(
         workingDirectoryUri: String?,
         prefix: String,
     ): List<TerminalFuzzyPathEntry> {
-        currentCoroutineContext().ensureActive()
+        val cancellationContext = currentCoroutineContext()
+        cancellationContext.ensureActive()
         if (project.isDisposed) return emptyList()
         val normalizedPrefix = prefix.replace('\\', '/')
         if (normalizedPrefix.substringAfterLast('/').isEmpty()) return emptyList()
@@ -79,6 +80,7 @@ internal class IntellijProjectFileLoader(
                 val viewModel = IntellijProjectFileSearchViewModel(project, model)
                 val results = ArrayList<TerminalFuzzyPathEntry>(INITIAL_RESULT_CAPACITY)
                 val paths = HashSet<String>(INITIAL_RESULT_CAPACITY)
+                var visited = 0
                 val indicator = ProgressManager.getInstance().progressIndicator ?: EmptyProgressIndicator()
                 val parameters = FindSymbolParameters.wrap(normalizedPrefix, GlobalSearchScope.projectScope(project))
                 itemProvider.filterElementsWithWeights(
@@ -86,7 +88,9 @@ internal class IntellijProjectFileLoader(
                     parameters,
                     indicator,
                     Processor { descriptor ->
+                        cancellationContext.ensureActive()
                         ProgressManager.checkCanceled()
+                        if (visited++ >= MAX_VISITED_ENTRIES) return@Processor false
                         val file = (descriptor.item as? PsiFileSystemItem)?.virtualFile ?: return@Processor true
                         val filePath = filePathResolver(file) ?: return@Processor true
                         val path = relativePath(workingDirectory, filePath) ?: return@Processor true
@@ -110,6 +114,7 @@ internal class IntellijProjectFileLoader(
 
     private companion object {
         private const val INITIAL_RESULT_CAPACITY = 64
+        private const val MAX_VISITED_ENTRIES = 8_192
         private const val MAX_RETAINED_ENTRIES = 4_096
     }
 }

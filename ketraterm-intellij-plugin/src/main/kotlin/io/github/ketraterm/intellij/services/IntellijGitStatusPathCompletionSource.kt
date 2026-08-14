@@ -15,10 +15,13 @@
  */
 package io.github.ketraterm.intellij.services
 
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.nio.file.Path
 
 /**
@@ -40,8 +43,10 @@ internal class IntellijGitStatusPathLoader(
      * @param workingDirectoryUri local `file` URI used to select and relativize a repository.
      * @return at most 2,048 changed paths, or an empty list for unusable project, URI, or repository state.
      */
-    suspend fun load(workingDirectoryUri: String?): List<TerminalFuzzyPathEntry> =
-        readIntellijGitRepository(project, workingDirectoryUri) { repository, workingDirectory ->
+    suspend fun load(workingDirectoryUri: String?): List<TerminalFuzzyPathEntry> {
+        val cancellationContext = currentCoroutineContext()
+        cancellationContext.ensureActive()
+        return readIntellijGitRepository(project, workingDirectoryUri) { repository, workingDirectory ->
             val repositoryRoot = repository.root.toNioPath()
             val retained = BoundedSnapshotCollector(MAX_RETAINED_PATHS, ENTRY_ORDER)
             var visited = 0
@@ -57,18 +62,23 @@ internal class IntellijGitStatusPathLoader(
                 retained.add(entry)
             }
             for (change in changeListManager.allChanges) {
+                cancellationContext.ensureActive()
+                ProgressManager.checkCanceled()
                 if (visited++ >= MAX_VISITED_CHANGES) break
                 val filePath = change.afterRevision?.file ?: change.beforeRevision?.file ?: continue
                 val path = runCatching { Path.of(filePath.path) }.getOrNull() ?: continue
                 retain(path, isDirectory = false, detail = "changed file")
             }
             for (filePath in changeListManager.unversionedFilesPaths) {
+                cancellationContext.ensureActive()
+                ProgressManager.checkCanceled()
                 if (visited++ >= MAX_VISITED_CHANGES) break
                 val path = runCatching { Path.of(filePath.path) }.getOrNull() ?: continue
                 retain(path, isDirectory = false, detail = "untracked file")
             }
             retained.toSortedList()
         } ?: emptyList()
+    }
 
     private fun relativePath(
         workingDirectory: Path,

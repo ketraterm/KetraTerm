@@ -16,8 +16,6 @@
 package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
@@ -38,12 +36,13 @@ class TerminalCompletionLearningCoordinatorTest {
             )
 
         coordinator.recordCommandResult("git status", true, "bash", "file:///repo", 42L)
-        coroutineContext[Job]?.children?.toList()?.joinAll()
+        coordinator.flush()
 
         assertEquals(listOf("git status"), store.snapshot().commandStats.map { it.commandLine })
         val reloaded = TerminalCompletionLearningStore()
         TerminalCompletionLearningRepository(reloaded, path).initialize()
         assertEquals(store.snapshot(), reloaded.snapshot())
+        coordinator.closeAndFlush()
     }
 
     @Test
@@ -57,8 +56,38 @@ class TerminalCompletionLearningCoordinatorTest {
                 )
 
             coordinator.recordCommandResult("docker login --password secret", true, null, null, 42L)
-            coroutineContext[Job]?.children?.toList()?.joinAll()
+            coordinator.flush()
 
             assertEquals(emptyList(), store.snapshot().commandStats)
+            coordinator.closeAndFlush()
         }
+
+    @Test
+    fun `commands execute in submission order and close flushes the final write`(
+        @TempDir directory: Path,
+    ) = runBlocking {
+        val firstPath = directory.resolve("first.tsv")
+        val secondPath = directory.resolve("second.tsv")
+        val store = TerminalCompletionLearningStore()
+        val coordinator =
+            TerminalCompletionLearningCoordinator(
+                TerminalCompletionLearningRepository(store, firstPath),
+                this,
+            )
+
+        coordinator.recordCommandResult("git status", true, null, null, 1L)
+        coordinator.setPersistencePath(secondPath)
+        coordinator.recordCommandResult("npm test", true, null, null, 2L)
+        coordinator.closeAndFlush()
+
+        val firstReloaded = TerminalCompletionLearningStore()
+        TerminalCompletionLearningRepository(firstReloaded, firstPath).initialize()
+        val secondReloaded = TerminalCompletionLearningStore()
+        TerminalCompletionLearningRepository(secondReloaded, secondPath).initialize()
+        assertEquals(listOf("git status"), firstReloaded.snapshot().commandStats.map { it.commandLine })
+        assertEquals(
+            setOf("git status", "npm test"),
+            secondReloaded.snapshot().commandStats.mapTo(HashSet()) { it.commandLine },
+        )
+    }
 }

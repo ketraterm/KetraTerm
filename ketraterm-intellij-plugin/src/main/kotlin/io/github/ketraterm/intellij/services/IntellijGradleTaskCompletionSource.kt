@@ -16,15 +16,18 @@
 package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.externalSystem.model.DataNode
 import com.intellij.openapi.externalSystem.model.ProjectKeys
 import com.intellij.openapi.externalSystem.model.project.ModuleData
 import com.intellij.openapi.externalSystem.model.task.TaskData
 import com.intellij.openapi.externalSystem.service.project.ProjectDataManager
-import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalGradleTask
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import org.jetbrains.plugins.gradle.util.GradleConstants
 import java.nio.file.Path
 
@@ -45,21 +48,58 @@ internal class IntellijGradleTaskLoader(
      * project is disposed, the directory is unavailable, or no Gradle model is imported.
      */
     suspend fun load(workingDirectoryUri: String?): List<TerminalGradleTask> {
+        val cancellationContext = currentCoroutineContext()
+        cancellationContext.ensureActive()
         if (project.isDisposed) return emptyList()
         val workingDirectory = TerminalLocalFileUriResolver.resolve(workingDirectoryUri) ?: return emptyList()
         return readAction {
+            cancellationContext.ensureActive()
+            ProgressManager.checkCanceled()
             if (project.isDisposed) return@readAction emptyList()
             val retained = BoundedSnapshotCollector(MAX_RETAINED_TASKS, TASK_ORDER)
-            var visited = 0
+            var visitedNodes = 0
+            var visitedTasks = 0
             for (projectInfo in ProjectDataManager.getInstance().getExternalProjectsData(project, GradleConstants.SYSTEM_ID)) {
-                val projectStructure = projectInfo.externalProjectStructure ?: continue
-                for (taskNode in ExternalSystemApiUtil.findAllRecursively(projectStructure, ProjectKeys.TASK)) {
-                    if (visited++ >= MAX_VISITED_TASKS) break
-                    val moduleData = ExternalSystemApiUtil.findParent(taskNode, ProjectKeys.MODULE)?.data ?: continue
-                    val entry = taskNode.data.toCompletionTask(workingDirectory, moduleData) ?: continue
-                    retained.add(entry)
+                cancellationContext.ensureActive()
+                ProgressManager.checkCanceled()
+                if (visitedNodes >= MAX_VISITED_MODEL_NODES || visitedTasks >= MAX_VISITED_TASKS) break
+                val root = projectInfo.externalProjectStructure ?: continue
+                val pending = ArrayDeque<PendingGradleNode>()
+                pending.addLast(PendingGradleNode(root, moduleData = null))
+                while (
+                    pending.isNotEmpty() &&
+                    visitedNodes < MAX_VISITED_MODEL_NODES &&
+                    visitedTasks < MAX_VISITED_TASKS
+                ) {
+                    cancellationContext.ensureActive()
+                    ProgressManager.checkCanceled()
+                    val pendingNode = pending.removeLast()
+                    val node = pendingNode.node
+                    visitedNodes++
+                    val moduleData =
+                        if (node.key == ProjectKeys.MODULE) {
+                            node.data as? ModuleData
+                        } else {
+                            pendingNode.moduleData
+                        }
+                    if (node.key == ProjectKeys.TASK) {
+                        visitedTasks++
+                        val taskData = node.data as? TaskData
+                        val entry =
+                            if (taskData == null || moduleData == null) {
+                                null
+                            } else {
+                                taskData.toCompletionTask(workingDirectory, moduleData)
+                            }
+                        if (entry != null) retained.add(entry)
+                    }
+                    for (child in node.children) {
+                        cancellationContext.ensureActive()
+                        ProgressManager.checkCanceled()
+                        if (visitedNodes + pending.size >= MAX_VISITED_MODEL_NODES) break
+                        pending.addLast(PendingGradleNode(child, moduleData))
+                    }
                 }
-                if (visited >= MAX_VISITED_TASKS) break
             }
             retained.toSortedList()
         }
@@ -93,6 +133,7 @@ internal class IntellijGradleTaskLoader(
         IntellijGradleTaskPath.fullyQualified(moduleId, taskName)
 
     private companion object {
+        private const val MAX_VISITED_MODEL_NODES = 16_384
         private const val MAX_VISITED_TASKS = 8_192
         private const val MAX_RETAINED_TASKS = 4_096
         private val TASK_ORDER =
@@ -100,6 +141,11 @@ internal class IntellijGradleTaskLoader(
                 .thenBy { it.path }
                 .thenBy { it.projectDirectory }
     }
+
+    private data class PendingGradleNode(
+        val node: DataNode<*>,
+        val moduleData: ModuleData?,
+    )
 }
 
 /** Converts public External System module and task data into a Gradle invocation path. */

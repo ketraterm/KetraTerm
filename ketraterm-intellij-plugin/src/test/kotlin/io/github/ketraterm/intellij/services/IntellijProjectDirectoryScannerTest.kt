@@ -51,4 +51,21 @@ class IntellijProjectDirectoryScannerTest : BasePlatformTestCase() {
             entries,
         )
     }
+
+    /** Verifies one VFS request cannot inspect or retain beyond its visit cap. */
+    fun testProjectContentVisitBound() {
+        val directory = myFixture.tempDirFixture.findOrCreateDir("bounded-completion")
+        repeat(10) { index -> myFixture.tempDirFixture.createFile("bounded-completion/file-$index.kt") }
+        val scanner =
+            IntellijProjectDirectoryScanner(
+                project = project,
+                virtualFileResolver = { directory },
+                maxVisitedEntries = 3,
+                maxMatchingEntries = 256,
+            )
+
+        val entries = runBlocking { scanner.scan(Path.of("project-content"), "") }
+
+        assertTrue(entries.size <= 3)
+    }
 }

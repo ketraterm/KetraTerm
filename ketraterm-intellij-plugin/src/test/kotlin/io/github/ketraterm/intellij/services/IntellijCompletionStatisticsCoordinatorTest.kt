@@ -20,8 +20,6 @@ import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapsh
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -52,13 +50,14 @@ class IntellijCompletionStatisticsCoordinatorTest {
                     finishedAtEpochMillis = 42L,
                 ),
             )
-            coroutineContext[Job]?.children?.toList()?.joinAll()
+            coordinator.flush()
 
             assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
             assertEquals(
                 listOf("git status"),
                 persistedSnapshot(path).commandStats.map { it.commandLine },
             )
+            coordinator.closeAndFlush()
         }
 
     private suspend fun persistedSnapshot(path: Path): TerminalCommandCompletionStatsSnapshot {

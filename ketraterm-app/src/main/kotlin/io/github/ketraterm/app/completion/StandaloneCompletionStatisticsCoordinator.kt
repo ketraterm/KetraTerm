@@ -28,8 +28,8 @@ import java.nio.file.Path
 /**
  * Standalone owner of serialized completion learning and optional persistence.
  *
- * The shared learning coordinator serializes and launches repository work in
- * the application's lifecycle scope. This adapter only maps standalone context
+ * The shared learning coordinator queues repository work for one ordered worker
+ * in the application's lifecycle scope. This adapter only maps standalone context
  * and Swing feedback vocabulary.
  */
 internal class StandaloneCompletionStatisticsCoordinator(
@@ -85,5 +85,20 @@ internal class StandaloneCompletionStatisticsCoordinator(
     /** Enables, switches, or disables the persistence store asynchronously. */
     fun setPersistencePath(path: Path?) {
         learning.setPersistencePath(path)
+    }
+
+    /** Waits until all previously submitted learning and persistence work completes. */
+    suspend fun flush() {
+        learning.flush()
+    }
+
+    /** Gracefully flushes and stops the statistics worker. */
+    suspend fun closeAndFlush() {
+        learning.closeAndFlush()
+    }
+
+    /** Stops accepting statistics and drains queued work in the lifecycle scope. */
+    fun close() {
+        learning.close()
     }
 }

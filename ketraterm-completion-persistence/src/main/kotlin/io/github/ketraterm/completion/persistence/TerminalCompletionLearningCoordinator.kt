@@ -17,40 +17,61 @@ package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Launches serialized completion-learning operations in a host-owned lifecycle scope.
+ * Owns one ordered completion-learning command stream in a host lifecycle scope.
  *
  * This class contains no product policy beyond the shared command-persistence
  * privacy check. The host still owns [coroutineScope], the persistence path,
- * enablement settings, and failure reporting. Cancelling the supplied scope
- * cancels queued repository operations through structured concurrency.
+ * enablement settings, and failure reporting. One worker initializes the
+ * repository and executes every subsequent command in submission order.
+ * Cancelling the supplied scope cancels the worker and its queued operations.
  *
  * @param repository suspending learning and persistence repository.
  * @param coroutineScope caller-owned lifecycle scope for infrequent learning operations.
  */
 class TerminalCompletionLearningCoordinator(
     private val repository: TerminalCompletionLearningRepository,
-    private val coroutineScope: CoroutineScope,
+    coroutineScope: CoroutineScope,
 ) {
+    private val commands = Channel<Command>(COMMAND_QUEUE_CAPACITY)
+    private val acceptingCommands = AtomicBoolean(true)
+    private val worker =
+        coroutineScope.async(start = CoroutineStart.UNDISPATCHED) {
+            var completionFailure: Throwable? = null
+            try {
+                repository.initialize()
+                for (command in commands) {
+                    command.execute(repository)
+                }
+            } catch (failure: Throwable) {
+                completionFailure = failure
+                throw failure
+            } finally {
+                commands.close(completionFailure)
+                val failure = completionFailure ?: CancellationException("completion-learning owner stopped")
+                while (true) {
+                    val pending = commands.tryReceive().getOrNull() ?: break
+                    if (pending is Command.Flush) pending.fail(failure)
+                }
+            }
+        }
+
     /** Mutable learning store shared with completion ranking and history sources. */
     val learningStore: TerminalCompletionLearningStore
         get() = repository.learningStore
 
-    init {
-        coroutineScope.launch { repository.initialize() }
-    }
-
     /**
-     * Launches one serialized learning mutation.
+     * Queues one learning mutation after all previously submitted commands.
      *
      * @param mutation synchronous bounded mutation run under the repository mutex.
      */
     fun submit(mutation: () -> Unit) {
-        coroutineScope.launch { repository.mutate { mutation() } }
+        enqueue(Command.Mutate(mutation))
     }
 
     /**
@@ -82,20 +103,99 @@ class TerminalCompletionLearningCoordinator(
     }
 
     /**
-     * Launches a change to the active persistence destination.
+     * Queues a change to the active persistence destination.
      *
      * @param path replacement snapshot path, or `null` for memory-only learning.
      */
     fun setPersistencePath(path: Path?) {
-        coroutineScope.launch { repository.setPersistencePath(path) }
+        enqueue(Command.SetPersistencePath(path))
     }
 
     /**
-     * Launches a change to persistence enablement for the configured path.
+     * Queues a change to persistence enablement for the configured path.
      *
      * @param enabled whether the configured snapshot path may be read and written.
      */
     fun setPersistenceEnabled(enabled: Boolean) {
-        coroutineScope.launch { repository.setPersistenceEnabled(enabled) }
+        enqueue(Command.SetPersistenceEnabled(enabled))
+    }
+
+    /**
+     * Waits until every command submitted before this call has completed.
+     *
+     * The barrier includes repository initialization and any disk write caused
+     * by an earlier mutation or settings change. Commands submitted after the
+     * barrier are not awaited.
+     */
+    suspend fun flush() {
+        check(acceptingCommands.get()) { "completion-learning owner is closed" }
+        val completed = CompletableDeferred<Unit>()
+        commands.send(Command.Flush(completed))
+        completed.await()
+    }
+
+    /** Stops accepting commands and lets the worker drain the queue in order. */
+    fun close() {
+        if (acceptingCommands.compareAndSet(true, false)) {
+            commands.close()
+        }
+    }
+
+    /**
+     * Stops accepting commands and waits for every queued operation and disk
+     * write to finish. Calling this method more than once is safe.
+     */
+    suspend fun closeAndFlush() {
+        close()
+        worker.await()
+    }
+
+    private fun enqueue(command: Command) {
+        check(acceptingCommands.get()) { "completion-learning owner is closed" }
+        commands.trySend(command).getOrThrow()
+    }
+
+    private sealed interface Command {
+        suspend fun execute(repository: TerminalCompletionLearningRepository)
+
+        class Mutate(
+            private val mutation: () -> Unit,
+        ) : Command {
+            override suspend fun execute(repository: TerminalCompletionLearningRepository) {
+                repository.mutate { mutation() }
+            }
+        }
+
+        class SetPersistencePath(
+            private val path: Path?,
+        ) : Command {
+            override suspend fun execute(repository: TerminalCompletionLearningRepository) {
+                repository.setPersistencePath(path)
+            }
+        }
+
+        class SetPersistenceEnabled(
+            private val enabled: Boolean,
+        ) : Command {
+            override suspend fun execute(repository: TerminalCompletionLearningRepository) {
+                repository.setPersistenceEnabled(enabled)
+            }
+        }
+
+        class Flush(
+            private val completed: CompletableDeferred<Unit>,
+        ) : Command {
+            override suspend fun execute(repository: TerminalCompletionLearningRepository) {
+                completed.complete(Unit)
+            }
+
+            fun fail(failure: Throwable) {
+                completed.completeExceptionally(failure)
+            }
+        }
+    }
+
+    private companion object {
+        private const val COMMAND_QUEUE_CAPACITY = 1_024
     }
 }
