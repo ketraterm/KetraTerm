@@ -26,9 +26,9 @@ import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
  * bounded indexing mechanics live in [BoundedStatsRowIndex].
  */
 internal class CommandCompletionStatsIndex(
-    capacity: Int,
+    private val capacity: Int,
 ) {
-    private val rows =
+    private var rows =
         BoundedStatsRowIndex(
             capacity = capacity,
             order = TERMINAL_COMMAND_COMPLETION_STATS_ORDER,
@@ -41,6 +41,8 @@ internal class CommandCompletionStatsIndex(
     fun mergeAll(records: List<TerminalCommandCompletionStats>) = rows.mergeAll(records.map(::canonicalizeContext), ::mergeStats)
 
     fun snapshot(): List<TerminalCommandCompletionStats> = rows.snapshot()
+
+    fun copy(): CommandCompletionStatsIndex = CommandCompletionStatsIndex(capacity).also { copy -> copy.rows = rows.copy() }
 
     fun recordCommandResult(
         commandLine: String,

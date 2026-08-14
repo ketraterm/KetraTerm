@@ -35,48 +35,96 @@ internal data class IntellijGitCompletionSnapshot(
     }
 }
 
+/** Lazy Git-reference view whose iterables are consumed inside the owning IDE read action. */
+internal data class GitReferenceReadModel(
+    val currentBranchName: String?,
+    val localBranchNames: Iterable<String>,
+    val remoteBranchNames: Iterable<String>,
+    val tagNames: Iterable<String>,
+)
+
+/** Executes bounded Git-reference collection inside an implementation-owned read action. */
+internal fun interface GitReferenceReadPort {
+    suspend fun read(
+        workingDirectoryUri: String?,
+        collector: (GitReferenceReadModel) -> IntellijGitCompletionSnapshot,
+    ): IntellijGitCompletionSnapshot?
+}
+
+private class IntellijGitReferenceReadPort(
+    private val project: Project,
+) : GitReferenceReadPort {
+    override suspend fun read(
+        workingDirectoryUri: String?,
+        collector: (GitReferenceReadModel) -> IntellijGitCompletionSnapshot,
+    ): IntellijGitCompletionSnapshot? =
+        readIntellijGitRepository(project, workingDirectoryUri) { repository, _ ->
+            collector(
+                GitReferenceReadModel(
+                    currentBranchName = repository.currentBranch?.name,
+                    localBranchNames =
+                        repository.branches.localBranches
+                            .asSequence()
+                            .map { it.name }
+                            .asIterable(),
+                    remoteBranchNames =
+                        repository.branches.remoteBranches
+                            .asSequence()
+                            .map { it.name }
+                            .asIterable(),
+                    tagNames =
+                        repository.tagsHolder.state.value.tagsToCommitHashes.keys
+                            .asSequence()
+                            .map { it.name }
+                            .asIterable(),
+                ),
+            )
+        }
+}
+
 /** Reads all Git-reference candidate groups from one selected repository read action. */
 internal class IntellijGitCompletionLoader(
-    private val project: Project,
+    private val readPort: GitReferenceReadPort,
 ) {
+    constructor(project: Project) : this(IntellijGitReferenceReadPort(project))
+
     suspend fun load(workingDirectoryUri: String?): IntellijGitCompletionSnapshot {
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
-        return readIntellijGitRepository(project, workingDirectoryUri) { repository, _ ->
-            val currentBranchName = repository.currentBranch?.name
+        return readPort.read(workingDirectoryUri) { model ->
             IntellijGitCompletionSnapshot(
                 localBranches =
-                    collectValues(repository.branches.localBranches, cancellationContext) { branch ->
-                        if (branch.name == currentBranchName) {
+                    collectValues(model.localBranchNames, cancellationContext) { branchName ->
+                        if (branchName == model.currentBranchName) {
                             null
                         } else {
                             TerminalCompletionDomainValue(
-                                value = branch.name,
+                                value = branchName,
                                 detail = "local branch",
                                 scoreAdjustment = LOCAL_SCORE_ADJUSTMENT,
                             )
                         }
                     },
                 remoteBranches =
-                    collectValues(repository.branches.remoteBranches, cancellationContext) { branch ->
+                    collectValues(model.remoteBranchNames, cancellationContext) { branchName ->
                         TerminalCompletionDomainValue(
-                            value = branch.name,
+                            value = branchName,
                             detail = "remote branch",
                             scoreAdjustment = REMOTE_SCORE_ADJUSTMENT,
                         )
                     },
                 tags =
-                    collectValues(repository.tagsHolder.state.value.tagsToCommitHashes.keys, cancellationContext) { tag ->
-                        TerminalCompletionDomainValue(tag.name, detail = "tag")
+                    collectValues(model.tagNames, cancellationContext) { tagName ->
+                        TerminalCompletionDomainValue(tagName, detail = "tag")
                     },
             )
         } ?: IntellijGitCompletionSnapshot.EMPTY
     }
 
-    private fun <T> collectValues(
-        values: Iterable<T>,
+    private fun collectValues(
+        values: Iterable<String>,
         cancellationContext: CoroutineContext,
-        toValue: (T) -> TerminalCompletionDomainValue?,
+        toValue: (String) -> TerminalCompletionDomainValue?,
     ): List<TerminalCompletionDomainValue> {
         val retained = BoundedSnapshotCollector(MAX_VALUES_PER_GROUP, VALUE_ORDER)
         val visitBudget =

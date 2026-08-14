@@ -32,6 +32,8 @@ internal val TERMINAL_COMMAND_COMPLETION_STATS_ORDER: Comparator<TerminalCommand
         .thenByDescending { it.successCount }
         .thenBy { it.dismissedCount }
         .thenBy { it.commandLine }
+        .thenBy { it.profileId.orEmpty() }
+        .thenBy { it.workingDirectoryUri.orEmpty() }
 
 internal val TERMINAL_COMMAND_SHAPE_STATS_ORDER: Comparator<TerminalCommandShapeStats> =
     compareByDescending<TerminalCommandShapeStats> { it.lastUsedEpochMillis }
@@ -39,6 +41,8 @@ internal val TERMINAL_COMMAND_SHAPE_STATS_ORDER: Comparator<TerminalCommandShape
         .thenByDescending { it.successCount }
         .thenBy { it.dismissedCount }
         .thenBy { it.shape.normalizedShapeKey }
+        .thenBy { it.profileId.orEmpty() }
+        .thenBy { it.workingDirectoryUri.orEmpty() }
 
 internal val TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER: Comparator<TerminalCompletionFeedbackStats> =
     compareByDescending<TerminalCompletionFeedbackStats> { it.lastUsedEpochMillis }
@@ -46,6 +50,8 @@ internal val TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER: Comparator<TerminalComple
         .thenBy { it.dismissedCount }
         .thenBy { it.source }
         .thenBy { it.candidateKind.name }
+        .thenBy { it.profileId.orEmpty() }
+        .thenBy { it.workingDirectoryUri.orEmpty() }
 
 internal fun isRecordableTerminalCompletionCommand(commandLine: String): Boolean =
     commandLine.isNotBlank() && !commandLine.hasTerminalCompletionLineBreak()

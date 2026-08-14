@@ -18,7 +18,9 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.*
 import kotlinx.coroutines.runBlocking
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.*
 
 class TerminalCompletionLearningStoreTest {
@@ -38,17 +40,42 @@ class TerminalCompletionLearningStoreTest {
         }
 
     @Test
-    fun `learning index compilation occurs outside the mutation monitor`() {
+    fun `learning mutation does not wait for index compilation`() {
         val source = TerminalCompletionLearningStore(commandSpecs = emptyList())
         source.recordCommandResult("git status", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 1)
-        val monitorHeldDuringCompilation = AtomicBoolean(false)
+        source.indexesFor(TerminalShellSyntax.PLAIN, emptyList())
+        val compilationStarted = CountDownLatch(1)
+        val releaseCompilation = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val compilation =
+                executor.submit {
+                    source.indexesFor(
+                        shellSyntax = TerminalShellSyntax.POSIX,
+                        commandSpecs = BlockingHashCommandSpecs(compilationStarted, releaseCompilation),
+                    )
+                }
+            assertTrue(compilationStarted.await(5, TimeUnit.SECONDS))
 
-        source.indexesFor(
-            shellSyntax = TerminalShellSyntax.POSIX,
-            commandSpecs = MonitorProbeCommandSpecs(source, monitorHeldDuringCompilation),
-        )
+            val mutation =
+                executor.submit {
+                    source.recordCommandResult(
+                        "git log",
+                        successful = true,
+                        profileId = null,
+                        workingDirectoryUri = null,
+                        usedAtEpochMillis = 2,
+                    )
+                }
+            mutation.get(5, TimeUnit.SECONDS)
+            releaseCompilation.countDown()
+            compilation.get(5, TimeUnit.SECONDS)
 
-        assertFalse(monitorHeldDuringCompilation.get())
+            assertEquals(setOf("git status", "git log"), source.snapshot().commandStats.mapTo(HashSet()) { it.commandLine })
+        } finally {
+            releaseCompilation.countDown()
+            executor.shutdownNow()
+        }
     }
 
     @Test
@@ -640,16 +667,17 @@ class TerminalCompletionLearningStoreTest {
             lastUsedEpochMillis = lastUsedEpochMillis,
         )
 
-    private class MonitorProbeCommandSpecs(
-        private val source: TerminalCompletionLearningStore,
-        private val monitorHeldDuringHash: AtomicBoolean,
+    private class BlockingHashCommandSpecs(
+        private val compilationStarted: CountDownLatch,
+        private val releaseCompilation: CountDownLatch,
     ) : AbstractList<TerminalCommandSpec>() {
         override val size: Int = 0
 
         override fun get(index: Int): TerminalCommandSpec = throw IndexOutOfBoundsException(index)
 
         override fun hashCode(): Int {
-            if (source.isMutationMonitorHeldByCurrentThread()) monitorHeldDuringHash.set(true)
+            compilationStarted.countDown()
+            check(releaseCompilation.await(5, TimeUnit.SECONDS)) { "test did not release index compilation" }
             return super.hashCode()
         }
 
@@ -658,13 +686,44 @@ class TerminalCompletionLearningStoreTest {
             if (javaClass != other?.javaClass) return false
             if (!super.equals(other)) return false
 
-            other as MonitorProbeCommandSpecs
+            other as BlockingHashCommandSpecs
 
             if (size != other.size) return false
-            if (source != other.source) return false
-            if (monitorHeldDuringHash != other.monitorHeldDuringHash) return false
+            if (compilationStarted != other.compilationStarted) return false
+            if (releaseCompilation != other.releaseCompilation) return false
 
             return true
+        }
+    }
+
+    @Test
+    fun `concurrent copy-on-write mutations do not lose commands`() {
+        val source = TerminalCompletionLearningStore(capacity = 128, commandSpecs = emptyList())
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val writers =
+                listOf("left", "right").map { prefix ->
+                    executor.submit {
+                        start.await()
+                        repeat(32) { index ->
+                            source.recordCommandResult(
+                                "$prefix-$index",
+                                successful = true,
+                                profileId = null,
+                                workingDirectoryUri = null,
+                                usedAtEpochMillis = index.toLong(),
+                            )
+                        }
+                    }
+                }
+
+            start.countDown()
+            writers.forEach { it.get(10, TimeUnit.SECONDS) }
+
+            assertEquals(64, source.snapshot().commandStats.size)
+        } finally {
+            executor.shutdownNow()
         }
     }
 

@@ -32,25 +32,24 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
     }
 
-    private val entries = ArrayList<Row>(capacity)
+    private val entriesByKey = HashMap<Key, IndexedRow<Row, Key>>(capacity)
+    private val orderedEntries = ArrayList<IndexedRow<Row, Key>>(capacity)
     private var publishedSnapshot: List<Row> = emptyList()
 
     fun replaceAll(records: List<Row>) {
-        val compacted = ArrayList<Row>(minOf(records.size, capacity))
+        val compacted = LinkedHashMap<Key, Row>(minOf(records.size, capacity))
         for (record in records) {
-            val index = compacted.indexOfKey(keySelector(record), keySelector)
-            if (index >= 0) {
-                if (shouldReplace(compacted[index], record)) {
-                    compacted[index] = record
+            val key = keySelector(record)
+            val current = compacted[key]
+            if (current != null) {
+                if (shouldReplace(current, record)) {
+                    compacted[key] = record
                 }
             } else {
-                compacted += record
+                compacted[key] = record
             }
         }
-        compacted.sortWith(order)
-        entries.clear()
-        entries.addAll(compacted.take(capacity))
-        publishSnapshot()
+        rebuild(compacted.entries.map { (key, row) -> IndexedRow(key, row) })
     }
 
     fun mergeAll(
@@ -58,51 +57,85 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
         merge: (current: Row, incoming: Row) -> Row,
     ) {
         for (record in records) {
-            val index = entries.indexOfKey(keySelector(record), keySelector)
-            if (index >= 0) {
-                entries[index] = merge(entries[index], record)
+            val key = keySelector(record)
+            val current = entriesByKey[key]
+            if (current != null) {
+                current.row = merge(current.row, record)
             } else {
-                entries += record
+                entriesByKey[key] = IndexedRow(key, record)
             }
         }
-        entries.sortWith(order)
-        if (entries.size > capacity) entries.subList(capacity, entries.size).clear()
-        publishSnapshot()
+        rebuild(entriesByKey.values)
     }
 
     fun snapshot(): List<Row> = publishedSnapshot
 
-    fun rawRows(): List<Row> = entries
+    fun copy(): BoundedStatsRowIndex<Row, Key> {
+        val copy = BoundedStatsRowIndex(capacity, order, keySelector, shouldReplace)
+        for (entry in orderedEntries) {
+            val copiedEntry = IndexedRow(entry.key, entry.row)
+            copy.orderedEntries += copiedEntry
+            copy.entriesByKey[copiedEntry.key] = copiedEntry
+        }
+        copy.publishedSnapshot = publishedSnapshot
+        return copy
+    }
 
     fun mutate(
         key: Key,
         initialRow: () -> Row,
         update: (Row) -> Row,
     ) {
-        val existingIndex = entries.indexOfKey(key, keySelector)
-        if (existingIndex >= 0) {
-            entries[existingIndex] = update(entries[existingIndex])
+        val existing = entriesByKey[key]
+        if (existing != null) {
+            check(orderedEntries.remove(existing)) { "indexed completion statistics row is missing from sorted storage" }
+            existing.row = update(existing.row)
+            insertOrdered(existing)
         } else {
-            if (entries.size == capacity) entries.removeAt(entries.size - 1)
-            entries += update(initialRow())
+            val created = IndexedRow(key, update(initialRow()))
+            entriesByKey[key] = created
+            insertOrdered(created)
+            if (orderedEntries.size > capacity) {
+                val evicted = orderedEntries.removeAt(orderedEntries.lastIndex)
+                entriesByKey.remove(evicted.key)
+                if (evicted === created) return
+            }
         }
-        entries.sortWith(order)
         publishSnapshot()
     }
 
-    private fun publishSnapshot() {
-        publishedSnapshot = entries.toList()
+    private fun rebuild(rows: Collection<IndexedRow<Row, Key>>) {
+        orderedEntries.clear()
+        orderedEntries.addAll(rows)
+        orderedEntries.sortWith { left, right -> order.compare(left.row, right.row) }
+        if (orderedEntries.size > capacity) {
+            orderedEntries.subList(capacity, orderedEntries.size).clear()
+        }
+        entriesByKey.clear()
+        for (entry in orderedEntries) entriesByKey[entry.key] = entry
+        publishSnapshot()
     }
 
-    private fun List<Row>.indexOfKey(
-        key: Key,
-        keySelector: (Row) -> Key,
-    ): Int {
-        var index = 0
-        while (index < size) {
-            if (keySelector(this[index]) == key) return index
-            index++
+    private fun insertOrdered(entry: IndexedRow<Row, Key>) {
+        var low = 0
+        var high = orderedEntries.size
+        while (low < high) {
+            val middle = (low + high).ushr(1)
+            if (order.compare(orderedEntries[middle].row, entry.row) <= 0) {
+                low = middle + 1
+            } else {
+                high = middle
+            }
         }
-        return -1
+        orderedEntries.add(low, entry)
     }
+
+    private fun publishSnapshot() {
+        publishedSnapshot = List(orderedEntries.size) { index -> orderedEntries[index].row }
+    }
+
+    private class IndexedRow<Row : Any, Key : Any>(
+        val key: Key,
+        var row: Row,
+    )
 }

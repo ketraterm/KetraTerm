@@ -21,6 +21,7 @@ import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORD
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+import java.util.*
 
 /** One source's bounded candidate surplus plus stable composition metadata. */
 internal data class CompletionSourceCandidates(
@@ -62,18 +63,6 @@ internal class GlobalCompletionRanker(
         )
     }
 
-    fun rank(
-        request: TerminalCompletionRequest,
-        context: TerminalCompletionContext,
-        sourceCandidates: List<CompletionSourceCandidates>,
-    ): List<TerminalCompletionCandidate> {
-        val state = createRequestState(request, context, Int.MAX_VALUE)
-        for (sourceResult in sourceCandidates) {
-            state.ingest(sourceResult)
-        }
-        return state.rankedCandidates()
-    }
-
     class RequestCompletionRankingState internal constructor(
         private val request: TerminalCompletionRequest,
         private val context: TerminalCompletionContext,
@@ -83,8 +72,11 @@ internal class GlobalCompletionRanker(
         private val now: Long,
         private val resultLimit: Int,
     ) {
-        private val aggregates = LinkedHashMap<Any, MutableOutcomeAggregate>()
-        private val fusedByOutcome = LinkedHashMap<Any, FusedCandidate>()
+        private val outcomes = HashMap<Any, RankedOutcome>()
+        private val topCandidates = TreeSet(FUSED_ORDER)
+        private val remainingCandidates = TreeSet(FUSED_ORDER)
+        private var publishedCandidates: List<TerminalCompletionCandidate> = emptyList()
+        private var publicationDirty = false
 
         fun ingest(sourceResult: CompletionSourceCandidates) {
             val locallyRanked = sourceResult.candidates.sortedLocally()
@@ -107,20 +99,71 @@ internal class GlobalCompletionRanker(
                 )
             }
             for ((key, contribution) in bestByOutcome) {
-                val aggregate = aggregates.getOrPut(key, ::MutableOutcomeAggregate)
-                aggregate.add(contribution)
-                fusedByOutcome[key] = aggregate.finish(learnedIndex, learningContext, now)
+                val outcome = outcomes.getOrPut(key, ::RankedOutcome)
+                val previous = outcome.fused
+                outcome.aggregate.add(contribution)
+                val updated = outcome.aggregate.finish(learnedIndex, learningContext, now)
+                outcome.fused = updated
+                updateTopCandidates(previous, updated)
             }
         }
 
         fun rankedCandidates(): List<TerminalCompletionCandidate> {
-            if (fusedByOutcome.isEmpty()) return emptyList()
-            val retained = TopFusedCandidateCollector(resultLimit)
-            for (candidate in fusedByOutcome.values) {
-                retained.offer(candidate)
+            if (!publicationDirty) return publishedCandidates
+            val candidates = ArrayList<TerminalCompletionCandidate>(topCandidates.size)
+            for (candidate in topCandidates) {
+                candidates += candidate.toPublicCandidate()
             }
-            return retained.finish()
+            publishedCandidates = if (candidates.isEmpty()) emptyList() else List.copyOf(candidates)
+            publicationDirty = false
+            return publishedCandidates
         }
+
+        private fun updateTopCandidates(
+            previous: FusedCandidate?,
+            updated: FusedCandidate,
+        ) {
+            var topChanged = false
+            if (previous != null) {
+                if (topCandidates.remove(previous)) {
+                    topChanged = true
+                } else {
+                    check(remainingCandidates.remove(previous)) { "ranked outcome is missing from incremental state" }
+                }
+            }
+            check(remainingCandidates.add(updated)) { "distinct completion outcomes must have a total ranking order" }
+            if (rebalanceTopCandidates()) topChanged = true
+            if (topChanged) publicationDirty = true
+        }
+
+        private fun rebalanceTopCandidates(): Boolean {
+            var changed = false
+            while (topCandidates.size < resultLimit && remainingCandidates.isNotEmpty()) {
+                topCandidates.add(remainingCandidates.pollFirst())
+                changed = true
+            }
+            while (topCandidates.size > resultLimit) {
+                remainingCandidates.add(topCandidates.pollLast())
+                changed = true
+            }
+            while (
+                topCandidates.isNotEmpty() &&
+                remainingCandidates.isNotEmpty() &&
+                FUSED_ORDER.compare(remainingCandidates.first(), topCandidates.last()) < 0
+            ) {
+                val promoted = remainingCandidates.pollFirst()
+                val demoted = topCandidates.pollLast()
+                topCandidates.add(promoted)
+                remainingCandidates.add(demoted)
+                changed = true
+            }
+            return changed
+        }
+    }
+
+    private class RankedOutcome {
+        val aggregate = MutableOutcomeAggregate()
+        var fused: FusedCandidate? = null
     }
 
     private class MutableOutcomeAggregate {
@@ -223,43 +266,6 @@ internal class GlobalCompletionRanker(
     ) {
         fun toPublicCandidate(): TerminalCompletionCandidate =
             candidate.copy(score = score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt())
-    }
-
-    private class TopFusedCandidateCollector(
-        private val capacity: Int,
-    ) {
-        private val candidates = ArrayList<FusedCandidate>(minOf(capacity, INITIAL_TOP_CANDIDATE_CAPACITY))
-        private var worstIndex = -1
-
-        fun offer(candidate: FusedCandidate) {
-            if (candidates.size < capacity) {
-                candidates += candidate
-                if (worstIndex < 0 || FUSED_ORDER.compare(candidate, candidates[worstIndex]) > 0) {
-                    worstIndex = candidates.lastIndex
-                }
-                return
-            }
-            if (FUSED_ORDER.compare(candidate, candidates[worstIndex]) >= 0) return
-            candidates[worstIndex] = candidate
-            findWorst()
-        }
-
-        fun finish(): List<TerminalCompletionCandidate> {
-            candidates.sortWith(FUSED_ORDER)
-            return List(candidates.size) { index -> candidates[index].toPublicCandidate() }
-        }
-
-        private fun findWorst() {
-            var index = 1
-            var currentWorst = 0
-            while (index < candidates.size) {
-                if (FUSED_ORDER.compare(candidates[index], candidates[currentWorst]) > 0) {
-                    currentWorst = index
-                }
-                index++
-            }
-            worstIndex = currentWorst
-        }
     }
 
     private companion object {
@@ -369,6 +375,5 @@ internal class GlobalCompletionRanker(
         private const val WEAK_CONTEXT_BOOST = 40
         private const val HISTORY_CONTEXT_PENALTY = -40
         private const val PATH_CONTEXT_PENALTY = -80
-        private const val INITIAL_TOP_CANDIDATE_CAPACITY = 256
     }
 }

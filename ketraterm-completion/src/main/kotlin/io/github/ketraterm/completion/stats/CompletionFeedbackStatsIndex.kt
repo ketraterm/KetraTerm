@@ -30,9 +30,9 @@ import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
  * path, spec, IDE, and history providers can learn independently.
  */
 internal class CompletionFeedbackStatsIndex(
-    capacity: Int,
+    private val capacity: Int,
 ) {
-    private val rows =
+    private var rows =
         BoundedStatsRowIndex(
             capacity = capacity,
             order = TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER,
@@ -45,6 +45,8 @@ internal class CompletionFeedbackStatsIndex(
     fun mergeAll(records: List<TerminalCompletionFeedbackStats>) = rows.mergeAll(records.map(::canonicalizeContext), ::mergeStats)
 
     fun snapshot(): List<TerminalCompletionFeedbackStats> = rows.snapshot()
+
+    fun copy(): CompletionFeedbackStatsIndex = CompletionFeedbackStatsIndex(capacity).also { copy -> copy.rows = rows.copy() }
 
     fun recordSuggestionFeedback(
         context: TerminalCompletionFeedbackContext,

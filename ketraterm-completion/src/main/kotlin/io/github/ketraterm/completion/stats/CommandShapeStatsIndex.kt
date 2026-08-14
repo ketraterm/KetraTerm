@@ -32,10 +32,10 @@ import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
  * become part of shape keys or rows.
  */
 internal class CommandShapeStatsIndex(
-    capacity: Int,
+    private val capacity: Int,
     commandSpecs: List<TerminalCommandSpec>,
 ) {
-    private val rows =
+    private var rows =
         BoundedStatsRowIndex(
             capacity = capacity,
             order = TERMINAL_COMMAND_SHAPE_STATS_ORDER,
@@ -49,6 +49,8 @@ internal class CommandShapeStatsIndex(
     fun mergeAll(records: List<TerminalCommandShapeStats>) = rows.mergeAll(records.map(::canonicalizeContext), ::mergeStats)
 
     fun snapshot(): List<TerminalCommandShapeStats> = rows.snapshot()
+
+    fun copy(): CommandShapeStatsIndex = CommandShapeStatsIndex(capacity, commandSpecs).also { copy -> copy.rows = rows.copy() }
 
     fun recordCommandResult(
         commandLine: String,

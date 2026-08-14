@@ -16,10 +16,9 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class PathCompletionSourceTest {
     private val mockProvider = FakeFileSystemProvider()
@@ -396,6 +395,23 @@ class PathCompletionSourceTest {
 
             val invalidRequest = request("cat R", "invalid-uri")
             assertTrue(source.complete(invalidRequest).isEmpty())
+        }
+
+    @Test
+    fun `propagates file-system provider cancellation`() =
+        runBlocking {
+            val cancellation = CancellationException("obsolete completion request")
+            val cancellingSource =
+                PathCompletionSource(
+                    TerminalFileSystemProvider { throw cancellation },
+                )
+
+            val thrown =
+                assertFailsWith<CancellationException> {
+                    cancellingSource.complete(request("cat R", "file:///project"))
+                }
+
+            assertSame(cancellation, thrown)
         }
 
     @Test

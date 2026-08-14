@@ -17,11 +17,12 @@ package io.github.ketraterm.completion.api
 
 import io.github.ketraterm.completion.internal.CompletionLearningIndexCache
 import io.github.ketraterm.completion.internal.CompletionLearningIndexes
-import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.model.*
 import io.github.ketraterm.completion.stats.CommandCompletionStatsIndex
 import io.github.ketraterm.completion.stats.CommandShapeStatsIndex
 import io.github.ketraterm.completion.stats.CompletionFeedbackStatsIndex
+import io.github.ketraterm.completion.stats.isRecordableStatsEvent
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Mutable, bounded in-memory store for aggregated completion learning.
@@ -39,19 +40,16 @@ import io.github.ketraterm.completion.stats.CompletionFeedbackStatsIndex
 class TerminalCompletionLearningStore
     @JvmOverloads
     constructor(
-        capacity: Int = DEFAULT_CAPACITY,
+        private val capacity: Int = DEFAULT_CAPACITY,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     ) {
         init {
             require(capacity > 0) { "capacity must be > 0, was $capacity" }
         }
 
-        private val lock = Any()
-        private val commandStats = CommandCompletionStatsIndex(capacity)
-        private val shapeStats = CommandShapeStatsIndex(capacity, commandSpecs)
-        private val feedbackStats = CompletionFeedbackStatsIndex(capacity)
+        private val commandSpecs = commandSpecs.toList()
         private val learningIndexCache = CompletionLearningIndexCache()
-        private var publishedSnapshot = TerminalCommandCompletionStatsSnapshot.EMPTY
+        private val state = AtomicReference(emptyState())
 
         /**
          * Replaces all retained statistics with [snapshot].
@@ -62,12 +60,7 @@ class TerminalCompletionLearningStore
          * @param snapshot compact completion-learning snapshot loaded by a host.
          */
         fun replaceSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot) {
-            synchronized(lock) {
-                commandStats.replaceAll(snapshot.commandStats)
-                shapeStats.replaceAll(snapshot.shapeStats)
-                feedbackStats.replaceAll(snapshot.feedbackStats)
-                publishSnapshot()
-            }
+            replaceState(stateFrom(snapshot))
         }
 
         /**
@@ -80,11 +73,12 @@ class TerminalCompletionLearningStore
          * @param snapshot aggregate events not already represented by this store.
          */
         fun mergeSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot) {
-            synchronized(lock) {
-                commandStats.mergeAll(snapshot.commandStats)
-                shapeStats.mergeAll(snapshot.shapeStats)
-                feedbackStats.mergeAll(snapshot.feedbackStats)
-                publishSnapshot()
+            if (snapshot == TerminalCommandCompletionStatsSnapshot.EMPTY) return
+            updateState { current ->
+                val commandStats = current.commandStats.copy().apply { mergeAll(snapshot.commandStats) }
+                val shapeStats = current.shapeStats.copy().apply { mergeAll(snapshot.shapeStats) }
+                val feedbackStats = current.feedbackStats.copy().apply { mergeAll(snapshot.feedbackStats) }
+                createState(commandStats, shapeStats, feedbackStats)
             }
         }
 
@@ -93,24 +87,13 @@ class TerminalCompletionLearningStore
          *
          * @return exact command, command-shape, and provider-feedback statistics.
          */
-        fun snapshot(): TerminalCommandCompletionStatsSnapshot =
-            synchronized(lock) {
-                publishedSnapshot
-            }
+        fun snapshot(): TerminalCommandCompletionStatsSnapshot = state.get().snapshot
 
         /** Returns identity-cached learned indexes shared by ranking and history recovery. */
         internal fun indexesFor(
             shellSyntax: TerminalShellSyntax,
             commandSpecs: List<TerminalCommandSpec>,
-        ): CompletionLearningIndexes {
-            val snapshot =
-                synchronized(lock) {
-                    publishedSnapshot
-                }
-            return learningIndexCache.indexesFor(snapshot, shellSyntax, commandSpecs)
-        }
-
-        internal fun isMutationMonitorHeldByCurrentThread(): Boolean = Thread.holdsLock(lock)
+        ): CompletionLearningIndexes = learningIndexCache.indexesFor(state.get().snapshot, shellSyntax, commandSpecs)
 
         /**
          * Records a completed command execution.
@@ -131,7 +114,9 @@ class TerminalCompletionLearningStore
             workingDirectoryUri: String?,
             usedAtEpochMillis: Long,
         ) {
-            synchronized(lock) {
+            if (!isRecordableStatsEvent(commandLine, usedAtEpochMillis)) return
+            updateState { current ->
+                val commandStats = current.commandStats.copy()
                 commandStats.recordCommandResult(
                     commandLine = commandLine,
                     successful = successful,
@@ -139,6 +124,7 @@ class TerminalCompletionLearningStore
                     workingDirectoryUri = workingDirectoryUri,
                     usedAtEpochMillis = usedAtEpochMillis,
                 )
+                val shapeStats = current.shapeStats.copy()
                 shapeStats.recordCommandResult(
                     commandLine = commandLine,
                     successful = successful,
@@ -146,7 +132,7 @@ class TerminalCompletionLearningStore
                     workingDirectoryUri = workingDirectoryUri,
                     usedAtEpochMillis = usedAtEpochMillis,
                 )
-                publishSnapshot()
+                createState(commandStats, shapeStats, current.feedbackStats)
             }
         }
 
@@ -169,7 +155,9 @@ class TerminalCompletionLearningStore
             feedbackAtEpochMillis: Long,
             context: TerminalCompletionFeedbackContext? = null,
         ) {
-            synchronized(lock) {
+            if (!isRecordableStatsEvent(commandLine, feedbackAtEpochMillis)) return
+            updateState { current ->
+                val commandStats = current.commandStats.copy()
                 commandStats.recordSuggestionFeedback(
                     commandLine = commandLine,
                     feedback = feedback,
@@ -177,6 +165,7 @@ class TerminalCompletionLearningStore
                     workingDirectoryUri = workingDirectoryUri,
                     feedbackAtEpochMillis = feedbackAtEpochMillis,
                 )
+                val shapeStats = current.shapeStats.copy()
                 shapeStats.recordSuggestionFeedback(
                     commandLine = commandLine,
                     feedback = feedback,
@@ -184,36 +173,79 @@ class TerminalCompletionLearningStore
                     workingDirectoryUri = workingDirectoryUri,
                     feedbackAtEpochMillis = feedbackAtEpochMillis,
                 )
-                if (isRecordableTerminalCompletionCommand(commandLine) && context != null) {
-                    feedbackStats.recordSuggestionFeedback(
-                        context = context,
-                        feedback = feedback,
-                        profileId = profileId,
-                        workingDirectoryUri = workingDirectoryUri,
-                        feedbackAtEpochMillis = feedbackAtEpochMillis,
-                    )
-                }
-                publishSnapshot()
+                val feedbackStats =
+                    if (context == null) {
+                        current.feedbackStats
+                    } else {
+                        current.feedbackStats.copy().also { feedbackStats ->
+                            feedbackStats.recordSuggestionFeedback(
+                                context = context,
+                                feedback = feedback,
+                                profileId = profileId,
+                                workingDirectoryUri = workingDirectoryUri,
+                                feedbackAtEpochMillis = feedbackAtEpochMillis,
+                            )
+                        }
+                    }
+                createState(commandStats, shapeStats, feedbackStats)
             }
         }
 
-        private fun publishSnapshot() {
-            val nextCommandStats = commandStats.snapshot()
-            val nextShapeStats = shapeStats.snapshot()
-            val nextFeedbackStats = feedbackStats.snapshot()
-            if (publishedSnapshot.commandStats == nextCommandStats &&
-                publishedSnapshot.shapeStats == nextShapeStats &&
-                publishedSnapshot.feedbackStats == nextFeedbackStats
-            ) {
-                return
-            }
-            publishedSnapshot =
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats = nextCommandStats,
-                    shapeStats = nextShapeStats,
-                    feedbackStats = nextFeedbackStats,
-                )
+        private fun emptyState(): LearningState =
+            createState(
+                CommandCompletionStatsIndex(capacity),
+                CommandShapeStatsIndex(capacity, commandSpecs),
+                CompletionFeedbackStatsIndex(capacity),
+            )
+
+        private fun stateFrom(snapshot: TerminalCommandCompletionStatsSnapshot): LearningState {
+            val commandStats = CommandCompletionStatsIndex(capacity).apply { replaceAll(snapshot.commandStats) }
+            val shapeStats = CommandShapeStatsIndex(capacity, commandSpecs).apply { replaceAll(snapshot.shapeStats) }
+            val feedbackStats = CompletionFeedbackStatsIndex(capacity).apply { replaceAll(snapshot.feedbackStats) }
+            return createState(commandStats, shapeStats, feedbackStats)
         }
+
+        private fun createState(
+            commandStats: CommandCompletionStatsIndex,
+            shapeStats: CommandShapeStatsIndex,
+            feedbackStats: CompletionFeedbackStatsIndex,
+        ): LearningState =
+            LearningState(
+                commandStats = commandStats,
+                shapeStats = shapeStats,
+                feedbackStats = feedbackStats,
+                snapshot =
+                    TerminalCommandCompletionStatsSnapshot(
+                        commandStats = commandStats.snapshot(),
+                        shapeStats = shapeStats.snapshot(),
+                        feedbackStats = feedbackStats.snapshot(),
+                    ),
+            )
+
+        private fun replaceState(replacement: LearningState) {
+            while (true) {
+                val current = state.get()
+                if (current.snapshot == replacement.snapshot) return
+                if (state.compareAndSet(current, replacement)) return
+            }
+        }
+
+        private fun updateState(transform: (LearningState) -> LearningState) {
+            while (true) {
+                val current = state.get()
+                val updated = transform(current)
+                if (current.snapshot == updated.snapshot) return
+                if (state.compareAndSet(current, updated)) return
+            }
+        }
+
+        /** Copy-on-write state; contained indexes are never mutated after publication. */
+        private class LearningState(
+            val commandStats: CommandCompletionStatsIndex,
+            val shapeStats: CommandShapeStatsIndex,
+            val feedbackStats: CompletionFeedbackStatsIndex,
+            val snapshot: TerminalCommandCompletionStatsSnapshot,
+        )
 
         private companion object {
             private const val DEFAULT_CAPACITY = 2048
