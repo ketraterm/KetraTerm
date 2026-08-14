@@ -81,6 +81,32 @@ class MergedCompletionEngineTest {
         }
 
     @Test
+    fun `malformed candidate ranges are filtered before ranking and publication`() =
+        runBlocking {
+            val commandLine = "echo \uD83D\uDE02"
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            entry(
+                                source(
+                                    candidate("valid", start = 5, end = commandLine.length),
+                                    candidate("outside", start = 5, end = commandLine.length + 1),
+                                    candidate("unrelated", start = 0, end = 1),
+                                    candidate("split", start = 6, end = commandLine.length),
+                                ),
+                                0,
+                            ),
+                        ),
+                    commandSpecs = emptyList(),
+                )
+
+            val candidates = engine.complete(request(commandLine))
+
+            assertEquals(listOf("valid"), candidates.map { it.replacementText })
+        }
+
+    @Test
     fun `source cancellation terminates the request and cancels siblings`() =
         runBlocking {
             val siblingStarted = CompletableDeferred<Unit>()
@@ -218,13 +244,15 @@ class MergedCompletionEngineTest {
         runBlocking {
             val engine =
                 TerminalCompletionEngines.fromSources(
-                    listOf(
-                        entry(source(candidate("status", start = 0, end = 1, source = "left")), priority = 0),
-                        entry(source(candidate("status", start = 4, end = 5, source = "right")), priority = 0),
-                    ),
+                    sources =
+                        listOf(
+                            entry(source(candidate("status", start = 0, end = 5, source = "left")), priority = 0),
+                            entry(source(candidate("status", start = 4, end = 5, source = "right")), priority = 0),
+                        ),
+                    commandSpecs = emptyList(),
                 )
 
-            val candidates = engine.complete(request())
+            val candidates = engine.complete(request(commandLine = "git s"))
 
             assertEquals(listOf("left", "right"), candidates.map { it.source })
             assertEquals(listOf(0, 4), candidates.map { it.replacementStartOffset })
@@ -261,6 +289,8 @@ class MergedCompletionEngineTest {
                         add(
                             candidate(
                                 replacement = "git remembered-${index + 1}",
+                                start = 0,
+                                end = 5,
                                 source = "mixed",
                                 kind = TerminalCompletionCandidateKind.HISTORY,
                                 score = 1_000 - index,

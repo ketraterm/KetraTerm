@@ -333,6 +333,34 @@ class TerminalSessionMruCompletionSourceTest {
         }
 
     @Test
+    fun `persisted history matches case-insensitively but preserves newest command casing`() =
+        runBlocking {
+            val stats = TerminalCompletionLearningStore()
+            stats.replaceSnapshot(
+                TerminalCommandCompletionStatsSnapshot(
+                    commandStats =
+                        listOf(
+                            TerminalCommandCompletionStats(
+                                commandLine = "git status",
+                                successCount = 1,
+                                lastUsedEpochMillis = 10,
+                            ),
+                            TerminalCommandCompletionStats(
+                                commandLine = "Git Status",
+                                successCount = 1,
+                                lastUsedEpochMillis = 20,
+                            ),
+                        ),
+                ),
+            )
+            val source = TerminalCompletionSources.sessionMru(learningStore = stats)
+
+            val candidates = source.complete(request("git s"))
+
+            assertEquals(listOf("Status"), candidates.map { it.replacementText })
+        }
+
+    @Test
     fun `persisted history applies directory boost across canonical URI variants`() =
         runBlocking {
             val stats = TerminalCompletionLearningStore(commandSpecs = emptyList())

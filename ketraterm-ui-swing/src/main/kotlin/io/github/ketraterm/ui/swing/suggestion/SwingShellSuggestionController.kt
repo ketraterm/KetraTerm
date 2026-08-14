@@ -164,16 +164,16 @@ internal class SwingShellSuggestionController(
         val acceptedRequest = request
         hide()
         host.invalidateSuggestions()
-        host.suggestionFeedbackHandler.onSuggestionFeedback(
-            SwingShellSuggestionFeedback(
-                kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
+        host.suggestionHandler.onSuggestionAccepted(
+            SwingShellSuggestionAcceptance(
                 suggestion = suggestion,
                 index = index,
                 request = acceptedRequest,
             ),
         )
-        host.suggestionHandler.onSuggestionAccepted(
-            SwingShellSuggestionAcceptance(
+        host.suggestionFeedbackHandler.onSuggestionFeedback(
+            SwingShellSuggestionFeedback(
+                kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
                 suggestion = suggestion,
                 index = index,
                 request = acceptedRequest,

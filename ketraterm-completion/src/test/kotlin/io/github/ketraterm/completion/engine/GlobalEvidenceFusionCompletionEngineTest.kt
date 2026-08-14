@@ -695,7 +695,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
         }
 
     @Test
-    fun `invalid replacement ranges use stable fallback grouping`() =
+    fun `invalid replacement ranges are not published`() =
         runBlocking {
             val malformed = candidate("status", 20, 30, "first", TerminalCompletionCandidateKind.SUBCOMMAND)
             val candidates =
@@ -707,8 +707,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                     ),
                 ).complete(request("git s"))
 
-            assertEquals(2, candidates.size)
-            assertEquals("first", candidates.first().source)
+            assertTrue(candidates.isEmpty())
         }
 
     @Test

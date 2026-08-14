@@ -88,7 +88,6 @@ internal object TerminalCommandLineTokenizer {
         var precededByOperator = false
 
         while (index < commandLine.length) {
-            val ch = commandLine[index]
             if (quote == NO_QUOTE) {
                 val operatorLength = ShellLexicalRules.operatorLength(commandLine, index, shellSyntax)
                 if (operatorLength > 0) {
@@ -115,8 +114,9 @@ internal object TerminalCommandLineTokenizer {
                 }
             }
 
-            quote = updateQuoteState(commandLine, index, quote, shellSyntax)
-            index += characterAdvance(commandLine, index, quote, shellSyntax)
+            val previousQuote = quote
+            quote = updateQuoteState(commandLine, index, previousQuote, shellSyntax)
+            index += characterAdvance(commandLine, index, previousQuote, shellSyntax)
         }
 
         return SegmentBounds(

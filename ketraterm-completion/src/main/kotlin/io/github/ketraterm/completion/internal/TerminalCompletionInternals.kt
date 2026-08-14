@@ -69,13 +69,23 @@ internal fun String.isTerminalCompletionUtf16Boundary(offset: Int): Boolean {
  * range is contained in the command line and does not split a surrogate pair.
  */
 internal fun TerminalCompletionRequest.commandLineAfterCandidate(candidate: TerminalCompletionCandidate): String? {
-    val startOffset = candidate.replacementStartOffset
-    val endOffset = candidate.replacementEndOffset
-    if (startOffset > commandLine.length) return null
-    if (endOffset > commandLine.length) return null
-    if (!commandLine.isTerminalCompletionUtf16Boundary(startOffset)) return null
-    if (!commandLine.isTerminalCompletionUtf16Boundary(endOffset)) return null
-    return commandLine.replaceRange(startOffset, endOffset, candidate.replacementText)
+    if (!candidate.hasValidReplacementRangeFor(this)) return null
+    return commandLine.replaceRange(candidate.replacementStartOffset, candidate.replacementEndOffset, candidate.replacementText)
+}
+
+/**
+ * Returns whether [candidate] can be applied to this request's active cursor
+ * range without crossing command-line or UTF-16 scalar boundaries.
+ */
+internal fun TerminalCompletionCandidate.hasValidReplacementRangeFor(request: TerminalCompletionRequest): Boolean {
+    val startOffset = replacementStartOffset
+    val endOffset = replacementEndOffset
+    if (startOffset > request.cursorOffset) return false
+    if (request.cursorOffset > endOffset) return false
+    if (endOffset > request.commandLine.length) return false
+    if (!request.commandLine.isTerminalCompletionUtf16Boundary(startOffset)) return false
+    if (!request.commandLine.isTerminalCompletionUtf16Boundary(endOffset)) return false
+    return true
 }
 
 internal fun saturatedCompletionCounterIncrement(value: Int): Int = if (value == Int.MAX_VALUE) value else value + 1

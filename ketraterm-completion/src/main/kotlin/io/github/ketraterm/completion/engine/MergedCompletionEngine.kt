@@ -19,6 +19,7 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
 import io.github.ketraterm.completion.internal.boundedTo
+import io.github.ketraterm.completion.internal.hasValidReplacementRangeFor
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.ranking.CompletionSourceCandidates
@@ -88,6 +89,7 @@ internal class MergedCompletionEngine(
                                 try {
                                     entry.source
                                         .complete(request, completionContext, SOURCE_CANDIDATE_LIMIT)
+                                        .filter { it.hasValidReplacementRangeFor(request) }
                                         .boundedTo(SOURCE_CANDIDATE_LIMIT)
                                 } catch (cancellation: CancellationException) {
                                     completions.close(cancellation)

@@ -83,6 +83,34 @@ class TerminalCommandLineTokenizerTest {
     }
 
     @Test
+    fun `PowerShell empty quoted argument does not leave segment quote state open`() {
+        val commandLine = "Write-Output \"\" | Select-String ok"
+        val context =
+            TerminalCommandLineTokenizer.parse(
+                commandLine,
+                commandLine.length,
+                TerminalShellSyntax.POWERSHELL,
+            )
+
+        assertEquals(listOf("Select-String", "ok"), context.tokens.map { it.text })
+        assertEquals(true, context.precededByOperator)
+    }
+
+    @Test
+    fun `PowerShell doubled quotes inside quoted argument do not close the segment quote state`() {
+        val commandLine = "Write-Output \"a \"\"literal\"\" pipe | value\" | Select-String ok"
+        val context =
+            TerminalCommandLineTokenizer.parse(
+                commandLine,
+                commandLine.length,
+                TerminalShellSyntax.POWERSHELL,
+            )
+
+        assertEquals(listOf("Select-String", "ok"), context.tokens.map { it.text })
+        assertEquals(true, context.precededByOperator)
+    }
+
+    @Test
     fun `plain syntax does not infer command separators`() {
         val commandLine = "echo first && cd src"
         val context =

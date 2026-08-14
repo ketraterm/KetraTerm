@@ -78,6 +78,30 @@ class CompletionStatsIndexesTest {
     }
 
     @Test
+    fun `exact command index keeps display casing from newest event when older feedback arrives later`() {
+        val index = CommandCompletionStatsIndex(capacity = 8)
+
+        index.recordCommandResult(
+            commandLine = "Git Status",
+            successful = true,
+            profileId = null,
+            workingDirectoryUri = null,
+            usedAtEpochMillis = 100,
+        )
+        index.recordSuggestionFeedback(
+            commandLine = "git status",
+            feedback = TerminalCompletionFeedbackKind.ACCEPTED,
+            profileId = null,
+            workingDirectoryUri = null,
+            feedbackAtEpochMillis = 50,
+        )
+
+        assertEquals("Git Status", index.snapshot().single().commandLine)
+        assertEquals(1, index.snapshot().single().acceptedCount)
+        assertEquals(100L, index.snapshot().single().lastUsedEpochMillis)
+    }
+
+    @Test
     fun `shape index keeps newest duplicate and does not retain raw arguments`() {
         val index = CommandShapeStatsIndex(capacity = 8, commandSpecs = TerminalCommandSpecs.defaults())
 

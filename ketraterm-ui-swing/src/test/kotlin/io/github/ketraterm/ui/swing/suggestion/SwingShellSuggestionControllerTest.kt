@@ -223,6 +223,22 @@ class SwingShellSuggestionControllerTest {
     }
 
     @Test
+    fun `failed acceptance handler does not emit accepted feedback`() {
+        val host = RecordingSuggestionHost(failAcceptance = true)
+        val controller = SwingShellSuggestionController(host)
+        val items = suggestions(1)
+        controller.show(request(), items, selectedIndex = 0)
+
+        assertThrows(IllegalStateException::class.java) {
+            controller.handleKeyPressed(keyPressed(KeyEvent.VK_TAB))
+        }
+
+        assertFalse(controller.state().visible)
+        assertTrue(host.feedbackKinds.isEmpty())
+        assertEquals(0, host.focusRequests)
+    }
+
+    @Test
     fun `disabled enter acceptance passes through with a selected suggestion`() {
         val host =
             RecordingSuggestionHost(
@@ -387,6 +403,7 @@ class SwingShellSuggestionControllerTest {
     private class RecordingSuggestionHost(
         override var settings: SwingSettings = SwingSettings(),
         override val suggestionKeymap: SwingShellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
+        private val failAcceptance: Boolean = false,
     ) : SwingShellSuggestionHost {
         val acceptedSuggestions = ArrayList<SwingShellSuggestion>()
         val acceptedIndexes = ArrayList<Int>()
@@ -400,6 +417,7 @@ class SwingShellSuggestionControllerTest {
 
         override val suggestionHandler: SwingShellSuggestionHandler =
             SwingShellSuggestionHandler { acceptance ->
+                if (failAcceptance) error("acceptance failed")
                 acceptedSuggestions += acceptance.suggestion
                 acceptedIndexes += acceptance.index
                 acceptedRequests += acceptance.request

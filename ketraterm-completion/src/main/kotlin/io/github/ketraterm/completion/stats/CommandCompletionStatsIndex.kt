@@ -52,7 +52,7 @@ internal class CommandCompletionStatsIndex(
         if (!isRecordableStatsEvent(commandLine, usedAtEpochMillis)) return
         mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
             previous.copy(
-                commandLine = canonical,
+                commandLine = previous.commandLineForEvent(canonical, usedAtEpochMillis),
                 useCount = saturatedCompletionCounterIncrement(previous.useCount),
                 successCount =
                     if (successful) {
@@ -81,7 +81,7 @@ internal class CommandCompletionStatsIndex(
         if (!isRecordableStatsEvent(commandLine, feedbackAtEpochMillis)) return
         mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
             previous.copy(
-                commandLine = canonical,
+                commandLine = previous.commandLineForEvent(canonical, feedbackAtEpochMillis),
                 acceptedCount = incrementAccepted(previous.acceptedCount, feedback),
                 dismissedCount = incrementDismissed(previous.dismissedCount, feedback),
                 lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
@@ -147,4 +147,9 @@ internal class CommandCompletionStatsIndex(
             lastUsedEpochMillis = maxOf(current.lastUsedEpochMillis, incoming.lastUsedEpochMillis),
         )
     }
+
+    private fun TerminalCommandCompletionStats.commandLineForEvent(
+        eventCommandLine: String,
+        eventEpochMillis: Long,
+    ): String = if (eventEpochMillis >= lastUsedEpochMillis) eventCommandLine else commandLine
 }

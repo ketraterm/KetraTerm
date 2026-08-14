@@ -39,8 +39,9 @@ class CompletionOutcomeProjectionPropertyTest {
                 val endIndex = random.nextInt(startIndex, boundaries.size)
                 val startOffset = boundaries[startIndex]
                 val endOffset = boundaries[endIndex]
+                val cursorOffset = boundaries[random.nextInt(startIndex, endIndex + 1)]
                 val replacement = REPLACEMENTS[random.nextInt(REPLACEMENTS.size)]
-                val request = request(commandLine)
+                val request = request(commandLine, cursorOffset = cursorOffset)
                 val candidate = candidate(replacement, startOffset, endOffset, "projection")
 
                 val projected = request.commandLineAfterCandidate(candidate)
@@ -54,7 +55,7 @@ class CompletionOutcomeProjectionPropertyTest {
         }
 
     @Test
-    fun `hostile replacement ranges are rejected or use deterministic fallback grouping`(): Unit =
+    fun `hostile replacement ranges are rejected before publication`(): Unit =
         runBlocking {
             val commandLine = "git 😀 status"
             val request = request(commandLine)
@@ -86,11 +87,11 @@ class CompletionOutcomeProjectionPropertyTest {
                 val completionEngine = engine(listOf(first), listOf(second), listOf(distinct))
                 val firstResult = completionEngine.complete(request)
 
-                assertEquals(2, firstResult.size, "Fallback grouping changed for case=$caseIndex range=$range")
+                assertEquals(0, firstResult.size, "Invalid range was published for case=$caseIndex range=$range")
                 assertEquals(
                     firstResult,
                     completionEngine.complete(request),
-                    "Fallback ordering is not deterministic for case=$caseIndex",
+                    "Invalid-range rejection is not deterministic for case=$caseIndex",
                 )
             }
 
@@ -204,10 +205,11 @@ class CompletionOutcomeProjectionPropertyTest {
     private fun request(
         commandLine: String,
         shellSyntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
+        cursorOffset: Int = commandLine.length,
     ): TerminalCompletionRequest =
         TerminalCompletionRequest(
             commandLine = commandLine,
-            cursorOffset = commandLine.length,
+            cursorOffset = cursorOffset,
             shellCapabilities =
                 when (shellSyntax) {
                     TerminalShellSyntax.PLAIN -> TerminalShellCapabilities.PLAIN
