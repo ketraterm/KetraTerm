@@ -183,16 +183,23 @@ internal class IntellijCompletionRegistry(
 
     /** Clears sessions and releases learning resources. Closing is idempotent. */
     override fun close() {
-        val states =
-            synchronized(lock) {
-                if (!closed.compareAndSet(false, true)) return
-                val copy = sessionStates.values.toList()
-                sessionStates.clear()
-                copy
-            }
-        states.forEach(SessionState::close)
+        closeSessionStates().forEach(SessionState::close)
         statistics.close()
     }
+
+    /** Clears sessions, drains queued learning, and waits for the final persistence write. */
+    suspend fun closeAndFlush() {
+        closeSessionStates().forEach(SessionState::close)
+        statistics.closeAndFlush()
+    }
+
+    private fun closeSessionStates(): List<SessionState> =
+        synchronized(lock) {
+            if (!closed.compareAndSet(false, true)) return@synchronized emptyList()
+            val copy = sessionStates.values.toList()
+            sessionStates.clear()
+            copy
+        }
 
     /** Session resources retained by the registry until replacement or closure. */
     private data class OpenedSession(

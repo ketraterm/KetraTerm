@@ -19,6 +19,7 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.boundedTo
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
+import kotlinx.coroutines.CancellationException
 
 /**
  * Autocomplete source for directory contents and file paths.
@@ -43,10 +44,8 @@ internal class PathCompletionSource(
 
         if (context.activePosition == TerminalCompletionActivePosition.OPERATOR) return emptyList()
 
-        // Don't autocomplete paths if the active prefix looks like an option flag
         if (context.activePosition == TerminalCompletionActivePosition.OPTION_NAME) return emptyList()
 
-        // If we are in the command position, only complete paths if prefix is explicitly path-like
         if (context.activePosition == TerminalCompletionActivePosition.COMMAND && !isPathLike(prefix)) return emptyList()
         if (context.activePosition != TerminalCompletionActivePosition.COMMAND &&
             context.expectedPathKind == TerminalPathArgumentKind.NONE &&
@@ -55,7 +54,6 @@ internal class PathCompletionSource(
             return emptyList()
         }
 
-        // Slashes normalized to forward slashes for URL path resolution
         val normalizedPrefix = prefix.replace('\\', '/')
         val pathParts = splitPathPrefix(normalizedPrefix) ?: return emptyList()
         val directoryPortion = pathParts.directoryPrefix
@@ -69,6 +67,8 @@ internal class PathCompletionSource(
                         entryNamePrefix = filePrefix,
                     ),
                 )
+            } catch (cancellation: CancellationException) {
+                throw cancellation
             } catch (_: Exception) {
                 return emptyList()
             }
@@ -77,12 +77,12 @@ internal class PathCompletionSource(
         val candidates = ArrayList<TerminalCompletionCandidate>()
         var orderIndex = 0
 
-        for (entry in entries) {
-            if (!context.expectedPathKind.acceptsPathEntry(entry.isDirectory)) continue
-            if (!context.expectedHiddenPathPolicy.acceptsPath(entry.name, filePrefix)) continue
-            if (matchesPrefix(entry.name, filePrefix)) {
-                val rawSuffix = if (entry.isDirectory) "$pathSeparator" else ""
-                val rawReplacement = directoryPortion + entry.name + rawSuffix
+        for ((name, isDirectory) in entries) {
+            if (!context.expectedPathKind.acceptsPathEntry(isDirectory)) continue
+            if (!context.expectedHiddenPathPolicy.acceptsPath(name, filePrefix)) continue
+            if (matchesPrefix(name, filePrefix)) {
+                val rawSuffix = if (isDirectory) "$pathSeparator" else ""
+                val rawReplacement = directoryPortion + name + rawSuffix
                 val replacementText =
                     ShellReplacementText.encode(
                         value = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement,
@@ -95,11 +95,11 @@ internal class PathCompletionSource(
                         replacementText = replacementText,
                         replacementStartOffset = context.replacementStartOffset,
                         replacementEndOffset = context.replacementEndOffset,
-                        displayText = entry.name + (if (entry.isDirectory) "$pathSeparator" else ""),
-                        detail = if (entry.isDirectory) "directory" else "file",
+                        displayText = name + (if (isDirectory) "$pathSeparator" else ""),
+                        detail = if (isDirectory) "directory" else "file",
                         source = SOURCE_PATH,
                         kind = TerminalCompletionCandidateKind.PATH,
-                        score = score(entry.name, filePrefix, PATH_BASE_SCORE, orderIndex++),
+                        score = score(name, filePrefix, PATH_BASE_SCORE, orderIndex++),
                     )
             }
         }

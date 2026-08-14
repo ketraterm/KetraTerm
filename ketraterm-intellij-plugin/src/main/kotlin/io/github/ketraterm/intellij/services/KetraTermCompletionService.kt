@@ -28,6 +28,7 @@ import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.runBlocking
 
 /**
  * Application-level owner of IntelliJ completion learning and session sources.
@@ -133,10 +134,10 @@ internal class KetraTermCompletionService(
         )
     }
 
-    /** Closes session sources. */
+    /** Closes sessions and durably flushes queued completion learning. */
     override fun dispose() {
         settings.removeChangeListener(settingsListener)
-        registry.close()
+        runBlocking { registry.closeAndFlush() }
     }
 
     companion object {

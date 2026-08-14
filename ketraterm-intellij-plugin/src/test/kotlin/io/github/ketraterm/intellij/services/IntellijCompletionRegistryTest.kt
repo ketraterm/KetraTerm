@@ -15,19 +15,20 @@
  */
 package io.github.ketraterm.intellij.services
 
-import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
-import io.github.ketraterm.completion.api.TerminalCompletionSources
-import io.github.ketraterm.completion.api.TerminalFileEntry
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalDirectoryScanner
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
+import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
+import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.file.Files
 import java.nio.file.Path
 
 class IntellijCompletionRegistryTest {
@@ -87,10 +88,10 @@ class IntellijCompletionRegistryTest {
             registry.recordFinishedCommand(
                 "first",
                 "bash",
-                io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata(
+                TerminalShellIntegrationCommandMetadata(
                     recordId = 1,
                     commandText = "git switch main",
-                    lifecycle = io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                    lifecycle = TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
                     workingDirectoryUri = "file:///repo",
                     exitCode = 0,
                     startedAtEpochMillis = 1L,
@@ -107,6 +108,43 @@ class IntellijCompletionRegistryTest {
             first.close()
             second.close()
             registry.close()
+        }
+
+    @Test
+    fun `close and flush persists the final queued command`() =
+        runBlocking {
+            val path =
+                Files
+                    .createTempDirectory("intellij-completion-registry")
+                    .resolve(TerminalCompletionLearningRepository.currentFileName())
+            val learningStore = TerminalCompletionLearningStore()
+            val registry =
+                IntellijCompletionRegistry(
+                    statsSource = learningStore,
+                    learningRepository = TerminalCompletionLearningRepository(learningStore, path),
+                    coroutineScope = this,
+                )
+
+            registry.recordFinishedCommand(
+                sessionId = "session",
+                profileId = "bash",
+                metadata =
+                    TerminalShellIntegrationCommandMetadata(
+                        recordId = 1,
+                        commandText = "git status",
+                        lifecycle = TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                        workingDirectoryUri = "file:///repo",
+                        exitCode = 0,
+                        startedAtEpochMillis = 1L,
+                        finishedAtEpochMillis = 2L,
+                    ),
+            )
+
+            registry.closeAndFlush()
+
+            val reloaded = TerminalCompletionLearningStore()
+            TerminalCompletionLearningRepository(reloaded, path).initialize()
+            assertEquals(listOf("git status"), reloaded.snapshot().commandStats.map { it.commandLine })
         }
 
     private fun context(

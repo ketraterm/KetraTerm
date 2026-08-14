@@ -31,6 +31,74 @@ import kotlinx.coroutines.ensureActive
 import org.jetbrains.plugins.gradle.util.GradleConstants
 import java.nio.file.Path
 
+/** Minimal imported Gradle task data required by completion projection. */
+internal data class GradleTaskReadModel(
+    val name: String,
+    val description: String,
+    val linkedProjectPath: String,
+)
+
+/** Lazy external-system node view consumed inside the owning IntelliJ read action. */
+internal interface GradleModelNode {
+    val moduleId: String?
+    val task: GradleTaskReadModel?
+    val children: Iterable<GradleModelNode>
+}
+
+/** Executes Gradle model traversal inside an implementation-owned read action. */
+internal fun interface GradleModelReadPort {
+    suspend fun read(collector: (Iterable<GradleModelNode>) -> List<TerminalGradleTask>): List<TerminalGradleTask>
+}
+
+private class IntellijGradleModelReadPort(
+    private val project: Project,
+) : GradleModelReadPort {
+    override suspend fun read(collector: (Iterable<GradleModelNode>) -> List<TerminalGradleTask>): List<TerminalGradleTask> {
+        val cancellationContext = currentCoroutineContext()
+        cancellationContext.ensureActive()
+        if (project.isDisposed) return emptyList()
+        return readAction {
+            cancellationContext.ensureActive()
+            ProgressManager.checkCanceled()
+            if (project.isDisposed) return@readAction emptyList()
+            val roots =
+                ProjectDataManager
+                    .getInstance()
+                    .getExternalProjectsData(project, GradleConstants.SYSTEM_ID)
+                    .asSequence()
+                    .mapNotNull { projectInfo -> projectInfo.externalProjectStructure }
+                    .map(::IntellijGradleModelNode)
+                    .asIterable()
+            collector(roots)
+        }
+    }
+}
+
+private class IntellijGradleModelNode(
+    private val node: DataNode<*>,
+) : GradleModelNode {
+    override val moduleId: String?
+        get() = if (node.key == ProjectKeys.MODULE) (node.data as? ModuleData)?.id else null
+
+    override val task: GradleTaskReadModel?
+        get() {
+            if (node.key != ProjectKeys.TASK) return null
+            val taskData = node.data as? TaskData ?: return null
+            return GradleTaskReadModel(
+                name = taskData.name,
+                description = taskData.description.orEmpty(),
+                linkedProjectPath = taskData.linkedExternalProjectPath,
+            )
+        }
+
+    override val children: Iterable<GradleModelNode>
+        get() =
+            node.children
+                .asSequence()
+                .map(::IntellijGradleModelNode)
+                .asIterable()
+}
+
 /**
  * Loads bounded Gradle tasks from IntelliJ's imported external-system model.
  *
@@ -38,8 +106,10 @@ import java.nio.file.Path
  * model built by a successful Gradle import.
  */
 internal class IntellijGradleTaskLoader(
-    private val project: Project,
+    private val readPort: GradleModelReadPort,
 ) {
+    constructor(project: Project) : this(IntellijGradleModelReadPort(project))
+
     /**
      * Loads the imported Gradle tasks visible to a terminal working directory.
      *
@@ -50,43 +120,26 @@ internal class IntellijGradleTaskLoader(
     suspend fun load(workingDirectoryUri: String?): List<TerminalGradleTask> {
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
-        if (project.isDisposed) return emptyList()
         val workingDirectory = TerminalLocalFileUriResolver.resolve(workingDirectoryUri) ?: return emptyList()
-        return readAction {
-            cancellationContext.ensureActive()
-            ProgressManager.checkCanceled()
-            if (project.isDisposed) return@readAction emptyList()
+        return readPort.read { modelRoots ->
             val retained = BoundedSnapshotCollector(MAX_RETAINED_TASKS, TASK_ORDER)
             var visitedTasks = 0
             val checkpoint = {
                 cancellationContext.ensureActive()
                 ProgressManager.checkCanceled()
             }
-            val roots =
-                ProjectDataManager
-                    .getInstance()
-                    .getExternalProjectsData(project, GradleConstants.SYSTEM_ID)
-                    .asSequence()
-                    .mapNotNull { projectInfo -> projectInfo.externalProjectStructure }
-                    .map { root -> PendingGradleNode(root, inheritedModuleData = null) }
-                    .asIterable()
+            val roots = modelRoots.asSequence().map { root -> PendingGradleNode(root, inheritedModuleId = null) }.asIterable()
             visitBoundedDepthFirst(
                 roots = roots,
                 maxVisited = MAX_VISITED_MODEL_NODES,
                 cancellationCheckpoint = checkpoint,
                 children = PendingGradleNode::children,
             ) { pendingNode ->
-                val node = pendingNode.node
-                if (node.key == ProjectKeys.TASK) {
+                val task = pendingNode.node.task
+                if (task != null) {
                     visitedTasks++
-                    val taskData = node.data as? TaskData
-                    val moduleData = pendingNode.moduleData
-                    val entry =
-                        if (taskData == null || moduleData == null) {
-                            null
-                        } else {
-                            taskData.toCompletionTask(workingDirectory, moduleData)
-                        }
+                    val moduleId = pendingNode.moduleId
+                    val entry = if (moduleId == null) null else task.toCompletionTask(workingDirectory, moduleId)
                     if (entry != null) retained.add(entry)
                 }
                 visitedTasks < MAX_VISITED_TASKS
@@ -95,16 +148,16 @@ internal class IntellijGradleTaskLoader(
         }
     }
 
-    private fun TaskData.toCompletionTask(
+    private fun GradleTaskReadModel.toCompletionTask(
         workingDirectory: Path,
-        moduleData: ModuleData,
+        moduleId: String,
     ): TerminalGradleTask? {
-        val taskPath = fullyQualifiedTaskPath(moduleData.id, name) ?: return null
-        val linkedProjectDirectory = runCatching { Path.of(linkedExternalProjectPath) }.getOrNull() ?: return null
+        val taskPath = fullyQualifiedTaskPath(moduleId, name) ?: return null
+        val linkedProjectDirectory = runCatching { Path.of(linkedProjectPath) }.getOrNull() ?: return null
         val projectDirectory = relativeProjectDirectory(workingDirectory, linkedProjectDirectory)
         return TerminalGradleTask(
             path = taskPath,
-            description = description.orEmpty(),
+            description = description,
             projectDirectory = projectDirectory,
         )
     }
@@ -130,20 +183,15 @@ internal class IntellijGradleTaskLoader(
     }
 
     private data class PendingGradleNode(
-        val node: DataNode<*>,
-        private val inheritedModuleData: ModuleData?,
+        val node: GradleModelNode,
+        private val inheritedModuleId: String?,
     ) {
-        val moduleData: ModuleData? =
-            if (node.key == ProjectKeys.MODULE) {
-                node.data as? ModuleData
-            } else {
-                inheritedModuleData
-            }
+        val moduleId: String? = node.moduleId ?: inheritedModuleId
 
         fun children(): Iterable<PendingGradleNode> =
             node.children
                 .asSequence()
-                .map { child -> PendingGradleNode(child, moduleData) }
+                .map { child -> PendingGradleNode(child, moduleId) }
                 .asIterable()
     }
 }

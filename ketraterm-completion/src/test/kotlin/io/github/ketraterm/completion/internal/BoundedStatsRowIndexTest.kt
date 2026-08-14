@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.internal
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class BoundedStatsRowIndexTest {
@@ -113,6 +114,27 @@ class BoundedStatsRowIndexTest {
         )
 
         assertEquals(listOf("gamma", "updated-alpha"), index.snapshot().map { it.value })
+    }
+
+    @Test
+    fun `mutate does not evict a retained row for a less relevant insertion`() {
+        val index = rowIndex(capacity = 2)
+        index.replaceAll(
+            listOf(
+                Row(key = "alpha", value = "alpha", timestamp = 3),
+                Row(key = "beta", value = "beta", timestamp = 2),
+            ),
+        )
+        val retained = index.snapshot()
+
+        index.mutate(
+            key = "obsolete",
+            initialRow = { Row(key = "obsolete", value = "obsolete", timestamp = 1) },
+            update = { it },
+        )
+
+        assertSame(retained, index.snapshot())
+        assertEquals(listOf("alpha", "beta"), index.snapshot().map { it.value })
     }
 
     private fun rowIndex(capacity: Int): BoundedStatsRowIndex<Row, String> =
