@@ -109,6 +109,28 @@ class TerminalCompletionLearningRepositoryTest {
         }
 
     @Test
+    fun `changing path while disabled does not enable persistence`() =
+        runTest {
+            val initialPath = completionLearningPath()
+            val replacementPath = completionLearningPath()
+            val learning = TerminalCompletionLearningStore()
+            val repository = repository(learning, initialPath)
+            repository.initialize()
+
+            repository.setPersistenceEnabled(false)
+            repository.setPersistencePath(replacementPath)
+            repository.mutate {
+                recordCommandResult("git status", true, null, null, 42L)
+            }
+
+            assertSame(CompletionLearningFileLoadOutcome.Missing, CompletionLearningFileStore(replacementPath).loadSnapshot())
+
+            repository.setPersistenceEnabled(true)
+
+            assertEquals(learning.snapshot(), CompletionLearningFileStore(replacementPath).loadSnapshot().loadedSnapshot())
+        }
+
+    @Test
     fun `initialization merges overlapping exact shape and provider aggregates`() =
         runTest {
             val path = completionLearningPath()

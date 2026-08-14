@@ -42,9 +42,14 @@ class IntellijDirectoryCompletionTest {
     }
 
     private fun request(
-        workingDirectoryUri: String = Path.of(".").toAbsolutePath().normalize().toUri().toString(),
+        workingDirectoryUri: String =
+            Path
+                .of(".")
+                .toAbsolutePath()
+                .normalize()
+                .toUri()
+                .toString(),
         directoryPrefix: String = "",
         entryNamePrefix: String = "",
-    ): TerminalDirectoryListingRequest =
-        TerminalDirectoryListingRequest(workingDirectoryUri, directoryPrefix, entryNamePrefix)
+    ): TerminalDirectoryListingRequest = TerminalDirectoryListingRequest(workingDirectoryUri, directoryPrefix, entryNamePrefix)
 }

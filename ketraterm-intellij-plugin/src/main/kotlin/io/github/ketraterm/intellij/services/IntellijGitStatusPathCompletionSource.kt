@@ -49,8 +49,13 @@ internal class IntellijGitStatusPathLoader(
         return readIntellijGitRepository(project, workingDirectoryUri) { repository, workingDirectory ->
             val repositoryRoot = repository.root.toNioPath()
             val retained = BoundedSnapshotCollector(MAX_RETAINED_PATHS, ENTRY_ORDER)
-            var visited = 0
+            val visitBudget =
+                BoundedVisitBudget(MAX_VISITED_CHANGES) {
+                    cancellationContext.ensureActive()
+                    ProgressManager.checkCanceled()
+                }
             val changeListManager = ChangeListManager.getInstance(project)
+
             fun retain(
                 path: Path,
                 isDirectory: Boolean,
@@ -61,19 +66,13 @@ internal class IntellijGitStatusPathLoader(
                 val entry = TerminalFuzzyPathEntry(relativePath, isDirectory = isDirectory, detail = detail)
                 retained.add(entry)
             }
-            for (change in changeListManager.allChanges) {
-                cancellationContext.ensureActive()
-                ProgressManager.checkCanceled()
-                if (visited++ >= MAX_VISITED_CHANGES) break
-                val filePath = change.afterRevision?.file ?: change.beforeRevision?.file ?: continue
-                val path = runCatching { Path.of(filePath.path) }.getOrNull() ?: continue
+            visitBudget.visit(changeListManager.allChanges) { change ->
+                val filePath = change.afterRevision?.file ?: change.beforeRevision?.file ?: return@visit
+                val path = runCatching { Path.of(filePath.path) }.getOrNull() ?: return@visit
                 retain(path, isDirectory = false, detail = "changed file")
             }
-            for (filePath in changeListManager.unversionedFilesPaths) {
-                cancellationContext.ensureActive()
-                ProgressManager.checkCanceled()
-                if (visited++ >= MAX_VISITED_CHANGES) break
-                val path = runCatching { Path.of(filePath.path) }.getOrNull() ?: continue
+            visitBudget.visit(changeListManager.unversionedFilesPaths) { filePath ->
+                val path = runCatching { Path.of(filePath.path) }.getOrNull() ?: return@visit
                 retain(path, isDirectory = false, detail = "untracked file")
             }
             retained.toSortedList()
@@ -83,9 +82,7 @@ internal class IntellijGitStatusPathLoader(
     private fun relativePath(
         workingDirectory: Path,
         file: Path,
-    ): String? {
-        return toRelativeCompletionPath(workingDirectory, file).takeIf(String::isNotEmpty)
-    }
+    ): String? = toRelativeCompletionPath(workingDirectory, file).takeIf(String::isNotEmpty)
 
     private companion object {
         private const val MAX_VISITED_CHANGES = 8_192
@@ -97,11 +94,10 @@ internal class IntellijGitStatusPathLoader(
 }
 
 /** Creates changed-Git-path completion without exposing IntelliJ VCS APIs to the shared engine. */
-internal fun intellijGitStatusPathCompletionSource(
-    loader: suspend (String?) -> List<TerminalFuzzyPathEntry>,
-) = TerminalCompletionSources.fuzzyPath(
-    sourceId = "intellij-git-status-path",
-    entriesProvider = { request -> loader(request.workingDirectoryUri) },
-    requiresNonEmptyPrefix = false,
-    allowedCommandNames = setOf("add", "restore", "rm", "diff"),
-)
+internal fun intellijGitStatusPathCompletionSource(loader: suspend (String?) -> List<TerminalFuzzyPathEntry>) =
+    TerminalCompletionSources.fuzzyPath(
+        sourceId = "intellij-git-status-path",
+        entriesProvider = { request -> loader(request.workingDirectoryUri) },
+        requiresNonEmptyPrefix = false,
+        allowedCommandNames = setOf("add", "restore", "rm", "diff"),
+    )

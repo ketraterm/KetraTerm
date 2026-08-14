@@ -22,6 +22,7 @@ plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.changelog")
     id("org.jetbrains.intellij.platform")
+    id("com.diffplug.spotless") version "8.8.0"
 }
 
 val repositoryVersionProvider =
@@ -147,9 +148,22 @@ intellijPlatform {
 kotlin {
     jvmToolchain(pluginJavaVersion)
     compilerOptions {
+        allWarningsAsErrors.set(true)
         // Avoid compatibility bridges for inherited IntelliJ Kotlin interface defaults.
         // The plugin has no public Kotlin interface ABI to preserve.
         jvmDefault.set(JvmDefaultMode.NO_COMPATIBILITY)
+    }
+}
+
+spotless {
+    kotlin {
+        target("src/**/*.kt")
+        ktlint("1.3.1")
+        licenseHeaderFile(file("../gradle/license-header.txt"))
+    }
+    kotlinGradle {
+        target("*.gradle.kts")
+        ktlint("1.3.1")
     }
 }
 

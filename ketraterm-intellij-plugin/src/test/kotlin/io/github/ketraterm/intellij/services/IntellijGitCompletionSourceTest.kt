@@ -111,10 +111,11 @@ class IntellijGitCompletionSourceTest {
             tags = listOf(TerminalCompletionDomainValue("v1.0", detail = "tag")),
         )
 
-    private fun request(command: String) = TerminalCompletionRequest(
-        commandLine = command,
-        cursorOffset = command.length,
-        workingDirectoryUri = "file:///repo",
-        shellCapabilities = TerminalShellCapabilities.POSIX,
-    )
+    private fun request(command: String) =
+        TerminalCompletionRequest(
+            commandLine = command,
+            cursorOffset = command.length,
+            workingDirectoryUri = "file:///repo",
+            shellCapabilities = TerminalShellCapabilities.POSIX,
+        )
 }

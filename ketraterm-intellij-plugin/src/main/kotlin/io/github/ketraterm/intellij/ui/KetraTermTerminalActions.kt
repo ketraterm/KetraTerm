@@ -73,7 +73,8 @@ abstract class KetraTermTerminalAction(
     override fun update(event: AnActionEvent) {
         val pane = terminalPane(event)
         event.presentation.isEnabled =
-            pane != null && pane.isTerminalActionEnabled(terminalAction, fromContextMenu = event.isTerminalContextMenu())
+            pane != null &&
+            pane.isTerminalActionEnabled(terminalAction, fromContextMenu = event.isTerminalContextMenu())
     }
 
     /**
@@ -82,7 +83,6 @@ abstract class KetraTermTerminalAction(
      * @return IntelliJ EDT update thread.
      */
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
-
 }
 
 /**

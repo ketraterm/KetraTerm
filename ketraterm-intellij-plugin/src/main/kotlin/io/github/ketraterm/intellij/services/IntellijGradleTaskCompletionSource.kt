@@ -57,49 +57,39 @@ internal class IntellijGradleTaskLoader(
             ProgressManager.checkCanceled()
             if (project.isDisposed) return@readAction emptyList()
             val retained = BoundedSnapshotCollector(MAX_RETAINED_TASKS, TASK_ORDER)
-            var visitedNodes = 0
             var visitedTasks = 0
-            for (projectInfo in ProjectDataManager.getInstance().getExternalProjectsData(project, GradleConstants.SYSTEM_ID)) {
+            val checkpoint = {
                 cancellationContext.ensureActive()
                 ProgressManager.checkCanceled()
-                if (visitedNodes >= MAX_VISITED_MODEL_NODES || visitedTasks >= MAX_VISITED_TASKS) break
-                val root = projectInfo.externalProjectStructure ?: continue
-                val pending = ArrayDeque<PendingGradleNode>()
-                pending.addLast(PendingGradleNode(root, moduleData = null))
-                while (
-                    pending.isNotEmpty() &&
-                    visitedNodes < MAX_VISITED_MODEL_NODES &&
-                    visitedTasks < MAX_VISITED_TASKS
-                ) {
-                    cancellationContext.ensureActive()
-                    ProgressManager.checkCanceled()
-                    val pendingNode = pending.removeLast()
-                    val node = pendingNode.node
-                    visitedNodes++
-                    val moduleData =
-                        if (node.key == ProjectKeys.MODULE) {
-                            node.data as? ModuleData
+            }
+            val roots =
+                ProjectDataManager
+                    .getInstance()
+                    .getExternalProjectsData(project, GradleConstants.SYSTEM_ID)
+                    .asSequence()
+                    .mapNotNull { projectInfo -> projectInfo.externalProjectStructure }
+                    .map { root -> PendingGradleNode(root, inheritedModuleData = null) }
+                    .asIterable()
+            visitBoundedDepthFirst(
+                roots = roots,
+                maxVisited = MAX_VISITED_MODEL_NODES,
+                cancellationCheckpoint = checkpoint,
+                children = PendingGradleNode::children,
+            ) { pendingNode ->
+                val node = pendingNode.node
+                if (node.key == ProjectKeys.TASK) {
+                    visitedTasks++
+                    val taskData = node.data as? TaskData
+                    val moduleData = pendingNode.moduleData
+                    val entry =
+                        if (taskData == null || moduleData == null) {
+                            null
                         } else {
-                            pendingNode.moduleData
+                            taskData.toCompletionTask(workingDirectory, moduleData)
                         }
-                    if (node.key == ProjectKeys.TASK) {
-                        visitedTasks++
-                        val taskData = node.data as? TaskData
-                        val entry =
-                            if (taskData == null || moduleData == null) {
-                                null
-                            } else {
-                                taskData.toCompletionTask(workingDirectory, moduleData)
-                            }
-                        if (entry != null) retained.add(entry)
-                    }
-                    for (child in node.children) {
-                        cancellationContext.ensureActive()
-                        ProgressManager.checkCanceled()
-                        if (visitedNodes + pending.size >= MAX_VISITED_MODEL_NODES) break
-                        pending.addLast(PendingGradleNode(child, moduleData))
-                    }
+                    if (entry != null) retained.add(entry)
                 }
+                visitedTasks < MAX_VISITED_TASKS
             }
             retained.toSortedList()
         }
@@ -122,15 +112,12 @@ internal class IntellijGradleTaskLoader(
     private fun relativeProjectDirectory(
         workingDirectory: Path,
         projectDirectory: Path,
-    ): String {
-        return toRelativeCompletionPath(workingDirectory, projectDirectory).ifBlank { "." }
-    }
+    ): String = toRelativeCompletionPath(workingDirectory, projectDirectory).ifBlank { "." }
 
     private fun fullyQualifiedTaskPath(
         moduleId: String,
         taskName: String,
-    ): String? =
-        IntellijGradleTaskPath.fullyQualified(moduleId, taskName)
+    ): String? = IntellijGradleTaskPath.fullyQualified(moduleId, taskName)
 
     private companion object {
         private const val MAX_VISITED_MODEL_NODES = 16_384
@@ -144,8 +131,21 @@ internal class IntellijGradleTaskLoader(
 
     private data class PendingGradleNode(
         val node: DataNode<*>,
-        val moduleData: ModuleData?,
-    )
+        private val inheritedModuleData: ModuleData?,
+    ) {
+        val moduleData: ModuleData? =
+            if (node.key == ProjectKeys.MODULE) {
+                node.data as? ModuleData
+            } else {
+                inheritedModuleData
+            }
+
+        fun children(): Iterable<PendingGradleNode> =
+            node.children
+                .asSequence()
+                .map { child -> PendingGradleNode(child, moduleData) }
+                .asIterable()
+    }
 }
 
 /** Converts public External System module and task data into a Gradle invocation path. */
@@ -174,9 +174,8 @@ internal object IntellijGradleTaskPath {
 }
 
 /** Creates imported-Gradle-task completion without exposing IntelliJ model APIs to the shared engine. */
-internal fun intellijGradleTaskCompletionSource(
-    loader: suspend (String?) -> List<TerminalGradleTask>,
-) = TerminalCompletionSources.gradleTask(
-    sourceId = "intellij-gradle-task",
-    tasksProvider = { request -> loader(request.workingDirectoryUri) },
-)
+internal fun intellijGradleTaskCompletionSource(loader: suspend (String?) -> List<TerminalGradleTask>) =
+    TerminalCompletionSources.gradleTask(
+        sourceId = "intellij-gradle-task",
+        tasksProvider = { request -> loader(request.workingDirectoryUri) },
+    )

@@ -44,8 +44,7 @@ private val TerminalTheme.id: String
     storages = [Storage(value = "ketraterm.xml", roamingType = RoamingType.DEFAULT)],
     category = SettingsCategory.TOOLS,
 )
-class KetraTermIntellijSettings :
-    SerializablePersistentStateComponent<KetraTermIntellijSettings.State>(State()) {
+class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTermIntellijSettings.State>(State()) {
     private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
 
     /**
@@ -115,28 +114,39 @@ class KetraTermIntellijSettings :
         val remoteTitle = parseTitlePermission(s.titleRemotePermission, TerminalConfig.DEFAULT_TITLE_REMOTE_PERMISSION)
 
         return HostPolicy(
-            titlePolicy = TerminalTitlePolicy(
-                origin = titleOrigin,
-                localPermission = localTitle,
-                remotePermission = remoteTitle,
-            ),
-            clipboardPolicy = TerminalClipboardPolicy(
-                origin = clipboardOrigin,
-                localWritePermission = localWrite,
-                remoteWritePermission = remoteWrite,
-                readPermission = read,
-                maxDecodedBytes = maxBytes,
-            ),
+            titlePolicy =
+                TerminalTitlePolicy(
+                    origin = titleOrigin,
+                    localPermission = localTitle,
+                    remotePermission = remoteTitle,
+                ),
+            clipboardPolicy =
+                TerminalClipboardPolicy(
+                    origin = clipboardOrigin,
+                    localWritePermission = localWrite,
+                    remoteWritePermission = remoteWrite,
+                    readPermission = read,
+                    maxDecodedBytes = maxBytes,
+                ),
             windowManipulationPolicy = HostControlPolicy.DENY,
         )
     }
 
     private fun isSshExecutable(command: String): Boolean {
-        val executable = command.trim().trim('"').replace('\\', '/').substringAfterLast('/').lowercase(Locale.ROOT)
+        val executable =
+            command
+                .trim()
+                .trim('"')
+                .replace('\\', '/')
+                .substringAfterLast('/')
+                .lowercase(Locale.ROOT)
         return executable == "ssh" || executable == "ssh.exe"
     }
 
-    private fun parseClipboardPermission(value: String, default: TerminalClipboardPermission): TerminalClipboardPermission =
+    private fun parseClipboardPermission(
+        value: String,
+        default: TerminalClipboardPermission,
+    ): TerminalClipboardPermission =
         when (value.trim().lowercase(Locale.ROOT)) {
             "allow" -> TerminalClipboardPermission.ALLOW
             "prompt" -> TerminalClipboardPermission.PROMPT
@@ -145,7 +155,10 @@ class KetraTermIntellijSettings :
             else -> default
         }
 
-    private fun parseTitlePermission(value: String, default: TerminalTitlePermission): TerminalTitlePermission =
+    private fun parseTitlePermission(
+        value: String,
+        default: TerminalTitlePermission,
+    ): TerminalTitlePermission =
         when (value.trim().lowercase(Locale.ROOT)) {
             "allow" -> TerminalTitlePermission.ALLOW
             "deny" -> TerminalTitlePermission.DENY
@@ -294,15 +307,17 @@ internal object KetraTermIntellijSettingsNormalizer {
                 state.fontSize.coerceIn(TerminalConfig.FONT_SIZE_MIN, TerminalConfig.FONT_SIZE_MAX),
             columns = state.columns.coerceIn(TerminalConfig.COLUMNS_MIN, TerminalConfig.COLUMNS_MAX),
             rows = state.rows.coerceIn(TerminalConfig.ROWS_MIN, TerminalConfig.ROWS_MAX),
-            cursorBlinkMillis = state.cursorBlinkMillis.coerceIn(
-                TerminalConfig.CURSOR_BLINK_MIN,
-                TerminalConfig.CURSOR_BLINK_MAX,
-            ),
+            cursorBlinkMillis =
+                state.cursorBlinkMillis.coerceIn(
+                    TerminalConfig.CURSOR_BLINK_MIN,
+                    TerminalConfig.CURSOR_BLINK_MAX,
+                ),
             cursorShape = normalizeCursorShape(state.cursorShape),
-            scrollbackLines = state.scrollbackLines.coerceIn(
-                TerminalConfig.SCROLLBACK_MIN,
-                TerminalConfig.SCROLLBACK_MAX,
-            ),
+            scrollbackLines =
+                state.scrollbackLines.coerceIn(
+                    TerminalConfig.SCROLLBACK_MIN,
+                    TerminalConfig.SCROLLBACK_MAX,
+                ),
             lineHeight = coerceLineHeight(state.lineHeight),
             shellPath = state.shellPath.trim().ifBlank { TerminalConfig.DEFAULT_SHELL_PATH },
             startDirectory = state.startDirectory.trim(),

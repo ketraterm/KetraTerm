@@ -28,11 +28,11 @@ internal fun TerminalProfileKind.intellijCompletionShellCapabilities(): Terminal
         TerminalProfileKind.ZSH,
         TerminalProfileKind.WSL,
         TerminalProfileKind.UNIX_SHELL,
-            -> TerminalShellCapabilities.POSIX
+        -> TerminalShellCapabilities.POSIX
 
         TerminalProfileKind.COMMAND_PROMPT,
         TerminalProfileKind.FISH,
         TerminalProfileKind.NUSHELL,
         TerminalProfileKind.DEFAULT,
-            -> TerminalShellCapabilities.PLAIN
+        -> TerminalShellCapabilities.PLAIN
     }

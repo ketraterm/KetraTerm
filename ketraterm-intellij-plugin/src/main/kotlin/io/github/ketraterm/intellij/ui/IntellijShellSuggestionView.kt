@@ -37,8 +37,7 @@ import kotlin.math.min
 
 /** Creates the IDE-themed terminal suggestion surface. */
 internal object IntellijShellSuggestionViewFactory : SwingShellSuggestionViewFactory {
-    override fun create(listener: SwingShellSuggestionViewListener): SwingShellSuggestionView =
-        IntellijShellSuggestionView(listener)
+    override fun create(listener: SwingShellSuggestionViewListener): SwingShellSuggestionView = IntellijShellSuggestionView(listener)
 }
 
 /**

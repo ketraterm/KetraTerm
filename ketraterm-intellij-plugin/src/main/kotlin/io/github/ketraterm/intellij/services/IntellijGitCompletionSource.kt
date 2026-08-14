@@ -73,17 +73,18 @@ internal class IntellijGitCompletionLoader(
         } ?: IntellijGitCompletionSnapshot.EMPTY
     }
 
-    private inline fun <T> collectValues(
+    private fun <T> collectValues(
         values: Iterable<T>,
         cancellationContext: CoroutineContext,
         toValue: (T) -> TerminalCompletionDomainValue?,
     ): List<TerminalCompletionDomainValue> {
         val retained = BoundedSnapshotCollector(MAX_VALUES_PER_GROUP, VALUE_ORDER)
-        var visited = 0
-        for (value in values) {
-            cancellationContext.ensureActive()
-            ProgressManager.checkCanceled()
-            if (visited++ >= MAX_VISITED_VALUES_PER_GROUP) break
+        val visitBudget =
+            BoundedVisitBudget(MAX_VISITED_VALUES_PER_GROUP) {
+                cancellationContext.ensureActive()
+                ProgressManager.checkCanceled()
+            }
+        visitBudget.visit(values) { value ->
             toValue(value)?.let(retained::add)
         }
         return retained.toSortedList()
@@ -101,9 +102,7 @@ internal class IntellijGitCompletionLoader(
 }
 
 /** Creates one completion source backed by one composite Git-reference load per request. */
-internal fun intellijGitCompletionSource(
-    loader: suspend (String?) -> IntellijGitCompletionSnapshot,
-): TerminalCompletionSource =
+internal fun intellijGitCompletionSource(loader: suspend (String?) -> IntellijGitCompletionSnapshot): TerminalCompletionSource =
     TerminalCompletionSource { request, context, limit ->
         if (context.expectedValueDomain != TerminalCompletionValueDomain.GIT_BRANCH) {
             return@TerminalCompletionSource emptyList()

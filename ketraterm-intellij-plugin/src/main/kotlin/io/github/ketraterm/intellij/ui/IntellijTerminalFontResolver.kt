@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.github.ketraterm.intellij.ui
 
 import com.intellij.openapi.editor.colors.EditorColorsManager
@@ -25,18 +24,27 @@ import java.awt.Font
  * Custom host font resolver using IntelliJ Platform API.
  */
 object IntellijTerminalFontResolver : TerminalFontResolver {
-    override fun resolveFallbackFont(codePoint: Int, style: Int, size2D: Float): Font? {
+    override fun resolveFallbackFont(
+        codePoint: Int,
+        style: Int,
+        size2D: Float,
+    ): Font? {
         val preferences = EditorColorsManager.getInstance().globalScheme.fontPreferences
-        val fontInfo = ComplementaryFontsRegistry.getFontAbleToDisplay(
-            codePoint,
-            style,
-            preferences,
-            null
-        )
+        val fontInfo =
+            ComplementaryFontsRegistry.getFontAbleToDisplay(
+                codePoint,
+                style,
+                preferences,
+                null,
+            )
         return fontInfo.font.deriveFont(style, size2D)
     }
 
-    override fun resolveFallbackFont(text: String, style: Int, size2D: Float): Font? {
+    override fun resolveFallbackFont(
+        text: String,
+        style: Int,
+        size2D: Float,
+    ): Font? {
         if (text.isEmpty()) return null
         val codePoint = text.codePointAt(0)
         return resolveFallbackFont(codePoint, style, size2D)

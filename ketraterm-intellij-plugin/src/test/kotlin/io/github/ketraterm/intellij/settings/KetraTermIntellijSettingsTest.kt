@@ -52,7 +52,7 @@ class KetraTermIntellijSettingsTest {
         val settings =
             KetraTermIntellijSettingsMapper.toSwingSettings(
                 KetraTermIntellijSettings.State(themeId = "nord"),
-        )
+            )
 
         assertEquals(Insets(0, 4, 4, 6), settings.padding)
         assertEquals(Insets(0, 2, 2, 2), settings.alternateScreenPadding)

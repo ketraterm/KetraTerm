@@ -40,7 +40,7 @@ class TerminalCompletionLearningRepository
     internal constructor(
         val learningStore: TerminalCompletionLearningStore,
         initialPersistencePath: Path?,
-        persistenceEnabled: Boolean,
+        private var persistenceEnabled: Boolean,
         private val ioDispatcher: CoroutineDispatcher,
         private val onPersistenceFailure: (Throwable) -> Unit,
         private val fileStoreFactory: (Path, (Throwable) -> Unit) -> CompletionLearningFileStore,
@@ -72,7 +72,6 @@ class TerminalCompletionLearningRepository
 
         private val mutex = Mutex()
         private var configuredPersistencePath: Path? = initialPersistencePath
-        private var persistencePath: Path? = initialPersistencePath.takeIf { persistenceEnabled }
         private var initializedPathIdentity: Path? = null
         private var initialized = false
         private val importedPathIdentities = mutableSetOf<Path>()
@@ -85,14 +84,15 @@ class TerminalCompletionLearningRepository
 
         /**
          * Changes the persistence destination, loading and merging its snapshot.
-         * Passing `null` keeps subsequent learning in memory only.
+         * This does not change whether persistence is enabled. Passing `null`
+         * removes the destination, while a non-null path remains inactive until
+         * [setPersistenceEnabled] is called with `true` when currently disabled.
          *
-         * @param path replacement persistence path, or `null` to disable disk I/O.
+         * @param path replacement persistence path, or `null` for no destination.
          */
         suspend fun setPersistencePath(path: Path?) {
             mutex.withLock {
                 configuredPersistencePath = path
-                persistencePath = path
                 ensureInitializedLocked()
             }
         }
@@ -100,8 +100,7 @@ class TerminalCompletionLearningRepository
         /** Enables or disables access to the configured persistence path. */
         suspend fun setPersistenceEnabled(enabled: Boolean) {
             mutex.withLock {
-                val replacement = configuredPersistencePath.takeIf { enabled }
-                persistencePath = replacement
+                persistenceEnabled = enabled
                 ensureInitializedLocked()
             }
         }
@@ -120,7 +119,7 @@ class TerminalCompletionLearningRepository
         }
 
         private suspend fun ensureInitializedLocked() {
-            val pathIdentity = persistencePath?.identity()
+            val pathIdentity = activePersistencePath()?.identity()
             if (initialized && initializedPathIdentity == pathIdentity) return
             loadConfiguredPath()
             initializedPathIdentity = pathIdentity
@@ -128,7 +127,7 @@ class TerminalCompletionLearningRepository
         }
 
         private suspend fun loadConfiguredPath() {
-            val path = persistencePath
+            val path = activePersistencePath()
             if (path == null) return
             val pathIdentity = path.identity()
             writeBlockedPathIdentity = null
@@ -157,7 +156,7 @@ class TerminalCompletionLearningRepository
         }
 
         private suspend fun persistCurrentSnapshot() {
-            val path = persistencePath ?: return
+            val path = activePersistencePath() ?: return
             val pathIdentity = path.identity()
             if (writeBlockedPathIdentity == pathIdentity || pathIdentity !in importedPathIdentities) return
             val snapshot = learningStore.snapshot()
@@ -167,6 +166,8 @@ class TerminalCompletionLearningRepository
         }
 
         private fun Path.identity(): Path = toAbsolutePath().normalize()
+
+        private fun activePersistencePath(): Path? = configuredPersistencePath.takeIf { persistenceEnabled }
 
         companion object {
             /**

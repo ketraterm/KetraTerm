@@ -123,11 +123,23 @@ internal class KetraTermTerminalPane private constructor(
                 true
             }
             SwingTerminalHostAction.SCROLL_PAGE_UP -> {
-                terminal.scrollViewportBy(terminal.visibleGridSize().height.coerceAtLeast(1).toDouble())
+                terminal.scrollViewportBy(
+                    terminal
+                        .visibleGridSize()
+                        .height
+                        .coerceAtLeast(1)
+                        .toDouble(),
+                )
                 true
             }
             SwingTerminalHostAction.SCROLL_PAGE_DOWN -> {
-                terminal.scrollViewportBy(-terminal.visibleGridSize().height.coerceAtLeast(1).toDouble())
+                terminal.scrollViewportBy(
+                    -terminal
+                        .visibleGridSize()
+                        .height
+                        .coerceAtLeast(1)
+                        .toDouble(),
+                )
                 true
             }
         }
@@ -275,9 +287,10 @@ internal class KetraTermTerminalPane private constructor(
                             shellSuggestionFeedbackHandler = liveCompletion.suggestionFeedbackHandler,
                             shellSuggestionKeymap = KetraTermShellSuggestionKeymap,
                             shellSuggestionViewFactory = IntellijShellSuggestionViewFactory,
-                            uiDispatcher = TerminalUiDispatcher { runnable ->
-                                ApplicationManager.getApplication().invokeLater(runnable)
-                            },
+                            uiDispatcher =
+                                TerminalUiDispatcher { runnable ->
+                                    ApplicationManager.getApplication().invokeLater(runnable)
+                                },
                             fontResolver = IntellijTerminalFontResolver,
                             hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
                             contextMenuHandler =

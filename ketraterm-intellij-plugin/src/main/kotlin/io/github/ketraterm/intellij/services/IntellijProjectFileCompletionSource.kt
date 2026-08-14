@@ -90,7 +90,8 @@ internal class IntellijProjectFileLoader(
                     Processor { descriptor ->
                         cancellationContext.ensureActive()
                         ProgressManager.checkCanceled()
-                        if (visited++ >= MAX_VISITED_ENTRIES) return@Processor false
+                        if (visited == MAX_VISITED_ENTRIES) return@Processor false
+                        visited++
                         val file = (descriptor.item as? PsiFileSystemItem)?.virtualFile ?: return@Processor true
                         val filePath = filePathResolver(file) ?: return@Processor true
                         val path = relativePath(workingDirectory, filePath) ?: return@Processor true
@@ -138,12 +139,11 @@ private class IntellijProjectFileSearchViewModel(
 }
 
 /** Creates query-aware IntelliJ project paths without exposing VFS APIs to the shared engine. */
-internal fun intellijProjectFileCompletionSource(
-    loader: suspend (String?, String) -> List<TerminalFuzzyPathEntry>,
-) = TerminalCompletionSources.fuzzyPath(
-    sourceId = "intellij-project-file",
-    entriesProvider =
-        TerminalFuzzyPathProvider { request, prefix ->
-            loader(request.workingDirectoryUri, prefix)
-        },
-)
+internal fun intellijProjectFileCompletionSource(loader: suspend (String?, String) -> List<TerminalFuzzyPathEntry>) =
+    TerminalCompletionSources.fuzzyPath(
+        sourceId = "intellij-project-file",
+        entriesProvider =
+            TerminalFuzzyPathProvider { request, prefix ->
+                loader(request.workingDirectoryUri, prefix)
+            },
+    )

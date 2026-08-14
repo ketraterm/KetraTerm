@@ -98,7 +98,12 @@ class IntellijCompletionRegistryTest {
                 ),
             )
 
-            assertTrue(first.provider.suggestions(request("git s")).last().any { it.source == "mru" })
+            assertTrue(
+                first.provider
+                    .suggestions(request("git s"))
+                    .last()
+                    .any { it.source == "mru" },
+            )
             first.close()
             second.close()
             registry.close()
@@ -108,15 +113,14 @@ class IntellijCompletionRegistryTest {
         sessionId: String = "session",
         additionalSources: List<TerminalCompletionSourceEntry> = emptyList(),
         scanner: TerminalDirectoryScanner = TerminalDirectoryScanner { _: Path, _: String -> emptyList() },
-    ) =
-        IntellijCompletionSessionContext(
-            sessionId = sessionId,
-            profileId = "bash",
-            workingDirectoryUriProvider = { "file:///repo" },
-            shellCapabilities = TerminalShellCapabilities.POSIX,
-            additionalSources = additionalSources,
-            directoryScanner = scanner,
-        )
+    ) = IntellijCompletionSessionContext(
+        sessionId = sessionId,
+        profileId = "bash",
+        workingDirectoryUriProvider = { "file:///repo" },
+        shellCapabilities = TerminalShellCapabilities.POSIX,
+        additionalSources = additionalSources,
+        directoryScanner = scanner,
+    )
 
     private fun request(command: String) = SwingShellSuggestionRequest(command, command.length, 0, 0)
 }

@@ -33,10 +33,11 @@ class IntellijProjectDirectoryScannerTest : BasePlatformTestCase() {
         val scanner =
             IntellijProjectDirectoryScanner(
                 project = project,
-                fallback = TerminalDirectoryScanner { _, _ ->
-                    fallbackCalls++
-                    listOf(TerminalFileEntry("fallback", false))
-                },
+                fallback =
+                    TerminalDirectoryScanner { _, _ ->
+                        fallbackCalls++
+                        listOf(TerminalFileEntry("fallback", false))
+                    },
                 virtualFileResolver = { directory },
             )
 

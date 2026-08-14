@@ -41,8 +41,7 @@ internal object KetraTermIntellijThemePalette {
      *
      * @return resolved terminal color palette.
      */
-    fun currentIntellijPalette(): TerminalColorPalette =
-        fromScheme(EditorColorsManager.getInstance().globalScheme)
+    fun currentIntellijPalette(): TerminalColorPalette = fromScheme(EditorColorsManager.getInstance().globalScheme)
 
     /**
      * Creates a palette from [scheme].
@@ -104,9 +103,10 @@ internal object KetraTermIntellijThemePalette {
         background: Int,
         foreground: Int,
         dark: Boolean,
-    ): Int = blend(if (dark) DARK_SELECTION_SEED else LIGHT_SELECTION_SEED, background, 0.72).let {
-        if (contrastRatio(it, foreground) >= MIN_READABLE_CONTRAST) it else blend(foreground, background, 0.28)
-    }
+    ): Int =
+        blend(if (dark) DARK_SELECTION_SEED else LIGHT_SELECTION_SEED, background, 0.72).let {
+            if (contrastRatio(it, foreground) >= MIN_READABLE_CONTRAST) it else blend(foreground, background, 0.28)
+        }
 
     private fun ensureReadable(
         foreground: Int,
