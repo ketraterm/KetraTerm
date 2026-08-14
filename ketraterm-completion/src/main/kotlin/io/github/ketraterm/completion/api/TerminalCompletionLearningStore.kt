@@ -102,10 +102,15 @@ class TerminalCompletionLearningStore
         internal fun indexesFor(
             shellSyntax: TerminalShellSyntax,
             commandSpecs: List<TerminalCommandSpec>,
-        ): CompletionLearningIndexes =
-            synchronized(lock) {
-                learningIndexCache.indexesFor(publishedSnapshot, shellSyntax, commandSpecs)
-            }
+        ): CompletionLearningIndexes {
+            val snapshot =
+                synchronized(lock) {
+                    publishedSnapshot
+                }
+            return learningIndexCache.indexesFor(snapshot, shellSyntax, commandSpecs)
+        }
+
+        internal fun isMutationMonitorHeldByCurrentThread(): Boolean = Thread.holdsLock(lock)
 
         /**
          * Records a completed command execution.

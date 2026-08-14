@@ -38,19 +38,22 @@ import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
  * a separate argument.
  * @throws IllegalArgumentException if tokens are blank or either count is negative.
  */
-data class TerminalCommandLineShape
+class TerminalCommandLineShape
     @JvmOverloads
     constructor(
         val executable: String,
-        val subcommands: List<String> = emptyList(),
-        val optionNames: List<String> = emptyList(),
+        subcommands: List<String> = emptyList(),
+        optionNames: List<String> = emptyList(),
         val positionalArgumentCount: Int = 0,
         val optionValueCount: Int = 0,
     ) {
+        val subcommands: List<String> = immutableStringListCopy(subcommands)
+        val optionNames: List<String> = immutableStringListCopy(optionNames)
+
         init {
             require(executable.isNotBlank()) { "executable must not be blank" }
-            require(subcommands.none(String::isBlank)) { "subcommands must not contain blank values" }
-            require(optionNames.none(String::isBlank)) { "optionNames must not contain blank values" }
+            require(this.subcommands.none(String::isBlank)) { "subcommands must not contain blank values" }
+            require(this.optionNames.none(String::isBlank)) { "optionNames must not contain blank values" }
             require(positionalArgumentCount >= 0) {
                 "positionalArgumentCount must be >= 0, was $positionalArgumentCount"
             }
@@ -65,11 +68,72 @@ data class TerminalCommandLineShape
         val normalizedShapeKey: String =
             normalizedTerminalCommandShapeKey(
                 executable = executable,
+                subcommands = this.subcommands,
+                optionNames = this.optionNames,
+                positionalArgumentCount = positionalArgumentCount,
+                optionValueCount = optionValueCount,
+            )
+
+        fun copy(
+            executable: String = this.executable,
+            subcommands: List<String> = this.subcommands,
+            optionNames: List<String> = this.optionNames,
+            positionalArgumentCount: Int = this.positionalArgumentCount,
+            optionValueCount: Int = this.optionValueCount,
+        ): TerminalCommandLineShape =
+            TerminalCommandLineShape(
+                executable = executable,
                 subcommands = subcommands,
                 optionNames = optionNames,
                 positionalArgumentCount = positionalArgumentCount,
                 optionValueCount = optionValueCount,
             )
+
+        operator fun component1(): String = executable
+
+        operator fun component2(): List<String> = subcommands
+
+        operator fun component3(): List<String> = optionNames
+
+        operator fun component4(): Int = positionalArgumentCount
+
+        operator fun component5(): Int = optionValueCount
+
+        override fun equals(other: Any?): Boolean =
+            this === other ||
+                (
+                    other is TerminalCommandLineShape &&
+                        executable == other.executable &&
+                        subcommands == other.subcommands &&
+                        optionNames == other.optionNames &&
+                        positionalArgumentCount == other.positionalArgumentCount &&
+                        optionValueCount == other.optionValueCount
+                )
+
+        override fun hashCode(): Int {
+            var result = executable.hashCode()
+            result = 31 * result + subcommands.hashCode()
+            result = 31 * result + optionNames.hashCode()
+            result = 31 * result + positionalArgumentCount
+            result = 31 * result + optionValueCount
+            return result
+        }
+
+        override fun toString(): String =
+            "TerminalCommandLineShape(" +
+                "executable=$executable, " +
+                "subcommands=$subcommands, " +
+                "optionNames=$optionNames, " +
+                "positionalArgumentCount=$positionalArgumentCount, " +
+                "optionValueCount=$optionValueCount" +
+                ")"
+    }
+
+private fun immutableStringListCopy(values: List<String>): List<String> =
+    if (values.isEmpty()) {
+        emptyList()
+    } else {
+        java.util.List.copyOf(values)
     }
 
 private fun normalizedTerminalCommandShapeKey(

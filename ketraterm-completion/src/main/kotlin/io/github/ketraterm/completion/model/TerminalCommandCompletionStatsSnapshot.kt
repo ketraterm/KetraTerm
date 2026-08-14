@@ -28,14 +28,67 @@ package io.github.ketraterm.completion.model
  * @property feedbackStats source-specific feedback rows used for provider-aware
  * ranking.
  */
-data class TerminalCommandCompletionStatsSnapshot(
-    val commandStats: List<TerminalCommandCompletionStats> = emptyList(),
-    val shapeStats: List<TerminalCommandShapeStats> = emptyList(),
-    val feedbackStats: List<TerminalCompletionFeedbackStats> = emptyList(),
-) {
-    companion object {
-        /** Shared empty learned-statistics snapshot. */
-        @JvmField
-        val EMPTY = TerminalCommandCompletionStatsSnapshot()
+class TerminalCommandCompletionStatsSnapshot
+    @JvmOverloads
+    constructor(
+        commandStats: List<TerminalCommandCompletionStats> = emptyList(),
+        shapeStats: List<TerminalCommandShapeStats> = emptyList(),
+        feedbackStats: List<TerminalCompletionFeedbackStats> = emptyList(),
+    ) {
+        val commandStats: List<TerminalCommandCompletionStats> = immutableListCopy(commandStats)
+        val shapeStats: List<TerminalCommandShapeStats> = immutableListCopy(shapeStats)
+        val feedbackStats: List<TerminalCompletionFeedbackStats> = immutableListCopy(feedbackStats)
+
+        fun copy(
+            commandStats: List<TerminalCommandCompletionStats> = this.commandStats,
+            shapeStats: List<TerminalCommandShapeStats> = this.shapeStats,
+            feedbackStats: List<TerminalCompletionFeedbackStats> = this.feedbackStats,
+        ): TerminalCommandCompletionStatsSnapshot =
+            TerminalCommandCompletionStatsSnapshot(
+                commandStats = commandStats,
+                shapeStats = shapeStats,
+                feedbackStats = feedbackStats,
+            )
+
+        operator fun component1(): List<TerminalCommandCompletionStats> = commandStats
+
+        operator fun component2(): List<TerminalCommandShapeStats> = shapeStats
+
+        operator fun component3(): List<TerminalCompletionFeedbackStats> = feedbackStats
+
+        override fun equals(other: Any?): Boolean =
+            this === other ||
+                (
+                    other is TerminalCommandCompletionStatsSnapshot &&
+                        commandStats == other.commandStats &&
+                        shapeStats == other.shapeStats &&
+                        feedbackStats == other.feedbackStats
+                )
+
+        override fun hashCode(): Int {
+            var result = commandStats.hashCode()
+            result = 31 * result + shapeStats.hashCode()
+            result = 31 * result + feedbackStats.hashCode()
+            return result
+        }
+
+        override fun toString(): String =
+            "TerminalCommandCompletionStatsSnapshot(" +
+                "commandStats=$commandStats, " +
+                "shapeStats=$shapeStats, " +
+                "feedbackStats=$feedbackStats" +
+                ")"
+
+        companion object {
+            /** Shared empty learned-statistics snapshot. */
+            @JvmField
+            val EMPTY = TerminalCommandCompletionStatsSnapshot()
+        }
     }
-}
+
+private fun <T> immutableListCopy(values: List<T>): List<T> =
+    if (values.isEmpty()) {
+        emptyList()
+    } else {
+        java.util.List.copyOf(values)
+    }

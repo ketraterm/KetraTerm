@@ -18,6 +18,7 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.*
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.*
 
 class TerminalCompletionLearningStoreTest {
@@ -35,6 +36,20 @@ class TerminalCompletionLearningStoreTest {
             assertNotSame(before, after)
             assertSame(after, source.snapshot())
         }
+
+    @Test
+    fun `learning index compilation occurs outside the mutation monitor`() {
+        val source = TerminalCompletionLearningStore(commandSpecs = emptyList())
+        source.recordCommandResult("git status", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 1)
+        val monitorHeldDuringCompilation = AtomicBoolean(false)
+
+        source.indexesFor(
+            shellSyntax = TerminalShellSyntax.POSIX,
+            commandSpecs = MonitorProbeCommandSpecs(source, monitorHeldDuringCompilation),
+        )
+
+        assertFalse(monitorHeldDuringCompilation.get())
+    }
 
     @Test
     fun `successful command result supplies token-local learned history evidence`() =
@@ -624,6 +639,34 @@ class TerminalCompletionLearningStoreTest {
             dismissedCount = 0,
             lastUsedEpochMillis = lastUsedEpochMillis,
         )
+
+    private class MonitorProbeCommandSpecs(
+        private val source: TerminalCompletionLearningStore,
+        private val monitorHeldDuringHash: AtomicBoolean,
+    ) : AbstractList<TerminalCommandSpec>() {
+        override val size: Int = 0
+
+        override fun get(index: Int): TerminalCommandSpec = throw IndexOutOfBoundsException(index)
+
+        override fun hashCode(): Int {
+            if (source.isMutationMonitorHeldByCurrentThread()) monitorHeldDuringHash.set(true)
+            return super.hashCode()
+        }
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+            if (!super.equals(other)) return false
+
+            other as MonitorProbeCommandSpecs
+
+            if (size != other.size) return false
+            if (source != other.source) return false
+            if (monitorHeldDuringHash != other.monitorHeldDuringHash) return false
+
+            return true
+        }
+    }
 
     private fun feedbackStats(
         source: String = "spec",

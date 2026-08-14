@@ -351,6 +351,45 @@ class MergedCompletionEngineTest {
         }
 
     @Test
+    fun `request result enforces top K after bounded per-source ingestion`() =
+        runBlocking {
+            val suppliedLimits = ArrayList<Int>()
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            entry(
+                                TerminalCompletionSource { _, _, limit ->
+                                    suppliedLimits += limit
+                                    List(300) { index ->
+                                        candidate(
+                                            replacement = "left-$index",
+                                            score = if (index < 256) 1_000 - index else 10_000,
+                                        )
+                                    }
+                                },
+                                0,
+                            ),
+                            entry(
+                                TerminalCompletionSource { _, _, limit ->
+                                    suppliedLimits += limit
+                                    List(300) { index -> candidate("right-$index", score = 900 - index) }
+                                },
+                                0,
+                            ),
+                        ),
+                    commandSpecs = emptyList(),
+                )
+
+            val candidates = engine.complete(request())
+
+            assertEquals(listOf(256, 256), suppliedLimits)
+            assertEquals(256, candidates.size)
+            assertTrue(candidates.none { it.replacementText == "left-256" })
+            assertEquals("left-0", candidates.first().replacementText)
+        }
+
+    @Test
     fun `large provider result preserves exact deterministic ordering`() =
         runBlocking {
             val candidates =

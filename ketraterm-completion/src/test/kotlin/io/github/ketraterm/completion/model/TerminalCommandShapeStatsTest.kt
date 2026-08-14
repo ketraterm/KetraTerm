@@ -17,10 +17,7 @@ package io.github.ketraterm.completion.model
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.commandline.classifyGenericCommandLineShape
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
+import kotlin.test.*
 
 class TerminalCommandShapeStatsTest {
     @Test
@@ -53,6 +50,28 @@ class TerminalCommandShapeStatsTest {
         assertNull(classifyGenericCommandLineShape("   "))
         assertNull(classifyGenericCommandLineShape("git status\ngit log"))
         assertNull(classifyGenericCommandLineShape("FOO=bar"))
+    }
+
+    @Test
+    fun `shape defensively copies and exposes immutable token lists`() {
+        val subcommands = arrayListOf("switch")
+        val optionNames = arrayListOf("--force")
+        val shape =
+            TerminalCommandLineShape(
+                executable = "git",
+                subcommands = subcommands,
+                optionNames = optionNames,
+            )
+
+        subcommands += "main"
+        optionNames += "--quiet"
+
+        assertEquals(listOf("switch"), shape.subcommands)
+        assertEquals(listOf("--force"), shape.optionNames)
+        assertFailsWith<UnsupportedOperationException> {
+            @Suppress("UNCHECKED_CAST")
+            (shape.subcommands as MutableList<String>).add("mutated")
+        }
     }
 
     @Test

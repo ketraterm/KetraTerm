@@ -57,7 +57,22 @@ class TerminalCommandCompletionStatsTest {
         }
     }
 
+    @Test
+    fun `snapshot defensively copies and exposes immutable statistic lists`() {
+        val mutableCommands = arrayListOf(stats())
+        val snapshot = TerminalCommandCompletionStatsSnapshot(commandStats = mutableCommands)
+
+        mutableCommands += stats(commandLine = "git log")
+
+        assertEquals(listOf("git status"), snapshot.commandStats.map { it.commandLine })
+        assertFailsWith<UnsupportedOperationException> {
+            @Suppress("UNCHECKED_CAST")
+            (snapshot.commandStats as MutableList<TerminalCommandCompletionStats>).add(stats(commandLine = "git diff"))
+        }
+    }
+
     private fun stats(
+        commandLine: String = "git status",
         useCount: Int = 0,
         successCount: Int = 0,
         failureCount: Int = 0,
@@ -66,7 +81,7 @@ class TerminalCommandCompletionStatsTest {
         lastUsedEpochMillis: Long = 0,
     ): TerminalCommandCompletionStats =
         TerminalCommandCompletionStats(
-            commandLine = "git status",
+            commandLine = commandLine,
             useCount = useCount,
             successCount = successCount,
             failureCount = failureCount,

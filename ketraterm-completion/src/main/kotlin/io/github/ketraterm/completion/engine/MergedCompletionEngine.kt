@@ -78,7 +78,12 @@ internal class MergedCompletionEngine(
                 return@channelFlow
             }
             val completions = Channel<SourceCompletion>(sources.size)
-            val collected = ArrayList<CompletionSourceCandidates>(sources.size)
+            val rankingState =
+                ranker.createRequestState(
+                    request = request,
+                    context = completionContext,
+                    resultLimit = REQUEST_CANDIDATE_LIMIT,
+                )
             var lastPublished: List<TerminalCompletionCandidate>? = null
 
             try {
@@ -104,14 +109,15 @@ internal class MergedCompletionEngine(
                     repeat(sources.size) {
                         val completed = completions.receive()
                         if (completed.candidates.isNotEmpty()) {
-                            collected +=
+                            rankingState.ingest(
                                 CompletionSourceCandidates(
                                     completed.sourceIndex,
                                     completed.priority,
                                     completed.candidates,
-                                )
+                                ),
+                            )
                         }
-                        val ranked = ranker.rank(request, completionContext, collected)
+                        val ranked = rankingState.rankedCandidates()
                         if (ranked != lastPublished) {
                             lastPublished = ranked
                             send(ranked)
@@ -131,5 +137,6 @@ internal class MergedCompletionEngine(
 
     private companion object {
         private const val SOURCE_CANDIDATE_LIMIT = 256
+        private const val REQUEST_CANDIDATE_LIMIT = 256
     }
 }
