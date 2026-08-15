@@ -394,6 +394,33 @@ class SpecCompletionEngineTest {
             // Test cargo flags
             val cargoFlags = engine.complete(request("cargo --rel"))
             assertEquals(listOf("--release"), cargoFlags.map { it.replacementText })
+
+            // Test Gradle universal tasks & flags
+            val gradleTasks = engine.complete(request("gradle cle"))
+            assertEquals(listOf("clean"), gradleTasks.map { it.replacementText })
+
+            val gradleConfigCache = engine.complete(request("gradle --config"))
+            assertEquals(
+                listOf(
+                    "--configuration-cache",
+                    "--configuration-cache-problems",
+                    "--no-configuration-cache",
+                ),
+                gradleConfigCache.map {
+                    it.replacementText
+                },
+            )
+
+            // Test kotlin / kotlinc flags
+            val kotlincFlags = engine.complete(request("kotlinc -jvm"))
+            assertEquals(listOf("-jvm-target"), kotlincFlags.map { it.replacementText })
+
+            val kotlinCandidates = engine.complete(request("kotlin ru"))
+            assertEquals(listOf("run"), kotlinCandidates.map { it.replacementText })
+
+            // Test adb subcommands
+            val adbCandidates = engine.complete(request("adb dev"))
+            assertEquals(listOf("devices"), adbCandidates.map { it.replacementText })
         }
 
     @Test

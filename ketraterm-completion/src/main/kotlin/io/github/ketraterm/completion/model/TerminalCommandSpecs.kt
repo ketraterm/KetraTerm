@@ -53,6 +53,9 @@ object TerminalCommandSpecs {
             pip(),
             go(),
             aws(),
+            kotlin(),
+            kotlinc(),
+            adb(),
             ketra(),
         )
 
@@ -523,7 +526,10 @@ object TerminalCommandSpecs {
         )
 
     /**
-     * Returns a Gradle command spec focused on common project tasks/options.
+     * Returns a Gradle command spec focused on universal project tasks and options.
+     *
+     * Dynamic project tasks (such as Kotlin Multiplatform targets, KSP, or Spotless)
+     * are provided dynamically by host Gradle task providers rather than hardcoded here.
      *
      * @return Gradle command specification.
      */
@@ -542,7 +548,12 @@ object TerminalCommandSpecs {
                     TerminalCommandSpec("tasks", "list available tasks"),
                     TerminalCommandSpec("run", "run the application"),
                     TerminalCommandSpec("assemble", "assembles the outputs of this project"),
-                    TerminalCommandSpec("bootRun", "runs this project as a Spring Boot application"),
+                    TerminalCommandSpec("help", "displays a help message"),
+                    TerminalCommandSpec("projects", "displays the sub-projects of the current project"),
+                    TerminalCommandSpec("properties", "displays the properties of the current project"),
+                    TerminalCommandSpec("dependencies", "displays all dependencies declared in the project"),
+                    TerminalCommandSpec("dependencyInsight", "displays the insight into a specific dependency"),
+                    TerminalCommandSpec("wrapper", "generates Gradle wrapper files"),
                 ),
             options =
                 listOf(
@@ -556,15 +567,63 @@ object TerminalCommandSpecs {
                     ),
                     TerminalOptionSpec(listOf("--info", "-i"), "set log level to info"),
                     TerminalOptionSpec(listOf("--debug", "-d"), "set log level to debug"),
+                    TerminalOptionSpec(listOf("--warn", "-w"), "set log level to warn"),
+                    TerminalOptionSpec(listOf("--quiet", "-q"), "set log level to quiet"),
+                    TerminalOptionSpec(listOf("--stacktrace", "-s"), "print out the stacktrace for all exceptions"),
+                    TerminalOptionSpec(listOf("--full-stacktrace", "-S"), "print out the full stacktrace for all exceptions"),
                     TerminalOptionSpec(listOf("--scan"), "create a build scan"),
+                    TerminalOptionSpec(listOf("--no-scan"), "do not create a build scan"),
+                    TerminalOptionSpec(listOf("--build-cache"), "enables the Gradle build cache"),
+                    TerminalOptionSpec(listOf("--no-build-cache"), "disables the Gradle build cache"),
+                    TerminalOptionSpec(listOf("--configuration-cache"), "enables the configuration cache"),
+                    TerminalOptionSpec(listOf("--no-configuration-cache"), "disables the configuration cache"),
+                    TerminalOptionSpec(
+                        names = listOf("--configuration-cache-problems"),
+                        description = "how to handle configuration cache problems",
+                        requiresValue = true,
+                        valueCandidates = listOf("fail", "warn"),
+                    ),
+                    TerminalOptionSpec(listOf("--daemon"), "uses the Gradle Daemon"),
+                    TerminalOptionSpec(listOf("--no-daemon"), "do not use the Gradle Daemon"),
+                    TerminalOptionSpec(listOf("--stop"), "stops all Gradle Daemons"),
+                    TerminalOptionSpec(listOf("--status"), "shows status of running and recently stopped Gradle Daemons"),
                     TerminalOptionSpec(listOf("--offline"), "build without network access"),
                     TerminalOptionSpec(listOf("--parallel"), "build projects in parallel"),
+                    TerminalOptionSpec(listOf("--no-parallel"), "disables parallel execution"),
+                    TerminalOptionSpec(listOf("--max-workers"), "sets the maximum number of workers", requiresValue = true),
                     TerminalOptionSpec(listOf("--continuous", "-t"), "enables continuous build and execution"),
+                    TerminalOptionSpec(listOf("--refresh-dependencies"), "refresh the state of dependencies"),
+                    TerminalOptionSpec(listOf("--dry-run", "-m"), "run the build with all task actions disabled"),
+                    TerminalOptionSpec(listOf("--rerun-tasks"), "ignore previously cached task outputs"),
+                    TerminalOptionSpec(listOf("--continue"), "continues task execution after a task failure"),
+                    TerminalOptionSpec(
+                        listOf("--exclude-task", "-x"),
+                        "specifies a task to be excluded from execution",
+                        requiresValue = true,
+                    ),
                     TerminalOptionSpec(
                         names = GradleCompletionSyntax.PROJECT_DIRECTORY_OPTION_NAMES,
                         description = "use the specified project directory",
                         requiresValue = true,
                         valuePathKind = TerminalPathArgumentKind.DIRECTORY,
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("--settings-file", "-c"),
+                        description = "specify the settings file",
+                        requiresValue = true,
+                        valuePathKind = TerminalPathArgumentKind.FILE,
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("--build-file", "-b"),
+                        description = "specify the build file",
+                        requiresValue = true,
+                        valuePathKind = TerminalPathArgumentKind.FILE,
+                    ),
+                    TerminalOptionSpec(
+                        names = listOf("--init-script", "-I"),
+                        description = "specify an initialization script",
+                        requiresValue = true,
+                        valuePathKind = TerminalPathArgumentKind.FILE,
                     ),
                 ),
         )
@@ -1183,6 +1242,142 @@ object TerminalCommandSpecs {
                         requiresValue = true,
                         valueCandidates = listOf("json", "text", "table", "yaml", "yaml-stream"),
                     ),
+                ),
+        )
+
+    /**
+     * Returns a Kotlin CLI runner command spec.
+     *
+     * @return Kotlin runner command specification.
+     */
+    private fun kotlin(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "kotlin",
+            description = "Kotlin command-line runner and REPL",
+            subcommands =
+                listOf(
+                    TerminalCommandSpec("run", "runs a Kotlin application or script"),
+                    TerminalCommandSpec("build", "builds a Kotlin project"),
+                    TerminalCommandSpec("test", "runs Kotlin tests"),
+                ),
+            options =
+                listOf(
+                    TerminalOptionSpec(listOf("-version", "--version", "-v"), "display compiler version"),
+                    TerminalOptionSpec(listOf("-help", "-h"), "how help"),
+                    TerminalOptionSpec(listOf("-e"), "evaluate inline Kotlin expression", requiresValue = true),
+                    TerminalOptionSpec(
+                        listOf("-classpath", "-cp"),
+                        "paths where to find user class files and annotation processors",
+                        requiresValue = true,
+                    ),
+                    TerminalOptionSpec(listOf("-include-runtime"), "include Kotlin runtime in to resulting JAR"),
+                    TerminalOptionSpec(listOf("-nowarn"), "generate no warnings"),
+                    TerminalOptionSpec(listOf("-verbose"), "enable verbose logging output"),
+                ),
+        )
+
+    /**
+     * Returns a Kotlin compiler command spec.
+     *
+     * @return kotlinc command specification.
+     */
+    private fun kotlinc(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "kotlinc",
+            description = "Kotlin command-line compiler",
+            aliases = listOf("kotlinc-jvm", "kotlinc-js", "kotlinc-native"),
+            options =
+                listOf(
+                    TerminalOptionSpec(listOf("-version", "--version", "-v"), "display compiler version"),
+                    TerminalOptionSpec(listOf("-help", "-h"), "show help"),
+                    TerminalOptionSpec(
+                        names = listOf("-d"),
+                        description = "destination for generated class files",
+                        requiresValue = true,
+                        valuePathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                    TerminalOptionSpec(
+                        listOf("-classpath", "-cp"),
+                        "paths where to find user class files and annotation processors",
+                        requiresValue = true,
+                    ),
+                    TerminalOptionSpec(listOf("-include-runtime"), "include Kotlin runtime in to resulting JAR"),
+                    TerminalOptionSpec(
+                        names = listOf("-jvm-target"),
+                        description = "target version of the generated JVM bytecode",
+                        requiresValue = true,
+                        valueCandidates = listOf("1.8", "11", "17", "21", "22", "23", "24", "25"),
+                    ),
+                    TerminalOptionSpec(
+                        listOf("-language-version"),
+                        "provide source compatibility with specified version of Kotlin",
+                        requiresValue = true,
+                    ),
+                    TerminalOptionSpec(
+                        listOf("-api-version"),
+                        "allow using declarations only from the specified version of Kotlin",
+                        requiresValue = true,
+                    ),
+                    TerminalOptionSpec(
+                        listOf("-opt-in"),
+                        "enable API usages that require opt-in with a requirement annotation",
+                        requiresValue = true,
+                    ),
+                    TerminalOptionSpec(listOf("-Xcontext-receivers"), "enable experimental context receivers"),
+                    TerminalOptionSpec(listOf("-Xcontext-parameters"), "enable experimental context parameters"),
+                    TerminalOptionSpec(listOf("-Xmulti-platform"), "enable multiplatform support"),
+                    TerminalOptionSpec(listOf("-Werror"), "turn all warnings into errors"),
+                    TerminalOptionSpec(listOf("-nowarn"), "generate no warnings"),
+                    TerminalOptionSpec(listOf("-verbose"), "enable verbose logging output"),
+                ),
+        )
+
+    /**
+     * Returns an Android Debug Bridge (adb) command spec.
+     *
+     * @return adb command specification.
+     */
+    private fun adb(): TerminalCommandSpec =
+        TerminalCommandSpec(
+            name = "adb",
+            description = "Android Debug Bridge CLI",
+            subcommands =
+                listOf(
+                    TerminalCommandSpec("devices", "list connected devices"),
+                    TerminalCommandSpec("logcat", "view device log stream"),
+                    TerminalCommandSpec(
+                        "install",
+                        "install an Android package (APK) to device",
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE,
+                    ),
+                    TerminalCommandSpec("uninstall", "remove an application package from device"),
+                    TerminalCommandSpec("shell", "run remote shell command on device"),
+                    TerminalCommandSpec(
+                        "push",
+                        "copy local files to device",
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                    TerminalCommandSpec(
+                        "pull",
+                        "copy files from device to local",
+                        positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
+                    ),
+                    TerminalCommandSpec("reboot", "reboot the device"),
+                    TerminalCommandSpec("reverse", "reverse socket connections"),
+                    TerminalCommandSpec("forward", "forward socket connections"),
+                    TerminalCommandSpec("start-server", "ensure that there is a server running"),
+                    TerminalCommandSpec("kill-server", "kill the server if it is running"),
+                    TerminalCommandSpec("connect", "connect to a device via TCP/IP"),
+                    TerminalCommandSpec("disconnect", "disconnect from a given TCP/IP device"),
+                    TerminalCommandSpec("tcpip", "restart host in TCP mode"),
+                ),
+            options =
+                listOf(
+                    TerminalOptionSpec(listOf("-s"), "use device with given serial number", requiresValue = true),
+                    TerminalOptionSpec(listOf("-d"), "direct an adb command to the only connected USB device"),
+                    TerminalOptionSpec(listOf("-e"), "direct an adb command to the only running emulator"),
+                    TerminalOptionSpec(listOf("--help", "-h"), "show help"),
+                    TerminalOptionSpec(listOf("--version"), "show version"),
                 ),
         )
 
