@@ -76,9 +76,8 @@ class SwingShellSuggestionMatchRanges private constructor(
         return fromOwnedPackedOffsets(displayText, truncated)
     }
 
-    override fun equals(other: Any?): Boolean {
-        return this === other || other is SwingShellSuggestionMatchRanges && packedOffsets.contentEquals(other.packedOffsets)
-    }
+    override fun equals(other: Any?): Boolean =
+        this === other || other is SwingShellSuggestionMatchRanges && packedOffsets.contentEquals(other.packedOffsets)
 
     override fun hashCode(): Int = contentHashCode
 

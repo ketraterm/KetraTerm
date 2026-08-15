@@ -131,8 +131,8 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   positions, privacy-preserving argument shape categories, source-specific accepted/dismissed feedback stats, one
   global evidence-fusion ranker, bounded surplus collection before final presentation truncation, a
   bounded in-memory session MRU source, command-aware path
-  completion, quote-preserving and shell-escaped path replacement for active tokens, and a small curated bootstrap spec
-  set for common developer CLIs and shell path commands. The standalone and IntelliJ hosts wire that engine through a
+  completion, quote-preserving and shell-escaped path replacement for active tokens, and a rich zero-latency bootstrap spec
+  catalog for common developer CLIs (`git` with subcommands/flags, `gradle`/`gradlew`, `npm`, `pnpm`, `yarn`, `bun`, `docker`, `docker-compose`, `cargo`, `kubectl` with resource types/flags, `gh`, `pip`, `go`, `aws`, `ketra`) and shell path commands. The standalone and IntelliJ hosts wire that engine through a
   shared optional Swing-host adapter, map authoritative profile categories to supported POSIX, PowerShell, or
   conservative plain capabilities, pass profile/current-directory context into requests, persist compact exact
   command/shape/source-feedback stats instead of scanning raw history, forward immutable match ranges to Swing suggestions,

@@ -61,9 +61,8 @@ class TerminalCompletionMatchRanges private constructor(
         validate(displayText, packedOffsets)
     }
 
-    override fun equals(other: Any?): Boolean {
-        return this === other || other is TerminalCompletionMatchRanges && packedOffsets.contentEquals(other.packedOffsets)
-    }
+    override fun equals(other: Any?): Boolean =
+        this === other || other is TerminalCompletionMatchRanges && packedOffsets.contentEquals(other.packedOffsets)
 
     override fun hashCode(): Int = contentHashCode
 

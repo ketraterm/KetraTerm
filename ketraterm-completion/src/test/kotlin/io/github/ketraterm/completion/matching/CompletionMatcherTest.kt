@@ -79,7 +79,6 @@ class CompletionMatcherTest {
         assertRanges(result!!, 0, 1, 6, 8)
     }
 
-
     @Test
     fun `snake case matches word boundaries`() {
         val result = CompletionMatcher.match("git_status_helper", "gsh")
