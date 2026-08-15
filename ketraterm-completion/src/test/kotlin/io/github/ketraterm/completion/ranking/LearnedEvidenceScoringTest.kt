@@ -28,9 +28,7 @@ class LearnedEvidenceScoringTest {
                 acceptedCount = Long.MAX_VALUE,
             )
 
-        assertEquals(260, LearnedEvidenceScoring.exact(counts, contextBoost = 0, nowEpochMillis = 0))
-        assertEquals(110, LearnedEvidenceScoring.shape(counts, contextBoost = 0))
-        assertEquals(100, LearnedEvidenceScoring.provider(counts, contextBoost = 0))
+        assertEquals(390, LearnedEvidenceScoring.exact(counts, contextBoost = 0, nowEpochMillis = 0))
     }
 
     @Test
@@ -41,21 +39,19 @@ class LearnedEvidenceScoringTest {
                 dismissedCount = Long.MAX_VALUE,
             )
 
-        assertEquals(-180, LearnedEvidenceScoring.exact(counts, contextBoost = 0, nowEpochMillis = 0))
-        assertEquals(-80, LearnedEvidenceScoring.shape(counts, contextBoost = 0))
-        assertEquals(-80, LearnedEvidenceScoring.provider(counts, contextBoost = 0))
+        assertEquals(-200, LearnedEvidenceScoring.exact(counts, contextBoost = 0, nowEpochMillis = 0))
     }
 
     @Test
     fun `recency uses elapsed age and safely handles future timestamps`() {
         val now = 2_000_000_000_000L
 
-        assertEquals(40, LearnedEvidenceScoring.recencyBoost(now, now - 60_000L))
-        assertEquals(25, LearnedEvidenceScoring.recencyBoost(now, now - 2L * 60L * 60L * 1_000L))
-        assertEquals(10, LearnedEvidenceScoring.recencyBoost(now, now - 2L * 24L * 60L * 60L * 1_000L))
-        assertEquals(5, LearnedEvidenceScoring.recencyBoost(now, now - 8L * 24L * 60L * 60L * 1_000L))
+        assertEquals(60, LearnedEvidenceScoring.recencyBoost(now, now - 60_000L))
+        assertEquals(40, LearnedEvidenceScoring.recencyBoost(now, now - 2L * 60L * 60L * 1_000L))
+        assertEquals(20, LearnedEvidenceScoring.recencyBoost(now, now - 2L * 24L * 60L * 60L * 1_000L))
+        assertEquals(10, LearnedEvidenceScoring.recencyBoost(now, now - 8L * 24L * 60L * 60L * 1_000L))
         assertEquals(0, LearnedEvidenceScoring.recencyBoost(now, now - 31L * 24L * 60L * 60L * 1_000L))
-        assertEquals(40, LearnedEvidenceScoring.recencyBoost(now, now + 1_000L))
+        assertEquals(60, LearnedEvidenceScoring.recencyBoost(now, now + 1_000L))
         assertEquals(0, LearnedEvidenceScoring.recencyBoost(now, 0L))
     }
 }

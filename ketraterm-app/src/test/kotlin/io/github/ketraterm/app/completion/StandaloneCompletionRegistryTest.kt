@@ -212,24 +212,26 @@ class StandaloneCompletionRegistryTest {
         }
 
     @Test
-    fun `shape stats boost matching static spec suggestions`() =
+    fun `learned command stats boost matching suggestions`() =
         runBlocking {
             val persistentStats = TerminalCompletionLearningStore()
             persistentStats.replaceSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
-                    shapeStats =
+                    commandStats =
                         listOf(
-                            shapeStats(
-                                commandLine = "git switch main",
-                                acceptedCount = 4,
+                            TerminalCommandCompletionStats(
+                                commandLine = "git switch",
+                                acceptedCount = 10,
                                 profileId = "bash",
                                 workingDirectoryUri = "file:///repo",
+                                lastUsedEpochMillis = 1_000,
                             ),
-                            shapeStats(
+                            TerminalCommandCompletionStats(
                                 commandLine = "git status",
-                                dismissedCount = 4,
+                                dismissedCount = 10,
                                 profileId = "bash",
                                 workingDirectoryUri = "file:///repo",
+                                lastUsedEpochMillis = 1_000,
                             ),
                         ),
                 ),
@@ -245,22 +247,22 @@ class StandaloneCompletionRegistryTest {
             val suggestions = provider.suggestions(request("git ")).last()
 
             assertEquals(listOf("switch", "status"), suggestions.map { it.replacementText }.take(2))
-            assertTrue(suggestions.take(2).all { it.source == "spec" })
         }
 
     @Test
-    fun `shape stats demote repeatedly dismissed static spec suggestions`() =
+    fun `learned command stats demote repeatedly dismissed suggestions`() =
         runBlocking {
             val persistentStats = TerminalCompletionLearningStore()
             persistentStats.replaceSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
-                    shapeStats =
+                    commandStats =
                         listOf(
-                            shapeStats(
+                            TerminalCommandCompletionStats(
                                 commandLine = "git status",
-                                dismissedCount = 4,
+                                dismissedCount = 20,
                                 profileId = "bash",
                                 workingDirectoryUri = "file:///repo",
+                                lastUsedEpochMillis = 1_000,
                             ),
                         ),
                 ),
