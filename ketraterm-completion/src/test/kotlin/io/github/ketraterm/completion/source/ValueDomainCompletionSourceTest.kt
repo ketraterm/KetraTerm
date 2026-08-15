@@ -23,6 +23,7 @@ import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -106,6 +107,42 @@ class ValueDomainCompletionSourceTest {
     fun `does not return an already complete value`() =
         runBlocking {
             assertTrue(source.complete(request("git switch feature/terminal")).isEmpty())
+        }
+
+    @Test
+    fun `custom display labels receive display-relative match ranges`() =
+        runBlocking {
+            val customDisplaySource =
+                TerminalCompletionSources.valueDomain(
+                    domain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    sourceId = "git",
+                    valuesProvider = {
+                        listOf(TerminalCompletionDomainValue(value = "f-branch", displayText = "Feature Branch"))
+                    },
+                )
+
+            val candidate = customDisplaySource.complete(request("git switch fb")).single()
+
+            assertEquals("Feature Branch", candidate.displayText)
+            assertContentEquals(intArrayOf(0, 1, 8, 9), candidate.matchedRanges.copyPackedOffsets())
+        }
+
+    @Test
+    fun `custom display labels without a display match remain eligible without highlight ranges`() =
+        runBlocking {
+            val customDisplaySource =
+                TerminalCompletionSources.valueDomain(
+                    domain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    sourceId = "git",
+                    valuesProvider = {
+                        listOf(TerminalCompletionDomainValue(value = "feature-branch", displayText = "Release candidate"))
+                    },
+                )
+
+            val candidate = customDisplaySource.complete(request("git switch fb")).single()
+
+            assertEquals("feature-branch", candidate.replacementText)
+            assertTrue(candidate.matchedRanges.isEmpty())
         }
 
     private fun request(

@@ -59,8 +59,11 @@ enum class TerminalCompletionCandidateKind {
  * are better in either scope.
  * @property valueDomain dynamic value domain for argument candidates supplied by
  * host-owned providers.
- * @throws IllegalArgumentException if text/source fields are empty or replacement
- * offsets do not form a nonnegative ordered range.
+ * @property matchedRanges immutable ordered UTF-16 intervals relative to
+ * [displayText] used by UI components to highlight matching fragments.
+ * @throws IllegalArgumentException if text/source fields are empty, replacement
+ * offsets do not form a nonnegative ordered range, or [matchedRanges] do not
+ * address [displayText].
  */
 data class TerminalCompletionCandidate
     @JvmOverloads
@@ -74,6 +77,7 @@ data class TerminalCompletionCandidate
         val detail: String = "",
         val score: Int = 0,
         val valueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
+        val matchedRanges: TerminalCompletionMatchRanges = TerminalCompletionMatchRanges.EMPTY,
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }
@@ -85,5 +89,6 @@ data class TerminalCompletionCandidate
             require(replacementEndOffset >= replacementStartOffset) {
                 "replacementEndOffset must be >= replacementStartOffset, was $replacementEndOffset"
             }
+            matchedRanges.requireValidFor(displayText)
         }
     }

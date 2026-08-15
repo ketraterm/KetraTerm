@@ -19,6 +19,7 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.GradleCompletionSyntax
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.boundedTo
+import io.github.ketraterm.completion.matching.CompletionMatcher
 
 /**
  * Gradle-task source backed by a bounded suspending host loader.
@@ -56,14 +57,8 @@ internal class GradleTaskCompletionSource(
         val emitted = HashSet<String>()
         for ((index, task) in tasks.withIndex()) {
             val replacement = replacementFor(task, prefix, projectDirectory) ?: continue
-            if (!replacement.startsWith(prefix, ignoreCase = true) ||
-                replacement.equals(
-                    prefix,
-                    ignoreCase = true,
-                )
-            ) {
-                continue
-            }
+            if (prefix.isNotEmpty() && replacement.equals(prefix, ignoreCase = true)) continue
+            val match = CompletionMatcher.match(replacement, prefix) ?: continue
             if (!emitted.add(replacement)) continue
             val encodedReplacement =
                 ShellReplacementText.encode(
@@ -80,7 +75,16 @@ internal class GradleTaskCompletionSource(
                     detail = task.description.ifBlank { "Gradle task ${task.path}" },
                     source = sourceId,
                     kind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                    score = score(task, replacement, prefix, index),
+                    score =
+                        match.sourceScore(
+                            baseScore =
+                                BASE_SCORE +
+                                    (if (task.isRootProjectTask) ROOT_TASK_BONUS else 0) +
+                                    (if (prefix.isEmpty()) EMPTY_PREFIX_BONUS else 0),
+                            query = prefix,
+                            orderIndex = index,
+                        ),
+                    matchedRanges = match.matchedRanges,
                 )
         }
         candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
@@ -133,18 +137,9 @@ internal class GradleTaskCompletionSource(
 
     private val TerminalGradleTask.isRootProjectTask: Boolean get() = path.indexOf(':', startIndex = 1) < 0
 
-    private fun score(
-        task: TerminalGradleTask,
-        replacement: String,
-        prefix: String,
-        orderIndex: Int,
-    ): Int {
-        val exactCaseBonus = if (replacement.startsWith(prefix)) 40 else 20
-        val rootTaskBonus = if (task.isRootProjectTask) 20 else 0
-        return BASE_SCORE + exactCaseBonus + rootTaskBonus - (replacement.length - prefix.length) - orderIndex
-    }
-
     private companion object {
         private const val BASE_SCORE = 300
+        private const val ROOT_TASK_BONUS = 20
+        private const val EMPTY_PREFIX_BONUS = 40
     }
 }

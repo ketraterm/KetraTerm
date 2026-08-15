@@ -137,11 +137,44 @@ class SwingShellSuggestionPopupLayoutTest {
         assertEquals(SwingShellSuggestionAccentRole.HISTORY, layout.row(2).accentRole)
     }
 
+    @Test
+    fun `ellipsizing truncates ranges before the ellipsis`() {
+        val component = JPanel().apply { font = Font(Font.SANS_SERIF, Font.PLAIN, 15) }
+        val layout = SwingShellSuggestionPopupLayout()
+        val displayText = "buildReleaseWithAnExtremelyLongSuffix"
+
+        layout.prepare(
+            component,
+            listOf(suggestion(displayText = displayText, matchedOffsets = intArrayOf(0, 1, 5, 8, 16, 17))),
+            availableWidth = 150,
+        )
+
+        val row = layout.row(0)
+        val retainedLength = row.displayText.removeSuffix("...").length
+        var rangeIndex = 0
+        while (rangeIndex < row.matchedRanges.rangeCount) {
+            assertTrue(row.matchedRanges.endOffset(rangeIndex) <= retainedLength)
+            rangeIndex++
+        }
+    }
+
+    @Test
+    fun `nonpositive source width budget produces an empty bounded label`() {
+        val component = JPanel().apply { font = Font(Font.MONOSPACED, Font.PLAIN, 13) }
+        val layout = SwingShellSuggestionPopupLayout()
+
+        layout.prepare(component, listOf(suggestion("candidate", source = "hostile-provider")), availableWidth = 20)
+
+        assertEquals("", layout.row(0).sourceLabel)
+        assertEquals(0, layout.row(0).sourceWidth)
+    }
+
     private fun suggestion(
         displayText: String,
         detail: String = "",
         source: String = "spec",
         kind: String = "COMMAND",
+        matchedOffsets: IntArray = IntArray(0),
     ): SwingShellSuggestion =
         SwingShellSuggestion(
             replacementText = displayText,
@@ -151,6 +184,7 @@ class SwingShellSuggestionPopupLayoutTest {
             kind = kind,
             displayText = displayText,
             detail = detail,
+            matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets(displayText, matchedOffsets),
         )
 
     private fun String.hasValidSurrogatePairs(): Boolean {

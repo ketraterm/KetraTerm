@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -44,6 +45,11 @@ class SwingCompletionSuggestionProviderTest {
                                         kind = TerminalCompletionCandidateKind.SUBCOMMAND,
                                         displayText = "status",
                                         detail = "show status",
+                                        matchedRanges =
+                                            TerminalCompletionMatchRanges.fromPackedOffsets(
+                                                "status",
+                                                intArrayOf(0, 2),
+                                            ),
                                     ),
                                 ),
                             )
@@ -67,6 +73,7 @@ class SwingCompletionSuggestionProviderTest {
             assertEquals(7, suggestions.single().replacementEndOffset)
             assertEquals("show status", suggestions.single().detail)
             assertEquals("SUBCOMMAND", suggestions.single().kind)
+            assertContentEquals(intArrayOf(0, 2), suggestions.single().matchedRanges.copyPackedOffsets())
         }
 
     @Test

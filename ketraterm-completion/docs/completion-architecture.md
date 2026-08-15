@@ -22,6 +22,12 @@ static candidates inconsistently. Statistics are
 ranking evidence and persisted fallback data; they are never composed as an
 independent candidate provider or ranking vote.
 
+`TerminalCompletionMatchRanges` is the immutable primitive-backed display-range
+contract carried by completion candidates. Construction validates ordered,
+non-overlapping UTF-16 scalar boundaries and takes ownership through defensive
+copying at public boundaries; hosts use indexed access when adapting or painting
+to avoid exposing mutable array state.
+
 `TerminalCompletionSourcePrior` is the single reviewed cold-start policy for
 built-in source families. Standalone and IntelliJ composition use these named
 values instead of maintaining duplicated numeric constants. They remain small

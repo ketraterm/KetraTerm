@@ -160,7 +160,9 @@ These are not badges of compatibility for this project. They expand attack surfa
   exact/shape/feedback learning, and bounded suspending off-EDT path providers. The reusable Swing
   terminal popup surface, keyboard/mouse selection, acceptance callback, range-aware Swing acceptance, dependency-free
   layered suspending completion foundation, deterministic source merge/ranking/deduplication with context-aware
-  command/subcommand/option/value/path/domain ranking, a cheap shared Swing live-trigger gate, bounded in-memory session MRU
+  command/subcommand/option/value/path/domain ranking, an allocation-minimal CamelHump and word-boundary acronym matcher,
+  validated immutable packed UTF-16 match ranges on candidates and Swing suggestions, display-relative bold matched-run
+  highlighting in the popup, a cheap shared Swing live-trigger gate, bounded in-memory session MRU
   plus session-only observed-token learning for unknown executable families, spec-declared path argument metadata,
   repeatable subcommand/task metadata, static option value domains, dynamic value-domain metadata for host providers,
   command-aware path completion with trailing-space argument semantics, quote-preserving and shell-escaped path

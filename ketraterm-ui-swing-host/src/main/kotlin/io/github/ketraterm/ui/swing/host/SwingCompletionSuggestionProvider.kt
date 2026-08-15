@@ -16,10 +16,7 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAccentRole
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -82,6 +79,11 @@ class SwingCompletionSuggestionProvider(
                         TerminalCompletionCandidateKind.HISTORY -> SwingShellSuggestionAccentRole.HISTORY
                         else -> SwingShellSuggestionAccentRole.OTHER
                     },
+                matchedRanges =
+                    SwingShellSuggestionMatchRanges.fromPackedOffsets(
+                        displayText,
+                        matchedRanges.copyPackedOffsets(),
+                    ),
             )
     }
 }

@@ -351,6 +351,15 @@ class SpecCompletionEngineTest {
             assertEquals(listOf("--profile"), ketraCandidates.map { it.replacementText })
         }
 
+    @Test
+    fun `subcommand query matches and populates matchedRanges`() =
+        runBlocking {
+            val candidates = engine().complete(request("git c"))
+            assertEquals(listOf("commit", "checkout"), candidates.map { it.replacementText })
+            val commit = candidates.first { it.replacementText == "commit" }
+            kotlin.test.assertContentEquals(intArrayOf(0, 1), commit.matchedRanges.copyPackedOffsets())
+        }
+
     private fun engine(): TerminalCompletionEngine {
         val specs =
             listOf(

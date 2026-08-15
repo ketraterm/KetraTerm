@@ -118,14 +118,16 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 - **Interactive Selection**: Drag selecting with velocity autoscrolling, Alt-drag block selection, double-click smart selection (words, paths, URLs), triple-click line selection, middle-click paste, and system clipboard interfaces.
 - **Scrollback Search**: Regex-free text search scanning viewport and retained scrollback history, ignoring soft-wrapping boundaries.
 - **Shell Suggestion Popup Surface**: Reusable Swing terminals expose a configurable, host-fed shell suggestion popup with keyboard and mouse selection, grid-cell anchoring, host acceptance callbacks, range-aware default acceptance, and standalone/IntelliJ settings toggles. The reusable controller owns semantic selection, acceptance, and dismissal actions while each host owns the physical key bindings: standalone uses the conventional popup map and IntelliJ resolves lookup actions from the user's active IDE keymap. Claimed actions retain the complete Swing press/typed/repeat/release lifecycle so an acceptance key cannot leak into terminal input after closing the popup. Default acceptance validates UTF-16 and extended grapheme-cluster boundaries, treats combining, emoji-modifier, regional-indicator, and ZWJ sequences as single editor actions, and submits Delete/Backspace/paste phases through one session-serialized text-replacement event. The input encoder reuses active keyboard and paste policies while coalescing long deletion sequences through a bounded buffer. Suggestion sources, ranking, live triggers, and source-specific replacement policy remain product-host responsibilities.
-- **Completion Engine Foundation**: Dependency-free pure Kotlin completion APIs define command-line requests, explicit
+- **Completion Engine Foundation & IntelliJ-Style Fuzzy Matching**: Dependency-free pure Kotlin completion APIs define command-line requests, explicit
   replacement-range candidates, candidate kinds, layered completion sources, deterministic source
   merging/ranking/deduplication, command/option specs with ordered optional/variadic positional argument metadata,
   mutually exclusive option groups, command/option hidden-path policies, repeatable subcommand/task semantics, bounded
   static option value domains, dynamic host-owned value-domain metadata, and host-resolved shell lexical/replacement
   capabilities, shell-word tokenization, a shared internal completion-context resolver for
   command/subcommand/option/value/argument positions, spec-backed evaluation, spec-aware command-line classification,
-  a cheap text-only Swing live-trigger gate, context-aware merged ranking for command/subcommand/option/value/path/domain
+  a fast allocation-minimal CamelHump and word-boundary acronym matcher that extracts validated immutable packed
+  UTF-16 match ranges for candidates, a cheap text-only Swing live-trigger gate,
+  context-aware merged ranking for command/subcommand/option/value/path/domain
   positions, privacy-preserving argument shape categories, source-specific accepted/dismissed feedback stats, one
   global evidence-fusion ranker, bounded surplus collection before final presentation truncation, a
   bounded in-memory session MRU source, command-aware path
@@ -133,7 +135,9 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   set for common developer CLIs and shell path commands. The standalone and IntelliJ hosts wire that engine through a
   shared optional Swing-host adapter, map authoritative profile categories to supported POSIX, PowerShell, or
   conservative plain capabilities, pass profile/current-directory context into requests, persist compact exact
-  command/shape/source-feedback stats instead of scanning raw history, and feed successful OSC 133 command metadata into
+  command/shape/source-feedback stats instead of scanning raw history, forward immutable match ranges to Swing suggestions,
+  render matching character runs in bold using their validated display-relative offsets, and feed successful OSC 133
+  command metadata into
   per-session MRU sources. For unknown executables, session MRU also learns bounded in-memory observed tokens without
   claiming false command semantics: `abc de -g`, `abc de -f`, and `abc as` offer `de`/`as` after `abc ` and observed
   options after `abc de `. It learns only the first non-option token and option names, never later positional or option

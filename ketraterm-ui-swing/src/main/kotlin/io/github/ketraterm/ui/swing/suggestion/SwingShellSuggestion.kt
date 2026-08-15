@@ -41,6 +41,11 @@ import java.util.regex.Pattern
  * command text.
  * @property replacementEndOffset exclusive UTF-16 end offset in the request
  * command text.
+ * @property matchedRanges immutable ordered UTF-16 intervals relative to
+ * [displayText] used to visually highlight matching fragments.
+ * @throws IllegalArgumentException if text/source/kind fields are invalid,
+ * replacement offsets are unordered, or [matchedRanges] do not address
+ * [displayText].
  */
 data class SwingShellSuggestion
     @JvmOverloads
@@ -53,6 +58,7 @@ data class SwingShellSuggestion
         val displayText: String = replacementText,
         val detail: String = "",
         val accentRole: SwingShellSuggestionAccentRole = SwingShellSuggestionAccentRole.from(kind, source),
+        val matchedRanges: SwingShellSuggestionMatchRanges = SwingShellSuggestionMatchRanges.EMPTY,
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }
@@ -66,6 +72,7 @@ data class SwingShellSuggestion
                 "replacementEndOffset must be >= replacementStartOffset, was " +
                     "$replacementEndOffset < $replacementStartOffset"
             }
+            matchedRanges.requireValidFor(displayText)
         }
     }
 
