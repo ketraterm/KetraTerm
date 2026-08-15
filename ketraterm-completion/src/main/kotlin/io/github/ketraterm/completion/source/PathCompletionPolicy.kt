@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.completion.source
 
+import io.github.ketraterm.completion.api.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.model.TerminalHiddenPathPolicy
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
@@ -25,7 +26,22 @@ internal fun isPathLike(prefix: String): Boolean =
         prefix.startsWith('.') ||
         prefix.startsWith('~') ||
         prefix.indexOf('/') >= 0 ||
-        prefix.indexOf('\\') >= 0
+        prefix.indexOf('\\') >= 0 ||
+        (prefix.length >= 2 && prefix[1] == ':')
+
+internal fun allowsPathCompletion(
+    activePosition: TerminalCompletionActivePosition,
+    expectedPathKind: TerminalPathArgumentKind,
+    prefix: String,
+): Boolean {
+    if (activePosition == TerminalCompletionActivePosition.OPERATOR ||
+        activePosition == TerminalCompletionActivePosition.OPTION_NAME
+    ) {
+        return false
+    }
+    if (activePosition == TerminalCompletionActivePosition.COMMAND) return isPathLike(prefix)
+    return expectedPathKind != TerminalPathArgumentKind.NONE || isPathLike(prefix)
+}
 
 internal fun TerminalPathArgumentKind.acceptsPathEntry(isDirectory: Boolean): Boolean =
     when (this) {

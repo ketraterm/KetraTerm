@@ -18,7 +18,6 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.boundedTo
-import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -41,16 +40,7 @@ internal class PathCompletionSource(
     ): List<TerminalCompletionCandidate> {
         val workingDir = request.workingDirectoryUri ?: return emptyList()
         val prefix = context.activePrefix
-
-        if (context.activePosition == TerminalCompletionActivePosition.OPERATOR) return emptyList()
-
-        if (context.activePosition == TerminalCompletionActivePosition.OPTION_NAME) return emptyList()
-
-        if (context.activePosition == TerminalCompletionActivePosition.COMMAND && !isPathLike(prefix)) return emptyList()
-        if (context.activePosition != TerminalCompletionActivePosition.COMMAND &&
-            context.expectedPathKind == TerminalPathArgumentKind.NONE &&
-            !isPathLike(prefix)
-        ) {
+        if (!allowsPathCompletion(context.activePosition, context.expectedPathKind, prefix)) {
             return emptyList()
         }
 

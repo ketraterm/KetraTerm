@@ -139,3 +139,14 @@ internal fun canonicalizeWorkingDirectoryUri(uri: String): String {
     val trimmed = uri.trim()
     return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
 }
+
+internal fun isCommandValidForDirectory(
+    commandLine: String,
+    sourceWorkingDir: String?,
+    targetWorkingDir: String?,
+): Boolean {
+    if (!isRelativeCdCommand(commandLine)) return true
+    val source = sourceWorkingDir ?: return true
+    val target = targetWorkingDir ?: return true
+    return canonicalizeWorkingDirectoryUri(source) == canonicalizeWorkingDirectoryUri(target)
+}

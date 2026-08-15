@@ -21,6 +21,7 @@ import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncrement
 import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.source.SessionObservedTokenIndex.Entry
 import io.github.ketraterm.completion.spec.findCommandSpec
 
 /** Bounded observed-token index for command families not covered by static specs. */
@@ -28,7 +29,10 @@ internal class SessionObservedTokenIndex(
     private val capacity: Int,
     private val commandSpecs: List<TerminalCommandSpec>,
 ) {
-    private val entries = ArrayList<Entry>(capacity)
+    private val entries =
+        object : LinkedHashMap<Key, Entry>(capacity, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, Entry>?): Boolean = size > capacity
+        }
 
     fun record(
         commandLine: String,
@@ -76,7 +80,7 @@ internal class SessionObservedTokenIndex(
     ) {
         val observedContext = context.observedContext() ?: return
         val normalizedPrefix = normalizeTerminalCommandToken(context.activePrefix)
-        for (entry in entries) {
+        for (entry in entries.values) {
             if (entry.context != observedContext || !entry.normalizedToken.startsWith(normalizedPrefix)) continue
             if (entry.normalizedToken == normalizedPrefix) continue
             destination += entry.toCandidate(request, context.replacementStartOffset, context.replacementEndOffset)
@@ -93,25 +97,27 @@ internal class SessionObservedTokenIndex(
         sequence: Long,
     ) {
         if (token.isBlank()) return
-        val index =
-            entries.indexOfFirst { entry ->
-                entry.context == context &&
-                    entry.normalizedToken == token &&
-                    entry.profileId == profileId &&
-                    entry.workingDirectoryUri == workingDirectoryUri
-            }
-        if (index >= 0) {
-            val entry = entries.removeAt(index)
-            entries +=
-                entry.copy(
+        val key = Key(context, token, profileId, workingDirectoryUri)
+        val existing = entries[key]
+        if (existing != null) {
+            entries[key] =
+                existing.copy(
                     token = token,
-                    useCount = saturatedCompletionCounterIncrement(entry.useCount),
+                    useCount = saturatedCompletionCounterIncrement(existing.useCount),
                     lastUsedSequence = sequence,
                 )
-            return
+        } else {
+            entries[key] =
+                Entry(
+                    context = context,
+                    token = token,
+                    normalizedToken = token,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    useCount = 1,
+                    lastUsedSequence = sequence,
+                )
         }
-        if (entries.size == capacity) entries.removeAt(0)
-        entries += Entry(context, token, token, profileId, workingDirectoryUri, useCount = 1, lastUsedSequence = sequence)
     }
 
     private fun TerminalCommandLineContext.observedContext(): String? {
@@ -152,6 +158,13 @@ internal class SessionObservedTokenIndex(
             length == SHORT_OPTION_LENGTH -> this
             else -> null
         }
+
+    private data class Key(
+        val context: String,
+        val token: String,
+        val profileId: String?,
+        val workingDirectoryUri: String?,
+    )
 
     private data class Entry(
         val context: String,

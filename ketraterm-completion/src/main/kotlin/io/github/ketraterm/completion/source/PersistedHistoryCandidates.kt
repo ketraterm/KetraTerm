@@ -20,7 +20,7 @@ import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
 import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
-import io.github.ketraterm.completion.internal.isRelativeCdCommand
+import io.github.ketraterm.completion.internal.isCommandValidForDirectory
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.ranking.LearnedEvidenceScoring
 
@@ -35,7 +35,7 @@ internal fun appendPersistedHistoryCandidates(
 ) {
     for (indexed in index.matching(lineContext)) {
         val entry = indexed.stats
-        if (!entry.isValidFor(request)) continue
+        if (!isCommandValidForDirectory(entry.commandLine, entry.workingDirectoryUri, request.workingDirectoryUri)) continue
         projectLearnedCommandCandidate(
             request = request,
             requestLine = lineContext,
@@ -47,13 +47,6 @@ internal fun appendPersistedHistoryCandidates(
             learnedLine = indexed.lineContext,
         )?.let(destination::add)
     }
-}
-
-private fun TerminalCommandCompletionStats.isValidFor(request: TerminalCompletionRequest): Boolean {
-    if (!isRelativeCdCommand(commandLine)) return true
-    val entryDirectory = workingDirectoryUri ?: return true
-    val requestDirectory = request.workingDirectoryUri ?: return true
-    return canonicalizeWorkingDirectoryUri(entryDirectory) == canonicalizeWorkingDirectoryUri(requestDirectory)
 }
 
 private fun TerminalCommandCompletionStats.localScore(

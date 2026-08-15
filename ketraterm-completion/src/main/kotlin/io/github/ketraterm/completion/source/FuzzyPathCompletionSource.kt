@@ -17,7 +17,6 @@ package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.BoundedCompletionCandidateCollector
-import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 /**
  * Materializes already-matched host paths using terminal-safe semantics.
@@ -82,20 +81,6 @@ internal class FuzzyPathCompletionSource(
             )
         }
         return candidates.finish()
-    }
-
-    private fun allowsPathCompletion(
-        activePosition: TerminalCompletionActivePosition,
-        expectedPathKind: TerminalPathArgumentKind,
-        prefix: String,
-    ): Boolean {
-        if (activePosition == TerminalCompletionActivePosition.OPERATOR ||
-            activePosition == TerminalCompletionActivePosition.OPTION_NAME
-        ) {
-            return false
-        }
-        if (activePosition == TerminalCompletionActivePosition.COMMAND) return isPathLike(prefix)
-        return expectedPathKind != TerminalPathArgumentKind.NONE || isPathLike(prefix)
     }
 
     private companion object {

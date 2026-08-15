@@ -18,9 +18,10 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
+import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.commandPrefix
-import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
-import io.github.ketraterm.completion.internal.isRelativeCdCommand
+import io.github.ketraterm.completion.internal.isCommandValidForDirectory
 import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
 import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncrement
 import io.github.ketraterm.completion.source.SessionCommandHistory.Entry
@@ -52,10 +53,12 @@ internal class SessionCommandHistory(
                     lastUsedSequence = sequence,
                 )
         } else {
+            val lineContext = TerminalCommandLineTokenizer.parse(commandLine, commandLine.length)
             entries[normalized] =
                 Entry(
                     commandLine = commandLine,
                     normalizedCommandLine = normalized,
+                    lineContext = lineContext,
                     profileId = profileId,
                     workingDirectoryUri = workingDirectoryUri,
                     useCount = 1,
@@ -73,7 +76,7 @@ internal class SessionCommandHistory(
         val normalizedPrefix = normalizeTerminalCommandLine(lineContext.commandPrefix(request.commandLine))
         for (entry in entries.values) {
             if (!entry.normalizedCommandLine.startsWith(normalizedPrefix) || entry.normalizedCommandLine == normalizedPrefix) continue
-            if (!entry.isValidFor(request)) continue
+            if (!isCommandValidForDirectory(entry.commandLine, entry.workingDirectoryUri, request.workingDirectoryUri)) continue
             projectLearnedCommandCandidate(
                 request = request,
                 requestLine = lineContext,
@@ -90,22 +93,17 @@ internal class SessionCommandHistory(
                         request,
                     ),
                 detailPrefix = "recent",
+                learnedLine = entry.lineContext,
             )?.let(destination::add)
         }
     }
 
     fun clear() = entries.clear()
 
-    private fun Entry.isValidFor(request: TerminalCompletionRequest): Boolean {
-        if (!isRelativeCdCommand(commandLine)) return true
-        val entryDirectory = workingDirectoryUri ?: return true
-        val requestDirectory = request.workingDirectoryUri ?: return true
-        return canonicalizeWorkingDirectoryUri(entryDirectory) == canonicalizeWorkingDirectoryUri(requestDirectory)
-    }
-
     private data class Entry(
         val commandLine: String,
         val normalizedCommandLine: String,
+        val lineContext: TerminalCommandLineContext,
         val profileId: String?,
         val workingDirectoryUri: String?,
         val useCount: Int,
