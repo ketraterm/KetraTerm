@@ -29,6 +29,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 
@@ -99,8 +100,8 @@ internal class MergedCompletionEngine(
                                         .filter { it.hasValidReplacementRangeFor(request) }
                                         .boundedTo(SOURCE_CANDIDATE_LIMIT)
                                 } catch (cancellation: CancellationException) {
-                                    completions.close(cancellation)
-                                    return@launch
+                                    if (!coroutineContext.isActive) throw cancellation
+                                    emptyList()
                                 } catch (failure: Exception) {
                                     reportSourceFailure(sourceIndex, entry, failure)
                                     emptyList()

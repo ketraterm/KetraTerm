@@ -117,10 +117,9 @@ class MergedCompletionEngineTest {
         }
 
     @Test
-    fun `source cancellation terminates the request and cancels siblings`() =
+    fun `isolated source cancellation does not cancel siblings or abort request`() =
         runBlocking {
             val siblingStarted = CompletableDeferred<Unit>()
-            val siblingCancelled = CompletableDeferred<Unit>()
             val cancelSource = CompletableDeferred<Unit>()
             val engine =
                 TerminalCompletionEngines.fromSources(
@@ -129,20 +128,16 @@ class MergedCompletionEngineTest {
                             entry(
                                 TerminalCompletionSource { _, _, _ ->
                                     cancelSource.await()
-                                    throw CancellationException("source cancelled")
+                                    throw CancellationException("isolated source cancelled")
                                 },
-                                0,
+                                priority = 0,
                             ),
                             entry(
                                 TerminalCompletionSource { _, _, _ ->
                                     siblingStarted.complete(Unit)
-                                    try {
-                                        awaitCancellation()
-                                    } finally {
-                                        siblingCancelled.complete(Unit)
-                                    }
+                                    listOf(candidate("available", source = "sibling"))
                                 },
-                                0,
+                                priority = 10,
                             ),
                         ),
                     commandSpecs = emptyList(),
@@ -152,8 +147,8 @@ class MergedCompletionEngineTest {
             siblingStarted.await()
             cancelSource.complete(Unit)
 
-            assertFailsWith<CancellationException> { collection.await() }
-            siblingCancelled.await()
+            val emissions = collection.await()
+            assertEquals(listOf("available"), emissions.last().map { it.replacementText })
         }
 
     @Test
