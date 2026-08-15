@@ -18,6 +18,7 @@ package io.github.ketraterm.completion.spec
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
+import io.github.ketraterm.completion.internal.matchesCompletablePrefix
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalOptionSpec
 
@@ -53,38 +54,47 @@ internal class SpecCompletionSource(
             .take(limit)
     }
 
-    private fun completeCommands(context: TerminalCommandLineContext): List<TerminalCompletionCandidate> =
-        commandSpecs
-            .asSequence()
-            .filter { matchesCompletablePrefix(it.name, context.activePrefix) }
-            .mapIndexed { orderIndex, spec ->
-                candidate(
-                    replacementText = spec.name,
-                    displayText = spec.name,
-                    detail = spec.description,
-                    kind = TerminalCompletionCandidateKind.COMMAND,
-                    context = context,
-                    score = score(spec.name, context.activePrefix, COMMAND_BASE_SCORE, orderIndex),
-                )
-            }.toList()
+    private fun completeCommands(context: TerminalCommandLineContext): List<TerminalCompletionCandidate> {
+        val candidates = ArrayList<TerminalCompletionCandidate>()
+        var orderIndex = 0
+        for (i in commandSpecs.indices) {
+            val spec = commandSpecs[i]
+            if (matchesCompletablePrefix(spec.name, context.activePrefix)) {
+                candidates +=
+                    candidate(
+                        replacementText = spec.name,
+                        displayText = spec.name,
+                        detail = spec.description,
+                        kind = TerminalCompletionCandidateKind.COMMAND,
+                        context = context,
+                        score = score(spec.name, context.activePrefix, COMMAND_BASE_SCORE, orderIndex++),
+                    )
+            }
+        }
+        return candidates
+    }
 
-    private fun completeSubcommands(context: TerminalCompletionContext): List<TerminalCompletionCandidate> =
-        context.subcommandCandidateSource
-            ?.subcommands
-            .orEmpty()
-            .asSequence()
-            .filterNot { context.isAlreadyUsedRepeatableSubcommand(it) }
-            .filter { matchesCompletablePrefix(it.name, context.activePrefix) }
-            .mapIndexed { orderIndex, spec ->
-                candidate(
-                    replacementText = spec.name,
-                    displayText = spec.name,
-                    detail = spec.description,
-                    kind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                    context = context.commandLineContext,
-                    score = score(spec.name, context.activePrefix, SUBCOMMAND_BASE_SCORE, orderIndex),
-                )
-            }.toList()
+    private fun completeSubcommands(context: TerminalCompletionContext): List<TerminalCompletionCandidate> {
+        val subcommands = context.subcommandCandidateSource?.subcommands ?: return emptyList()
+        val candidates = ArrayList<TerminalCompletionCandidate>()
+        var orderIndex = 0
+        for (i in subcommands.indices) {
+            val spec = subcommands[i]
+            if (context.isAlreadyUsedRepeatableSubcommand(spec)) continue
+            if (matchesCompletablePrefix(spec.name, context.activePrefix)) {
+                candidates +=
+                    candidate(
+                        replacementText = spec.name,
+                        displayText = spec.name,
+                        detail = spec.description,
+                        kind = TerminalCompletionCandidateKind.SUBCOMMAND,
+                        context = context.commandLineContext,
+                        score = score(spec.name, context.activePrefix, SUBCOMMAND_BASE_SCORE, orderIndex++),
+                    )
+            }
+        }
+        return candidates
+    }
 
     private fun TerminalCompletionContext.isAlreadyUsedRepeatableSubcommand(spec: TerminalCommandSpec): Boolean {
         val source = subcommandCandidateSource ?: return false
@@ -122,35 +132,49 @@ internal class SpecCompletionSource(
         return candidates
     }
 
-    private fun completeOptionValues(context: TerminalCompletionContext): List<TerminalCompletionCandidate> =
-        context.staticValueCandidates
-            .asSequence()
-            .filter { matchesCompletablePrefix(it, context.activePrefix) }
-            .mapIndexed { orderIndex, value ->
-                candidate(
-                    replacementText = value,
-                    displayText = value,
-                    detail = context.activeOption?.description.orEmpty(),
-                    kind = TerminalCompletionCandidateKind.ARGUMENT,
-                    context = context,
-                    score = score(value, context.activePrefix, OPTION_VALUE_BASE_SCORE, orderIndex),
-                )
-            }.toList()
+    private fun completeOptionValues(context: TerminalCompletionContext): List<TerminalCompletionCandidate> {
+        val values = context.staticValueCandidates
+        if (values.isEmpty()) return emptyList()
+        val candidates = ArrayList<TerminalCompletionCandidate>()
+        var orderIndex = 0
+        for (i in values.indices) {
+            val value = values[i]
+            if (matchesCompletablePrefix(value, context.activePrefix)) {
+                candidates +=
+                    candidate(
+                        replacementText = value,
+                        displayText = value,
+                        detail = context.activeOption?.description.orEmpty(),
+                        kind = TerminalCompletionCandidateKind.ARGUMENT,
+                        context = context,
+                        score = score(value, context.activePrefix, OPTION_VALUE_BASE_SCORE, orderIndex++),
+                    )
+            }
+        }
+        return candidates
+    }
 
-    private fun completePositionalValues(context: TerminalCompletionContext): List<TerminalCompletionCandidate> =
-        context.staticValueCandidates
-            .asSequence()
-            .filter { matchesCompletablePrefix(it, context.activePrefix) }
-            .mapIndexed { orderIndex, value ->
-                candidate(
-                    replacementText = value,
-                    displayText = value,
-                    detail = context.activePositionalArgument?.description.orEmpty(),
-                    kind = TerminalCompletionCandidateKind.ARGUMENT,
-                    context = context,
-                    score = score(value, context.activePrefix, OPTION_VALUE_BASE_SCORE, orderIndex),
-                )
-            }.toList()
+    private fun completePositionalValues(context: TerminalCompletionContext): List<TerminalCompletionCandidate> {
+        val values = context.staticValueCandidates
+        if (values.isEmpty()) return emptyList()
+        val candidates = ArrayList<TerminalCompletionCandidate>()
+        var orderIndex = 0
+        for (i in values.indices) {
+            val value = values[i]
+            if (matchesCompletablePrefix(value, context.activePrefix)) {
+                candidates +=
+                    candidate(
+                        replacementText = value,
+                        displayText = value,
+                        detail = context.activePositionalArgument?.description.orEmpty(),
+                        kind = TerminalCompletionCandidateKind.ARGUMENT,
+                        context = context,
+                        score = score(value, context.activePrefix, OPTION_VALUE_BASE_SCORE, orderIndex++),
+                    )
+            }
+        }
+        return candidates
+    }
 
     private fun candidate(
         replacementText: String,
@@ -196,11 +220,6 @@ internal class SpecCompletionSource(
         private const val SUBCOMMAND_BASE_SCORE = 250
         private const val OPTION_BASE_SCORE = 220
         private const val OPTION_VALUE_BASE_SCORE = 210
-
-        private fun matchesCompletablePrefix(
-            value: String,
-            prefix: String,
-        ): Boolean = prefix.isEmpty() || (value.startsWith(prefix, ignoreCase = true) && !value.equals(prefix, ignoreCase = true))
 
         private fun score(
             value: String,

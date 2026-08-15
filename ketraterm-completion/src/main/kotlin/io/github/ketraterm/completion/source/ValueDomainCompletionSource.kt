@@ -18,6 +18,7 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.boundedTo
+import io.github.ketraterm.completion.internal.matchesCompletablePrefix
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 
@@ -108,13 +109,6 @@ internal fun projectValueDomainCandidates(
     candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
     return candidates.boundedTo(limit)
 }
-
-private fun matchesCompletablePrefix(
-    value: String,
-    prefix: String,
-): Boolean =
-    prefix.isEmpty() ||
-        (value.startsWith(prefix, ignoreCase = true) && !value.equals(prefix, ignoreCase = true))
 
 private fun valueDomainScore(
     value: TerminalCompletionDomainValue,

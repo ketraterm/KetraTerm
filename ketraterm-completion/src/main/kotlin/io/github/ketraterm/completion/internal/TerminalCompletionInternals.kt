@@ -150,3 +150,10 @@ internal fun isCommandValidForDirectory(
     val target = targetWorkingDir ?: return true
     return canonicalizeWorkingDirectoryUri(source) == canonicalizeWorkingDirectoryUri(target)
 }
+
+internal fun matchesCompletablePrefix(
+    value: String,
+    prefix: String,
+): Boolean =
+    prefix.isEmpty() ||
+        (value.startsWith(prefix, ignoreCase = true) && !value.equals(prefix, ignoreCase = true))
