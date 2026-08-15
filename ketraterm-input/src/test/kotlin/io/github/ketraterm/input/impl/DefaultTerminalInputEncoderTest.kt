@@ -58,6 +58,48 @@ class DefaultTerminalInputEncoderTest {
     }
 
     @Test
+    fun `encode text replacement reads modes once and preserves edit ordering`() {
+        val inputState = RecordingInputState(0L)
+        val output = RecordingHostOutput()
+        val encoder = DefaultTerminalInputEncoder(inputState, output)
+
+        encoder.encodeTextReplacement(
+            TerminalTextReplacementEvent(
+                deleteAfterCursorCount = 2,
+                deleteBeforeCursorCount = 3,
+                replacementText = "status",
+            ),
+        )
+
+        assertEquals(1, inputState.reads)
+        assertArrayEquals(
+            esc("[3~") + esc("[3~") + byteArrayOf(0x7f, 0x7f, 0x7f) + "status".encodeToByteArray(),
+            output.bytes,
+        )
+        assertEquals(2, output.writeCalls)
+    }
+
+    @Test
+    fun `long text replacement coalesces deletion sequences into bounded writes`() {
+        val inputState = RecordingInputState(0L)
+        val output = RecordingHostOutput()
+        val encoder = DefaultTerminalInputEncoder(inputState, output)
+
+        encoder.encodeTextReplacement(
+            TerminalTextReplacementEvent(
+                deleteAfterCursorCount = 4_096,
+                deleteBeforeCursorCount = 4_096,
+                replacementText = "done",
+            ),
+        )
+
+        assertEquals(1, inputState.reads)
+        assertEquals(6, output.writeCalls)
+        assertEquals(4_096 * 5 + 4, output.bytes.size)
+        assertArrayEquals("done".encodeToByteArray(), output.bytes.copyOfRange(output.bytes.size - 4, output.bytes.size))
+    }
+
+    @Test
     fun `encodeFocus reads mode bits once per event`() {
         val inputState = RecordingInputState(TerminalModeBits.FOCUS_REPORTING)
         val output = RecordingHostOutput()
@@ -226,8 +268,11 @@ class DefaultTerminalInputEncoderTest {
     private class RecordingHostOutput : TerminalHostOutput {
         var bytes: ByteArray = ByteArray(0)
             private set
+        var writeCalls: Int = 0
+            private set
 
         override fun writeByte(byte: Int) {
+            writeCalls++
             bytes += byte.toByte()
         }
 
@@ -236,14 +281,17 @@ class DefaultTerminalInputEncoderTest {
             offset: Int,
             length: Int,
         ) {
+            writeCalls++
             this.bytes += bytes.copyOfRange(offset, offset + length)
         }
 
         override fun writeAscii(text: String) {
+            writeCalls++
             bytes += text.encodeToByteArray()
         }
 
         override fun writeUtf8(text: String) {
+            writeCalls++
             bytes += text.encodeToByteArray()
         }
     }

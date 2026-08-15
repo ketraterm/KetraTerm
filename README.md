@@ -1,6 +1,6 @@
 # KetraTerm Terminal
 
-**KetraTerm**  is a next-generation, high-performance, strictly modular terminal emulator library written in **Kotlin/JVM 21**.
+**KetraTerm**  is a next-generation, high-performance, strictly modular terminal emulator library written in **Kotlin/JVM 25**.
 
 Designed for embedding into IDEs, developer tools, and standalone desktop applications, KetraTerm provides a clean, fast, and modern terminal architecture. It rejects the bloated legacy compatibility of the 1980s (like printer passthroughs or Tektronix vector graphics) to focus on contemporary shells and text-user interfaces (TUIs).
 
@@ -90,12 +90,16 @@ KetraTerm is composed of strict, decoupled Gradle modules:
 * **`:ketraterm-core`**: Headless text grid storage, circular scrollback buffers, and resizing reflow.
 * **`:ketraterm-host`**: Semantic translation adapter connecting the parser to core state.
 * **`:ketraterm-input`**: Keyboard/mouse event models and host-bound ANSI encoders.
+* **`:ketraterm-completion`**: Dependency-free command completion models, parsing, ranking, and learning indexes.
+* **`:ketraterm-completion-host`**: Direct suspending local path-provider and bounded scanning infrastructure.
+* **`:ketraterm-completion-persistence`**: Optional sanitized local-file storage for completion learning.
 * **`:ketraterm-render-api`**: Dependency-free visual frame contracts.
 * **`:ketraterm-render-cache`**: Double/triple-buffered publication cache.
 * **`:ketraterm-transport-api`**: Duplex I/O connector interfaces.
 * **`:ketraterm-session`**: Thread synchronization, lock controls, and event loop.
 * **`:ketraterm-pty`**: Local native process Pty4J launcher and stream pump.
 * **`:ketraterm-ui-swing`**: Reusable desktop `JComponent` painter and mouse interaction adapters.
+* **`:ketraterm-ui-swing-host`**: Optional host chrome, actions, and completion-to-Swing adapters.
 * **`:ketraterm-workspace`**: Headless tab/profile workspace layer used by product hosts.
 * **`:ketraterm-app`**: Standalone desktop application host.
 * **`:ketraterm-testkit`**: In-memory connector mocks and simulation tools.
@@ -109,7 +113,7 @@ KetraTerm is composed of strict, decoupled Gradle modules:
 ## Development & Verification
 
 ### Prerequisites
-* **JDK 21 or higher**
+* **JDK 25 or higher**
 * **Gradle 7.4+**
 
 ### Command Reference

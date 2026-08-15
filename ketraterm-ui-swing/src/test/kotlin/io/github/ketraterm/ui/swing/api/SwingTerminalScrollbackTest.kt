@@ -47,6 +47,7 @@ import javax.swing.JComponent
 import javax.swing.RepaintManager
 import javax.swing.SwingUtilities
 
+/** Rendering, viewport, and EDT coalescing tests for Swing terminal scrollback. */
 class SwingTerminalScrollbackTest {
     @Test
     fun `equal render requests schedule at most one pending EDT repaint`() {
@@ -563,7 +564,7 @@ class SwingTerminalScrollbackTest {
 
             reader.activeBuffer = TerminalRenderBufferKind.ALTERNATE
             session.requestRender(scrollbackOffset = 0)
-            drainEdt()
+            awaitVisibleGridColumnsGreaterThan(component, primaryColumns)
 
             lateinit var alternateVisibleSize: java.awt.Dimension
             SwingUtilities.invokeAndWait {
@@ -694,6 +695,19 @@ class SwingTerminalScrollbackTest {
             Thread.sleep(5)
         }
         assertEquals(expectedOffset, component.viewportState().scrollbackOffset)
+    }
+
+    private fun awaitVisibleGridColumnsGreaterThan(
+        component: SwingTerminal,
+        columns: Int,
+    ) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+        while (System.nanoTime() < deadline) {
+            drainEdt()
+            if (component.visibleGridSize().width > columns) return
+            Thread.sleep(5)
+        }
+        assertTrue(component.visibleGridSize().width > columns, "visible grid was not resized")
     }
 
     private fun awaitRequestedRows(

@@ -44,5 +44,6 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+/graphify-out
 ### Node.js tooling ###
 node_modules/

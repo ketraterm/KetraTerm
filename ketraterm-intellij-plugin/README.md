@@ -28,6 +28,10 @@ Current intent:
 
 ## Build
 
+KetraTerm and the IntelliJ 2026.2 plugin compile with JDK 25. This keeps the
+shared modules, standalone application, tests, benchmarks, and IDE-facing
+classes on one supported toolchain.
+
 From this directory:
 
 ```text
@@ -67,8 +71,12 @@ services, tool windows, settings bridges, notifications, and disposal hooks.
 
 Reusable terminal behavior stays in the main KetraTerm modules:
 
+- `ketraterm-completion`: pure command parsing, sources, ranking, and learning.
+- `ketraterm-completion-host`: structured latest-request directory and value snapshots.
+- `ketraterm-completion-persistence`: sanitized, bounded statistics storage.
 - `ketraterm-ui-swing`: Swing terminal component, painting, selection, input, and
   viewport behavior.
+- `ketraterm-ui-swing-host`: reusable completion-to-Swing request and feedback adapters.
 - `ketraterm-workspace`: host-neutral terminal profiles and workspace/session
   state.
 - `ketraterm-session`: parser/core/input/transport synchronization.
@@ -93,6 +101,8 @@ project references:
 
 ```kotlin
 implementation("io.github.ketraterm:ketraterm-ui-swing")
+implementation("io.github.ketraterm:ketraterm-completion-host")
+implementation("io.github.ketraterm:ketraterm-completion-persistence")
 implementation("io.github.ketraterm:ketraterm-workspace")
 ```
 

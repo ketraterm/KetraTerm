@@ -1,6 +1,6 @@
 # Terminal Pipeline Agent Guide
 
-This repository is building a modern, secure terminal pipeline in Kotlin/JVM 21.
+This repository is building a modern, secure terminal pipeline in Kotlin/JVM 25.
 It is not chasing literal full xterm parity. The goal is a clean, fast,
 professional terminal architecture for contemporary shells and TUIs.
 
@@ -20,6 +20,12 @@ The project is split into strict layers:
   APIs.
 - `ketraterm-input`: host-bound input encoding for keyboard, paste, focus, and
   future mouse reports.
+- `ketraterm-completion`: suspending command-line completion models, parsing, parallel source evaluation, ranking, and
+  bounded in-memory learning.
+- `ketraterm-completion-host`: host-neutral suspending local-path and bounded directory-scanning support
+  for completion providers.
+- `ketraterm-completion-persistence`: optional sanitized, versioned local-file persistence for completion-learning
+  snapshots.
 - `ketraterm-render-api`: dependency-free primitive render frame, cursor, cell,
   cluster, and attribute vocabulary.
 - `ketraterm-render-cache`: renderer-side cache that copies primitive render
@@ -31,6 +37,8 @@ The project is split into strict layers:
 - `ketraterm-ui-swing`: reusable Swing terminal UI component, painting,
   selection, input event handling, clipboard/font/settings abstractions, and
   viewport/scrollbar model.
+- `ketraterm-ui-swing-host`: optional reusable Swing host chrome, action bindings, and completion request/feedback
+  vocabulary adapters.
 - `ketraterm-app`: standalone Swing desktop application hosting the reusable UI
   component, managing tab states, window framing, and PTY processes.
 - `ketraterm-testkit`: reusable public test fakes for connector/session tests.
@@ -50,6 +58,8 @@ Keep these boundaries intact:
   internals.
 - Input encodes. It reads stable input-facing mode state and writes host-bound
   bytes without parsing terminal output or touching grid/cursor internals.
+- Completion evaluates. Its engine performs no host I/O; it parses once and uses structured concurrency to evaluate
+  suspending sources. Host support and optional disk persistence live in their dedicated completion modules.
 - Render API exposes primitive frame contracts only. It must not depend on UI,
   Swing, PTY, parser, host, or core internals.
 - Render cache copies render frame data for consumers. It must not choose host
@@ -65,6 +75,8 @@ Keep these boundaries intact:
   SSH, tests, or another transport.
   It may use `ketraterm-input` event vocabulary but must send encoded intent
   through `TerminalSession` rather than writing host bytes directly.
+- Swing host support adapts host-neutral actions and completion vocabulary. It must not choose product completion
+  sources, priorities, persistence, or keymaps.
 - Swing demo hosts. It may start PTY sessions and create windows, but reusable
   rendering and input behavior still belong in `ketraterm-ui-swing`.
 - PTY hosts. It starts local pseudo-terminal processes and exposes them through
@@ -174,3 +186,16 @@ leave the workspace.
 - Core contract: `ketraterm-core/docs/terminal-core-contract.md`
 - Project skills index: `docs/agent-skills.md`
 - Repo-local Codex skills: `.agents/skills/*/SKILL.md`
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

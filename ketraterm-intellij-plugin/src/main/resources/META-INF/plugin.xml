@@ -24,6 +24,9 @@
     <description>KetraTerm terminal emulator integration for IntelliJ Platform IDEs.</description>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>Git4Idea</depends>
+    <depends>org.jetbrains.plugins.gradle</depends>
 
     <resource-bundle>messages.MyMessageBundle</resource-bundle>
 
@@ -77,6 +80,13 @@
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control F" remove="true"/>
             <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta F"/>
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta F"/>
+        </action>
+
+        <action id="KetraTerm.Terminal.RequestSuggestions"
+                class="io.github.ketraterm.intellij.ui.KetraTermRequestSuggestionsAction"
+                text="Request Terminal Suggestions"
+                description="Show suggestions for the active KetraTerm command line">
+            <keyboard-shortcut keymap="$default" first-keystroke="control SPACE"/>
         </action>
 
         <action id="KetraTerm.Terminal.SelectAll"

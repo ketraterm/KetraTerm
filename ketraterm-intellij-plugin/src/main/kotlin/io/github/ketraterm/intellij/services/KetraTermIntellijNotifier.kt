@@ -57,8 +57,7 @@ internal object KetraTermIntellijNotifier {
         ).notify(project)
     }
 
-    internal fun displayTitle(title: String): String =
-        escapeNotificationText(title.trim().ifBlank { DEFAULT_TITLE })
+    internal fun displayTitle(title: String): String = escapeNotificationText(title.trim().ifBlank { DEFAULT_TITLE })
 
     internal fun notificationType(level: NotificationLevel): NotificationType =
         when (level) {

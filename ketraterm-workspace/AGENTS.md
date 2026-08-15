@@ -22,6 +22,7 @@ This module must not:
 - mutate terminal core internals.
 - encode keyboard, paste, focus, or mouse bytes directly.
 - own PTY stream threads or process implementation details.
+- own completion sources, completion learning, or completion-statistics persistence.
 
 PTY process lifecycle stays in `ketraterm-pty`; session synchronization stays in
 `ketraterm-session`; UI modules adapt workspace state to visual containers.

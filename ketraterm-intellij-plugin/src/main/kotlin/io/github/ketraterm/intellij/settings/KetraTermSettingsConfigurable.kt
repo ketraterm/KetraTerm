@@ -34,7 +34,7 @@ import java.awt.Component
 import java.util.*
 import javax.swing.*
 
-private const val KetraTerm_SETTINGS_CONFIGURABLE_ID = "io.github.ketraterm.terminal.settings"
+private const val KETRATERM_SETTINGS_CONFIGURABLE_ID = "io.github.ketraterm.terminal.settings"
 
 /**
  * IntelliJ-native settings page for IDE-hosted KetraTerm terminals.
@@ -49,7 +49,8 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
     private val themeCombo = ComboBox(themeOptions())
     private val fontFamilyCombo = ComboBox(fontFamilyOptions()).apply { isEditable = false }
     private val fallbackFontFamilyCombo = ComboBox(fontFamilyOptions()).apply { isEditable = false }
-    private val fontSizeSpinner = integerSpinner(KetraTermIntellijSettings.DEFAULT_FONT_SIZE, TerminalConfig.FONT_SIZE_MIN, TerminalConfig.FONT_SIZE_MAX)
+    private val fontSizeSpinner =
+        integerSpinner(KetraTermIntellijSettings.DEFAULT_FONT_SIZE, TerminalConfig.FONT_SIZE_MIN, TerminalConfig.FONT_SIZE_MAX)
     private val columnsSpinner = spinner(TerminalConfig.DEFAULT_COLUMNS, TerminalConfig.COLUMNS_MIN, TerminalConfig.COLUMNS_MAX)
     private val rowsSpinner = spinner(TerminalConfig.DEFAULT_ROWS, TerminalConfig.ROWS_MIN, TerminalConfig.ROWS_MAX)
     private val scrollbackSpinner =
@@ -78,6 +79,10 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
     private val pasteOnMiddleClickCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.pasteOnMiddleClick"))
     private val overrideIdeShortcutsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.overrideIdeShortcuts"))
     private val shellSuggestionsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.shellSuggestions"))
+    private val acceptSelectedSuggestionWithEnterCheckBox =
+        JBCheckBox(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter"))
+    private val completionLearningPersistenceCheckBox =
+        JBCheckBox(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence"))
     private val scrollOnOutputCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.scrollOnOutput"))
 
     private val pasteSanitizationCombo = ComboBox(pasteSanitizationOptions())
@@ -104,7 +109,7 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
         }
     }
 
-    override fun getId(): String = KetraTerm_SETTINGS_CONFIGURABLE_ID
+    override fun getId(): String = KETRATERM_SETTINGS_CONFIGURABLE_ID
 
     override fun getDisplayName(): String = KetraTermBundle.message("settings.ketraterm.displayName")
 
@@ -191,6 +196,15 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
                     }
                     row {
                         cell(shellSuggestionsCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.shellSuggestions.comment"))
+                    }
+                    row {
+                        cell(acceptSelectedSuggestionWithEnterCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.acceptSelectedSuggestionWithEnter.comment"))
+                    }
+                    row {
+                        cell(completionLearningPersistenceCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence.comment"))
                     }
                     row {
                         cell(scrollOnOutputCheckBox)
@@ -264,6 +278,8 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
         pasteOnMiddleClickCheckBox.isSelected = normalized.pasteOnMiddleClick
         overrideIdeShortcutsCheckBox.isSelected = normalized.overrideIdeShortcuts
         shellSuggestionsCheckBox.isSelected = normalized.shellSuggestionsEnabled
+        acceptSelectedSuggestionWithEnterCheckBox.isSelected = normalized.acceptSelectedSuggestionWithEnter
+        completionLearningPersistenceCheckBox.isSelected = normalized.completionLearningPersistenceEnabled
         scrollOnOutputCheckBox.isSelected = normalized.scrollOnOutput
         pasteSanitizationCombo.selectedItem = pasteSanitizationOptions().firstOrNull { it.id == normalized.pasteSanitization }
         clipboardLocalWriteCombo.selectedItem = visiblePermissionOption(normalized.clipboardLocalWrite, "prompt")
@@ -290,6 +306,8 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
             pasteOnMiddleClick = pasteOnMiddleClickCheckBox.isSelected,
             overrideIdeShortcuts = overrideIdeShortcutsCheckBox.isSelected,
             shellSuggestionsEnabled = shellSuggestionsCheckBox.isSelected,
+            acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckBox.isSelected,
+            completionLearningPersistenceEnabled = completionLearningPersistenceCheckBox.isSelected,
             scrollbackLines = spinnerValue(scrollbackSpinner),
             lineHeight = spinnerDoubleValue(lineHeightSpinner).toFloat(),
             shellPath = selectedShellPath(),
@@ -306,20 +324,25 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
             scrollOnOutput = scrollOnOutputCheckBox.isSelected,
         )
 
-    private fun selectedThemeId(): String =
-        (themeCombo.selectedItem as? ThemeOption)?.id ?: KetraTermIntellijSettings.DEFAULT_THEME_ID
+    private fun selectedThemeId(): String = (themeCombo.selectedItem as? ThemeOption)?.id ?: KetraTermIntellijSettings.DEFAULT_THEME_ID
 
-    private fun selectedCursorShapeId(): String =
-        (cursorShapeCombo.selectedItem as? CursorShapeOption)?.id ?: "block"
+    private fun selectedCursorShapeId(): String = (cursorShapeCombo.selectedItem as? CursorShapeOption)?.id ?: "block"
 
-    private fun selectedString(comboBox: ComboBox<String>): String = comboBox.selectedItem?.toString()?.trim().orEmpty()
+    private fun selectedString(comboBox: ComboBox<String>): String =
+        comboBox.selectedItem
+            ?.toString()
+            ?.trim()
+            .orEmpty()
 
-    private fun selectedShellPath(): String {
-        return when (val selected = shellPathCombo.selectedItem) {
+    private fun selectedShellPath(): String =
+        when (val selected = shellPathCombo.selectedItem) {
             is ShellPathOption -> selected.profile.command.first()
-            else -> shellPathCombo.editor.item?.toString()?.trim().orEmpty()
+            else ->
+                shellPathCombo.editor.item
+                    ?.toString()
+                    ?.trim()
+                    .orEmpty()
         }
-    }
 
     private fun spinnerValue(spinner: JSpinner): Int = (spinner.value as Number).toInt()
 
@@ -348,7 +371,6 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
         JSpinner(SpinnerNumberModel(value, minimum, maximum, 0.1)).apply {
             editor = JSpinner.NumberEditor(this, "0.0")
         }
-
 }
 
 private data class ThemeOption(
@@ -398,10 +420,11 @@ private class ShellPathOptionRenderer : DefaultListCellRenderer() {
 }
 
 private fun fontFamilyOptions(): Array<String> =
-    LinkedHashSet<String>().apply {
-        add(KetraTermIntellijSettings.DEFAULT_FONT_FAMILY)
-        addAll(SwingSettings.getMonospaceFontFamilies())
-    }.toTypedArray()
+    LinkedHashSet<String>()
+        .apply {
+            add(KetraTermIntellijSettings.DEFAULT_FONT_FAMILY)
+            addAll(SwingSettings.getMonospaceFontFamilies())
+        }.toTypedArray()
 
 private fun shellPathOptions(): Array<Any> =
     TerminalProfileRegistry()
@@ -413,7 +436,11 @@ private fun shellPathOptionFor(shellPath: String): ShellPathOption? =
     shellPathOptions()
         .asSequence()
         .filterIsInstance<ShellPathOption>()
-        .firstOrNull { option -> option.profile.command.first().shellPathMatches(shellPath) }
+        .firstOrNull { option ->
+            option.profile.command
+                .first()
+                .shellPathMatches(shellPath)
+        }
 
 private fun String.shellPathMatches(shellPath: String): Boolean {
     if (equals(shellPath, ignoreCase = true)) return true
@@ -467,8 +494,6 @@ private fun visiblePermissionOption(
     id: String,
     fallback: String,
 ): PermissionOption = permissionOptions().firstOrNull { it.id == id } ?: permissionOptions().first { it.id == fallback }
-
-
 
 private data class PasteSanitizationOption(
     val id: String,

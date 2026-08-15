@@ -6,7 +6,7 @@ Thanks for your interest in contributing to KetraTerm!
 
 ## What this repository is
 
-This repository contains the source code for KetraTerm, a fast, modern, and secure terminal pipeline built in Kotlin/JVM 21. It hosts:
+This repository contains the source code for KetraTerm, a fast, modern, and secure terminal pipeline built in Kotlin/JVM 25. It hosts:
 *   The headless terminal logic (`ketraterm-core`, `ketraterm-parser`, `ketraterm-input`, etc.).
 *   The reusable Swing component (`ketraterm-ui-swing`).
 *   The standalone desktop application wrapper (`ketraterm-app`).

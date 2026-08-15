@@ -18,8 +18,7 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher.Companion.SWING
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.*
 import java.awt.event.KeyEvent
 import javax.swing.SwingUtilities
 
@@ -100,6 +99,14 @@ fun interface SwingTerminalHostKeyHandler {
  * command-line suggestion snapshots.
  * @property shellSuggestionHandler host callback invoked after the user accepts
  * a shell suggestion from the reusable popup.
+ * @property shellSuggestionFeedbackHandler host callback invoked when the user
+ * accepts or explicitly dismisses a shell suggestion.
+ * @property shellSuggestionKeymap host-owned mapping from Swing key events to
+ * semantic suggestion actions. Standalone hosts may retain the standard map;
+ * platform integrations should resolve their active application keymap.
+ * @property shellSuggestionViewFactory host-owned suggestion presentation
+ * factory. It changes visuals only; the reusable controller retains navigation,
+ * acceptance, dismissal, and feedback semantics.
  * @property hostKeyHandler host-owned keyboard action policy evaluated before
  * terminal input encoding.
  * @property contextMenuHandler host-owned right-click popup policy. The
@@ -118,6 +125,9 @@ data class SwingHostServices
         val scrollbarOverlayEnabled: Boolean = true,
         val shellSuggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
         val shellSuggestionHandler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
+        val shellSuggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+        val shellSuggestionKeymap: SwingShellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
+        val shellSuggestionViewFactory: SwingShellSuggestionViewFactory = SwingShellSuggestionViewFactory.DEFAULT,
         val hostKeyHandler: SwingTerminalHostKeyHandler = SwingTerminalHostKeyHandler.NONE,
         val contextMenuHandler: SwingTerminalContextMenuHandler = SwingTerminalContextMenuHandler.NONE,
         val fontResolver: TerminalFontResolver? = null,

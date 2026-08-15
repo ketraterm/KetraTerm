@@ -20,82 +20,103 @@ import java.awt.event.KeyEvent
 
 internal class SwingShellSuggestionController(
     private val host: SwingShellSuggestionHost,
+    viewFactory: SwingShellSuggestionViewFactory = SwingShellSuggestionViewFactory.DEFAULT,
 ) {
     private var suggestions: List<SwingShellSuggestion> = emptyList()
     private var selectedIndex: Int = NO_SELECTION
+    private var viewportStartIndex: Int = 0
     private var request: SwingShellSuggestionRequest = SwingShellSuggestionRequest.EMPTY
 
-    val popup: SwingShellSuggestionPopup =
-        SwingShellSuggestionPopup(
-            object : SwingShellSuggestionPopupListener {
+    private val view: SwingShellSuggestionView =
+        viewFactory.create(
+            object : SwingShellSuggestionViewListener {
                 override fun onSuggestionHovered(index: Int) {
-                    select(index)
+                    select(viewportStartIndex + index)
                 }
 
                 override fun onSuggestionClicked(index: Int) {
-                    select(index)
+                    select(viewportStartIndex + index)
                     acceptSelected()
                 }
             },
         )
+
+    val popup get() = view.component
 
     fun show(
         request: SwingShellSuggestionRequest,
         suggestions: List<SwingShellSuggestion>,
         selectedIndex: Int,
     ): Boolean {
-        if (!host.settings.shellSuggestionsEnabled || suggestions.isEmpty()) {
+        if (suggestions.isEmpty()) {
             hide()
             return false
         }
-        this.suggestions = retainVisibleSuggestions(suggestions)
+        val selectedOutcome =
+            this.suggestions
+                .getOrNull(this.selectedIndex)
+                ?.outcomeKey()
+                ?.takeIf { this.request == request }
+        this.suggestions = suggestions.toList()
         this.request = request
-        this.selectedIndex = selectedIndex.coerceIn(0, this.suggestions.lastIndex)
-        popup.update(this.suggestions, this.selectedIndex)
-        popup.isVisible = true
+        this.selectedIndex =
+            selectedIndex.takeIf { it in this.suggestions.indices }
+                ?: selectedOutcome
+                    ?.let { outcome -> this.suggestions.indexOfFirst { it.outcomeKey() == outcome } }
+                    ?.takeIf { it >= 0 }
+                ?: NO_SELECTION
+        updateViewport()
+        view.component.isVisible = true
         host.revalidate()
         host.repaint()
         return true
     }
 
     fun hide(): Boolean {
-        if (!popup.isVisible && suggestions.isEmpty()) return false
+        if (!view.component.isVisible && suggestions.isEmpty()) return false
         suggestions = emptyList()
         selectedIndex = NO_SELECTION
+        viewportStartIndex = 0
         request = SwingShellSuggestionRequest.EMPTY
-        popup.update(suggestions, selectedIndex)
-        popup.isVisible = false
+        view.update(emptyList(), NO_SELECTION)
+        view.component.isVisible = false
         host.revalidate()
         host.repaint()
         return true
     }
 
-    fun reloadSettings() {
-        if (!host.settings.shellSuggestionsEnabled) {
-            hide()
-        }
+    fun close() {
+        hide()
+        view.close()
     }
 
     fun handleKeyPressed(event: KeyEvent): Boolean {
-        if (!popup.isVisible || suggestions.isEmpty()) return false
-        val handled =
-            when (event.keyCode) {
-                KeyEvent.VK_DOWN -> selectRelative(1)
-                KeyEvent.VK_UP -> selectRelative(-1)
-                KeyEvent.VK_HOME -> select(0)
-                KeyEvent.VK_END -> select(suggestions.lastIndex)
-                KeyEvent.VK_PAGE_DOWN -> selectRelative(PAGE_STEP)
-                KeyEvent.VK_PAGE_UP -> selectRelative(-PAGE_STEP)
-                KeyEvent.VK_ENTER, KeyEvent.VK_TAB -> acceptSelected()
-                KeyEvent.VK_ESCAPE -> hide()
-                else -> false
-            }
+        if (!view.component.isVisible || suggestions.isEmpty()) return false
+        val action = host.suggestionKeymap.actionFor(event) ?: return false
+        val enterAcceptanceDisabled =
+            action == SwingShellSuggestionAction.ACCEPT_SELECTED &&
+                event.keyCode == KeyEvent.VK_ENTER &&
+                !host.settings.acceptSelectedSuggestionWithEnter
+        val handled = !enterAcceptanceDisabled && handleAction(action)
         if (handled) event.consume()
         return handled
     }
 
+    private fun handleAction(action: SwingShellSuggestionAction): Boolean =
+        when (action) {
+            SwingShellSuggestionAction.SELECT_NEXT -> selectRelative(1)
+            SwingShellSuggestionAction.SELECT_PREVIOUS -> selectRelative(-1)
+            SwingShellSuggestionAction.SELECT_FIRST -> select(0)
+            SwingShellSuggestionAction.SELECT_LAST -> select(suggestions.lastIndex)
+            SwingShellSuggestionAction.SELECT_NEXT_PAGE -> selectRelative(POPUP_MAX_VISIBLE_ROWS)
+            SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE -> selectRelative(-POPUP_MAX_VISIBLE_ROWS)
+            SwingShellSuggestionAction.ACCEPT -> selectFirstOrAccept()
+            SwingShellSuggestionAction.ACCEPT_SELECTED -> acceptSelected()
+            SwingShellSuggestionAction.DISMISS -> dismissSelected()
+        }
+
     fun state(): SwingShellSuggestionState =
-        if (!popup.isVisible || suggestions.isEmpty()) {
+        if (!view.component.isVisible || suggestions.isEmpty()) {
             SwingShellSuggestionState.EMPTY
         } else {
             SwingShellSuggestionState(
@@ -104,22 +125,34 @@ internal class SwingShellSuggestionController(
                 selectedIndex = selectedIndex,
                 anchorColumn = request.anchorColumn,
                 anchorRow = request.anchorRow,
-                selectedSuggestion = suggestions[selectedIndex],
+                selectedSuggestion = suggestions.getOrNull(selectedIndex),
             )
         }
 
     private fun selectRelative(delta: Int): Boolean {
         if (suggestions.isEmpty()) return false
-        val current = if (selectedIndex in suggestions.indices) selectedIndex else 0
+        val current =
+            when {
+                selectedIndex in suggestions.indices -> selectedIndex
+                delta > 0 -> -1
+                else -> suggestions.size
+            }
         val next = (current + delta).coerceIn(0, suggestions.lastIndex)
         return select(next)
     }
+
+    private fun selectFirstOrAccept(): Boolean =
+        if (selectedIndex in suggestions.indices) {
+            acceptSelected()
+        } else {
+            select(0)
+        }
 
     private fun select(index: Int): Boolean {
         if (index !in suggestions.indices) return false
         if (selectedIndex == index) return true
         selectedIndex = index
-        popup.update(suggestions, selectedIndex)
+        updateViewport()
         host.repaint()
         return true
     }
@@ -130,8 +163,17 @@ internal class SwingShellSuggestionController(
         val index = selectedIndex
         val acceptedRequest = request
         hide()
+        host.invalidateSuggestions()
         host.suggestionHandler.onSuggestionAccepted(
             SwingShellSuggestionAcceptance(
+                suggestion = suggestion,
+                index = index,
+                request = acceptedRequest,
+            ),
+        )
+        host.suggestionFeedbackHandler.onSuggestionFeedback(
+            SwingShellSuggestionFeedback(
+                kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
                 suggestion = suggestion,
                 index = index,
                 request = acceptedRequest,
@@ -141,29 +183,68 @@ internal class SwingShellSuggestionController(
         return true
     }
 
-    private fun retainVisibleSuggestions(suggestions: List<SwingShellSuggestion>): List<SwingShellSuggestion> =
-        if (suggestions.size <=
-            MAX_RETAINED_SUGGESTIONS
-        ) {
-            suggestions.toList()
-        } else {
-            suggestions.subList(0, MAX_RETAINED_SUGGESTIONS).toList()
-        }
+    private fun dismissSelected(): Boolean {
+        if (selectedIndex !in suggestions.indices) return hide()
+        val suggestion = suggestions[selectedIndex]
+        val index = selectedIndex
+        val dismissedRequest = request
+        hide()
+        host.invalidateSuggestions()
+        host.suggestionFeedbackHandler.onSuggestionFeedback(
+            SwingShellSuggestionFeedback(
+                kind = SwingShellSuggestionFeedbackKind.DISMISSED,
+                suggestion = suggestion,
+                index = index,
+                request = dismissedRequest,
+            ),
+        )
+        host.requestFocusInWindow()
+        return true
+    }
+
+    private fun updateViewport() {
+        viewportStartIndex =
+            when {
+                suggestions.size <= POPUP_MAX_VISIBLE_ROWS -> 0
+                selectedIndex < 0 -> viewportStartIndex.coerceIn(0, suggestions.size - POPUP_MAX_VISIBLE_ROWS)
+                selectedIndex < viewportStartIndex -> selectedIndex
+                selectedIndex >= viewportStartIndex + POPUP_MAX_VISIBLE_ROWS ->
+                    selectedIndex - POPUP_MAX_VISIBLE_ROWS + 1
+                else -> viewportStartIndex
+            }
+        val viewportEnd = minOf(suggestions.size, viewportStartIndex + POPUP_MAX_VISIBLE_ROWS)
+        val visible = suggestions.subList(viewportStartIndex, viewportEnd)
+        val localSelection = selectedIndex.takeIf { it in viewportStartIndex until viewportEnd }?.minus(viewportStartIndex) ?: NO_SELECTION
+        view.update(visible, localSelection)
+        host.revalidate()
+        host.repaint()
+    }
+
+    private fun SwingShellSuggestion.outcomeKey(): SuggestionOutcomeKey =
+        SuggestionOutcomeKey(replacementStartOffset, replacementEndOffset, replacementText)
 
     private companion object {
         private const val NO_SELECTION = -1
-        private const val PAGE_STEP = 5
-        private const val MAX_RETAINED_SUGGESTIONS = 8
     }
+
+    private data class SuggestionOutcomeKey(
+        val replacementStartOffset: Int,
+        val replacementEndOffset: Int,
+        val replacementText: String,
+    )
 }
 
 internal interface SwingShellSuggestionHost {
     val settings: SwingSettings
+    val suggestionKeymap: SwingShellSuggestionKeymap
     val suggestionHandler: SwingShellSuggestionHandler
+    val suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler
 
     fun revalidate()
 
     fun repaint()
 
     fun requestFocusInWindow(): Boolean
+
+    fun invalidateSuggestions()
 }

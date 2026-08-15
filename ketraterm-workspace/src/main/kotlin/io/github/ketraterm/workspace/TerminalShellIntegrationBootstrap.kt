@@ -61,14 +61,12 @@ internal object TerminalShellIntegrationBootstrap {
         if (integrated === profile) return profile
 
         val configPath = TerminalWorkspaceConfigManager.getDefaultPath()
-        val historyPath = configPath.resolveSibling("command-history-v1.tsv")
         val binDir = scriptDirectory.resolve("bin")
         writeWrapperScripts(binDir)
 
         val baseEnv = integrated.environment.toMutableMap()
         baseEnv["KetraTerm_VERSION"] = getAppVersion()
         baseEnv["KetraTerm_CONFIG_PATH"] = configPath.toAbsolutePath().toString()
-        baseEnv["KetraTerm_HISTORY_PATH"] = historyPath.toAbsolutePath().toString()
         baseEnv["KetraTerm_OS"] = System.getProperty("os.name") + " (" + System.getProperty("os.arch") + ")"
         baseEnv["KetraTerm_JVM"] = System.getProperty("java.version") + " (" + System.getProperty("java.vendor") + ")"
 
@@ -109,7 +107,7 @@ internal object TerminalShellIntegrationBootstrap {
             }
         if (integrated === shellProfile) return profile
 
-        var environment = integrated.environment
+        var environment = integrated.environment - OSC7_AUTHORITY_ENVIRONMENT_VARIABLE
         environment =
             when (shellName) {
                 "bash", "bash.exe" -> environment.withWslEnvironmentExport("PROMPT_COMMAND/u")
@@ -174,6 +172,7 @@ internal object TerminalShellIntegrationBootstrap {
             profile.environment +
                 mapOf(
                     "PROMPT_COMMAND" to joinedShellCommands(BASH_PROMPT_COMMAND, promptCommand),
+                    OSC7_AUTHORITY_ENVIRONMENT_VARIABLE to LOCAL_OSC7_AUTHORITY,
                 )
         return profile.copy(environment = environment)
     }
@@ -198,6 +197,7 @@ internal object TerminalShellIntegrationBootstrap {
                 mapOf(
                     "KetraTerm_ORIGINAL_ZDOTDIR" to originalZdotdir,
                     "ZDOTDIR" to zshDirectory.toString(),
+                    OSC7_AUTHORITY_ENVIRONMENT_VARIABLE to LOCAL_OSC7_AUTHORITY,
                 )
         return profile.copy(environment = environment)
     }
@@ -210,7 +210,10 @@ internal object TerminalShellIntegrationBootstrap {
         next += command
         next += "--init-command"
         next += FISH_INIT_COMMAND
-        return profile.copy(command = next)
+        return profile.copy(
+            command = next,
+            environment = profile.environment + (OSC7_AUTHORITY_ENVIRONMENT_VARIABLE to LOCAL_OSC7_AUTHORITY),
+        )
     }
 
     private fun encodedPowerShellScript(): String = Base64.getEncoder().encodeToString(POWERSHELL_SCRIPT.toByteArray(Charsets.UTF_16LE))
@@ -367,7 +370,7 @@ internal object TerminalShellIntegrationBootstrap {
             __ketraterm_command_started=0
             __ketraterm_in_prompt=0
             __ketraterm_osc133() { printf '\033]133;%s\a' "${'$'}1"; }
-            __ketraterm_hostname=${'$'}{HOSTNAME:-${'$'}(hostname 2>/dev/null)}
+            __ketraterm_hostname=${'$'}{KetraTerm_OSC7_AUTHORITY:-${'$'}{HOSTNAME:-${'$'}(hostname 2>/dev/null)}}
             [[ -n "${'$'}__ketraterm_hostname" ]] || __ketraterm_hostname=localhost
             __ketraterm_encode_uri_path() {
                 local LC_ALL=C __ketraterm_value=${'$'}1 __ketraterm_encoded= __ketraterm_char __ketraterm_hex __ketraterm_index
@@ -426,7 +429,10 @@ internal object TerminalShellIntegrationBootstrap {
             function __ketraterm_osc133 --argument-names marker
                 printf '\e]133;%s\a' "${'$'}marker"
             end
-            set -g __ketraterm_fish_hostname (hostname 2>/dev/null)
+            set -g __ketraterm_fish_hostname "${'$'}KetraTerm_OSC7_AUTHORITY"
+            if test -z "${'$'}__ketraterm_fish_hostname"
+                set -g __ketraterm_fish_hostname (hostname 2>/dev/null)
+            end
             if test -z "${'$'}__ketraterm_fish_hostname"
                 set -g __ketraterm_fish_hostname localhost
             end
@@ -469,7 +475,7 @@ internal object TerminalShellIntegrationBootstrap {
             function __ketraterm_osc133() {
                 printf '\033]133;%s\a' "${'$'}1"
             }
-            typeset -g __ketraterm_zsh_hostname=${'$'}{HOST:-${'$'}(hostname 2>/dev/null)}
+            typeset -g __ketraterm_zsh_hostname=${'$'}{KetraTerm_OSC7_AUTHORITY:-${'$'}{HOST:-${'$'}(hostname 2>/dev/null)}}
             [[ -n "${'$'}__ketraterm_zsh_hostname" ]] || __ketraterm_zsh_hostname=localhost
             function __ketraterm_zsh_encode_uri_path() {
                 local LC_ALL=C value=${'$'}1 encoded='' char hex
@@ -526,7 +532,7 @@ internal object TerminalShellIntegrationBootstrap {
                     if (${'$'}location.Provider.Name -ne 'FileSystem') {
                         return
                     }
-                    ${'$'}builder = [System.UriBuilder]::new('file', [Environment]::MachineName)
+                    ${'$'}builder = [System.UriBuilder]::new('file', 'localhost')
                     ${'$'}builder.Path = ${'$'}location.Path
                     [Console]::Write(([string][char]27) + ']7;' + ${'$'}builder.Uri.AbsoluteUri + ([string][char]7))
                 } catch {
@@ -590,6 +596,9 @@ internal object TerminalShellIntegrationBootstrap {
             "0.1.0"
         }
 
+    private const val OSC7_AUTHORITY_ENVIRONMENT_VARIABLE = "KetraTerm_OSC7_AUTHORITY"
+    private const val LOCAL_OSC7_AUTHORITY = "localhost"
+
     private fun writeWrapperScripts(directory: Path) {
         try {
             Files.createDirectories(directory)
@@ -636,57 +645,22 @@ internal object TerminalShellIntegrationBootstrap {
                     exit 1
                 fi
                 ;;
-            history)
-                if [ -n "${'$'}KetraTerm_HISTORY_PATH" ]; then
-                    if [ "${'$'}2" = "--clear" ] || [ "${'$'}2" = "-c" ]; then
-                        if [ -f "${'$'}KetraTerm_HISTORY_PATH" ]; then
-                            rm -f "${'$'}KetraTerm_HISTORY_PATH"
-                            echo "History cleared."
-                        else
-                            echo "No history file to clear."
-                        fi
-                        exit 0
-                    fi
-                    if [ -f "${'$'}KetraTerm_HISTORY_PATH" ]; then
-                        tail -n +2 "${'$'}KetraTerm_HISTORY_PATH" | cut -f6 | while read -r cmd; do
-                            if [ -n "${'$'}cmd" ]; then
-                                cleaned=\$(echo "${'$'}cmd" | tr -d '\r' | tr -- '-_' '+/')
-                                case \$((${'$'}{'#'}cleaned % 4)) in
-                                    2) cleaned="${'$'}{cleaned}==" ;;
-                                    3) cleaned="${'$'}{cleaned}=" ;;
-                                    *) ;;
-                                  esac
-                                echo "${'$'}cleaned" | base64 -d 2>/dev/null || echo "${'$'}cleaned" | openssl base64 -d -A 2>/dev/null || echo "${'$'}cmd"
-                            fi
-                        done
-                    else
-                        echo "No history found at ${'$'}KetraTerm_HISTORY_PATH"
-                        exit 1
-                    fi
-                else
-                    echo "KetraTerm_HISTORY_PATH is not set."
-                    exit 1
-                fi
-                ;;
             info)
                 echo "KetraTerm System Information:"
                 echo "  Version:       ${'$'}{KetraTerm_VERSION:-unknown}"
                 echo "  Config Path:   ${'$'}{KetraTerm_CONFIG_PATH:-unknown}"
-                echo "  History Path:  ${'$'}{KetraTerm_HISTORY_PATH:-unknown}"
                 echo "  OS:            ${'$'}{KetraTerm_OS:-unknown}"
                 echo "  JVM:           ${'$'}{KetraTerm_JVM:-unknown}"
                 echo ""
                 echo "Environment Variables:"
                 echo "  KetraTerm_VERSION       Active version of the terminal application"
                 echo "  KetraTerm_CONFIG_PATH   Path to workspace settings file (config.toml)"
-                echo "  KetraTerm_HISTORY_PATH  Path to persistent command history database file"
                 echo "  KetraTerm_OS            Current OS and architecture details"
                 echo "  KetraTerm_JVM           Java runtime version and vendor details"
                 echo ""
                 echo "Useful Commands:"
                 echo "  cat \"${'$'}{KetraTerm_CONFIG_PATH}\"       - Display the configuration file"
                 echo "  nano \"${'$'}{KetraTerm_CONFIG_PATH}\"      - Edit the configuration file in nano"
-                echo "  cat \"${'$'}{KetraTerm_HISTORY_PATH}\"      - Display the raw tab-separated command database"
                 ;;
             help|--help|-h|"")
                 echo "KetraTerm Companion CLI CLI Tool"
@@ -697,15 +671,11 @@ internal object TerminalShellIntegrationBootstrap {
                 echo "Commands:"
                 echo "  version           Display active KetraTerm version"
                 echo "  config            Open config.toml in your default editor"
-                echo "  history           Print human-readable command history"
                 echo "  info              Print system diagnostic and path information"
                 echo "  help              Display this help instructions"
-                echo ""
-                echo "Options for history:"
-                echo "  --clear, -c       Delete your persistent command history file"
                 ;;
             *)
-                echo "Usage: ketra [version | config | history | info | help]"
+                echo "Usage: ketra [version | config | info | help]"
                 exit 1
                 ;;
         esac
@@ -716,14 +686,13 @@ internal object TerminalShellIntegrationBootstrap {
         @echo off
         if "%1"=="version" goto run_version
         if "%1"=="config" goto run_config
-        if "%1"=="history" goto run_history
         if "%1"=="info" goto run_info
         if "%1"=="help" goto run_help
         if "%1"=="--help" goto run_help
         if "%1"=="-h" goto run_help
         if "%1"=="" goto run_help
 
-        echo Usage: ketra [version ^| config ^| history ^| info ^| help]
+        echo Usage: ketra [version ^| config ^| info ^| help]
         exit /b 1
 
         :run_version
@@ -742,48 +711,21 @@ internal object TerminalShellIntegrationBootstrap {
         )
         goto end
 
-        :run_history
-        if "%KetraTerm_HISTORY_PATH%"=="" (
-            echo KetraTerm_HISTORY_PATH is not set.
-            exit /b 1
-        )
-        if "%2"=="--clear" goto clear_history
-        if "%2"=="-c" goto clear_history
-
-        if not exist "%KetraTerm_HISTORY_PATH%" (
-            echo No history found at %KetraTerm_HISTORY_PATH%
-            exit /b 1
-        )
-        powershell -NoProfile -Command "Get-Content '%KetraTerm_HISTORY_PATH%' | Select-Object -Skip 1 | ForEach-Object { ${'$'}fields = ${'$'}_.Split([char]9); if (${'$'}fields.Length -ge 6) { ${'$'}b = ${'$'}fields[5].Replace('-', '+').Replace('_', '/'); switch (${'$'}b.Length %% 4) { 2 { ${'$'}b += '==' } 3 { ${'$'}b += '=' } }; [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(${'$'}b)) } }"
-        goto end
-
-        :clear_history
-        if exist "%KetraTerm_HISTORY_PATH%" (
-            del /f /q "%KetraTerm_HISTORY_PATH%"
-            echo History cleared.
-        ) else (
-            echo No history file to clear.
-        )
-        goto end
-
         :run_info
         echo KetraTerm System Information:
         echo   Version:       %KetraTerm_VERSION%
         echo   Config Path:   %KetraTerm_CONFIG_PATH%
-        echo   History Path:  %KetraTerm_HISTORY_PATH%
         echo   OS:            %KetraTerm_OS%
         echo   JVM:           %KetraTerm_JVM%
         echo.
         echo Environment Variables:
         echo   KetraTerm_VERSION       Active version of the terminal application
         echo   KetraTerm_CONFIG_PATH   Path to workspace settings file (config.toml)
-        echo   KetraTerm_HISTORY_PATH  Path to persistent command history database file
         echo   KetraTerm_OS            Current OS and architecture details
         echo   KetraTerm_JVM           Java runtime version and vendor details
         echo.
         echo Useful Commands:
         echo   notepad "%%KetraTerm_CONFIG_PATH%%"      - Edit configuration in Notepad
-        echo   type "%%KetraTerm_HISTORY_PATH%%"         - Display raw command history database
         goto end
 
         :run_help
@@ -795,12 +737,8 @@ internal object TerminalShellIntegrationBootstrap {
         echo Commands:
         echo   version           Display active KetraTerm version
         echo   config            Open config.toml in your default editor
-        echo   history           Print human-readable command history
         echo   info              Print system diagnostic and path information
         echo   help              Display this help instructions
-        echo.
-        echo Options for history:
-        echo   --clear, -c       Delete your persistent command history file
         goto end
 
         :end

@@ -24,6 +24,8 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.*
 
+private const val SUGGESTION_LEARNING_PERSISTENCE_KEY = "suggestion_learning_persistence_enabled"
+
 /**
  * Manages loading and saving the [TerminalConfig] TOML file.
  *
@@ -126,9 +128,14 @@ class TerminalWorkspaceConfigManager(
                 behavior["desktop_notifications_enabled"]?.toBooleanStrictOrNull() ?: default.desktopNotificationsEnabled
             val shellSuggestionsEnabled =
                 behavior["shell_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.shellSuggestionsEnabled
-            val persistentCommandHistoryEnabled =
-                behavior["persistent_command_history_enabled"]?.toBooleanStrictOrNull()
-                    ?: default.persistentCommandHistoryEnabled
+            val acceptSelectedSuggestionWithEnter =
+                behavior["accept_selected_suggestion_with_enter"]?.toBooleanStrictOrNull()
+                    ?: default.acceptSelectedSuggestionWithEnter
+            val persistentSuggestionLearningEnabled =
+                behavior[SUGGESTION_LEARNING_PERSISTENCE_KEY]?.toBooleanStrictOrNull()
+                    ?: behavior["persistent_suggestion_learning_enabled"]?.toBooleanStrictOrNull()
+                    ?: behavior["persistent_command_history_enabled"]?.toBooleanStrictOrNull()
+                    ?: default.persistentSuggestionLearningEnabled
             val scrollOnOutput =
                 behavior["scroll_on_output"]?.toBooleanStrictOrNull()
                     ?: default.scrollOnOutput
@@ -199,7 +206,8 @@ class TerminalWorkspaceConfigManager(
                 shellRequestWindowManipulation = shellRequestWindowManipulation,
                 desktopNotificationsEnabled = desktopNotificationsEnabled,
                 shellSuggestionsEnabled = shellSuggestionsEnabled,
-                persistentCommandHistoryEnabled = persistentCommandHistoryEnabled,
+                acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnter,
+                persistentSuggestionLearningEnabled = persistentSuggestionLearningEnabled,
                 clipboardLocalWrite = clipboardLocalWrite,
                 clipboardRemoteWrite = clipboardRemoteWrite,
                 clipboardRead = clipboardRead,
@@ -300,8 +308,10 @@ class TerminalWorkspaceConfigManager(
         desktop_notifications_enabled = ${config.desktopNotificationsEnabled}
         # Whether host-provided shell suggestions may appear in the terminal UI
         shell_suggestions_enabled = ${config.shellSuggestionsEnabled}
-        # Persist bounded command metadata (never raw terminal output) across application restarts
-        persistent_command_history_enabled = ${config.persistentCommandHistoryEnabled}
+        # Whether Enter accepts an already-selected suggestion; with no selection Enter reaches the shell
+        accept_selected_suggestion_with_enter = ${config.acceptSelectedSuggestionWithEnter}
+        # Persist compact suggestion-learning metadata (never raw terminal output) across application restarts
+        $SUGGESTION_LEARNING_PERSISTENCE_KEY = ${config.persistentSuggestionLearningEnabled}
         # Automatically scroll to bottom when new process output arrives
         scroll_on_output = ${config.scrollOnOutput}
 

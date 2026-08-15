@@ -15,13 +15,18 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
+import io.github.ketraterm.app.completion.StandaloneCompletionStatisticsCoordinator
+import io.github.ketraterm.app.completion.completionShellCapabilities
 import io.github.ketraterm.app.config.KetraTermSettings
-import io.github.ketraterm.app.history.CommandHistoryStore
-import io.github.ketraterm.app.history.CommandHistorySuggestionProvider
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
+import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.workspace.*
+import kotlinx.coroutines.*
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
@@ -53,8 +58,22 @@ internal class TabManager(
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
     private val tabRoots = HashMap<String, SplitNode>()
     private val tabContainers = HashMap<String, JPanel>()
-    private var commandHistoryStore: CommandHistoryStore? = createCommandHistoryStoreIfEnabled()
-
+    private val completionSpecs = TerminalCommandSpecs.defaults()
+    private val commandCompletionStatsSource = TerminalCompletionLearningStore(commandSpecs = completionSpecs)
+    private val completionScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("standalone-completion"))
+    private val completionStatistics =
+        StandaloneCompletionStatisticsCoordinator(
+            statsSource = commandCompletionStatsSource,
+            initialPersistencePath =
+                settings.commandCompletionStatsPath.takeIf { settings.persistentSuggestionLearningEnabled },
+            coroutineScope = completionScope,
+        )
+    private val completionRegistry =
+        StandaloneCompletionRegistry(
+            specs = completionSpecs,
+            persistentStatsSource = commandCompletionStatsSource,
+        )
     val selectedPane: TerminalPane?
         get() = tabBar.selectedId()?.let { getActivePane(it) }
 
@@ -200,18 +219,11 @@ internal class TabManager(
                 return false
             }
 
-        val pane =
-            TerminalPane.create(
-                tab = workspaceTab,
-                settings = settings,
-                suggestionProvider = historySuggestionProvider(workspaceTab.profile.id),
-            ) { p, request ->
-                showPaneContextMenu(p, request)
-            }
-        panes += pane
+        val createdPane = createTerminalPane(workspaceTab)
+        panes += createdPane
 
-        val tabId = pane.tab.id
-        val leaf = LeafNode(pane)
+        val tabId = createdPane.tab.id
+        val leaf = LeafNode(createdPane)
         tabRoots[tabId] = leaf
 
         val container =
@@ -226,7 +238,7 @@ internal class TabManager(
         tabBar.addTab(TabEntry(id = tabId, title = workspaceTab.title, profileKind = profile.kind))
         showPane(tabId)
         updateFrameTitle()
-        pane.requestFocus()
+        createdPane.requestFocus()
         return true
     }
 
@@ -251,6 +263,7 @@ internal class TabManager(
         for (pane in tabPanes) {
             panes.remove(pane)
             pane.close()
+            completionRegistry.removeSession(pane.tab.id)
             workspace.closeTab(pane.tab.id)
         }
         tabRoots.remove(id)
@@ -282,9 +295,10 @@ internal class TabManager(
         for (tabId in tabIds) {
             tabRoots[tabId]?.let { closeTabWithoutConfirmation(tabId, it) }
         }
+        completionRegistry.close()
         workspace.close()
-        commandHistoryStore?.close()
-        commandHistoryStore = null
+        runBlocking { completionStatistics.closeAndFlush() }
+        completionScope.cancel()
     }
 
     /** Propagates a settings reload to all live panes and the workspace. */
@@ -300,7 +314,7 @@ internal class TabManager(
             palette = snapshot.palette,
             treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
         )
-        reconcileCommandHistoryStore()
+        reconcileCommandPersistenceStores()
         tabBar.repaint()
     }
 
@@ -372,18 +386,11 @@ internal class TabManager(
                 showStartError(profile, exception)
                 return
             }
-        val newPane =
-            TerminalPane.create(
-                tab = workspaceTab,
-                settings = settings,
-                suggestionProvider = historySuggestionProvider(workspaceTab.profile.id),
-            ) { p, request ->
-                showPaneContextMenu(p, request)
-            }
+        val createdPane = createTerminalPane(workspaceTab)
 
-        panes += newPane
+        panes += createdPane
 
-        val newRoot = splitNodeInTree(root, pane, newPane, isVertical)
+        val newRoot = splitNodeInTree(root, pane, createdPane, isVertical)
         tabRoots[tabId] = newRoot
 
         val container = tabContainers[tabId] ?: return
@@ -392,8 +399,33 @@ internal class TabManager(
         container.revalidate()
         container.repaint()
 
-        newPane.requestFocus()
+        createdPane.requestFocus()
         updateFrameTitle()
+    }
+
+    private fun createTerminalPane(workspaceTab: TerminalWorkspaceTab): TerminalPane {
+        val workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri }
+        val shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities()
+        val suggestionProvider =
+            completionRegistry.createProvider(
+                sessionId = workspaceTab.id,
+                profileId = workspaceTab.profile.id,
+                workingDirectoryUriProvider = workingDirectoryUriProvider,
+                shellCapabilities = shellCapabilities,
+            )
+        return TerminalPane.create(
+            tab = workspaceTab,
+            settings = settings,
+            completionScope = completionScope,
+            suggestionProvider = suggestionProvider,
+            suggestionFeedbackHandler =
+                completionStatistics.createFeedbackHandler(
+                    profileId = workspaceTab.profile.id,
+                    workingDirectoryUriProvider = workingDirectoryUriProvider,
+                ),
+        ) { pane, request ->
+            showPaneContextMenu(pane, request)
+        }
     }
 
     private fun splitNodeInTree(
@@ -435,13 +467,12 @@ internal class TabManager(
         val allPanes = root.allPanes()
 
         if (allPanes.size <= 1) {
-            val closed =
-                if (openReplacementWhenLastPane) {
-                    closeTabWithoutUserPrompt(tabId)
-                } else {
-                    closeTab(tabId)
-                }
-            if (closed && openReplacementWhenLastPane && tabRoots.isEmpty()) {
+            if (openReplacementWhenLastPane) {
+                closeTabWithoutUserPrompt(tabId)
+            } else if (!closeTab(tabId)) {
+                return
+            }
+            if (openReplacementWhenLastPane && tabRoots.isEmpty()) {
                 openTab(defaultProfileProvider())
             }
             return
@@ -461,6 +492,7 @@ internal class TabManager(
 
         panes.remove(pane)
         pane.close()
+        completionRegistry.removeSession(pane.tab.id)
         workspace.closeTab(pane.tab.id)
 
         val newActive = getActivePane(tabId)
@@ -650,10 +682,9 @@ internal class TabManager(
         (tabContentPanel.layout as CardLayout).show(tabContentPanel, tabId)
     }
 
-    private fun closeTabWithoutUserPrompt(id: String): Boolean {
-        val root = tabRoots[id] ?: return true
+    private fun closeTabWithoutUserPrompt(id: String) {
+        val root = tabRoots[id] ?: return
         closeTabWithoutConfirmation(id, root)
-        return true
     }
 
     private fun confirmClose(root: SplitNode): Boolean = confirmClose(root.allPanes())
@@ -678,13 +709,13 @@ internal class TabManager(
                         .hasRunningCommand()
                 } ?: 0
             }
-        if (liveProcessCount == 0) return true
-        return closeConfirmation.confirmClose(
-            TerminalCloseRequest(
-                displayName = Chrome.APP_TITLE,
-                liveProcessCount = liveProcessCount,
-            ),
-        )
+        return liveProcessCount == 0 ||
+            closeConfirmation.confirmClose(
+                TerminalCloseRequest(
+                    displayName = Chrome.APP_TITLE,
+                    liveProcessCount = liveProcessCount,
+                ),
+            )
     }
 
     private fun closeDisplayName(panesToClose: List<TerminalPane>): String {
@@ -744,7 +775,26 @@ internal class TabManager(
             if (event.marker != io.github.ketraterm.protocol.ShellIntegrationMarker.COMMAND_FINISHED) return
             val state = tab.session.shellIntegrationState
             val metadata = state.commandMetadata(state.latestCommandRecordId()) ?: return
-            commandHistoryStore?.record(tab.profile.id, metadata)
+            val command = metadata.commandText
+            if (command != null) {
+                completionStatistics.recordFinishedCommand(
+                    commandLine = command,
+                    successful = metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                    profileId = tab.profile.id,
+                    workingDirectoryUri = metadata.workingDirectoryUri,
+                    usedAtEpochMillis = metadata.finishedAtEpochMillis ?: System.currentTimeMillis(),
+                )
+            }
+            if (metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED) {
+                command?.let {
+                    completionRegistry.recordSuccessfulCommand(
+                        sessionId = tab.id,
+                        commandLine = it,
+                        profileId = tab.profile.id,
+                        workingDirectoryUri = metadata.workingDirectoryUri,
+                    )
+                }
+            }
         }
 
         override fun bell(tab: TerminalWorkspaceTab) {
@@ -939,23 +989,11 @@ internal class TabManager(
         }
     }
 
-    private fun reconcileCommandHistoryStore() {
-        if (settings.persistentCommandHistoryEnabled) {
-            if (commandHistoryStore == null) commandHistoryStore = CommandHistoryStore(settings.commandHistoryPath)
-        } else {
-            commandHistoryStore?.close()
-            commandHistoryStore = null
-        }
-    }
-
-    private fun createCommandHistoryStoreIfEnabled(): CommandHistoryStore? =
-        if (settings.persistentCommandHistoryEnabled) CommandHistoryStore(settings.commandHistoryPath) else null
-
-    private fun historySuggestionProvider(profileId: String): CommandHistorySuggestionProvider =
-        CommandHistorySuggestionProvider(
-            profileId = profileId,
-            historySnapshot = { commandHistoryStore?.latestSnapshot() ?: emptyList() },
+    private fun reconcileCommandPersistenceStores() {
+        completionStatistics.setPersistencePath(
+            settings.commandCompletionStatsPath.takeIf { settings.persistentSuggestionLearningEnabled },
         )
+    }
 
     private companion object {
         private const val INITIAL_TAB_CAPACITY = 4

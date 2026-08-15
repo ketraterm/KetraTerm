@@ -117,6 +117,7 @@ internal object TerminalPaneActionRegistry {
             SwingTerminalHostAction.COPY_SELECTION -> target.hasSelection()
             SwingTerminalHostAction.PASTE_CLIPBOARD,
             SwingTerminalHostAction.OPEN_SEARCH,
+            SwingTerminalHostAction.REQUEST_SUGGESTIONS,
             SwingTerminalHostAction.SELECT_ALL,
             SwingTerminalHostAction.CLEAR_SCREEN,
             SwingTerminalHostAction.SCROLL_PAGE_UP,
@@ -140,6 +141,10 @@ internal object TerminalPaneActionRegistry {
             SwingTerminalHostAction.PASTE_CLIPBOARD -> target.pasteClipboardText()
             SwingTerminalHostAction.SELECT_ALL -> target.selectAll()
             SwingTerminalHostAction.CLEAR_SCREEN -> target.clearScreen()
+            SwingTerminalHostAction.REQUEST_SUGGESTIONS -> {
+                target.requestShellSuggestions()
+                true
+            }
             SwingTerminalHostAction.OPEN_SEARCH -> {
                 target.openSearch()
                 true
@@ -183,6 +188,11 @@ internal interface TerminalPaneActionTarget {
      * Requests a foreground-program screen clear/redraw.
      */
     fun clearScreen(): Boolean
+
+    /**
+     * Requests suggestions for the active shell command line.
+     */
+    fun requestShellSuggestions()
 
     /**
      * Opens host-owned search chrome.

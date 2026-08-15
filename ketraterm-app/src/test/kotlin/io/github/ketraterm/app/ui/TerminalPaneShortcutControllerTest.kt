@@ -33,6 +33,16 @@ class TerminalPaneShortcutControllerTest {
         assertEquals(0, target.pasteCount)
     }
 
+    @Test
+    fun requestSuggestionsActionUsesActiveShellCommand() {
+        val target = RecordingActionTarget()
+
+        val performed = TerminalPaneActionRegistry.perform(SwingTerminalHostAction.REQUEST_SUGGESTIONS, target)
+
+        assertTrue(performed)
+        assertEquals(1, target.requestSuggestionsCount)
+    }
+
     private class RecordingActionTarget : TerminalPaneActionTarget {
         var openSearchCount: Int = 0
             private set
@@ -43,6 +53,8 @@ class TerminalPaneShortcutControllerTest {
         var selectAllCount: Int = 0
             private set
         var clearScreenCount: Int = 0
+            private set
+        var requestSuggestionsCount: Int = 0
             private set
 
         override fun hasSelection(): Boolean = false
@@ -65,6 +77,10 @@ class TerminalPaneShortcutControllerTest {
         override fun clearScreen(): Boolean {
             clearScreenCount++
             return true
+        }
+
+        override fun requestShellSuggestions() {
+            requestSuggestionsCount++
         }
 
         override fun openSearch() {

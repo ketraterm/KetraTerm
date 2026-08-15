@@ -89,8 +89,11 @@ import java.util.*
  * @property lineHeight vertical line height scaling factor.
  * @property shellRequestResizeWindow whether the terminal panel requests window resizing.
  * @property shellRequestWindowManipulation whether the terminal panel allows shell window manipulation.
- * @property shellSuggestionsEnabled whether the reusable terminal component may
- * show host-provided shell suggestion popups.
+ * @property shellSuggestionsEnabled whether hosts may request shell suggestion
+ * popups automatically. Explicit user requests remain available when disabled.
+ * @property acceptSelectedSuggestionWithEnter whether an unmodified Enter key
+ * accepts an already-selected shell suggestion. Enter remains terminal input
+ * when the popup has no selection.
  */
 data class SwingSettings
     @JvmOverloads
@@ -130,6 +133,7 @@ data class SwingSettings
         val shellRequestResizeWindow: Boolean = false,
         val shellRequestWindowManipulation: Boolean = false,
         val shellSuggestionsEnabled: Boolean = true,
+        val acceptSelectedSuggestionWithEnter: Boolean = true,
         val scrollOnOutput: Boolean = true,
     ) {
         init {

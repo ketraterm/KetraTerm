@@ -44,9 +44,12 @@ import io.github.ketraterm.ui.swing.viewport.SwingViewportController
 import io.github.ketraterm.ui.swing.viewport.TerminalScrollbarOverlay
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOn
 import java.awt.*
 import java.awt.event.*
 import java.lang.Runnable
+import java.util.concurrent.CopyOnWriteArraySet
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import javax.swing.Timer
@@ -99,6 +102,11 @@ class SwingTerminal
         private val componentScope =
             CoroutineScope(componentJob + uiCoroutineDispatcher + CoroutineName("swing-terminal"))
         private var bindingJob: Job? = null
+        private var suggestionJob: Job? = null
+        private var activeSuggestionIsAutomatic: Boolean = false
+        private val suggestionInvalidationListeners = CopyOnWriteArraySet<SwingShellSuggestionInvalidationListener>()
+        private val suggestionEligibilityListeners = CopyOnWriteArraySet<SwingShellSuggestionEligibilityListener>()
+        private val automaticSuggestionEligible = AtomicBoolean(settings.shellSuggestionsEnabled)
 
         internal val hasActiveRenderBinding: Boolean
             get() = bindingJob?.isActive == true
@@ -322,14 +330,21 @@ class SwingTerminal
             SwingShellSuggestionController(
                 object : SwingShellSuggestionHost {
                     override val settings: SwingSettings get() = this@SwingTerminal.settings
+                    override val suggestionKeymap get() = hostServices.shellSuggestionKeymap
                     override val suggestionHandler: SwingShellSuggestionHandler get() = hostServices.shellSuggestionHandler
+                    override val suggestionFeedbackHandler get() = hostServices.shellSuggestionFeedbackHandler
 
                     override fun revalidate() = this@SwingTerminal.revalidate()
 
                     override fun repaint() = this@SwingTerminal.repaint()
 
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
+
+                    override fun invalidateSuggestions() {
+                        invalidateShellSuggestionsOnEdt()
+                    }
                 },
+                hostServices.shellSuggestionViewFactory,
             )
         private val inputController =
             SwingTerminalInputController(
@@ -356,6 +371,14 @@ class SwingTerminal
 
                     override fun handleShellSuggestionKeyPressed(event: KeyEvent): Boolean =
                         shellSuggestionController.handleKeyPressed(event)
+
+                    override fun invalidateShellSuggestions() {
+                        invalidateShellSuggestionsOnEdt()
+                    }
+
+                    override fun hideShellSuggestions() {
+                        this@SwingTerminal.hideShellSuggestions()
+                    }
                 },
             )
         private val mouseController =
@@ -636,11 +659,9 @@ class SwingTerminal
          * be rebound to another session.
          */
         fun dispose() {
-            runOnEdt(
-                Runnable {
-                    disposeOnEdt()
-                },
-            )
+            runOnEdt {
+                disposeOnEdt()
+            }
         }
 
         /**
@@ -666,11 +687,9 @@ class SwingTerminal
          * may be called from any thread; animation state is updated on the EDT.
          */
         fun showVisualBell() {
-            runOnEdt(
-                Runnable {
-                    visualBellController.trigger()
-                },
-            )
+            runOnEdt {
+                visualBellController.trigger()
+            }
         }
 
         /**
@@ -729,11 +748,9 @@ class SwingTerminal
          * @param scrollbackOffset requested whole-row offset from live output.
          */
         fun scrollToScrollbackOffset(scrollbackOffset: Int) {
-            runOnEdt(
-                Runnable {
-                    scrollViewportToOnEdt(scrollbackOffset)
-                },
-            )
+            runOnEdt {
+                scrollViewportToOnEdt(scrollbackOffset)
+            }
         }
 
         /**
@@ -748,11 +765,9 @@ class SwingTerminal
          */
         fun scrollViewportBy(deltaLines: Double) {
             require(deltaLines.isFinite()) { "deltaLines must be finite, was $deltaLines" }
-            runOnEdt(
-                Runnable {
-                    rowScroller.scrollByPreciseRows(deltaLines)
-                },
-            )
+            runOnEdt {
+                rowScroller.scrollByPreciseRows(deltaLines)
+            }
         }
 
         override fun scrollFromScrollbar(
@@ -764,11 +779,9 @@ class SwingTerminal
                 scrollFromScrollbarOnEdt(scrollbackOffset, valueIsAdjusting)
                 return
             }
-            runOnEdt(
-                Runnable {
-                    scrollFromScrollbarOnEdt(scrollbackOffset, valueIsAdjusting)
-                },
-            )
+            runOnEdt {
+                scrollFromScrollbarOnEdt(scrollbackOffset, valueIsAdjusting)
+            }
         }
 
         private fun scrollFromScrollbarOnEdt(
@@ -791,11 +804,9 @@ class SwingTerminal
          * is updated asynchronously on the EDT.
          */
         fun scrollToPreviousCommand() {
-            runOnEdt(
-                Runnable {
-                    commandInteractionController.scrollToCommand(previous = true)
-                },
-            )
+            runOnEdt {
+                commandInteractionController.scrollToCommand(previous = true)
+            }
         }
 
         /**
@@ -807,11 +818,9 @@ class SwingTerminal
          * is updated asynchronously on the EDT.
          */
         fun scrollToNextCommand() {
-            runOnEdt(
-                Runnable {
-                    commandInteractionController.scrollToCommand(previous = false)
-                },
-            )
+            runOnEdt {
+                commandInteractionController.scrollToCommand(previous = false)
+            }
         }
 
         /**
@@ -847,10 +856,7 @@ class SwingTerminal
         fun selectCommandOutputAt(
             x: Int,
             y: Int,
-        ): Boolean {
-            if (!SwingUtilities.isEventDispatchThread()) return false
-            return commandInteractionController.selectCommandOutputAt(x, y)
-        }
+        ): Boolean = SwingUtilities.isEventDispatchThread() && commandInteractionController.selectCommandOutputAt(x, y)
 
         /**
          * Selects command output for [recordId].
@@ -862,10 +868,8 @@ class SwingTerminal
          * @param recordId retained command record id.
          * @return true when command output was selected.
          */
-        fun selectCommandOutput(recordId: Int): Boolean {
-            if (!SwingUtilities.isEventDispatchThread()) return false
-            return commandInteractionController.selectCommandOutput(recordId)
-        }
+        fun selectCommandOutput(recordId: Int): Boolean =
+            SwingUtilities.isEventDispatchThread() && commandInteractionController.selectCommandOutput(recordId)
 
         /**
          * Returns all currently retained output for [recordId].
@@ -1030,14 +1034,14 @@ class SwingTerminal
 
         private fun bindOnEdt(session: TerminalSession) {
             if (disposed) return
-            bindingJob?.cancel()
+            bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
             this.session = session
             updateMinimizedStateFromAncestor()
             applySettingsToSession(session, settings)
             resetScrollbackState()
             selectionController.clearSelection()
             searchController.reset(renderCache.rows)
-            shellSuggestionController.hide()
+            cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
             shellIntegrationDecorations.reset()
             if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
             visualGeometry.reset()
@@ -1072,13 +1076,13 @@ class SwingTerminal
         }
 
         private fun unbindOnEdt() {
-            bindingJob?.cancel()
+            bindingJob?.cancel(CancellationException("Terminal session unbound"))
             bindingJob = null
+            cancelAndHideShellSuggestionsOnEdt("Terminal session unbound")
             session = null
             resetScrollbackState()
             selectionController.clearSelection()
             searchController.reset(renderCache.rows)
-            shellSuggestionController.hide()
             shellIntegrationDecorations.reset()
             if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
             visualGeometry.reset()
@@ -1101,7 +1105,12 @@ class SwingTerminal
             rowScroller.finish()
             selectionController.stopSelectionDrag()
             hyperlinkDiscoveryController.dispose()
-            componentScope.cancel()
+            suggestionJob?.cancel(CancellationException("Swing terminal disposed"))
+            suggestionJob = null
+            suggestionInvalidationListeners.clear()
+            suggestionEligibilityListeners.clear()
+            shellSuggestionController.close()
+            componentScope.cancel(CancellationException("Swing terminal disposed"))
         }
 
         private fun reloadSettingsOnEdt() {
@@ -1115,7 +1124,6 @@ class SwingTerminal
             preferredSize = preferredGridSize(settings.columns, settings.rows)
             configureCursorTimerOnEdt()
             configureVisualBellOnEdt()
-            shellSuggestionController.reloadSettings()
             session?.let {
                 updateMinimizedStateFromAncestor()
                 applySettingsToSession(it, settings)
@@ -1177,44 +1185,36 @@ class SwingTerminal
          * @param query literal text to find.
          */
         fun search(query: String) {
-            runOnEdt(
-                Runnable {
-                    searchController.search(query)
-                },
-            )
+            runOnEdt {
+                searchController.search(query)
+            }
         }
 
         /**
          * Clears the current terminal-buffer search query and highlights.
          */
         fun clearSearch() {
-            runOnEdt(
-                Runnable {
-                    searchController.clear()
-                },
-            )
+            runOnEdt {
+                searchController.clear()
+            }
         }
 
         /**
          * Selects the next search result when a search query is active.
          */
         fun selectNextSearchResult() {
-            runOnEdt(
-                Runnable {
-                    searchController.findNext()
-                },
-            )
+            runOnEdt {
+                searchController.findNext()
+            }
         }
 
         /**
          * Selects the previous search result when a search query is active.
          */
         fun selectPreviousSearchResult() {
-            runOnEdt(
-                Runnable {
-                    searchController.findPrevious()
-                },
-            )
+            runOnEdt {
+                searchController.findPrevious()
+            }
         }
 
         /**
@@ -1224,11 +1224,9 @@ class SwingTerminal
          * case-insensitive search.
          */
         fun setSearchCaseSensitive(caseSensitive: Boolean) {
-            runOnEdt(
-                Runnable {
-                    searchController.setIgnoreCase(!caseSensitive)
-                },
-            )
+            runOnEdt {
+                searchController.setIgnoreCase(!caseSensitive)
+            }
         }
 
         /**
@@ -1239,37 +1237,39 @@ class SwingTerminal
         fun currentSearchState(): TerminalSearchState = searchController.state()
 
         /**
-         * Shows host-provided shell suggestions near a terminal-grid cell.
+         * Shows host-provided shell suggestions for a known command-line request.
          *
          * The reusable Swing terminal only presents the suggestions. Accepted
          * suggestions are delivered to [SwingHostServices.shellSuggestionHandler]
-         * so the host/provider can apply command-line replacement semantics.
+         * with the same [request] so host adapters can apply and learn from the
+         * exact command-line replacement range that produced each suggestion.
          *
-         * If [SwingSettings.shellSuggestionsEnabled] is `false` or [suggestions]
-         * is empty, the current popup is hidden.
+         * This is an explicit display request, so it is independent of the
+         * automatic-popup setting. If [suggestions] is empty, the current popup
+         * is hidden.
          *
+         * @param request command-line context that produced [suggestions].
          * @param suggestions suggestions to display.
-         * @param anchorColumn visible terminal-grid column used as the popup anchor.
-         * @param anchorRow visible terminal-grid row used as the popup anchor.
-         * @param selectedIndex initially selected suggestion index.
+         * @param selectedIndex initially selected suggestion index, or `-1` to
+         * leave the popup passive until the user navigates it.
          */
         @JvmOverloads
         fun showShellSuggestions(
+            request: SwingShellSuggestionRequest,
             suggestions: List<SwingShellSuggestion>,
-            anchorColumn: Int,
-            anchorRow: Int,
-            selectedIndex: Int = 0,
+            selectedIndex: Int = -1,
         ) {
-            val request =
-                SwingShellSuggestionRequest(
-                    commandText = "",
-                    cursorOffset = 0,
-                    anchorColumn = anchorColumn.coerceAtLeast(0),
-                    anchorRow = anchorRow.coerceAtLeast(0),
-                )
             val snapshot = suggestions.toList()
             runOnEdt(
                 Runnable {
+                    if (!isLiveViewportOnEdt()) {
+                        cancelAndHideShellSuggestionsOnEdt("Suggestions require the live viewport")
+                        doLayout()
+                        return@Runnable
+                    }
+                    suggestionJob?.cancel(CancellationException("Explicit suggestions replaced provider request"))
+                    suggestionJob = null
+                    activeSuggestionIsAutomatic = false
                     shellSuggestionController.show(request, snapshot, selectedIndex)
                     doLayout()
                 },
@@ -1278,11 +1278,14 @@ class SwingTerminal
 
         /**
          * Requests shell suggestions from [SwingHostServices.shellSuggestionProvider]
-         * and shows the returned snapshot near a terminal-grid cell.
+         * and shows the returned suggestions near a terminal-grid cell.
          *
-         * Providers run on the Swing Event Dispatch Thread and should return a
-         * bounded, already-computed snapshot quickly. Empty provider results hide
-         * the current popup.
+         * The component replaces its one completion coroutine for every request,
+         * so suspending providers run outside the Swing Event Dispatch Thread and
+         * are cancelled when newer input arrives or the popup is hidden. This
+         * automatic request is ignored when
+         * [SwingSettings.shellSuggestionsEnabled] is `false`. Empty provider
+         * results hide the current popup.
          *
          * @param commandText visible command-line text known to the host.
          * @param cursorOffset UTF-16 cursor offset within [commandText].
@@ -1302,20 +1305,39 @@ class SwingTerminal
                     anchorColumn = anchorColumn,
                     anchorRow = anchorRow,
                 )
+            runOnEdt {
+                requestShellSuggestionsOnEdt(request)
+                doLayout()
+            }
+        }
+
+        /**
+         * Requests suggestions for the command line currently reported by the
+         * bound [TerminalSession].
+         *
+         * This method uses OSC 133 shell-integration marker state captured by
+         * the session. It does not infer command text from key events or
+         * persistent command history. When no trustworthy active command line is
+         * available, the current suggestion popup is hidden. This explicit
+         * request remains available when automatic suggestions are disabled.
+         */
+        fun requestActiveShellSuggestions() {
             runOnEdt(
                 Runnable {
-                    if (!settings.shellSuggestionsEnabled) {
+                    val snapshot = session?.activeShellCommandLine()
+                    if (snapshot == null) {
                         shellSuggestionController.hide()
+                        doLayout()
                         return@Runnable
                     }
-                    val suggestions =
-                        runCatching {
-                            hostServices.shellSuggestionProvider.suggestions(request)
-                        }.getOrElse { exception ->
-                            System.err.println("Shell suggestion provider failed: ${exception.message}")
-                            emptyList()
-                        }
-                    shellSuggestionController.show(request, suggestions, selectedIndex = 0)
+                    val request =
+                        SwingShellSuggestionRequest(
+                            commandText = snapshot.commandText,
+                            cursorOffset = snapshot.cursorOffset,
+                            anchorColumn = snapshot.cursorColumn,
+                            anchorRow = snapshot.cursorRow,
+                        )
+                    requestShellSuggestionsOnEdt(request, automatic = false)
                     doLayout()
                 },
             )
@@ -1328,12 +1350,38 @@ class SwingTerminal
          * asynchronously on the EDT.
          */
         fun hideShellSuggestions() {
-            runOnEdt(
-                Runnable {
-                    shellSuggestionController.hide()
-                },
-            )
+            runOnEdt {
+                cancelAndHideShellSuggestionsOnEdt("Shell suggestions hidden")
+            }
         }
+
+        /** Registers an EDT callback for shell-bound input invalidation. */
+        fun addShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
+            suggestionInvalidationListeners += listener
+        }
+
+        /** Removes a callback previously registered with [addShellSuggestionInvalidationListener]. */
+        fun removeShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
+            suggestionInvalidationListeners -= listener
+        }
+
+        /** Registers an EDT callback for automatic-suggestion eligibility changes. */
+        fun addShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
+            suggestionEligibilityListeners += listener
+        }
+
+        /** Removes a callback previously registered with [addShellSuggestionEligibilityListener]. */
+        fun removeShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
+            suggestionEligibilityListeners -= listener
+        }
+
+        /**
+         * Returns whether automatic suggestions are enabled at the live viewport.
+         *
+         * This method is safe to call from any thread and returns the last state
+         * published by the EDT without blocking it.
+         */
+        fun isAutomaticShellSuggestionEligible(): Boolean = automaticSuggestionEligible.get()
 
         /**
          * Returns the current shell suggestion popup state.
@@ -1460,8 +1508,38 @@ class SwingTerminal
         fun pasteClipboardText(): Boolean {
             val text = hostServices.clipboardHandler.readText() ?: return false
             if (text.isEmpty()) return false
-            session?.encodePaste(TerminalPasteEvent(text))
+            val boundSession = session ?: return false
+            invalidateShellSuggestionsOnEdt()
+            boundSession.encodePaste(TerminalPasteEvent(text))
             return true
+        }
+
+        private fun requestShellSuggestionsOnEdt(
+            request: SwingShellSuggestionRequest,
+            automatic: Boolean = true,
+        ) {
+            cancelAndHideShellSuggestionsOnEdt("Shell suggestion request replaced")
+            if (!isLiveViewportOnEdt() || automatic && !settings.shellSuggestionsEnabled) {
+                return
+            }
+            activeSuggestionIsAutomatic = automatic
+            suggestionJob =
+                componentScope.launch {
+                    try {
+                        hostServices.shellSuggestionProvider
+                            .suggestions(request)
+                            .flowOn(Dispatchers.Default)
+                            .collect { suggestions ->
+                                ensureActive()
+                                shellSuggestionController.show(request, suggestions, selectedIndex = -1)
+                            }
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (exception: Exception) {
+                        System.err.println("Shell suggestion provider failed: ${exception.message}")
+                        shellSuggestionController.hide()
+                    }
+                }
         }
 
         /**
@@ -1479,8 +1557,16 @@ class SwingTerminal
             val boundSession = session ?: return false
             selectionController.clearSelection()
             searchController.clear()
+            invalidateShellSuggestionsOnEdt()
             boundSession.encodeKey(CLEAR_SCREEN_KEY_EVENT)
             return true
+        }
+
+        private fun invalidateShellSuggestionsOnEdt() {
+            cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input")
+            suggestionInvalidationListeners.forEach { listener ->
+                runCatching(listener::onShellSuggestionsInvalidated)
+            }
         }
 
         private fun handleContextMenuMouseEvent(
@@ -1506,11 +1592,7 @@ class SwingTerminal
                 uri = uri,
                 openAction = { openHyperlink(hyperlinkId) },
                 copyUriAction = {
-                    if (uri == null) {
-                        false
-                    } else {
-                        copyTextToClipboard(uri)
-                    }
+                    uri != null && copyTextToClipboard(uri)
                 },
             )
         }
@@ -1693,6 +1775,30 @@ class SwingTerminal
                 notifyListener = notifyListener,
                 notifyPrimitiveListener = notifyPrimitiveListener,
             )
+            updateAutomaticSuggestionEligibilityOnEdt()
+        }
+
+        private fun updateAutomaticSuggestionEligibilityOnEdt() {
+            val liveViewport = isLiveViewportOnEdt()
+            if (!liveViewport || !settings.shellSuggestionsEnabled && activeSuggestionIsAutomatic) {
+                cancelAndHideShellSuggestionsOnEdt(
+                    if (liveViewport) "Automatic suggestions disabled by settings" else "Viewport left live output",
+                )
+            }
+            val eligible = !disposed && liveViewport && settings.shellSuggestionsEnabled
+            if (automaticSuggestionEligible.getAndSet(eligible) == eligible) return
+            suggestionEligibilityListeners.forEach { listener ->
+                runCatching { listener.onAutomaticShellSuggestionEligibilityChanged(eligible) }
+            }
+        }
+
+        private fun isLiveViewportOnEdt(): Boolean = viewportController.preciseOffset == 0.0
+
+        private fun cancelAndHideShellSuggestionsOnEdt(reason: String) {
+            suggestionJob?.cancel(CancellationException(reason))
+            suggestionJob = null
+            activeSuggestionIsAutomatic = false
+            shellSuggestionController.hide()
         }
 
         fun preferredGridSize(

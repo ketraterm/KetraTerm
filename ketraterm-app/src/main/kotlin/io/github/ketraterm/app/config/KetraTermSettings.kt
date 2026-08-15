@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.config
 
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import io.github.ketraterm.host.*
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
@@ -159,16 +160,22 @@ internal class KetraTermSettings(
             updateConfig(config.copy(desktopNotificationsEnabled = value))
         }
 
-    var persistentCommandHistoryEnabled: Boolean
-        get() = config.persistentCommandHistoryEnabled
+    var persistentSuggestionLearningEnabled: Boolean
+        get() = config.persistentSuggestionLearningEnabled
         set(value) {
-            updateConfig(config.copy(persistentCommandHistoryEnabled = value))
+            updateConfig(config.copy(persistentSuggestionLearningEnabled = value))
         }
 
     var shellSuggestionsEnabled: Boolean
         get() = config.shellSuggestionsEnabled
         set(value) {
             updateConfig(config.copy(shellSuggestionsEnabled = value))
+        }
+
+    var acceptSelectedSuggestionWithEnter: Boolean
+        get() = config.acceptSelectedSuggestionWithEnter
+        set(value) {
+            updateConfig(config.copy(acceptSelectedSuggestionWithEnter = value))
         }
 
     var scrollOnOutput: Boolean
@@ -213,8 +220,9 @@ internal class KetraTermSettings(
             updateConfig(config.copy(titleRemotePermission = value))
         }
 
-    val commandHistoryPath: Path
-        get() = configManager.configPath.resolveSibling("command-history-v1.tsv")
+    /** Path for the compact persisted command-completion stats index. */
+    val commandCompletionStatsPath: Path
+        get() = configManager.configPath.resolveSibling(TerminalCompletionLearningRepository.currentFileName())
 
     fun current(): SwingSettings {
         val resolvedFamily = SwingSettings.resolveFontFamily(config.fontFamily)
@@ -234,6 +242,7 @@ internal class KetraTermSettings(
             shellRequestResizeWindow = config.shellRequestResizeWindow,
             shellRequestWindowManipulation = config.shellRequestWindowManipulation,
             shellSuggestionsEnabled = config.shellSuggestionsEnabled,
+            acceptSelectedSuggestionWithEnter = config.acceptSelectedSuggestionWithEnter,
             scrollOnOutput = config.scrollOnOutput,
         )
     }

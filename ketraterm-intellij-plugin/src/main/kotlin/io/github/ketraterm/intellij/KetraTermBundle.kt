@@ -37,7 +37,9 @@ internal object KetraTermBundle {
      */
     @JvmStatic
     fun message(
-        key: @PropertyKey(resourceBundle = BUNDLE) String,
+        key:
+            @PropertyKey(resourceBundle = BUNDLE)
+            String,
         vararg params: Any?,
     ): @Nls String = instance.getMessage(key, *params)
 

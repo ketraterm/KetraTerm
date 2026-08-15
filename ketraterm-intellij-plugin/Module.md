@@ -14,6 +14,10 @@ and publishing do not leak into the terminal library build.
 The plugin adapts reusable KetraTerm modules to IntelliJ IDE services:
 
 - terminal rendering and input through `ketraterm-ui-swing`.
+- completion parsing and ranking through `ketraterm-completion`.
+- bounded completion snapshots through `ketraterm-completion-host`.
+- sanitized completion statistics through `ketraterm-completion-persistence`.
+- completion/Swing adaptation through `ketraterm-ui-swing-host`.
 - workspace and session state through `ketraterm-workspace` and
   `ketraterm-session`.
 - local process lifecycle through `ketraterm-pty`.

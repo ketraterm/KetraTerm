@@ -44,8 +44,7 @@ private val TerminalTheme.id: String
     storages = [Storage(value = "ketraterm.xml", roamingType = RoamingType.DEFAULT)],
     category = SettingsCategory.TOOLS,
 )
-class KetraTermIntellijSettings :
-    SerializablePersistentStateComponent<KetraTermIntellijSettings.State>(State()) {
+class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTermIntellijSettings.State>(State()) {
     private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
 
     /**
@@ -72,6 +71,18 @@ class KetraTermIntellijSettings :
      * @return `true` when terminal panes may override IDE shortcuts.
      */
     fun overrideIdeShortcuts(): Boolean = KetraTermIntellijSettingsNormalizer.normalize(state).overrideIdeShortcuts
+
+    /**
+     * Returns whether learned completion statistics may be stored on disk.
+     *
+     * Disabling persistence does not disable session-local MRU or in-memory
+     * ranking. It only prevents the IntelliJ host from reading or writing the
+     * learned completion snapshot.
+     *
+     * @return `true` when completion learning may cross IDE restarts.
+     */
+    fun completionLearningPersistenceEnabled(): Boolean =
+        KetraTermIntellijSettingsNormalizer.normalize(state).completionLearningPersistenceEnabled
 
     /**
      * Replaces persisted IDE terminal settings with a normalized state.
@@ -103,28 +114,39 @@ class KetraTermIntellijSettings :
         val remoteTitle = parseTitlePermission(s.titleRemotePermission, TerminalConfig.DEFAULT_TITLE_REMOTE_PERMISSION)
 
         return HostPolicy(
-            titlePolicy = TerminalTitlePolicy(
-                origin = titleOrigin,
-                localPermission = localTitle,
-                remotePermission = remoteTitle,
-            ),
-            clipboardPolicy = TerminalClipboardPolicy(
-                origin = clipboardOrigin,
-                localWritePermission = localWrite,
-                remoteWritePermission = remoteWrite,
-                readPermission = read,
-                maxDecodedBytes = maxBytes,
-            ),
+            titlePolicy =
+                TerminalTitlePolicy(
+                    origin = titleOrigin,
+                    localPermission = localTitle,
+                    remotePermission = remoteTitle,
+                ),
+            clipboardPolicy =
+                TerminalClipboardPolicy(
+                    origin = clipboardOrigin,
+                    localWritePermission = localWrite,
+                    remoteWritePermission = remoteWrite,
+                    readPermission = read,
+                    maxDecodedBytes = maxBytes,
+                ),
             windowManipulationPolicy = HostControlPolicy.DENY,
         )
     }
 
     private fun isSshExecutable(command: String): Boolean {
-        val executable = command.trim().trim('"').replace('\\', '/').substringAfterLast('/').lowercase(Locale.ROOT)
+        val executable =
+            command
+                .trim()
+                .trim('"')
+                .replace('\\', '/')
+                .substringAfterLast('/')
+                .lowercase(Locale.ROOT)
         return executable == "ssh" || executable == "ssh.exe"
     }
 
-    private fun parseClipboardPermission(value: String, default: TerminalClipboardPermission): TerminalClipboardPermission =
+    private fun parseClipboardPermission(
+        value: String,
+        default: TerminalClipboardPermission,
+    ): TerminalClipboardPermission =
         when (value.trim().lowercase(Locale.ROOT)) {
             "allow" -> TerminalClipboardPermission.ALLOW
             "prompt" -> TerminalClipboardPermission.PROMPT
@@ -133,7 +155,10 @@ class KetraTermIntellijSettings :
             else -> default
         }
 
-    private fun parseTitlePermission(value: String, default: TerminalTitlePermission): TerminalTitlePermission =
+    private fun parseTitlePermission(
+        value: String,
+        default: TerminalTitlePermission,
+    ): TerminalTitlePermission =
         when (value.trim().lowercase(Locale.ROOT)) {
             "allow" -> TerminalTitlePermission.ALLOW
             "deny" -> TerminalTitlePermission.DENY
@@ -182,7 +207,12 @@ class KetraTermIntellijSettings :
      * @property environmentVariables newline-separated `NAME=VALUE` environment entries.
      * @property defaultTabName user-visible name for newly opened tabs.
      * @property shellSuggestionsEnabled whether host-provided shell suggestions
-     * may appear in IDE-hosted terminals.
+     * may appear automatically. Explicit user requests remain available when
+     * disabled.
+     * @property acceptSelectedSuggestionWithEnter whether Enter accepts an
+     * already-selected terminal suggestion and otherwise reaches the shell.
+     * @property completionLearningPersistenceEnabled whether sanitized learned
+     * completion statistics may be read from and written to local disk.
      */
     data class State(
         @JvmField val themeId: String = DEFAULT_THEME_ID,
@@ -205,6 +235,8 @@ class KetraTermIntellijSettings :
         @JvmField val environmentVariables: String = "",
         @JvmField val defaultTabName: String = "Local",
         @JvmField val shellSuggestionsEnabled: Boolean = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED,
+        @JvmField val acceptSelectedSuggestionWithEnter: Boolean = TerminalConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
+        @JvmField val completionLearningPersistenceEnabled: Boolean = false,
         @JvmField val pasteSanitization: String = "raw",
         @JvmField val clipboardLocalWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_LOCAL_WRITE.name.lowercase(Locale.ROOT),
         @JvmField val clipboardRemoteWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_REMOTE_WRITE.name.lowercase(Locale.ROOT),
@@ -275,15 +307,17 @@ internal object KetraTermIntellijSettingsNormalizer {
                 state.fontSize.coerceIn(TerminalConfig.FONT_SIZE_MIN, TerminalConfig.FONT_SIZE_MAX),
             columns = state.columns.coerceIn(TerminalConfig.COLUMNS_MIN, TerminalConfig.COLUMNS_MAX),
             rows = state.rows.coerceIn(TerminalConfig.ROWS_MIN, TerminalConfig.ROWS_MAX),
-            cursorBlinkMillis = state.cursorBlinkMillis.coerceIn(
-                TerminalConfig.CURSOR_BLINK_MIN,
-                TerminalConfig.CURSOR_BLINK_MAX,
-            ),
+            cursorBlinkMillis =
+                state.cursorBlinkMillis.coerceIn(
+                    TerminalConfig.CURSOR_BLINK_MIN,
+                    TerminalConfig.CURSOR_BLINK_MAX,
+                ),
             cursorShape = normalizeCursorShape(state.cursorShape),
-            scrollbackLines = state.scrollbackLines.coerceIn(
-                TerminalConfig.SCROLLBACK_MIN,
-                TerminalConfig.SCROLLBACK_MAX,
-            ),
+            scrollbackLines =
+                state.scrollbackLines.coerceIn(
+                    TerminalConfig.SCROLLBACK_MIN,
+                    TerminalConfig.SCROLLBACK_MAX,
+                ),
             lineHeight = coerceLineHeight(state.lineHeight),
             shellPath = state.shellPath.trim().ifBlank { TerminalConfig.DEFAULT_SHELL_PATH },
             startDirectory = state.startDirectory.trim(),
@@ -421,6 +455,7 @@ internal object KetraTermIntellijSettingsMapper {
             shellRequestResizeWindow = false,
             shellRequestWindowManipulation = false,
             shellSuggestionsEnabled = normalized.shellSuggestionsEnabled,
+            acceptSelectedSuggestionWithEnter = normalized.acceptSelectedSuggestionWithEnter,
             scrollOnOutput = normalized.scrollOnOutput,
         )
     }

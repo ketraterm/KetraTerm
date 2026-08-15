@@ -35,7 +35,9 @@ import io.github.ketraterm.workspace.TerminalProfileRegistry
 /**
  * Creates the IntelliJ tool window that hosts KetraTerm terminal tabs.
  */
-class KetraTermToolWindowFactory : ToolWindowFactory, DumbAware {
+class KetraTermToolWindowFactory :
+    ToolWindowFactory,
+    DumbAware {
     override fun createToolWindowContent(
         project: Project,
         toolWindow: ToolWindow,

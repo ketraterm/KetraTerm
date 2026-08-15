@@ -15,12 +15,18 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
+import io.github.ketraterm.input.api.TerminalInputEncoder
+import io.github.ketraterm.input.event.TerminalTextReplacementEvent
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import java.util.regex.Pattern
+
 /**
  * Host-provided shell suggestion shown by the reusable Swing terminal popup.
  *
- * The Swing layer only presents and selects suggestions. It does not decide how
- * accepted text should replace the command line because shell editing semantics
- * belong to the host/provider that produced the suggestion.
+ * The Swing layer only presents and selects suggestions. The host/provider
+ * owns choosing the replacement text, range, source, and semantic kind; Swing
+ * validates that contract before applying the default command-line edit.
  *
  * @property replacementText text the provider intends to insert or use for
  * command-line replacement after acceptance.
@@ -28,20 +34,172 @@ package io.github.ketraterm.ui.swing.suggestion
  * @property detail secondary text shown below [displayText], such as flags,
  * path context, or a short description.
  * @property source compact source label, such as `history`, `path`, or `git`.
+ * @property kind compact semantic candidate kind label supplied by the host.
+ * @property accentRole stable visual category supplied by the host or derived
+ * from [kind] for generic providers.
+ * @property replacementStartOffset inclusive UTF-16 start offset in the request
+ * command text.
+ * @property replacementEndOffset exclusive UTF-16 end offset in the request
+ * command text.
  */
 data class SwingShellSuggestion
     @JvmOverloads
     constructor(
         val replacementText: String,
+        val replacementStartOffset: Int,
+        val replacementEndOffset: Int,
+        val source: String,
+        val kind: String,
         val displayText: String = replacementText,
         val detail: String = "",
-        val source: String = "",
+        val accentRole: SwingShellSuggestionAccentRole = SwingShellSuggestionAccentRole.from(kind, source),
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }
             require(displayText.isNotEmpty()) { "displayText must not be empty" }
+            require(source.isNotBlank()) { "source must not be blank" }
+            require(kind.isNotBlank()) { "kind must not be blank" }
+            require(replacementStartOffset >= 0) {
+                "replacementStartOffset must be >= 0, was $replacementStartOffset"
+            }
+            require(replacementEndOffset >= replacementStartOffset) {
+                "replacementEndOffset must be >= replacementStartOffset, was " +
+                    "$replacementEndOffset < $replacementStartOffset"
+            }
         }
     }
+
+/**
+ * Stable presentation category for one shell suggestion.
+ *
+ * Hosts should provide this from their semantic completion vocabulary rather
+ * than making the popup infer visual meaning from source-label text.
+ */
+enum class SwingShellSuggestionAccentRole {
+    /** Command or subcommand completion. */
+    COMMAND,
+
+    /** Filesystem or project-path completion. */
+    PATH,
+
+    /** Command option-name completion. */
+    OPTION,
+
+    /** Session or persisted command-history completion. */
+    HISTORY,
+
+    /** A value that does not belong to another presentation category. */
+    OTHER,
+    ;
+
+    companion object {
+        /**
+         * Derives a conservative visual category for generic providers that do
+         * not expose a richer semantic completion vocabulary.
+         */
+        fun from(
+            kind: String,
+            source: String,
+        ): SwingShellSuggestionAccentRole =
+            when {
+                kind.equals("PATH", ignoreCase = true) -> PATH
+                kind.equals("OPTION", ignoreCase = true) -> OPTION
+                kind.equals("COMMAND", ignoreCase = true) || kind.equals("SUBCOMMAND", ignoreCase = true) -> COMMAND
+                source.equals("mru", ignoreCase = true) ||
+                    source.equals("history", ignoreCase = true) ||
+                    source.equals("stats", ignoreCase = true) -> HISTORY
+                else -> OTHER
+            }
+    }
+}
+
+/**
+ * Validated command-line replacement plan for one shell suggestion.
+ *
+ * The plan is derived from the suggestion's replacement range and the request
+ * cursor. Hosts can use [commandTextAfterReplacement] for learning/feedback
+ * while the default Swing acceptance handler uses the delete counts to emit
+ * terminal editing keys before pasting [replacementText].
+ *
+ * @property startOffset inclusive UTF-16 start offset replaced in the request
+ * command text.
+ * @property endOffset exclusive UTF-16 end offset replaced in the request
+ * command text.
+ * @property replacementText text pasted after the deletion keys are emitted.
+ * @property deleteBeforeCursorCount number of Backspace key events needed
+ * before paste.
+ * @property deleteAfterCursorCount number of Delete key events needed before
+ * any Backspace key events.
+ */
+data class SwingShellSuggestionReplacement(
+    val startOffset: Int,
+    val endOffset: Int,
+    val replacementText: String,
+    val deleteBeforeCursorCount: Int,
+    val deleteAfterCursorCount: Int,
+) {
+    init {
+        require(startOffset >= 0) { "startOffset must be >= 0, was $startOffset" }
+        require(endOffset >= startOffset) { "endOffset must be >= startOffset, was $endOffset < $startOffset" }
+        require(replacementText.isNotEmpty()) { "replacementText must not be empty" }
+        require(deleteBeforeCursorCount >= 0) {
+            "deleteBeforeCursorCount must be >= 0, was $deleteBeforeCursorCount"
+        }
+        require(deleteAfterCursorCount >= 0) {
+            "deleteAfterCursorCount must be >= 0, was $deleteAfterCursorCount"
+        }
+    }
+}
+
+/**
+ * Returns the validated replacement plan for this suggestion and request.
+ *
+ * Replacement ranges are validated against the command text and request cursor.
+ * Malformed UTF-16 offsets and offsets inside an extended grapheme cluster
+ * return `null` instead of producing partial user-perceived characters.
+ *
+ * @param request command-line request that produced this suggestion.
+ * @return validated replacement plan, or `null` when the request/range is invalid.
+ */
+fun SwingShellSuggestion.replacementFor(request: SwingShellSuggestionRequest): SwingShellSuggestionReplacement? {
+    if (!request.commandText.isUtf16Boundary(request.cursorOffset)) return null
+    if (replacementStartOffset > request.cursorOffset) return null
+    if (request.cursorOffset > replacementEndOffset) return null
+    if (replacementEndOffset > request.commandText.length) return null
+    if (!request.commandText.isUtf16Boundary(replacementStartOffset)) return null
+    if (!request.commandText.isUtf16Boundary(replacementEndOffset)) return null
+    val deletionCounts =
+        request.commandText.graphemeDeletionCounts(
+            startOffset = replacementStartOffset,
+            cursorOffset = request.cursorOffset,
+            endOffset = replacementEndOffset,
+        ) ?: return null
+    return SwingShellSuggestionReplacement(
+        startOffset = replacementStartOffset,
+        endOffset = replacementEndOffset,
+        replacementText = replacementText,
+        deleteBeforeCursorCount = deletionCounts.beforeCursor,
+        deleteAfterCursorCount = deletionCounts.afterCursor,
+    )
+}
+
+/**
+ * Returns the command text that would result from accepting this suggestion.
+ *
+ * This is the host-learning companion to [replacementFor]: it uses the same
+ * UTF-16 and grapheme-cluster rules as the default acceptance handler.
+ *
+ * @param request command-line request that produced this suggestion.
+ * @return resulting command text, or `null` when the request/range is invalid.
+ */
+fun SwingShellSuggestion.commandTextAfterReplacement(request: SwingShellSuggestionRequest): String? {
+    val replacement = replacementFor(request) ?: return null
+    return request.commandText.replaceRange(
+        replacement.startOffset,
+        replacement.endOffset,
+        replacement.replacementText,
+    )
+}
 
 /**
  * Snapshot of the currently visible shell suggestion popup state.
@@ -103,11 +261,9 @@ data class SwingShellSuggestionRequest(
 
     companion object {
         /**
-         * Empty request used by direct popup callers that already computed the
-         * suggestion list outside the provider pipeline.
+         * Empty request used only while the popup is hidden.
          */
-        @JvmField
-        val EMPTY: SwingShellSuggestionRequest =
+        internal val EMPTY: SwingShellSuggestionRequest =
             SwingShellSuggestionRequest(
                 commandText = "",
                 cursorOffset = 0,
@@ -121,7 +277,7 @@ data class SwingShellSuggestionRequest(
  * Host/provider result accepted by the user.
  *
  * @property suggestion accepted suggestion.
- * @property index index of [suggestion] in the displayed list.
+ * @property index global rank of [suggestion] in the current ranked snapshot.
  * @property request command-line context that produced the accepted suggestion.
  */
 data class SwingShellSuggestionAcceptance(
@@ -131,27 +287,107 @@ data class SwingShellSuggestionAcceptance(
 )
 
 /**
- * Host provider for event-level shell suggestions.
+ * Feedback kind emitted by the reusable suggestion popup.
+ */
+enum class SwingShellSuggestionFeedbackKind {
+    /**
+     * The user accepted the selected suggestion.
+     */
+    ACCEPTED,
+
+    /**
+     * The user explicitly dismissed the selected suggestion.
+     */
+    DISMISSED,
+}
+
+/**
+ * User feedback event for the selected shell suggestion.
+ *
+ * @property kind feedback category.
+ * @property suggestion suggestion that was accepted or explicitly dismissed.
+ * @property index index of [suggestion] in the displayed list.
+ * @property request command-line context that produced the suggestion.
+ */
+data class SwingShellSuggestionFeedback(
+    val kind: SwingShellSuggestionFeedbackKind,
+    val suggestion: SwingShellSuggestion,
+    val index: Int,
+    val request: SwingShellSuggestionRequest,
+)
+
+/**
+ * Host provider for progressive shell-suggestion snapshots.
  */
 fun interface SwingShellSuggestionProvider {
     /**
-     * Returns suggestions for [request].
+     * Returns a cold stream of suggestions for [request].
      *
-     * This method is invoked on the Swing Event Dispatch Thread. Providers must
-     * keep the work bounded and return quickly; slower providers should cache or
-     * precompute outside this callback and return the latest ready snapshot.
+     * The reusable Swing terminal invokes this on [kotlinx.coroutines.Dispatchers.Default],
+     * outside the Swing Event Dispatch Thread. Implementations must cooperate
+     * with cancellation when a newer request replaces the current one.
      *
      * @param request command-line context.
-     * @return ordered suggestions, best first.
+     * @return cold stream of ordered suggestion snapshots, best first.
      */
-    fun suggestions(request: SwingShellSuggestionRequest): List<SwingShellSuggestion>
+    fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>>
 
     companion object {
         /**
          * Provider that returns no suggestions.
          */
         @JvmField
-        val NONE: SwingShellSuggestionProvider = SwingShellSuggestionProvider { emptyList() }
+        val NONE: SwingShellSuggestionProvider = SwingShellSuggestionProvider { flowOf(emptyList()) }
+    }
+}
+
+/**
+ * Listener notified immediately before command-affecting terminal input is submitted.
+ *
+ * Listeners are registered on one [io.github.ketraterm.ui.swing.api.SwingTerminal]
+ * and invoked synchronously on the Swing Event Dispatch Thread after its active
+ * provider collection is cancelled and its popup is hidden.
+ */
+fun interface SwingShellSuggestionInvalidationListener {
+    /** Called on the Swing Event Dispatch Thread before command-affecting input is submitted. */
+    fun onShellSuggestionsInvalidated()
+}
+
+/**
+ * Listener for automatic shell-suggestion eligibility changes.
+ *
+ * Eligibility is false while the terminal is outside its live viewport or the
+ * current Swing settings disable automatic suggestions. Callbacks are invoked
+ * synchronously on the Swing Event Dispatch Thread after ineligible component
+ * work has been cancelled and hidden.
+ */
+fun interface SwingShellSuggestionEligibilityListener {
+    /**
+     * Reports the latest automatic-suggestion eligibility.
+     *
+     * @param eligible `true` only when automatic suggestions are enabled and
+     * the terminal is displaying its live viewport.
+     */
+    fun onAutomaticShellSuggestionEligibilityChanged(eligible: Boolean)
+}
+
+/**
+ * Host callback invoked for suggestion acceptance and explicit dismissal.
+ */
+fun interface SwingShellSuggestionFeedbackHandler {
+    /**
+     * Handles one user feedback event.
+     *
+     * @param feedback selected suggestion and feedback kind.
+     */
+    fun onSuggestionFeedback(feedback: SwingShellSuggestionFeedback)
+
+    companion object {
+        /**
+         * Feedback handler that ignores all popup feedback.
+         */
+        @JvmField
+        val NONE: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler { }
     }
 }
 
@@ -172,5 +408,72 @@ fun interface SwingShellSuggestionHandler {
          */
         @JvmField
         val NONE: SwingShellSuggestionHandler = SwingShellSuggestionHandler { }
+
+        /**
+         * Creates a standard command-line replacement suggestion handler.
+         *
+         * The default handler is Unicode-aware: it computes grapheme-cluster
+         * counts for generated Delete and Backspace events before pasting the
+         * accepted suggestion replacement.
+         *
+         * @param session active input encoder used to submit the replacement event.
+         * @return standard replacement suggestion handler.
+         */
+        @JvmStatic
+        fun createDefault(session: TerminalInputEncoder): SwingShellSuggestionHandler =
+            SwingShellSuggestionHandler { acceptance ->
+                val request = acceptance.request
+                val replacement = acceptance.suggestion.replacementFor(request) ?: return@SwingShellSuggestionHandler
+
+                session.encodeTextReplacement(
+                    TerminalTextReplacementEvent(
+                        deleteAfterCursorCount = replacement.deleteAfterCursorCount,
+                        deleteBeforeCursorCount = replacement.deleteBeforeCursorCount,
+                        replacementText = replacement.replacementText,
+                    ),
+                )
+            }
     }
 }
+
+private data class GraphemeDeletionCounts(
+    val beforeCursor: Int,
+    val afterCursor: Int,
+)
+
+private fun String.graphemeDeletionCounts(
+    startOffset: Int,
+    cursorOffset: Int,
+    endOffset: Int,
+): GraphemeDeletionCounts? {
+    var beforeCursor = 0
+    var afterCursor = 0
+    var startIsBoundary = startOffset == 0
+    var cursorIsBoundary = cursorOffset == 0
+    var endIsBoundary = endOffset == 0
+    val matcher = EXTENDED_GRAPHEME_CLUSTER.matcher(this)
+    while (matcher.find()) {
+        val clusterStart = matcher.start()
+        val clusterEnd = matcher.end()
+        if (clusterStart == startOffset || clusterEnd == startOffset) startIsBoundary = true
+        if (clusterStart == cursorOffset || clusterEnd == cursorOffset) cursorIsBoundary = true
+        if (clusterStart == endOffset || clusterEnd == endOffset) endIsBoundary = true
+
+        when {
+            clusterStart >= startOffset && clusterEnd <= cursorOffset -> beforeCursor++
+            clusterStart >= cursorOffset && clusterEnd <= endOffset -> afterCursor++
+        }
+        if (clusterEnd >= endOffset) break
+    }
+    if (!startIsBoundary || !cursorIsBoundary || !endIsBoundary) return null
+    return GraphemeDeletionCounts(beforeCursor, afterCursor)
+}
+
+private fun String.isUtf16Boundary(offset: Int): Boolean {
+    if (offset !in 0..length) return false
+    val afterHighSurrogate = offset > 0 && Character.isHighSurrogate(this[offset - 1])
+    val beforeLowSurrogate = offset < length && Character.isLowSurrogate(this[offset])
+    return !afterHighSurrogate && !beforeLowSurrogate
+}
+
+private val EXTENDED_GRAPHEME_CLUSTER: Pattern = Pattern.compile("\\X")

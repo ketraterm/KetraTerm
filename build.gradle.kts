@@ -21,7 +21,7 @@ plugins {
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
 }
 
-extra["kotlinxCoroutinesVersion"] = "1.11.0"
+extra["kotlinxCoroutinesVersion"] = "1.10.2"
 
 repositories {
     mavenCentral()
@@ -33,6 +33,9 @@ dependencies {
     dokka(project(":ketraterm-core"))
     dokka(project(":ketraterm-host"))
     dokka(project(":ketraterm-input"))
+    dokka(project(":ketraterm-completion"))
+    dokka(project(":ketraterm-completion-host"))
+    dokka(project(":ketraterm-completion-persistence"))
     dokka(project(":ketraterm-render-api"))
     dokka(project(":ketraterm-render-cache"))
     dokka(project(":ketraterm-transport-api"))
@@ -63,7 +66,7 @@ subprojects {
 
     plugins.withId("org.jetbrains.kotlin.jvm") {
         extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
-            jvmToolchain(21)
+            jvmToolchain(25)
         }
     }
 

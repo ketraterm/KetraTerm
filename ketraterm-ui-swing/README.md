@@ -1,6 +1,6 @@
 # KetraTerm UI Swing (`:ketraterm-ui-swing`)
 
-A reusable, premium-tier Swing terminal component built in Kotlin/JVM 21.
+A reusable, premium-tier Swing terminal component built in Kotlin/JVM 25.
 
 `ketraterm-ui-swing` translates terminal render frames and keyboard/mouse events into a desktop component (`JComponent`) without knowing which transport (PTY, SSH, WebSocket, etc.) produced the raw stream. It serves as the visual and interactive foundation for standalone desktop terminal apps, IDE tool windows, and custom Swing hosts.
 

@@ -190,9 +190,11 @@ internal class SettingsDialog(
     private val shellRequestWindowManipulationCheckbox =
         JCheckBox("Allow window manipulation from shell", settings.shellRequestWindowManipulation)
     private val shellSuggestionsCheckbox =
-        JCheckBox("Show shell suggestions", settings.shellSuggestionsEnabled)
-    private val persistentCommandHistoryCheckbox =
-        JCheckBox("Persist command history", settings.persistentCommandHistoryEnabled)
+        JCheckBox("Show shell suggestions automatically", settings.shellSuggestionsEnabled)
+    private val acceptSelectedSuggestionWithEnterCheckbox =
+        JCheckBox("Accept selected suggestion with Enter", settings.acceptSelectedSuggestionWithEnter)
+    private val persistentSuggestionLearningCheckbox =
+        JCheckBox("Persist suggestion learning", settings.persistentSuggestionLearningEnabled)
     private val scrollOnOutputCheckbox = JCheckBox("Scroll on output", settings.scrollOnOutput)
     private val cursorBlinkSpinner =
         createSpinner(settings.cursorBlinkMillis, TerminalConfig.CURSOR_BLINK_MIN, TerminalConfig.CURSOR_BLINK_MAX, 50, 70)
@@ -289,7 +291,8 @@ internal class SettingsDialog(
         registerChangeListener(shellRequestResizeWindowCheckbox, updateApplyState)
         registerChangeListener(shellRequestWindowManipulationCheckbox, updateApplyState)
         registerChangeListener(shellSuggestionsCheckbox, updateApplyState)
-        registerChangeListener(persistentCommandHistoryCheckbox, updateApplyState)
+        registerChangeListener(acceptSelectedSuggestionWithEnterCheckbox, updateApplyState)
+        registerChangeListener(persistentSuggestionLearningCheckbox, updateApplyState)
         registerChangeListener(scrollOnOutputCheckbox, updateApplyState)
         registerChangeListener(cursorBlinkSpinner, updateApplyState)
         registerChangeListener(cursorShapeCombo, updateApplyState)
@@ -417,13 +420,13 @@ internal class SettingsDialog(
         )
         panel.add(appSection)
 
-        panel.add(SectionHeader("Command History"))
+        panel.add(SectionHeader("Shell Suggestions"))
         val historySection = createSectionPanel()
         addCheckboxRow(
             historySection,
             0,
-            persistentCommandHistoryCheckbox,
-            "Persist bounded command text, working directory, exit status, and timestamps. Terminal output is never stored.",
+            persistentSuggestionLearningCheckbox,
+            "Persist compact suggestion ranking metadata across app restarts. Terminal output is never stored.",
         )
         panel.add(historySection)
 
@@ -515,7 +518,13 @@ internal class SettingsDialog(
             keyboardSection,
             2,
             shellSuggestionsCheckbox,
-            "Show host-provided command, path, and history suggestions when a provider is active.",
+            "Show suggestions while typing. Ctrl+Space requests them manually when this is disabled.",
+        )
+        addCheckboxRow(
+            keyboardSection,
+            4,
+            acceptSelectedSuggestionWithEnterCheckbox,
+            "Insert the highlighted suggestion with Enter. With no selection, Enter runs the command normally.",
         )
         panel.add(keyboardSection)
 
@@ -758,7 +767,9 @@ internal class SettingsDialog(
         shellRequestResizeWindowCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_RESIZE_WINDOW
         shellRequestWindowManipulationCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
         shellSuggestionsCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED
-        persistentCommandHistoryCheckbox.isSelected = TerminalConfig.DEFAULT_PERSISTENT_COMMAND_HISTORY_ENABLED
+        acceptSelectedSuggestionWithEnterCheckbox.isSelected =
+            TerminalConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER
+        persistentSuggestionLearningCheckbox.isSelected = TerminalConfig.DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED
         scrollOnOutputCheckbox.isSelected = TerminalConfig.DEFAULT_SCROLL_ON_OUTPUT
         cursorBlinkSpinner.value = TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS
         cursorShapeCombo.selectedItem = TerminalConfig.DEFAULT_CURSOR_SHAPE
@@ -831,7 +842,8 @@ internal class SettingsDialog(
             shellRequestResizeWindow = shellRequestResizeWindowCheckbox.isSelected,
             shellRequestWindowManipulation = shellRequestWindowManipulationCheckbox.isSelected,
             shellSuggestionsEnabled = shellSuggestionsCheckbox.isSelected,
-            persistentCommandHistoryEnabled = persistentCommandHistoryCheckbox.isSelected,
+            acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckbox.isSelected,
+            persistentSuggestionLearningEnabled = persistentSuggestionLearningCheckbox.isSelected,
             clipboardLocalWrite =
                 TerminalClipboardPermission.valueOf(
                     (clipboardLocalWriteCombo.selectedItem as String).uppercase(Locale.ROOT),

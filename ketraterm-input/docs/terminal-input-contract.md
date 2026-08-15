@@ -2,15 +2,15 @@
 
 This document defines the public behavioral contract of `:ketraterm-input`.
 
-It is the host-bound input boundary for normalized keyboard, mouse, paste, and
-focus events. If code outside the input module depends on behavior not described
-here, that behavior is not yet guaranteed.
+It is the host-bound input boundary for normalized keyboard, mouse, paste,
+text-replacement, and focus events. If code outside the input module depends on
+behavior not described here, that behavior is not yet guaranteed.
 
 ## Scope
 
 Input owns:
 
-- platform-neutral keyboard, mouse, paste, and focus event vocabulary
+- platform-neutral keyboard, mouse, paste, text-replacement, and focus event vocabulary
 - event validation for input-only invariants
 - host-bound byte encoding for keyboard, keypad, mouse, paste, and focus reports
 - policy decisions for ambiguous or unsupported input encodings
@@ -31,8 +31,8 @@ Input does not own:
 The public input surface is:
 
 - `TerminalInputEncoder`, the facade for encoding one normalized input event
-- `TerminalKeyEvent`, `TerminalPasteEvent`, `TerminalFocusEvent`, and
-  `TerminalMouseEvent`, the normalized event models
+- `TerminalKeyEvent`, `TerminalPasteEvent`, `TerminalTextReplacementEvent`,
+  `TerminalFocusEvent`, and `TerminalMouseEvent`, the normalized event models
 - `TerminalInputPolicy`, the compatibility and safety policy for ambiguous
   encodings
 - `TerminalHostOutput`, the host-bound byte sink shared with terminal responses
@@ -88,10 +88,18 @@ Guaranteed behavior:
 - release can use `NONE`, though SGR encoding suppresses it because SGR
   releases preserve button identity
 
+Text-replacement events describe one logical edit around the active cursor:
+Delete actions for text after the cursor, Backspace actions for text before the
+cursor, then optional replacement text through the normal paste policy. Counts
+are editor actions, not UTF-16 units or Unicode code points, and must be
+non-negative. The UI that owns the edited text is responsible for converting
+its text model into deletion counts.
+
 ## Mode-State Contract
 
 `DefaultTerminalInputEncoder` reads `TerminalInputState.getInputModeBits()` once
-per event and passes that stable value to the specialized encoder.
+per event and passes that stable value to the specialized encoder. A complete
+text replacement uses one mode snapshot for all deletion and paste phases.
 
 Input may use only core/protocol helper APIs to interpret packed mode state,
 including:
@@ -130,6 +138,12 @@ parser/core responses -> same terminal actor -> TerminalHostOutput -> PTY stdin
 Concurrent calls from independent UI and parser/core threads are outside this
 module's contract unless the host wraps them in an ordering layer before they
 reach `TerminalHostOutput`.
+
+`TerminalSession` treats one text-replacement event as one serialized outbound
+operation. Its Delete, Backspace, and paste phases cannot interleave with other
+session input or parser/core responses. The default encoder coalesces repeated
+deletion sequences through a bounded reusable buffer; replacement text still
+uses the configured paste policy.
 
 ## Keyboard Contract
 
@@ -294,6 +308,7 @@ Required coverage for behavior changes:
 - paste policy and bracketed paste behavior
 - focus reporting suppression and emission
 - one-read-per-event mode behavior through `DefaultTerminalInputEncoder`
+- exact and hostile-length text-replacement ordering
 - real core packed mode host for input-facing modes
 - xterm input profile matrix coverage for supported mode combinations
 

@@ -16,6 +16,7 @@
 package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.config.KetraTermSettings
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import io.github.ketraterm.host.*
 import io.github.ketraterm.workspace.TerminalProfileRegistry
 import io.github.ketraterm.workspace.config.TerminalWorkspaceConfigManager
@@ -54,8 +55,18 @@ class SettingsModelTest {
         assertEquals(settings.shellRequestResizeWindow, state.shellRequestResizeWindow)
         assertEquals(settings.shellRequestWindowManipulation, state.shellRequestWindowManipulation)
         assertEquals(settings.shellSuggestionsEnabled, state.shellSuggestionsEnabled)
+        assertEquals(settings.acceptSelectedSuggestionWithEnter, state.acceptSelectedSuggestionWithEnter)
+        assertEquals(settings.persistentSuggestionLearningEnabled, state.persistentSuggestionLearningEnabled)
         assertEquals(settings.scrollOnOutput, state.scrollOnOutput)
         assertFalse(model.hasChanges(state))
+    }
+
+    @Test
+    fun `command completion stats path uses codec-owned file name`() {
+        assertEquals(
+            tempFile.resolveSibling(TerminalCompletionLearningRepository.currentFileName()),
+            settings.commandCompletionStatsPath,
+        )
     }
 
     @Test
@@ -84,6 +95,8 @@ class SettingsModelTest {
                 shellRequestResizeWindow = true,
                 shellRequestWindowManipulation = true,
                 shellSuggestionsEnabled = false,
+                acceptSelectedSuggestionWithEnter = false,
+                persistentSuggestionLearningEnabled = true,
                 clipboardLocalWrite = TerminalClipboardPermission.ALLOW,
                 clipboardRemoteWrite = TerminalClipboardPermission.ALLOWLIST,
                 clipboardRead = TerminalClipboardPermission.PROMPT,
@@ -108,6 +121,8 @@ class SettingsModelTest {
         assertTrue(settings.shellRequestResizeWindow)
         assertTrue(settings.shellRequestWindowManipulation)
         assertFalse(settings.shellSuggestionsEnabled)
+        assertFalse(settings.acceptSelectedSuggestionWithEnter)
+        assertTrue(settings.persistentSuggestionLearningEnabled)
         assertEquals(TerminalClipboardPermission.ALLOW, settings.clipboardLocalWrite)
         assertEquals(TerminalClipboardPermission.ALLOWLIST, settings.clipboardRemoteWrite)
         assertEquals(TerminalClipboardPermission.PROMPT, settings.clipboardRead)

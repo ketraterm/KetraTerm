@@ -21,6 +21,7 @@ import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.input.event.TerminalTextReplacementEvent
 import io.github.ketraterm.input.impl.keyboard.KeyboardEncoder
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.host.TerminalHostOutput
@@ -53,6 +54,8 @@ internal class DefaultTerminalInputEncoder(
     private val paste = PasteEncoder(output, scratch, policy)
     private val focus = FocusEncoder(output)
     private val mouse = MouseEncoder(output, scratch, policy)
+    private val bufferedDeletionOutput = BufferedHostOutput(output)
+    private val replacementKeyboard = KeyboardEncoder(bufferedDeletionOutput, scratch, policy)
 
     /**
      * Encodes one keyboard event using one packed mode read.
@@ -72,6 +75,31 @@ internal class DefaultTerminalInputEncoder(
     override fun encodePaste(event: TerminalPasteEvent) {
         val modeBits = inputState.getInputModeBits()
         paste.encode(event, modeBits)
+    }
+
+    /**
+     * Encodes one replacement from a single mode snapshot, coalescing repeated
+     * Delete and Backspace sequences before applying normal paste policy.
+     *
+     * @param event deletion counts and replacement text.
+     */
+    override fun encodeTextReplacement(event: TerminalTextReplacementEvent) {
+        val modeBits = inputState.getInputModeBits()
+        bufferedDeletionOutput.reset()
+        try {
+            repeat(event.deleteAfterCursorCount) {
+                replacementKeyboard.encode(DELETE_EVENT, modeBits)
+            }
+            repeat(event.deleteBeforeCursorCount) {
+                replacementKeyboard.encode(BACKSPACE_EVENT, modeBits)
+            }
+            bufferedDeletionOutput.flush()
+            if (event.replacementText.isNotEmpty()) {
+                paste.encode(TerminalPasteEvent(event.replacementText), modeBits)
+            }
+        } finally {
+            bufferedDeletionOutput.reset()
+        }
     }
 
     /**
@@ -96,7 +124,13 @@ internal class DefaultTerminalInputEncoder(
 
     override fun setInputPolicy(policy: TerminalInputPolicy) {
         keyboard.policy = policy
+        replacementKeyboard.policy = policy
         paste.policy = policy
         mouse.policy = policy
+    }
+
+    private companion object {
+        private val DELETE_EVENT = TerminalKeyEvent.key(io.github.ketraterm.input.event.TerminalKey.DELETE)
+        private val BACKSPACE_EVENT = TerminalKeyEvent.key(io.github.ketraterm.input.event.TerminalKey.BACKSPACE)
     }
 }

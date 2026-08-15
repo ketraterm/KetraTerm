@@ -33,6 +33,8 @@ import io.github.ketraterm.ui.swing.render.TestRenderFrame
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Insets
@@ -309,13 +311,22 @@ class SwingTerminalSelectionTest {
             )
 
         session.start(columns = 5, rows = 1)
+        val visibleDuringInvalidation = ArrayList<Boolean>()
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
+            component.addShellSuggestionInvalidationListener {
+                visibleDuringInvalidation += component.currentShellSuggestionState().visible
+            }
+            component.showShellSuggestions(
+                SwingShellSuggestionRequest("git s", 5, 5, 0),
+                listOf(SwingShellSuggestion("status", 4, 5, "spec", "SUBCOMMAND")),
+            )
             assertTrue(component.pasteClipboardText())
         }
 
         assertEquals("pasted text", input.pasteText.get())
+        assertEquals(listOf(false), visibleDuringInvalidation)
         session.close()
     }
 

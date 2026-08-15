@@ -16,6 +16,8 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 import java.awt.*
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.util.*
@@ -23,198 +25,308 @@ import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import kotlin.math.min
 
-internal interface SwingShellSuggestionPopupListener {
-    fun onSuggestionHovered(index: Int)
+internal const val POPUP_MAX_VISIBLE_ROWS = 8
+internal const val POPUP_MIN_WIDTH = 320
+internal const val POPUP_MAX_WIDTH = 620
 
-    fun onSuggestionClicked(index: Int)
-}
+internal data class SwingShellSuggestionPopupRow(
+    val displayText: String,
+    val detail: String,
+    val sourceLabel: String,
+    val sourceWidth: Int,
+    val accentRole: SwingShellSuggestionAccentRole,
+)
 
-internal class SwingShellSuggestionPopup(
-    private val listener: SwingShellSuggestionPopupListener,
-) : JComponent() {
-    private var suggestions: List<SwingShellSuggestion> = emptyList()
-    private var selectedIndex: Int = NO_SELECTION
+internal class SwingShellSuggestionPopupLayout {
+    private val rows = arrayOfNulls<SwingShellSuggestionPopupRow>(POPUP_MAX_VISIBLE_ROWS)
 
-    init {
-        isOpaque = false
-        isFocusable = false
-        addMouseMotionListener(
-            object : MouseAdapter() {
-                override fun mouseMoved(event: MouseEvent) {
-                    val row = rowAt(event.y)
-                    if (row != NO_SELECTION) listener.onSuggestionHovered(row)
-                }
-            },
-        )
-        addMouseListener(
-            object : MouseAdapter() {
-                override fun mousePressed(event: MouseEvent) {
-                    if (!SwingUtilities.isLeftMouseButton(event)) return
-                    val row = rowAt(event.y)
-                    if (row != NO_SELECTION) {
-                        listener.onSuggestionClicked(row)
-                        event.consume()
-                    }
-                }
-            },
-        )
-    }
+    var rowCount: Int = 0
+        private set
 
-    fun update(
+    var preferredWidth: Int = POPUP_MIN_WIDTH
+        private set
+
+    fun prepare(
+        component: JComponent,
         suggestions: List<SwingShellSuggestion>,
-        selectedIndex: Int,
+        availableWidth: Int,
     ) {
-        this.suggestions = suggestions
-        this.selectedIndex = selectedIndex
-        revalidate()
-        repaint()
-    }
+        val font = component.font ?: DEFAULT_FONT
+        val fontMetrics = component.getFontMetrics(font)
+        val sourceMetrics = component.getFontMetrics(font.deriveFont(Font.BOLD, 10f))
+        val count = min(suggestions.size, POPUP_MAX_VISIBLE_ROWS)
+        var maxNaturalWidth = POPUP_MIN_WIDTH
 
-    override fun getPreferredSize(): Dimension {
-        if (suggestions.isEmpty()) return Dimension(0, 0)
-        val rows = min(suggestions.size, MAX_VISIBLE_ROWS)
-        return Dimension(DEFAULT_WIDTH, VERTICAL_PADDING * 2 + rows * ROW_HEIGHT)
-    }
-
-    override fun paintComponent(graphics: Graphics) {
-        val g = graphics.create() as Graphics2D
-        try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            paintChrome(g)
-            paintRows(g)
-        } finally {
-            g.dispose()
-        }
-    }
-
-    private fun paintChrome(g: Graphics2D) {
-        g.color = BACKGROUND
-        g.fillRoundRect(0, 0, width - 1, height - 1, ARC, ARC)
-        g.color = BORDER
-        g.drawRoundRect(0, 0, width - 1, height - 1, ARC, ARC)
-    }
-
-    private fun paintRows(g: Graphics2D) {
-        val textFont = font ?: g.font
-        g.font = textFont
-        val metrics = g.fontMetrics
-        val detailFont = textFont.deriveFont(Font.PLAIN, (textFont.size2D - 1f).coerceAtLeast(MIN_DETAIL_FONT_SIZE))
-        val detailMetrics = g.getFontMetrics(detailFont)
-        val sourceFont = textFont.deriveFont(Font.BOLD, SOURCE_FONT_SIZE)
-        val sourceMetrics = g.getFontMetrics(sourceFont)
-        val count = min(suggestions.size, MAX_VISIBLE_ROWS)
         var index = 0
         while (index < count) {
-            val top = VERTICAL_PADDING + index * ROW_HEIGHT
             val suggestion = suggestions[index]
-            if (index == selectedIndex) {
-                g.color = SELECTED_BACKGROUND
-                g.fillRoundRect(ROW_INSET, top + 2, width - ROW_INSET * 2, ROW_HEIGHT - 4, 8, 8)
-            }
+            val formattedSource = formatSourceLabel(suggestion.source)
+            val sourceLabel = ellipsize(formattedSource, sourceMetrics, min(112, availableWidth - 28))
+            val sourceWidth = if (sourceLabel.isEmpty()) 0 else sourceMetrics.stringWidth(sourceLabel) + 12
+            val textWidth = fontMetrics.stringWidth(suggestion.displayText)
+            val detailWidth = fontMetrics.stringWidth(suggestion.detail.trim())
 
-            val markerColor = MARKER_COLORS[index % MARKER_COLORS.size]
-            g.color = markerColor
-            g.fillRoundRect(ROW_INSET + 2, top + 8, MARKER_SIZE, MARKER_SIZE, MARKER_SIZE, MARKER_SIZE)
+            val itemNaturalWidth = 32 + textWidth + (if (detailWidth > 0) detailWidth + 8 else 0) + sourceWidth
+            maxNaturalWidth = maxOf(maxNaturalWidth, itemNaturalWidth)
 
-            val textX = ROW_INSET + 18
-            val rightLimit = width - ROW_INSET
-            val source = suggestion.source.trim()
-            val sourceWidth =
-                if (source.isEmpty()) {
-                    0
-                } else {
-                    sourceMetrics.stringWidth(source.uppercase(Locale.ROOT)) + SOURCE_HORIZONTAL_PADDING * 2
-                }
-            val textLimit = rightLimit - sourceWidth - if (sourceWidth == 0) 0 else SOURCE_GAP
-
-            g.font = textFont
-            g.color = TEXT
-            g.drawString(ellipsize(suggestion.displayText, metrics, textLimit - textX), textX, top + 18)
-
-            val detail = suggestion.detail.trim()
-            if (detail.isNotEmpty()) {
-                g.font = detailFont
-                g.color = DETAIL
-                g.drawString(ellipsize(detail, detailMetrics, textLimit - textX), textX, top + 34)
-            }
-
-            if (sourceWidth > 0) {
-                paintSource(g, source, rightLimit - sourceWidth, top + 10, sourceWidth, sourceFont)
-            }
+            val maxTextWidth = (availableWidth - sourceWidth - 40).coerceAtLeast(40)
+            rows[index] =
+                SwingShellSuggestionPopupRow(
+                    displayText = ellipsize(suggestion.displayText, fontMetrics, maxTextWidth),
+                    detail = ellipsize(suggestion.detail.trim(), fontMetrics, maxTextWidth),
+                    sourceLabel = sourceLabel,
+                    sourceWidth = sourceWidth,
+                    accentRole = suggestion.accentRole,
+                )
             index++
         }
+        while (index < rowCount) {
+            rows[index] = null
+            index++
+        }
+        rowCount = count
+        preferredWidth = maxNaturalWidth.coerceIn(POPUP_MIN_WIDTH, POPUP_MAX_WIDTH)
     }
 
-    private fun paintSource(
-        g: Graphics2D,
-        source: String,
-        x: Int,
-        y: Int,
-        sourceWidth: Int,
-        sourceFont: Font,
-    ) {
-        val label = source.uppercase(Locale.ROOT)
-        g.color = SOURCE_BACKGROUND
-        g.fillRoundRect(x, y, sourceWidth, SOURCE_HEIGHT, SOURCE_ARC, SOURCE_ARC)
-        g.font = sourceFont
-        g.color = SOURCE_TEXT
-        g.drawString(label, x + SOURCE_HORIZONTAL_PADDING, y + SOURCE_BASELINE)
+    fun row(index: Int): SwingShellSuggestionPopupRow {
+        require(index in 0 until rowCount) { "row index must be in 0 until $rowCount, was $index" }
+        return checkNotNull(rows[index])
     }
 
-    private fun rowAt(y: Int): Int {
-        if (y < VERTICAL_PADDING) return NO_SELECTION
-        val row = (y - VERTICAL_PADDING) / ROW_HEIGHT
-        return if (row in suggestions.indices && row < MAX_VISIBLE_ROWS) row else NO_SELECTION
-    }
+    private fun formatSourceLabel(source: String): String =
+        when (source) {
+            "mru", "MRU" -> "MRU"
+            "history", "HISTORY" -> "HISTORY"
+            "spec", "SPEC" -> "SPEC"
+            "path", "PATH" -> "PATH"
+            "stats", "STATS" -> "STATS"
+            "git", "GIT" -> "GIT"
+            "gradle", "GRADLE" -> "GRADLE"
+            else -> source.trim().uppercase(Locale.ROOT)
+        }
 
     private fun ellipsize(
         text: String,
         metrics: FontMetrics,
         maxWidth: Int,
     ): String {
-        if (maxWidth <= 0) return ""
+        if (text.isEmpty() || maxWidth <= 0) return ""
         if (metrics.stringWidth(text) <= maxWidth) return text
+        val ellipsisWidth = metrics.stringWidth(ELLIPSIS)
+        if (ellipsisWidth > maxWidth) return ""
 
-        var end = text.length
-        while (end > 0) {
-            val candidate = text.substring(0, end) + ELLIPSIS
-            if (metrics.stringWidth(candidate) <= maxWidth) return candidate
-            end--
+        var low = 0
+        var high = text.length
+        while (low < high) {
+            val middle = (low + high + 1) ushr 1
+            val boundary = text.safeUtf16BoundaryBefore(middle)
+            if (metrics.stringWidth(text.substring(0, boundary)) + ellipsisWidth <= maxWidth) {
+                low = middle
+            } else {
+                high = middle - 1
+            }
         }
-        return ""
+        val boundary = text.safeUtf16BoundaryBefore(low)
+        return if (boundary == 0) ELLIPSIS else text.substring(0, boundary) + ELLIPSIS
+    }
+
+    private fun String.safeUtf16BoundaryBefore(offset: Int): Int =
+        if (offset in 1 until length && Character.isHighSurrogate(this[offset - 1]) && Character.isLowSurrogate(this[offset])) {
+            offset - 1
+        } else {
+            offset
+        }
+
+    private companion object {
+        private const val ELLIPSIS = "..."
+        private val DEFAULT_FONT = Font(Font.SANS_SERIF, Font.PLAIN, 12)
+    }
+}
+
+internal class SwingShellSuggestionPopup(
+    private val listener: SwingShellSuggestionViewListener,
+) : JComponent(),
+    SwingShellSuggestionView {
+    private var suggestions: List<SwingShellSuggestion> = emptyList()
+    private var selectedIndex: Int = NO_SELECTION
+    private val layout = SwingShellSuggestionPopupLayout()
+
+    override val component: JComponent get() = this
+
+    init {
+        isOpaque = false
+        isFocusable = false
+        addMouseMotionListener(
+            object : MouseAdapter() {
+                override fun mouseMoved(e: MouseEvent) {
+                    val row = rowAt(e.y)
+                    if (row != NO_SELECTION) listener.onSuggestionHovered(row)
+                }
+            },
+        )
+        addMouseListener(
+            object : MouseAdapter() {
+                override fun mousePressed(e: MouseEvent) {
+                    if (SwingUtilities.isLeftMouseButton(e)) {
+                        val row = rowAt(e.y)
+                        if (row != NO_SELECTION) {
+                            listener.onSuggestionClicked(row)
+                            e.consume()
+                        }
+                    }
+                }
+            },
+        )
+        addComponentListener(
+            object : ComponentAdapter() {
+                override fun componentResized(e: ComponentEvent) {
+                    prepareLayout()
+                }
+            },
+        )
+        addPropertyChangeListener("font") { prepareLayout() }
+    }
+
+    override fun update(
+        suggestions: List<SwingShellSuggestion>,
+        selectedIndex: Int,
+    ) {
+        if (this.suggestions != suggestions) {
+            this.suggestions = suggestions
+            prepareLayout()
+            revalidate()
+        }
+        this.selectedIndex = selectedIndex
+        repaint()
+    }
+
+    override fun getPreferredSize(): Dimension {
+        if (suggestions.isEmpty()) return Dimension(0, 0)
+        val count = min(suggestions.size, POPUP_MAX_VISIBLE_ROWS)
+        return Dimension(layout.preferredWidth, SURFACE_PADDING * 2 + count * ROW_HEIGHT)
+    }
+
+    override fun paintComponent(graphics: Graphics) {
+        val g2 = graphics as? Graphics2D ?: return
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+
+        val bg = parent?.background ?: DEFAULT_BG
+        val fg = parent?.foreground ?: DEFAULT_FG
+        val border = mix(bg, fg, 0.18)
+        val selectionBg = mix(bg, fg, 0.24)
+
+        // Surface Fill & Border
+        g2.color = bg
+        g2.fillRoundRect(0, 0, width - 1, height - 1, SURFACE_ARC, SURFACE_ARC)
+        g2.color = border
+        g2.drawRoundRect(0, 0, width - 1, height - 1, SURFACE_ARC, SURFACE_ARC)
+
+        // Rows Paint Loop
+        val font = font ?: DEFAULT_FONT
+        val detailFont = font.deriveFont(Font.PLAIN, (font.size2D - 1f).coerceAtLeast(10f))
+        val sourceFont = font.deriveFont(Font.BOLD, 10f)
+
+        val count = layout.rowCount
+        var i = 0
+        while (i < count) {
+            val row = layout.row(i)
+            val top = SURFACE_PADDING + i * ROW_HEIGHT
+
+            if (i == selectedIndex) {
+                g2.color = selectionBg
+                g2.fillRoundRect(4, top + 1, width - 8, ROW_HEIGHT - 2, SELECTION_ARC, SELECTION_ARC)
+            }
+
+            // Accent Pill Indicator
+            g2.color = accentColor(row.accentRole, fg)
+            g2.fillRoundRect(8, top + 5, 3, 18, 3, 3)
+
+            // Primary Text
+            g2.font = font
+            g2.color = fg
+            g2.drawString(row.displayText, 20, top + PRIMARY_BASELINE)
+
+            // Inline Detail
+            if (row.detail.isNotEmpty()) {
+                val primaryWidth = g2.fontMetrics.stringWidth(row.displayText)
+                val detailX = 20 + primaryWidth + 8
+                val maxDetailRight = width - row.sourceWidth - 16
+                if (detailX < maxDetailRight) {
+                    g2.font = detailFont
+                    g2.color = mix(fg, bg, 0.40)
+                    g2.drawString(row.detail, detailX, top + PRIMARY_BASELINE)
+                }
+            }
+
+            // Source Badge
+            if (row.sourceWidth > 0) {
+                val sourceX = width - row.sourceWidth - 8
+                g2.color = border
+                g2.fillRoundRect(sourceX, top + 5, row.sourceWidth, 18, 4, 4)
+                g2.font = sourceFont
+                g2.color = mix(fg, bg, 0.20)
+                g2.drawString(row.sourceLabel, sourceX + 6, top + 17)
+            }
+
+            i++
+        }
+    }
+
+    private fun prepareLayout() {
+        layout.prepare(
+            component = this,
+            suggestions = suggestions,
+            availableWidth = if (width > 0) width - 8 else POPUP_MAX_WIDTH,
+        )
+    }
+
+    private fun accentColor(
+        role: SwingShellSuggestionAccentRole,
+        fg: Color,
+    ): Color =
+        when (role) {
+            SwingShellSuggestionAccentRole.COMMAND -> COLOR_COMMAND
+            SwingShellSuggestionAccentRole.PATH -> COLOR_PATH
+            SwingShellSuggestionAccentRole.OPTION -> COLOR_OPTION
+            SwingShellSuggestionAccentRole.HISTORY -> COLOR_HISTORY
+            SwingShellSuggestionAccentRole.OTHER -> fg
+        }
+
+    private fun rowAt(y: Int): Int {
+        if (y < SURFACE_PADDING) return NO_SELECTION
+        val row = (y - SURFACE_PADDING) / ROW_HEIGHT
+        return if (row in 0 until layout.rowCount) row else NO_SELECTION
+    }
+
+    private fun mix(
+        base: Color,
+        overlay: Color,
+        ratio: Double,
+    ): Color {
+        val r = ratio.coerceIn(0.0, 1.0)
+        val br = 1.0 - r
+        return Color(
+            (base.red * br + overlay.red * r).toInt().coerceIn(0, 255),
+            (base.green * br + overlay.green * r).toInt().coerceIn(0, 255),
+            (base.blue * br + overlay.blue * r).toInt().coerceIn(0, 255),
+        )
     }
 
     private companion object {
         private const val NO_SELECTION = -1
-        private const val MAX_VISIBLE_ROWS = 8
-        private const val DEFAULT_WIDTH = 440
-        private const val ROW_HEIGHT = 44
-        private const val ROW_INSET = 8
-        private const val VERTICAL_PADDING = 8
-        private const val ARC = 14
-        private const val MARKER_SIZE = 8
-        private const val SOURCE_HEIGHT = 18
-        private const val SOURCE_BASELINE = 13
-        private const val SOURCE_ARC = 8
-        private const val SOURCE_FONT_SIZE = 10f
-        private const val SOURCE_HORIZONTAL_PADDING = 7
-        private const val SOURCE_GAP = 10
-        private const val MIN_DETAIL_FONT_SIZE = 10f
-        private const val ELLIPSIS = "..."
+        private const val ROW_HEIGHT = 28
+        private const val SURFACE_PADDING = 4
+        private const val SURFACE_ARC = 10
+        private const val SELECTION_ARC = 6
+        private const val PRIMARY_BASELINE = 19
 
-        private val BACKGROUND = Color(0xF21F2329.toInt(), true)
-        private val BORDER = Color(0x663F4752, true)
-        private val SELECTED_BACKGROUND = Color(0x384DA3FF, true)
-        private val TEXT = Color(0xFFF3F6FA.toInt(), true)
-        private val DETAIL = Color(0xFFA8B0BD.toInt(), true)
-        private val SOURCE_BACKGROUND = Color(0x24FFFFFF, true)
-        private val SOURCE_TEXT = Color(0xFFCBD5E1.toInt(), true)
-        private val MARKER_COLORS =
-            arrayOf(
-                Color(0xFF6EE7B7.toInt(), true),
-                Color(0xFF60A5FA.toInt(), true),
-                Color(0xFFFBBF24.toInt(), true),
-                Color(0xFFF472B6.toInt(), true),
-            )
+        private val DEFAULT_FONT = Font(Font.SANS_SERIF, Font.PLAIN, 12)
+        private val DEFAULT_BG = Color(0x10, 0x14, 0x18)
+        private val DEFAULT_FG = Color(0xE5, 0xE7, 0xEB)
+
+        private val COLOR_COMMAND = Color(0x70, 0xD6, 0xB0)
+        private val COLOR_PATH = Color(0x69, 0xA7, 0xFF)
+        private val COLOR_OPTION = Color(0xFF, 0xC8, 0x57)
+        private val COLOR_HISTORY = Color(0xD8, 0x92, 0xFF)
     }
 }

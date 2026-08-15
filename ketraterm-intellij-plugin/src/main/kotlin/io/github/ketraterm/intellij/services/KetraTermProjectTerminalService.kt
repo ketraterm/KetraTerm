@@ -34,8 +34,11 @@ import io.github.ketraterm.intellij.ui.KetraTermTerminalPane
 import io.github.ketraterm.intellij.ui.KetraTermTerminalPaneHostActions
 import io.github.ketraterm.intellij.ui.KetraTermTerminalStartupView
 import io.github.ketraterm.protocol.NotificationLevel
+import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.protocol.ShellIntegrationMarker
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.workspace.*
+import kotlinx.coroutines.CoroutineScope
 import java.awt.BorderLayout
 import java.awt.Component
 import java.util.concurrent.atomic.AtomicInteger
@@ -54,6 +57,7 @@ import javax.swing.SwingUtilities
 @Service(Service.Level.PROJECT)
 class KetraTermProjectTerminalService(
     private val project: Project,
+    private val coroutineScope: CoroutineScope,
 ) : Disposable {
     private val contentsByTabId = LinkedHashMap<String, Content>()
     private val pendingTabsById = LinkedHashMap<String, PendingTerminalTab>()
@@ -165,6 +169,7 @@ class KetraTermProjectTerminalService(
             )
 
         content.isCloseable = true
+        @Suppress("UsePropertyAccessSyntax")
         content.setDisposer(PendingTerminalTabDisposable(pendingId))
 
         pendingTabsById[pendingId] = PendingTerminalTab(content, container)
@@ -301,6 +306,7 @@ class KetraTermProjectTerminalService(
             KetraTermTerminalPane.create(
                 project = project,
                 tab = workspaceTab,
+                completionScope = coroutineScope,
                 hostActions =
                     KetraTermTerminalPaneHostActions(
                         openNewTabAction = ::openDefaultTabFromContextMenu,
@@ -312,6 +318,7 @@ class KetraTermProjectTerminalService(
         replaceContent(pendingTab.container, pane.component)
         pendingTab.content.displayName = workspaceTab.title
         pendingTab.content.preferredFocusableComponent = pane.terminal
+        @Suppress("UsePropertyAccessSyntax")
         pendingTab.content.setDisposer(TerminalTabDisposable(workspaceTab.id))
         installCloseQueryListener(pendingTab.content, workspaceTab)
         contentsByTabId[workspaceTab.id] = pendingTab.content
@@ -446,6 +453,16 @@ class KetraTermProjectTerminalService(
     }
 
     private inner class IntellijWorkspaceListener : TerminalWorkspaceListener {
+        override fun shellIntegrationMarker(
+            tab: TerminalWorkspaceTab,
+            event: ShellIntegrationEvent,
+        ) {
+            if (event.marker != ShellIntegrationMarker.COMMAND_FINISHED) return
+            val state = tab.session.shellIntegrationState
+            val metadata = state.commandMetadata(state.latestCommandRecordId()) ?: return
+            KetraTermCompletionService.getInstance().recordFinishedCommand(tab, metadata)
+        }
+
         override fun bell(tab: TerminalWorkspaceTab) {
             invokeLaterIfAlive {
                 panesByTabId[tab.id]?.terminal?.showVisualBell()

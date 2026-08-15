@@ -157,7 +157,7 @@ class TerminalWorkspace internal constructor(
                 val index = tabs.indexOfFirst { it.id == id }
                 if (index < 0) return
                 val tab = tabs.removeAt(index)
-                sessionStateJobs.remove(id)?.cancel()
+                sessionStateJobs.remove(id)?.cancel(CancellationException("Terminal workspace tab closed"))
                 if (selectedTabId == id) {
                     selectedTabId = tabs.getOrNull(index.coerceAtMost(tabs.lastIndex))?.id
                 }
@@ -190,7 +190,7 @@ class TerminalWorkspace internal constructor(
             val id = synchronized(stateLock) { tabs.lastOrNull()?.id } ?: break
             closeTab(id)
         }
-        workspaceScope.cancel()
+        workspaceScope.cancel(CancellationException("Terminal workspace closed"))
     }
 
     private fun tabEventListener(tabId: String): PtyEventListener =

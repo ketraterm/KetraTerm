@@ -52,7 +52,7 @@ internal class TerminalHyperlinkDiscoveryController(
 
     fun reset() {
         analysisSequence++
-        analysisJob?.cancel()
+        analysisJob?.cancel(CancellationException("Hyperlink discovery reset"))
         analysisJob = null
         debounceTimer.stop()
         overlay.clear()
@@ -108,7 +108,7 @@ internal class TerminalHyperlinkDiscoveryController(
 
         val sequence = analysisSequence
         val snapshot = snapshotBuilder.snapshot(host.renderCache)
-        analysisJob?.cancel()
+        analysisJob?.cancel(CancellationException("Hyperlink discovery superseded"))
         analysisJob =
             scope.launch {
                 val candidate =
@@ -473,7 +473,33 @@ private data class TerminalHyperlinkRowEntry(
     val wrapped: Boolean,
     val activeBuffer: TerminalRenderBufferKind,
     val runs: Array<TerminalHyperlinkRowRun>,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as TerminalHyperlinkRowEntry
+
+        if (lineId != other.lineId) return false
+        if (lineGeneration != other.lineGeneration) return false
+        if (fingerprint != other.fingerprint) return false
+        if (wrapped != other.wrapped) return false
+        if (activeBuffer != other.activeBuffer) return false
+        if (!runs.contentEquals(other.runs)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = lineId.hashCode()
+        result = 31 * result + lineGeneration.hashCode()
+        result = 31 * result + fingerprint.hashCode()
+        result = 31 * result + wrapped.hashCode()
+        result = 31 * result + activeBuffer.hashCode()
+        result = 31 * result + runs.contentHashCode()
+        return result
+    }
+}
 
 private data class TerminalHyperlinkRowRun(
     val startColumn: Int,
@@ -509,7 +535,25 @@ internal data class TerminalDetectedHyperlink(
 internal data class TerminalHyperlinkOverlayCandidate(
     val hyperlinkIds: IntArray,
     val actions: Array<SwingHyperlinkAction>,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as TerminalHyperlinkOverlayCandidate
+
+        if (!hyperlinkIds.contentEquals(other.hyperlinkIds)) return false
+        if (!actions.contentEquals(other.actions)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = hyperlinkIds.contentHashCode()
+        result = 31 * result + actions.contentHashCode()
+        return result
+    }
+}
 
 internal class TerminalHyperlinkDetectionSnapshot(
     val key: TerminalHyperlinkFrameKey,

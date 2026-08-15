@@ -20,10 +20,15 @@ import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuHandler
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
+import io.github.ketraterm.ui.swing.host.SwingLiveCompletionBinding
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
+import kotlinx.coroutines.CoroutineScope
 import javax.swing.JPanel
 
 /**
@@ -37,6 +42,7 @@ internal class TerminalPane private constructor(
     val terminal: SwingTerminal,
     val component: JPanel,
     private val settings: KetraTermSettings,
+    private val liveCompletion: SwingLiveCompletionBinding,
     private val searchBar: SwingTerminalSearchBar,
 ) : TerminalPaneActionTarget {
     private var shortcutController: TerminalPaneShortcutController? = null
@@ -50,6 +56,11 @@ internal class TerminalPane private constructor(
         component.background = terminal.background
         searchBar.refreshColors()
         tab.session.setHostPolicy(settings.createHostPolicy(tab.profile.command))
+        if (settings.shellSuggestionsEnabled) {
+            liveCompletion.scheduleRefresh()
+        } else {
+            liveCompletion.cancelAndHide()
+        }
     }
 
     override fun hasSelection(): Boolean = terminal.currentSelection() != null
@@ -61,6 +72,10 @@ internal class TerminalPane private constructor(
     override fun selectAll(): Boolean = terminal.selectAll()
 
     override fun clearScreen(): Boolean = terminal.clearScreen()
+
+    override fun requestShellSuggestions() {
+        terminal.requestActiveShellSuggestions()
+    }
 
     override fun openSearch() {
         searchBar.open()
@@ -87,6 +102,7 @@ internal class TerminalPane private constructor(
     }
 
     fun close() {
+        liveCompletion.close()
         searchBar.close()
         shortcutController?.dispose()
         shortcutController = null
@@ -97,17 +113,30 @@ internal class TerminalPane private constructor(
         fun create(
             tab: TerminalWorkspaceTab,
             settings: KetraTermSettings,
+            completionScope: CoroutineScope,
             suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
+            suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
             onContextMenu: (TerminalPane, SwingTerminalContextMenuRequest) -> Unit,
         ): TerminalPane {
             val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
             val paneRef = arrayOfNulls<TerminalPane>(1)
+            val liveCompletion =
+                SwingLiveCompletionBinding(
+                    session = tab.session,
+                    coroutineScope = completionScope,
+                    suggestionsEnabled = { settings.shellSuggestionsEnabled },
+                    rankingContextKey = { tab.currentWorkingDirectoryUri },
+                    feedbackHandler = suggestionFeedbackHandler,
+                )
             val terminal =
                 SwingTerminal(
                     settingsProvider = { settings.current() },
                     hostServices =
                         SwingHostServices(
                             shellSuggestionProvider = suggestionProvider,
+                            shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
+                            shellSuggestionFeedbackHandler = liveCompletion.suggestionFeedbackHandler,
+                            shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
                             hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
                             contextMenuHandler =
                                 SwingTerminalContextMenuHandler { request ->
@@ -128,13 +157,14 @@ internal class TerminalPane private constructor(
                     terminal = terminal,
                     component = component,
                     settings = settings,
+                    liveCompletion = liveCompletion,
                     searchBar = searchBar,
                 )
             pane.shortcutController = TerminalPaneShortcutController(pane, settings)
             shortcutControllerRef[0] = pane.shortcutController
             paneRef[0] = pane
-
             tab.session.requestRender(scrollbackOffset = 0)
+            liveCompletion.attach(terminal)
             return pane
         }
 
