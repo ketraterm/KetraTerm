@@ -21,7 +21,6 @@ import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORD
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
-import java.util.*
 
 /** One source's bounded candidate surplus plus stable composition metadata. */
 internal data class CompletionSourceCandidates(
@@ -73,8 +72,6 @@ internal class GlobalCompletionRanker(
         private val resultLimit: Int,
     ) {
         private val outcomes = HashMap<Any, RankedOutcome>()
-        private val topCandidates = TreeSet(FUSED_ORDER)
-        private val remainingCandidates = TreeSet(FUSED_ORDER)
         private var publishedCandidates: List<TerminalCompletionCandidate> = emptyList()
         private var publicationDirty = false
 
@@ -85,8 +82,7 @@ internal class GlobalCompletionRanker(
                 val candidate = locallyRanked[candidateIndex]
                 val resolved = outcomeResolver.resolve(request, candidate, context)
                 val key: Any = resolved?.groupKey ?: FallbackOutcomeKey(candidate)
-                bestByOutcome.putIfAbsent(
-                    key,
+                val contribution =
                     RankedContribution(
                         candidate = candidate,
                         resolved = resolved,
@@ -95,69 +91,38 @@ internal class GlobalCompletionRanker(
                         localRank = candidateIndex + 1,
                         sourcePrior = sourceResult.priority.coerceIn(MIN_SOURCE_PRIOR, MAX_SOURCE_PRIOR),
                         contextAdjustment = semanticAdjustment(context, candidate),
-                    ),
-                )
+                    )
+                val existing = bestByOutcome[key]
+                if (existing == null || REPRESENTATIVE_ORDER.compare(contribution, existing) < 0) {
+                    bestByOutcome[key] = contribution
+                }
             }
             for ((key, contribution) in bestByOutcome) {
                 val outcome = outcomes.getOrPut(key, ::RankedOutcome)
-                val previous = outcome.fused
                 outcome.aggregate.add(contribution)
-                val updated = outcome.aggregate.finish(learnedIndex, learningContext, now)
-                outcome.fused = updated
-                updateTopCandidates(previous, updated)
+                outcome.fused = outcome.aggregate.finish(learnedIndex, learningContext, now)
+                publicationDirty = true
             }
         }
 
         fun rankedCandidates(): List<TerminalCompletionCandidate> {
             if (!publicationDirty) return publishedCandidates
-            val candidates = ArrayList<TerminalCompletionCandidate>(topCandidates.size)
-            for (candidate in topCandidates) {
-                candidates += candidate.toPublicCandidate()
+            val allFused = ArrayList<FusedCandidate>(outcomes.size)
+            for (outcome in outcomes.values) {
+                val fused = outcome.fused
+                if (fused != null) allFused += fused
             }
-            publishedCandidates = candidates.toList()
+            allFused.sortWith(FUSED_ORDER)
+            val limit = minOf(resultLimit, allFused.size)
+            val candidates = ArrayList<TerminalCompletionCandidate>(limit)
+            for (i in 0 until limit) {
+                candidates += allFused[i].toPublicCandidate()
+            }
+            if (candidates != publishedCandidates) {
+                publishedCandidates = candidates
+            }
             publicationDirty = false
             return publishedCandidates
-        }
-
-        private fun updateTopCandidates(
-            previous: FusedCandidate?,
-            updated: FusedCandidate,
-        ) {
-            var topChanged = false
-            if (previous != null) {
-                if (topCandidates.remove(previous)) {
-                    topChanged = true
-                } else {
-                    check(remainingCandidates.remove(previous)) { "ranked outcome is missing from incremental state" }
-                }
-            }
-            check(remainingCandidates.add(updated)) { "distinct completion outcomes must have a total ranking order" }
-            if (rebalanceTopCandidates()) topChanged = true
-            if (topChanged) publicationDirty = true
-        }
-
-        private fun rebalanceTopCandidates(): Boolean {
-            var changed = false
-            while (topCandidates.size < resultLimit && remainingCandidates.isNotEmpty()) {
-                topCandidates.add(remainingCandidates.pollFirst())
-                changed = true
-            }
-            while (topCandidates.size > resultLimit) {
-                remainingCandidates.add(topCandidates.pollLast())
-                changed = true
-            }
-            while (
-                topCandidates.isNotEmpty() &&
-                remainingCandidates.isNotEmpty() &&
-                FUSED_ORDER.compare(remainingCandidates.first(), topCandidates.last()) < 0
-            ) {
-                val promoted = remainingCandidates.pollFirst()
-                val demoted = topCandidates.pollLast()
-                topCandidates.add(promoted)
-                remainingCandidates.add(demoted)
-                changed = true
-            }
-            return changed
         }
     }
 
@@ -227,7 +192,7 @@ internal class GlobalCompletionRanker(
         val sourcePrior: Int,
         val contextAdjustment: Int,
     ) {
-        val replacementLength: Int = candidate.replacementEndOffset - candidate.replacementStartOffset
+        val replacementLength: Int = candidate.replacementText.length
     }
 
     private data class FallbackOutcomeKey(

@@ -41,24 +41,54 @@ internal class TerminalCompletionOutcomeKeyResolver(
         val pathAware =
             candidate.kind == TerminalCompletionCandidateKind.PATH ||
                 context.expectedPathKind != TerminalPathArgumentKind.NONE
-        val projectedCursorOffset =
-            (candidate.replacementStartOffset + candidate.replacementText.length).coerceIn(0, commandLine.length)
-        val projectedContext =
-            TerminalCommandLineTokenizer.parse(
-                commandLine,
-                projectedCursorOffset,
-                request.shellCapabilities.syntax,
-            )
+
+        val lineContext = context.commandLineContext
+        val isSimpleSingleToken =
+            candidate.replacementStartOffset == lineContext.replacementStartOffset &&
+                candidate.replacementEndOffset == lineContext.replacementEndOffset &&
+                lineContext.activeTokenIndex in lineContext.tokens.indices &&
+                !hasSpecialSyntax(candidate.replacementText)
+
+        val (tokens, activeIndex) =
+            if (isSimpleSingleToken) {
+                val baseTokens = lineContext.tokens
+                val activeIdx = lineContext.activeTokenIndex
+                val projectedTokens = ArrayList<TerminalCommandLineToken>(baseTokens.size)
+                for (i in baseTokens.indices) {
+                    if (i == activeIdx) {
+                        projectedTokens +=
+                            TerminalCommandLineToken(
+                                text = candidate.replacementText,
+                                startOffset = candidate.replacementStartOffset,
+                                endOffset = candidate.replacementStartOffset + candidate.replacementText.length,
+                            )
+                    } else {
+                        projectedTokens += baseTokens[i]
+                    }
+                }
+                projectedTokens to activeIdx
+            } else {
+                val projectedCursorOffset =
+                    (candidate.replacementStartOffset + candidate.replacementText.length).coerceIn(0, commandLine.length)
+                val projectedContext =
+                    TerminalCommandLineTokenizer.parse(
+                        commandLine,
+                        projectedCursorOffset,
+                        request.shellCapabilities.syntax,
+                    )
+                projectedContext.tokens to projectedContext.activeTokenIndex
+            }
+
         val classification =
             TerminalCommandLineClassifier.classify(
                 commandLine,
-                projectedContext.tokens,
+                tokens,
                 commandSpecs,
             ) ?: return null
         val learnedKey =
             learnedKey(
-                tokens = projectedContext.tokens,
-                pathTokenIndex = projectedContext.activeTokenIndex,
+                tokens = tokens,
+                pathTokenIndex = activeIndex,
                 pathAware = pathAware,
             ) ?: return null
         return ResolvedCompletionOutcome(
@@ -86,6 +116,16 @@ internal class TerminalCompletionOutcomeKeyResolver(
             tokens = resultTokens,
             pathTokenIndex = normalizedPathIndex,
         )
+    }
+
+    private fun hasSpecialSyntax(text: String): Boolean {
+        for (i in 0 until text.length) {
+            val c = text[i]
+            if (c.isWhitespace() || c == '\'' || c == '"' || c == '\\' || c == '|' || c == '&' || c == ';') {
+                return true
+            }
+        }
+        return false
     }
 
     private fun normalizePathToken(token: String): String {

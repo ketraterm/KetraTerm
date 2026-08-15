@@ -23,12 +23,16 @@ import io.github.ketraterm.completion.internal.canonicalizeWorkingDirectoryUri
 import io.github.ketraterm.completion.internal.isRelativeCdCommand
 import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
 import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncrement
+import io.github.ketraterm.completion.source.SessionCommandHistory.Entry
 
 /** Bounded full-command MRU index. Its owner serializes all access. */
 internal class SessionCommandHistory(
     private val capacity: Int,
 ) {
-    private val entries = ArrayList<Entry>(capacity)
+    private val entries =
+        object : LinkedHashMap<String, Entry>(capacity, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Entry>?): Boolean = size > capacity
+        }
 
     fun record(
         commandLine: String,
@@ -37,29 +41,27 @@ internal class SessionCommandHistory(
         sequence: Long,
     ) {
         val normalized = normalizeTerminalCommandLine(commandLine)
-        val index = entries.indexOfFirst { it.normalizedCommandLine == normalized }
-        if (index >= 0) {
-            val entry = entries.removeAt(index)
-            entries +=
-                entry.copy(
+        val existing = entries[normalized]
+        if (existing != null) {
+            entries[normalized] =
+                existing.copy(
                     commandLine = commandLine,
                     profileId = profileId,
                     workingDirectoryUri = workingDirectoryUri,
-                    useCount = saturatedCompletionCounterIncrement(entry.useCount),
+                    useCount = saturatedCompletionCounterIncrement(existing.useCount),
                     lastUsedSequence = sequence,
                 )
-            return
+        } else {
+            entries[normalized] =
+                Entry(
+                    commandLine = commandLine,
+                    normalizedCommandLine = normalized,
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUri,
+                    useCount = 1,
+                    lastUsedSequence = sequence,
+                )
         }
-        if (entries.size == capacity) entries.removeAt(0)
-        entries +=
-            Entry(
-                commandLine = commandLine,
-                normalizedCommandLine = normalized,
-                profileId = profileId,
-                workingDirectoryUri = workingDirectoryUri,
-                useCount = 1,
-                lastUsedSequence = sequence,
-            )
     }
 
     fun appendCandidates(
@@ -69,7 +71,7 @@ internal class SessionCommandHistory(
     ) {
         val lineContext = context.commandLineContext
         val normalizedPrefix = normalizeTerminalCommandLine(lineContext.commandPrefix(request.commandLine))
-        for (entry in entries) {
+        for (entry in entries.values) {
             if (!entry.normalizedCommandLine.startsWith(normalizedPrefix) || entry.normalizedCommandLine == normalizedPrefix) continue
             if (!entry.isValidFor(request)) continue
             projectLearnedCommandCandidate(
@@ -112,6 +114,6 @@ internal class SessionCommandHistory(
 
     private companion object {
         private const val SOURCE_ID = "mru"
-        private const val BASE_SCORE = 700
+        private const val BASE_SCORE = 20
     }
 }
