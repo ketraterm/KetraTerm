@@ -50,19 +50,29 @@ internal class CompletionLearningIndexCache {
         private val lock = Any()
 
         @Volatile
-        private var indexes: Map<CompilationKey, CompletionLearningIndexes> = emptyMap()
+        private var entries: Array<CompilationEntry> = emptyArray()
 
         fun indexesFor(
             shellSyntax: TerminalShellSyntax,
             commandSpecs: List<TerminalCommandSpec>,
         ): CompletionLearningIndexes {
-            val key = CompilationKey(shellSyntax, commandSpecs)
-            indexes[key]?.let { return it }
+            val currentEntries = entries
+            for (i in currentEntries.indices) {
+                val entry = currentEntries[i]
+                if (entry.shellSyntax == shellSyntax && (entry.commandSpecs === commandSpecs || entry.commandSpecs == commandSpecs)) {
+                    return entry.indexes
+                }
+            }
             return synchronized(lock) {
-                indexes[key]
-                    ?: buildIndexes(shellSyntax, commandSpecs).also { built ->
-                        indexes = indexes + (key to built)
+                for (entry in entries) {
+                    if (entry.shellSyntax == shellSyntax && (entry.commandSpecs === commandSpecs || entry.commandSpecs == commandSpecs)) {
+                        return@synchronized entry.indexes
                     }
+                }
+                val built = buildIndexes(shellSyntax, commandSpecs)
+                val newEntry = CompilationEntry(shellSyntax, commandSpecs, built)
+                entries = entries + newEntry
+                built
             }
         }
 
@@ -81,9 +91,10 @@ internal class CompletionLearningIndexCache {
             )
     }
 
-    private data class CompilationKey(
+    private class CompilationEntry(
         val shellSyntax: TerminalShellSyntax,
         val commandSpecs: List<TerminalCommandSpec>,
+        val indexes: CompletionLearningIndexes,
     )
 }
 

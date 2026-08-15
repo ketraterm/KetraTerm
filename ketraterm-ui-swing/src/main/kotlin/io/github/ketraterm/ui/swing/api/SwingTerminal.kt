@@ -44,6 +44,7 @@ import io.github.ketraterm.ui.swing.viewport.SwingViewportController
 import io.github.ketraterm.ui.swing.viewport.TerminalScrollbarOverlay
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOn
 import java.awt.*
 import java.awt.event.*
 import java.lang.Runnable
@@ -1525,16 +1526,13 @@ class SwingTerminal
             suggestionJob =
                 componentScope.launch {
                     try {
-                        withContext(Dispatchers.Default) {
-                            hostServices.shellSuggestionProvider
-                                .suggestions(request)
-                                .collect { suggestions ->
-                                    withContext(uiCoroutineDispatcher) {
-                                        ensureActive()
-                                        shellSuggestionController.show(request, suggestions, selectedIndex = -1)
-                                    }
-                                }
-                        }
+                        hostServices.shellSuggestionProvider
+                            .suggestions(request)
+                            .flowOn(Dispatchers.Default)
+                            .collect { suggestions ->
+                                ensureActive()
+                                shellSuggestionController.show(request, suggestions, selectedIndex = -1)
+                            }
                     } catch (cancellation: CancellationException) {
                         throw cancellation
                     } catch (exception: Exception) {

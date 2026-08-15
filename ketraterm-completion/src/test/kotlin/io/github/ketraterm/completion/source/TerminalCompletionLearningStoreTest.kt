@@ -671,14 +671,19 @@ class TerminalCompletionLearningStoreTest {
         private val compilationStarted: CountDownLatch,
         private val releaseCompilation: CountDownLatch,
     ) : AbstractList<TerminalCommandSpec>() {
-        override val size: Int = 0
+        override val size: Int
+            get() {
+                compilationStarted.countDown()
+                check(releaseCompilation.await(5, TimeUnit.SECONDS)) { "test did not release index compilation" }
+                return 0
+            }
 
         override fun get(index: Int): TerminalCommandSpec = throw IndexOutOfBoundsException(index)
 
-        override fun hashCode(): Int {
+        override fun iterator(): Iterator<TerminalCommandSpec> {
             compilationStarted.countDown()
             check(releaseCompilation.await(5, TimeUnit.SECONDS)) { "test did not release index compilation" }
-            return super.hashCode()
+            return emptyList<TerminalCommandSpec>().iterator()
         }
 
         override fun equals(other: Any?): Boolean {
@@ -693,6 +698,14 @@ class TerminalCompletionLearningStoreTest {
             if (releaseCompilation != other.releaseCompilation) return false
 
             return true
+        }
+
+        override fun hashCode(): Int {
+            var result = super.hashCode()
+            result = 31 * result + compilationStarted.hashCode()
+            result = 31 * result + releaseCompilation.hashCode()
+            result = 31 * result + size
+            return result
         }
     }
 

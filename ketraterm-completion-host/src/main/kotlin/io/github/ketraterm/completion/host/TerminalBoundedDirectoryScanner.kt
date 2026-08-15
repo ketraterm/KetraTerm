@@ -21,7 +21,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.TimeUnit
 
 /**
@@ -72,7 +71,7 @@ class TerminalBoundedDirectoryScanner
             entryNamePrefix: String,
         ): List<TerminalFileEntry> {
             val startedAt = nanoTime()
-            val entries = ArrayList<TerminalFileEntry>(minOf(maxVisitedEntries, DEFAULT_MAX_VISITED_ENTRIES))
+            val entries = ArrayList<TerminalFileEntry>(minOf(maxVisitedEntries, INITIAL_SCAN_CAPACITY))
             try {
                 if (!Files.isDirectory(directory)) return emptyList()
                 Files.newDirectoryStream(directory).use { stream ->
@@ -87,13 +86,17 @@ class TerminalBoundedDirectoryScanner
                         val child = iterator.next()
                         visited++
                         val name = child.fileName?.toString() ?: continue
-                        val attributes =
+                        val isDirectory =
                             try {
-                                Files.readAttributes(child, BasicFileAttributes::class.java)
+                                child.toFile().isDirectory
                             } catch (_: Exception) {
-                                continue
+                                try {
+                                    Files.isDirectory(child)
+                                } catch (_: Exception) {
+                                    continue
+                                }
                             }
-                        val entry = TerminalFileEntry(name, attributes.isDirectory)
+                        val entry = TerminalFileEntry(name, isDirectory)
                         entries += entry
                     }
                 }
@@ -114,6 +117,7 @@ class TerminalBoundedDirectoryScanner
         }
 
         private companion object {
+            private const val INITIAL_SCAN_CAPACITY = 128
             private const val DEFAULT_MAX_VISITED_ENTRIES = 8_192
             private const val DEFAULT_MAX_MATCHING_ENTRIES = 256
             private const val DEFAULT_SCAN_BUDGET_MILLIS = 50L

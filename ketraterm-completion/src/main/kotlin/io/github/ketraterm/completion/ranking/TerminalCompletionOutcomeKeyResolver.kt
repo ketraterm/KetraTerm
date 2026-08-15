@@ -28,8 +28,10 @@ import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 /** Resolves source-independent keys for candidate outcomes and learned commands. */
 internal class TerminalCompletionOutcomeKeyResolver(
-    private val commandSpecs: List<TerminalCommandSpec>,
+    commandSpecs: List<TerminalCommandSpec>,
 ) {
+    private val commandSpecs = commandSpecs.toList()
+
     fun resolve(
         request: TerminalCompletionRequest,
         candidate: TerminalCompletionCandidate,
