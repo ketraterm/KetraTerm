@@ -770,6 +770,87 @@ class MergedCompletionEngineTest {
             assertSame(contexts[0], contexts[1])
         }
 
+    @Test
+    fun `rapid typing bursts cleanly cancel obsolete queries and converge to final request`(): Unit =
+        runBlocking {
+            var activeCancelledCount = 0
+            val delayedSource =
+                TerminalCompletionSource { req, ctx, _ ->
+                    try {
+                        delay(20)
+                        listOf(
+                            TerminalCompletionCandidate(
+                                replacementText = req.commandLine + "-done",
+                                replacementStartOffset = 0,
+                                replacementEndOffset = req.commandLine.length,
+                                source = "async-io",
+                                kind = TerminalCompletionCandidateKind.COMMAND,
+                            ),
+                        )
+                    } catch (cancellation: CancellationException) {
+                        activeCancelledCount++
+                        throw cancellation
+                    }
+                }
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources = listOf(entry(delayedSource, priority = 0)),
+                    commandSpecs = emptyList(),
+                )
+
+            val keystrokes = listOf("g", "gi", "git", "git ", "git s", "git st", "git sta", "git status")
+            var currentJob: Job? = null
+            var lastEmitted: List<TerminalCompletionCandidate>? = null
+
+            for (keystroke in keystrokes) {
+                currentJob?.cancelAndJoin()
+                val request = TerminalCompletionRequest(keystroke, keystroke.length)
+                currentJob =
+                    launch {
+                        engine.completions(request).collect {
+                            lastEmitted = it
+                        }
+                    }
+                delay(2) // simulate fast keystroke typing interval (2ms)
+            }
+
+            currentJob?.join()
+            assertTrue(activeCancelledCount > 0, "Obsolete background coroutines must be cancelled during typing bursts")
+            assertEquals(listOf("git status-done"), lastEmitted?.map { it.replacementText })
+        }
+
+    @Test
+    fun `concurrent multi-source slow I_O yields progressive updates without race conditions`(): Unit =
+        runBlocking {
+            val sourceA =
+                TerminalCompletionSource { _, _, _ ->
+                    delay(5)
+                    listOf(candidate("alpha", source = "sourceA", score = 10))
+                }
+            val sourceB =
+                TerminalCompletionSource { _, _, _ ->
+                    delay(15)
+                    listOf(candidate("beta", source = "sourceB", score = 20))
+                }
+            val sourceC =
+                TerminalCompletionSource { _, _, _ ->
+                    delay(25)
+                    listOf(candidate("gamma", source = "sourceC", score = 30))
+                }
+
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources = listOf(entry(sourceA, 0), entry(sourceB, 10), entry(sourceC, 20)),
+                    commandSpecs = emptyList(),
+                )
+
+            val emissions = engine.completions(request("s")).toList()
+
+            assertTrue(emissions.size in 1..3, "Should receive progressive snapshots as sources complete")
+            val finalSnapshot = emissions.last().map { it.replacementText }
+            assertEquals(listOf("gamma", "beta", "alpha"), finalSnapshot)
+        }
+
     private data class RecordedSourceFailure(
         val sourceIndex: Int,
         val source: TerminalCompletionSourceEntry,

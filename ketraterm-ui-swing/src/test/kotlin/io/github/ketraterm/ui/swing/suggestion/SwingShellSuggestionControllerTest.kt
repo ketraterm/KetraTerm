@@ -349,6 +349,71 @@ class SwingShellSuggestionControllerTest {
         assertTrue(host.feedbackKinds.isEmpty())
     }
 
+    @Test
+    fun `keyboard navigation clamps cleanly at top and bottom boundaries`() {
+        val host = RecordingSuggestionHost()
+        val controller = SwingShellSuggestionController(host)
+        controller.show(request(), suggestions(5), selectedIndex = 0)
+
+        val upFromTop = keyPressed(KeyEvent.VK_UP)
+        controller.handleKeyPressed(upFromTop)
+        assertEquals(0, controller.state().selectedIndex, "Up arrow at index 0 should clamp at 0")
+
+        repeat(10) { controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN)) }
+        assertEquals(4, controller.state().selectedIndex, "Down arrow should clamp at last index")
+    }
+
+    @Test
+    fun `page down and page up navigate in blocks of maximum visible rows`() {
+        val host = RecordingSuggestionHost()
+        val controller = SwingShellSuggestionController(host)
+        val items = suggestions(20)
+        controller.show(request(), items, selectedIndex = 0)
+
+        val pageDown = keyPressed(KeyEvent.VK_PAGE_DOWN)
+        controller.handleKeyPressed(pageDown)
+        assertEquals(8, controller.state().selectedIndex, "Page down should advance by 8 items")
+
+        controller.handleKeyPressed(pageDown)
+        assertEquals(16, controller.state().selectedIndex, "Second page down should advance by another 8 items")
+
+        val pageUp = keyPressed(KeyEvent.VK_PAGE_UP)
+        controller.handleKeyPressed(pageUp)
+        assertEquals(8, controller.state().selectedIndex, "Page up should move back by 8 items")
+    }
+
+    @Test
+    fun `mouse click on suggestion accepts item and dismisses popup`() {
+        val host = RecordingSuggestionHost()
+        lateinit var view: RecordingSuggestionView
+        val controller =
+            SwingShellSuggestionController(
+                host = host,
+                viewFactory = { listener -> RecordingSuggestionView(listener).also { view = it } },
+            )
+        val items = suggestions(4)
+        controller.show(request(), items, selectedIndex = -1)
+
+        view.listener.onSuggestionClicked(2)
+
+        assertEquals(1, host.acceptedSuggestions.size)
+        assertEquals("command-2", host.acceptedSuggestions.single().replacementText)
+        assertFalse(controller.state().visible)
+    }
+
+    @Test
+    fun `empty suggestions list hides popup and clears selection cleanly`() {
+        val host = RecordingSuggestionHost()
+        val controller = SwingShellSuggestionController(host)
+        controller.show(request(), suggestions(3), selectedIndex = 1)
+        assertTrue(controller.state().visible)
+
+        val shown = controller.show(request(), emptyList(), selectedIndex = -1)
+        assertFalse(shown)
+        assertFalse(controller.state().visible)
+        assertEquals(-1, controller.state().selectedIndex)
+    }
+
     private fun assertPassiveHideIsNeutral() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)

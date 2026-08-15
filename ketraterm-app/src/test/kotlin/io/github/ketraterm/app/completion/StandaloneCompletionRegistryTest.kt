@@ -16,7 +16,10 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
-import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
 import kotlinx.coroutines.flow.last
@@ -397,6 +400,58 @@ class StandaloneCompletionRegistryTest {
         }
 
     @Test
+    fun `dynamic working directory transitions update contextual ranking without session restart`() =
+        runBlocking {
+            val registry = registry(listOf(TerminalCommandSpec("git")))
+            var currentDirectory = "file:///repo-a"
+            val provider =
+                registry.createProvider(
+                    sessionId = "session-1",
+                    profileId = "bash",
+                    workingDirectoryUriProvider = { currentDirectory },
+                )
+
+            registry.recordSuccessfulCommand(
+                sessionId = "session-1",
+                commandLine = "git checkout feature-a",
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo-a",
+            )
+            registry.recordSuccessfulCommand(
+                sessionId = "session-1",
+                commandLine = "git checkout feature-b",
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo-b",
+            )
+
+            // When in repo-a
+            val repoASuggestions = provider.suggestions(request("git ")).last().map { it.replacementText }
+            assertEquals("checkout feature-a", repoASuggestions.first())
+
+            // Seamless OSC 7 directory transition to repo-b
+            currentDirectory = "file:///repo-b"
+            val repoBSuggestions = provider.suggestions(request("git ")).last().map { it.replacementText }
+            assertEquals("checkout feature-b", repoBSuggestions.first())
+        }
+
+    @Test
+    fun `independent sessions maintain isolated history and MRU contexts under concurrent activity`() =
+        runBlocking {
+            val registry = registry(listOf(TerminalCommandSpec("build")))
+            val session1 = registry.createProvider("session-1", profileId = "bash")
+            val session2 = registry.createProvider("session-2", profileId = "zsh")
+
+            registry.recordSuccessfulCommand("session-1", "build --release", profileId = "bash", workingDirectoryUri = null)
+            registry.recordSuccessfulCommand("session-2", "build --debug", profileId = "zsh", workingDirectoryUri = null)
+
+            val s1 = session1.suggestions(request("build")).last().map { it.replacementText }
+            val s2 = session2.suggestions(request("build")).last().map { it.replacementText }
+
+            assertEquals(listOf("build --release"), s1)
+            assertEquals(listOf("build --debug"), s2)
+        }
+
+    @Test
     fun `closed registry rejects new providers`() {
         val registry = registry(emptyList())
 
@@ -426,36 +481,6 @@ class StandaloneCompletionRegistryTest {
                         TerminalCommandSpec("switch", "switch branches"),
                     ),
             ),
-        )
-
-    private fun shapeStats(
-        commandLine: String,
-        profileId: String? = null,
-        workingDirectoryUri: String? = null,
-        acceptedCount: Int = 0,
-        dismissedCount: Int = 0,
-    ): TerminalCommandShapeStats =
-        TerminalCommandShapeStats(
-            shape =
-                when (commandLine) {
-                    "git switch main" ->
-                        TerminalCommandLineShape(
-                            executable = "git",
-                            subcommands = listOf("switch"),
-                            positionalArgumentCount = 1,
-                        )
-                    "git status" ->
-                        TerminalCommandLineShape(
-                            executable = "git",
-                            subcommands = listOf("status"),
-                        )
-                    else -> error("Unsupported test command: $commandLine")
-                },
-            profileId = profileId,
-            workingDirectoryUri = workingDirectoryUri,
-            acceptedCount = acceptedCount,
-            dismissedCount = dismissedCount,
-            lastUsedEpochMillis = 100,
         )
 
     private fun request(commandText: String): SwingShellSuggestionRequest =
