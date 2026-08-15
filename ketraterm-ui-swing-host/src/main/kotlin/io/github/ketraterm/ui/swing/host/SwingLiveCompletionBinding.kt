@@ -32,6 +32,7 @@ import java.awt.event.FocusListener
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import javax.swing.SwingUtilities
+import javax.swing.Timer
 
 /**
  * Binds host-neutral live-completion behavior to one Swing terminal.
@@ -52,11 +53,13 @@ class SwingLiveCompletionBinding
         private val activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
         private val shellCommandLineRevisions: Flow<Long>,
         private val suggestionsEnabled: () -> Boolean,
-        rankingContextKey: () -> String?,
+        private val rankingContextKey: () -> String?,
         feedbackHandler: SwingShellSuggestionFeedbackHandler,
-        scheduler: SwingLiveCompletionScheduler,
+        private val scheduler: SwingLiveCompletionScheduler,
         private val observationScope: CoroutineScope,
         private val edtDispatcher: SwingLiveCompletionEdtDispatcher = SwingLiveCompletionSwingEdtDispatcher,
+        private val debounceMillis: Int = DEFAULT_DEBOUNCE_MILLIS,
+        private val minimumNonWhitespaceCharacters: Int = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
     ) : AutoCloseable {
         private var target: SwingLiveCompletionTarget? = null
         private var observationJob: Job? = null
@@ -64,6 +67,7 @@ class SwingLiveCompletionBinding
         private var awaitingShellCommandLineRevision = false
         private val latestRevision = AtomicLong(NO_SHELL_COMMAND_LINE_REVISION)
         private val revisionDispatchQueued = AtomicBoolean()
+        private var lastRequest: RequestKey? = null
 
         @Volatile
         private var closed = false
@@ -71,18 +75,7 @@ class SwingLiveCompletionBinding
         private val revisionDrain = Runnable(::drainShellCommandLineRevisionOnEdt)
         private val scheduleRefreshTask = Runnable { scheduleRefreshOnEdt() }
         private val cancelAndHideTask = Runnable { cancelAndHideOnEdt() }
-
-        private val triggerController =
-            SwingLiveCompletionTriggerController(
-                activeCommandLine = activeCommandLine,
-                requestSuggestions = { snapshot -> target?.requestSuggestions(snapshot) },
-                hideSuggestions = { target?.hideSuggestions() },
-                rankingContextKey = rankingContextKey,
-                suggestionsEnabled = ::isEligibleOnEdt,
-                scheduler = scheduler,
-                debounceMillis = DEFAULT_DEBOUNCE_MILLIS,
-                minimumNonWhitespaceCharacters = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
-            )
+        private val refreshAction = ::refreshNow
 
         private val focusListener =
             object : FocusAdapter() {
@@ -101,7 +94,7 @@ class SwingLiveCompletionBinding
                 if (closed) return@SwingShellSuggestionInvalidationListener
                 invalidatedRevision = latestRevision.get()
                 awaitingShellCommandLineRevision = true
-                triggerController.cancelAndHide()
+                cancelAndHideInternal()
             }
 
         private val eligibilityListener =
@@ -109,14 +102,11 @@ class SwingLiveCompletionBinding
                 check(edtDispatcher.isDispatchThread()) { "shell suggestion eligibility must run on the EDT" }
                 if (closed) return@SwingShellSuggestionEligibilityListener
                 if (eligible && isEligibleOnEdt() && !awaitingShellCommandLineRevision) {
-                    triggerController.invalidateLastRequest()
-                    triggerController.scheduleRefresh()
+                    invalidateLastRequest()
+                    scheduleRefreshInternal()
                 } else {
-                    // SwingTerminal synchronously cancels and hides only the
-                    // ineligible automatic presentation before publishing this
-                    // callback. Do not hide an explicitly requested popup when
-                    // settings disable automatic completion.
-                    triggerController.automaticEligibilityLost()
+                    scheduler.cancel()
+                    invalidateLastRequest()
                 }
             }
 
@@ -129,7 +119,7 @@ class SwingLiveCompletionBinding
         val suggestionFeedbackHandler =
             SwingShellSuggestionFeedbackHandler { feedback ->
                 check(edtDispatcher.isDispatchThread()) { "shell suggestion feedback must run on the EDT" }
-                triggerController.invalidateLastRequest()
+                invalidateLastRequest()
                 feedbackHandler.onSuggestionFeedback(feedback)
             }
 
@@ -208,9 +198,26 @@ class SwingLiveCompletionBinding
             edtDispatcher.dispatch(cancelAndHideTask)
         }
 
+        internal fun invalidateLastRequest() {
+            lastRequest = null
+        }
+
         internal fun refreshNow() {
             check(edtDispatcher.isDispatchThread()) { "live completion must refresh on the EDT" }
-            if (!closed && isEligibleOnEdt()) triggerController.refreshNow()
+            if (closed || !isEligibleOnEdt()) {
+                cancelAndHideInternal()
+                return
+            }
+            val snapshot = activeCommandLine()
+            if (snapshot == null || !shouldRequest(snapshot)) {
+                invalidateLastRequest()
+                target?.hideSuggestions()
+                return
+            }
+            val request = RequestKey(snapshot, rankingContextKey())
+            if (request == lastRequest) return
+            lastRequest = request
+            target?.requestSuggestions(snapshot)
         }
 
         /** Stops observation, removes focus wiring, and hides suggestions. */
@@ -220,7 +227,7 @@ class SwingLiveCompletionBinding
             closed = true
             observationJob?.cancel()
             observationJob = null
-            triggerController.cancelAndHide()
+            cancelAndHideInternal()
             target?.removeFocusListener(focusListener)
             target?.removeInvalidationListener(invalidationListener)
             target?.removeEligibilityListener(eligibilityListener)
@@ -252,21 +259,52 @@ class SwingLiveCompletionBinding
                 invalidatedRevision = NO_SHELL_COMMAND_LINE_REVISION
             }
             if (!isEligibleOnEdt()) {
-                triggerController.cancelAndHide()
+                cancelAndHideInternal()
                 return
             }
-            triggerController.commandLineChanged()
-            triggerController.scheduleRefresh()
+            scheduler.cancel()
+            invalidateLastRequest()
+            target?.hideSuggestions()
+            scheduleRefreshInternal()
         }
 
         private fun scheduleRefreshOnEdt() {
             if (!closed && !awaitingShellCommandLineRevision && isEligibleOnEdt()) {
-                triggerController.scheduleRefresh()
+                scheduleRefreshInternal()
             }
         }
 
+        private fun scheduleRefreshInternal() {
+            scheduler.restart(debounceMillis, refreshAction)
+        }
+
         private fun cancelAndHideOnEdt() {
-            if (!closed) triggerController.cancelAndHide()
+            if (!closed) cancelAndHideInternal()
+        }
+
+        private fun cancelAndHideInternal() {
+            scheduler.cancel()
+            invalidateLastRequest()
+            target?.hideSuggestions()
+        }
+
+        private fun shouldRequest(snapshot: TerminalShellCommandLineSnapshot): Boolean {
+            val text = snapshot.commandText
+            val cursorOffset = snapshot.cursorOffset
+            var nonWhitespaceCharacters = 0
+            for (index in 0 until cursorOffset) {
+                if (!text[index].isWhitespace()) nonWhitespaceCharacters++
+            }
+            if (nonWhitespaceCharacters == 0) return false
+            if (nonWhitespaceCharacters >= minimumNonWhitespaceCharacters) return true
+
+            return when (text.getOrNull(cursorOffset - 1)) {
+                '-', '/', '\\', '$', '=' -> true
+                ' ' ->
+                    nonWhitespaceCharacters >= MINIMUM_SPACE_TRIGGER_CHARACTERS &&
+                        text.getOrNull(cursorOffset - 2)?.isWhitespace() == false
+                else -> false
+            }
         }
 
         private fun isEligibleOnEdt(): Boolean =
@@ -275,9 +313,26 @@ class SwingLiveCompletionBinding
                 target?.isAutomaticSuggestionEligible() == true &&
                 suggestionsEnabled()
 
+        private data class RequestKey(
+            val commandText: String,
+            val cursorOffset: Int,
+            val cursorColumn: Int,
+            val cursorRow: Int,
+            val rankingContextKey: String?,
+        ) {
+            constructor(snapshot: TerminalShellCommandLineSnapshot, rankingContextKey: String?) : this(
+                commandText = snapshot.commandText,
+                cursorOffset = snapshot.cursorOffset,
+                cursorColumn = snapshot.cursorColumn,
+                cursorRow = snapshot.cursorRow,
+                rankingContextKey = rankingContextKey,
+            )
+        }
+
         private companion object {
             private const val DEFAULT_DEBOUNCE_MILLIS = 75
             private const val DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS = 2
+            private const val MINIMUM_SPACE_TRIGGER_CHARACTERS = 2
             private const val NO_SHELL_COMMAND_LINE_REVISION = -1L
         }
     }
@@ -347,6 +402,47 @@ private class SwingTerminalLiveCompletionTarget(
     override fun isFocusOwner(): Boolean = terminal.isFocusOwner
 
     override fun isAutomaticSuggestionEligible(): Boolean = terminal.isAutomaticShellSuggestionEligible()
+}
+
+/** EDT-confined replaceable delayed-action seam for Swing live completion refreshes. */
+internal interface SwingLiveCompletionScheduler {
+    /** Replaces pending work and invokes [action] after [delayMillis]. */
+    fun restart(
+        delayMillis: Int,
+        action: () -> Unit,
+    )
+
+    /** Cancels the pending action, if present. */
+    fun cancel()
+}
+
+/** Reusable one-shot Swing timer whose state is confined to the EDT. */
+internal class SwingTimerLiveCompletionScheduler : SwingLiveCompletionScheduler {
+    private var pendingAction: (() -> Unit)? = null
+    private val timer =
+        Timer(0) {
+            val action = pendingAction
+            pendingAction = null
+            action?.invoke()
+        }.apply {
+            isRepeats = false
+        }
+
+    override fun restart(
+        delayMillis: Int,
+        action: () -> Unit,
+    ) {
+        check(SwingUtilities.isEventDispatchThread()) { "live completion timer must restart on the EDT" }
+        pendingAction = action
+        timer.initialDelay = delayMillis
+        timer.restart()
+    }
+
+    override fun cancel() {
+        check(SwingUtilities.isEventDispatchThread()) { "live completion timer must cancel on the EDT" }
+        pendingAction = null
+        timer.stop()
+    }
 }
 
 internal interface SwingLiveCompletionEdtDispatcher {

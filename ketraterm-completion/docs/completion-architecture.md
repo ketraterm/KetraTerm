@@ -79,11 +79,11 @@ expected path kind, expected dynamic value domain, repeatable subcommand source,
 static value candidates, replacement offsets,
 or active quote state from raw command text.
 
-Swing hosts share one `SwingLiveCompletionTriggerController`. Its debounced,
+Swing hosts share one `SwingLiveCompletionBinding`. Its debounced,
 text-only predicate is deliberately a cheap UX gate: it never tokenizes,
 resolves command specs, or duplicates source eligibility. The merged engine is
 the sole semantic authority and returns an empty result when completion is not
-valid. The controller retains only the last primitive request identity so equal
+valid. The binding retains only the last primitive request identity so equal
 render frames do not republish work.
 
 `TerminalShellCapabilities` is the single host-to-engine dialect contract. It
@@ -230,7 +230,7 @@ parser. A small non-whitespace threshold plus common trigger characters keeps
 typing responsive, while the merged engine parses once and suppresses invalid
 operator, command, option, path, and value-domain requests authoritatively.
 
-Swing hosts share `SwingLiveCompletionTriggerController` and one EDT-confined
+Swing hosts share `SwingLiveCompletionBinding` and one EDT-confined
 one-shot `Timer` for debouncing. `SwingTerminal` owns exactly one replaceable
 `suggestionJob`; a new request or popup hide cancels it. The provider and engine
 remain suspending end to end.

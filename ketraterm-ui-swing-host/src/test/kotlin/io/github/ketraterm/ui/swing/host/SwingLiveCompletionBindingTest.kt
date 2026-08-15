@@ -230,12 +230,77 @@ class SwingLiveCompletionBindingTest {
             binding.close()
         }
 
+    @Test
+    fun `cheap trigger characters bypass the normal length threshold`() =
+        runTest {
+            val target = RecordingTarget()
+            var active = snapshot("-")
+            val binding =
+                binding(
+                    scope = backgroundScope,
+                    activeCommandLine = { active },
+                    minimumNonWhitespaceCharacters = 99,
+                )
+            binding.attach(target)
+
+            listOf("-", "/", "\\", "$", "=", "go ").forEach { command ->
+                active = snapshot(command)
+                binding.refreshNow()
+            }
+
+            assertEquals(listOf("-", "/", "\\", "$", "=", "go "), target.requests.map { it.commandText })
+            binding.close()
+        }
+
+    @Test
+    fun `short ordinary text is hidden`() =
+        runTest {
+            val target = RecordingTarget()
+            val binding = binding(scope = backgroundScope, activeCommandLine = { snapshot("g") })
+            binding.attach(target)
+
+            binding.refreshNow()
+
+            assertEquals(emptyList(), target.requests)
+            assertEquals(1, target.hideCount)
+            binding.close()
+        }
+
+    @Test
+    fun `ranking context change invalidates request deduplication`() =
+        runTest {
+            val target = RecordingTarget()
+            val active = snapshot("git s")
+            var directory = "file:///one"
+            val binding =
+                SwingLiveCompletionBinding(
+                    activeCommandLine = { active },
+                    shellCommandLineRevisions = MutableStateFlow(-1L),
+                    suggestionsEnabled = { true },
+                    rankingContextKey = { directory },
+                    feedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+                    scheduler = RecordingScheduler(),
+                    observationScope = backgroundScope,
+                    edtDispatcher = ImmediateEdtDispatcher,
+                )
+            binding.attach(target)
+
+            binding.refreshNow()
+            binding.refreshNow()
+            directory = "file:///two"
+            binding.refreshNow()
+
+            assertEquals(listOf(active, active), target.requests)
+            binding.close()
+        }
+
     private fun binding(
         scope: CoroutineScope,
         revisions: MutableStateFlow<Long> = MutableStateFlow(-1L),
         scheduler: RecordingScheduler = RecordingScheduler(),
         activeCommandLine: () -> TerminalShellCommandLineSnapshot? = { snapshot("git s") },
         feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+        minimumNonWhitespaceCharacters: Int = 2,
     ): SwingLiveCompletionBinding =
         SwingLiveCompletionBinding(
             activeCommandLine = activeCommandLine,
@@ -246,6 +311,7 @@ class SwingLiveCompletionBindingTest {
             scheduler = scheduler,
             observationScope = scope,
             edtDispatcher = ImmediateEdtDispatcher,
+            minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
         )
 
     private fun snapshot(command: String): TerminalShellCommandLineSnapshot =
