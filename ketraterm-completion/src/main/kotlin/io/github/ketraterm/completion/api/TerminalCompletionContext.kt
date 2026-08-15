@@ -44,53 +44,54 @@ enum class TerminalCompletionActivePosition {
  * One parsed, spec-resolved completion context shared by every source.
  *
  * The merged engine constructs this object once per request. Source
- * implementations consume it directly and must not tokenize the command line
- * again.
+ * implementations consume it directly to determine eligibility, prefix matching,
+ * replacement ranges, and semantic argument kinds without re-tokenizing the command line.
+ *
+ * @property activePosition semantic position of the active completion token (e.g. COMMAND, SUBCOMMAND, OPTION_NAME, OPTION_VALUE, POSITIONAL_ARGUMENT, OPERATOR).
+ * @property commandTokenIndex token index of the executable in the active command segment.
+ * @property command matched root command specification, or `null` for unknown commands.
+ * @property commandPath matched root-to-leaf command specification path reflecting the active subcommand hierarchy.
+ * @property activeOption specification of the option whose value is being completed, or `null` when not completing an option value.
+ * @property activePositionalArgument positional argument specification active at the cursor, or `null` if unspecified or variadic limit reached.
+ * @property usedOptionExclusiveGroupIds identifiers of exclusive option groups already supplied before the cursor.
+ * @property optionsTerminated whether a `--` token terminated option parsing before the cursor.
+ * @property expectedPathKind file-system path kind expected at the cursor (e.g. FILE, DIRECTORY, FILE_OR_DIRECTORY, or NONE).
+ * @property expectedHiddenPathPolicy hidden-entry policy expected at the cursor.
+ * @property expectedValueDomain dynamic host-provided value domain expected at the cursor (e.g. GIT_BRANCH, ENVIRONMENT_VARIABLE, or NONE).
+ * @property subcommandCandidateSource command specification whose subcommands are eligible for completion at the cursor.
+ * @property staticValueCandidates static candidate values declared by the active option or positional argument specification.
+ * @property activeTokenQuote quote character enclosing the active token (`'` or `"`), or the null character `\u0000` when unquoted.
+ * @property activePrefix decoded prefix text that candidates must match, taking attached option value prefixes (`--key=val`) into account.
+ * @property replacementStartOffset inclusive UTF-16 replacement start offset in the original request command line.
+ * @property replacementEndOffset exclusive UTF-16 replacement end offset in the original request command line.
+ * @property currentCommand deepest matched command specification in [commandPath], or `null` when no command spec was matched.
  */
 class TerminalCompletionContext
     internal constructor(
         internal val commandLineContext: TerminalCommandLineContext,
-        /** Semantic position of the active token. */
         val activePosition: TerminalCompletionActivePosition,
-        /** Token index of the executable. */
         val commandTokenIndex: Int = 0,
-        /** Matched root command, or `null` for unknown commands. */
         val command: TerminalCommandSpec? = null,
-        /** Matched root-to-leaf command path. */
         val commandPath: List<TerminalCommandSpec> = emptyList(),
-        /** Option whose value is active, or `null`. */
         val activeOption: TerminalOptionSpec? = null,
-        /** Positional argument specification at the cursor, or `null`. */
         val activePositionalArgument: TerminalArgumentSpec? = null,
-        /** Exclusive option groups already used before the cursor. */
         val usedOptionExclusiveGroupIds: Set<String> = emptySet(),
-        /** Whether `--` terminated option parsing before the cursor. */
         val optionsTerminated: Boolean = false,
-        /** Expected path kind at the cursor. */
         val expectedPathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
-        /** Hidden-path policy at the cursor. */
         val expectedHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
-        /** Dynamic value domain expected at the cursor. */
         val expectedValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
-        /** Command whose subcommands are eligible at the cursor. */
         val subcommandCandidateSource: TerminalCommandSpec? = null,
-        /** Static option or positional values eligible at the cursor. */
         val staticValueCandidates: List<String> = emptyList(),
-        /** Active token quote, or the null character when unquoted. */
         val activeTokenQuote: Char = NO_QUOTE,
         internal val attachedOptionValue: AttachedOptionValue? = null,
     ) {
-        /** Decoded prefix that candidates must match. */
         val activePrefix: String get() = attachedOptionValue?.prefix ?: commandLineContext.activePrefix
 
-        /** Inclusive replacement start offset in the command line. */
         val replacementStartOffset: Int
             get() = attachedOptionValue?.replacementStartOffset ?: commandLineContext.replacementStartOffset
 
-        /** Exclusive replacement end offset in the command line. */
         val replacementEndOffset: Int get() = commandLineContext.replacementEndOffset
 
-        /** Deepest matched command specification. */
         val currentCommand: TerminalCommandSpec? get() = commandPath.lastOrNull()
 
         private companion object {
