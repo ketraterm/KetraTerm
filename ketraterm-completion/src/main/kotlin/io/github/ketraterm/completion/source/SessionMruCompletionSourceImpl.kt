@@ -49,6 +49,9 @@ internal class SessionMruCompletionSourceImpl(
         observedTokens = SessionObservedTokenIndex(capacity, this.commandSpecs)
     }
 
+    override val isFastInMemory: Boolean
+        get() = true
+
     override fun recordSuccessfulCommand(
         commandLine: String,
         profileId: String?,

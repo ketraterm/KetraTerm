@@ -80,7 +80,6 @@ internal class MergedCompletionEngine(
                 send(emptyList())
                 return@channelFlow
             }
-            val completions = Channel<SourceCompletion>(sources.size)
             val rankingState =
                 ranker.createRequestState(
                     request = request,
@@ -89,13 +88,67 @@ internal class MergedCompletionEngine(
                 )
             var lastPublished: List<TerminalCompletionCandidate>? = null
 
+            // 1. Fast in-memory evaluation (Synchronous on the caller coroutine)
+            var hasAsyncSources = false
+            for (sourceIndex in sources.indices) {
+                val entry = sources[sourceIndex]
+                if (entry.source.isFastInMemory) {
+                    val candidates =
+                        try {
+                            entry.source
+                                .complete(request, completionContext, SOURCE_CANDIDATE_LIMIT)
+                                .filter { it.hasValidReplacementRangeFor(request) }
+                                .boundedTo(SOURCE_CANDIDATE_LIMIT)
+                        } catch (cancellation: CancellationException) {
+                            if (!coroutineContext.isActive) throw cancellation
+                            emptyList()
+                        } catch (failure: Exception) {
+                            reportSourceFailure(sourceIndex, entry, failure)
+                            emptyList()
+                        }
+                    if (candidates.isNotEmpty()) {
+                        rankingState.ingest(
+                            CompletionSourceCandidates(
+                                sourceIndex = sourceIndex,
+                                priority = entry.priority,
+                                candidates = candidates,
+                            ),
+                        )
+                    }
+                } else {
+                    hasAsyncSources = true
+                }
+            }
+
+            // Immediately emit the initial synchronous ranking (specs + MRU history)
+            val initialRanked = rankingState.rankedCandidates()
+            if (initialRanked.isNotEmpty() || !hasAsyncSources) {
+                lastPublished = initialRanked
+                send(initialRanked)
+            }
+
+            // If there are no async/suspending sources (e.g. pure CLI spec / history typing), finish immediately!
+            if (!hasAsyncSources) {
+                return@channelFlow
+            }
+
+            // 2. Asynchronous background evaluation strictly for suspending/IO sources (paths, Git branches, etc.)
+            val asyncSources = ArrayList<IndexedSourceEntry>(sources.size)
+            for (sourceIndex in sources.indices) {
+                val entry = sources[sourceIndex]
+                if (!entry.source.isFastInMemory) {
+                    asyncSources += IndexedSourceEntry(sourceIndex, entry)
+                }
+            }
+
+            val completions = Channel<SourceCompletion>(asyncSources.size)
             try {
                 supervisorScope {
-                    sources.forEachIndexed { sourceIndex, entry ->
+                    for (asyncEntry in asyncSources) {
                         launch {
                             val candidates =
                                 try {
-                                    entry.source
+                                    asyncEntry.entry.source
                                         .complete(request, completionContext, SOURCE_CANDIDATE_LIMIT)
                                         .filter { it.hasValidReplacementRangeFor(request) }
                                         .boundedTo(SOURCE_CANDIDATE_LIMIT)
@@ -103,14 +156,14 @@ internal class MergedCompletionEngine(
                                     if (!coroutineContext.isActive) throw cancellation
                                     emptyList()
                                 } catch (failure: Exception) {
-                                    reportSourceFailure(sourceIndex, entry, failure)
+                                    reportSourceFailure(asyncEntry.sourceIndex, asyncEntry.entry, failure)
                                     emptyList()
                                 }
-                            completions.send(SourceCompletion(sourceIndex, entry.priority, candidates))
+                            completions.send(SourceCompletion(asyncEntry.sourceIndex, asyncEntry.entry.priority, candidates))
                         }
                     }
 
-                    repeat(sources.size) {
+                    repeat(asyncSources.size) {
                         val completed = completions.receive()
                         if (completed.candidates.isNotEmpty()) {
                             rankingState.ingest(
@@ -150,6 +203,11 @@ internal class MergedCompletionEngine(
         val sourceIndex: Int,
         val priority: Int,
         val candidates: List<TerminalCompletionCandidate>,
+    )
+
+    private data class IndexedSourceEntry(
+        val sourceIndex: Int,
+        val entry: TerminalCompletionSourceEntry,
     )
 
     private companion object {
