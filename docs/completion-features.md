@@ -27,6 +27,7 @@ You don't need to type full command or task names. KetraTerm understands upperca
 When running inside IntelliJ IDEA or Android Studio, KetraTerm taps directly into the IDE's live project indices:
 - **Whole-Project File Search**: Type any part of a filename to find and complete files across the entire project (powered by IntelliJ's *Search Everywhere* engine).
 - **Live Git Branches & Tags**: Typing `git switch <TAB>` or `git checkout <TAB>` lists your repository's local and remote branches in real time.
+- **Recent Git Commits**: Typing `git cherry-pick <TAB>`, `git revert <TAB>`, or `git show <TAB>` lists up to 50 recent commits with their short hashes and subjects; accepting one inserts its full hash.
 - **Live Git Staged & Modified Files**: Typing `git add <TAB>` or `git restore <TAB>` lists the exact modified and untracked files from your IDE changelist.
 - **Dynamic Gradle Tasks**: Completes all multi-module tasks (e.g. `:app:assembleDebug`, `:core:test`) directly from your imported project model.
 - **Native Keymap Integration**: The popup responds to your familiar IntelliJ keybindings (e.g. Tab, Enter, Up/Down arrows, Escape).

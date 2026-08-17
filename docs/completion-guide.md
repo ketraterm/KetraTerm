@@ -14,7 +14,7 @@ The completion system is built on strict layer boundaries:
 - **`ketraterm-completion-host`**: Host-neutral suspending abstractions for local path resolution and bounded directory scanning (`Files.newDirectoryStream`).
 - **`ketraterm-completion-persistence`**: Serialized local storage (`completion-stats.json`) for sanitized command and option shape statistics.
 - **`ketraterm-ui-swing-host`**: Reusable Swing adapter converting engine results to immutable suggestion rows and forwarding keyboard/mouse actions to the terminal session.
-- **`ketraterm-intellij-plugin`**: IntelliJ Platform adapters delegating path, Git, and Gradle completion to IntelliJ in-memory indices (`GotoFileModel`, `GitRepositoryManager`, `ChangeListManager`, `ProjectDataManager`, and `VirtualFileManager`).
+- **`ketraterm-intellij-plugin`**: IntelliJ Platform adapters delegating path, Git, and Gradle completion to IntelliJ project models and bounded Git history queries (`GotoFileModel`, `GitRepositoryManager`, `GitHistoryUtils`, `ChangeListManager`, `ProjectDataManager`, and `VirtualFileManager`).
 
 ---
 
@@ -46,6 +46,7 @@ Shell capability contracts define tokenization, quote handling, and command sepa
 | **Immediate Directory Scan** | Suspending NIO scan (`Files.newDirectoryStream`) | In-memory VFS project scan (0 disk I/O) + NIO fallback | `ketraterm-completion-host` / IDE VFS |
 | **Whole-Project Fuzzy Files** | Scoped to active directory path | Global Search Everywhere index (`GotoFileModel`) | `IntellijProjectFileCompletionSource` |
 | **Git Branches & Tags** | Static spec / argument values | Live Git4Idea branches and tags (`GitRepositoryManager`) | `IntellijGitCompletionSource` |
+| **Recent Git Commits** | No dynamic commit source | Up to 50 recent commits across HEAD, local branches, remotes, and tags (`GitHistoryUtils`) | `IntellijGitCommitCompletionSource` |
 | **Git Modified / Staged Paths** | Directory path completion | Live VCS changelist paths (`ChangeListManager`) | `IntellijGitStatusPathCompletionSource` |
 | **Gradle Tasks** | Universal lifecycle tasks | Universal tasks + dynamic `:module:task` from imported project model | `IntellijGradleTaskCompletionSource` |
 | **Fuzzy Matching** | CamelHump, Acronyms, Prefix, Exact | CamelHump, Acronyms, Prefix, Exact | `CompletionMatcher` |
@@ -107,7 +108,7 @@ The completion learning engine is designed to prevent sensitive data leaks:
 
 | Command | Subcommands, Options, and Domains |
 | :--- | :--- |
-| **`git`** | Subcommands (`commit`, `checkout`, `switch`, `merge`, `rebase`, `pull`, `push`, `status`, `diff`, `log`, `branch`, `tag`, `stash`, `clone`, `fetch`, `reset`, `restore`, `remote`, `cherry-pick`, `show`), option flags, value domains (`GIT_LOCAL_BRANCH`, `GIT_REMOTE_BRANCH`, `GIT_TAG`, `GIT_STATUS_PATH`). |
+| **`git`** | Subcommands (`commit`, `checkout`, `switch`, `merge`, `rebase`, `pull`, `push`, `status`, `diff`, `log`, `branch`, `tag`, `stash`, `clone`, `fetch`, `reset`, `restore`, `remote`, `cherry-pick`, `revert`, `show`), option flags, and dynamic value domains for branches (`GIT_BRANCH`) and commits (`GIT_COMMIT`); the IntelliJ host also supplies changed-path candidates. |
 | **`gradle` / `gradlew`** | Universal tasks (`build`, `test`, `check`, `clean`, `tasks`, `run`, `assemble`, `help`, `projects`, `properties`, `dependencies`, `dependencyInsight`, `wrapper`), CLI flags (`--configuration-cache`, `--build-cache`, `--daemon`, `--parallel`, `--continuous`, `--scan`, `--info`, `--debug`, `--stacktrace`, `--project-dir`, `--exclude-task`), repeatable sibling task lists. |
 | **`kotlin` / `kotlinc`** | Standalone Kotlin compiler CLIs (`kotlinc`, `kotlinc-jvm`, `kotlinc-js`, `kotlinc-native`) with compiler options (`-jvm-target`, `-language-version`, `-api-version`, `-opt-in`, `-Xcontext-parameters`, `-Xmulti-platform`, `-Werror`, `-verbose`, `-d`, `-cp`). |
 | **`adb`** | Android Debug Bridge commands (`devices`, `logcat`, `install`, `uninstall`, `shell`, `push`, `pull`, `reboot`, `reverse`, `forward`, `start-server`, `kill-server`, `connect`, `disconnect`, `tcpip`) and device selection flags (`-s`, `-d`, `-e`). |

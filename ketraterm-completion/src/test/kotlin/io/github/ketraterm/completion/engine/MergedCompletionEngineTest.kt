@@ -21,6 +21,7 @@ import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.toList
 import kotlin.test.*
+import kotlin.time.Duration.Companion.milliseconds
 
 class MergedCompletionEngineTest {
     @Test
@@ -325,7 +326,7 @@ class MergedCompletionEngineTest {
             val candidates = engine.complete(request(commandLine = "git s"))
 
             assertEquals(256, collectionLimit)
-            assertEquals(11, candidates.size)
+            assertEquals(12, candidates.size)
             assertEquals("spec", candidates.first().source)
             assertEquals(TerminalCompletionCandidateKind.SUBCOMMAND, candidates.first().kind)
         }
@@ -717,7 +718,7 @@ class MergedCompletionEngineTest {
             val engine = TerminalCompletionEngines.fromSources(emptyList<TerminalCompletionSourceEntry>())
 
             assertEquals(
-                listOf("status", "stash", "switch"),
+                listOf("show", "status", "switch", "stash"),
                 engine.complete(request(commandLine = "git s")).map { it.replacementText },
             )
         }
@@ -775,9 +776,9 @@ class MergedCompletionEngineTest {
         runBlocking {
             var activeCancelledCount = 0
             val delayedSource =
-                TerminalCompletionSource { req, ctx, _ ->
+                TerminalCompletionSource { req, _, _ ->
                     try {
-                        delay(20)
+                        delay(20.milliseconds)
                         listOf(
                             TerminalCompletionCandidate(
                                 replacementText = req.commandLine + "-done",
@@ -811,7 +812,7 @@ class MergedCompletionEngineTest {
                             lastEmitted = it
                         }
                     }
-                delay(2) // simulate fast keystroke typing interval (2ms)
+                delay(2.milliseconds) // simulate fast keystroke typing interval (2ms)
             }
 
             currentJob?.join()
@@ -824,17 +825,17 @@ class MergedCompletionEngineTest {
         runBlocking {
             val sourceA =
                 TerminalCompletionSource { _, _, _ ->
-                    delay(5)
+                    delay(5.milliseconds)
                     listOf(candidate("alpha", source = "sourceA", score = 10))
                 }
             val sourceB =
                 TerminalCompletionSource { _, _, _ ->
-                    delay(15)
+                    delay(15.milliseconds)
                     listOf(candidate("beta", source = "sourceB", score = 20))
                 }
             val sourceC =
                 TerminalCompletionSource { _, _, _ ->
-                    delay(25)
+                    delay(25.milliseconds)
                     listOf(candidate("gamma", source = "sourceC", score = 30))
                 }
 

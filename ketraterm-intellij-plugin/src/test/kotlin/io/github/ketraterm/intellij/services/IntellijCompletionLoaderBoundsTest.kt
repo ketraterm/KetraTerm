@@ -78,6 +78,44 @@ class IntellijCompletionLoaderBoundsTest {
         }
 
     @Test
+    fun `Git commit loader retains only the newest fifty commits`() =
+        runBlocking {
+            val commits = CountingGitCommitIterable()
+            val loader =
+                IntellijGitCommitCompletionLoader(
+                    GitCommitReadPort { _, limit ->
+                        assertEquals(50, limit)
+                        commits
+                    },
+                )
+
+            val values = loader.load("file:///repo")
+
+            assertEquals(50, values.size)
+            assertEquals(50, commits.nextCalls)
+            assertEquals(commitHash(0), values.first().value)
+            assertEquals(commitHash(49), values.last().value)
+        }
+
+    @Test
+    fun `Git commit loader stops projection when its request is cancelled`() =
+        runBlocking {
+            lateinit var loading: Deferred<List<io.github.ketraterm.completion.model.TerminalCompletionDomainValue>>
+            val commits =
+                CountingGitCommitIterable { count ->
+                    if (count == 4) loading.cancel(CancellationException("obsolete Git commit completion"))
+                }
+            val loader = IntellijGitCommitCompletionLoader(GitCommitReadPort { _, _ -> commits })
+            loading = async(start = CoroutineStart.LAZY) { loader.load("file:///repo") }
+
+            loading.start()
+            val failure = runCatching { loading.await() }.exceptionOrNull()
+
+            assertTrue(failure is CancellationException)
+            assertEquals(4, commits.nextCalls)
+        }
+
+    @Test
     fun `Git status loader shares one exact visit bound across both status groups`() =
         runBlocking {
             val repositoryRoot = temporaryFolder.newFolder("git-status-loader").toPath()
@@ -196,6 +234,29 @@ class IntellijCompletionLoaderBoundsTest {
             }
     }
 
+    private class CountingGitCommitIterable(
+        private val afterNext: (Int) -> Unit = {},
+    ) : Iterable<GitCommitReadModel> {
+        var nextCalls: Int = 0
+            private set
+
+        override fun iterator(): Iterator<GitCommitReadModel> =
+            object : Iterator<GitCommitReadModel> {
+                override fun hasNext(): Boolean = true
+
+                override fun next(): GitCommitReadModel {
+                    val index = nextCalls++
+                    afterNext(nextCalls)
+                    val hash = commitHash(index)
+                    return GitCommitReadModel(
+                        fullHash = hash,
+                        shortHash = hash.take(7),
+                        subject = "commit $index",
+                    )
+                }
+            }
+    }
+
     private class CountingGradleTaskNodes(
         private val linkedProjectPath: String,
         private val afterNext: (Int) -> Unit = {},
@@ -222,4 +283,8 @@ class IntellijCompletionLoaderBoundsTest {
         override val task: GradleTaskReadModel? = null,
         override val children: Iterable<GradleModelNode> = emptyList(),
     ) : GradleModelNode
+
+    private companion object {
+        private fun commitHash(index: Int): String = index.toString(16).padStart(40, '0')
+    }
 }

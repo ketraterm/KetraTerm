@@ -438,6 +438,11 @@ object TerminalCommandSpecs {
                             ),
                     ),
                     TerminalCommandSpec(
+                        name = "show",
+                        description = "show one or more objects",
+                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
+                    ),
+                    TerminalCommandSpec(
                         name = "diff",
                         description = "show changes between commits, trees, or files",
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
@@ -494,6 +499,7 @@ object TerminalCommandSpecs {
                     TerminalCommandSpec(
                         name = "cherry-pick",
                         description = "apply the changes introduced by some existing commits",
+                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
                         options =
                             listOf(
                                 TerminalOptionSpec(listOf("--continue"), "continue operation in progress"),
@@ -504,6 +510,7 @@ object TerminalCommandSpecs {
                     TerminalCommandSpec(
                         name = "revert",
                         description = "revert some existing commits",
+                        positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
                         options =
                             listOf(
                                 TerminalOptionSpec(listOf("--continue"), "continue operation in progress"),

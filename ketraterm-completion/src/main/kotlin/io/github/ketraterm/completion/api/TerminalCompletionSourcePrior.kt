@@ -27,7 +27,7 @@ object TerminalCompletionSourcePrior {
     /** Prior for imported Gradle task candidates. */
     const val GRADLE_TASK: Int = 15
 
-    /** Prior for Git branch and tag candidates captured by one repository read. */
+    /** Prior for Git branch, tag, and commit candidates captured from one repository. */
     const val GIT_REFERENCE: Int = 15
 
     /** Prior for changed or untracked Git path candidates. */

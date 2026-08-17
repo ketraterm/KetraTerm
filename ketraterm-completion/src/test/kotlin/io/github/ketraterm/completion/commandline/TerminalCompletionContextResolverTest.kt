@@ -187,6 +187,20 @@ class TerminalCompletionContextResolverTest {
     }
 
     @Test
+    fun `recent Git commit domain remains active for repeated commit arguments`() {
+        for (subcommand in listOf("cherry-pick", "revert", "show")) {
+            val firstCommit = resolve("git $subcommand ")
+            assertEquals(listOf("git", subcommand), firstCommit.commandPath.map { it.name })
+            assertEquals(TerminalCompletionActivePosition.POSITIONAL_ARGUMENT, firstCommit.activePosition)
+            assertEquals(TerminalCompletionValueDomain.GIT_COMMIT, firstCommit.expectedValueDomain)
+
+            val nextCommit = resolve("git $subcommand deadbeef ")
+            assertEquals(TerminalCompletionActivePosition.POSITIONAL_ARGUMENT, nextCommit.activePosition)
+            assertEquals(TerminalCompletionValueDomain.GIT_COMMIT, nextCommit.expectedValueDomain)
+        }
+    }
+
+    @Test
     fun `ordered positional arguments advance through optional and variadic declarations`() {
         val spec =
             TerminalCommandSpec(

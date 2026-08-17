@@ -93,6 +93,12 @@ internal class KetraTermCompletionService(
                             TerminalCompletionSourcePrior.GIT_REFERENCE,
                         ),
                         TerminalCompletionSourceEntry(
+                            intellijGitCommitCompletionSource(
+                                loader = IntellijGitCommitCompletionLoader(project)::load,
+                            ),
+                            TerminalCompletionSourcePrior.GIT_REFERENCE,
+                        ),
+                        TerminalCompletionSourceEntry(
                             intellijGitStatusPathCompletionSource(
                                 loader = IntellijGitStatusPathLoader(project)::load,
                             ),
