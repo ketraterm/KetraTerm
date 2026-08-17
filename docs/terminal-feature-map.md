@@ -118,72 +118,23 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 - **Interactive Selection**: Drag selecting with velocity autoscrolling, Alt-drag block selection, double-click smart selection (words, paths, URLs), triple-click line selection, middle-click paste, and system clipboard interfaces.
 - **Scrollback Search**: Regex-free text search scanning viewport and retained scrollback history, ignoring soft-wrapping boundaries.
 - **Shell Suggestion Popup Surface**: Reusable Swing terminals expose a configurable, host-fed shell suggestion popup with keyboard and mouse selection, grid-cell anchoring, host acceptance callbacks, range-aware default acceptance, and standalone/IntelliJ settings toggles. The reusable controller owns semantic selection, acceptance, and dismissal actions while each host owns the physical key bindings: standalone uses the conventional popup map and IntelliJ resolves lookup actions from the user's active IDE keymap. Claimed actions retain the complete Swing press/typed/repeat/release lifecycle so an acceptance key cannot leak into terminal input after closing the popup. Default acceptance validates UTF-16 and extended grapheme-cluster boundaries, treats combining, emoji-modifier, regional-indicator, and ZWJ sequences as single editor actions, and submits Delete/Backspace/paste phases through one session-serialized text-replacement event. The input encoder reuses active keyboard and paste policies while coalescing long deletion sequences through a bounded buffer. Suggestion sources, ranking, live triggers, and source-specific replacement policy remain product-host responsibilities.
-- **Completion Engine Foundation & IntelliJ-Style Fuzzy Matching**: Dependency-free pure Kotlin completion APIs define command-line requests, explicit
-  replacement-range candidates, candidate kinds, layered completion sources, deterministic source
-  merging/ranking/deduplication, command/option specs with ordered optional/variadic positional argument metadata,
-  mutually exclusive option groups, command/option hidden-path policies, repeatable subcommand/task semantics, bounded
-  static option value domains, dynamic host-owned value-domain metadata, and host-resolved shell lexical/replacement
-  capabilities, shell-word tokenization, a shared internal completion-context resolver for
-  command/subcommand/option/value/argument positions, spec-backed evaluation, spec-aware command-line classification,
-  a fast allocation-minimal CamelHump and word-boundary acronym matcher that extracts validated immutable packed
-  UTF-16 match ranges for candidates, a cheap text-only Swing live-trigger gate,
-  context-aware merged ranking for command/subcommand/option/value/path/domain
-  positions, privacy-preserving argument shape categories, source-specific accepted/dismissed feedback stats, one
-  global evidence-fusion ranker, bounded surplus collection before final presentation truncation, a
-  bounded in-memory session MRU source, command-aware path
-  completion, quote-preserving and shell-escaped path replacement for active tokens, and a rich zero-latency bootstrap spec
-  catalog for common developer CLIs (`git` with subcommands/flags, `gradle`/`gradlew`, `npm`, `pnpm`, `yarn`, `bun`, `docker`, `docker-compose`, `cargo`, `kubectl` with resource types/flags, `gh`, `pip`, `go`, `aws`, `ketra`) and shell path commands. The standalone and IntelliJ hosts wire that engine through a
-  shared optional Swing-host adapter, map authoritative profile categories to supported POSIX, PowerShell, or
-  conservative plain capabilities, pass profile/current-directory context into requests, persist compact exact
-  command/shape/source-feedback stats instead of scanning raw history, forward immutable match ranges to Swing suggestions,
-  render matching character runs in bold using their validated display-relative offsets, and feed successful OSC 133
-  command metadata into
-  per-session MRU sources. For unknown executables, session MRU also learns bounded in-memory observed tokens without
-  claiming false command semantics: `abc de -g`, `abc de -f`, and `abc as` offer `de`/`as` after `abc ` and observed
-  options after `abc de `. It learns only the first non-option token and option names, never later positional or option
-  values; this data is session-only and is not persisted. Trailing space is treated as a command-line boundary: `cd`
-  completes the active command token, while `cd ` completes a new argument, with directory-changing commands receiving
-  visible directory candidates ahead of whole-command MRU matches and dot-prefixed paths hidden until `.` is typed
-  unless the relevant spec explicitly includes or excludes them. Separate and attached option values share the same
-  completion semantics, so `--output text` and `--output=text` use the same value source while attached replacement
-  preserves the option name and separator. The merged engine uses one single-pass lexical scan per request for supported
-  POSIX and PowerShell command separators: cursors inside an operator return no candidates, cursors on either side
-  resolve to that command segment, and unclosed quotes recover to the closest logical segment. The exact `--` terminator
-  changes later tokens to positional arguments, suppressing option, option-value, and subcommand completion.
-  Whole-command history is suppressed after an operator because it cannot safely replace a segment-local range.
-  Mid-command learned completion replaces only the active token and preserves following arguments. Positive persisted
-  commands use a reusable snapshot-identity/shell-syntax prefix index rather than a per-request history scan, and
-  recency is based on evidence age from one request clock snapshot.
-  Gradle-style repeatable task lists keep suggesting unused sibling tasks after existing tasks, so `./gradlew clean bu`
-  can suggest `build`. IntelliJ augments those bootstrap tasks from its imported Gradle model, including canonical
-  `:module:task` paths and short task names scoped by `-p`/`--project-dir`. Dynamic value domains such as Git branches,
-  Docker contexts, Kubernetes namespaces, npm scripts,
-  AWS profiles/regions, and IDE run configurations are modeled and ranked by the shared engine but supplied by
-  standalone/plugin-owned providers. The reusable Swing acceptance handler supports explicit UTF-16 replacement ranges
-  by deleting suffix text, backspacing prefix text, and pasting the selected replacement through the input/session
-  boundary. The engine does not spawn shells, parse terminal output, perform I/O, or depend on
-  Swing/IntelliJ/session/runtime modules.
-- **IntelliJ Dynamic Completion Providers**: The IntelliJ host uses Git4Idea repository metadata through one bounded
-  suspending Git source for `git switch`, `checkout`, `merge`, and `rebase`. It selects the repository once and derives
-  local branches, remote branches, and tags in one IntelliJ read action. Sources execute as children of the merged
-  engine request and are cancelled when `SwingTerminal` replaces its single suggestion job. IntelliJ project
-  path completion uses the IDE's indexed Go to File matcher and ranking inside a write-action-aware suspending read
-  action, while blocking directory scanning uses the IO dispatcher outside the project. Dynamic
-  sources are ordinary prioritized source entries without provider factories, provider-owned jobs, or closeable state.
-  IntelliJ completion persistence is an explicit, disabled-by-default setting; session-local MRU and in-memory
-  evidence remain active without disk access.
-- **Shared Completion Host Support**: `ketraterm-completion-host` owns direct suspending providers,
-  authority-preserving local path resolution, and bounded local scanning. `SwingTerminal` owns one replaceable request
-  job and the merged engine alone parallelizes sources with structured concurrency. Each
-  product host retains source composition and priority policy. `ketraterm-completion-persistence` owns sanitized
-  versioned local-file storage with byte, line, and row bounds; one mutex-backed suspending repository serializes
-  learning and persistence on `Dispatchers.IO`.
-  `ketraterm-ui-swing-host`
-  owns the reusable engine/feedback vocabulary adapters. The pure completion engine, product-specific loaders, UI
-  presentation, source composition, and persistence policy remain in their responsible layers.
 - **Fixed-Grid Smooth Swing Viewport**: One allocation-conscious row-scrolling engine serves notched mouse wheels, precise trackpads, Shift+Page Up/Down keyboard paging, selection-drag autoscroll, programmatic navigation, and standalone/IntelliJ scrollbars. The reusable Swing terminal defaults to zero top padding so smooth row animation can enter and leave through the top edge without clipping, while preserving a compact right edge for natural wrapping, a stable bottom spacer, and the left shell-integration decoration gutter. Alternate-screen rendering suppresses prompt decorations and uses symmetric left/right insets equal to the bottom spacer, then resizes the terminal grid to the newly available columns so full-screen TUIs avoid fake right slack. Optional host padding is treated consistently as an explicit visual inset on all four edges. Precise device deltas accumulate without moving content until they emit whole rows; every destination and resting viewport is therefore row-aligned. Animation retains a fractional visual position only while easing between integer destinations, with line-based render-cache addressing through an integer anchor and one overscan row clipped to the terminal grid. A fractional component height is covered by a separate render-only row, so a 10.9-row viewport requests 11 rows at rest and up to 12 during animation without changing the 10-row terminal grid. The Swing cache reserves both transient rows and reuses its primitive planes while overscan toggles, avoiding animation-loop storage allocation. Scrollbar dragging remains continuous at the thumb while every position maps immediately to an integer terminal top row, so content has no drag lag and release is already aligned. Allocation-free primitive viewport notifications keep the thumb synchronized on every animation frame; full snapshot objects remain event-level only. Sub-row animation frames update translated geometry without rereading the render cache or rebuilding shell/search projections until the integer render mapping changes. Hit testing, repaint bounds, command anchors, and terminal-pixel mouse coordinates consume the same translated geometry. Shell-integration prompt dots remain zero-layout decorations and never change row pitch, visible row count, scroll range, mouse coordinates, or PTY dimensions.
-- **Host Path Providers**: Path interpretation remains host-owned. Standalone and IntelliJ resolve local and
-  `localhost` OSC 7 file URIs, explicit home paths, Windows drive roots, and Windows UNC roots while rejecting non-local
-  authorities. Directory enumeration is suspending and interruptible outside the EDT. Visit, result, and elapsed-time
-  limits bound work; request cancellation prevents stale results from refreshing the popup.
 - **Bell Indicators**: Alerts embedding hosts of beep signals (`BEL`) through independently configurable audible bell and visual bell policies. The reusable Swing terminal can show a subtle edge pulse that remains available when audio is disabled.
+
+---
+
+## 8. Command-Line Completion Pipeline (`ketraterm-completion`)
+
+KetraTerm includes a pure Kotlin command-line completion pipeline with zero-allocation matching, structured concurrency, and privacy-preserving learning.
+
+For detailed dialect contracts, host capabilities, and specification tables, see the [Command-Line Completion Architecture & Reference](completion-guide.md).
+
+### Key Subsystems
+
+- **Pure Kotlin Engine**: Evaluates CLI specs, lexical context, and layered sources in parallel using Kotlin coroutines without spawning shell processes or performing blocking I/O.
+- **Shell Dialect Support**: Implements explicit lexical contracts for POSIX shells (`bash`, `zsh`), PowerShell (`pwsh`), and Plain/conservative (`cmd.exe`) shells, supporting command chaining (`&&`, `||`, `;`, `|`), path quoting, and end-of-options (`--`) boundary semantics.
+- **IntelliJ Platform Integration**: Replaces disk-bound scans with IntelliJ's in-memory `GotoFileModel` (whole-project fuzzy search), `VirtualFileManager` (in-memory directory trees), `GitRepositoryManager` (live Git branches/tags), `ChangeListManager` (staged/modified files), and `ProjectDataManager` (imported Gradle tasks).
+- **CamelHump & Word-Boundary Matching**: Allocation-minimal matching engine supporting CamelHump (`ctk` -> `compileTestKotlin`), delimiter-separated acronyms (`d-c` -> `docker-compose`), and exact/prefix matching, providing bit-packed UTF-16 match ranges for zero-allocation bold accent rendering.
+- **Privacy-Preserving Learning**: Persists only sanitized command names, option shapes, and source feedback statistics (`completion-stats.json`). Command arguments, file paths, branch names, passwords, and tokens are never written to disk. Session MRU and unknown executable token learning remain strictly in-memory per tab.
+- **Zero-Latency Spec Catalog**: Bundled specifications for 18+ standard developer tools: `git`, `gradle`, `kotlin`, `kotlinc`, `adb`, `docker`, `docker-compose`, `kubectl`, `cargo`, `npm`, `pnpm`, `yarn`, `bun`, `gh`, `pip`, `go`, `aws`, and `ketra`.
+
