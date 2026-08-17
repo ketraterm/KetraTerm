@@ -20,6 +20,7 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFileSystemItem
@@ -28,7 +29,6 @@ import com.intellij.util.Processor
 import com.intellij.util.indexing.FindSymbolParameters
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
-import io.github.ketraterm.completion.api.TerminalFuzzyPathProvider
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -68,6 +68,7 @@ internal class IntellijProjectFileLoader(
         if (normalizedPrefix.substringAfterLast('/').isEmpty()) return emptyList()
         val workingDirectory =
             TerminalLocalFileUriResolver.resolve(workingDirectoryUri)
+                ?: project.guessProjectDir()?.toNioPath()
                 ?: project.basePath?.let { runCatching { Path.of(it) }.getOrNull() }
                 ?: return emptyList()
         return readAction {
@@ -142,8 +143,7 @@ private class IntellijProjectFileSearchViewModel(
 internal fun intellijProjectFileCompletionSource(loader: suspend (String?, String) -> List<TerminalFuzzyPathEntry>) =
     TerminalCompletionSources.fuzzyPath(
         sourceId = "intellij-project-file",
-        entriesProvider =
-            TerminalFuzzyPathProvider { request, prefix ->
+        entriesProvider = { request, prefix ->
                 loader(request.workingDirectoryUri, prefix)
             },
     )

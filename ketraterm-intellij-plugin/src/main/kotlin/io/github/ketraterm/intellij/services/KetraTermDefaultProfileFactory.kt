@@ -16,6 +16,7 @@
 package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettingsNormalizer
 import io.github.ketraterm.workspace.TerminalProfile
@@ -38,7 +39,7 @@ internal object KetraTermDefaultProfileFactory {
     fun defaultProfile(
         project: Project,
         settings: KetraTermIntellijSettings.State = KetraTermIntellijSettings.getInstance().state,
-    ): TerminalProfile = defaultProfile(project.basePath, settings)
+    ): TerminalProfile = defaultProfile(project.guessProjectDir()?.path ?: project.basePath, settings)
 
     /**
      * Creates a default profile for a nullable project path.
@@ -73,7 +74,7 @@ internal object KetraTermDefaultProfileFactory {
         project: Project,
         profile: TerminalProfile,
         settings: KetraTermIntellijSettings.State = KetraTermIntellijSettings.getInstance().state,
-    ): TerminalProfile = profileForSelectedShell(project.basePath, profile, settings)
+    ): TerminalProfile = profileForSelectedShell(project.guessProjectDir()?.path ?: project.basePath, profile, settings)
 
     /**
      * Applies IntelliJ launch settings to a selected shell profile.
