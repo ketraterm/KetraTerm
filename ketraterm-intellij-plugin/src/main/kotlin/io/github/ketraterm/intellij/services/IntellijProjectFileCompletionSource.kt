@@ -23,6 +23,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.toNioPathOrNull
 import com.intellij.psi.PsiFileSystemItem
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.util.Processor
@@ -47,7 +48,7 @@ import java.nio.file.Path
  */
 internal class IntellijProjectFileLoader(
     private val project: Project,
-    private val filePathResolver: (VirtualFile) -> Path? = { file -> runCatching(file::toNioPath).getOrNull() },
+    private val filePathResolver: (VirtualFile) -> Path? = VirtualFile::toNioPathOrNull,
 ) {
     /**
      * Returns IntelliJ-ranked project paths matching [prefix].
