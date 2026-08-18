@@ -544,7 +544,7 @@ object TerminalCommandSpecs {
         TerminalCommandSpec(
             name = GradleCompletionSyntax.COMMAND_NAME,
             description = "build automation",
-            aliases = listOf("./gradlew", "gradlew"),
+            aliases = listOf("./gradlew", "./gradlew.bat", ".\\gradlew", ".\\gradlew.bat", "gradlew", "gradlew.bat"),
             repeatableSubcommands = true,
             subcommands =
                 listOf(

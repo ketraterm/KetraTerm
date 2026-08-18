@@ -22,6 +22,138 @@ import kotlin.test.*
 
 class TerminalCompletionSessionRegistryTest {
     @Test
+    fun `existing POSIX Gradle wrapper is presented as the authoritative Gradle command`() =
+        runBlocking {
+            val registry = registry(commandSpecs = TerminalCommandSpecs.defaults())
+            val session = registry.openSession("session", fileSystemWith("gradlew"))
+
+            val candidates =
+                session.engine.complete(
+                    request(
+                        commandLine = "./gr",
+                        workingDirectoryUri = "file:///project",
+                        shellCapabilities = TerminalShellCapabilities.POSIX,
+                    ),
+                )
+            val wrapper = candidates.single { it.replacementText == "./gradlew" }
+
+            assertEquals("./gradlew", wrapper.displayText)
+            assertEquals("build automation", wrapper.detail)
+            assertEquals("spec", wrapper.source)
+            assertEquals(TerminalCompletionCandidateKind.COMMAND, wrapper.kind)
+            assertEquals(0, wrapper.replacementStartOffset)
+            assertEquals(4, wrapper.replacementEndOffset)
+            assertContentEquals(intArrayOf(0, 4), wrapper.matchedRanges.copyPackedOffsets())
+            registry.close()
+        }
+
+    @Test
+    fun `existing PowerShell Gradle wrapper uses its local batch invocation spelling`() =
+        runBlocking {
+            val registry = registry(commandSpecs = TerminalCommandSpecs.defaults())
+            val session = registry.openSession("session", fileSystemWith("gradlew.bat"))
+
+            val candidates =
+                session.engine.complete(
+                    request(
+                        commandLine = ".\\gr",
+                        workingDirectoryUri = "file:///project",
+                        shellCapabilities = TerminalShellCapabilities.POWERSHELL,
+                    ),
+                )
+            val wrapper = candidates.single { it.replacementText == ".\\gradlew.bat" }
+
+            assertEquals(".\\gradlew.bat", wrapper.displayText)
+            assertEquals("build automation", wrapper.detail)
+            assertEquals("spec", wrapper.source)
+            assertEquals(TerminalCompletionCandidateKind.COMMAND, wrapper.kind)
+            registry.close()
+        }
+
+    @Test
+    fun `quoted local Gradle wrapper retains specification presentation`() =
+        runBlocking {
+            val registry = registry(commandSpecs = TerminalCommandSpecs.defaults())
+            val session = registry.openSession("session", fileSystemWith("gradlew"))
+
+            val wrapper =
+                session.engine
+                    .complete(
+                        request(
+                            commandLine = "\"./gr",
+                            workingDirectoryUri = "file:///project",
+                            shellCapabilities = TerminalShellCapabilities.POSIX,
+                        ),
+                    ).single { it.replacementText == "\"./gradlew\"" }
+
+            assertEquals("./gradlew", wrapper.displayText)
+            assertEquals("build automation", wrapper.detail)
+            assertEquals("spec", wrapper.source)
+            assertEquals(TerminalCompletionCandidateKind.COMMAND, wrapper.kind)
+            registry.close()
+        }
+
+    @Test
+    fun `canonical Gradle command remains available without a local wrapper`() =
+        runBlocking {
+            val registry = registry(commandSpecs = TerminalCommandSpecs.defaults())
+            val session = registry.openSession("session", EMPTY_FILE_SYSTEM)
+
+            val candidate = session.engine.complete(request("gr")).single { it.replacementText == "gradle" }
+
+            assertEquals("gradle", candidate.displayText)
+            assertEquals("build automation", candidate.detail)
+            assertEquals("spec", candidate.source)
+            assertEquals(TerminalCompletionCandidateKind.COMMAND, candidate.kind)
+            registry.close()
+        }
+
+    @Test
+    fun `ordinary local file remains a path candidate`() =
+        runBlocking {
+            val registry = registry(commandSpecs = TerminalCommandSpecs.defaults())
+            val session = registry.openSession("session", fileSystemWith("gradient"))
+
+            val candidate =
+                session.engine
+                    .complete(
+                        request(
+                            commandLine = "./gr",
+                            workingDirectoryUri = "file:///project",
+                            shellCapabilities = TerminalShellCapabilities.POSIX,
+                        ),
+                    ).single()
+
+            assertEquals("./gradient", candidate.replacementText)
+            assertEquals("gradient", candidate.displayText)
+            assertEquals("file", candidate.detail)
+            assertEquals("path", candidate.source)
+            assertEquals(TerminalCompletionCandidateKind.PATH, candidate.kind)
+            registry.close()
+        }
+
+    @Test
+    fun `PowerShell wrapper spelling resolves the Gradle command specification`() =
+        runBlocking {
+            val registry = registry(commandSpecs = TerminalCommandSpecs.defaults())
+            val session = registry.openSession("session", EMPTY_FILE_SYSTEM)
+
+            val candidate =
+                session.engine
+                    .complete(
+                        request(
+                            commandLine = ".\\gradlew.bat bu",
+                            shellCapabilities = TerminalShellCapabilities.POWERSHELL,
+                        ),
+                    ).single { it.replacementText == "build" }
+
+            assertEquals("assemble and test the project", candidate.detail)
+            assertEquals("spec", candidate.source)
+            assertEquals(TerminalCompletionCandidateKind.SUBCOMMAND, candidate.kind)
+            registry.close()
+        }
+
+    @Test
     fun `repeated Gradle executions preserve default specification presentation`() =
         runBlocking {
             val learningStore = TerminalCompletionLearningStore()
@@ -220,8 +352,26 @@ class TerminalCompletionSessionRegistryTest {
             sessionMruCapacity = 4,
         )
 
-    private fun request(commandLine: String = "git"): TerminalCompletionRequest =
-        TerminalCompletionRequest(commandLine = commandLine, cursorOffset = commandLine.length)
+    private fun request(
+        commandLine: String = "git",
+        workingDirectoryUri: String? = null,
+        shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
+    ): TerminalCompletionRequest =
+        TerminalCompletionRequest(
+            commandLine = commandLine,
+            cursorOffset = commandLine.length,
+            workingDirectoryUri = workingDirectoryUri,
+            shellCapabilities = shellCapabilities,
+        )
+
+    private fun fileSystemWith(name: String): TerminalFileSystemProvider =
+        TerminalFileSystemProvider { request ->
+            if (name.startsWith(request.entryNamePrefix, ignoreCase = true)) {
+                listOf(TerminalFileEntry(name, isDirectory = false))
+            } else {
+                emptyList()
+            }
+        }
 
     private companion object {
         private val GRADLE_SPEC =

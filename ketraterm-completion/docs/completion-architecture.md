@@ -223,6 +223,14 @@ escaping is necessary, and `PLAIN` omits replacements that would require
 dialect-specific escaping. Existing single- and double-quote styles are
 preserved when that style can safely represent the candidate.
 
+In command position, an existing path candidate whose replacement resolves to
+a declared top-level command alias is presented with that specification's
+command kind and description. The path source remains the existence authority
+and retains its ranking contribution; the specification supplies semantic
+presentation only. Raw and shell-encoded alias spellings are indexed when the
+engine is created, so this enrichment does not re-tokenize candidates or probe
+the filesystem.
+
 Path interpretation is host-owned. The pure source emits a
 `TerminalDirectoryListingRequest` containing the authoritative working-directory
 URI, a transport-neutral lexical directory prefix, and the active entry-name

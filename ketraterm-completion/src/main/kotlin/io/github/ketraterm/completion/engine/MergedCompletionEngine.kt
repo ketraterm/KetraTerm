@@ -24,6 +24,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.ranking.CompletionSourceCandidates
 import io.github.ketraterm.completion.ranking.GlobalCompletionRanker
+import io.github.ketraterm.completion.spec.PathCommandSpecCandidateProjector
 import io.github.ketraterm.completion.spec.SpecCompletionSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
@@ -56,6 +57,7 @@ internal class MergedCompletionEngine(
             addAll(sources)
         }
     private val ranker = GlobalCompletionRanker(this.commandSpecs, learningStore, clockEpochMillis)
+    private val pathCommandSpecCandidateProjector = PathCommandSpecCandidateProjector(this.commandSpecs)
 
     override fun completions(request: TerminalCompletionRequest): Flow<List<TerminalCompletionCandidate>> =
         channelFlow {
@@ -97,6 +99,7 @@ internal class MergedCompletionEngine(
                         try {
                             entry.source
                                 .complete(request, completionContext, SOURCE_CANDIDATE_LIMIT)
+                                .let { pathCommandSpecCandidateProjector.project(request, completionContext, it) }
                                 .filter { it.hasValidReplacementRangeFor(request) }
                                 .boundedTo(SOURCE_CANDIDATE_LIMIT)
                         } catch (cancellation: CancellationException) {
@@ -151,6 +154,7 @@ internal class MergedCompletionEngine(
                                 try {
                                     asyncEntry.entry.source
                                         .complete(request, completionContext, SOURCE_CANDIDATE_LIMIT)
+                                        .let { pathCommandSpecCandidateProjector.project(request, completionContext, it) }
                                         .filter { it.hasValidReplacementRangeFor(request) }
                                         .boundedTo(SOURCE_CANDIDATE_LIMIT)
                                 } catch (cancellation: CancellationException) {
