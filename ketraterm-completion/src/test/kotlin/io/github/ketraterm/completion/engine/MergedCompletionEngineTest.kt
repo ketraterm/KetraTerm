@@ -246,6 +246,40 @@ class MergedCompletionEngineTest {
         }
 
     @Test
+    fun `fallback source supports an identical edit without replacing primary presentation`() =
+        runBlocking {
+            val primary = candidate("status", detail = "static", source = "spec", score = 900)
+            val primaryOnly =
+                TerminalCompletionEngines
+                    .fromSources(
+                        sources = listOf(entry(source(primary), priority = 0)),
+                        commandSpecs = emptyList(),
+                    ).complete(request())
+                    .single()
+            val fused =
+                TerminalCompletionEngines
+                    .fromSources(
+                        sources =
+                            listOf(
+                                entry(source(primary), priority = 0),
+                                entry(
+                                    source(
+                                        candidate("status", detail = "recent", source = "mru", score = 1),
+                                        presentationRole = TerminalCompletionSourcePresentationRole.FALLBACK,
+                                    ),
+                                    priority = 100,
+                                ),
+                            ),
+                        commandSpecs = emptyList(),
+                    ).complete(request())
+                    .single()
+
+            assertEquals("static", fused.detail)
+            assertEquals("spec", fused.source)
+            assertTrue(fused.score > primaryOnly.score)
+        }
+
+    @Test
     fun `keeps same replacement text when replacement range differs`() =
         runBlocking {
             val engine =
@@ -867,8 +901,19 @@ class MergedCompletionEngineTest {
             priority = priority,
         )
 
-    private fun source(vararg candidates: TerminalCompletionCandidate): TerminalCompletionSource =
-        TerminalCompletionSource { _, _, _ -> candidates.toList() }
+    private fun source(
+        vararg candidates: TerminalCompletionCandidate,
+        presentationRole: TerminalCompletionSourcePresentationRole = TerminalCompletionSourcePresentationRole.PRIMARY,
+    ): TerminalCompletionSource =
+        object : TerminalCompletionSource {
+            override val presentationRole: TerminalCompletionSourcePresentationRole = presentationRole
+
+            override suspend fun complete(
+                request: TerminalCompletionRequest,
+                context: TerminalCompletionContext,
+                limit: Int,
+            ): List<TerminalCompletionCandidate> = candidates.toList()
+        }
 
     private fun candidate(
         replacement: String,

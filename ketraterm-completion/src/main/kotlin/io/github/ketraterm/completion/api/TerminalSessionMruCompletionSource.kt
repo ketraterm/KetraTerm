@@ -26,6 +26,10 @@ package io.github.ketraterm.completion.api
  * bounded, thread-safe, and perform no persistence or shell I/O.
  */
 interface TerminalSessionMruCompletionSource : TerminalCompletionSource {
+    /** Session and persisted history yield to primary sources that supply the same edit. */
+    override val presentationRole: TerminalCompletionSourcePresentationRole
+        get() = TerminalCompletionSourcePresentationRole.FALLBACK
+
     /**
      * Records one successful command for future session MRU suggestions.
      *

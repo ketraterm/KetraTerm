@@ -18,12 +18,10 @@ package io.github.ketraterm.completion.ranking
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.TerminalCompletionSourcePresentationRole
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
-import kotlin.test.Test
-import kotlin.test.assertNotSame
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class GlobalCompletionRankerIncrementalTest {
     @Test
@@ -71,16 +69,82 @@ class GlobalCompletionRankerIncrementalTest {
         assertTrue(promoted.any { it.replacementText == "charlie" })
     }
 
+    @Test
+    fun `primary presentation wins identical edit regardless of source arrival order`() {
+        val fallback =
+            CompletionSourceCandidates(
+                sourceIndex = 0,
+                priority = 100,
+                presentationRole = TerminalCompletionSourcePresentationRole.FALLBACK,
+                candidates =
+                    listOf(
+                        candidate(
+                            replacement = "gradle",
+                            score = 20,
+                            source = "mru",
+                            detail = "learned command",
+                        ),
+                    ),
+            )
+        val primary =
+            CompletionSourceCandidates(
+                sourceIndex = 1,
+                priority = 0,
+                candidates =
+                    listOf(
+                        candidate(
+                            replacement = "gradle",
+                            score = 10,
+                            source = "spec",
+                            detail = "build automation tool",
+                        ),
+                    ),
+            )
+
+        val fallbackFirst = requestState()
+        fallbackFirst.ingest(fallback)
+        val fallbackOnly = fallbackFirst.rankedCandidates()
+        assertEquals("mru", fallbackOnly.single().source)
+
+        fallbackFirst.ingest(primary)
+        val fallbackThenPrimary = fallbackFirst.rankedCandidates()
+        assertNotSame(fallbackOnly, fallbackThenPrimary)
+
+        val primaryFirst = requestState()
+        primaryFirst.ingest(primary)
+        primaryFirst.ingest(fallback)
+        val primaryThenFallback = primaryFirst.rankedCandidates()
+
+        assertEquals(fallbackThenPrimary, primaryThenFallback)
+        assertEquals("spec", fallbackThenPrimary.single().source)
+        assertEquals("build automation tool", fallbackThenPrimary.single().detail)
+    }
+
+    private fun requestState(): GlobalCompletionRanker.RequestCompletionRankingState {
+        val request = TerminalCompletionRequest("g", 1)
+        val context =
+            TerminalCompletionContextResolver.resolve(
+                commandLine = request.commandLine,
+                lineContext = TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset),
+                commandSpecs = emptyList(),
+            )
+        return GlobalCompletionRanker(emptyList(), learningStore = null, clockEpochMillis = { 0L })
+            .createRequestState(request, context, resultLimit = 2)
+    }
+
     private fun candidate(
         replacement: String,
         score: Int,
+        source: String = replacement,
+        detail: String = "",
     ): TerminalCompletionCandidate =
         TerminalCompletionCandidate(
             replacementText = replacement,
             replacementStartOffset = 0,
             replacementEndOffset = 1,
             displayText = replacement,
-            source = replacement,
+            detail = detail,
+            source = source,
             kind = TerminalCompletionCandidateKind.COMMAND,
             score = score,
         )

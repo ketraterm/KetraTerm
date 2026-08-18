@@ -385,9 +385,20 @@ no exact history. Feedback ratios use smoothing so one event cannot overwhelm
 strong command semantics. Only explicit dismissal is negative; passive popup
 closure is neutral.
 
-The selected representative favors semantic fit, a narrow replacement range,
-the bounded prior, local rank, and stable declaration order. Returned candidate
-scores are the fused global score. Ordering and all tie-breakers are deterministic.
+The edit representative favors semantic fit, a narrow replacement range, the
+bounded prior, local rank, and stable declaration order. Presentation selection
+cannot change that edit. Among contributors with identical replacement text and
+range, it first preserves the strongest semantic fit and then prefers a primary
+source over a fallback source before applying the ordinary prior and stable
+tie-breakers. The selected contributor supplies the complete candidate atomically;
+the engine never mixes display text, match ranges, detail, kind, or source labels
+from different candidates. Session and persisted MRU candidates are presentation
+fallbacks, so they strengthen matching specification or provider outcomes without
+replacing authoritative metadata. Unique learned outcomes remain visible.
+
+Returned candidate scores are the fused global score. Final ordering continues to
+use the edit representative, so presentation ownership cannot change ranking.
+Ordering and all tie-breakers are deterministic.
 
 Source safety and presentation are independent. Every source receives a fixed
 256-candidate safety budget. The engine globally fuses the complete bounded

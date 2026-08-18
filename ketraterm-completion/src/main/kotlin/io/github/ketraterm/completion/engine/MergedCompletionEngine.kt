@@ -111,6 +111,7 @@ internal class MergedCompletionEngine(
                             CompletionSourceCandidates(
                                 sourceIndex = sourceIndex,
                                 priority = entry.priority,
+                                presentationRole = entry.source.presentationRole,
                                 candidates = candidates,
                             ),
                         )
@@ -159,7 +160,14 @@ internal class MergedCompletionEngine(
                                     reportSourceFailure(asyncEntry.sourceIndex, asyncEntry.entry, failure)
                                     emptyList()
                                 }
-                            completions.send(SourceCompletion(asyncEntry.sourceIndex, asyncEntry.entry.priority, candidates))
+                            completions.send(
+                                SourceCompletion(
+                                    sourceIndex = asyncEntry.sourceIndex,
+                                    priority = asyncEntry.entry.priority,
+                                    presentationRole = asyncEntry.entry.source.presentationRole,
+                                    candidates = candidates,
+                                ),
+                            )
                         }
                     }
 
@@ -168,9 +176,10 @@ internal class MergedCompletionEngine(
                         if (completed.candidates.isNotEmpty()) {
                             rankingState.ingest(
                                 CompletionSourceCandidates(
-                                    completed.sourceIndex,
-                                    completed.priority,
-                                    completed.candidates,
+                                    sourceIndex = completed.sourceIndex,
+                                    priority = completed.priority,
+                                    presentationRole = completed.presentationRole,
+                                    candidates = completed.candidates,
                                 ),
                             )
                         }
@@ -202,6 +211,7 @@ internal class MergedCompletionEngine(
     private data class SourceCompletion(
         val sourceIndex: Int,
         val priority: Int,
+        val presentationRole: TerminalCompletionSourcePresentationRole,
         val candidates: List<TerminalCompletionCandidate>,
     )
 

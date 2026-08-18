@@ -26,15 +26,17 @@ import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 internal data class CompletionSourceCandidates(
     val sourceIndex: Int,
     val priority: Int,
+    val presentationRole: TerminalCompletionSourcePresentationRole = TerminalCompletionSourcePresentationRole.PRIMARY,
     val candidates: List<TerminalCompletionCandidate>,
 )
 
 /**
  * Deterministic global evidence-fusion ranker for one merged completion engine.
  *
- * This component groups projected outcomes, chooses representatives, and orders
- * the fused results. Outcome resolution, context relevance, numeric policy, and
- * learned evidence indexing are delegated to their owning collaborators.
+ * This component groups projected outcomes, chooses edit and presentation
+ * representatives, and orders the fused results. Outcome resolution, context
+ * relevance, numeric policy, and learned evidence indexing are delegated to
+ * their owning collaborators.
  */
 internal class GlobalCompletionRanker(
     commandSpecs: List<TerminalCommandSpec>,
@@ -90,10 +92,11 @@ internal class GlobalCompletionRanker(
                         candidateIndex = candidateIndex,
                         localRank = candidateIndex + 1,
                         sourcePrior = sourceResult.priority.coerceIn(MIN_SOURCE_PRIOR, MAX_SOURCE_PRIOR),
+                        presentationRole = sourceResult.presentationRole,
                         contextAdjustment = semanticAdjustment(context, candidate),
                     )
                 val existing = bestByOutcome[key]
-                if (existing == null || REPRESENTATIVE_ORDER.compare(contribution, existing) < 0) {
+                if (existing == null || EDIT_REPRESENTATIVE_ORDER.compare(contribution, existing) < 0) {
                     bestByOutcome[key] = contribution
                 }
             }
@@ -143,7 +146,8 @@ internal class GlobalCompletionRanker(
             learningContext: CompletionLearningContextKey,
             now: Long,
         ): FusedCandidate {
-            val representative = contributions.minWith(REPRESENTATIVE_ORDER)
+            val editRepresentative = contributions.minWith(EDIT_REPRESENTATIVE_ORDER)
+            var presentationRepresentative = editRepresentative
             var reciprocalRankScore = 0L
             var sourcePriorScore = 0L
             var strongestContext = Int.MIN_VALUE
@@ -151,9 +155,14 @@ internal class GlobalCompletionRanker(
                 reciprocalRankScore += reciprocalRank(contribution.localRank)
                 sourcePriorScore += contribution.sourcePrior
                 strongestContext = maxOf(strongestContext, contribution.contextAdjustment)
+                if (contribution.hasSameEditAs(editRepresentative) &&
+                    PRESENTATION_REPRESENTATIVE_ORDER.compare(contribution, presentationRepresentative) < 0
+                ) {
+                    presentationRepresentative = contribution
+                }
             }
             val exactLearningScore =
-                representative.resolved?.let { learnedIndex?.exactAdjustment(it.learnedKey, learningContext, now) } ?: 0
+                editRepresentative.resolved?.let { learnedIndex?.exactAdjustment(it.learnedKey, learningContext, now) } ?: 0
             val score =
                 CompletionScoreComponents(
                     reciprocalRank = reciprocalRankScore,
@@ -162,12 +171,13 @@ internal class GlobalCompletionRanker(
                     exactLearning = exactLearningScore,
                 )
             return FusedCandidate(
-                candidate = representative.candidate,
+                rankingCandidate = editRepresentative.candidate,
+                presentationCandidate = presentationRepresentative.candidate,
                 score = score.total,
                 strongestContext = strongestContext,
                 bestLocalRank = contributions.minOf { it.localRank },
-                sourceIndex = representative.sourceIndex,
-                candidateIndex = representative.candidateIndex,
+                sourceIndex = editRepresentative.sourceIndex,
+                candidateIndex = editRepresentative.candidateIndex,
             )
         }
     }
@@ -190,9 +200,15 @@ internal class GlobalCompletionRanker(
         val candidateIndex: Int,
         val localRank: Int,
         val sourcePrior: Int,
+        val presentationRole: TerminalCompletionSourcePresentationRole,
         val contextAdjustment: Int,
     ) {
         val replacementLength: Int = candidate.replacementText.length
+
+        fun hasSameEditAs(other: RankedContribution): Boolean =
+            candidate.replacementText == other.candidate.replacementText &&
+                candidate.replacementStartOffset == other.candidate.replacementStartOffset &&
+                candidate.replacementEndOffset == other.candidate.replacementEndOffset
     }
 
     private data class FallbackOutcomeKey(
@@ -208,7 +224,8 @@ internal class GlobalCompletionRanker(
     }
 
     private data class FusedCandidate(
-        val candidate: TerminalCompletionCandidate,
+        val rankingCandidate: TerminalCompletionCandidate,
+        val presentationCandidate: TerminalCompletionCandidate,
         val score: Long,
         val strongestContext: Int,
         val bestLocalRank: Int,
@@ -216,7 +233,7 @@ internal class GlobalCompletionRanker(
         val candidateIndex: Int,
     ) {
         fun toPublicCandidate(): TerminalCompletionCandidate =
-            candidate.copy(score = score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt())
+            presentationCandidate.copy(score = score.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt())
     }
 
     private companion object {
@@ -287,9 +304,17 @@ internal class GlobalCompletionRanker(
                     PATH_CONTEXT_PENALTY
             }
 
-        private val REPRESENTATIVE_ORDER =
+        private val EDIT_REPRESENTATIVE_ORDER =
             compareByDescending<RankedContribution> { it.contextAdjustment }
                 .thenBy { it.replacementLength }
+                .thenByDescending { it.sourcePrior }
+                .thenBy { it.localRank }
+                .thenBy { it.sourceIndex }
+                .thenBy { it.candidateIndex }
+
+        private val PRESENTATION_REPRESENTATIVE_ORDER =
+            compareByDescending<RankedContribution> { it.contextAdjustment }
+                .thenBy { it.presentationRole == TerminalCompletionSourcePresentationRole.FALLBACK }
                 .thenByDescending { it.sourcePrior }
                 .thenBy { it.localRank }
                 .thenBy { it.sourceIndex }
@@ -299,8 +324,8 @@ internal class GlobalCompletionRanker(
             compareByDescending<FusedCandidate> { it.score }
                 .thenByDescending { it.strongestContext }
                 .thenBy { it.bestLocalRank }
-                .thenBy { it.candidate.displayText }
-                .thenBy { it.candidate.replacementText }
+                .thenBy { it.rankingCandidate.displayText }
+                .thenBy { it.rankingCandidate.replacementText }
                 .thenBy { it.sourceIndex }
                 .thenBy { it.candidateIndex }
 
