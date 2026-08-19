@@ -247,7 +247,16 @@ operator, command, option, path, and value-domain requests authoritatively.
 Swing hosts share `SwingLiveCompletionBinding` and one EDT-confined
 one-shot `Timer` for debouncing. `SwingTerminal` owns exactly one replaceable
 `suggestionJob`; a new request or popup hide cancels it. The provider and engine
-remain suspending end to end.
+remain suspending end to end. Provider construction and flow collection execute
+off the EDT, and progressive rankings are conflated before the latest immutable
+snapshot is published back to Swing.
+
+Presentation is intentionally platform-owned. The standalone host custom-paints
+a compact completion list; the IntelliJ plugin owns a separate native `JBList`.
+Both consume `SwingShellSuggestionViewSnapshot` and the same authoritative
+display text, detail, source label, semantic accent role, and matched ranges.
+Physical renderers may follow their platform's visuals and mechanics but do not
+reparse engine kinds or provider identifiers.
 
 Static bounded option domains belong in `TerminalOptionSpec.valueCandidates`.
 Examples are output formats, log levels, or other values that are stable and do
@@ -411,7 +420,9 @@ Ordering and all tie-breakers are deterministic.
 Source safety and presentation are independent. Every source receives a fixed
 256-candidate safety budget. The engine globally fuses the complete bounded
 union and has no popup-size parameter; the Swing controller alone presents an
-eight-row sliding viewport across the ranked snapshot.
+eight-row sliding viewport across the ranked snapshot. The snapshot also carries
+absolute overflow metadata so each physical renderer can expose range and scroll
+position without gaining access to ranking state.
 
 Source collection uses one cold structured `channelFlow`. The engine parses
 once, resolves one context, launches one child per source under a supervisor,

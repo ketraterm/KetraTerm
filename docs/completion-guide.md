@@ -13,8 +13,9 @@ The completion system is built on strict layer boundaries:
 - **`ketraterm-completion`**: Pure Kotlin completion engine with zero external dependencies (no Swing, no IntelliJ SDK, no disk I/O, no process execution). It owns lexical tokenization, command specification models, parallel source evaluation via structured concurrency, CamelHump/prefix matching, and evidence-fusion ranking.
 - **`ketraterm-completion-host`**: Host-neutral suspending abstractions for local path resolution and bounded directory scanning (`Files.newDirectoryStream`).
 - **`ketraterm-completion-persistence`**: Serialized local storage (`completion-stats.json`) for sanitized command and option shape statistics.
-- **`ketraterm-ui-swing-host`**: Reusable Swing adapter converting engine results to immutable suggestion rows and forwarding keyboard/mouse actions to the terminal session.
-- **`ketraterm-intellij-plugin`**: IntelliJ Platform adapters delegating path, Git, and Gradle completion to IntelliJ project models and bounded Git history queries (`GotoFileModel`, `GitRepositoryManager`, `GitHistoryUtils`, `ChangeListManager`, `ProjectDataManager`, and `VirtualFileManager`).
+- **`ketraterm-ui-swing`**: Shared completion interaction contract, bounded viewport controller, and the standalone custom-painted completion list. It owns selection and acceptance semantics, but not sources or ranking.
+- **`ketraterm-ui-swing-host`**: Reusable adapter converting engine results into immutable renderer-neutral suggestions. It resolves semantic accent roles, match ranges, and source display labels once before either UI sees them.
+- **`ketraterm-intellij-plugin`**: IntelliJ Platform adapters delegating path, Git, and Gradle completion to IntelliJ project models and bounded Git history queries (`GotoFileModel`, `GitRepositoryManager`, `GitHistoryUtils`, `ChangeListManager`, `ProjectDataManager`, and `VirtualFileManager`). It owns a separate platform-native `JBList` completion renderer.
 
 ---
 
@@ -50,8 +51,9 @@ Shell capability contracts define tokenization, quote handling, and command sepa
 | **Git Modified / Staged Paths** | Directory path completion | Live VCS changelist paths (`ChangeListManager`) | `IntellijGitStatusPathCompletionSource` |
 | **Gradle Tasks** | Universal lifecycle tasks | Universal tasks + dynamic `:module:task` from imported project model | `IntellijGradleTaskCompletionSource` |
 | **Fuzzy Matching** | CamelHump, Acronyms, Prefix, Exact | CamelHump, Acronyms, Prefix, Exact | `CompletionMatcher` |
-| **Match Highlighting** | Bold matched characters + accent color | Bold matched characters + IDE theme accent | `SwingShellSuggestionPopupRow` |
-| **Keymap Integration** | Standard keys (Tab, Enter, Arrows, Esc) | Resolved from user's active IntelliJ Keymap | `KetraTermActionUtils` |
+| **Match Highlighting** | Precomputed bold matched fragments + contrast-safe accent | Precomputed bold matched fragments + IDE theme accent | Renderer-neutral `SwingShellSuggestion.matchedRanges` |
+| **Completion Surface** | Compact custom-painted list with semantic vector icons | IntelliJ-native `JBList` with platform icons and footer | Host-owned renderers over `SwingShellSuggestionViewSnapshot` |
+| **Keymap Integration** | Standard keys (Tab, Enter, Arrows, Esc) | Standard fallback plus actions resolved from the active IntelliJ Keymap | `SwingShellSuggestionKeymap` / `KetraTermShellSuggestionKeymap` |
 | **Stats Persistence** | Enabled by default (`~/.ketraterm/completion-stats.json`) | Configurable in IDE Settings (Default: in-memory) | `ketraterm-completion-persistence` |
 
 ---
@@ -70,7 +72,15 @@ Completion candidate filtering and ranking runs synchronously in memory without 
 
 ### Zero-Allocation Match Ranges
 
-`CompletionMatcher` returns bit-packed `IntArray` pairs (`[start0, end0, start1, end1]`) wrapped in `TerminalCompletionMatchRanges`. The Swing popup renderer uses these offsets to paint matching characters in bold with the active accent color without allocating substring objects during paint cycles.
+`CompletionMatcher` returns bit-packed `IntArray` pairs (`[start0, end0, start1, end1]`) wrapped in `TerminalCompletionMatchRanges`. The Swing adapter copies them into the renderer-neutral presentation contract. Both physical renderers consume those exact ranges; the standalone renderer precomputes immutable `TextLayout` objects outside paint, while the IntelliJ renderer precomputes styled fragments before cell painting.
+
+### Presentation Contract
+
+The standalone and IntelliJ products intentionally do not share a physical widget. Standalone uses `SwingCompletionPopupView`, a compact custom-painted list tuned for terminal rendering. The plugin uses `IntellijCompletionListView`, an IntelliJ-owned `JBList` that follows IDE colors, icons, scaling, and accessibility conventions.
+
+They do share one immutable semantic contract. `SwingShellSuggestionViewSnapshot` carries a bounded visible window, a local selected index, absolute viewport position, and total result count. Each `SwingShellSuggestion` supplies the authoritative display text, detail, stable provider id, user-facing source label, typed accent role, and validated match ranges. Renderers may choose native mechanics and visuals, but they must not reinterpret raw kind or source strings.
+
+The shared controller retains the complete ranked snapshot and owns navigation, acceptance, dismissal, and feedback. Renderer pointer indices are local to the published viewport. Provider creation and collection run off the EDT; progressive snapshots are conflated before the latest state is published on the EDT.
 
 ### Ranking Formula
 

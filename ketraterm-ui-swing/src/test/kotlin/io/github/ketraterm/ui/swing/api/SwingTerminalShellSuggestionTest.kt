@@ -88,6 +88,7 @@ class SwingTerminalShellSuggestionTest {
 
     @Test
     fun `provider runs on default dispatcher and publishes on EDT`() {
+        val providerFactoryWasOnEdt = CompletableDeferred<Boolean>()
         val providerWasOnEdt = CompletableDeferred<Boolean>()
         val providerDispatcher = CompletableDeferred<ContinuationInterceptor?>()
         val view = RecordingSuggestionView()
@@ -98,6 +99,7 @@ class SwingTerminalShellSuggestionTest {
                     SwingHostServices(
                         shellSuggestionProvider =
                             SwingShellSuggestionProvider { request ->
+                                providerFactoryWasOnEdt.complete(SwingUtilities.isEventDispatchThread())
                                 flow {
                                     providerWasOnEdt.complete(SwingUtilities.isEventDispatchThread())
                                     providerDispatcher.complete(currentCoroutineContext()[ContinuationInterceptor])
@@ -114,6 +116,7 @@ class SwingTerminalShellSuggestionTest {
         }
         val update = view.awaitUpdate()
 
+        assertFalse(runBlocking { providerFactoryWasOnEdt.await() })
         assertFalse(runBlocking { providerWasOnEdt.await() })
         assertSame(Dispatchers.Default, runBlocking { providerDispatcher.await() })
         assertTrue(update.onEdt)
@@ -787,14 +790,11 @@ class SwingTerminalShellSuggestionTest {
         override val component = JPanel()
         private val updates = LinkedBlockingQueue<RecordedSuggestionUpdate>()
 
-        override fun update(
-            suggestions: List<SwingShellSuggestion>,
-            selectedIndex: Int,
-        ) {
+        override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
             updates +=
                 RecordedSuggestionUpdate(
-                    suggestions = suggestions,
-                    selectedIndex = selectedIndex,
+                    suggestions = snapshot.visibleSuggestions,
+                    selectedIndex = snapshot.selectedIndex,
                     onEdt = SwingUtilities.isEventDispatchThread(),
                 )
         }

@@ -43,8 +43,7 @@ import io.github.ketraterm.ui.swing.viewport.SmoothRowScroller
 import io.github.ketraterm.ui.swing.viewport.SwingViewportController
 import io.github.ketraterm.ui.swing.viewport.TerminalScrollbarOverlay
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.*
 import java.awt.*
 import java.awt.event.*
 import java.lang.Runnable
@@ -1386,9 +1385,15 @@ class SwingTerminal
         /**
          * Returns the current shell suggestion popup state.
          *
+         * This state is owned by Swing and must be read on the Event Dispatch
+         * Thread, like the other synchronous component interaction methods.
+         *
          * @return immutable shell suggestion state snapshot.
          */
-        fun currentShellSuggestionState(): SwingShellSuggestionState = shellSuggestionController.state()
+        fun currentShellSuggestionState(): SwingShellSuggestionState {
+            check(SwingUtilities.isEventDispatchThread()) { "shell suggestion state must be read on the EDT" }
+            return shellSuggestionController.state()
+        }
 
         private fun applySettingsToSession(
             session: TerminalSession,
@@ -1526,9 +1531,10 @@ class SwingTerminal
             suggestionJob =
                 componentScope.launch {
                     try {
-                        hostServices.shellSuggestionProvider
-                            .suggestions(request)
-                            .flowOn(Dispatchers.Default)
+                        flow {
+                            emitAll(hostServices.shellSuggestionProvider.suggestions(request))
+                        }.flowOn(Dispatchers.Default)
+                            .conflate()
                             .collect { suggestions ->
                                 ensureActive()
                                 shellSuggestionController.show(request, suggestions, selectedIndex = -1)

@@ -165,9 +165,53 @@ class SwingShellSuggestionControllerTest {
         assertEquals(9, controller.state().selectedIndex)
         assertEquals(7, view.selectedIndex)
         assertEquals((2..9).map { "command-$it" }, view.suggestions.map { it.replacementText })
+        assertEquals(2, view.snapshot.viewportStartIndex)
+        assertEquals(20, view.snapshot.totalSuggestionCount)
+        assertTrue(view.snapshot.hasSuggestionsBefore)
+        assertTrue(view.snapshot.hasSuggestionsAfter)
         view.listener.onSuggestionClicked(3)
         assertEquals(listOf(5), host.acceptedIndexes)
         assertEquals(listOf(items[5]), host.acceptedSuggestions)
+    }
+
+    @Test
+    fun `wheel navigation is bounded and passive upward motion clamps to the first result`() {
+        lateinit var view: RecordingSuggestionView
+        val controller =
+            SwingShellSuggestionController(
+                host = RecordingSuggestionHost(),
+                viewFactory = { listener -> RecordingSuggestionView(listener).also { view = it } },
+            )
+        controller.show(request(), suggestions(20), selectedIndex = -1)
+
+        view.listener.onSuggestionScrollRequested(-100)
+
+        assertEquals(0, controller.state().selectedIndex)
+        assertEquals(0, view.snapshot.viewportStartIndex)
+
+        controller.show(request(commandText = "different"), suggestions(20), selectedIndex = -1)
+        view.listener.onSuggestionScrollRequested(100)
+
+        assertEquals(2, controller.state().selectedIndex)
+        assertEquals(0, view.snapshot.viewportStartIndex)
+    }
+
+    @Test
+    fun `new request resets a previously scrolled passive viewport`() {
+        lateinit var view: RecordingSuggestionView
+        val controller =
+            SwingShellSuggestionController(
+                host = RecordingSuggestionHost(),
+                viewFactory = { listener -> RecordingSuggestionView(listener).also { view = it } },
+            )
+        val firstRequest = request(commandText = "first")
+        controller.show(firstRequest, suggestions(20), selectedIndex = 12)
+        assertTrue(view.snapshot.viewportStartIndex > 0)
+
+        controller.show(request(commandText = "second"), suggestions(20), selectedIndex = -1)
+
+        assertEquals(0, view.snapshot.viewportStartIndex)
+        assertEquals(-1, view.snapshot.selectedIndex)
     }
 
     @Test
@@ -520,13 +564,13 @@ class SwingShellSuggestionControllerTest {
             private set
         var selectedIndex: Int = -1
             private set
+        var snapshot: SwingShellSuggestionViewSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
+            private set
 
-        override fun update(
-            suggestions: List<SwingShellSuggestion>,
-            selectedIndex: Int,
-        ) {
-            this.suggestions = suggestions
-            this.selectedIndex = selectedIndex
+        override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+            this.snapshot = snapshot
+            suggestions = snapshot.visibleSuggestions
+            selectedIndex = snapshot.selectedIndex
         }
     }
 }

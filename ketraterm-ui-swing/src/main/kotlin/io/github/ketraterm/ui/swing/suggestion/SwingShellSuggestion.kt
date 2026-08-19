@@ -31,9 +31,13 @@ import java.util.regex.Pattern
  * @property replacementText text the provider intends to insert or use for
  * command-line replacement after acceptance.
  * @property displayText primary text shown in the popup.
- * @property detail secondary text shown below [displayText], such as flags,
- * path context, or a short description.
- * @property source compact source label, such as `history`, `path`, or `git`.
+ * @property detail secondary contextual text shown with [displayText], such as
+ * flags, path context, or a short description.
+ * @property source stable provider identifier used for feedback and learning,
+ * such as `history`, `path`, or `intellij-git-branch`.
+ * @property sourceDisplayText compact user-facing source label. This is kept
+ * separate from [source] so renderers never need to infer presentation from a
+ * provider identifier.
  * @property kind compact semantic candidate kind label supplied by the host.
  * @property accentRole stable visual category supplied by the host or derived
  * from [kind] for generic providers.
@@ -59,11 +63,13 @@ data class SwingShellSuggestion
         val detail: String = "",
         val accentRole: SwingShellSuggestionAccentRole = SwingShellSuggestionAccentRole.from(kind, source),
         val matchedRanges: SwingShellSuggestionMatchRanges = SwingShellSuggestionMatchRanges.EMPTY,
+        val sourceDisplayText: String = source,
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }
             require(displayText.isNotEmpty()) { "displayText must not be empty" }
             require(source.isNotBlank()) { "source must not be blank" }
+            require(sourceDisplayText.isNotBlank()) { "sourceDisplayText must not be blank" }
             require(kind.isNotBlank()) { "kind must not be blank" }
             require(replacementStartOffset >= 0) {
                 "replacementStartOffset must be >= 0, was $replacementStartOffset"

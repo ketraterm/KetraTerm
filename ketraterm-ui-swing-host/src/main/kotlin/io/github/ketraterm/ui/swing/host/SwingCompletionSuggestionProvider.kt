@@ -20,6 +20,7 @@ import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import java.util.*
 
 /**
  * Host-neutral adapter from the pure completion engine to Swing suggestions.
@@ -65,6 +66,7 @@ class SwingCompletionSuggestionProvider(
                 replacementStartOffset = replacementStartOffset,
                 replacementEndOffset = replacementEndOffset,
                 source = source,
+                sourceDisplayText = source.toDisplayText(),
                 kind = kind.name,
                 displayText = displayText,
                 detail = detail,
@@ -85,6 +87,67 @@ class SwingCompletionSuggestionProvider(
                         matchedRanges.copyPackedOffsets(),
                     ),
             )
+
+        private fun String.toDisplayText(): String {
+            val normalized = trim().boundedSourceLabel().lowercase(Locale.ROOT).boundedSourceLabel()
+            return when {
+                normalized == "spec" -> "Built-in"
+                normalized == "mru" || normalized == "history" -> "Recent"
+                normalized == "stats" -> "Learned"
+                normalized == "observed" -> "Session"
+                normalized.containsIdentifierToken("gradle") -> "Gradle"
+                normalized.containsIdentifierToken("git") -> "Git"
+                normalized.containsIdentifierToken("project") && normalized.containsIdentifierToken("file") -> "Project"
+                normalized.containsIdentifierToken("path") || normalized.containsIdentifierToken("file") -> "Path"
+                else ->
+                    normalized
+                        .removePrefix("intellij-")
+                        .humanizeSourceIdentifier()
+                        .replaceFirstChar { character -> character.titlecase(Locale.ROOT) }
+                        .boundedSourceLabel()
+            }
+        }
+
+        private fun String.containsIdentifierToken(token: String): Boolean {
+            var startIndex = indexOf(token)
+            while (startIndex >= 0) {
+                val endIndex = startIndex + token.length
+                val startsAtBoundary = startIndex == 0 || !this[startIndex - 1].isLetterOrDigit()
+                val endsAtBoundary = endIndex == length || !this[endIndex].isLetterOrDigit()
+                if (startsAtBoundary && endsAtBoundary) return true
+                startIndex = indexOf(token, startIndex + 1)
+            }
+            return false
+        }
+
+        private fun String.humanizeSourceIdentifier(): String {
+            val result = StringBuilder(length.coerceAtMost(MAXIMUM_SOURCE_LABEL_CODE_UNITS))
+            var separatorPending = false
+            for (character in this) {
+                if (character == '-' || character == '_' || character.isWhitespace()) {
+                    separatorPending = result.isNotEmpty()
+                } else {
+                    if (separatorPending) result.append(' ')
+                    result.append(character)
+                    separatorPending = false
+                }
+            }
+            return result.toString().ifEmpty { "other" }
+        }
+
+        private fun String.boundedSourceLabel(): String {
+            if (length <= MAXIMUM_SOURCE_LABEL_CODE_UNITS) return this
+            var retainedLength = MAXIMUM_SOURCE_LABEL_CODE_UNITS - ELLIPSIS.length
+            if (
+                Character.isHighSurrogate(this[retainedLength - 1]) && Character.isLowSurrogate(this[retainedLength])
+            ) {
+                retainedLength--
+            }
+            return substring(0, retainedLength).trimEnd() + ELLIPSIS
+        }
+
+        private const val MAXIMUM_SOURCE_LABEL_CODE_UNITS = 128
+        private const val ELLIPSIS = "…"
     }
 }
 

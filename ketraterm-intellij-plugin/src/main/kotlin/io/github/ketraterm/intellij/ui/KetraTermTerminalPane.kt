@@ -286,7 +286,7 @@ internal class KetraTermTerminalPane private constructor(
                             shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
                             shellSuggestionFeedbackHandler = liveCompletion.suggestionFeedbackHandler,
                             shellSuggestionKeymap = KetraTermShellSuggestionKeymap,
-                            shellSuggestionViewFactory = IntellijShellSuggestionViewFactory,
+                            shellSuggestionViewFactory = IntellijCompletionListViewFactory,
                             uiDispatcher =
                                 TerminalUiDispatcher { runnable ->
                                     ApplicationManager.getApplication().invokeLater(runnable)

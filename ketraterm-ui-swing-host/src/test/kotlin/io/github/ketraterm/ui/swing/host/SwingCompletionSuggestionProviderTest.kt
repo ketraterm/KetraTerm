@@ -73,7 +73,66 @@ class SwingCompletionSuggestionProviderTest {
             assertEquals(7, suggestions.single().replacementEndOffset)
             assertEquals("show status", suggestions.single().detail)
             assertEquals("SUBCOMMAND", suggestions.single().kind)
+            assertEquals("Built-in", suggestions.single().sourceDisplayText)
             assertContentEquals(intArrayOf(0, 2), suggestions.single().matchedRanges.copyPackedOffsets())
+        }
+
+    @Test
+    fun `maps provider identifiers once into bounded renderer-neutral labels`() =
+        runBlocking {
+            val sources =
+                listOf(
+                    "spec",
+                    "history",
+                    "stats",
+                    "observed",
+                    "intellij-git-branch",
+                    "intellij-gradle-task",
+                    "intellij-project-file",
+                    "filesystem-path",
+                    "intellij-custom_source",
+                    "legitimate-provider",
+                    "pathology",
+                    "custom-${"x".repeat(500)}",
+                )
+            val provider =
+                SwingCompletionSuggestionProvider(
+                    TerminalCompletionEngine {
+                        flowOf(
+                            sources.map { source ->
+                                TerminalCompletionCandidate(
+                                    replacementText = source,
+                                    replacementStartOffset = 0,
+                                    replacementEndOffset = 0,
+                                    source = source,
+                                    kind = TerminalCompletionCandidateKind.ARGUMENT,
+                                )
+                            },
+                        )
+                    },
+                )
+
+            val labels = provider.suggestions(request("x", cursorOffset = 1)).last().map { it.sourceDisplayText }
+
+            assertEquals(
+                listOf(
+                    "Built-in",
+                    "Recent",
+                    "Learned",
+                    "Session",
+                    "Git",
+                    "Gradle",
+                    "Project",
+                    "Path",
+                    "Custom source",
+                    "Legitimate provider",
+                    "Pathology",
+                ),
+                labels.dropLast(1),
+            )
+            assertTrue(labels.last().startsWith("Custom "))
+            assertTrue(labels.last().endsWith("…"))
+            assertTrue(labels.last().length <= 128)
         }
 
     @Test

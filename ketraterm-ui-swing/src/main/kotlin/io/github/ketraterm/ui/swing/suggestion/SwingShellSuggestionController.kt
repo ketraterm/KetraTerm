@@ -38,6 +38,10 @@ internal class SwingShellSuggestionController(
                     select(viewportStartIndex + index)
                     acceptSelected()
                 }
+
+                override fun onSuggestionScrollRequested(delta: Int) {
+                    scrollRelative(delta)
+                }
             },
         )
 
@@ -52,13 +56,15 @@ internal class SwingShellSuggestionController(
             hide()
             return false
         }
+        val sameRequest = this.request == request
         val selectedOutcome =
             this.suggestions
                 .getOrNull(this.selectedIndex)
                 ?.outcomeKey()
-                ?.takeIf { this.request == request }
+                ?.takeIf { sameRequest }
         this.suggestions = suggestions.toList()
         this.request = request
+        if (!sameRequest) viewportStartIndex = 0
         this.selectedIndex =
             selectedIndex.takeIf { it in this.suggestions.indices }
                 ?: selectedOutcome
@@ -78,7 +84,7 @@ internal class SwingShellSuggestionController(
         selectedIndex = NO_SELECTION
         viewportStartIndex = 0
         request = SwingShellSuggestionRequest.EMPTY
-        view.update(emptyList(), NO_SELECTION)
+        view.update(SwingShellSuggestionViewSnapshot.EMPTY)
         view.component.isVisible = false
         host.revalidate()
         host.repaint()
@@ -108,8 +114,9 @@ internal class SwingShellSuggestionController(
             SwingShellSuggestionAction.SELECT_PREVIOUS -> selectRelative(-1)
             SwingShellSuggestionAction.SELECT_FIRST -> select(0)
             SwingShellSuggestionAction.SELECT_LAST -> select(suggestions.lastIndex)
-            SwingShellSuggestionAction.SELECT_NEXT_PAGE -> selectRelative(POPUP_MAX_VISIBLE_ROWS)
-            SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE -> selectRelative(-POPUP_MAX_VISIBLE_ROWS)
+            SwingShellSuggestionAction.SELECT_NEXT_PAGE -> selectRelative(SwingShellSuggestionViewSnapshot.MAX_VISIBLE_SUGGESTIONS)
+            SwingShellSuggestionAction.SELECT_PREVIOUS_PAGE ->
+                selectRelative(-SwingShellSuggestionViewSnapshot.MAX_VISIBLE_SUGGESTIONS)
             SwingShellSuggestionAction.ACCEPT -> selectFirstOrAccept()
             SwingShellSuggestionAction.ACCEPT_SELECTED -> acceptSelected()
             SwingShellSuggestionAction.DISMISS -> dismissSelected()
@@ -141,6 +148,18 @@ internal class SwingShellSuggestionController(
         return select(next)
     }
 
+    private fun scrollRelative(delta: Int): Boolean {
+        if (suggestions.isEmpty() || delta == 0) return false
+        val boundedDelta = delta.coerceIn(-MAX_POINTER_SCROLL_DELTA, MAX_POINTER_SCROLL_DELTA)
+        val current =
+            when {
+                selectedIndex in suggestions.indices -> selectedIndex
+                boundedDelta > 0 -> viewportStartIndex - 1
+                else -> viewportStartIndex
+            }
+        return select((current + boundedDelta).coerceIn(0, suggestions.lastIndex))
+    }
+
     private fun selectFirstOrAccept(): Boolean =
         if (selectedIndex in suggestions.indices) {
             acceptSelected()
@@ -153,7 +172,6 @@ internal class SwingShellSuggestionController(
         if (selectedIndex == index) return true
         selectedIndex = index
         updateViewport()
-        host.repaint()
         return true
     }
 
@@ -205,19 +223,36 @@ internal class SwingShellSuggestionController(
     private fun updateViewport() {
         viewportStartIndex =
             when {
-                suggestions.size <= POPUP_MAX_VISIBLE_ROWS -> 0
-                selectedIndex < 0 -> viewportStartIndex.coerceIn(0, suggestions.size - POPUP_MAX_VISIBLE_ROWS)
+                suggestions.size <= SwingShellSuggestionViewSnapshot.MAX_VISIBLE_SUGGESTIONS -> 0
+                selectedIndex < 0 ->
+                    viewportStartIndex.coerceIn(
+                        0,
+                        suggestions.size - SwingShellSuggestionViewSnapshot.MAX_VISIBLE_SUGGESTIONS,
+                    )
                 selectedIndex < viewportStartIndex -> selectedIndex
-                selectedIndex >= viewportStartIndex + POPUP_MAX_VISIBLE_ROWS ->
-                    selectedIndex - POPUP_MAX_VISIBLE_ROWS + 1
+                selectedIndex >= viewportStartIndex + SwingShellSuggestionViewSnapshot.MAX_VISIBLE_SUGGESTIONS ->
+                    selectedIndex - SwingShellSuggestionViewSnapshot.MAX_VISIBLE_SUGGESTIONS + 1
                 else -> viewportStartIndex
             }
-        val viewportEnd = minOf(suggestions.size, viewportStartIndex + POPUP_MAX_VISIBLE_ROWS)
+        val viewportEnd =
+            minOf(
+                suggestions.size,
+                viewportStartIndex + SwingShellSuggestionViewSnapshot.MAX_VISIBLE_SUGGESTIONS,
+            )
         val visible = suggestions.subList(viewportStartIndex, viewportEnd)
-        val localSelection = selectedIndex.takeIf { it in viewportStartIndex until viewportEnd }?.minus(viewportStartIndex) ?: NO_SELECTION
-        view.update(visible, localSelection)
-        host.revalidate()
-        host.repaint()
+        val localSelection =
+            selectedIndex
+                .takeIf { it in viewportStartIndex until viewportEnd }
+                ?.minus(viewportStartIndex)
+                ?: NO_SELECTION
+        view.update(
+            SwingShellSuggestionViewSnapshot.create(
+                visibleSuggestions = visible,
+                selectedIndex = localSelection,
+                viewportStartIndex = viewportStartIndex,
+                totalSuggestionCount = suggestions.size,
+            ),
+        )
     }
 
     private fun SwingShellSuggestion.outcomeKey(): SuggestionOutcomeKey =
@@ -225,6 +260,7 @@ internal class SwingShellSuggestionController(
 
     private companion object {
         private const val NO_SELECTION = -1
+        private const val MAX_POINTER_SCROLL_DELTA = 3
     }
 
     private data class SuggestionOutcomeKey(
