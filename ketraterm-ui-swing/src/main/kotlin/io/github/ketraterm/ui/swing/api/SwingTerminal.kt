@@ -1537,7 +1537,11 @@ class SwingTerminal
                             .conflate()
                             .collect { suggestions ->
                                 ensureActive()
-                                shellSuggestionController.show(request, suggestions, selectedIndex = -1)
+                                shellSuggestionController.showPreservingSelectedOutcome(
+                                    request,
+                                    suggestions,
+                                    fallbackSelectedIndex = 0,
+                                )
                             }
                     } catch (cancellation: CancellationException) {
                         throw cancellation

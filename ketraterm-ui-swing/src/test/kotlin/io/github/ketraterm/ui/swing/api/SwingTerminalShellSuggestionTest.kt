@@ -24,9 +24,11 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.receiveAsFlow
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Insets
@@ -283,10 +285,10 @@ class SwingTerminalShellSuggestionTest {
             assertEquals(5, state.anchorColumn)
             assertEquals(2, state.anchorRow)
 
-            assertEquals(-1, state.selectedIndex)
+            assertEquals(0, state.selectedIndex)
+            assertEquals("git status", state.selectedSuggestion?.replacementText)
             component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_TAB)) }
             component.keyListeners.forEach { listener -> listener.keyReleased(keyReleased(component, KeyEvent.VK_TAB)) }
-            component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_TAB)) }
         }
 
         val expectedRequest =
@@ -301,33 +303,101 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `provider empty result hides current suggestion popup`() {
+    fun `progressive provider rankings preserve the selected outcome after automatic preselection`() {
+        val emissions = Channel<List<SwingShellSuggestion>>(Channel.UNLIMITED)
         val view = RecordingSuggestionView()
         val component =
             SwingTerminal(
                 settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
                 hostServices =
                     SwingHostServices(
-                        shellSuggestionProvider = SwingShellSuggestionProvider { flowOf(emptyList()) },
+                        shellSuggestionProvider = SwingShellSuggestionProvider { emissions.receiveAsFlow() },
+                        shellSuggestionViewFactory = view.factory(),
+                    ),
+            )
+        val initial =
+            suggestions() +
+                suggestion(
+                    replacementText = "git stash",
+                    detail = "stash working tree changes",
+                    source = "git",
+                    kind = "SUBCOMMAND",
+                )
+
+        SwingUtilities.invokeAndWait {
+            component.size = component.preferredGridSize(20, 4)
+            component.requestShellSuggestions("git s", 5, 5, 0)
+        }
+        assertTrue(emissions.trySend(initial).isSuccess)
+        view.awaitUpdate()
+
+        SwingUtilities.invokeAndWait {
+            component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_DOWN)) }
+            component.keyListeners.forEach { listener -> listener.keyReleased(keyReleased(component, KeyEvent.VK_DOWN)) }
+            assertEquals(initial[1], component.currentShellSuggestionState().selectedSuggestion)
+        }
+        view.awaitUpdate()
+
+        val reranked = listOf(initial[2], initial[0], initial[1])
+        assertTrue(emissions.trySend(reranked).isSuccess)
+        view.awaitUpdate()
+
+        SwingUtilities.invokeAndWait {
+            val state = component.currentShellSuggestionState()
+            assertEquals(2, state.selectedIndex)
+            assertEquals(initial[1], state.selectedSuggestion)
+            component.dispose()
+        }
+        emissions.close()
+    }
+
+    @Test
+    fun `provider empty result hides popup and later results reopen with first selection`() {
+        val emissions = Channel<List<SwingShellSuggestion>>(Channel.UNLIMITED)
+        val view = RecordingSuggestionView()
+        val component =
+            SwingTerminal(
+                settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
+                hostServices =
+                    SwingHostServices(
+                        shellSuggestionProvider = SwingShellSuggestionProvider { emissions.receiveAsFlow() },
                         shellSuggestionViewFactory = view.factory(),
                     ),
             )
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
-            component.showShellSuggestions(request(), suggestions())
-            assertTrue(component.currentShellSuggestionState().visible)
-        }
-        assertTrue(view.awaitUpdate().suggestions.isNotEmpty())
-
-        SwingUtilities.invokeAndWait {
             component.requestShellSuggestions(commandText = "missing", cursorOffset = 7, anchorColumn = 0, anchorRow = 0)
         }
+        val initialSuggestions = suggestions("missing")
+        assertTrue(emissions.trySend(initialSuggestions).isSuccess)
+        assertEquals(initialSuggestions, view.awaitUpdate().suggestions)
+
+        SwingUtilities.invokeAndWait {
+            val state = component.currentShellSuggestionState()
+            assertTrue(state.visible)
+            assertEquals(0, state.selectedIndex)
+        }
+
+        assertTrue(emissions.trySend(emptyList()).isSuccess)
         assertTrue(view.awaitUpdate().suggestions.isEmpty())
 
         SwingUtilities.invokeAndWait {
             assertFalse(component.currentShellSuggestionState().visible)
         }
+
+        val laterSuggestions = initialSuggestions.reversed()
+        assertTrue(emissions.trySend(laterSuggestions).isSuccess)
+        view.awaitUpdate()
+
+        SwingUtilities.invokeAndWait {
+            val state = component.currentShellSuggestionState()
+            assertTrue(state.visible)
+            assertEquals(0, state.selectedIndex)
+            assertEquals(laterSuggestions.first(), state.selectedSuggestion)
+            component.dispose()
+        }
+        emissions.close()
     }
 
     @Test
@@ -361,8 +431,8 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             val state = component.currentShellSuggestionState()
             assertTrue(state.visible)
-            assertEquals(-1, state.selectedIndex)
-            assertNull(state.selectedSuggestion)
+            assertEquals(0, state.selectedIndex)
+            assertEquals(suggestions("git s").first(), state.selectedSuggestion)
         }
 
         assertEquals(

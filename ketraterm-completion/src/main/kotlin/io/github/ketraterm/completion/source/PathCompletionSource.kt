@@ -18,6 +18,7 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.boundedTo
+import io.github.ketraterm.completion.matching.CompletionMatcher
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -70,28 +71,29 @@ internal class PathCompletionSource(
         for ((name, isDirectory) in entries) {
             if (!context.expectedPathKind.acceptsPathEntry(isDirectory)) continue
             if (!context.expectedHiddenPathPolicy.acceptsPath(name, filePrefix)) continue
-            if (matchesPrefix(name, filePrefix)) {
-                val rawSuffix = if (isDirectory) "$pathSeparator" else ""
-                val rawReplacement = directoryPortion + name + rawSuffix
-                val replacementText =
-                    ShellReplacementText.encode(
-                        value = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement,
-                        activeTokenQuote = context.activeTokenQuote,
-                        policy = request.shellCapabilities.quoting,
-                    ) ?: continue
+            val match = CompletionMatcher.match(name, filePrefix) ?: continue
+            if (!match.matchedRanges.isEmpty() && match.matchedRanges.startOffset(0) != 0) continue
+            val rawSuffix = if (isDirectory) "$pathSeparator" else ""
+            val rawReplacement = directoryPortion + name + rawSuffix
+            val replacementText =
+                ShellReplacementText.encode(
+                    value = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement,
+                    activeTokenQuote = context.activeTokenQuote,
+                    policy = request.shellCapabilities.quoting,
+                ) ?: continue
 
-                candidates +=
-                    TerminalCompletionCandidate(
-                        replacementText = replacementText,
-                        replacementStartOffset = context.replacementStartOffset,
-                        replacementEndOffset = context.replacementEndOffset,
-                        displayText = name + (if (isDirectory) "$pathSeparator" else ""),
-                        detail = if (isDirectory) "directory" else "file",
-                        source = SOURCE_PATH,
-                        kind = TerminalCompletionCandidateKind.PATH,
-                        score = score(name, filePrefix, PATH_BASE_SCORE, orderIndex++),
-                    )
-            }
+            candidates +=
+                TerminalCompletionCandidate(
+                    replacementText = replacementText,
+                    replacementStartOffset = context.replacementStartOffset,
+                    replacementEndOffset = context.replacementEndOffset,
+                    displayText = name + rawSuffix,
+                    detail = if (isDirectory) "directory" else "file",
+                    source = SOURCE_PATH,
+                    kind = TerminalCompletionCandidateKind.PATH,
+                    score = match.sourceScore(PATH_BASE_SCORE, filePrefix, orderIndex++),
+                    matchedRanges = match.matchedRanges,
+                )
         }
 
         candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
@@ -110,23 +112,6 @@ internal class PathCompletionSource(
         } else {
             PathParts(directoryPrefix = "", entryNamePrefix = prefix)
         }
-    }
-
-    private fun matchesPrefix(
-        value: String,
-        prefix: String,
-    ): Boolean = prefix.isEmpty() || value.startsWith(prefix, ignoreCase = true)
-
-    private fun score(
-        value: String,
-        prefix: String,
-        base: Int,
-        orderIndex: Int,
-    ): Int {
-        if (prefix.isEmpty()) return base - orderIndex
-        val caseBonus = if (value.startsWith(prefix)) 40 else 20
-        val completionLengthPenalty = value.length - prefix.length
-        return base + caseBonus - completionLengthPenalty - orderIndex
     }
 
     private companion object {

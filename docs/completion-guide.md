@@ -80,6 +80,8 @@ The standalone and IntelliJ products intentionally do not share a physical widge
 
 They do share one immutable semantic contract. `SwingShellSuggestionViewSnapshot` carries a bounded visible window, a local selected index, absolute viewport position, and total result count. Each `SwingShellSuggestion` supplies the authoritative display text, detail, stable provider id, user-facing source label, typed accent role, and validated match ranges. Renderers may choose native mechanics and visuals, but they must not reinterpret raw kind or source strings.
 
+Automatic completion popups preselect the highest-ranked result when they open. Progressive provider updates preserve the user's selected outcome across reranking instead of resetting selection to the new first row.
+
 The shared controller retains the complete ranked snapshot and owns navigation, acceptance, dismissal, and feedback. Renderer pointer indices are local to the published viewport. Provider creation and collection run off the EDT; progressive snapshots are conflated before the latest state is published on the EDT.
 
 ### Ranking Formula

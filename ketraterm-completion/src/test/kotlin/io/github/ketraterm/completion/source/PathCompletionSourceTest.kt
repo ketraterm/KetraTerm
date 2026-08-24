@@ -65,6 +65,26 @@ class PathCompletionSourceTest {
             assertEquals("README.md", candidate.displayText)
             assertEquals(TerminalCompletionCandidateKind.PATH, candidate.kind)
             assertEquals("file", candidate.detail)
+            assertEquals(1, candidate.matchedRanges.rangeCount)
+            assertEquals(0, candidate.matchedRanges.startOffset(0))
+            assertEquals(1, candidate.matchedRanges.endOffset(0))
+        }
+
+    @Test
+    fun `completes path with camel hump and word boundary match ranges`() =
+        runBlocking {
+            val request = request("cd IP", "file:///project")
+            val candidates = source.complete(request)
+
+            assertEquals(1, candidates.size)
+            val candidate = candidates.first()
+            assertEquals("Idea\\ Projects/", candidate.replacementText)
+            assertEquals("Idea Projects/", candidate.displayText)
+            assertEquals(2, candidate.matchedRanges.rangeCount)
+            assertEquals(0, candidate.matchedRanges.startOffset(0))
+            assertEquals(1, candidate.matchedRanges.endOffset(0))
+            assertEquals(5, candidate.matchedRanges.startOffset(1))
+            assertEquals(6, candidate.matchedRanges.endOffset(1))
         }
 
     @Test

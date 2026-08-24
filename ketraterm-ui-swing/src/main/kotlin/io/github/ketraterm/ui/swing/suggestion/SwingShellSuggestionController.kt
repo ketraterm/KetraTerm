@@ -51,6 +51,19 @@ internal class SwingShellSuggestionController(
         request: SwingShellSuggestionRequest,
         suggestions: List<SwingShellSuggestion>,
         selectedIndex: Int,
+    ): Boolean = showInternal(request, suggestions, selectedIndex, preserveSelectedOutcome = false)
+
+    fun showPreservingSelectedOutcome(
+        request: SwingShellSuggestionRequest,
+        suggestions: List<SwingShellSuggestion>,
+        fallbackSelectedIndex: Int,
+    ): Boolean = showInternal(request, suggestions, fallbackSelectedIndex, preserveSelectedOutcome = true)
+
+    private fun showInternal(
+        request: SwingShellSuggestionRequest,
+        suggestions: List<SwingShellSuggestion>,
+        selectedIndex: Int,
+        preserveSelectedOutcome: Boolean,
     ): Boolean {
         if (suggestions.isEmpty()) {
             hide()
@@ -61,15 +74,15 @@ internal class SwingShellSuggestionController(
             this.suggestions
                 .getOrNull(this.selectedIndex)
                 ?.outcomeKey()
-                ?.takeIf { sameRequest }
+                ?.takeIf { preserveSelectedOutcome && sameRequest }
         this.suggestions = suggestions.toList()
         this.request = request
         if (!sameRequest) viewportStartIndex = 0
         this.selectedIndex =
-            selectedIndex.takeIf { it in this.suggestions.indices }
-                ?: selectedOutcome
-                    ?.let { outcome -> this.suggestions.indexOfFirst { it.outcomeKey() == outcome } }
-                    ?.takeIf { it >= 0 }
+            selectedOutcome
+                ?.let { outcome -> this.suggestions.indexOfFirst { it.outcomeKey() == outcome } }
+                ?.takeIf { it >= 0 }
+                ?: selectedIndex.takeIf { it in this.suggestions.indices }
                 ?: NO_SELECTION
         updateViewport()
         view.component.isVisible = true
@@ -110,8 +123,8 @@ internal class SwingShellSuggestionController(
 
     private fun handleAction(action: SwingShellSuggestionAction): Boolean =
         when (action) {
-            SwingShellSuggestionAction.SELECT_NEXT -> selectRelative(1)
-            SwingShellSuggestionAction.SELECT_PREVIOUS -> selectRelative(-1)
+            SwingShellSuggestionAction.SELECT_NEXT -> selectAdjacent(1)
+            SwingShellSuggestionAction.SELECT_PREVIOUS -> selectAdjacent(-1)
             SwingShellSuggestionAction.SELECT_FIRST -> select(0)
             SwingShellSuggestionAction.SELECT_LAST -> select(suggestions.lastIndex)
             SwingShellSuggestionAction.SELECT_NEXT_PAGE -> selectRelative(SwingShellSuggestionViewSnapshot.MAX_VISIBLE_SUGGESTIONS)
@@ -135,6 +148,18 @@ internal class SwingShellSuggestionController(
                 selectedSuggestion = suggestions.getOrNull(selectedIndex),
             )
         }
+
+    private fun selectAdjacent(delta: Int): Boolean {
+        if (suggestions.isEmpty()) return false
+        val next =
+            when {
+                selectedIndex !in suggestions.indices -> if (delta > 0) 0 else suggestions.lastIndex
+                delta > 0 && selectedIndex == suggestions.lastIndex -> 0
+                delta < 0 && selectedIndex == 0 -> suggestions.lastIndex
+                else -> selectedIndex + delta
+            }
+        return select(next)
+    }
 
     private fun selectRelative(delta: Int): Boolean {
         if (suggestions.isEmpty()) return false

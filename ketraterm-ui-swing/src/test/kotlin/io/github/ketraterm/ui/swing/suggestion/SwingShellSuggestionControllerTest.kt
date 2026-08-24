@@ -99,7 +99,7 @@ class SwingShellSuggestionControllerTest {
         assertTrue(down.isConsumed)
 
         assertTrue(controller.handleKeyPressed(up))
-        assertEquals(0, controller.state().selectedIndex)
+        assertEquals(2, controller.state().selectedIndex)
         assertTrue(up.isConsumed)
     }
 
@@ -221,12 +221,33 @@ class SwingShellSuggestionControllerTest {
         val first = suggestions(3, endOffset = request.commandText.length)
         controller.show(request, first, selectedIndex = 1)
 
-        controller.show(request, listOf(first[2], first[1], first[0]), selectedIndex = -1)
+        controller.showPreservingSelectedOutcome(
+            request,
+            listOf(first[2], first[1], first[0]),
+            fallbackSelectedIndex = 0,
+        )
         assertEquals(1, controller.state().selectedIndex)
         assertSame(first[1], controller.state().selectedSuggestion)
 
-        controller.show(request(commandText = "git st"), first, selectedIndex = -1)
+        controller.showPreservingSelectedOutcome(
+            request(commandText = "git st"),
+            first,
+            fallbackSelectedIndex = 0,
+        )
+        assertEquals(0, controller.state().selectedIndex)
+    }
+
+    @Test
+    fun `explicit passive display clears selection for the same request`() {
+        val controller = SwingShellSuggestionController(RecordingSuggestionHost())
+        val request = request(commandText = "git s")
+        val items = suggestions(3, endOffset = request.commandText.length)
+        controller.show(request, items, selectedIndex = 1)
+
+        controller.show(request, listOf(items[2], items[1], items[0]), selectedIndex = -1)
+
         assertEquals(-1, controller.state().selectedIndex)
+        assertNull(controller.state().selectedSuggestion)
     }
 
     @Test
@@ -394,17 +415,31 @@ class SwingShellSuggestionControllerTest {
     }
 
     @Test
-    fun `keyboard navigation clamps cleanly at top and bottom boundaries`() {
+    fun `arrow navigation wraps cleanly at top and bottom boundaries`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)
         controller.show(request(), suggestions(5), selectedIndex = 0)
 
         val upFromTop = keyPressed(KeyEvent.VK_UP)
         controller.handleKeyPressed(upFromTop)
-        assertEquals(0, controller.state().selectedIndex, "Up arrow at index 0 should clamp at 0")
+        assertEquals(4, controller.state().selectedIndex, "Up arrow at index 0 should wrap to the last suggestion")
 
-        repeat(10) { controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN)) }
-        assertEquals(4, controller.state().selectedIndex, "Down arrow should clamp at last index")
+        val downFromBottom = keyPressed(KeyEvent.VK_DOWN)
+        controller.handleKeyPressed(downFromBottom)
+        assertEquals(0, controller.state().selectedIndex, "Down arrow at the last index should wrap to the first suggestion")
+    }
+
+    @Test
+    fun `repeated arrow presses continue one item at a time through wrap boundaries`() {
+        val host = RecordingSuggestionHost()
+        val controller = SwingShellSuggestionController(host)
+        controller.show(request(), suggestions(5), selectedIndex = 4)
+
+        repeat(3) { controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN)) }
+        assertEquals(2, controller.state().selectedIndex)
+
+        repeat(4) { controller.handleKeyPressed(keyPressed(KeyEvent.VK_UP)) }
+        assertEquals(3, controller.state().selectedIndex)
     }
 
     @Test
