@@ -16,7 +16,9 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -37,45 +39,22 @@ class TerminalCompletionLearningStoreTest {
             val after = source.snapshot()
             assertNotSame(before, after)
             assertSame(after, source.snapshot())
+
+            source.replaceSnapshot(after)
+
+            assertSame(after, source.snapshot())
         }
 
     @Test
-    fun `learning mutation does not wait for index compilation`() {
-        val source = TerminalCompletionLearningStore(commandSpecs = emptyList())
+    fun `derived learning indexes are cached for a stable snapshot and syntax`() {
+        val source = TerminalCompletionLearningStore()
         source.recordCommandResult("git status", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 1)
-        source.indexesFor(TerminalShellSyntax.PLAIN, emptyList())
-        val compilationStarted = CountDownLatch(1)
-        val releaseCompilation = CountDownLatch(1)
-        val executor = Executors.newFixedThreadPool(2)
-        try {
-            val compilation =
-                executor.submit {
-                    source.indexesFor(
-                        shellSyntax = TerminalShellSyntax.POSIX,
-                        commandSpecs = BlockingHashCommandSpecs(compilationStarted, releaseCompilation),
-                    )
-                }
-            assertTrue(compilationStarted.await(5, TimeUnit.SECONDS))
 
-            val mutation =
-                executor.submit {
-                    source.recordCommandResult(
-                        "git log",
-                        successful = true,
-                        profileId = null,
-                        workingDirectoryUri = null,
-                        usedAtEpochMillis = 2,
-                    )
-                }
-            mutation.get(5, TimeUnit.SECONDS)
-            releaseCompilation.countDown()
-            compilation.get(5, TimeUnit.SECONDS)
+        val first = source.indexesFor(TerminalShellSyntax.POSIX)
+        val second = source.indexesFor(TerminalShellSyntax.POSIX)
 
-            assertEquals(setOf("git status", "git log"), source.snapshot().commandStats.mapTo(HashSet()) { it.commandLine })
-        } finally {
-            releaseCompilation.countDown()
-            executor.shutdownNow()
-        }
+        assertSame(first, second)
+        assertNotSame(first, source.indexesFor(TerminalShellSyntax.POWERSHELL))
     }
 
     @Test
@@ -423,177 +402,6 @@ class TerminalCompletionLearningStoreTest {
         }
 
     @Test
-    fun `custom command specs classify nested command shapes`() =
-        runBlocking {
-            val source =
-                TerminalCompletionLearningStore(
-                    commandSpecs =
-                        listOf(
-                            TerminalCommandSpec(
-                                name = "tool",
-                                subcommands =
-                                    listOf(
-                                        TerminalCommandSpec(
-                                            name = "alpha",
-                                            subcommands = listOf(TerminalCommandSpec("beta", "run beta workflow")),
-                                        ),
-                                    ),
-                            ),
-                        ),
-                )
-
-            source.recordCommandResult(
-                commandLine = "tool alpha beta private-branch",
-                successful = true,
-                profileId = null,
-                workingDirectoryUri = null,
-                usedAtEpochMillis = 1,
-            )
-
-            val shape =
-                source
-                    .snapshot()
-                    .shapeStats
-                    .single()
-                    .shape
-            assertEquals("tool", shape.executable)
-            assertEquals(listOf("alpha", "beta"), shape.subcommands)
-            assertEquals(1, shape.positionalArgumentCount)
-            assertTrue("private-branch" !in shape.normalizedShapeKey)
-        }
-
-    @Test
-    fun `custom command specs canonicalize aliased subcommands`() =
-        runBlocking {
-            val source =
-                TerminalCompletionLearningStore(
-                    commandSpecs =
-                        listOf(
-                            TerminalCommandSpec(
-                                name = "git",
-                                subcommands = listOf(TerminalCommandSpec("checkout", aliases = listOf("co"))),
-                            ),
-                        ),
-                )
-
-            source.recordCommandResult(
-                commandLine = "git co main",
-                successful = true,
-                profileId = null,
-                workingDirectoryUri = null,
-                usedAtEpochMillis = 1,
-            )
-
-            val shape =
-                source
-                    .snapshot()
-                    .shapeStats
-                    .single()
-                    .shape
-            assertEquals(listOf("checkout"), shape.subcommands)
-            assertEquals(1, shape.positionalArgumentCount)
-            assertTrue("main" !in shape.normalizedShapeKey)
-        }
-
-    @Test
-    fun `empty command specs fall back to generic private shape classification`() =
-        runBlocking {
-            val source = TerminalCompletionLearningStore(commandSpecs = emptyList())
-
-            source.recordCommandResult(
-                commandLine = "docker compose up secret-project",
-                successful = true,
-                profileId = null,
-                workingDirectoryUri = null,
-                usedAtEpochMillis = 1,
-            )
-
-            val shape =
-                source
-                    .snapshot()
-                    .shapeStats
-                    .single()
-                    .shape
-            assertEquals("docker", shape.executable)
-            assertEquals(listOf("compose"), shape.subcommands)
-            assertEquals(2, shape.positionalArgumentCount)
-            assertTrue("secret-project" !in shape.normalizedShapeKey)
-        }
-
-    @Test
-    fun `records source-specific feedback context without command text`() =
-        runBlocking {
-            val source = TerminalCompletionLearningStore()
-
-            source.recordSuggestionFeedback(
-                commandLine = "git status",
-                feedback = TerminalCompletionFeedbackKind.ACCEPTED,
-                profileId = "bash",
-                workingDirectoryUri = "file:///repo",
-                feedbackAtEpochMillis = 100,
-                context =
-                    TerminalCompletionFeedbackContext(
-                        source = "spec",
-                        candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                    ),
-            )
-            source.recordSuggestionFeedback(
-                commandLine = "git status",
-                feedback = TerminalCompletionFeedbackKind.DISMISSED,
-                profileId = "bash",
-                workingDirectoryUri = "file:///repo",
-                feedbackAtEpochMillis = 200,
-                context =
-                    TerminalCompletionFeedbackContext(
-                        source = "spec",
-                        candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                    ),
-            )
-
-            assertEquals(
-                listOf(
-                    TerminalCompletionFeedbackStats(
-                        source = "spec",
-                        candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                        profileId = "bash",
-                        workingDirectoryUri = "file:///repo/",
-                        acceptedCount = 1,
-                        dismissedCount = 1,
-                        lastUsedEpochMillis = 200,
-                    ),
-                ),
-                source.snapshot().feedbackStats,
-            )
-            assertTrue(
-                source
-                    .snapshot()
-                    .feedbackStats
-                    .single()
-                    .source != "git status",
-            )
-        }
-
-    @Test
-    fun `replace snapshot keeps newest duplicate feedback context`() =
-        runBlocking {
-            val source = TerminalCompletionLearningStore()
-
-            source.replaceSnapshot(
-                TerminalCommandCompletionStatsSnapshot(
-                    feedbackStats =
-                        listOf(
-                            feedbackStats(lastUsedEpochMillis = 10, acceptedCount = 1),
-                            feedbackStats(lastUsedEpochMillis = 20, dismissedCount = 1),
-                            feedbackStats(source = "stats", lastUsedEpochMillis = 5, acceptedCount = 1),
-                        ),
-                ),
-            )
-
-            assertEquals(listOf(20L, 5L), source.snapshot().feedbackStats.map { it.lastUsedEpochMillis })
-            assertEquals(listOf("spec", "stats"), source.snapshot().feedbackStats.map { it.source })
-        }
-
-    @Test
     fun `recorded counters saturate at integer maximum`() =
         runBlocking {
             val source = TerminalCompletionLearningStore()
@@ -667,51 +475,9 @@ class TerminalCompletionLearningStoreTest {
             lastUsedEpochMillis = lastUsedEpochMillis,
         )
 
-    private class BlockingHashCommandSpecs(
-        private val compilationStarted: CountDownLatch,
-        private val releaseCompilation: CountDownLatch,
-    ) : AbstractList<TerminalCommandSpec>() {
-        override val size: Int
-            get() {
-                compilationStarted.countDown()
-                check(releaseCompilation.await(5, TimeUnit.SECONDS)) { "test did not release index compilation" }
-                return 0
-            }
-
-        override fun get(index: Int): TerminalCommandSpec = throw IndexOutOfBoundsException(index)
-
-        override fun iterator(): Iterator<TerminalCommandSpec> {
-            compilationStarted.countDown()
-            check(releaseCompilation.await(5, TimeUnit.SECONDS)) { "test did not release index compilation" }
-            return emptyList<TerminalCommandSpec>().iterator()
-        }
-
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
-            if (!super.equals(other)) return false
-
-            other as BlockingHashCommandSpecs
-
-            if (size != other.size) return false
-            if (compilationStarted != other.compilationStarted) return false
-            if (releaseCompilation != other.releaseCompilation) return false
-
-            return true
-        }
-
-        override fun hashCode(): Int {
-            var result = super.hashCode()
-            result = 31 * result + compilationStarted.hashCode()
-            result = 31 * result + releaseCompilation.hashCode()
-            result = 31 * result + size
-            return result
-        }
-    }
-
     @Test
-    fun `concurrent copy-on-write mutations do not lose commands`() {
-        val source = TerminalCompletionLearningStore(capacity = 128, commandSpecs = emptyList())
+    fun `concurrent synchronized mutations do not lose commands`() {
+        val source = TerminalCompletionLearningStore(capacity = 128)
         val start = CountDownLatch(1)
         val executor = Executors.newFixedThreadPool(2)
         try {
@@ -739,20 +505,4 @@ class TerminalCompletionLearningStoreTest {
             executor.shutdownNow()
         }
     }
-
-    private fun feedbackStats(
-        source: String = "spec",
-        lastUsedEpochMillis: Long,
-        acceptedCount: Int = 0,
-        dismissedCount: Int = 0,
-    ): TerminalCompletionFeedbackStats =
-        TerminalCompletionFeedbackStats(
-            source = source,
-            candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-            profileId = "bash",
-            workingDirectoryUri = "file:///repo",
-            acceptedCount = acceptedCount,
-            dismissedCount = dismissedCount,
-            lastUsedEpochMillis = lastUsedEpochMillis,
-        )
 }

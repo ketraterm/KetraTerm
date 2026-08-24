@@ -35,6 +35,7 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
     private val entriesByKey = HashMap<Key, IndexedRow<Row, Key>>(capacity)
     private val orderedEntries = ArrayList<IndexedRow<Row, Key>>(capacity)
     private var publishedSnapshot: List<Row> = emptyList()
+    private var snapshotDirty = false
 
     fun replaceAll(records: List<Row>) {
         val compacted = LinkedHashMap<Key, Row>(minOf(records.size, capacity))
@@ -68,28 +69,25 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
         rebuild(entriesByKey.values)
     }
 
-    fun snapshot(): List<Row> = publishedSnapshot
-
-    fun copy(): BoundedStatsRowIndex<Row, Key> {
-        val copy = BoundedStatsRowIndex(capacity, order, keySelector, shouldReplace)
-        for (entry in orderedEntries) {
-            val copiedEntry = IndexedRow(entry.key, entry.row)
-            copy.orderedEntries += copiedEntry
-            copy.entriesByKey[copiedEntry.key] = copiedEntry
-        }
-        copy.publishedSnapshot = publishedSnapshot
-        return copy
+    fun snapshot(): List<Row> {
+        if (!snapshotDirty) return publishedSnapshot
+        val candidate = List(orderedEntries.size) { index -> orderedEntries[index].row }
+        if (candidate != publishedSnapshot) publishedSnapshot = candidate
+        snapshotDirty = false
+        return publishedSnapshot
     }
 
     fun mutate(
         key: Key,
         initialRow: () -> Row,
         update: (Row) -> Row,
-    ) {
+    ): Boolean {
         val existing = entriesByKey[key]
         if (existing != null) {
+            val updated = update(existing.row)
+            if (updated == existing.row) return false
             check(orderedEntries.remove(existing)) { "indexed completion statistics row is missing from sorted storage" }
-            existing.row = update(existing.row)
+            existing.row = updated
             insertOrdered(existing)
         } else {
             val created = IndexedRow(key, update(initialRow()))
@@ -98,10 +96,11 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
             if (orderedEntries.size > capacity) {
                 val evicted = orderedEntries.removeAt(orderedEntries.lastIndex)
                 entriesByKey.remove(evicted.key)
-                if (evicted === created) return
+                if (evicted === created) return false
             }
         }
-        publishSnapshot()
+        snapshotDirty = true
+        return true
     }
 
     private fun rebuild(rows: Collection<IndexedRow<Row, Key>>) {
@@ -113,7 +112,7 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
         }
         entriesByKey.clear()
         for (entry in orderedEntries) entriesByKey[entry.key] = entry
-        publishSnapshot()
+        snapshotDirty = true
     }
 
     private fun insertOrdered(entry: IndexedRow<Row, Key>) {
@@ -128,10 +127,6 @@ internal class BoundedStatsRowIndex<Row : Any, Key : Any>(
             }
         }
         orderedEntries.add(low, entry)
-    }
-
-    private fun publishSnapshot() {
-        publishedSnapshot = List(orderedEntries.size) { index -> orderedEntries[index].row }
     }
 
     private class IndexedRow<Row : Any, Key : Any>(

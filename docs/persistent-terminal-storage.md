@@ -41,30 +41,39 @@ file to `config.toml.broken`, then writes clean defaults so the app can start.
 ### `command-completion-stats-v1.tsv`
 
 For both standalone and IntelliJ this is an opt-in compact suggestion-learning
-index. This is not raw shell history.
-The file stores aggregate exact-command counters, privacy-preserving command
-shape counters, and source-specific suggestion feedback counters used by the
-completion engine:
+index rather than a replayable terminal transcript. It stores sanitized
+aggregate exact-command counters used by the completion engine:
 
 ```tsv
 KetraTerm_COMMAND_COMPLETION_STATS	1
 C	<commandBase64>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
-S	<executableBase64>	<subcommandsBase64List>	<optionNamesBase64List>	<positionalArgumentCount>	<optionValueCount>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
-F	<sourceBase64>	<candidateKind>	<profileBase64>	<cwdBase64>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
 ```
 
-Text fields are Base64URL-encoded without padding so tabs and Unicode text do not corrupt the TSV layout. The optional
-`ketraterm-completion-persistence`
-module owns this file through `TerminalCompletionLearningRepository`; its codec and bounded raw file store are internal,
-and workspace state has no dependency on completion learning. Legacy nine-field feedback rows containing a redundant
-token-position column are accepted when loading existing version-1 files, but new writes use the eight-field row above.
-One suspending `TerminalCompletionLearningRepository` serializes learning and file replacement with a mutex and moves
-file access to `Dispatchers.IO`. Hosts share `TerminalCompletionLearningCoordinator` to launch those operations in
-their own lifecycle scopes without duplicating scheduling or privacy-filtering code. Loads, rows, line sizes, and total file bytes are bounded before decoding or encoding,
-so neither startup nor settings changes read this file on the Swing event-dispatch thread. Derived
-matching keys, such as normalized command text and normalized command-shape
-keys, are recomputed by the completion models and are not stored as separate
-fields.
+Text fields are Base64URL-encoded without padding so tabs and Unicode text do
+not corrupt the TSV layout. Base64URL is not encryption. The decoder accepts
+only the header and exact `C` rows shown above; unsupported or malformed rows
+reject the complete file.
+
+`TerminalCompletionLearningCoordinator` is the single runtime owner. Each
+bounded learning event updates memory before its recording call returns, so
+ranking does not wait for hydration or disk. Hydration merges atomically with
+live rows before any snapshot is written. A bounded worker handles only
+persistence controls and flush barriers; a child latest-snapshot writer
+debounces and conflates dirty generations, materializing the immutable row
+snapshot only when the latest generation reaches the I/O boundary. This avoids
+both snapshot reconstruction and a full-file write for every event. The
+internal `TerminalCompletionLearningRepository` is a passive snapshot I/O
+boundary; its codec and bounded raw file store remain internal and perform file
+access on the configured I/O dispatcher.
+
+Each product supplies one fixed destination when it creates the coordinator and
+only toggles persistence on or off. Runtime path switching and cross-file import
+semantics are intentionally unsupported. Loads, rows, line sizes, and total file
+bytes are bounded before decoding or encoding, so neither startup nor settings
+changes read this file on the Swing event-dispatch thread. Derived matching keys
+are recomputed by completion models rather than stored as additional fields.
+The coordinator merges this one file with live in-memory learning; callers must
+not separately preload the same aggregate file.
 
 ## Security And Secret Filtering
 
@@ -75,21 +84,25 @@ configs using `persistent_suggestion_learning_enabled` or
 `persistent_command_history_enabled` are accepted as load-only compatibility
 fallbacks, but new saves write only `suggestion_learning_persistence_enabled`.
 IntelliJ exposes **Remember learned suggestions across IDE restarts** and keeps
-it disabled by default. When disabled, session MRU and in-memory learning still
-work, but the plugin neither loads nor writes this file. Its enabled store lives
-in the IDE system directory described above.
+it disabled by default. When a product starts disabled, it neither loads nor
+writes this file. Disabling at runtime synchronously prevents new writes and
+invalidates debounced generations; an atomic file operation already in progress
+may finish. Session MRU and in-memory learning remain active. The plugin's
+enabled store lives in the IDE system directory described above.
 
-Before any exact command or shape row enters persistent learning, both hosts apply
+Before any exact-command row enters persistent learning, both hosts apply
 `TerminalCompletionPersistencePolicy`:
 
 1. Commands starting with a space or tab are ignored, matching the common shell
    `HISTCONTROL=ignorespace` convention.
 2. Blank and multi-line commands are ignored.
-3. Commands and shape vocabulary containing sensitive substrings are ignored,
+3. Commands containing sensitive substrings are ignored,
    including password/passwd, secret, token, apikey/api_key, private_key,
    access_key, secret_key, bearer, authorization, credential/credentials,
    passcode, passphrase, jwt, key markers, and auth markers.
 
-Shape rows intentionally avoid raw positional argument values. They store only
-the executable, bounded known subcommand vocabulary, option names, argument
-counts, and ranking counters.
+Exact rows retain command text and optional profile and
+working-directory context. The filters block common accidental disclosures but
+cannot recognize every argument, path, URL, credential, or user-defined secret.
+Treat `command-completion-stats-v1.tsv` as sensitive local command-derived data
+and protect it with normal filesystem permissions.

@@ -17,67 +17,87 @@ package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
+import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import java.nio.file.Path
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Owns one ordered completion-learning command stream in a host lifecycle scope.
+ * Owns synchronous in-memory learning and one latest-snapshot writer.
  *
- * This class contains no product policy beyond the shared command-persistence
- * privacy check. The host still owns [coroutineScope], the persistence path,
- * enablement settings, and failure reporting. One worker initializes the
- * repository and executes every subsequent command in submission order.
- * Cancelling the supplied scope cancels the worker and its queued operations.
- *
- * @param repository suspending learning and persistence repository.
- * @param coroutineScope caller-owned lifecycle scope for infrequent learning operations.
- * @param workerDispatcher dispatcher used by the ordered command worker. The
- * worker remains a child of [coroutineScope].
+ * The caller supplies the lifecycle scope and a fixed persistence destination.
+ * Each learning event updates the bounded store before returning, then emits a
+ * conflated write generation. A small bounded control worker handles only
+ * startup hydration, persistence enablement, and flush barriers. The
+ * coordinator owns scheduling; its passive repository owns only configured
+ * snapshot I/O.
  */
 class TerminalCompletionLearningCoordinator
-    @JvmOverloads
-    constructor(
+    internal constructor(
         private val repository: TerminalCompletionLearningRepository,
         coroutineScope: CoroutineScope,
-        workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+        workerDispatcher: CoroutineDispatcher,
+        writeDebounceMillis: Long,
     ) {
-        private val commands = Channel<Command>(COMMAND_QUEUE_CAPACITY)
-        private val acceptingCommands = AtomicBoolean(true)
+        /**
+         * Creates a lifecycle-bound learning owner for one fixed persistence path.
+         *
+         * @param learningStore bounded in-memory learning used immediately by completion ranking. The coordinator
+         * owns hydration from [persistencePath]; callers must not preload that same aggregate file into the store.
+         * @param coroutineScope caller-owned lifecycle scope for learning and write workers.
+         * @param persistencePath fixed snapshot path, or `null` for memory-only learning.
+         * @param persistenceEnabled whether the fixed path may initially be read and written.
+         * @param workerDispatcher dispatcher used by the persistence control and debounce workers.
+         * @param ioDispatcher dispatcher used for bounded snapshot file access.
+         * @param onPersistenceFailure optional diagnostic callback for failed file access.
+         */
+        @JvmOverloads
+        constructor(
+            learningStore: TerminalCompletionLearningStore,
+            coroutineScope: CoroutineScope,
+            persistencePath: Path? = null,
+            persistenceEnabled: Boolean = true,
+            workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            onPersistenceFailure: (Throwable) -> Unit = {},
+        ) : this(
+            repository =
+                TerminalCompletionLearningRepository(
+                    learningStore = learningStore,
+                    persistencePath = persistencePath,
+                    persistenceEnabled = persistenceEnabled,
+                    ioDispatcher = ioDispatcher,
+                    onPersistenceFailure = onPersistenceFailure,
+                ),
+            coroutineScope = coroutineScope,
+            workerDispatcher = workerDispatcher,
+            writeDebounceMillis = DEFAULT_WRITE_DEBOUNCE_MILLIS,
+        )
+
+        private val stateLock = Any()
+        private val controls = Channel<ControlCommand>(CONTROL_QUEUE_CAPACITY)
+        private var acceptingEvents = true
+        private var persistenceReady = false
+        private var desiredPersistenceEnabled = repository.initialPersistenceEnabled
+        private var persistenceControlGeneration = 0L
+        private var currentWriteRequest: CompletionLearningWriteRequest? = null
+        private var changedBeforeHydration = false
+        private val snapshotWriter =
+            LatestCompletionLearningSnapshotWriter(
+                coroutineScope = coroutineScope,
+                workerDispatcher = workerDispatcher,
+                debounceMillis = writeDebounceMillis,
+                materialize = repository::materialize,
+                persist = repository::persist,
+            )
         private val worker =
             coroutineScope.async(context = workerDispatcher, start = CoroutineStart.UNDISPATCHED) {
-                var completionFailure: Throwable? = null
-                try {
-                    repository.initialize()
-                    for (command in commands) {
-                        command.execute(repository)
-                    }
-                } catch (failure: Throwable) {
-                    completionFailure = failure
-                    throw failure
-                } finally {
-                    commands.close(completionFailure)
-                    val failure = completionFailure ?: CancellationException("completion-learning owner stopped")
-                    while (true) {
-                        val pending = commands.tryReceive().getOrNull() ?: break
-                        if (pending is Command.Flush) pending.fail(failure)
-                    }
-                }
+                runControlWorker()
             }
 
         /** Mutable learning store shared with completion ranking and history sources. */
         val learningStore: TerminalCompletionLearningStore
             get() = repository.learningStore
-
-        /**
-         * Queues one learning mutation after all previously submitted commands.
-         *
-         * @param mutation synchronous bounded mutation run under the repository mutex.
-         */
-        fun submit(mutation: () -> Unit) {
-            enqueue(Command.Mutate(mutation))
-        }
 
         /**
          * Records one completed command when the shared persistence privacy policy permits it.
@@ -95,112 +115,223 @@ class TerminalCompletionLearningCoordinator
             workingDirectoryUri: String?,
             usedAtEpochMillis: Long,
         ) {
-            if (!TerminalCompletionPersistencePolicy.allowsCommand(commandLine)) return
-            submit {
-                learningStore.recordCommandResult(
-                    commandLine = commandLine,
-                    successful = successful,
-                    profileId = profileId,
-                    workingDirectoryUri = workingDirectoryUri,
-                    usedAtEpochMillis = usedAtEpochMillis,
-                )
+            if (!TerminalCompletionPersistencePolicy.allowsCommand(commandLine) || usedAtEpochMillis < 0L) return
+            synchronized(stateLock) {
+                check(acceptingEvents) { "completion-learning owner is closed" }
+                val changed =
+                    learningStore.recordCommandResult(
+                        commandLine = commandLine,
+                        successful = successful,
+                        profileId = profileId,
+                        workingDirectoryUri = workingDirectoryUri,
+                        usedAtEpochMillis = usedAtEpochMillis,
+                    )
+                if (changed) requestWriteAfterMutation()
             }
         }
 
         /**
-         * Queues a change to the active persistence destination.
+         * Records accepted or dismissed feedback for one exact suggested command.
          *
-         * @param path replacement snapshot path, or `null` for memory-only learning.
+         * @param commandLine command text produced by accepting the suggestion.
+         * @param feedback accepted or dismissed feedback kind.
+         * @param profileId optional host profile identifier.
+         * @param workingDirectoryUri optional working-directory URI captured for the event.
+         * @param feedbackAtEpochMillis non-negative feedback timestamp.
          */
-        fun setPersistencePath(path: Path?) {
-            enqueue(Command.SetPersistencePath(path))
+        fun recordSuggestionFeedback(
+            commandLine: String,
+            feedback: TerminalCompletionFeedbackKind,
+            profileId: String?,
+            workingDirectoryUri: String?,
+            feedbackAtEpochMillis: Long,
+        ) {
+            if (!TerminalCompletionPersistencePolicy.allowsCommand(commandLine) || feedbackAtEpochMillis < 0L) return
+            synchronized(stateLock) {
+                check(acceptingEvents) { "completion-learning owner is closed" }
+                val changed =
+                    learningStore.recordSuggestionFeedback(
+                        commandLine = commandLine,
+                        feedback = feedback,
+                        profileId = profileId,
+                        workingDirectoryUri = workingDirectoryUri,
+                        feedbackAtEpochMillis = feedbackAtEpochMillis,
+                    )
+                if (changed) requestWriteAfterMutation()
+            }
         }
 
         /**
-         * Queues a change to persistence enablement for the configured path.
+         * Changes persistence enablement for the fixed configured path.
+         *
+         * Disabling synchronously prevents new write requests and invalidates
+         * any snapshot still waiting in the debounce window. Loading after an
+         * enable remains asynchronous. In-memory learning stays active and is
+         * written when the same path is enabled again.
          *
          * @param enabled whether the configured snapshot path may be read and written.
          */
         fun setPersistenceEnabled(enabled: Boolean) {
-            enqueue(Command.SetPersistenceEnabled(enabled))
-        }
-
-        /**
-         * Waits until every command submitted before this call has completed.
-         *
-         * The barrier includes repository initialization and any disk write caused
-         * by an earlier mutation or settings change. Commands submitted after the
-         * barrier are not awaited.
-         */
-        suspend fun flush() {
-            check(acceptingCommands.get()) { "completion-learning owner is closed" }
-            val completed = CompletableDeferred<Unit>()
-            commands.send(Command.Flush(completed))
-            completed.await()
-        }
-
-        /** Stops accepting commands and lets the worker drain the queue in order. */
-        fun close() {
-            if (acceptingCommands.compareAndSet(true, false)) {
-                commands.close()
+            synchronized(stateLock) {
+                check(acceptingEvents) { "completion-learning owner is closed" }
+                if (desiredPersistenceEnabled == enabled) return
+                check(persistenceControlGeneration != Long.MAX_VALUE) {
+                    "completion-learning persistence control generation overflow"
+                }
+                val generation = persistenceControlGeneration + 1L
+                val control = ControlCommand.SetPersistenceEnabled(enabled, generation)
+                check(controls.trySend(control).isSuccess) {
+                    "completion-learning control queue is full or closed"
+                }
+                desiredPersistenceEnabled = enabled
+                persistenceControlGeneration = generation
+                if (!enabled) {
+                    currentWriteRequest = null
+                    snapshotWriter.request(null)
+                }
             }
         }
 
         /**
-         * Stops accepting commands and waits for every queued operation and disk
-         * write to finish. Calling this method more than once is safe.
+         * Waits for hydration, earlier controls, and the latest requested disk generation.
+         *
+         * Write requests issued after the writer reaches this barrier are not
+         * awaited. A failed latest write is reported to the configured diagnostic
+         * callback and rethrown here.
+         */
+        suspend fun flush() {
+            val completed = CompletableDeferred<Unit>()
+            enqueueControl(ControlCommand.Flush(completed))
+            completed.await()
+        }
+
+        /** Stops accepting events and lets the bounded control worker drain. */
+        fun close() {
+            synchronized(stateLock) {
+                if (!acceptingEvents) return
+                acceptingEvents = false
+                controls.close()
+            }
+        }
+
+        /**
+         * Stops accepting events and waits for the final requested generation.
+         *
+         * Calling this method more than once is safe. Persistence failure from
+         * the final generation is surfaced to the caller.
          */
         suspend fun closeAndFlush() {
             close()
             worker.await()
         }
 
-        private fun enqueue(command: Command) {
-            check(acceptingCommands.get()) { "completion-learning owner is closed" }
-            commands.trySend(command).getOrThrow()
+        private suspend fun runControlWorker() {
+            var terminalFailure: Throwable? = null
+            try {
+                repository.initialize()
+                synchronized(stateLock) {
+                    persistenceReady = true
+                    currentWriteRequest = repository.writeRequestOrNull().takeIf { desiredPersistenceEnabled }
+                    if (changedBeforeHydration) {
+                        currentWriteRequest?.let(snapshotWriter::request)
+                        changedBeforeHydration = false
+                    }
+                }
+                for (control in controls) executeControl(control)
+            } catch (failure: Throwable) {
+                terminalFailure = failure
+            } finally {
+                synchronized(stateLock) {
+                    acceptingEvents = false
+                    controls.close(terminalFailure)
+                }
+                val pendingFailure = terminalFailure ?: CancellationException("completion-learning owner stopped")
+                while (true) {
+                    val pending = controls.tryReceive().getOrNull() ?: break
+                    if (pending is ControlCommand.Flush) pending.completed.completeExceptionally(pendingFailure)
+                }
+
+                try {
+                    snapshotWriter.closeAndFlush()
+                } catch (closeFailure: Throwable) {
+                    if (terminalFailure == null) {
+                        terminalFailure = closeFailure
+                    } else if (closeFailure !== terminalFailure) {
+                        terminalFailure.addSuppressed(closeFailure)
+                    }
+                }
+            }
+
+            terminalFailure?.let { throw it }
         }
 
-        private sealed interface Command {
-            suspend fun execute(repository: TerminalCompletionLearningRepository)
+        private suspend fun executeControl(control: ControlCommand) {
+            when (control) {
+                is ControlCommand.SetPersistenceEnabled -> {
+                    repository.setPersistenceEnabled(control.enabled)
+                    val request = repository.writeRequestOrNull()
+                    synchronized(stateLock) {
+                        if (control.generation != persistenceControlGeneration ||
+                            control.enabled != desiredPersistenceEnabled
+                        ) {
+                            return
+                        }
+                        currentWriteRequest = request
+                        snapshotWriter.request(request)
+                    }
+                }
 
-            class Mutate(
-                private val mutation: () -> Unit,
-            ) : Command {
-                override suspend fun execute(repository: TerminalCompletionLearningRepository) {
-                    repository.mutate { mutation() }
+                is ControlCommand.Flush -> {
+                    try {
+                        snapshotWriter.flushLatest()
+                        control.completed.complete(Unit)
+                    } catch (failure: Throwable) {
+                        control.completed.completeExceptionally(failure)
+                        if (failure is CancellationException) throw failure
+                    }
                 }
             }
+        }
 
-            class SetPersistencePath(
-                private val path: Path?,
-            ) : Command {
-                override suspend fun execute(repository: TerminalCompletionLearningRepository) {
-                    repository.setPersistencePath(path)
-                }
+        private fun requestWriteAfterMutation() {
+            if (!persistenceReady) {
+                changedBeforeHydration = true
+                return
             }
+            currentWriteRequest?.let(snapshotWriter::request)
+        }
 
+        private fun enqueueControl(control: ControlCommand) {
+            synchronized(stateLock) {
+                check(acceptingEvents) { "completion-learning owner is closed" }
+                check(controls.trySend(control).isSuccess) { "completion-learning control queue is full or closed" }
+            }
+        }
+
+        private sealed interface ControlCommand {
             class SetPersistenceEnabled(
-                private val enabled: Boolean,
-            ) : Command {
-                override suspend fun execute(repository: TerminalCompletionLearningRepository) {
-                    repository.setPersistenceEnabled(enabled)
-                }
-            }
+                val enabled: Boolean,
+                val generation: Long,
+            ) : ControlCommand
 
             class Flush(
-                private val completed: CompletableDeferred<Unit>,
-            ) : Command {
-                override suspend fun execute(repository: TerminalCompletionLearningRepository) {
-                    completed.complete(Unit)
-                }
-
-                fun fail(failure: Throwable) {
-                    completed.completeExceptionally(failure)
-                }
-            }
+                val completed: CompletableDeferred<Unit>,
+            ) : ControlCommand
         }
 
-        private companion object {
-            private const val COMMAND_QUEUE_CAPACITY = 1_024
+        companion object {
+            private const val DEFAULT_WRITE_DEBOUNCE_MILLIS = 150L
+            private const val CONTROL_QUEUE_CAPACITY = 64
+
+            /**
+             * Returns the versioned filename used for persisted learning.
+             *
+             * Hosts choose the parent directory while this module owns the
+             * file-format identity.
+             *
+             * @return current completion-learning filename.
+             */
+            @JvmStatic
+            fun currentFileName(): String = CompletionLearningSnapshotCodec.currentFileName()
         }
     }

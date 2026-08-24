@@ -18,7 +18,6 @@ package io.github.ketraterm.completion.ranking
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
-import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
@@ -39,12 +38,10 @@ internal data class CompletionSourceCandidates(
  * their owning collaborators.
  */
 internal class GlobalCompletionRanker(
-    commandSpecs: List<TerminalCommandSpec>,
     private val learningStore: TerminalCompletionLearningStore?,
     private val clockEpochMillis: () -> Long,
 ) {
-    private val commandSpecs = commandSpecs.toList()
-    private val outcomeResolver = TerminalCompletionOutcomeKeyResolver(commandSpecs)
+    private val outcomeResolver = TerminalCompletionOutcomeKeyResolver()
 
     fun createRequestState(
         request: TerminalCompletionRequest,
@@ -52,7 +49,7 @@ internal class GlobalCompletionRanker(
         resultLimit: Int,
     ): RequestCompletionRankingState {
         require(resultLimit > 0) { "resultLimit must be > 0, was $resultLimit" }
-        val learnedIndex = learningStore?.indexesFor(request.shellCapabilities.syntax, commandSpecs)?.evidence
+        val learnedIndex = learningStore?.indexesFor(request.shellCapabilities.syntax)?.evidence
         return RequestCompletionRankingState(
             request = request,
             context = context,
@@ -87,13 +84,13 @@ internal class GlobalCompletionRanker(
                 val contribution =
                     RankedContribution(
                         candidate = candidate,
-                        resolved = resolved,
                         sourceIndex = sourceResult.sourceIndex,
                         candidateIndex = candidateIndex,
                         localRank = candidateIndex + 1,
                         sourcePrior = sourceResult.priority.coerceIn(MIN_SOURCE_PRIOR, MAX_SOURCE_PRIOR),
                         presentationRole = sourceResult.presentationRole,
                         contextAdjustment = semanticAdjustment(context, candidate),
+                        exactLearningAdjustment = learnedIndex?.adjustment(resolved, learningContext, now) ?: 0,
                     )
                 val existing = bestByOutcome[key]
                 if (existing == null || EDIT_REPRESENTATIVE_ORDER.compare(contribution, existing) < 0) {
@@ -103,7 +100,7 @@ internal class GlobalCompletionRanker(
             for ((key, contribution) in bestByOutcome) {
                 val outcome = outcomes.getOrPut(key, ::RankedOutcome)
                 outcome.aggregate.add(contribution)
-                outcome.fused = outcome.aggregate.finish(learnedIndex, learningContext, now)
+                outcome.fused = outcome.aggregate.finish()
                 publicationDirty = true
             }
         }
@@ -141,11 +138,7 @@ internal class GlobalCompletionRanker(
             contributions += contribution
         }
 
-        fun finish(
-            learnedIndex: LearnedCompletionEvidenceIndex?,
-            learningContext: CompletionLearningContextKey,
-            now: Long,
-        ): FusedCandidate {
+        fun finish(): FusedCandidate {
             val editRepresentative = contributions.minWith(EDIT_REPRESENTATIVE_ORDER)
             var presentationRepresentative = editRepresentative
             var reciprocalRankScore = 0L
@@ -161,14 +154,12 @@ internal class GlobalCompletionRanker(
                     presentationRepresentative = contribution
                 }
             }
-            val exactLearningScore =
-                editRepresentative.resolved?.let { learnedIndex?.exactAdjustment(it.learnedKey, learningContext, now) } ?: 0
             val score =
                 CompletionScoreComponents(
                     reciprocalRank = reciprocalRankScore,
                     sourcePrior = sourcePriorScore,
                     semanticContext = strongestContext,
-                    exactLearning = exactLearningScore,
+                    exactLearning = editRepresentative.exactLearningAdjustment,
                 )
             return FusedCandidate(
                 rankingCandidate = editRepresentative.candidate,
@@ -195,13 +186,13 @@ internal class GlobalCompletionRanker(
 
     private data class RankedContribution(
         val candidate: TerminalCompletionCandidate,
-        val resolved: ResolvedCompletionOutcome?,
         val sourceIndex: Int,
         val candidateIndex: Int,
         val localRank: Int,
         val sourcePrior: Int,
         val presentationRole: TerminalCompletionSourcePresentationRole,
         val contextAdjustment: Int,
+        val exactLearningAdjustment: Int,
     ) {
         val replacementLength: Int = candidate.replacementText.length
 

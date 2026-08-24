@@ -59,14 +59,14 @@ internal class TabManager(
     private val tabRoots = HashMap<String, SplitNode>()
     private val tabContainers = HashMap<String, JPanel>()
     private val completionSpecs = TerminalCommandSpecs.defaults()
-    private val commandCompletionStatsSource = TerminalCompletionLearningStore(commandSpecs = completionSpecs)
+    private val commandCompletionStatsSource = TerminalCompletionLearningStore()
     private val completionScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("standalone-completion"))
     private val completionStatistics =
         StandaloneCompletionStatisticsCoordinator(
             statsSource = commandCompletionStatsSource,
-            initialPersistencePath =
-                settings.commandCompletionStatsPath.takeIf { settings.persistentSuggestionLearningEnabled },
+            persistencePath = settings.commandCompletionStatsPath,
+            persistenceEnabled = settings.persistentSuggestionLearningEnabled,
             coroutineScope = completionScope,
         )
     private val completionRegistry =
@@ -990,9 +990,7 @@ internal class TabManager(
     }
 
     private fun reconcileCommandPersistenceStores() {
-        completionStatistics.setPersistencePath(
-            settings.commandCompletionStatsPath.takeIf { settings.persistentSuggestionLearningEnabled },
-        )
+        completionStatistics.setPersistenceEnabled(settings.persistentSuggestionLearningEnabled)
     }
 
     private companion object {

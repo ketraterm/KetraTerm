@@ -20,42 +20,46 @@ package io.github.ketraterm.completion.model
  * imported corpora and host context providers are available.
  */
 object TerminalCommandSpecs {
+    private val DEFAULT_CATALOG: List<TerminalCommandSpec> =
+        freezeSpecs(
+            listOf(
+                cd(),
+                pushd(),
+                ls(),
+                cat(),
+                mkdir(),
+                rm(),
+                cp(),
+                mv(),
+                code(),
+                GitCommandSpecs.git(),
+                GradleCommandSpecs.gradle(),
+                PackageManagerCommandSpecs.npm(),
+                PackageManagerCommandSpecs.pnpm(),
+                PackageManagerCommandSpecs.yarn(),
+                PackageManagerCommandSpecs.bun(),
+                ContainerCommandSpecs.docker(),
+                ContainerCommandSpecs.dockerCompose(),
+                PackageManagerCommandSpecs.cargo(),
+                ContainerCommandSpecs.kubectl(),
+                PackageManagerCommandSpecs.gh(),
+                PackageManagerCommandSpecs.pip(),
+                PackageManagerCommandSpecs.go(),
+                ToolchainCommandSpecs.aws(),
+                ToolchainCommandSpecs.kotlin(),
+                ToolchainCommandSpecs.kotlinc(),
+                ToolchainCommandSpecs.adb(),
+                ToolchainCommandSpecs.ketra(),
+            ),
+        )
+
     /**
-     * Returns a deterministic default spec set for common developer commands.
+     * Returns the shared immutable default spec catalog for common developer commands.
      *
      * @return built-in command specifications.
      */
     @JvmStatic
-    fun defaults(): List<TerminalCommandSpec> =
-        listOf(
-            cd(),
-            pushd(),
-            ls(),
-            cat(),
-            mkdir(),
-            rm(),
-            cp(),
-            mv(),
-            code(),
-            GitCommandSpecs.git(),
-            GradleCommandSpecs.gradle(),
-            PackageManagerCommandSpecs.npm(),
-            PackageManagerCommandSpecs.pnpm(),
-            PackageManagerCommandSpecs.yarn(),
-            PackageManagerCommandSpecs.bun(),
-            ContainerCommandSpecs.docker(),
-            ContainerCommandSpecs.dockerCompose(),
-            PackageManagerCommandSpecs.cargo(),
-            ContainerCommandSpecs.kubectl(),
-            PackageManagerCommandSpecs.gh(),
-            PackageManagerCommandSpecs.pip(),
-            PackageManagerCommandSpecs.go(),
-            ToolchainCommandSpecs.aws(),
-            ToolchainCommandSpecs.kotlin(),
-            ToolchainCommandSpecs.kotlinc(),
-            ToolchainCommandSpecs.adb(),
-            ToolchainCommandSpecs.ketra(),
-        )
+    fun defaults(): List<TerminalCommandSpec> = DEFAULT_CATALOG
 
     private fun cd(): TerminalCommandSpec =
         TerminalCommandSpec(
@@ -169,4 +173,32 @@ object TerminalCommandSpecs {
 
     internal val KUBECTL_RESOURCES: List<String>
         get() = ContainerCommandSpecs.KUBECTL_RESOURCES
+
+    private fun freezeSpecs(specs: List<TerminalCommandSpec>): List<TerminalCommandSpec> =
+        immutableList(
+            specs.map { spec ->
+                spec.copy(
+                    aliases = immutableList(spec.aliases),
+                    subcommands = freezeSpecs(spec.subcommands),
+                    options =
+                        immutableList(
+                            spec.options.map { option ->
+                                option.copy(
+                                    names = immutableList(option.names),
+                                    valueCandidates = immutableList(option.valueCandidates),
+                                    exclusiveGroupIds = immutableList(option.exclusiveGroupIds),
+                                )
+                            },
+                        ),
+                    positionalArguments =
+                        immutableList(
+                            spec.positionalArguments.map { argument ->
+                                argument.copy(valueCandidates = immutableList(argument.valueCandidates))
+                            },
+                        ),
+                )
+            },
+        )
+
+    private fun <T> immutableList(values: List<T>): List<T> = if (values.isEmpty()) emptyList() else java.util.List.copyOf(values)
 }

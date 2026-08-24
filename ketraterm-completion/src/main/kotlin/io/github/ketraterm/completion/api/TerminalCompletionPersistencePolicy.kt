@@ -15,8 +15,6 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.history.CommandCompletionStatsSanitizer
-import io.github.ketraterm.completion.history.CommandPersistencePrivacyPolicy
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 
 /**
@@ -33,18 +31,54 @@ object TerminalCompletionPersistencePolicy {
      * @param command full command line captured by an authoritative host integration.
      * @return `true` when [command] is safe enough for local persisted learning.
      */
-    fun allowsCommand(command: String): Boolean = CommandPersistencePrivacyPolicy.allowsCommand(command)
+    fun allowsCommand(command: String): Boolean {
+        if (command.isBlank() || command.indexOf('\n') >= 0 || command.indexOf('\r') >= 0) return false
+        if (command.startsWith(' ') || command.startsWith('\t')) return false
+        return SENSITIVE_KEYWORDS.none { command.contains(it, ignoreCase = true) }
+    }
 
     /**
      * Returns a snapshot safe enough for local persisted completion learning.
      *
-     * Exact command and structural shape rows are filtered independently.
-     * Feedback rows are retained because their contract contains source and UX
-     * counters rather than raw command arguments.
+     * Every exact-command row is checked because it contains raw command text.
      *
      * @param snapshot completion-learning snapshot at a persistence boundary.
      * @return sanitized immutable snapshot.
      */
-    fun sanitizeSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot): TerminalCommandCompletionStatsSnapshot =
-        CommandCompletionStatsSanitizer.sanitize(snapshot)
+    fun sanitizeSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot): TerminalCommandCompletionStatsSnapshot {
+        val retained = snapshot.commandStats.filter { allowsCommand(it.commandLine) }
+        return if (retained.size == snapshot.commandStats.size) {
+            snapshot
+        } else {
+            TerminalCommandCompletionStatsSnapshot(retained)
+        }
+    }
+
+    private val SENSITIVE_KEYWORDS =
+        listOf(
+            "password",
+            "passwd",
+            "secret",
+            "token",
+            "apikey",
+            "api_key",
+            "private_key",
+            "access_key",
+            "secret_key",
+            "bearer",
+            "authorization",
+            "credential",
+            "credentials",
+            "passphrase",
+            "passcode",
+            "jwt",
+            "key=",
+            "_key",
+            "key_",
+            "-key",
+            "--key",
+            "key ",
+            "auth ",
+            "auth=",
+        )
 }

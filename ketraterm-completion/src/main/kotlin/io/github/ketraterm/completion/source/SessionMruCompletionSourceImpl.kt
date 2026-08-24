@@ -40,7 +40,7 @@ internal class SessionMruCompletionSourceImpl(
     private val lock = Any()
     private val commandHistory: SessionCommandHistory
     private val observedTokens: SessionObservedTokenIndex
-    private val commandSpecs = commandSpecs.toList()
+    private val commandSpecs = commandSpecs
     private var nextSequence = 1L
 
     init {
@@ -85,7 +85,7 @@ internal class SessionMruCompletionSourceImpl(
             commandHistory.appendCandidates(request, context, candidates)
             observedTokens.appendCandidates(request, commandLineContext, candidates)
         }
-        learningStore?.indexesFor(request.shellCapabilities.syntax, commandSpecs)?.history?.let { learnedHistory ->
+        learningStore?.indexesFor(request.shellCapabilities.syntax)?.history?.let { learnedHistory ->
             appendPersistedHistoryCandidates(
                 request = request,
                 lineContext = commandLineContext,

@@ -30,8 +30,9 @@ object TerminalCompletionEngines {
      * source priors, command-line context, and learned statistics.
      *
      * @param sources prioritized source registrations.
-     * @param commandSpecs command specs used to classify the active command-line
-     * position for ranking.
+     * @param commandSpecs immutable command catalog used to classify the active
+     * command-line position for ranking. Callers must not mutate this list while
+     * the engine is alive.
      * @param learningStore optional shared in-memory learning store. The engine
      * reads its immutable published snapshot and performs no host I/O.
      * @param sourceFailureHandler diagnostic sink for isolated non-cancellation

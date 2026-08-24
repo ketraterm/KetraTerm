@@ -363,7 +363,7 @@ class TerminalSessionMruCompletionSourceTest {
     @Test
     fun `persisted history applies directory boost across canonical URI variants`() =
         runBlocking {
-            val stats = TerminalCompletionLearningStore(commandSpecs = emptyList())
+            val stats = TerminalCompletionLearningStore()
             stats.recordCommandResult(
                 commandLine = "tool z-match",
                 successful = true,
@@ -444,7 +444,7 @@ class TerminalSessionMruCompletionSourceTest {
             val source =
                 SessionMruCompletionSourceImpl(
                     commandSpecs = emptyList(),
-                    learningStore = TerminalCompletionLearningStore(commandSpecs = emptyList()).apply { replaceSnapshot(snapshot) },
+                    learningStore = TerminalCompletionLearningStore().apply { replaceSnapshot(snapshot) },
                     clockEpochMillis = { now },
                 )
 

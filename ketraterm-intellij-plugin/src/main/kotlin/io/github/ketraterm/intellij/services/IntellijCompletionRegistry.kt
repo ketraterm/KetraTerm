@@ -20,11 +20,11 @@ import io.github.ketraterm.completion.api.TerminalCompletionSessionRegistry
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 import kotlinx.coroutines.CoroutineScope
+import java.nio.file.Path
 
 /**
  * Plugin-owned bridge from IntelliJ session context to shared completion sessions and learned statistics.
@@ -34,15 +34,17 @@ import kotlinx.coroutines.CoroutineScope
  *
  * @param specs immutable command specifications shared by every session.
  * @param statsSource bounded learned-statistics source.
- * @param learningRepository serialized learning and persistence owner.
+ * @param persistencePath fixed product-owned learning destination, or `null` for memory-only learning.
+ * @param persistenceEnabled whether the fixed destination may initially be read and written.
  * @param sessionMruCapacity positive per-session MRU capacity.
  * @param coroutineScope host lifecycle scope that parents completion work.
  * @throws IllegalArgumentException if [sessionMruCapacity] is not positive.
  */
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    statsSource: TerminalCompletionLearningStore = TerminalCompletionLearningStore(commandSpecs = specs),
-    learningRepository: TerminalCompletionLearningRepository = TerminalCompletionLearningRepository(statsSource),
+    statsSource: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
+    persistencePath: Path? = null,
+    persistenceEnabled: Boolean = true,
     sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
     coroutineScope: CoroutineScope,
 ) : AutoCloseable {
@@ -56,7 +58,9 @@ internal class IntellijCompletionRegistry(
         )
     private val statistics =
         IntellijCompletionStatisticsCoordinator(
-            repository = learningRepository,
+            statsSource = statsSource,
+            persistencePath = persistencePath,
+            persistenceEnabled = persistenceEnabled,
             coroutineScope = coroutineScope,
         )
 
@@ -100,7 +104,7 @@ internal class IntellijCompletionRegistry(
     }
 
     /**
-     * Updates session MRU state and queues privacy-filtered persistent learning.
+     * Updates session MRU state and records privacy-filtered persistent learning.
      *
      * @param sessionId terminal session that produced the command.
      * @param profileId stable terminal profile identifier used for ranking context.
@@ -145,7 +149,7 @@ internal class IntellijCompletionRegistry(
         statistics.close()
     }
 
-    /** Clears sessions, drains queued learning, and waits for the final persistence write. */
+    /** Clears sessions and waits for the final requested persistence write. */
     suspend fun closeAndFlush() {
         if (beginClose()) sessions.close()
         statistics.closeAndFlush()

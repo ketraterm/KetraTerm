@@ -23,7 +23,7 @@ import com.intellij.openapi.project.Project
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
-import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
@@ -42,20 +42,16 @@ internal class KetraTermCompletionService(
 ) : Disposable {
     private val settings = KetraTermIntellijSettings.getInstance()
     private val learningStore = TerminalCompletionLearningStore()
-    private val learningRepository =
-        TerminalCompletionLearningRepository(
-            learningStore = learningStore,
-            initialPersistencePath =
-                PathManager
-                    .getSystemDir()
-                    .resolve("ketraterm")
-                    .resolve(TerminalCompletionLearningRepository.currentFileName()),
-            persistenceEnabled = settings.completionLearningPersistenceEnabled(),
-        )
+    private val persistencePath =
+        PathManager
+            .getSystemDir()
+            .resolve("ketraterm")
+            .resolve(TerminalCompletionLearningCoordinator.currentFileName())
     private val registry =
         IntellijCompletionRegistry(
             statsSource = learningStore,
-            learningRepository = learningRepository,
+            persistencePath = persistencePath,
+            persistenceEnabled = settings.completionLearningPersistenceEnabled(),
             coroutineScope = coroutineScope,
         )
     private val settingsListener: () -> Unit = {
@@ -140,7 +136,7 @@ internal class KetraTermCompletionService(
         )
     }
 
-    /** Closes sessions and durably flushes queued completion learning. */
+    /** Closes sessions and durably flushes learned completion state. */
     override fun dispose() {
         settings.removeChangeListener(settingsListener)
         runBlocking { registry.closeAndFlush() }

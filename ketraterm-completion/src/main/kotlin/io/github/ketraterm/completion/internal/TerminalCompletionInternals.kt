@@ -18,8 +18,6 @@ package io.github.ketraterm.completion.internal
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandShapeStats
-import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
 
 internal val TERMINAL_COMPLETION_CANDIDATE_ORDER: Comparator<TerminalCompletionCandidate> =
     compareByDescending<TerminalCompletionCandidate> { it.score }
@@ -32,24 +30,6 @@ internal val TERMINAL_COMMAND_COMPLETION_STATS_ORDER: Comparator<TerminalCommand
         .thenByDescending { it.successCount }
         .thenBy { it.dismissedCount }
         .thenBy { it.commandLine }
-        .thenBy { it.profileId.orEmpty() }
-        .thenBy { it.workingDirectoryUri.orEmpty() }
-
-internal val TERMINAL_COMMAND_SHAPE_STATS_ORDER: Comparator<TerminalCommandShapeStats> =
-    compareByDescending<TerminalCommandShapeStats> { it.lastUsedEpochMillis }
-        .thenByDescending { it.acceptedCount }
-        .thenByDescending { it.successCount }
-        .thenBy { it.dismissedCount }
-        .thenBy { it.shape.normalizedShapeKey }
-        .thenBy { it.profileId.orEmpty() }
-        .thenBy { it.workingDirectoryUri.orEmpty() }
-
-internal val TERMINAL_COMPLETION_FEEDBACK_STATS_ORDER: Comparator<TerminalCompletionFeedbackStats> =
-    compareByDescending<TerminalCompletionFeedbackStats> { it.lastUsedEpochMillis }
-        .thenByDescending { it.acceptedCount }
-        .thenBy { it.dismissedCount }
-        .thenBy { it.source }
-        .thenBy { it.candidateKind.name }
         .thenBy { it.profileId.orEmpty() }
         .thenBy { it.workingDirectoryUri.orEmpty() }
 

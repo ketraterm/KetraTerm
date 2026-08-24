@@ -19,25 +19,22 @@ import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.commandline.TerminalCommandLineClassifier
 import io.github.ketraterm.completion.commandline.TerminalCommandLineToken
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
+import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
 import io.github.ketraterm.completion.internal.commandLineAfterCandidate
-import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.internal.isRecordableTerminalCompletionCommand
 import io.github.ketraterm.completion.model.TerminalPathArgumentKind
 
 /** Resolves source-independent keys for candidate outcomes and learned commands. */
-internal class TerminalCompletionOutcomeKeyResolver(
-    commandSpecs: List<TerminalCommandSpec>,
-) {
-    private val commandSpecs = commandSpecs.toList()
-
+internal class TerminalCompletionOutcomeKeyResolver {
     fun resolve(
         request: TerminalCompletionRequest,
         candidate: TerminalCompletionCandidate,
         context: TerminalCompletionContext,
     ): ResolvedCompletionOutcome? {
         val commandLine = request.commandLineAfterCandidate(candidate) ?: return null
+        if (!isRecordableTerminalCompletionCommand(commandLine)) return null
         val pathAware =
             candidate.kind == TerminalCompletionCandidateKind.PATH ||
                 context.expectedPathKind != TerminalPathArgumentKind.NONE
@@ -79,12 +76,7 @@ internal class TerminalCompletionOutcomeKeyResolver(
                 projectedContext.tokens to projectedContext.activeTokenIndex
             }
 
-        val classification =
-            TerminalCommandLineClassifier.classify(
-                commandLine,
-                tokens,
-                commandSpecs,
-            ) ?: return null
+        if (tokens.firstCommandTokenIndex() >= tokens.size) return null
         val learnedKey =
             learnedKey(
                 tokens = tokens,
@@ -94,7 +86,6 @@ internal class TerminalCompletionOutcomeKeyResolver(
         return ResolvedCompletionOutcome(
             groupKey = learnedKey.tokens,
             learnedKey = learnedKey,
-            shape = classification.shape,
         )
     }
 
@@ -163,7 +154,6 @@ internal class TerminalCompletionOutcomeKeyResolver(
 internal data class ResolvedCompletionOutcome(
     val groupKey: List<String>,
     val learnedKey: LearnedCompletionOutcomeKey,
-    val shape: io.github.ketraterm.completion.model.TerminalCommandLineShape?,
 )
 
 internal data class LearnedCompletionOutcomeKey(

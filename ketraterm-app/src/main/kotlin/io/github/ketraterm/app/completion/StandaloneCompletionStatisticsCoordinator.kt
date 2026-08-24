@@ -16,9 +16,7 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
-import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
-import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
@@ -28,32 +26,29 @@ import java.nio.file.Path
 /**
  * Standalone owner of serialized completion learning and optional persistence.
  *
- * The shared learning coordinator queues repository work for one ordered worker
- * in the application's lifecycle scope. This adapter only maps standalone context
- * and Swing feedback vocabulary.
+ * The shared coordinator updates bounded memory synchronously and conflates
+ * pending disk generations in the application's lifecycle scope. This adapter
+ * only maps standalone context and Swing feedback vocabulary.
  */
 internal class StandaloneCompletionStatisticsCoordinator(
     statsSource: TerminalCompletionLearningStore,
-    initialPersistencePath: Path?,
+    persistencePath: Path,
+    persistenceEnabled: Boolean,
     coroutineScope: CoroutineScope,
 ) {
     private val learning =
         TerminalCompletionLearningCoordinator(
-            repository =
-                TerminalCompletionLearningRepository(
-                    learningStore = statsSource,
-                    initialPersistencePath = initialPersistencePath,
-                ),
+            learningStore = statsSource,
             coroutineScope = coroutineScope,
+            persistencePath = persistencePath,
+            persistenceEnabled = persistenceEnabled,
         )
     private val feedbackRecorder =
         SwingCompletionFeedbackRecorder(
-            statsSource = statsSource,
-            submitMutation = learning::submit,
-            allowsCommand = TerminalCompletionPersistencePolicy::allowsCommand,
+            recordSuggestionFeedback = learning::recordSuggestionFeedback,
         )
 
-    /** Creates a feedback handler whose mutations are serialized by this owner. */
+    /** Creates a feedback handler whose exact learning is recorded immediately. */
     fun createFeedbackHandler(
         profileId: String?,
         workingDirectoryUriProvider: () -> String?,
@@ -65,7 +60,7 @@ internal class StandaloneCompletionStatisticsCoordinator(
             )
         }
 
-    /** Records one privacy-filtered shell command result off the caller thread. */
+    /** Records one privacy-filtered shell command result in bounded memory. */
     fun recordFinishedCommand(
         commandLine: String,
         successful: Boolean,
@@ -82,12 +77,12 @@ internal class StandaloneCompletionStatisticsCoordinator(
         )
     }
 
-    /** Enables, switches, or disables the persistence store asynchronously. */
-    fun setPersistencePath(path: Path?) {
-        learning.setPersistencePath(path)
+    /** Enables or disables the coordinator's fixed persistence destination. */
+    fun setPersistenceEnabled(enabled: Boolean) {
+        learning.setPersistenceEnabled(enabled)
     }
 
-    /** Waits until all previously submitted learning and persistence work completes. */
+    /** Waits for hydration, prior persistence controls, and the latest requested write. */
     suspend fun flush() {
         learning.flush()
     }
@@ -97,7 +92,7 @@ internal class StandaloneCompletionStatisticsCoordinator(
         learning.closeAndFlush()
     }
 
-    /** Stops accepting statistics and drains queued work in the lifecycle scope. */
+    /** Stops accepting statistics and drains persistence control work. */
     fun close() {
         learning.close()
     }

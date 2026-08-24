@@ -15,7 +15,8 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -43,50 +44,6 @@ class TerminalCompletionLearningStoreMergeTest {
         assertEquals(200, merged.lastUsedEpochMillis)
     }
 
-    @Test
-    fun `merge snapshot adds shape aggregates with saturated counters`() {
-        val shape = TerminalCommandLineShape(executable = "git", subcommands = listOf("status"))
-        val store = TerminalCompletionLearningStore()
-        store.replaceSnapshot(
-            TerminalCommandCompletionStatsSnapshot(
-                shapeStats = listOf(shapeStats(shape, Int.MAX_VALUE, 2, 100)),
-            ),
-        )
-
-        store.mergeSnapshot(
-            TerminalCommandCompletionStatsSnapshot(
-                shapeStats = listOf(shapeStats(shape, 5, 3, 200)),
-            ),
-        )
-
-        val merged = store.snapshot().shapeStats.single()
-        assertEquals(Int.MAX_VALUE, merged.useCount)
-        assertEquals(5, merged.acceptedCount)
-        assertEquals(200, merged.lastUsedEpochMillis)
-    }
-
-    @Test
-    fun `merge snapshot adds provider feedback by canonical provider context`() {
-        val store = TerminalCompletionLearningStore()
-        store.replaceSnapshot(
-            TerminalCommandCompletionStatsSnapshot(
-                feedbackStats = listOf(feedbackStats("file:///repo", 2, 1, 100)),
-            ),
-        )
-
-        store.mergeSnapshot(
-            TerminalCommandCompletionStatsSnapshot(
-                feedbackStats = listOf(feedbackStats("file:///repo/", 3, 4, 200)),
-            ),
-        )
-
-        val merged = store.snapshot().feedbackStats.single()
-        assertEquals("file:///repo/", merged.workingDirectoryUri)
-        assertEquals(5, merged.acceptedCount)
-        assertEquals(5, merged.dismissedCount)
-        assertEquals(200, merged.lastUsedEpochMillis)
-    }
-
     private fun commandStats(
         commandLine: String,
         directory: String,
@@ -99,35 +56,6 @@ class TerminalCompletionLearningStoreMergeTest {
         workingDirectoryUri = directory,
         useCount = useCount,
         successCount = successCount,
-        lastUsedEpochMillis = timestamp,
-    )
-
-    private fun shapeStats(
-        shape: TerminalCommandLineShape,
-        useCount: Int,
-        acceptedCount: Int,
-        timestamp: Long,
-    ) = TerminalCommandShapeStats(
-        shape = shape,
-        profileId = "bash",
-        workingDirectoryUri = "file:///repo",
-        useCount = useCount,
-        acceptedCount = acceptedCount,
-        lastUsedEpochMillis = timestamp,
-    )
-
-    private fun feedbackStats(
-        directory: String,
-        acceptedCount: Int,
-        dismissedCount: Int,
-        timestamp: Long,
-    ) = TerminalCompletionFeedbackStats(
-        source = "spec",
-        candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-        profileId = "bash",
-        workingDirectoryUri = directory,
-        acceptedCount = acceptedCount,
-        dismissedCount = dismissedCount,
         lastUsedEpochMillis = timestamp,
     )
 }

@@ -18,8 +18,6 @@ package io.github.ketraterm.completion.persistence
 import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
-import io.github.ketraterm.completion.model.TerminalCommandShapeStats
-import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.*
@@ -42,29 +40,34 @@ internal sealed interface CompletionLearningFileLoadOutcome {
     data object Failed : CompletionLearningFileLoadOutcome
 }
 
-/** Bounded local-file implementation used only by the suspending repository. */
+/** Snapshot file operations supplied to the passive persistence repository. */
+internal interface CompletionLearningSnapshotFileStore {
+    /** Reads and validates one bounded snapshot. */
+    fun loadSnapshot(): CompletionLearningFileLoadOutcome
+
+    /** Atomically replaces the file with one bounded, sanitized [snapshot]. */
+    fun persist(snapshot: TerminalCommandCompletionStatsSnapshot)
+}
+
+/** Bounded local-file implementation used only by the passive snapshot repository. */
 internal class CompletionLearningFileStore(
     private val path: Path,
     private val onFailure: (Throwable) -> Unit = {},
     private val openInput: (Path) -> InputStream = { Files.newInputStream(it) },
     private val createTemporaryFile: (Path, String, String) -> Path = Files::createTempFile,
-) {
-    fun loadSnapshot(): CompletionLearningFileLoadOutcome =
+) : CompletionLearningSnapshotFileStore {
+    override fun loadSnapshot(): CompletionLearningFileLoadOutcome =
         try {
             val attributes = Files.readAttributes(path, BasicFileAttributes::class.java)
             if (!attributes.isRegularFile) {
                 CompletionLearningFileLoadOutcome.Rejected
             } else {
-                val lines = readBoundedLines()
-                if (lines == null || lines.firstOrNull() != CURRENT_HEADER) {
+                val snapshot = readBoundedLines()?.let(CompletionLearningSnapshotCodec::decode)
+                if (snapshot == null || !snapshotFitsBounds(snapshot)) {
                     CompletionLearningFileLoadOutcome.Rejected
                 } else {
                     CompletionLearningFileLoadOutcome.Loaded(
-                        boundedSnapshot(
-                            TerminalCompletionPersistencePolicy.sanitizeSnapshot(
-                                CompletionLearningSnapshotCodec.decode(lines),
-                            ),
-                        ),
+                        TerminalCompletionPersistencePolicy.sanitizeSnapshot(snapshot),
                     )
                 }
             }
@@ -74,13 +77,10 @@ internal class CompletionLearningFileStore(
             failed(failure)
         }
 
-    fun persist(snapshot: TerminalCommandCompletionStatsSnapshot) {
-        writeSnapshot(boundedSnapshot(TerminalCompletionPersistencePolicy.sanitizeSnapshot(snapshot)))
-    }
-
-    private fun writeSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot) {
-        runCatching {
-            val lines = CompletionLearningSnapshotCodec.encode(snapshot)
+    override fun persist(snapshot: TerminalCommandCompletionStatsSnapshot) {
+        try {
+            val sanitized = TerminalCompletionPersistencePolicy.sanitizeSnapshot(snapshot)
+            val lines = CompletionLearningSnapshotCodec.encode(boundedSnapshot(sanitized))
             requireEncodedBounds(lines)
             val absolutePath = path.toAbsolutePath().normalize()
             val parent = requireNotNull(absolutePath.parent) { "persistence path must have a parent: $path" }
@@ -96,7 +96,10 @@ internal class CompletionLearningFileStore(
             } finally {
                 Files.deleteIfExists(temporary)
             }
-        }.onFailure(onFailure)
+        } catch (failure: Exception) {
+            reportFailure(failure)
+            throw failure
+        }
     }
 
     private fun requireEncodedBounds(lines: List<String>) {
@@ -156,52 +159,41 @@ internal class CompletionLearningFileStore(
     }
 
     private fun failed(failure: Throwable): CompletionLearningFileLoadOutcome {
-        onFailure(failure)
+        reportFailure(failure)
         return CompletionLearningFileLoadOutcome.Failed
     }
 
-    private fun boundedSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot): TerminalCommandCompletionStatsSnapshot =
-        TerminalCommandCompletionStatsSnapshot(
-            commandStats = boundedRows(snapshot.commandStats, ::commandRowSize),
-            shapeStats = boundedRows(snapshot.shapeStats, ::shapeRowSize),
-            feedbackStats = boundedRows(snapshot.feedbackStats, ::feedbackRowSize),
-        )
+    private fun reportFailure(failure: Throwable) {
+        runCatching { onFailure(failure) }
+    }
 
-    private fun <T> boundedRows(
-        rows: List<T>,
-        rowSize: (T) -> Int?,
-    ): List<T> {
-        val retained = ArrayList<T>(minOf(rows.size, MAX_ROWS_PER_FAMILY))
+    private fun snapshotFitsBounds(snapshot: TerminalCommandCompletionStatsSnapshot): Boolean {
+        if (snapshot.commandStats.size > MAX_COMMAND_ROWS) return false
+        var encodedBytes = 0
+        for (row in snapshot.commandStats) {
+            val rowSize = commandRowSize(row) ?: return false
+            encodedBytes += rowSize + MAX_NEWLINE_BYTES
+            if (encodedBytes > MAX_ENCODED_COMMAND_BYTES) return false
+        }
+        return true
+    }
+
+    private fun boundedSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot): TerminalCommandCompletionStatsSnapshot {
+        val retained = ArrayList<TerminalCommandCompletionStats>(minOf(snapshot.commandStats.size, MAX_COMMAND_ROWS))
         var retainedBytes = 0
-        for (row in rows) {
-            val size = rowSize(row) ?: continue
-            if (retainedBytes + size + MAX_NEWLINE_BYTES > MAX_ENCODED_BYTES_PER_FAMILY) continue
+        for (row in snapshot.commandStats) {
+            val size = commandRowSize(row) ?: continue
+            if (retainedBytes + size + MAX_NEWLINE_BYTES > MAX_ENCODED_COMMAND_BYTES) continue
             retained += row
             retainedBytes += size + MAX_NEWLINE_BYTES
-            if (retained.size == MAX_ROWS_PER_FAMILY) break
+            if (retained.size == MAX_COMMAND_ROWS) break
         }
-        return retained
+        return TerminalCommandCompletionStatsSnapshot(commandStats = retained)
     }
 
     private fun commandRowSize(row: TerminalCommandCompletionStats): Int? =
         encodedRowSize(row.commandLine, row.profileId, row.workingDirectoryUri) {
             CompletionLearningSnapshotCodec.encodeCommandRow(row)
-        }
-
-    private fun shapeRowSize(row: TerminalCommandShapeStats): Int? {
-        if (row.shape.subcommands.size > MAX_SHAPE_TOKENS || row.shape.optionNames.size > MAX_SHAPE_TOKENS) return null
-        return encodedRowSize(
-            row.shape.executable,
-            row.profileId,
-            row.workingDirectoryUri,
-            *row.shape.subcommands.toTypedArray(),
-            *row.shape.optionNames.toTypedArray(),
-        ) { CompletionLearningSnapshotCodec.encodeShapeRow(row) }
-    }
-
-    private fun feedbackRowSize(row: TerminalCompletionFeedbackStats): Int? =
-        encodedRowSize(row.source, row.profileId, row.workingDirectoryUri) {
-            CompletionLearningSnapshotCodec.encodeFeedbackRow(row)
         }
 
     private inline fun encodedRowSize(
@@ -224,19 +216,16 @@ internal class CompletionLearningFileStore(
     }
 
     private companion object {
-        private const val MAX_ROWS_PER_FAMILY = 2_048
-        private const val MAX_FILE_BYTES = 4 * 1024 * 1024
-        private const val MAX_FILE_LINES = 1 + 3 * MAX_ROWS_PER_FAMILY
+        private const val MAX_COMMAND_ROWS = 2_048
+        private const val MAX_ENCODED_COMMAND_BYTES = 1_000_000
+        private const val MAX_FILE_BYTES = MAX_ENCODED_COMMAND_BYTES + 128
+        private const val MAX_FILE_LINES = 1 + MAX_COMMAND_ROWS
         private const val MAX_LINE_BYTES = 16 * 1024
         private const val MAX_NEWLINE_BYTES = 2
-        private const val MAX_ENCODED_BYTES_PER_FAMILY = 1_000_000
         private const val MAX_ROW_RAW_CHARS = 8 * 1024
         private const val MAX_TEXT_CHARS = 4 * 1024
-        private const val MAX_SHAPE_TOKENS = 128
         private const val DEFAULT_LINE_CAPACITY = 256
         private const val NEWLINE_BYTE: Byte = 0x0A
         private const val CARRIAGE_RETURN_BYTE: Byte = 0x0D
-        private val CURRENT_HEADER =
-            CompletionLearningSnapshotCodec.encode(TerminalCommandCompletionStatsSnapshot()).single()
     }
 }

@@ -27,6 +27,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
  * permanently rejects new sessions; late command records are ignored.
  *
  * @param commandSpecs immutable command vocabulary shared by every session.
+ * Callers must not mutate this list while the registry is alive.
  * @param learningStore optional cross-session learning used by MRU recovery and ranking.
  * @param sessionMruCapacity positive number of distinct session commands retained per session.
  * @param sourceFailureHandler diagnostic sink shared by session engines.
@@ -45,7 +46,7 @@ class TerminalCompletionSessionRegistry
             require(sessionMruCapacity > 0) { "sessionMruCapacity must be > 0, was $sessionMruCapacity" }
         }
 
-        private val commandSpecs = commandSpecs.toList()
+        private val commandSpecs = commandSpecs
         private val lock = Any()
         private val sessions = HashMap<String, TerminalCompletionSessionHandle>()
         private var closed = false

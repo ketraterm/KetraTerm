@@ -17,7 +17,7 @@ package io.github.ketraterm.completion.ranking
 
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 
-/** Saturating aggregate for command frecency learning. */
+/** Saturating aggregate for exact command learning. */
 internal data class LearnedEvidenceCounts(
     var useCount: Long = 0,
     var successCount: Long = 0,

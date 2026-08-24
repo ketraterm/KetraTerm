@@ -34,7 +34,7 @@ class GlobalCompletionRankerIncrementalTest {
                 commandSpecs = emptyList(),
             )
         val state =
-            GlobalCompletionRanker(emptyList(), learningStore = null, clockEpochMillis = { 0L })
+            GlobalCompletionRanker(learningStore = null, clockEpochMillis = { 0L })
                 .createRequestState(request, context, resultLimit = 2)
         state.ingest(
             CompletionSourceCandidates(
@@ -128,7 +128,7 @@ class GlobalCompletionRankerIncrementalTest {
                 lineContext = TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset),
                 commandSpecs = emptyList(),
             )
-        return GlobalCompletionRanker(emptyList(), learningStore = null, clockEpochMillis = { 0L })
+        return GlobalCompletionRanker(learningStore = null, clockEpochMillis = { 0L })
             .createRequestState(request, context, resultLimit = 2)
     }
 

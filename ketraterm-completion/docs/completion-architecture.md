@@ -41,19 +41,16 @@ or construct:
 - `TerminalCompletionValueDomain`
 - `TerminalCommandSpecs`
 - `TerminalCommandCompletionStats`
-- `TerminalCommandShapeStats` and `TerminalCommandLineShape`
-- `TerminalCompletionFeedbackStats` and feedback vocabulary
+- `TerminalCompletionFeedbackKind`
 - `TerminalCommandCompletionStatsSnapshot`
 
-`TerminalCompletionPersistencePolicy` is the reviewed host-facing privacy facade. It answers whether an exact command
-may be persisted and sanitizes a complete snapshot before a host crosses a storage boundary. Detailed rejection
-reasons, command-location analysis, keyword matching, and structural-statistic filtering remain internal because hosts
-do not need to branch on them.
+`TerminalCompletionPersistencePolicy` is the reviewed host-facing privacy boundary. It answers whether an exact
+command may be persisted and sanitizes a complete snapshot before a host crosses a storage boundary. Its conservative
+keyword list remains internal because hosts do not need to branch on individual rejection reasons.
 
 Model constructors expose durable host-owned fields only. Derived matching keys,
-such as normalized command text and normalized command-shape keys, are computed
-by completion internals and snapshot codecs instead of being caller-owned
-constructor state.
+such as normalized command text, are computed by completion internals instead
+of being caller-owned constructor state.
 
 Types used only to tokenize, classify, rank, merge, or index suggestions belong
 in implementation packages and must stay `internal`.
@@ -118,8 +115,7 @@ decision explicitly promotes a type into `api` or `model`.
 
 Implementation files follow the completion request directly. One semantic
 token pass resolves command paths, inherited options, repeatable subcommands,
-option values, and positional arguments for both live completion and learned
-command-shape classification. Session MRU coordinates bounded command-history
+option values, and positional arguments for live completion. Session MRU coordinates bounded command-history
 and observed-token indexes, projects learned commands into the active
 replacement range, and recovers positive persisted commands as one learned
 fallback stream. The shared learning store publishes one immutable aggregate
@@ -140,13 +136,13 @@ read files, scan raw shell history, spawn shells, or talk to UI frameworks.
 
 Optional disk I/O belongs to the separately published
 `ketraterm-completion-persistence` module. Its
-`TerminalCompletionLearningRepository` owns an internal codec and bounded file store that sanitize again at the storage
-boundary, apply byte/line/row bounds before decoding or encoding, and perform atomic file replacement. The repository
-serializes mutation, loading, and persistence with a `Mutex` and moves file I/O to `Dispatchers.IO`.
-`TerminalCompletionLearningCoordinator` owns one ordered command worker parented by a caller-owned lifecycle scope and
-centralizes the shared command privacy check. Its explicit flush barrier lets product disposal wait for all accepted
-mutations and writes before the lifecycle scope is cancelled. Product hosts own the destination path, enablement policy,
-diagnostics, and the point at which graceful shutdown becomes blocking.
+`TerminalCompletionLearningCoordinator` owns the public fixed-path lifecycle. Learning mutates its bounded in-memory
+store synchronously; one bounded worker handles only hydration, enablement, and flush controls, while one debounced,
+conflated writer materializes and persists only the latest generation in a burst. Its internal repository performs bounded
+load/write I/O without owning another mutex, queue, cache, or scope. The explicit flush barrier lets product disposal wait
+for accepted mutations and the latest write before the lifecycle scope is cancelled.
+Product hosts own the fixed destination, enablement policy, diagnostics, and the point at which graceful shutdown
+becomes blocking.
 Completion persistence is not a workspace responsibility.
 
 The standalone app and IntelliJ plugin should compose completion sources through
@@ -332,7 +328,7 @@ untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Gi
 IntelliJ dynamic completion is composed from ordinary source-producing functions and explicit prioritized source
 entries. There is no provider-factory or registration framework. The shared completion session registry owns
 session MRU/path/engine composition and strict close semantics; a thin IntelliJ statistics adapter
-maps host events into the shared learning repository. Standalone uses the same repository path so completion files are
+maps host events into the shared learning coordinator. Standalone uses the same coordinator contract so completion files are
 never loaded on the Swing event-dispatch thread.
 
 The engine-to-Swing request/candidate bridge and Swing-feedback-to-statistics mapping live in `ketraterm-ui-swing-host`.
@@ -345,9 +341,11 @@ deduplicate, and rank candidates.
 `ketraterm-completion` must stay pure: it should not shell out to Git, read IDE
 indexes, watch files, or block on host I/O.
 
-Learned statistics publish one immutable snapshot instance after each mutation.
-The ranker builds one direct exact/shape/provider lookup per snapshot identity
-and shell syntax, then reuses it for subsequent requests. There are no indexed
+Learned statistics mutate one bounded exact index and publish its immutable snapshot lazily on the next ranking,
+history, persistence, or explicit snapshot read. Multiple events before that read therefore avoid rebuilding the full row
+list. No-op or rejected events retain the current snapshot identity.
+The ranker builds one direct exact-command lookup per snapshot identity and
+shell syntax, then reuses it for subsequent requests. There are no indexed
 list wrappers or a second mutation-time ranking-index hierarchy.
 
 Positive persisted command rows also have a snapshot-identity and shell-syntax
@@ -388,8 +386,8 @@ authorities, environment variables, or filesystem case.
 Provider support uses reciprocal-rank fusion. Candidate scores are meaningful
 only within their producing source; an MRU score is never compared numerically
 with a path or specification score. Each distinct semantic or learned source
-entry contributes its best local rank for an outcome, a source prior clamped to
-`[-20, 20]`, and its context-specific provider feedback. Persistent statistics
+entry contributes its best local rank for an outcome and a source prior clamped to
+`[-20, 20]`. Persistent statistics
 do not constitute a source entry, so the same command execution cannot gain a
 second provider vote merely because it exists in both MRU and persisted stats.
 Duplicate candidates from the same source do not multiply support.
@@ -397,9 +395,7 @@ Duplicate candidates from the same source do not multiply support.
 The global ranker applies the strongest semantic adjustment among contributors.
 Exact outcome statistics then add bounded usage,
 success/failure, accepted/dismissed, recency, profile, and working-directory
-evidence. Command-shape evidence supplies a weaker fallback for outcomes with
-no exact history. Feedback ratios use smoothing so one event cannot overwhelm
-strong command semantics. Only explicit dismissal is negative; passive popup
+evidence. Only explicit dismissal is negative; passive popup
 closure is neutral.
 
 The edit representative favors semantic fit, a narrow replacement range, the
@@ -447,5 +443,4 @@ includes eight-provider fusion, 2,048 learned rows, duplicate-heavy evidence,
 hostile collection-cap input, and a real session-MRU lookup backed by the full
 persisted snapshot. The persisted-history case is prewarmed deliberately: it
 measures the normal learning-store-owned compiled-index cache hit, while index
-construction stays bounded to snapshot mutation or first use for a new shell
-syntax and command-spec set.
+construction stays bounded to first use of a new snapshot or shell syntax.

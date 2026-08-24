@@ -17,7 +17,8 @@ package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
-import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
@@ -29,9 +30,9 @@ class StandaloneCompletionStatisticsCoordinatorTest {
     fun `command learning uses the lifecycle scope and repository`(
         @TempDir directory: Path,
     ) = runBlocking {
-        val path = directory.resolve(TerminalCompletionLearningRepository.currentFileName())
+        val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
         val learning = TerminalCompletionLearningStore()
-        val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, this)
+        val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, true, this)
 
         coordinator.recordFinishedCommand("git status", true, "bash", "file:///repo", 42L)
         coordinator.flush()
@@ -45,14 +46,15 @@ class StandaloneCompletionStatisticsCoordinatorTest {
     }
 
     @Test
-    fun `null persistence path keeps later learning in memory only`(
+    fun `disabled persistence keeps later learning in memory only`(
         @TempDir directory: Path,
     ) = runBlocking {
-        val path = directory.resolve(TerminalCompletionLearningRepository.currentFileName())
+        val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
         val learning = TerminalCompletionLearningStore()
-        val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, this)
+        val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, true, this)
         coordinator.recordFinishedCommand("git status", true, null, null, 1L)
-        coordinator.setPersistencePath(null)
+        coordinator.flush()
+        coordinator.setPersistenceEnabled(false)
         coordinator.recordFinishedCommand("npm test", true, null, null, 2L)
         coordinator.flush()
 
@@ -71,9 +73,18 @@ class StandaloneCompletionStatisticsCoordinatorTest {
         coordinator.closeAndFlush()
     }
 
-    private suspend fun persistedSnapshot(path: Path): TerminalCommandCompletionStatsSnapshot {
-        val learning = TerminalCompletionLearningStore()
-        TerminalCompletionLearningRepository(learning, path).initialize()
-        return learning.snapshot()
-    }
+    private suspend fun persistedSnapshot(path: Path): TerminalCommandCompletionStatsSnapshot =
+        coroutineScope {
+            val learning = TerminalCompletionLearningStore()
+            val coordinator =
+                TerminalCompletionLearningCoordinator(
+                    learningStore = learning,
+                    coroutineScope = this,
+                    persistencePath = path,
+                )
+            coordinator.flush()
+            val snapshot = learning.snapshot()
+            coordinator.closeAndFlush()
+            snapshot
+        }
 }

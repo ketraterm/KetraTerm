@@ -18,7 +18,6 @@ package io.github.ketraterm.ui.swing.host
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
-import io.github.ketraterm.completion.model.TerminalCompletionFeedbackStats
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
@@ -61,27 +60,6 @@ class SwingCompletionFeedbackRecorderTest {
             source.snapshot().commandStats,
         )
         assertEquals(source.snapshot(), published.single())
-        assertEquals(
-            "git",
-            published
-                .single()
-                .shapeStats
-                .single()
-                .shape.executable,
-        )
-        assertEquals(
-            listOf(
-                TerminalCompletionFeedbackStats(
-                    source = "spec",
-                    candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                    profileId = "bash",
-                    workingDirectoryUri = "file:///repo/",
-                    acceptedCount = 1,
-                    lastUsedEpochMillis = 1_000L,
-                ),
-            ),
-            published.single().feedbackStats,
-        )
     }
 
     @Test
@@ -134,7 +112,7 @@ class SwingCompletionFeedbackRecorderTest {
         }
 
     @Test
-    fun `unknown suggestion kind records command feedback without source-specific row`() {
+    fun `unknown suggestion kind still records exact command feedback`() {
         val source = TerminalCompletionLearningStore()
         val recorder = recorder(source, clockEpochMillis = { 1_500L })
 
@@ -159,7 +137,6 @@ class SwingCompletionFeedbackRecorderTest {
                 .single()
                 .acceptedCount,
         )
-        assertTrue(source.snapshot().feedbackStats.isEmpty())
     }
 
     @Test
@@ -246,28 +223,6 @@ class SwingCompletionFeedbackRecorderTest {
     }
 
     @Test
-    fun `sensitive resulting command is ignored and does not publish`() {
-        val source = TerminalCompletionLearningStore()
-        var publishCount = 0
-        val recorder = recorder(source, afterMutation = { publishCount++ })
-
-        recorder.record(
-            feedback =
-                feedback(
-                    kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
-                    commandText = "docker login ",
-                    replacementText = "--password hunter2",
-                    replacementStartOffset = 13,
-                    replacementEndOffset = 13,
-                ),
-            context = context(),
-        )
-
-        assertEquals(TerminalCommandCompletionStatsSnapshot.EMPTY, source.snapshot())
-        assertEquals(0, publishCount)
-    }
-
-    @Test
     fun `created handler reads latest context`() {
         val source = TerminalCompletionLearningStore()
         val recorder = recorder(source, clockEpochMillis = { 3_000L })
@@ -296,34 +251,40 @@ class SwingCompletionFeedbackRecorderTest {
                 .single()
                 .workingDirectoryUri,
         )
-        assertEquals(
-            "file:///second/",
-            source
-                .snapshot()
-                .shapeStats
-                .single()
-                .workingDirectoryUri,
-        )
     }
 
     @Test
-    fun `privacy policy sees leading whitespace before feedback is learned`() {
-        val source = TerminalCompletionLearningStore(commandSpecs = emptyList())
-        val recorder = recorder(source)
+    fun `queued feedback keeps the event timestamp`() {
+        val source = TerminalCompletionLearningStore()
+        val queued = ArrayList<() -> Unit>()
+        var currentTime = 1_000L
+        val recorder =
+            SwingCompletionFeedbackRecorder(
+                recordSuggestionFeedback = { commandLine, feedback, profileId, workingDirectoryUri, timestamp ->
+                    queued += {
+                        source.recordSuggestionFeedback(commandLine, feedback, profileId, workingDirectoryUri, timestamp)
+                    }
+                },
+                clockEpochMillis = { currentTime },
+            )
 
         recorder.record(
             feedback =
                 feedback(
                     kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
-                    commandText = " gi",
-                    replacementText = "git status",
-                    replacementStartOffset = 1,
-                    replacementEndOffset = 3,
+                    commandText = "git s",
+                    replacementText = "status",
+                    replacementStartOffset = 4,
+                    replacementEndOffset = 5,
+                    suggestionKind = TerminalCompletionCandidateKind.ARGUMENT,
                 ),
             context = SwingCompletionContext(profileId = "bash"),
         )
+        currentTime = 2_000L
+        queued.single().invoke()
 
-        assertEquals(TerminalCommandCompletionStatsSnapshot.EMPTY, source.snapshot())
+        val snapshot = source.snapshot()
+        assertEquals(1_000L, snapshot.commandStats.single().lastUsedEpochMillis)
     }
 
     private fun recorder(
@@ -332,9 +293,11 @@ class SwingCompletionFeedbackRecorderTest {
         clockEpochMillis: () -> Long = System::currentTimeMillis,
     ): SwingCompletionFeedbackRecorder =
         SwingCompletionFeedbackRecorder(
-            statsSource = source,
-            afterMutation = afterMutation,
-            allowsCommand = TerminalCompletionPersistencePolicy::allowsCommand,
+            recordSuggestionFeedback = { commandLine, feedback, profileId, workingDirectoryUri, timestamp ->
+                if (source.recordSuggestionFeedback(commandLine, feedback, profileId, workingDirectoryUri, timestamp)) {
+                    afterMutation?.invoke(source.snapshot())
+                }
+            },
             clockEpochMillis = clockEpochMillis,
         )
 

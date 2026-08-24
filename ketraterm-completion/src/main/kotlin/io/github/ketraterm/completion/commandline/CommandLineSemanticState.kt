@@ -24,7 +24,7 @@ import io.github.ketraterm.completion.spec.findOptionSpec
 internal data class CommandLineSemanticState(
     val commandPath: List<TerminalCommandSpec>,
     val optionNames: List<String>,
-    val arguments: List<TerminalCommandArgumentShape>,
+    val arguments: List<TerminalCommandArgumentState>,
     val usedOptionExclusiveGroupIds: Set<String>,
     val optionsTerminated: Boolean,
     val pendingOptionValue: TerminalOptionSpec?,
@@ -37,7 +37,7 @@ internal data class CommandLineSemanticState(
             }
 }
 
-/** Analyzes a known command path once, retaining the state needed by completion and learning. */
+/** Analyzes a known command path once, retaining the state needed by completion. */
 internal fun analyzeCommandTokens(
     tokens: List<TerminalCommandLineToken>,
     startIndex: Int,
@@ -46,7 +46,7 @@ internal fun analyzeCommandTokens(
 ): CommandLineSemanticState {
     val commandPath = ArrayList<TerminalCommandSpec>(TERMINAL_COMMAND_LIST_CAPACITY)
     val optionNames = ArrayList<String>(TERMINAL_COMMAND_LIST_CAPACITY)
-    val arguments = ArrayList<TerminalCommandArgumentShape>(TERMINAL_COMMAND_LIST_CAPACITY)
+    val arguments = ArrayList<TerminalCommandArgumentState>(TERMINAL_COMMAND_LIST_CAPACITY)
     var usedExclusiveGroupIds: LinkedHashSet<String>? = null
     var pendingOptionValue: TerminalOptionSpec? = null
     var acceptingSubcommands = true
@@ -67,7 +67,7 @@ internal fun analyzeCommandTokens(
         when {
             valueOption != null -> {
                 arguments +=
-                    TerminalCommandArgumentShape(
+                    TerminalCommandArgumentState(
                         TerminalCommandArgumentKind.OPTION_VALUE,
                         normalizeTerminalCommandToken(valueOption.names.first()),
                     )
@@ -101,15 +101,15 @@ internal fun analyzeCommandTokens(
                 if (next != null) {
                     commandPath += next
                 } else {
-                    arguments += TerminalCommandArgumentShape(TerminalCommandArgumentKind.POSITIONAL)
+                    arguments += TerminalCommandArgumentState(TerminalCommandArgumentKind.POSITIONAL)
                     acceptingSubcommands = false
                 }
             }
 
             optionsTerminated ->
-                arguments += TerminalCommandArgumentShape(TerminalCommandArgumentKind.OPTION_TERMINATED_POSITIONAL)
+                arguments += TerminalCommandArgumentState(TerminalCommandArgumentKind.OPTION_TERMINATED_POSITIONAL)
 
-            else -> arguments += TerminalCommandArgumentShape(TerminalCommandArgumentKind.POSITIONAL)
+            else -> arguments += TerminalCommandArgumentState(TerminalCommandArgumentKind.POSITIONAL)
         }
         tokenIndex++
     }

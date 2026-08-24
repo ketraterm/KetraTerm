@@ -23,7 +23,6 @@ import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.CompletionLearningIndexCache
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import kotlin.test.Test
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
@@ -32,7 +31,7 @@ import kotlin.test.assertTrue
 class LearnedCompletionEvidenceIndexTest {
     @Test
     fun `textual path variants merge counters and retain newest timestamp`() {
-        val resolver = TerminalCompletionOutcomeKeyResolver(TerminalCommandSpecs.defaults())
+        val resolver = TerminalCompletionOutcomeKeyResolver()
         val snapshot =
             TerminalCommandCompletionStatsSnapshot(
                 commandStats =
@@ -50,24 +49,23 @@ class LearnedCompletionEvidenceIndexTest {
     }
 
     @Test
-    fun `cache shares one compiled learning view until snapshot identity changes`() {
-        val specs = TerminalCommandSpecs.defaults()
+    fun `cache shares one compiled learning view until snapshot identity or syntax changes`() {
         val snapshot = TerminalCommandCompletionStatsSnapshot.EMPTY
         val cache = CompletionLearningIndexCache()
 
-        val firstPosix = cache.indexesFor(snapshot, TerminalShellSyntax.POSIX, specs)
+        val firstPosix = cache.indexesFor(snapshot, TerminalShellSyntax.POSIX)
 
-        assertSame(firstPosix, cache.indexesFor(snapshot, TerminalShellSyntax.POSIX, specs.toList()))
-        assertNotSame(firstPosix, cache.indexesFor(snapshot, TerminalShellSyntax.POWERSHELL, specs))
+        assertSame(firstPosix, cache.indexesFor(snapshot, TerminalShellSyntax.POSIX))
+        assertNotSame(firstPosix, cache.indexesFor(snapshot, TerminalShellSyntax.POWERSHELL))
         assertNotSame(
             firstPosix,
-            cache.indexesFor(TerminalCommandCompletionStatsSnapshot(), TerminalShellSyntax.POSIX, specs),
+            cache.indexesFor(TerminalCommandCompletionStatsSnapshot(), TerminalShellSyntax.POSIX),
         )
     }
 
     @Test
     fun `exact evidence prefers directory context over profile context`() {
-        val resolver = TerminalCompletionOutcomeKeyResolver(TerminalCommandSpecs.defaults())
+        val resolver = TerminalCompletionOutcomeKeyResolver()
         val snapshot =
             TerminalCommandCompletionStatsSnapshot(
                 commandStats =

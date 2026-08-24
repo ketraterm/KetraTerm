@@ -46,10 +46,11 @@ Works seamlessly across complex command lines with operators:
 ### 6. Visual Match Highlighting
 Characters that match your search query are highlighted in **bold** with your accent color, so you always see exactly why a suggestion was offered.
 
-### 7. Privacy First: Zero Telemetry & Secret Leakage
-- **No Private Data Logged**: Arguments, file paths, passwords, URLs, API keys, and environment variables are **never stored on disk**.
-- Only sanitized command names and general option usage are retained locally on your machine to improve ranking order over time.
-- Session command history is kept purely in memory and cleared the moment you close the terminal tab.
+### 7. Local, Opt-In Learning
+- Suggestion learning works in memory by default. Both standalone KetraTerm and the IntelliJ plugin require an explicit setting before learned statistics are loaded from or written to disk.
+- When enabled, the local file stores sanitized aggregate exact-command rows, including command text plus optional profile and working-directory context.
+- Commands with leading whitespace and common secret-bearing patterns are filtered. Filtering is a safeguard rather than a guarantee: arguments, paths, URLs, or secrets that do not match a filter can still appear in an exact-command row.
+- The persistence file is Base64URL-encoded TSV, not encrypted. Session MRU remains in memory and is cleared with its terminal tab.
 
 ---
 

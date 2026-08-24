@@ -16,169 +16,119 @@
 package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
 
+/** Immutable destination captured for one pending write generation. */
+internal data class CompletionLearningWriteRequest(
+    val path: Path,
+)
+
+/** Destination and immutable payload resolved for one still-current generation. */
+internal data class CompletionLearningSnapshotWrite(
+    val path: Path,
+    val snapshot: TerminalCommandCompletionStatsSnapshot,
+)
+
 /**
- * Serializes completion learning and optional local-file persistence.
+ * Passive configured I/O boundary for completion-learning snapshots.
  *
- * A single [Mutex] protects mutations, persistence reconfiguration, loading,
- * and writes. Disk access runs on [ioDispatcher]; callers provide lifecycle
- * ownership by launching these suspending operations in their existing scope.
+ * This repository owns fixed-path identity, bounded file loading, and one-shot
+ * snapshot writes. It deliberately owns no mutex,
+ * queue, coroutine scope, or mutation scheduling. A live product must hand the
+ * repository to [TerminalCompletionLearningCoordinator], which is the sole
+ * runtime serialization and write-lifecycle owner.
  *
- * @property learningStore bounded in-memory learning index used by ranking.
- * @param initialPersistencePath initial snapshot path, or `null` for memory-only learning.
+ * [initialize] is directly available for focused loading tests. It must not be
+ * called concurrently or after the repository has been handed to a coordinator.
+ *
+ * @param learningStore bounded in-memory learning index populated by loads.
+ * @param persistencePath fixed snapshot path, or `null` for a memory-only namespace.
  * @param persistenceEnabled whether the initial path may be read and written.
  * @param ioDispatcher dispatcher used for local-file access.
  * @param onPersistenceFailure optional diagnostic callback for failed file access.
  */
-class TerminalCompletionLearningRepository
+internal class TerminalCompletionLearningRepository
     internal constructor(
-        val learningStore: TerminalCompletionLearningStore,
-        initialPersistencePath: Path?,
-        private var persistenceEnabled: Boolean,
-        private val ioDispatcher: CoroutineDispatcher,
-        private val onPersistenceFailure: (Throwable) -> Unit,
-        private val fileStoreFactory: (Path, (Throwable) -> Unit) -> CompletionLearningFileStore,
+        internal val learningStore: TerminalCompletionLearningStore,
+        persistencePath: Path? = null,
+        private var persistenceEnabled: Boolean = true,
+        private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        private val onPersistenceFailure: (Throwable) -> Unit = {},
+        private val fileStoreFactory: (Path, (Throwable) -> Unit) -> CompletionLearningSnapshotFileStore =
+            { path, onFailure -> CompletionLearningFileStore(path, onFailure) },
     ) {
-        /**
-         * Creates a repository backed by the standard bounded local-file store.
-         *
-         * @param learningStore bounded in-memory learning index used by ranking.
-         * @param initialPersistencePath initial snapshot path, or `null` for memory-only learning.
-         * @param persistenceEnabled whether the initial path may be read and written.
-         * @param ioDispatcher dispatcher used for local-file access.
-         * @param onPersistenceFailure optional diagnostic callback for failed file access.
-         */
-        @JvmOverloads
-        constructor(
-            learningStore: TerminalCompletionLearningStore,
-            initialPersistencePath: Path? = null,
-            persistenceEnabled: Boolean = true,
-            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            onPersistenceFailure: (Throwable) -> Unit = {},
-        ) : this(
-            learningStore = learningStore,
-            initialPersistencePath = initialPersistencePath,
-            persistenceEnabled = persistenceEnabled,
-            ioDispatcher = ioDispatcher,
-            onPersistenceFailure = onPersistenceFailure,
-            fileStoreFactory = { path, onFailure -> CompletionLearningFileStore(path, onFailure) },
-        )
-
-        private val mutex = Mutex()
-        private var configuredPersistencePath: Path? = initialPersistencePath
-        private var initializedPathIdentity: Path? = null
+        internal val initialPersistenceEnabled: Boolean = persistenceEnabled
+        private val persistencePath: Path? = persistencePath?.identity()
+        private var pathInitialized = false
+        private var writeBlocked = false
         private var initialized = false
-        private val importedPathIdentities = mutableSetOf<Path>()
-        private var writeBlockedPathIdentity: Path? = null
 
-        /** Loads the configured snapshot once and merges it with live learning. */
+        /** Loads and merges the initially configured snapshot once. */
         suspend fun initialize() {
-            mutex.withLock { ensureInitializedLocked() }
-        }
-
-        /**
-         * Changes the persistence destination, loading and merging its snapshot.
-         * This does not change whether persistence is enabled. Passing `null`
-         * removes the destination, while a non-null path remains inactive until
-         * [setPersistenceEnabled] is called with `true` when currently disabled.
-         *
-         * @param path replacement persistence path, or `null` for no destination.
-         */
-        suspend fun setPersistencePath(path: Path?) {
-            mutex.withLock {
-                configuredPersistencePath = path
-                ensureInitializedLocked()
-            }
-        }
-
-        /** Enables or disables access to the configured persistence path. */
-        suspend fun setPersistenceEnabled(enabled: Boolean) {
-            mutex.withLock {
-                persistenceEnabled = enabled
-                ensureInitializedLocked()
-            }
-        }
-
-        /**
-         * Runs one bounded learning mutation and persists the resulting snapshot.
-         *
-         * @param mutation synchronous mutation of the in-memory learning index.
-         */
-        suspend fun mutate(mutation: TerminalCompletionLearningStore.() -> Unit) {
-            mutex.withLock {
-                ensureInitializedLocked()
-                learningStore.mutation()
-                persistCurrentSnapshot()
-            }
-        }
-
-        private suspend fun ensureInitializedLocked() {
-            val pathIdentity = activePersistencePath()?.identity()
-            if (initialized && initializedPathIdentity == pathIdentity) return
-            loadConfiguredPath()
-            initializedPathIdentity = pathIdentity
+            if (initialized) return
             initialized = true
+            if (persistenceEnabled) loadConfiguredPath()
+        }
+
+        /** Enables or disables the fixed configured path without clearing live learning. */
+        internal suspend fun setPersistenceEnabled(enabled: Boolean): Boolean {
+            check(initialized) { "completion-learning repository is not initialized" }
+            if (persistenceEnabled == enabled) return false
+
+            persistenceEnabled = enabled
+            if (!enabled) {
+                if (writeBlocked) pathInitialized = false
+                return true
+            }
+
+            if (!pathInitialized) loadConfiguredPath()
+            return true
+        }
+
+        /** Captures the writable destination for a later latest-state write, if any. */
+        internal fun writeRequestOrNull(): CompletionLearningWriteRequest? {
+            val path = activePersistencePath() ?: return null
+            if (!pathInitialized || writeBlocked) return null
+            return CompletionLearningWriteRequest(path)
+        }
+
+        /** Materializes the current immutable state for one pending write generation. */
+        internal fun materialize(write: CompletionLearningWriteRequest): CompletionLearningSnapshotWrite =
+            CompletionLearningSnapshotWrite(write.path, learningStore.snapshot())
+
+        /** Performs exactly one materialized write requested by the coordinator. */
+        internal suspend fun persist(write: CompletionLearningSnapshotWrite) {
+            withContext(ioDispatcher) {
+                fileStoreFactory(write.path, onPersistenceFailure).persist(write.snapshot)
+            }
         }
 
         private suspend fun loadConfiguredPath() {
-            val path = activePersistencePath()
-            if (path == null) return
-            val pathIdentity = path.identity()
-            writeBlockedPathIdentity = null
-            if (pathIdentity in importedPathIdentities) {
-                persistCurrentSnapshot()
-                return
-            }
-
-            val store = fileStoreFactory(path, onPersistenceFailure)
-            when (val outcome = withContext(ioDispatcher) { store.loadSnapshot() }) {
-                CompletionLearningFileLoadOutcome.Missing -> {
-                    importedPathIdentities.add(pathIdentity)
-                    withContext(ioDispatcher) { store.persist(learningStore.snapshot()) }
+            val path = activePersistencePath() ?: return
+            writeBlocked = false
+            val outcome =
+                withContext(ioDispatcher) {
+                    fileStoreFactory(path, onPersistenceFailure).loadSnapshot()
                 }
 
-                is CompletionLearningFileLoadOutcome.Loaded -> {
-                    learningStore.mergeSnapshot(outcome.snapshot)
-                    importedPathIdentities.add(pathIdentity)
-                    withContext(ioDispatcher) { store.persist(learningStore.snapshot()) }
-                }
+            when (outcome) {
+                CompletionLearningFileLoadOutcome.Missing -> Unit
+
+                is CompletionLearningFileLoadOutcome.Loaded -> learningStore.mergeSnapshot(outcome.snapshot)
 
                 CompletionLearningFileLoadOutcome.Rejected,
                 CompletionLearningFileLoadOutcome.Failed,
-                -> writeBlockedPathIdentity = pathIdentity
+                -> writeBlocked = true
             }
-        }
 
-        private suspend fun persistCurrentSnapshot() {
-            val path = activePersistencePath() ?: return
-            val pathIdentity = path.identity()
-            if (writeBlockedPathIdentity == pathIdentity || pathIdentity !in importedPathIdentities) return
-            val snapshot = learningStore.snapshot()
-            withContext(ioDispatcher) {
-                fileStoreFactory(path, onPersistenceFailure).persist(snapshot)
-            }
+            pathInitialized = true
         }
 
         private fun Path.identity(): Path = toAbsolutePath().normalize()
 
-        private fun activePersistencePath(): Path? = configuredPersistencePath.takeIf { persistenceEnabled }
-
-        companion object {
-            /**
-             * Returns the versioned filename used for persisted learning.
-             *
-             * Hosts choose the parent directory while the persistence module
-             * owns the file-format identity.
-             *
-             * @return current completion-learning filename.
-             */
-            @JvmStatic
-            fun currentFileName(): String = CompletionLearningSnapshotCodec.currentFileName()
-        }
+        private fun activePersistencePath(): Path? = persistencePath.takeIf { persistenceEnabled }
     }

@@ -17,7 +17,6 @@ package io.github.ketraterm.completion.internal
 
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
-import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.ranking.LearnedCompletionEvidenceIndex
 import io.github.ketraterm.completion.ranking.TerminalCompletionOutcomeKeyResolver
 import io.github.ketraterm.completion.source.LearnedHistoryCandidateIndex
@@ -32,10 +31,9 @@ internal class CompletionLearningIndexCache {
     fun indexesFor(
         snapshot: TerminalCommandCompletionStatsSnapshot,
         shellSyntax: TerminalShellSyntax,
-        commandSpecs: List<TerminalCommandSpec>,
     ): CompletionLearningIndexes {
         val compilation = current?.takeIf { it.snapshot === snapshot } ?: compilationFor(snapshot)
-        return compilation.indexesFor(shellSyntax, commandSpecs)
+        return compilation.indexesFor(shellSyntax)
     }
 
     private fun compilationFor(snapshot: TerminalCommandCompletionStatsSnapshot): SnapshotCompilation =
@@ -52,40 +50,34 @@ internal class CompletionLearningIndexCache {
         @Volatile
         private var entries: Array<CompilationEntry> = emptyArray()
 
-        fun indexesFor(
-            shellSyntax: TerminalShellSyntax,
-            commandSpecs: List<TerminalCommandSpec>,
-        ): CompletionLearningIndexes {
+        fun indexesFor(shellSyntax: TerminalShellSyntax): CompletionLearningIndexes {
             val currentEntries = entries
             for (i in currentEntries.indices) {
                 val entry = currentEntries[i]
-                if (entry.shellSyntax == shellSyntax && (entry.commandSpecs === commandSpecs || entry.commandSpecs == commandSpecs)) {
+                if (entry.shellSyntax == shellSyntax) {
                     return entry.indexes
                 }
             }
             return synchronized(lock) {
                 for (entry in entries) {
-                    if (entry.shellSyntax == shellSyntax && (entry.commandSpecs === commandSpecs || entry.commandSpecs == commandSpecs)) {
+                    if (entry.shellSyntax == shellSyntax) {
                         return@synchronized entry.indexes
                     }
                 }
-                val built = buildIndexes(shellSyntax, commandSpecs)
-                val newEntry = CompilationEntry(shellSyntax, commandSpecs, built)
+                val built = buildIndexes(shellSyntax)
+                val newEntry = CompilationEntry(shellSyntax, built)
                 entries = entries + newEntry
                 built
             }
         }
 
-        private fun buildIndexes(
-            shellSyntax: TerminalShellSyntax,
-            commandSpecs: List<TerminalCommandSpec>,
-        ): CompletionLearningIndexes =
+        private fun buildIndexes(shellSyntax: TerminalShellSyntax): CompletionLearningIndexes =
             CompletionLearningIndexes(
                 evidence =
                     LearnedCompletionEvidenceIndex.build(
                         snapshot = snapshot,
                         shellSyntax = shellSyntax,
-                        outcomeResolver = TerminalCompletionOutcomeKeyResolver(commandSpecs),
+                        outcomeResolver = LEARNED_KEY_RESOLVER,
                     ),
                 history = LearnedHistoryCandidateIndex.build(snapshot, shellSyntax),
             )
@@ -93,12 +85,15 @@ internal class CompletionLearningIndexCache {
 
     private class CompilationEntry(
         val shellSyntax: TerminalShellSyntax,
-        val commandSpecs: List<TerminalCommandSpec>,
         val indexes: CompletionLearningIndexes,
     )
+
+    private companion object {
+        private val LEARNED_KEY_RESOLVER = TerminalCompletionOutcomeKeyResolver()
+    }
 }
 
-/** All derived learning data for one shell syntax and command-spec vocabulary. */
+/** All derived learning data for one shell syntax. */
 internal data class CompletionLearningIndexes(
     val evidence: LearnedCompletionEvidenceIndex,
     val history: LearnedHistoryCandidateIndex,

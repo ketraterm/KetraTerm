@@ -43,7 +43,7 @@ internal class MergedCompletionEngine(
     private val sourceFailureHandler: TerminalCompletionSourceFailureHandler =
         TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
 ) : TerminalCompletionEngine {
-    private val commandSpecs = commandSpecs.toList()
+    private val commandSpecs = commandSpecs
     private val sources =
         buildList(sources.size + 1) {
             if (this@MergedCompletionEngine.commandSpecs.isNotEmpty()) {
@@ -56,7 +56,7 @@ internal class MergedCompletionEngine(
             }
             addAll(sources)
         }
-    private val ranker = GlobalCompletionRanker(this.commandSpecs, learningStore, clockEpochMillis)
+    private val ranker = GlobalCompletionRanker(learningStore, clockEpochMillis)
     private val pathCommandSpecCandidateProjector = PathCommandSpecCandidateProjector(this.commandSpecs)
 
     override fun completions(request: TerminalCompletionRequest): Flow<List<TerminalCompletionCandidate>> =

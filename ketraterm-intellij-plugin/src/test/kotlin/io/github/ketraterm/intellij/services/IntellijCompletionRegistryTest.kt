@@ -19,10 +19,11 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalDirectoryScanner
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
-import io.github.ketraterm.completion.persistence.TerminalCompletionLearningRepository
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -159,12 +160,12 @@ class IntellijCompletionRegistryTest {
             val path =
                 Files
                     .createTempDirectory("intellij-completion-registry")
-                    .resolve(TerminalCompletionLearningRepository.currentFileName())
+                    .resolve(TerminalCompletionLearningCoordinator.currentFileName())
             val learningStore = TerminalCompletionLearningStore()
             val registry =
                 IntellijCompletionRegistry(
                     statsSource = learningStore,
-                    learningRepository = TerminalCompletionLearningRepository(learningStore, path),
+                    persistencePath = path,
                     coroutineScope = this,
                 )
 
@@ -185,9 +186,22 @@ class IntellijCompletionRegistryTest {
 
             registry.closeAndFlush()
 
-            val reloaded = TerminalCompletionLearningStore()
-            TerminalCompletionLearningRepository(reloaded, path).initialize()
-            assertEquals(listOf("git status"), reloaded.snapshot().commandStats.map { it.commandLine })
+            assertEquals(listOf("git status"), persistedSnapshot(path).commandStats.map { it.commandLine })
+        }
+
+    private suspend fun persistedSnapshot(path: Path) =
+        coroutineScope {
+            val learning = TerminalCompletionLearningStore()
+            val coordinator =
+                TerminalCompletionLearningCoordinator(
+                    learningStore = learning,
+                    coroutineScope = this,
+                    persistencePath = path,
+                )
+            coordinator.flush()
+            val snapshot = learning.snapshot()
+            coordinator.closeAndFlush()
+            snapshot
         }
 
     private fun context(

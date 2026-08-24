@@ -16,7 +16,9 @@
 package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
 import org.openjdk.jmh.annotations.*
@@ -40,7 +42,7 @@ open class TerminalLearnedRankingBenchmark {
     @Setup
     open fun setUp() {
         val commandSpecs = TerminalCommandSpecs.defaults()
-        statsSource = TerminalCompletionLearningStore(capacity = STATS_CAPACITY, commandSpecs = commandSpecs)
+        statsSource = TerminalCompletionLearningStore(capacity = STATS_CAPACITY)
         statsSource.replaceSnapshot(fullLearnedSnapshot())
         learnedEngine =
             TerminalCompletionEngines.fromSources(
@@ -91,50 +93,29 @@ open class TerminalLearnedRankingBenchmark {
     }
 
     private fun fullLearnedSnapshot(): TerminalCommandCompletionStatsSnapshot {
-        val shapeStats = ArrayList<TerminalCommandShapeStats>(STATS_CAPACITY)
-        val feedbackStats = ArrayList<TerminalCompletionFeedbackStats>(STATS_CAPACITY)
+        val commandStats = ArrayList<TerminalCommandCompletionStats>(STATS_CAPACITY)
         var index = 0
         while (index < STATS_CAPACITY - 1) {
-            shapeStats +=
-                TerminalCommandShapeStats(
-                    shape = TerminalCommandLineShape(executable = "tool-$index"),
+            commandStats +=
+                TerminalCommandCompletionStats(
+                    commandLine = "tool-$index command",
                     profileId = "profile-$index",
                     workingDirectoryUri = "file:///workspace/$index",
                     successCount = 1,
                     lastUsedEpochMillis = index.toLong(),
                 )
-            feedbackStats +=
-                TerminalCompletionFeedbackStats(
-                    source = "provider-$index",
-                    candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                    profileId = "profile-$index",
-                    workingDirectoryUri = "file:///workspace/$index",
-                    acceptedCount = 1,
-                    lastUsedEpochMillis = index.toLong(),
-                )
             index++
         }
-        shapeStats +=
-            TerminalCommandShapeStats(
-                shape = TerminalCommandLineShape(executable = "git", subcommands = listOf("status")),
+        commandStats +=
+            TerminalCommandCompletionStats(
+                commandLine = "git status",
                 profileId = TARGET_PROFILE,
                 workingDirectoryUri = TARGET_DIRECTORY,
+                successCount = 8,
                 acceptedCount = 8,
                 lastUsedEpochMillis = STATS_CAPACITY.toLong(),
             )
-        feedbackStats +=
-            TerminalCompletionFeedbackStats(
-                source = "spec",
-                candidateKind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                profileId = TARGET_PROFILE,
-                workingDirectoryUri = TARGET_DIRECTORY,
-                acceptedCount = 8,
-                lastUsedEpochMillis = STATS_CAPACITY.toLong(),
-            )
-        return TerminalCommandCompletionStatsSnapshot(
-            shapeStats = shapeStats,
-            feedbackStats = feedbackStats,
-        )
+        return TerminalCommandCompletionStatsSnapshot(commandStats)
     }
 
     private fun fixedProvider(providerIndex: Int): TerminalCompletionSource {

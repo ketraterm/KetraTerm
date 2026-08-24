@@ -21,10 +21,16 @@ import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 
-/** Immutable direct-lookup view of learned frecency signals in one snapshot. */
+/** Immutable direct-lookup view of exact command learning in one snapshot. */
 internal class LearnedCompletionEvidenceIndex private constructor(
     private val exactEvidence: Map<ExactEvidenceKey, LearnedEvidenceCounts>,
 ) {
+    fun adjustment(
+        outcome: ResolvedCompletionOutcome?,
+        requestContext: CompletionLearningContextKey,
+        nowEpochMillis: Long,
+    ): Int = outcome?.let { exactAdjustment(it.learnedKey, requestContext, nowEpochMillis) } ?: 0
+
     fun exactAdjustment(
         key: LearnedCompletionOutcomeKey,
         requestContext: CompletionLearningContextKey,
@@ -61,7 +67,6 @@ internal class LearnedCompletionEvidenceIndex private constructor(
                     }
                 }
             }
-
             return LearnedCompletionEvidenceIndex(
                 exactEvidence = exactRows.mapValues { (_, rows) -> LearnedEvidenceCounts.fromCommands(rows) },
             )

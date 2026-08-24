@@ -25,7 +25,7 @@ import io.github.ketraterm.completion.model.TerminalOptionSpec
 internal class SpecCompletionSource(
     specs: List<TerminalCommandSpec>,
 ) : TerminalCompletionSource {
-    private val commandSpecs = specs.toList()
+    private val commandSpecs = specs
 
     init {
         require(specs.none { it.name.isBlank() }) { "specs must not contain blank command names" }

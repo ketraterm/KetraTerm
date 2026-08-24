@@ -28,7 +28,7 @@ import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 internal class CommandCompletionStatsIndex(
     private val capacity: Int,
 ) {
-    private var rows =
+    private val rows =
         BoundedStatsRowIndex(
             capacity = capacity,
             order = TERMINAL_COMMAND_COMPLETION_STATS_ORDER,
@@ -42,36 +42,33 @@ internal class CommandCompletionStatsIndex(
 
     fun snapshot(): List<TerminalCommandCompletionStats> = rows.snapshot()
 
-    fun copy(): CommandCompletionStatsIndex = CommandCompletionStatsIndex(capacity).also { copy -> copy.rows = rows.copy() }
-
     fun recordCommandResult(
         commandLine: String,
         successful: Boolean,
         profileId: String?,
         workingDirectoryUri: String?,
         usedAtEpochMillis: Long,
-    ) {
-        if (!isRecordableStatsEvent(commandLine, usedAtEpochMillis)) return
-        mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
-            previous.copy(
-                commandLine = previous.commandLineForEvent(canonical, usedAtEpochMillis),
-                useCount = saturatedCompletionCounterIncrement(previous.useCount),
-                successCount =
-                    if (successful) {
-                        saturatedCompletionCounterIncrement(previous.successCount)
-                    } else {
-                        previous.successCount
-                    },
-                failureCount =
-                    if (successful) {
-                        previous.failureCount
-                    } else {
-                        saturatedCompletionCounterIncrement(previous.failureCount)
-                    },
-                lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, usedAtEpochMillis),
-            )
-        }
-    }
+    ): Boolean =
+        isRecordableStatsEvent(commandLine, usedAtEpochMillis) &&
+            mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
+                previous.copy(
+                    commandLine = previous.commandLineForEvent(canonical, usedAtEpochMillis),
+                    useCount = saturatedCompletionCounterIncrement(previous.useCount),
+                    successCount =
+                        if (successful) {
+                            saturatedCompletionCounterIncrement(previous.successCount)
+                        } else {
+                            previous.successCount
+                        },
+                    failureCount =
+                        if (successful) {
+                            previous.failureCount
+                        } else {
+                            saturatedCompletionCounterIncrement(previous.failureCount)
+                        },
+                    lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, usedAtEpochMillis),
+                )
+            }
 
     fun recordSuggestionFeedback(
         commandLine: String,
@@ -79,28 +76,27 @@ internal class CommandCompletionStatsIndex(
         profileId: String?,
         workingDirectoryUri: String?,
         feedbackAtEpochMillis: Long,
-    ) {
-        if (!isRecordableStatsEvent(commandLine, feedbackAtEpochMillis)) return
-        mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
-            previous.copy(
-                commandLine = previous.commandLineForEvent(canonical, feedbackAtEpochMillis),
-                acceptedCount = incrementAccepted(previous.acceptedCount, feedback),
-                dismissedCount = incrementDismissed(previous.dismissedCount, feedback),
-                lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
-            )
-        }
-    }
+    ): Boolean =
+        isRecordableStatsEvent(commandLine, feedbackAtEpochMillis) &&
+            mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
+                previous.copy(
+                    commandLine = previous.commandLineForEvent(canonical, feedbackAtEpochMillis),
+                    acceptedCount = incrementAccepted(previous.acceptedCount, feedback),
+                    dismissedCount = incrementDismissed(previous.dismissedCount, feedback),
+                    lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
+                )
+            }
 
     private fun mutate(
         commandLine: String,
         profileId: String?,
         workingDirectoryUri: String?,
         update: (TerminalCommandCompletionStats, String) -> TerminalCommandCompletionStats,
-    ) {
+    ): Boolean {
         val canonical = commandLine.trim()
         val normalized = normalizeTerminalCommandLine(canonical)
         val context = CompletionLearningContextKey.of(profileId, workingDirectoryUri)
-        rows.mutate(
+        return rows.mutate(
             key = CommandCompletionStatsKey(normalized, context),
             initialRow = {
                 TerminalCommandCompletionStats(

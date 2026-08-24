@@ -29,9 +29,10 @@ object TerminalCompletionSources {
      *
      * @param capacity maximum number of distinct normalized commands and
      * session-local observed-token transitions retained.
-     * @param commandSpecs static command specs whose known command families are
-     * excluded from observed-token learning because specs are authoritative for
-     * those commands.
+     * @param commandSpecs immutable command catalog whose known command families
+     * are excluded from observed-token learning because specs are authoritative
+     * for those commands. Callers must not mutate this list while the source is
+     * alive.
      * @param learningStore optional shared learning store used to recover
      * positive commands across sessions. Its rows contribute through this
      * single learned source and are not a separate completion provider.
