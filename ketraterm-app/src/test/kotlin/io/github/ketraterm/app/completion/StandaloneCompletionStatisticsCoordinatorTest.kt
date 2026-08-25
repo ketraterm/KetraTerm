@@ -21,13 +21,15 @@ import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoor
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 class StandaloneCompletionStatisticsCoordinatorTest {
     @Test
-    fun `command learning uses the lifecycle scope and repository`(
+    fun `shutdown persists the final learned command`(
         @TempDir directory: Path,
     ) = runBlocking {
         val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
@@ -35,28 +37,25 @@ class StandaloneCompletionStatisticsCoordinatorTest {
         val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, true, this)
 
         coordinator.recordFinishedCommand("git status", true, "bash", "file:///repo", 42L)
-        coordinator.flush()
+        coordinator.closeAndFlush()
 
         assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
         assertEquals(
             listOf("git status"),
             persistedSnapshot(path).commandStats.map { it.commandLine },
         )
-        coordinator.closeAndFlush()
     }
 
     @Test
-    fun `disabled persistence keeps later learning in memory only`(
+    fun `disabled persistence keeps learning in memory only`(
         @TempDir directory: Path,
     ) = runBlocking {
         val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
         val learning = TerminalCompletionLearningStore()
-        val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, true, this)
+        val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, false, this)
         coordinator.recordFinishedCommand("git status", true, null, null, 1L)
-        coordinator.flush()
-        coordinator.setPersistenceEnabled(false)
         coordinator.recordFinishedCommand("npm test", true, null, null, 2L)
-        coordinator.flush()
+        coordinator.closeAndFlush()
 
         assertEquals(
             setOf("git status", "npm test"),
@@ -66,11 +65,7 @@ class StandaloneCompletionStatisticsCoordinatorTest {
                 .map { it.commandLine }
                 .toSet(),
         )
-        assertEquals(
-            listOf("git status"),
-            persistedSnapshot(path).commandStats.map { it.commandLine },
-        )
-        coordinator.closeAndFlush()
+        assertFalse(Files.exists(path))
     }
 
     private suspend fun persistedSnapshot(path: Path): TerminalCommandCompletionStatsSnapshot =
@@ -81,10 +76,9 @@ class StandaloneCompletionStatisticsCoordinatorTest {
                     learningStore = learning,
                     coroutineScope = this,
                     persistencePath = path,
+                    persistenceEnabled = true,
                 )
-            coordinator.flush()
-            val snapshot = learning.snapshot()
             coordinator.closeAndFlush()
-            snapshot
+            learning.snapshot()
         }
 }

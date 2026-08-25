@@ -29,8 +29,8 @@ import java.nio.file.Path
  * IntelliJ adapter for learned completion statistics.
  *
  * The shared learning coordinator updates bounded memory synchronously and
- * conflates pending disk generations; this class only maps IntelliJ lifecycle
- * and Swing feedback events.
+ * checkpoints dirty state; this class only maps IntelliJ lifecycle and Swing
+ * feedback events.
  *
  * @param statsSource shared bounded learning store.
  * @param persistencePath fixed product-owned persistence destination.
@@ -39,7 +39,7 @@ import java.nio.file.Path
  */
 internal class IntellijCompletionStatisticsCoordinator(
     statsSource: TerminalCompletionLearningStore,
-    persistencePath: Path?,
+    persistencePath: Path,
     persistenceEnabled: Boolean,
     coroutineScope: CoroutineScope,
 ) {
@@ -60,8 +60,8 @@ internal class IntellijCompletionStatisticsCoordinator(
      *
      * The first enable loads the fixed snapshot once and merges its aggregate
      * counters with learning collected during the current session.
-     * Earlier mutations remain in memory; disabling invalidates their disk
-     * generation if it is still waiting in the debounce window.
+     * Earlier mutations remain in memory; disabling cancels a pending
+     * checkpoint.
      *
      * @param enabled `true` to permit snapshot reads and writes.
      */
@@ -88,18 +88,8 @@ internal class IntellijCompletionStatisticsCoordinator(
         )
     }
 
-    /** Waits for hydration, prior persistence controls, and the latest requested write. */
-    suspend fun flush() {
-        learning.flush()
-    }
-
-    /** Gracefully flushes and stops the statistics worker. */
+    /** Gracefully checkpoints dirty learning and stops the persistence worker. */
     suspend fun closeAndFlush() {
         learning.closeAndFlush()
-    }
-
-    /** Stops accepting statistics and drains persistence control work. */
-    fun close() {
-        learning.close()
     }
 }

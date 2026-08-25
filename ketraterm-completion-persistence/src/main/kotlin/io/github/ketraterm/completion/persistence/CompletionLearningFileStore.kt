@@ -40,7 +40,7 @@ internal sealed interface CompletionLearningFileLoadOutcome {
     data object Failed : CompletionLearningFileLoadOutcome
 }
 
-/** Snapshot file operations supplied to the passive persistence repository. */
+/** Fixed-path snapshot operations used by the persistence coordinator. */
 internal interface CompletionLearningSnapshotFileStore {
     /** Reads and validates one bounded snapshot. */
     fun loadSnapshot(): CompletionLearningFileLoadOutcome
@@ -49,7 +49,7 @@ internal interface CompletionLearningSnapshotFileStore {
     fun persist(snapshot: TerminalCommandCompletionStatsSnapshot)
 }
 
-/** Bounded local-file implementation used only by the passive snapshot repository. */
+/** Bounded local-file implementation used by the persistence coordinator. */
 internal class CompletionLearningFileStore(
     private val path: Path,
     private val onFailure: (Throwable) -> Unit = {},

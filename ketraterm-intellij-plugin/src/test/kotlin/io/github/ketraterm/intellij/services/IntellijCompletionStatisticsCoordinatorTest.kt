@@ -29,7 +29,7 @@ import java.nio.file.Path
 
 class IntellijCompletionStatisticsCoordinatorTest {
     @Test
-    fun `finished command is serialized and persisted by the repository`() =
+    fun `shutdown persists the final finished command`() =
         runBlocking {
             val directory = Files.createTempDirectory("intellij-completion-learning")
             val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
@@ -53,14 +53,13 @@ class IntellijCompletionStatisticsCoordinatorTest {
                     finishedAtEpochMillis = 42L,
                 ),
             )
-            coordinator.flush()
+            coordinator.closeAndFlush()
 
             assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
             assertEquals(
                 listOf("git status"),
                 persistedSnapshot(path).commandStats.map { it.commandLine },
             )
-            coordinator.closeAndFlush()
         }
 
     private suspend fun persistedSnapshot(path: Path): TerminalCommandCompletionStatsSnapshot =
@@ -71,10 +70,9 @@ class IntellijCompletionStatisticsCoordinatorTest {
                     learningStore = learning,
                     coroutineScope = this,
                     persistencePath = path,
+                    persistenceEnabled = true,
                 )
-            coordinator.flush()
-            val snapshot = learning.snapshot()
             coordinator.closeAndFlush()
-            snapshot
+            learning.snapshot()
         }
 }

@@ -26,9 +26,9 @@ import java.nio.file.Path
 /**
  * Standalone owner of serialized completion learning and optional persistence.
  *
- * The shared coordinator updates bounded memory synchronously and conflates
- * pending disk generations in the application's lifecycle scope. This adapter
- * only maps standalone context and Swing feedback vocabulary.
+ * The shared coordinator updates bounded memory synchronously and checkpoints
+ * dirty state in the application's lifecycle scope. This adapter only maps
+ * standalone context and Swing feedback vocabulary.
  */
 internal class StandaloneCompletionStatisticsCoordinator(
     statsSource: TerminalCompletionLearningStore,
@@ -82,18 +82,8 @@ internal class StandaloneCompletionStatisticsCoordinator(
         learning.setPersistenceEnabled(enabled)
     }
 
-    /** Waits for hydration, prior persistence controls, and the latest requested write. */
-    suspend fun flush() {
-        learning.flush()
-    }
-
-    /** Gracefully flushes and stops the statistics worker. */
+    /** Gracefully checkpoints dirty learning and stops the persistence worker. */
     suspend fun closeAndFlush() {
         learning.closeAndFlush()
-    }
-
-    /** Stops accepting statistics and drains persistence control work. */
-    fun close() {
-        learning.close()
     }
 }

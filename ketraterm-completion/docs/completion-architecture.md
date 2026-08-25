@@ -129,18 +129,17 @@ implementations each live in their matching file in `ketraterm-completion-host`.
 
 ## Host Ownership
 
-Hosts are responsible for applying `TerminalCompletionPersistencePolicy` to authoritative command records and for
-choosing whether and where persistence is enabled. `TerminalCompletionLearningStore` accepts compact snapshots and live feedback
+Hosts are responsible for choosing whether and where persistence is enabled. The shared persistence coordinator applies
+`TerminalCompletionPersistencePolicy` to authoritative command records. `TerminalCompletionLearningStore` accepts compact snapshots and live feedback
 events, but it is not a completion source and never contributes a second visible candidate. Completion components never
 read files, scan raw shell history, spawn shells, or talk to UI frameworks.
 
 Optional disk I/O belongs to the separately published
 `ketraterm-completion-persistence` module. Its
 `TerminalCompletionLearningCoordinator` owns the public fixed-path lifecycle. Learning mutates its bounded in-memory
-store synchronously; one bounded worker handles only hydration, enablement, and flush controls, while one debounced,
-conflated writer materializes and persists only the latest generation in a burst. Its internal repository performs bounded
-load/write I/O without owning another mutex, queue, cache, or scope. The explicit flush barrier lets product disposal wait
-for accepted mutations and the latest write before the lifecycle scope is cancelled.
+store synchronously; one conflated worker hydrates once, observes last-value enablement, and checkpoints the latest dirty
+snapshot every 30 seconds. It talks directly to one bounded file store and forces the final dirty write during shutdown.
+There is no runtime path switching, repository lifecycle, separate writer, control actor, or arbitrary flush barrier.
 Product hosts own the fixed destination, enablement policy, diagnostics, and the point at which graceful shutdown
 becomes blocking.
 Completion persistence is not a workspace responsibility.

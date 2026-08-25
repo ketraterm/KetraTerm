@@ -19,21 +19,22 @@ import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import kotlinx.coroutines.*
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.*
 import java.io.IOException
-import java.nio.file.Path
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import kotlin.io.path.Path
-import kotlin.test.*
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalCompletionLearningCoordinatorTest {
     @Test
-    fun `large mutation burst updates memory synchronously and coalesces to one latest write`() =
+    fun `large mutation burst is synchronous and checkpoints one latest snapshot`() =
         runTest {
             val files = RecordingSnapshotFiles()
             val learning = TerminalCompletionLearningStore()
@@ -51,106 +52,137 @@ class TerminalCompletionLearningCoordinatorTest {
                     .single()
                     .useCount,
             )
-            assertEquals(emptyList(), files.writes)
+            assertTrue(files.writes.isEmpty())
 
             runCurrent()
-            assertEquals(emptyList(), files.writes)
+            advanceTimeBy((CHECKPOINT_INTERVAL_MILLIS - 1L).milliseconds)
+            runCurrent()
+            assertTrue(files.writes.isEmpty())
 
-            coordinator.flush()
+            advanceTimeBy(1L.milliseconds)
+            runCurrent()
+            assertEquals(listOf(learning.snapshot()), files.writes)
 
-            assertEquals(1, files.writes.size)
-            assertEquals(learning.snapshot(), files.writes.single().snapshot)
             coordinator.closeAndFlush()
+            assertEquals(1, files.writes.size)
         }
 
     @Test
-    fun `event recorded during startup hydration is immediately visible and persisted after merge`() =
+    fun `later mutations do not postpone the fixed checkpoint`() =
         runTest {
-            val path = Path("existing.tsv")
             val files = RecordingSnapshotFiles()
-            files.snapshots[path.toAbsolutePath().normalize()] = snapshot("git status", 1L)
             val learning = TerminalCompletionLearningStore()
-            val coordinator = coordinator(learning, files, path = path)
+            val coordinator = coordinator(learning, files)
 
-            coordinator.recordCommandResult("npm test", true, null, null, 2L)
+            coordinator.recordCommandResult("git status", true, null, null, 1L)
+            runCurrent()
+            advanceTimeBy((CHECKPOINT_INTERVAL_MILLIS * 3L / 5L).milliseconds)
+            coordinator.recordCommandResult("git status", true, null, null, 2L)
+            advanceTimeBy((CHECKPOINT_INTERVAL_MILLIS * 2L / 5L).milliseconds)
+            runCurrent()
 
-            assertEquals(listOf("npm test"), learning.snapshot().commandStats.map { it.commandLine })
-
-            coordinator.flush()
-
-            assertEquals(
-                setOf("git status", "npm test"),
-                learning.snapshot().commandStats.mapTo(mutableSetOf()) { it.commandLine },
-            )
             assertEquals(1, files.writes.size)
-            assertEquals(learning.snapshot(), files.writes.single().snapshot)
+            assertEquals(
+                2,
+                files.writes
+                    .single()
+                    .commandStats
+                    .single()
+                    .useCount,
+            )
             coordinator.closeAndFlush()
         }
 
     @Test
-    fun `disable during startup hydration prevents the pending live change from being written`() =
+    fun `a clean store schedules another checkpoint after its next mutation`() =
+        runTest {
+            val files = RecordingSnapshotFiles()
+            val learning = TerminalCompletionLearningStore()
+            val coordinator = coordinator(learning, files)
+
+            coordinator.recordCommandResult("git status", true, null, null, 1L)
+            runCurrent()
+            advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+            runCurrent()
+            coordinator.recordCommandResult("npm test", true, null, null, 2L)
+            runCurrent()
+            advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+            runCurrent()
+
+            assertEquals(2, files.writes.size)
+            assertEquals(learning.snapshot(), files.writes.last())
+            coordinator.closeAndFlush()
+        }
+
+    @Test
+    fun `event recorded during hydration is immediately visible and persisted after merge`() =
         runTest {
             val loadStarted = CountDownLatch(1)
             val releaseLoad = CountDownLatch(1)
             val files =
                 RecordingSnapshotFiles(
+                    initialLoadOutcome = CompletionLearningFileLoadOutcome.Loaded(snapshot("git status", 1L)),
                     beforeLoad = {
                         loadStarted.countDown()
                         check(releaseLoad.await(5L, TimeUnit.SECONDS)) { "test load was not released" }
                     },
                 )
             val learning = TerminalCompletionLearningStore()
-            val repository =
-                TerminalCompletionLearningRepository(
-                    learningStore = learning,
-                    persistencePath = Path("fixed.tsv"),
-                    persistenceEnabled = true,
-                    ioDispatcher = Dispatchers.IO,
-                    fileStoreFactory = files::store,
+            val coordinator = coordinator(learning, files, ioDispatcher = Dispatchers.IO)
+
+            try {
+                assertTrue(loadStarted.await(5L, TimeUnit.SECONDS))
+                coordinator.recordCommandResult("npm test", true, null, null, 2L)
+                assertEquals(listOf("npm test"), learning.snapshot().commandStats.map { it.commandLine })
+
+                releaseLoad.countDown()
+                coordinator.closeAndFlush()
+
+                assertEquals(
+                    setOf("git status", "npm test"),
+                    learning.snapshot().commandStats.mapTo(mutableSetOf()) { it.commandLine },
                 )
-            val coordinator =
-                TerminalCompletionLearningCoordinator(
-                    repository = repository,
-                    coroutineScope = this,
-                    workerDispatcher = Dispatchers.Default,
-                    writeDebounceMillis = 0L,
+                assertEquals(listOf(learning.snapshot()), files.writes)
+            } finally {
+                releaseLoad.countDown()
+            }
+        }
+
+    @Test
+    fun `disable during hydration lets the started load merge but prevents writes`() =
+        runTest {
+            val loadStarted = CountDownLatch(1)
+            val releaseLoad = CountDownLatch(1)
+            val files =
+                RecordingSnapshotFiles(
+                    initialLoadOutcome = CompletionLearningFileLoadOutcome.Loaded(snapshot("git status", 1L)),
+                    beforeLoad = {
+                        loadStarted.countDown()
+                        check(releaseLoad.await(5L, TimeUnit.SECONDS)) { "test load was not released" }
+                    },
                 )
+            val learning = TerminalCompletionLearningStore()
+            val coordinator = coordinator(learning, files, ioDispatcher = Dispatchers.IO)
 
             try {
                 assertTrue(loadStarted.await(5L, TimeUnit.SECONDS))
                 coordinator.recordCommandResult("npm test", true, null, null, 2L)
                 coordinator.setPersistenceEnabled(false)
                 releaseLoad.countDown()
-                coordinator.flush()
+                coordinator.closeAndFlush()
 
-                assertEquals(listOf("npm test"), learning.snapshot().commandStats.map { it.commandLine })
-                assertEquals(emptyList(), files.writes)
+                assertEquals(
+                    setOf("git status", "npm test"),
+                    learning.snapshot().commandStats.mapTo(mutableSetOf()) { it.commandLine },
+                )
+                assertTrue(files.writes.isEmpty())
             } finally {
                 releaseLoad.countDown()
-                coordinator.closeAndFlush()
             }
         }
 
     @Test
-    fun `flush surfaces the latest write failure and reports it once`() =
-        runTest {
-            val expectedFailure = IOException("test write failure")
-            val failures = mutableListOf<Throwable>()
-            val files = RecordingSnapshotFiles(writeFailure = expectedFailure)
-            val coordinator = coordinator(TerminalCompletionLearningStore(), files, onFailure = failures::add)
-
-            coordinator.recordCommandResult("git status", true, null, null, 42L)
-
-            val thrown = assertFailsWith<IOException> { coordinator.flush() }
-            assertEquals(expectedFailure.message, thrown.message)
-            assertSame(expectedFailure, failures.single())
-
-            coordinator.setPersistenceEnabled(false)
-            coordinator.closeAndFlush()
-        }
-
-    @Test
-    fun `disabling persistence discards a debounced backlog but keeps every memory mutation`() =
+    fun `disabled persistence cancels a checkpoint but keeps memory mutations`() =
         runTest {
             val files = RecordingSnapshotFiles()
             val learning = TerminalCompletionLearningStore()
@@ -159,8 +191,11 @@ class TerminalCompletionLearningCoordinatorTest {
             repeat(BURST_SIZE) { index ->
                 coordinator.recordCommandResult("npm test", true, null, null, index + 1L)
             }
+            runCurrent()
             coordinator.setPersistenceEnabled(false)
-            coordinator.flush()
+            advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+            runCurrent()
+            coordinator.closeAndFlush()
 
             assertEquals(
                 BURST_SIZE,
@@ -170,118 +205,76 @@ class TerminalCompletionLearningCoordinatorTest {
                     .single()
                     .useCount,
             )
-            assertEquals(emptyList(), files.writes)
-            coordinator.closeAndFlush()
+            assertTrue(files.writes.isEmpty())
         }
 
     @Test
-    fun `enabling the same fixed path merges disk once with offline session learning`() =
+    fun `first enable hydrates once and reenable never reloads`() =
         runTest {
-            val path = Path("fixed.tsv")
-            val files = RecordingSnapshotFiles()
-            files.snapshots[path.toAbsolutePath().normalize()] = snapshot("git status", 1L)
+            val files =
+                RecordingSnapshotFiles(
+                    initialLoadOutcome = CompletionLearningFileLoadOutcome.Loaded(snapshot("git status", 1L)),
+                )
             val learning = TerminalCompletionLearningStore()
-            val coordinator = coordinator(learning, files, path = path, enabled = false)
+            val coordinator = coordinator(learning, files, enabled = false)
 
+            runCurrent()
+            assertEquals(0, files.loadCount.get())
             coordinator.recordCommandResult("npm test", true, null, null, 2L)
             coordinator.setPersistenceEnabled(true)
-            coordinator.flush()
-            coordinator.setPersistenceEnabled(false)
-            coordinator.recordCommandResult("npm test", true, null, null, 3L)
-            coordinator.setPersistenceEnabled(true)
-            coordinator.flush()
+            runCurrent()
+            advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+            runCurrent()
 
-            assertEquals(1, files.loadCount)
+            coordinator.setPersistenceEnabled(false)
+            files.loadOutcome = CompletionLearningFileLoadOutcome.Loaded(snapshot("external rewrite", 3L))
+            coordinator.recordCommandResult("npm test", true, null, null, 4L)
+            coordinator.setPersistenceEnabled(true)
+            coordinator.closeAndFlush()
+
+            assertEquals(1, files.loadCount.get())
             assertEquals(
                 mapOf("git status" to 1, "npm test" to 2),
                 learning.snapshot().commandStats.associate { it.commandLine to it.useCount },
             )
             assertEquals(2, files.writes.size)
-            assertEquals(learning.snapshot(), files.writes.last().snapshot)
-            coordinator.closeAndFlush()
+            assertEquals(learning.snapshot(), files.writes.last())
         }
 
     @Test
-    fun `disable remains authoritative when an earlier enable load completes late`() =
+    fun `clean hydration and shutdown do not rewrite the file`() =
         runTest {
-            val loadStarted = CountDownLatch(1)
-            val releaseLoad = CountDownLatch(1)
             val files =
                 RecordingSnapshotFiles(
-                    beforeLoad = {
-                        loadStarted.countDown()
-                        check(releaseLoad.await(5L, TimeUnit.SECONDS)) { "test load was not released" }
-                    },
+                    initialLoadOutcome = CompletionLearningFileLoadOutcome.Loaded(snapshot("git status", 1L)),
                 )
             val learning = TerminalCompletionLearningStore()
-            val repository =
-                TerminalCompletionLearningRepository(
-                    learningStore = learning,
-                    persistencePath = Path("fixed.tsv"),
-                    persistenceEnabled = false,
-                    ioDispatcher = Dispatchers.IO,
-                    fileStoreFactory = files::store,
-                )
-            val coordinator =
-                TerminalCompletionLearningCoordinator(
-                    repository = repository,
-                    coroutineScope = this,
-                    workerDispatcher = Dispatchers.Default,
-                    writeDebounceMillis = 0L,
-                )
+            val coordinator = coordinator(learning, files)
 
-            try {
-                coordinator.setPersistenceEnabled(true)
-                assertTrue(loadStarted.await(5L, TimeUnit.SECONDS))
-
-                coordinator.setPersistenceEnabled(false)
-                coordinator.recordCommandResult("npm test", true, null, null, 2L)
-                releaseLoad.countDown()
-                coordinator.flush()
-
-                assertEquals(listOf("npm test"), learning.snapshot().commandStats.map { it.commandLine })
-                assertEquals(emptyList(), files.writes)
-            } finally {
-                releaseLoad.countDown()
-                coordinator.closeAndFlush()
-            }
-        }
-
-    @Test
-    fun `startup load and flush do not rewrite an unchanged snapshot`() =
-        runTest {
-            val path = Path("existing.tsv")
-            val files = RecordingSnapshotFiles()
-            files.snapshots[path.toAbsolutePath().normalize()] = snapshot("git status", 1L)
-            val learning = TerminalCompletionLearningStore()
-            val coordinator = coordinator(learning, files, path = path)
-
-            coordinator.flush()
+            runCurrent()
+            coordinator.closeAndFlush()
 
             assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
-            assertEquals(emptyList(), files.writes)
-            coordinator.closeAndFlush()
+            assertTrue(files.writes.isEmpty())
         }
 
     @Test
-    fun `shared privacy policy rejects sensitive commands before mutation`() =
+    fun `privacy rejected and invalid events never dirty persistence`() =
         runTest {
-            val coordinator =
-                coordinator(
-                    learning = TerminalCompletionLearningStore(),
-                    files = RecordingSnapshotFiles(),
-                    path = null,
-                )
+            val files = RecordingSnapshotFiles()
+            val learning = TerminalCompletionLearningStore()
+            val coordinator = coordinator(learning, files)
 
             coordinator.recordCommandResult("docker login --password secret", true, null, null, 42L)
-            coordinator.flush()
-
-            assertEquals(emptyList(), coordinator.learningStore.snapshot().commandStats)
+            coordinator.recordCommandResult("git status", true, null, null, -1L)
             coordinator.closeAndFlush()
+
+            assertTrue(learning.snapshot().commandStats.isEmpty())
+            assertTrue(files.writes.isEmpty())
         }
 
     @Test
-    fun `exact suggestion feedback mutates and persists through the coordinator`() =
+    fun `exact suggestion feedback uses the same checkpoint path`() =
         runTest {
             val files = RecordingSnapshotFiles()
             val learning = TerminalCompletionLearningStore()
@@ -294,7 +287,7 @@ class TerminalCompletionLearningCoordinatorTest {
                 workingDirectoryUri = "file:///repo",
                 feedbackAtEpochMillis = 42L,
             )
-            coordinator.flush()
+            coordinator.closeAndFlush()
 
             assertEquals(
                 1,
@@ -304,12 +297,11 @@ class TerminalCompletionLearningCoordinatorTest {
                     .single()
                     .acceptedCount,
             )
-            assertEquals(1, files.writes.size)
-            coordinator.closeAndFlush()
+            assertEquals(listOf(learning.snapshot()), files.writes)
         }
 
     @Test
-    fun `evicted no-op mutation does not request a disk write`() =
+    fun `evicted no-op mutation does not request a checkpoint`() =
         runTest {
             val files = RecordingSnapshotFiles()
             val learning = TerminalCompletionLearningStore(capacity = 1)
@@ -317,15 +309,191 @@ class TerminalCompletionLearningCoordinatorTest {
             val coordinator = coordinator(learning, files)
 
             coordinator.recordCommandResult("obsolete", true, null, null, 1L)
-            coordinator.flush()
+            coordinator.closeAndFlush()
 
             assertEquals(listOf("retained"), learning.snapshot().commandStats.map { it.commandLine })
-            assertEquals(emptyList(), files.writes)
-            coordinator.closeAndFlush()
+            assertTrue(files.writes.isEmpty())
         }
 
     @Test
-    fun `close flushes the final requested generation`() =
+    fun `rejected and failed hydration block overwrite for the lifecycle`() =
+        runTest {
+            for (
+            outcome in
+            listOf(
+                CompletionLearningFileLoadOutcome.Rejected,
+                CompletionLearningFileLoadOutcome.Failed,
+            )
+            ) {
+                val files = RecordingSnapshotFiles(initialLoadOutcome = outcome)
+                val learning = TerminalCompletionLearningStore()
+                val coordinator = coordinator(learning, files)
+
+                coordinator.recordCommandResult("git status", true, null, null, 42L)
+                coordinator.closeAndFlush()
+
+                assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
+                assertTrue(files.writes.isEmpty())
+            }
+        }
+
+    @Test
+    fun `checkpoint failure retries only after a newer mutation`() =
+        runTest {
+            val expectedFailure = IOException("test write failure")
+            val files = RecordingSnapshotFiles(writeFailure = expectedFailure)
+            val learning = TerminalCompletionLearningStore()
+            val coordinator = coordinator(learning, files)
+
+            coordinator.recordCommandResult("git status", true, null, null, 42L)
+            runCurrent()
+            advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+            runCurrent()
+            advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+            runCurrent()
+            assertEquals(1, files.writeAttempts.get())
+
+            files.writeFailure = null
+            coordinator.recordCommandResult("npm test", true, null, null, 43L)
+            runCurrent()
+            advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+            runCurrent()
+            coordinator.closeAndFlush()
+
+            assertEquals(2, files.writeAttempts.get())
+            assertEquals(listOf(learning.snapshot()), files.writes)
+        }
+
+    @Test
+    fun `shutdown retries a failed checkpoint once and surfaces the final failure`() =
+        runTest {
+            val expectedFailure = IOException("test write failure")
+            val files = RecordingSnapshotFiles(writeFailure = expectedFailure)
+            val coordinator = coordinator(TerminalCompletionLearningStore(), files)
+
+            coordinator.recordCommandResult("git status", true, null, null, 42L)
+            runCurrent()
+            advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+            runCurrent()
+
+            val thrown = assertFailsWith<IOException> { coordinator.closeAndFlush() }
+            assertEquals(expectedFailure.message, thrown.message)
+            assertEquals(2, files.writeAttempts.get())
+            assertFailsWith<IOException> { coordinator.closeAndFlush() }
+            assertEquals(2, files.writeAttempts.get())
+        }
+
+    @Test
+    fun `mutation accepted during an in-flight write is included in the final write`() =
+        runTest {
+            val loadFinished = CompletableDeferred<Unit>()
+            val writeStarted = CompletableDeferred<Unit>()
+            val releaseWrite = CountDownLatch(1)
+            val files =
+                RecordingSnapshotFiles(
+                    afterLoad = { loadFinished.complete(Unit) },
+                    beforePersist = { attempt ->
+                        if (attempt == 1) {
+                            writeStarted.complete(Unit)
+                            check(releaseWrite.await(5L, TimeUnit.SECONDS)) { "test write was not released" }
+                        }
+                    },
+                )
+            val learning = TerminalCompletionLearningStore()
+            val coordinator = coordinator(learning, files, ioDispatcher = Dispatchers.IO)
+
+            try {
+                loadFinished.await()
+                runCurrent()
+                coordinator.recordCommandResult("git status", true, null, null, 1L)
+                runCurrent()
+                advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+                runCurrent()
+                writeStarted.await()
+
+                coordinator.recordCommandResult("git status", true, null, null, 2L)
+                releaseWrite.countDown()
+                coordinator.closeAndFlush()
+
+                assertEquals(2, files.writes.size)
+                assertEquals(
+                    1,
+                    files.writes
+                        .first()
+                        .commandStats
+                        .single()
+                        .useCount,
+                )
+                assertEquals(
+                    2,
+                    files.writes
+                        .last()
+                        .commandStats
+                        .single()
+                        .useCount,
+                )
+            } finally {
+                releaseWrite.countDown()
+            }
+        }
+
+    @Test
+    fun `disable during an in-flight write allows only that write to finish`() =
+        runTest {
+            val loadFinished = CompletableDeferred<Unit>()
+            val writeStarted = CompletableDeferred<Unit>()
+            val releaseWrite = CountDownLatch(1)
+            val files =
+                RecordingSnapshotFiles(
+                    afterLoad = { loadFinished.complete(Unit) },
+                    beforePersist = { attempt ->
+                        if (attempt == 1) {
+                            writeStarted.complete(Unit)
+                            check(releaseWrite.await(5L, TimeUnit.SECONDS)) { "test write was not released" }
+                        }
+                    },
+                )
+            val learning = TerminalCompletionLearningStore()
+            val coordinator = coordinator(learning, files, ioDispatcher = Dispatchers.IO)
+
+            try {
+                loadFinished.await()
+                runCurrent()
+                coordinator.recordCommandResult("git status", true, null, null, 1L)
+                runCurrent()
+                advanceTimeBy(CHECKPOINT_INTERVAL_MILLIS.milliseconds)
+                runCurrent()
+                writeStarted.await()
+
+                coordinator.recordCommandResult("git status", true, null, null, 2L)
+                coordinator.setPersistenceEnabled(false)
+                releaseWrite.countDown()
+                coordinator.closeAndFlush()
+
+                assertEquals(1, files.writes.size)
+                assertEquals(
+                    1,
+                    files.writes
+                        .single()
+                        .commandStats
+                        .single()
+                        .useCount,
+                )
+                assertEquals(
+                    2,
+                    learning
+                        .snapshot()
+                        .commandStats
+                        .single()
+                        .useCount,
+                )
+            } finally {
+                releaseWrite.countDown()
+            }
+        }
+
+    @Test
+    fun `close flushes once and remains idempotent`() =
         runTest {
             val files = RecordingSnapshotFiles()
             val learning = TerminalCompletionLearningStore()
@@ -335,12 +503,11 @@ class TerminalCompletionLearningCoordinatorTest {
             coordinator.closeAndFlush()
             coordinator.closeAndFlush()
 
-            assertEquals(1, files.writes.size)
-            assertEquals(learning.snapshot(), files.writes.single().snapshot)
+            assertEquals(listOf(learning.snapshot()), files.writes)
         }
 
     @Test
-    fun `concurrent close either accepts and flushes a complete mutation or rejects it`() =
+    fun `concurrent close persists every mutation that returned normally`() =
         runTest {
             val files = RecordingSnapshotFiles()
             val learning = TerminalCompletionLearningStore()
@@ -348,21 +515,29 @@ class TerminalCompletionLearningCoordinatorTest {
             val start = CompletableDeferred<Unit>()
             val recordings =
                 List(CONCURRENT_RECORDINGS) { index ->
-                    async(Dispatchers.Default) {
+                    async<Throwable?>(Dispatchers.Default) {
                         start.await()
-                        runCatching {
+                        try {
                             coordinator.recordCommandResult("git status", true, null, null, index + 1L)
-                        }.isSuccess
+                            null
+                        } catch (failure: Throwable) {
+                            failure
+                        }
                     }
                 }
             val closing =
                 async(Dispatchers.Default) {
                     start.await()
-                    coordinator.close()
+                    coordinator.closeAndFlush()
                 }
 
             start.complete(Unit)
-            val accepted = recordings.awaitAll().count { it }
+            val outcomes = recordings.awaitAll()
+            outcomes.filterNotNull().forEach { failure ->
+                assertTrue(failure is IllegalStateException, "unexpected recording failure: $failure")
+                assertEquals("completion-learning owner is closed", failure.message)
+            }
+            val accepted = outcomes.count { it == null }
             closing.await()
             coordinator.closeAndFlush()
 
@@ -374,15 +549,30 @@ class TerminalCompletionLearningCoordinatorTest {
                     ?.useCount ?: 0
             assertEquals(accepted, retained)
             if (accepted == 0) {
-                assertEquals(emptyList(), files.writes)
+                assertTrue(files.writes.isEmpty())
             } else {
                 assertEquals(
                     accepted,
                     files.writes
                         .single()
-                        .snapshot.commandStats
+                        .commandStats
                         .single()
                         .useCount,
+                )
+            }
+        }
+
+    @Test
+    fun `checkpoint interval must be positive`() =
+        runTest {
+            assertFailsWith<IllegalArgumentException> {
+                TerminalCompletionLearningCoordinator(
+                    learningStore = TerminalCompletionLearningStore(),
+                    fileStore = RecordingSnapshotFiles(),
+                    coroutineScope = this,
+                    persistenceEnabled = true,
+                    checkpointIntervalMillis = 0L,
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
                 )
             }
         }
@@ -390,65 +580,46 @@ class TerminalCompletionLearningCoordinatorTest {
     private fun TestScope.coordinator(
         learning: TerminalCompletionLearningStore,
         files: RecordingSnapshotFiles,
-        path: Path? = Path("learning.tsv"),
         enabled: Boolean = true,
-        onFailure: (Throwable) -> Unit = {},
-    ): TerminalCompletionLearningCoordinator {
-        val workerDispatcher = StandardTestDispatcher(testScheduler, name = "learning-worker")
-        val ioDispatcher = StandardTestDispatcher(testScheduler, name = "learning-io")
-        val repository =
-            TerminalCompletionLearningRepository(
-                learningStore = learning,
-                persistencePath = path,
-                persistenceEnabled = enabled,
-                ioDispatcher = ioDispatcher,
-                onPersistenceFailure = onFailure,
-                fileStoreFactory = files::store,
-            )
-        return TerminalCompletionLearningCoordinator(
-            repository = repository,
+        ioDispatcher: CoroutineDispatcher = StandardTestDispatcher(testScheduler, name = "learning-io"),
+    ): TerminalCompletionLearningCoordinator =
+        TerminalCompletionLearningCoordinator(
+            learningStore = learning,
+            fileStore = files,
             coroutineScope = this,
-            workerDispatcher = workerDispatcher,
-            writeDebounceMillis = TEST_DEBOUNCE_MILLIS,
+            persistenceEnabled = enabled,
+            checkpointIntervalMillis = CHECKPOINT_INTERVAL_MILLIS,
+            ioDispatcher = ioDispatcher,
         )
-    }
 
     private class RecordingSnapshotFiles(
-        var writeFailure: Throwable? = null,
+        initialLoadOutcome: CompletionLearningFileLoadOutcome = CompletionLearningFileLoadOutcome.Missing,
+        @Volatile var writeFailure: Throwable? = null,
         private val beforeLoad: () -> Unit = {},
-    ) {
-        val snapshots = mutableMapOf<Path, TerminalCommandCompletionStatsSnapshot>()
-        val writes = mutableListOf<RecordedSnapshotWrite>()
-        var loadCount = 0
+        private val afterLoad: () -> Unit = {},
+        private val beforePersist: (Int) -> Unit = {},
+    ) : CompletionLearningSnapshotFileStore {
+        @Volatile
+        var loadOutcome: CompletionLearningFileLoadOutcome = initialLoadOutcome
 
-        fun store(
-            path: Path,
-            onFailure: (Throwable) -> Unit,
-        ): CompletionLearningSnapshotFileStore =
-            object : CompletionLearningSnapshotFileStore {
-                override fun loadSnapshot(): CompletionLearningFileLoadOutcome {
-                    beforeLoad()
-                    loadCount++
-                    val snapshot = snapshots[path.toAbsolutePath().normalize()] ?: return CompletionLearningFileLoadOutcome.Missing
-                    return CompletionLearningFileLoadOutcome.Loaded(snapshot)
-                }
+        val loadCount = AtomicInteger()
+        val writeAttempts = AtomicInteger()
+        val writes = CopyOnWriteArrayList<TerminalCommandCompletionStatsSnapshot>()
 
-                override fun persist(snapshot: TerminalCommandCompletionStatsSnapshot) {
-                    val failure = writeFailure
-                    if (failure != null) {
-                        onFailure(failure)
-                        throw failure
-                    }
-                    val identity = path.toAbsolutePath().normalize()
-                    snapshots[identity] = snapshot
-                    writes += RecordedSnapshotWrite(identity, snapshot)
-                }
-            }
+        override fun loadSnapshot(): CompletionLearningFileLoadOutcome {
+            beforeLoad()
+            loadCount.incrementAndGet()
+            val outcome = loadOutcome
+            afterLoad()
+            return outcome
+        }
 
-        data class RecordedSnapshotWrite(
-            val path: Path,
-            val snapshot: TerminalCommandCompletionStatsSnapshot,
-        )
+        override fun persist(snapshot: TerminalCommandCompletionStatsSnapshot) {
+            val attempt = writeAttempts.incrementAndGet()
+            beforePersist(attempt)
+            writeFailure?.let { throw it }
+            writes += snapshot
+        }
     }
 
     private fun snapshot(
@@ -462,6 +633,6 @@ class TerminalCompletionLearningCoordinatorTest {
     private companion object {
         private const val BURST_SIZE = 5_000
         private const val CONCURRENT_RECORDINGS = 128
-        private const val TEST_DEBOUNCE_MILLIS = 1_000L
+        private const val CHECKPOINT_INTERVAL_MILLIS = 1_000L
     }
 }

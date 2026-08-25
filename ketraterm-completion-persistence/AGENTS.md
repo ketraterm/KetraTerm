@@ -10,9 +10,9 @@ This module may:
 - sanitize snapshots at the storage boundary.
 - perform versioned, atomic local-file replacement.
 - apply bounded in-memory learning synchronously in one lifecycle coordinator.
-- debounce and conflate write generations through one latest-snapshot writer.
-- expose passive internal repository and bounded file-store I/O.
-- expose a suspending flush barrier for host lifecycle coordination.
+- checkpoint dirty snapshots periodically through one conflated worker.
+- expose bounded fixed-path file-store I/O.
+- force and await one final dirty write during lifecycle shutdown.
 
 ## Boundary
 
@@ -24,17 +24,16 @@ This module must not:
 - create or implicitly own coroutine scopes.
 - persist any learning family beyond exact-command aggregates.
 
-The persistence coordinator may create one bounded control worker and one
-latest-snapshot writer as children of its caller-supplied scope; it must not
-create an executor or independent scope. Learning must become visible before a
-recording call returns and must not wait for hydration or disk. The control
-worker handles only hydration, enablement, and flush barriers. The writer must
-debounce and conflate bursts, materialize only the latest immutable snapshot,
-and keep flush semantics deterministic.
+The persistence coordinator may create one worker in its caller-supplied scope;
+it must not create an executor or independent scope. Learning must become
+visible before a recording call returns and must not wait for hydration or
+disk. The worker owns hydration, last-value enablement, periodic dirty
+checkpoints, and final shutdown persistence. It uses one conflated wakeup and
+must not enqueue per-event snapshots or controls.
 
-Product hosts choose one fixed destination at coordinator construction, supply
-the scope, and own enablement, lifecycle, and user-facing settings. Do not add
-runtime path switching or snapshot-import semantics. The internal repository is
-a passive I/O boundary and must not acquire a second mutex, queue, cache, or
-scope. The dependency-free completion engine remains free of filesystem and
-scheduling concerns.
+Product hosts choose one non-null fixed destination at coordinator
+construction, supply the scope, and own enablement, lifecycle, and user-facing
+settings. Do not add runtime path switching, snapshot-import semantics,
+arbitrary flush barriers, a repository layer, or a separate writer. The
+dependency-free completion engine remains free of filesystem and scheduling
+concerns.

@@ -57,14 +57,13 @@ reject the complete file.
 `TerminalCompletionLearningCoordinator` is the single runtime owner. Each
 bounded learning event updates memory before its recording call returns, so
 ranking does not wait for hydration or disk. Hydration merges atomically with
-live rows before any snapshot is written. A bounded worker handles only
-persistence controls and flush barriers; a child latest-snapshot writer
-debounces and conflates dirty generations, materializing the immutable row
-snapshot only when the latest generation reaches the I/O boundary. This avoids
-both snapshot reconstruction and a full-file write for every event. The
-internal `TerminalCompletionLearningRepository` is a passive snapshot I/O
-boundary; its codec and bounded raw file store remain internal and perform file
-access on the configured I/O dispatcher.
+live rows before any snapshot is written. One worker observes a conflated dirty
+signal and checkpoints the latest immutable snapshot every 30 seconds while
+dirty. Continuous command activity does not postpone that checkpoint, and
+shutdown forces the final dirty write. The coordinator talks directly to one
+bounded fixed-path file store, whose strict codec and atomic replacement run on
+the I/O dispatcher. There is no repository, child writer, control-command
+queue, per-event snapshot, or general flush operation.
 
 Each product supplies one fixed destination when it creates the coordinator and
 only toggles persistence on or off. Runtime path switching and cross-file import
@@ -86,12 +85,15 @@ fallbacks, but new saves write only `suggestion_learning_persistence_enabled`.
 IntelliJ exposes **Remember learned suggestions across IDE restarts** and keeps
 it disabled by default. When a product starts disabled, it neither loads nor
 writes this file. Disabling at runtime synchronously prevents new writes and
-invalidates debounced generations; an atomic file operation already in progress
-may finish. Session MRU and in-memory learning remain active. The plugin's
+invalidates a pending checkpoint; an atomic file operation already in progress
+may finish. Hydration that already started may also finish and merge because
+disabling does not clear in-memory learning. The first enable hydrates the fixed
+file once, and later toggles do not reload it. A rejected or unreadable file is
+not overwritten during that lifecycle. Session MRU and in-memory learning remain active. The plugin's
 enabled store lives in the IDE system directory described above.
 
-Before any exact-command row enters persistent learning, both hosts apply
-`TerminalCompletionPersistencePolicy`:
+Before any exact-command row enters persistent learning, the shared coordinator
+applies `TerminalCompletionPersistencePolicy`:
 
 1. Commands starting with a space or tab are ignored, matching the common shell
    `HISTCONTROL=ignorespace` convention.

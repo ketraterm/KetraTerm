@@ -8,19 +8,20 @@ through the shared completion persistence policy, enforces byte/line/row
 bounds, uses a versioned codec, and replaces files atomically when supported.
 
 `TerminalCompletionLearningCoordinator` is the runtime owner shared by product
-hosts. It applies each bounded learning mutation synchronously and sends only a
-conflated dirty generation to the latest-snapshot writer. One small bounded
-worker handles hydration, enablement, and flush controls in the host-owned
-lifecycle scope. The writer materializes immutable state only at the I/O
-boundary. Ranking observes in-memory learning without waiting for disk, bursts
-do not trigger a snapshot or write per event, and hosts can await a flush
-barrier at shutdown. The internal repository is a passive load/write boundary
-and does not own a mutex, queue, cache, or scope.
+hosts. It applies each bounded learning mutation synchronously and signals one
+conflated worker when clean state first becomes dirty. That worker hydrates the
+fixed file once, observes last-value enablement, and checkpoints the latest
+immutable snapshot every 30 seconds while dirty. Ranking observes in-memory
+learning without waiting for disk, sustained traffic cannot postpone a
+checkpoint, and shutdown forces and awaits the final dirty write.
 
 Each host supplies one fixed product path at construction and may only enable or
 disable persistence for that path. The module deliberately has no runtime path
 switching or cross-file import contract. It does not rank suggestions, parse
 command lines, inspect shell history, or depend on workspace and UI modules.
 
-The coordinator hydrates that fixed file and merges it with live rows in the
-supplied store. Callers must not separately preload the same aggregate file.
+The coordinator talks directly to one bounded file store. There is no
+repository, separate writer, control-command actor, arbitrary flush barrier,
+nullable path, or per-event persistence request. Hydration merges the fixed
+file with live rows in the supplied store; callers must not separately preload
+the same aggregate file.

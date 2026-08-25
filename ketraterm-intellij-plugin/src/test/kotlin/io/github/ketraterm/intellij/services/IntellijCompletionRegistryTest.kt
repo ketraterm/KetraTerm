@@ -36,7 +36,12 @@ class IntellijCompletionRegistryTest {
     fun `directory completion suspends until the scanner returns real values`() =
         runBlocking {
             var scans = 0
-            val registry = IntellijCompletionRegistry(coroutineScope = this)
+            val registry =
+                IntellijCompletionRegistry(
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
             val session =
                 registry.openSession(
                     context(
@@ -53,7 +58,7 @@ class IntellijCompletionRegistryTest {
             assertEquals(1, scans)
             assertEquals("src/", suggestions.first { it.source == "path" }.replacementText)
             session.close()
-            registry.close()
+            registry.closeAndFlush()
         }
 
     @Test
@@ -69,20 +74,30 @@ class IntellijCompletionRegistryTest {
                         listOf(TerminalCompletionDomainValue("main"))
                     },
                 )
-            val registry = IntellijCompletionRegistry(coroutineScope = this)
+            val registry =
+                IntellijCompletionRegistry(
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
             val session = registry.openSession(context(additionalSources = listOf(TerminalCompletionSourceEntry(source, 20))))
 
             session.provider.suggestions(request("git switch m")).last()
 
             assertEquals(1, loads)
             session.close()
-            registry.close()
+            registry.closeAndFlush()
         }
 
     @Test
     fun `successful commands feed session mru`() =
         runBlocking {
-            val registry = IntellijCompletionRegistry(coroutineScope = this)
+            val registry =
+                IntellijCompletionRegistry(
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
             val first = registry.openSession(context(sessionId = "first"))
             val second = registry.openSession(context(sessionId = "second"))
             registry.recordFinishedCommand(
@@ -107,13 +122,19 @@ class IntellijCompletionRegistryTest {
             )
             first.close()
             second.close()
-            registry.close()
+            registry.closeAndFlush()
         }
 
     @Test
     fun `closing a replaced session cannot remove its replacement`() =
         runBlocking {
-            val registry = IntellijCompletionRegistry(specs = emptyList(), coroutineScope = this)
+            val registry =
+                IntellijCompletionRegistry(
+                    specs = emptyList(),
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
             val previous = registry.openSession(context(sessionId = "session"))
             val replacement = registry.openSession(context(sessionId = "session"))
 
@@ -140,16 +161,21 @@ class IntellijCompletionRegistryTest {
                     .map { it.replacementText },
             )
             replacement.close()
-            registry.close()
+            registry.closeAndFlush()
         }
 
     @Test
     fun `closed registry rejects new sessions`(): Unit =
         runBlocking {
-            val registry = IntellijCompletionRegistry(coroutineScope = this)
+            val registry =
+                IntellijCompletionRegistry(
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
 
-            registry.close()
-            registry.close()
+            registry.closeAndFlush()
+            registry.closeAndFlush()
 
             assertThrows(IllegalStateException::class.java) { registry.openSession(context()) }
         }
@@ -166,6 +192,7 @@ class IntellijCompletionRegistryTest {
                 IntellijCompletionRegistry(
                     statsSource = learningStore,
                     persistencePath = path,
+                    persistenceEnabled = true,
                     coroutineScope = this,
                 )
 
@@ -197,12 +224,16 @@ class IntellijCompletionRegistryTest {
                     learningStore = learning,
                     coroutineScope = this,
                     persistencePath = path,
+                    persistenceEnabled = true,
                 )
-            coordinator.flush()
-            val snapshot = learning.snapshot()
             coordinator.closeAndFlush()
-            snapshot
+            learning.snapshot()
         }
+
+    private fun memoryOnlyPath(): Path =
+        Files
+            .createTempDirectory("intellij-completion-memory")
+            .resolve(TerminalCompletionLearningCoordinator.currentFileName())
 
     private fun context(
         sessionId: String = "session",

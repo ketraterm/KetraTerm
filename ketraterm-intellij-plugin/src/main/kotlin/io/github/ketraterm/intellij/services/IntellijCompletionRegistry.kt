@@ -34,7 +34,7 @@ import java.nio.file.Path
  *
  * @param specs immutable command specifications shared by every session.
  * @param statsSource bounded learned-statistics source.
- * @param persistencePath fixed product-owned learning destination, or `null` for memory-only learning.
+ * @param persistencePath fixed product-owned learning destination.
  * @param persistenceEnabled whether the fixed destination may initially be read and written.
  * @param sessionMruCapacity positive per-session MRU capacity.
  * @param coroutineScope host lifecycle scope that parents completion work.
@@ -43,11 +43,11 @@ import java.nio.file.Path
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     statsSource: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
-    persistencePath: Path? = null,
-    persistenceEnabled: Boolean = true,
+    persistencePath: Path,
+    persistenceEnabled: Boolean,
     sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
     coroutineScope: CoroutineScope,
-) : AutoCloseable {
+) {
     private val lock = Any()
     private var closed = false
     private val sessions =
@@ -143,13 +143,7 @@ internal class IntellijCompletionRegistry(
         }
     }
 
-    /** Clears sessions and releases learning resources. Closing is idempotent. */
-    override fun close() {
-        if (beginClose()) sessions.close()
-        statistics.close()
-    }
-
-    /** Clears sessions and waits for the final requested persistence write. */
+    /** Clears sessions and waits for the final dirty persistence write. */
     suspend fun closeAndFlush() {
         if (beginClose()) sessions.close()
         statistics.closeAndFlush()

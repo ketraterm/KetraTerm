@@ -21,83 +21,76 @@ import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Owns synchronous in-memory learning and one latest-snapshot writer.
+ * Owns synchronous exact-command learning and optional fixed-path persistence.
  *
- * The caller supplies the lifecycle scope and a fixed persistence destination.
- * Each learning event updates the bounded store before returning, then emits a
- * conflated write generation. A small bounded control worker handles only
- * startup hydration, persistence enablement, and flush barriers. The
- * coordinator owns scheduling; its passive repository owns only configured
- * snapshot I/O.
+ * One caller-owned worker hydrates the file once, observes last-value
+ * enablement, and checkpoints the latest dirty snapshot at a fixed interval.
+ * Recording never waits for hydration or disk. Shutdown bypasses the interval
+ * and awaits the final dirty write.
  */
 class TerminalCompletionLearningCoordinator
     internal constructor(
-        private val repository: TerminalCompletionLearningRepository,
+        private val learningStore: TerminalCompletionLearningStore,
+        private val fileStore: CompletionLearningSnapshotFileStore,
         coroutineScope: CoroutineScope,
-        workerDispatcher: CoroutineDispatcher,
-        writeDebounceMillis: Long,
+        persistenceEnabled: Boolean,
+        private val checkpointIntervalMillis: Long,
+        private val ioDispatcher: CoroutineDispatcher,
     ) {
         /**
          * Creates a lifecycle-bound learning owner for one fixed persistence path.
          *
-         * @param learningStore bounded in-memory learning used immediately by completion ranking. The coordinator
-         * owns hydration from [persistencePath]; callers must not preload that same aggregate file into the store.
-         * @param coroutineScope caller-owned lifecycle scope for learning and write workers.
-         * @param persistencePath fixed snapshot path, or `null` for memory-only learning.
-         * @param persistenceEnabled whether the fixed path may initially be read and written.
-         * @param workerDispatcher dispatcher used by the persistence control and debounce workers.
-         * @param ioDispatcher dispatcher used for bounded snapshot file access.
+         * @param learningStore bounded in-memory learning used immediately by completion ranking.
+         * @param coroutineScope caller-owned lifecycle scope for the persistence worker.
+         * @param persistencePath fixed snapshot path owned by the product.
+         * @param persistenceEnabled whether the snapshot may initially be read and written.
          * @param onPersistenceFailure optional diagnostic callback for failed file access.
          */
         @JvmOverloads
         constructor(
             learningStore: TerminalCompletionLearningStore,
             coroutineScope: CoroutineScope,
-            persistencePath: Path? = null,
-            persistenceEnabled: Boolean = true,
-            workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
-            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            persistencePath: Path,
+            persistenceEnabled: Boolean,
             onPersistenceFailure: (Throwable) -> Unit = {},
         ) : this(
-            repository =
-                TerminalCompletionLearningRepository(
-                    learningStore = learningStore,
-                    persistencePath = persistencePath,
-                    persistenceEnabled = persistenceEnabled,
-                    ioDispatcher = ioDispatcher,
-                    onPersistenceFailure = onPersistenceFailure,
+            learningStore = learningStore,
+            fileStore =
+                CompletionLearningFileStore(
+                    path = persistencePath.toAbsolutePath().normalize(),
+                    onFailure = onPersistenceFailure,
                 ),
             coroutineScope = coroutineScope,
-            workerDispatcher = workerDispatcher,
-            writeDebounceMillis = DEFAULT_WRITE_DEBOUNCE_MILLIS,
+            persistenceEnabled = persistenceEnabled,
+            checkpointIntervalMillis = DEFAULT_CHECKPOINT_INTERVAL_MILLIS,
+            ioDispatcher = Dispatchers.IO,
         )
 
-        private val stateLock = Any()
-        private val controls = Channel<ControlCommand>(CONTROL_QUEUE_CAPACITY)
-        private var acceptingEvents = true
-        private var persistenceReady = false
-        private var desiredPersistenceEnabled = repository.initialPersistenceEnabled
-        private var persistenceControlGeneration = 0L
-        private var currentWriteRequest: CompletionLearningWriteRequest? = null
-        private var changedBeforeHydration = false
-        private val snapshotWriter =
-            LatestCompletionLearningSnapshotWriter(
-                coroutineScope = coroutineScope,
-                workerDispatcher = workerDispatcher,
-                debounceMillis = writeDebounceMillis,
-                materialize = repository::materialize,
-                persist = repository::persist,
-            )
-        private val worker =
-            coroutineScope.async(context = workerDispatcher, start = CoroutineStart.UNDISPATCHED) {
-                runControlWorker()
+        init {
+            require(checkpointIntervalMillis > 0L) {
+                "checkpointIntervalMillis must be > 0, was $checkpointIntervalMillis"
             }
+        }
 
-        /** Mutable learning store shared with completion ranking and history sources. */
-        val learningStore: TerminalCompletionLearningStore
-            get() = repository.learningStore
+        private val stateLock = Any()
+        private val wakeups = Channel<Unit>(Channel.CONFLATED)
+        private var acceptingEvents = true
+        private var closeRequested = false
+        private var finalWriteAttempted = false
+        private var persistenceEnabled = persistenceEnabled
+        private var hydrated = false
+        private var loadBlocked = false
+        private var mutationRevision = 0L
+        private var persistedRevision = 0L
+        private var attemptedRevision = 0L
+        private var persistenceFailure: Throwable? = null
+        private val worker: Deferred<Unit> =
+            coroutineScope.async(start = CoroutineStart.UNDISPATCHED) {
+                runWorker()
+            }
 
         /**
          * Records one completed command when the shared persistence privacy policy permits it.
@@ -126,7 +119,7 @@ class TerminalCompletionLearningCoordinator
                         workingDirectoryUri = workingDirectoryUri,
                         usedAtEpochMillis = usedAtEpochMillis,
                     )
-                if (changed) requestWriteAfterMutation()
+                if (changed) markDirty()
             }
         }
 
@@ -157,171 +150,166 @@ class TerminalCompletionLearningCoordinator
                         workingDirectoryUri = workingDirectoryUri,
                         feedbackAtEpochMillis = feedbackAtEpochMillis,
                     )
-                if (changed) requestWriteAfterMutation()
+                if (changed) markDirty()
             }
         }
 
         /**
-         * Changes persistence enablement for the fixed configured path.
+         * Enables or disables persistence for the fixed configured path.
          *
-         * Disabling synchronously prevents new write requests and invalidates
-         * any snapshot still waiting in the debounce window. Loading after an
-         * enable remains asynchronous. In-memory learning stays active and is
-         * written when the same path is enabled again.
+         * The first enable hydrates the file once. Disabling cancels a pending
+         * checkpoint but does not clear in-memory learning. File I/O already in
+         * progress may still finish.
          *
-         * @param enabled whether the configured snapshot path may be read and written.
+         * @param enabled whether the fixed snapshot may be read and written.
          */
         fun setPersistenceEnabled(enabled: Boolean) {
             synchronized(stateLock) {
                 check(acceptingEvents) { "completion-learning owner is closed" }
-                if (desiredPersistenceEnabled == enabled) return
-                check(persistenceControlGeneration != Long.MAX_VALUE) {
-                    "completion-learning persistence control generation overflow"
-                }
-                val generation = persistenceControlGeneration + 1L
-                val control = ControlCommand.SetPersistenceEnabled(enabled, generation)
-                check(controls.trySend(control).isSuccess) {
-                    "completion-learning control queue is full or closed"
-                }
-                desiredPersistenceEnabled = enabled
-                persistenceControlGeneration = generation
-                if (!enabled) {
-                    currentWriteRequest = null
-                    snapshotWriter.request(null)
-                }
+                if (persistenceEnabled == enabled) return
+                persistenceEnabled = enabled
+                wakeups.trySend(Unit)
             }
         }
 
         /**
-         * Waits for hydration, earlier controls, and the latest requested disk generation.
+         * Stops accepting events and awaits the final dirty write when persistence is enabled.
          *
-         * Write requests issued after the writer reaches this barrier are not
-         * awaited. A failed latest write is reported to the configured diagnostic
-         * callback and rethrown here.
-         */
-        suspend fun flush() {
-            val completed = CompletableDeferred<Unit>()
-            enqueueControl(ControlCommand.Flush(completed))
-            completed.await()
-        }
-
-        /** Stops accepting events and lets the bounded control worker drain. */
-        fun close() {
-            synchronized(stateLock) {
-                if (!acceptingEvents) return
-                acceptingEvents = false
-                controls.close()
-            }
-        }
-
-        /**
-         * Stops accepting events and waits for the final requested generation.
-         *
-         * Calling this method more than once is safe. Persistence failure from
-         * the final generation is surfaced to the caller.
+         * Calling this method more than once is safe. An unrecovered final
+         * write failure is rethrown after the worker stops.
          */
         suspend fun closeAndFlush() {
-            close()
+            synchronized(stateLock) {
+                if (acceptingEvents) {
+                    acceptingEvents = false
+                    closeRequested = true
+                    wakeups.trySend(Unit)
+                }
+            }
             worker.await()
+            synchronized(stateLock) { persistenceFailure.takeIf { persistenceEnabled } }?.let { throw it }
         }
 
-        private suspend fun runControlWorker() {
-            var terminalFailure: Throwable? = null
+        private suspend fun runWorker() {
             try {
-                repository.initialize()
-                synchronized(stateLock) {
-                    persistenceReady = true
-                    currentWriteRequest = repository.writeRequestOrNull().takeIf { desiredPersistenceEnabled }
-                    if (changedBeforeHydration) {
-                        currentWriteRequest?.let(snapshotWriter::request)
-                        changedBeforeHydration = false
+                while (true) {
+                    when (nextAction()) {
+                        WorkerAction.HYDRATE -> hydrate()
+                        WorkerAction.WAIT -> wakeups.receive()
+                        WorkerAction.WAIT_FOR_CHECKPOINT -> waitForCheckpoint()
+                        WorkerAction.WRITE_NOW -> persistLatest()
+                        WorkerAction.STOP -> return
                     }
                 }
-                for (control in controls) executeControl(control)
-            } catch (failure: Throwable) {
-                terminalFailure = failure
             } finally {
                 synchronized(stateLock) {
                     acceptingEvents = false
-                    controls.close(terminalFailure)
+                    closeRequested = true
                 }
-                val pendingFailure = terminalFailure ?: CancellationException("completion-learning owner stopped")
-                while (true) {
-                    val pending = controls.tryReceive().getOrNull() ?: break
-                    if (pending is ControlCommand.Flush) pending.completed.completeExceptionally(pendingFailure)
-                }
-
-                try {
-                    snapshotWriter.closeAndFlush()
-                } catch (closeFailure: Throwable) {
-                    if (terminalFailure == null) {
-                        terminalFailure = closeFailure
-                    } else if (closeFailure !== terminalFailure) {
-                        terminalFailure.addSuppressed(closeFailure)
-                    }
-                }
-            }
-
-            terminalFailure?.let { throw it }
-        }
-
-        private suspend fun executeControl(control: ControlCommand) {
-            when (control) {
-                is ControlCommand.SetPersistenceEnabled -> {
-                    repository.setPersistenceEnabled(control.enabled)
-                    val request = repository.writeRequestOrNull()
-                    synchronized(stateLock) {
-                        if (control.generation != persistenceControlGeneration ||
-                            control.enabled != desiredPersistenceEnabled
-                        ) {
-                            return
-                        }
-                        currentWriteRequest = request
-                        snapshotWriter.request(request)
-                    }
-                }
-
-                is ControlCommand.Flush -> {
-                    try {
-                        snapshotWriter.flushLatest()
-                        control.completed.complete(Unit)
-                    } catch (failure: Throwable) {
-                        control.completed.completeExceptionally(failure)
-                        if (failure is CancellationException) throw failure
-                    }
-                }
+                wakeups.close()
             }
         }
 
-        private fun requestWriteAfterMutation() {
-            if (!persistenceReady) {
-                changedBeforeHydration = true
-                return
-            }
-            currentWriteRequest?.let(snapshotWriter::request)
-        }
-
-        private fun enqueueControl(control: ControlCommand) {
+        private fun nextAction(): WorkerAction =
             synchronized(stateLock) {
-                check(acceptingEvents) { "completion-learning owner is closed" }
-                check(controls.trySend(control).isSuccess) { "completion-learning control queue is full or closed" }
+                when {
+                    persistenceEnabled && !hydrated -> WorkerAction.HYDRATE
+                    closeRequested && canPersist() && !finalWriteAttempted -> {
+                        finalWriteAttempted = true
+                        WorkerAction.WRITE_NOW
+                    }
+                    closeRequested -> WorkerAction.STOP
+                    canCheckpoint() -> WorkerAction.WAIT_FOR_CHECKPOINT
+                    else -> WorkerAction.WAIT
+                }
+            }
+
+        private suspend fun hydrate() {
+            val outcome = withContext(ioDispatcher) { fileStore.loadSnapshot() }
+            synchronized(stateLock) {
+                if (outcome is CompletionLearningFileLoadOutcome.Loaded) {
+                    learningStore.mergeSnapshot(outcome.snapshot)
+                }
+                if (outcome === CompletionLearningFileLoadOutcome.Rejected ||
+                    outcome === CompletionLearningFileLoadOutcome.Failed
+                ) {
+                    loadBlocked = true
+                }
+                hydrated = true
             }
         }
 
-        private sealed interface ControlCommand {
-            class SetPersistenceEnabled(
-                val enabled: Boolean,
-                val generation: Long,
-            ) : ControlCommand
+        private suspend fun waitForCheckpoint() {
+            while (wakeups.tryReceive().isSuccess) {
+                // Collapse signals already represented by the current state.
+            }
+            if (synchronized(stateLock) { !canCheckpoint() || closeRequested }) return
 
-            class Flush(
-                val completed: CompletableDeferred<Unit>,
-            ) : ControlCommand
+            val stateChanged =
+                withTimeoutOrNull(checkpointIntervalMillis.milliseconds) {
+                    wakeups.receive()
+                    true
+                } ?: false
+            if (!stateChanged) persistLatest()
+        }
+
+        private suspend fun persistLatest() {
+            var revision = 0L
+            val snapshot =
+                synchronized(stateLock) {
+                    if (!canPersist()) return
+                    revision = mutationRevision
+                    learningStore.snapshot()
+                }
+            val shouldPersist =
+                synchronized(stateLock) {
+                    if (!canPersist()) return@synchronized false
+                    attemptedRevision = maxOf(attemptedRevision, revision)
+                    true
+                }
+            if (!shouldPersist) return
+
+            val failure =
+                try {
+                    withContext(ioDispatcher) { fileStore.persist(snapshot) }
+                    null
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (writeFailure: Throwable) {
+                    writeFailure
+                }
+
+            synchronized(stateLock) {
+                if (failure == null) {
+                    if (revision > persistedRevision) persistedRevision = revision
+                    persistenceFailure = null
+                } else {
+                    persistenceFailure = failure
+                }
+            }
+        }
+
+        private fun markDirty() {
+            check(mutationRevision != Long.MAX_VALUE) { "completion-learning mutation revision overflow" }
+            val shouldSignal = mutationRevision == persistedRevision || mutationRevision == attemptedRevision
+            ++mutationRevision
+            if (shouldSignal) wakeups.trySend(Unit)
+        }
+
+        private fun canPersist(): Boolean = persistenceEnabled && hydrated && !loadBlocked && mutationRevision > persistedRevision
+
+        private fun canCheckpoint(): Boolean = canPersist() && mutationRevision > attemptedRevision
+
+        private enum class WorkerAction {
+            HYDRATE,
+            WAIT,
+            WAIT_FOR_CHECKPOINT,
+            WRITE_NOW,
+            STOP,
         }
 
         companion object {
-            private const val DEFAULT_WRITE_DEBOUNCE_MILLIS = 150L
-            private const val CONTROL_QUEUE_CAPACITY = 64
+            private const val DEFAULT_CHECKPOINT_INTERVAL_MILLIS = 30_000L
 
             /**
              * Returns the versioned filename used for persisted learning.
