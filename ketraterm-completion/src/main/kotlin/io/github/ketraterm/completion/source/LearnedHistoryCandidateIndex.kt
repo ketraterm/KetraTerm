@@ -15,11 +15,9 @@
  */
 package io.github.ketraterm.completion.source
 
-import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
-import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
+import io.github.ketraterm.completion.internal.ParsedLearnedStatsRow
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import java.util.*
 
 /** Immutable prefix-context index for positive persisted command rows. */
@@ -53,26 +51,25 @@ internal class LearnedHistoryCandidateIndex private constructor(
     }
 
     companion object {
-        /** Builds one bounded index for an immutable snapshot and shell syntax. */
-        fun build(
-            snapshot: TerminalCommandCompletionStatsSnapshot,
-            shellSyntax: TerminalShellSyntax,
-        ): LearnedHistoryCandidateIndex {
+        /** Builds one bounded index from rows parsed by the shared learning compiler. */
+        fun build(rows: List<ParsedLearnedStatsRow>): LearnedHistoryCandidateIndex {
             val mutableBuckets = HashMap<List<String>, MutableList<IndexedLearnedCommand>>()
-            snapshot.commandStats.forEachIndexed { snapshotRank, stats ->
-                if (!stats.hasPositiveSuggestionSignal()) return@forEachIndexed
-                val line = TerminalCommandLineTokenizer.parse(stats.commandLine, stats.commandLine.length, shellSyntax)
+            for (snapshotRank in rows.indices) {
+                val parsedRow = rows[snapshotRank]
+                val stats = parsedRow.stats
+                if (!stats.hasPositiveSuggestionSignal()) continue
+                val line = parsedRow.lineContext
+                val normalizedTokens = line.tokens.map { it.text.lowercase(Locale.ROOT) }
                 val indexedTokenCount = minOf(line.tokens.size, MAX_INDEXED_TOKEN_POSITIONS)
                 for (activeIndex in 0 until indexedTokenCount) {
-                    val token = line.tokens[activeIndex]
-                    val key = line.tokens.subList(0, activeIndex).map { it.text.lowercase(Locale.ROOT) }
+                    val key = normalizedTokens.subList(0, activeIndex)
                     mutableBuckets
                         .getOrPut(key, ::ArrayList)
                         .add(
                             IndexedLearnedCommand(
                                 stats = stats,
                                 lineContext = line,
-                                normalizedActiveToken = token.text.lowercase(Locale.ROOT),
+                                normalizedActiveToken = normalizedTokens[activeIndex],
                                 snapshotRank = snapshotRank,
                             ),
                         )

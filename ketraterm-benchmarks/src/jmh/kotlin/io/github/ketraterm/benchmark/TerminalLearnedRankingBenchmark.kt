@@ -43,7 +43,7 @@ open class TerminalLearnedRankingBenchmark {
     open fun setUp() {
         val commandSpecs = TerminalCommandSpecs.defaults()
         statsSource = TerminalCompletionLearningStore(capacity = STATS_CAPACITY)
-        statsSource.replaceSnapshot(fullLearnedSnapshot())
+        statsSource.mergeSnapshot(fullLearnedSnapshot())
         learnedEngine =
             TerminalCompletionEngines.fromSources(
                 sources = emptyList(),

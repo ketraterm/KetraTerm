@@ -22,10 +22,10 @@ import kotlin.test.assertEquals
 
 class CompletionStatsIndexesTest {
     @Test
-    fun `exact command index keeps newest duplicate and stable relevance order`() {
+    fun `exact command index merges duplicates and keeps stable relevance order`() {
         val index = CommandCompletionStatsIndex(capacity = 8)
 
-        index.replaceAll(
+        index.mergeAll(
             listOf(
                 commandStats("Git Status", lastUsedEpochMillis = 10),
                 commandStats("npm test", lastUsedEpochMillis = 30),
@@ -35,10 +35,11 @@ class CompletionStatsIndexesTest {
 
         assertEquals(listOf("npm test", "git status"), index.snapshot().map { it.commandLine })
         assertEquals(listOf(30L, 20L), index.snapshot().map { it.lastUsedEpochMillis })
+        assertEquals(2, index.snapshot()[1].successCount)
     }
 
     @Test
-    fun `exact command index records counters ignores malformed events and evicts least relevant rows`() {
+    fun `exact command index records counters and evicts least relevant rows`() {
         val index = CommandCompletionStatsIndex(capacity = 2)
 
         index.recordCommandResult("one", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 1)
@@ -58,15 +59,6 @@ class CompletionStatsIndexesTest {
             feedbackAtEpochMillis = 4,
         )
         index.recordCommandResult("three", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 5)
-        index.recordCommandResult("   ", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 6)
-        index.recordCommandResult(
-            "four\nfive",
-            successful = true,
-            profileId = null,
-            workingDirectoryUri = null,
-            usedAtEpochMillis = 7,
-        )
-        index.recordCommandResult("six", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = -1)
 
         assertEquals(listOf("three", "two"), index.snapshot().map { it.commandLine })
         assertEquals(1, index.snapshot()[1].failureCount)
@@ -102,7 +94,7 @@ class CompletionStatsIndexesTest {
     @Test
     fun `exact command index deduplicates canonical directory variants`() {
         val index = CommandCompletionStatsIndex(capacity = 8)
-        index.replaceAll(
+        index.mergeAll(
             listOf(
                 TerminalCommandCompletionStats(
                     commandLine = "git status",

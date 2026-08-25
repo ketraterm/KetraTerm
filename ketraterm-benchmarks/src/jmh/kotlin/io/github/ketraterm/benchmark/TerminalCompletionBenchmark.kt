@@ -90,10 +90,10 @@ open class TerminalCompletionBenchmark {
             TerminalCompletionEngines.fromSources(
                 realisticSources,
                 commandSpecs,
-                learningStore = TerminalCompletionLearningStore().apply { replaceSnapshot(learnedSnapshot) },
+                learningStore = TerminalCompletionLearningStore().apply { mergeSnapshot(learnedSnapshot) },
             )
         val persistedStatsSource = TerminalCompletionLearningStore(capacity = 2_048)
-        persistedStatsSource.replaceSnapshot(learnedSnapshot)
+        persistedStatsSource.mergeSnapshot(learnedSnapshot)
         val sessionMru =
             TerminalCompletionSources.sessionMru(
                 commandSpecs = commandSpecs,
@@ -169,14 +169,14 @@ open class TerminalCompletionBenchmark {
         blackhole.consume(runBlocking { learnedFusionEngine.completions(fusionRequest).last() })
     }
 
-    /** Measures cold construction of the 2,048-row learned-evidence index and one ranked completion. */
+    /** Measures cold construction of both 2,048-row learned indexes and one ranked completion. */
     @Benchmark
     open fun buildLearnedIndexAndComplete(blackhole: Blackhole) {
         val coldEngine =
             TerminalCompletionEngines.fromSources(
                 sources = realisticSources,
                 commandSpecs = commandSpecs,
-                learningStore = TerminalCompletionLearningStore().apply { replaceSnapshot(learnedSnapshot) },
+                learningStore = TerminalCompletionLearningStore().apply { mergeSnapshot(learnedSnapshot) },
             )
         blackhole.consume(runBlocking { coldEngine.completions(fusionRequest).last() })
     }

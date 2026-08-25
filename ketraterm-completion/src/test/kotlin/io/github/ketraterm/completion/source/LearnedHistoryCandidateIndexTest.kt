@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
+import io.github.ketraterm.completion.internal.CompletionLearningIndexCache
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import kotlinx.coroutines.runBlocking
@@ -38,7 +39,7 @@ class LearnedHistoryCandidateIndexTest {
                             TerminalCommandCompletionStats(commandLine = "git switch malformed"),
                         ),
                 )
-            val index = LearnedHistoryCandidateIndex.build(snapshot, TerminalShellSyntax.POSIX)
+            val index = CompletionLearningIndexCache().indexesFor(snapshot, TerminalShellSyntax.POSIX).history
             val requestLine = TerminalCommandLineTokenizer.parse("git switch ma", "git switch ma".length, TerminalShellSyntax.POSIX)
 
             val matches = index.matching(requestLine)

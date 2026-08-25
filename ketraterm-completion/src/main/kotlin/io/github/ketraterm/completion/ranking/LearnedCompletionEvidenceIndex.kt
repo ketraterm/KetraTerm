@@ -15,11 +15,8 @@
  */
 package io.github.ketraterm.completion.ranking
 
-import io.github.ketraterm.completion.api.TerminalShellSyntax
-import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.internal.CompletionLearningContextKey
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.internal.ParsedLearnedStatsRow
 
 /** Immutable direct-lookup view of exact command learning in one snapshot. */
 internal class LearnedCompletionEvidenceIndex private constructor(
@@ -49,27 +46,24 @@ internal class LearnedCompletionEvidenceIndex private constructor(
 
     companion object {
         fun build(
-            snapshot: TerminalCommandCompletionStatsSnapshot,
-            shellSyntax: TerminalShellSyntax,
+            rows: List<ParsedLearnedStatsRow>,
             outcomeResolver: TerminalCompletionOutcomeKeyResolver,
         ): LearnedCompletionEvidenceIndex {
-            val exactRows = HashMap<ExactEvidenceKey, MutableList<TerminalCommandCompletionStats>>()
-            for (row in snapshot.commandStats) {
-                val tokens = TerminalCommandLineTokenizer.parse(row.commandLine, row.commandLine.length, shellSyntax).tokens
-                if (tokens.isEmpty()) continue
+            val exactEvidence = HashMap<ExactEvidenceKey, LearnedEvidenceCounts>()
+            for (parsedRow in rows) {
+                val row = parsedRow.stats
+                val tokens = parsedRow.lineContext.tokens
                 val context = CompletionLearningContextKey.of(row.profileId, row.workingDirectoryUri)
                 outcomeResolver.learnedKey(tokens, NO_PATH_TOKEN, pathAware = false)?.let { key ->
-                    exactRows.getOrPut(ExactEvidenceKey(key, context), ::ArrayList).add(row)
+                    exactEvidence.getOrPut(ExactEvidenceKey(key, context), ::LearnedEvidenceCounts).add(row)
                 }
                 for (tokenIndex in tokens.indices) {
                     outcomeResolver.learnedKey(tokens, tokenIndex, pathAware = true)?.let { key ->
-                        exactRows.getOrPut(ExactEvidenceKey(key, context), ::ArrayList).add(row)
+                        exactEvidence.getOrPut(ExactEvidenceKey(key, context), ::LearnedEvidenceCounts).add(row)
                     }
                 }
             }
-            return LearnedCompletionEvidenceIndex(
-                exactEvidence = exactRows.mapValues { (_, rows) -> LearnedEvidenceCounts.fromCommands(rows) },
-            )
+            return LearnedCompletionEvidenceIndex(exactEvidence)
         }
 
         private const val NO_PATH_TOKEN = -1

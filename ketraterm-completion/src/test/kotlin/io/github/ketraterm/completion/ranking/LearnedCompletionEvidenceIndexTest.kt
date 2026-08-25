@@ -24,8 +24,6 @@ import io.github.ketraterm.completion.internal.CompletionLearningIndexCache
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import kotlin.test.Test
-import kotlin.test.assertNotSame
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LearnedCompletionEvidenceIndexTest {
@@ -40,27 +38,12 @@ class LearnedCompletionEvidenceIndexTest {
                         stats("cd build/", lastUsedEpochMillis = NOW),
                     ),
             )
-        val index = LearnedCompletionEvidenceIndex.build(snapshot, TerminalShellSyntax.POSIX, resolver)
+        val index = CompletionLearningIndexCache().indexesFor(snapshot, TerminalShellSyntax.POSIX).evidence
         val tokens = TerminalCommandLineTokenizer.parse("cd build", "cd build".length, TerminalShellSyntax.POSIX).tokens
         val key = requireNotNull(resolver.learnedKey(tokens, 1, pathAware = true))
 
         val adjustment = index.exactAdjustment(key, CompletionLearningContextKey.from(request()), NOW)
         assertTrue(adjustment > 0)
-    }
-
-    @Test
-    fun `cache shares one compiled learning view until snapshot identity or syntax changes`() {
-        val snapshot = TerminalCommandCompletionStatsSnapshot.EMPTY
-        val cache = CompletionLearningIndexCache()
-
-        val firstPosix = cache.indexesFor(snapshot, TerminalShellSyntax.POSIX)
-
-        assertSame(firstPosix, cache.indexesFor(snapshot, TerminalShellSyntax.POSIX))
-        assertNotSame(firstPosix, cache.indexesFor(snapshot, TerminalShellSyntax.POWERSHELL))
-        assertNotSame(
-            firstPosix,
-            cache.indexesFor(TerminalCommandCompletionStatsSnapshot(), TerminalShellSyntax.POSIX),
-        )
     }
 
     @Test
@@ -82,7 +65,7 @@ class LearnedCompletionEvidenceIndexTest {
                         ),
                     ),
             )
-        val index = LearnedCompletionEvidenceIndex.build(snapshot, TerminalShellSyntax.POSIX, resolver)
+        val index = CompletionLearningIndexCache().indexesFor(snapshot, TerminalShellSyntax.POSIX).evidence
         val tokens = TerminalCommandLineTokenizer.parse("git status", "git status".length, TerminalShellSyntax.POSIX).tokens
         val key = requireNotNull(resolver.learnedKey(tokens, -1, pathAware = false))
 

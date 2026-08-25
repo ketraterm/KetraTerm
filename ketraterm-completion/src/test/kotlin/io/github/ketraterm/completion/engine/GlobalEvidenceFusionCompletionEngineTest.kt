@@ -85,7 +85,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                             ),
                         ),
                 )
-            val learningStore = TerminalCompletionLearningStore().apply { replaceSnapshot(snapshot) }
+            val learningStore = TerminalCompletionLearningStore().apply { mergeSnapshot(snapshot) }
             val learnedSource =
                 TerminalCompletionSources.sessionMru(
                     learningStore = learningStore,
@@ -671,7 +671,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
         MergedCompletionEngine(
             sources = sources,
             commandSpecs = commandSpecs,
-            learningStore = TerminalCompletionLearningStore().apply { replaceSnapshot(snapshot) },
+            learningStore = TerminalCompletionLearningStore().apply { mergeSnapshot(snapshot) },
             clockEpochMillis = { NOW },
         )
 

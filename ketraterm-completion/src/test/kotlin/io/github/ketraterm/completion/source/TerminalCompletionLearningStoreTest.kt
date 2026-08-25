@@ -39,10 +39,6 @@ class TerminalCompletionLearningStoreTest {
             val after = source.snapshot()
             assertNotSame(before, after)
             assertSame(after, source.snapshot())
-
-            source.replaceSnapshot(after)
-
-            assertSame(after, source.snapshot())
         }
 
     @Test
@@ -55,6 +51,10 @@ class TerminalCompletionLearningStoreTest {
 
         assertSame(first, second)
         assertNotSame(first, source.indexesFor(TerminalShellSyntax.POWERSHELL))
+
+        source.recordCommandResult("git log", successful = true, profileId = null, workingDirectoryUri = null, usedAtEpochMillis = 2)
+
+        assertNotSame(first, source.indexesFor(TerminalShellSyntax.POSIX))
     }
 
     @Test
@@ -165,7 +165,7 @@ class TerminalCompletionLearningStoreTest {
     fun `exact command ranking caps learned counter contribution`() =
         runBlocking {
             val source = TerminalCompletionLearningStore()
-            source.replaceSnapshot(
+            source.mergeSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     commandStats =
                         listOf(
@@ -343,14 +343,27 @@ class TerminalCompletionLearningStoreTest {
             )
 
             assertEquals(listOf("three", "two"), source.snapshot().commandStats.map { it.commandLine })
+            val retained = source.snapshot()
+
+            val changed =
+                source.recordCommandResult(
+                    "obsolete",
+                    successful = true,
+                    profileId = null,
+                    workingDirectoryUri = null,
+                    usedAtEpochMillis = 0,
+                )
+
+            assertFalse(changed)
+            assertSame(retained, source.snapshot())
         }
 
     @Test
-    fun `replace snapshot deduplicates by normalized command profile and directory`() =
+    fun `merge snapshot deduplicates by normalized command profile and directory`() =
         runBlocking {
             val source = TerminalCompletionLearningStore()
 
-            source.replaceSnapshot(
+            source.mergeSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     commandStats =
                         listOf(
@@ -405,7 +418,7 @@ class TerminalCompletionLearningStoreTest {
     fun `recorded counters saturate at integer maximum`() =
         runBlocking {
             val source = TerminalCompletionLearningStore()
-            source.replaceSnapshot(
+            source.mergeSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     commandStats =
                         listOf(

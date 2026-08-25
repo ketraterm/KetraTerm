@@ -16,6 +16,9 @@
 package io.github.ketraterm.completion.internal
 
 import io.github.ketraterm.completion.api.TerminalShellSyntax
+import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
+import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
+import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.ranking.LearnedCompletionEvidenceIndex
 import io.github.ketraterm.completion.ranking.TerminalCompletionOutcomeKeyResolver
@@ -24,69 +27,37 @@ import io.github.ketraterm.completion.source.LearnedHistoryCandidateIndex
 /** Compiles and shares derived learning indexes for one current snapshot. */
 internal class CompletionLearningIndexCache {
     private val lock = Any()
-
-    @Volatile
-    private var current: SnapshotCompilation? = null
+    private var cachedSnapshot: TerminalCommandCompletionStatsSnapshot? = null
+    private val indexesBySyntax = arrayOfNulls<CompletionLearningIndexes>(TerminalShellSyntax.entries.size)
 
     fun indexesFor(
         snapshot: TerminalCommandCompletionStatsSnapshot,
         shellSyntax: TerminalShellSyntax,
-    ): CompletionLearningIndexes {
-        val compilation = current?.takeIf { it.snapshot === snapshot } ?: compilationFor(snapshot)
-        return compilation.indexesFor(shellSyntax)
-    }
-
-    private fun compilationFor(snapshot: TerminalCommandCompletionStatsSnapshot): SnapshotCompilation =
+    ): CompletionLearningIndexes =
         synchronized(lock) {
-            current?.takeIf { it.snapshot === snapshot }
-                ?: SnapshotCompilation(snapshot).also { current = it }
+            if (cachedSnapshot !== snapshot) {
+                cachedSnapshot = snapshot
+                indexesBySyntax.fill(null)
+            }
+            val syntaxIndex = shellSyntax.ordinal
+            indexesBySyntax[syntaxIndex]
+                ?: buildIndexes(snapshot, shellSyntax).also { indexesBySyntax[syntaxIndex] = it }
         }
 
-    private class SnapshotCompilation(
-        val snapshot: TerminalCommandCompletionStatsSnapshot,
-    ) {
-        private val lock = Any()
-
-        @Volatile
-        private var entries: Array<CompilationEntry> = emptyArray()
-
-        fun indexesFor(shellSyntax: TerminalShellSyntax): CompletionLearningIndexes {
-            val currentEntries = entries
-            for (i in currentEntries.indices) {
-                val entry = currentEntries[i]
-                if (entry.shellSyntax == shellSyntax) {
-                    return entry.indexes
-                }
-            }
-            return synchronized(lock) {
-                for (entry in entries) {
-                    if (entry.shellSyntax == shellSyntax) {
-                        return@synchronized entry.indexes
-                    }
-                }
-                val built = buildIndexes(shellSyntax)
-                val newEntry = CompilationEntry(shellSyntax, built)
-                entries = entries + newEntry
-                built
-            }
+    private fun buildIndexes(
+        snapshot: TerminalCommandCompletionStatsSnapshot,
+        shellSyntax: TerminalShellSyntax,
+    ): CompletionLearningIndexes {
+        val parsedRows = ArrayList<ParsedLearnedStatsRow>(snapshot.commandStats.size)
+        for (stats in snapshot.commandStats) {
+            val line = TerminalCommandLineTokenizer.parse(stats.commandLine, stats.commandLine.length, shellSyntax)
+            parsedRows += ParsedLearnedStatsRow(stats, line)
         }
-
-        private fun buildIndexes(shellSyntax: TerminalShellSyntax): CompletionLearningIndexes =
-            CompletionLearningIndexes(
-                evidence =
-                    LearnedCompletionEvidenceIndex.build(
-                        snapshot = snapshot,
-                        shellSyntax = shellSyntax,
-                        outcomeResolver = LEARNED_KEY_RESOLVER,
-                    ),
-                history = LearnedHistoryCandidateIndex.build(snapshot, shellSyntax),
-            )
+        return CompletionLearningIndexes(
+            evidence = LearnedCompletionEvidenceIndex.build(parsedRows, LEARNED_KEY_RESOLVER),
+            history = LearnedHistoryCandidateIndex.build(parsedRows),
+        )
     }
-
-    private class CompilationEntry(
-        val shellSyntax: TerminalShellSyntax,
-        val indexes: CompletionLearningIndexes,
-    )
 
     private companion object {
         private val LEARNED_KEY_RESOLVER = TerminalCompletionOutcomeKeyResolver()
@@ -94,7 +65,13 @@ internal class CompletionLearningIndexCache {
 }
 
 /** All derived learning data for one shell syntax. */
-internal data class CompletionLearningIndexes(
+internal class CompletionLearningIndexes(
     val evidence: LearnedCompletionEvidenceIndex,
     val history: LearnedHistoryCandidateIndex,
+)
+
+/** One learned row tokenized for both derived indexes. */
+internal class ParsedLearnedStatsRow(
+    val stats: TerminalCommandCompletionStats,
+    val lineContext: TerminalCommandLineContext,
 )

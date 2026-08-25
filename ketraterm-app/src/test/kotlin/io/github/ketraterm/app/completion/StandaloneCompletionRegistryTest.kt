@@ -100,7 +100,7 @@ class StandaloneCompletionRegistryTest {
             try {
                 Files.createDirectories(directory.resolve("IdeaProjects/KetraTerm"))
                 val persistentStats = TerminalCompletionLearningStore()
-                persistentStats.replaceSnapshot(
+                persistentStats.mergeSnapshot(
                     TerminalCommandCompletionStatsSnapshot(
                         commandStats =
                             listOf(
@@ -218,7 +218,7 @@ class StandaloneCompletionRegistryTest {
     fun `learned command stats boost matching suggestions`() =
         runBlocking {
             val persistentStats = TerminalCompletionLearningStore()
-            persistentStats.replaceSnapshot(
+            persistentStats.mergeSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     commandStats =
                         listOf(
@@ -256,7 +256,7 @@ class StandaloneCompletionRegistryTest {
     fun `learned command stats demote repeatedly dismissed suggestions`() =
         runBlocking {
             val persistentStats = TerminalCompletionLearningStore()
-            persistentStats.replaceSnapshot(
+            persistentStats.mergeSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     commandStats =
                         listOf(

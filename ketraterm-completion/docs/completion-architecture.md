@@ -130,8 +130,8 @@ implementations each live in their matching file in `ketraterm-completion-host`.
 ## Host Ownership
 
 Hosts are responsible for choosing whether and where persistence is enabled. The shared persistence coordinator applies
-`TerminalCompletionPersistencePolicy` to authoritative command records. `TerminalCompletionLearningStore` accepts compact snapshots and live feedback
-events, but it is not a completion source and never contributes a second visible candidate. Completion components never
+`TerminalCompletionPersistencePolicy` to authoritative command records. `TerminalCompletionLearningStore` merges its one
+persisted hydration snapshot and accepts live feedback events, but it is not a completion source and never contributes a second visible candidate. Completion components never
 read files, scan raw shell history, spawn shells, or talk to UI frameworks.
 
 Optional disk I/O belongs to the separately published
@@ -342,16 +342,15 @@ indexes, watch files, or block on host I/O.
 
 Learned statistics mutate one bounded exact index and publish its immutable snapshot lazily on the next ranking,
 history, persistence, or explicit snapshot read. Multiple events before that read therefore avoid rebuilding the full row
-list. No-op or rejected events retain the current snapshot identity.
-The ranker builds one direct exact-command lookup per snapshot identity and
-shell syntax, then reuses it for subsequent requests. There are no indexed
-list wrappers or a second mutation-time ranking-index hierarchy.
+list. No-op or rejected events retain the current snapshot identity. There is no
+second row-snapshot cache inside the mutable index.
 
-Positive persisted command rows also have a snapshot-identity and shell-syntax
-index. It groups rows by normalized tokens before the active position and
-binary-searches the active-token prefix, so a hot request does not rescan the
-bounded 2,048-row snapshot. The index stores pre-tokenized command lines and is
-rebuilt only when the immutable snapshot identity or shell syntax changes.
+On first use of a snapshot identity and shell syntax, one compiler tokenizes
+each learned row once and feeds that parsed context to both the direct ranking
+lookup and the positive-history prefix index. One flat syntax-indexed cache
+reuses the resulting pair for subsequent requests. History lookup groups rows
+by normalized tokens before the active position and binary-searches the active
+token prefix, so a hot request does not rescan the bounded 2,048-row snapshot.
 
 The standalone host currently maps PowerShell to `POWERSHELL`, its tested
 POSIX-profile categories to `POSIX`, and Command Prompt, Fish, Nushell, and

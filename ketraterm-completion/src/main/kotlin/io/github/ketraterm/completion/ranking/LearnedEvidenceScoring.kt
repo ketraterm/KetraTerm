@@ -18,7 +18,7 @@ package io.github.ketraterm.completion.ranking
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 
 /** Saturating aggregate for exact command learning. */
-internal data class LearnedEvidenceCounts(
+internal class LearnedEvidenceCounts(
     var useCount: Long = 0,
     var successCount: Long = 0,
     var failureCount: Long = 0,
@@ -26,37 +26,16 @@ internal data class LearnedEvidenceCounts(
     var dismissedCount: Long = 0,
     var lastUsedEpochMillis: Long = 0,
 ) {
-    private fun add(
-        useCount: Int,
-        successCount: Int,
-        failureCount: Int,
-        acceptedCount: Int,
-        dismissedCount: Int,
-        lastUsedEpochMillis: Long,
-    ) {
-        this.useCount = saturatedAdd(this.useCount, useCount.toLong())
-        this.successCount = saturatedAdd(this.successCount, successCount.toLong())
-        this.failureCount = saturatedAdd(this.failureCount, failureCount.toLong())
-        this.acceptedCount = saturatedAdd(this.acceptedCount, acceptedCount.toLong())
-        this.dismissedCount = saturatedAdd(this.dismissedCount, dismissedCount.toLong())
-        this.lastUsedEpochMillis = maxOf(this.lastUsedEpochMillis, lastUsedEpochMillis)
+    fun add(row: TerminalCommandCompletionStats) {
+        useCount = saturatedAdd(useCount, row.useCount.toLong())
+        successCount = saturatedAdd(successCount, row.successCount.toLong())
+        failureCount = saturatedAdd(failureCount, row.failureCount.toLong())
+        acceptedCount = saturatedAdd(acceptedCount, row.acceptedCount.toLong())
+        dismissedCount = saturatedAdd(dismissedCount, row.dismissedCount.toLong())
+        lastUsedEpochMillis = maxOf(lastUsedEpochMillis, row.lastUsedEpochMillis)
     }
 
-    companion object {
-        fun fromCommands(rows: List<TerminalCommandCompletionStats>): LearnedEvidenceCounts =
-            LearnedEvidenceCounts().also { counts ->
-                for (row in rows) {
-                    counts.add(
-                        row.useCount,
-                        row.successCount,
-                        row.failureCount,
-                        row.acceptedCount,
-                        row.dismissedCount,
-                        row.lastUsedEpochMillis,
-                    )
-                }
-            }
-
+    private companion object {
         private fun saturatedAdd(
             left: Long,
             right: Long,

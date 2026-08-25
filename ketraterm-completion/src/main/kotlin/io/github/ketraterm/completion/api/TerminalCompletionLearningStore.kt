@@ -25,11 +25,11 @@ import io.github.ketraterm.completion.stats.isRecordableStatsEvent
 /**
  * Mutable, bounded in-memory store for exact command completion learning.
  *
- * Hosts may load and persist [snapshot] values, record command lifecycle
- * outcomes, and feed explicit popup feedback. The store performs no I/O and
- * does not emit candidates. Mutations are serialized around one mutable exact
- * index. Published snapshots are immutable and retain identity until their
- * contents change.
+ * Hosts record command lifecycle outcomes and explicit popup feedback. Optional
+ * persistence may hydrate the store once through [mergeSnapshot] and persist
+ * [snapshot] values. The store performs no I/O and does not emit candidates.
+ * Mutations are serialized around one mutable exact index. Published snapshots
+ * are immutable and retain identity until their contents change.
  *
  * @param capacity maximum distinct exact-command rows retained.
  * @throws IllegalArgumentException if [capacity] is not positive.
@@ -37,12 +37,8 @@ import io.github.ketraterm.completion.stats.isRecordableStatsEvent
 class TerminalCompletionLearningStore
     @JvmOverloads
     constructor(
-        private val capacity: Int = DEFAULT_CAPACITY,
+        capacity: Int = DEFAULT_CAPACITY,
     ) {
-        init {
-            require(capacity > 0) { "capacity must be > 0, was $capacity" }
-        }
-
         private val lock = Any()
         private val commandStats = CommandCompletionStatsIndex(capacity)
         private val learningIndexCache = CompletionLearningIndexCache()
@@ -52,20 +48,6 @@ class TerminalCompletionLearningStore
 
         @Volatile
         private var snapshotDirty = false
-
-        /**
-         * Replaces all retained exact-command statistics with [snapshot].
-         *
-         * Duplicate keys are compacted and the configured capacity is applied.
-         *
-         * @param snapshot compact completion-learning snapshot loaded by a host.
-         */
-        fun replaceSnapshot(snapshot: TerminalCommandCompletionStatsSnapshot) {
-            synchronized(lock) {
-                commandStats.replaceAll(snapshot.commandStats)
-                snapshotDirty = true
-            }
-        }
 
         /**
          * Adds distinct aggregate events from [snapshot] to retained learning.

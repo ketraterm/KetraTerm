@@ -336,7 +336,7 @@ class TerminalSessionMruCompletionSourceTest {
     fun `persisted history matches case-insensitively but preserves newest command casing`() =
         runBlocking {
             val stats = TerminalCompletionLearningStore()
-            stats.replaceSnapshot(
+            stats.mergeSnapshot(
                 TerminalCommandCompletionStatsSnapshot(
                     commandStats =
                         listOf(
@@ -444,7 +444,7 @@ class TerminalSessionMruCompletionSourceTest {
             val source =
                 SessionMruCompletionSourceImpl(
                     commandSpecs = emptyList(),
-                    learningStore = TerminalCompletionLearningStore().apply { replaceSnapshot(snapshot) },
+                    learningStore = TerminalCompletionLearningStore().apply { mergeSnapshot(snapshot) },
                     clockEpochMillis = { now },
                 )
 

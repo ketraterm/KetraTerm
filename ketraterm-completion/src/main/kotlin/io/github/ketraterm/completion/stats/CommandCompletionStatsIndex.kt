@@ -15,32 +15,34 @@
  */
 package io.github.ketraterm.completion.stats
 
-import io.github.ketraterm.completion.internal.*
+import io.github.ketraterm.completion.internal.CompletionLearningContextKey
+import io.github.ketraterm.completion.internal.TERMINAL_COMMAND_COMPLETION_STATS_ORDER
+import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
+import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncrement
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 
-/**
- * Bounded exact-command stats index.
- *
- * This class owns exact command row creation and counter mutation. Shared
- * bounded indexing mechanics live in [BoundedStatsRowIndex].
- */
+/** Bounded exact-command stats index. */
 internal class CommandCompletionStatsIndex(
     private val capacity: Int,
 ) {
-    private val rows =
-        BoundedStatsRowIndex(
-            capacity = capacity,
-            order = TERMINAL_COMMAND_COMPLETION_STATS_ORDER,
-            keySelector = { it.key() },
-            shouldReplace = { current, candidate -> candidate.lastUsedEpochMillis >= current.lastUsedEpochMillis },
-        )
+    init {
+        require(capacity > 0) { "capacity must be > 0, was $capacity" }
+    }
 
-    fun replaceAll(records: List<TerminalCommandCompletionStats>) = rows.replaceAll(records.map(::canonicalizeContext))
+    private val rowsByKey = HashMap<CommandCompletionStatsKey, TerminalCommandCompletionStats>(capacity)
+    private val orderedRows = ArrayList<TerminalCommandCompletionStats>(capacity)
 
-    fun mergeAll(records: List<TerminalCommandCompletionStats>) = rows.mergeAll(records.map(::canonicalizeContext), ::mergeStats)
+    fun mergeAll(records: List<TerminalCommandCompletionStats>) {
+        for (record in records) {
+            val incoming = canonicalizeContext(record)
+            val key = incoming.key()
+            rowsByKey[key] = rowsByKey[key]?.let { current -> mergeStats(current, incoming) } ?: incoming
+        }
+        rebuildOrder()
+    }
 
-    fun snapshot(): List<TerminalCommandCompletionStats> = rows.snapshot()
+    fun snapshot(): List<TerminalCommandCompletionStats> = orderedRows.toList()
 
     fun recordCommandResult(
         commandLine: String,
@@ -49,26 +51,25 @@ internal class CommandCompletionStatsIndex(
         workingDirectoryUri: String?,
         usedAtEpochMillis: Long,
     ): Boolean =
-        isRecordableStatsEvent(commandLine, usedAtEpochMillis) &&
-            mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
-                previous.copy(
-                    commandLine = previous.commandLineForEvent(canonical, usedAtEpochMillis),
-                    useCount = saturatedCompletionCounterIncrement(previous.useCount),
-                    successCount =
-                        if (successful) {
-                            saturatedCompletionCounterIncrement(previous.successCount)
-                        } else {
-                            previous.successCount
-                        },
-                    failureCount =
-                        if (successful) {
-                            previous.failureCount
-                        } else {
-                            saturatedCompletionCounterIncrement(previous.failureCount)
-                        },
-                    lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, usedAtEpochMillis),
-                )
-            }
+        mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
+            previous.copy(
+                commandLine = previous.commandLineForEvent(canonical, usedAtEpochMillis),
+                useCount = saturatedCompletionCounterIncrement(previous.useCount),
+                successCount =
+                    if (successful) {
+                        saturatedCompletionCounterIncrement(previous.successCount)
+                    } else {
+                        previous.successCount
+                    },
+                failureCount =
+                    if (successful) {
+                        previous.failureCount
+                    } else {
+                        saturatedCompletionCounterIncrement(previous.failureCount)
+                    },
+                lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, usedAtEpochMillis),
+            )
+        }
 
     fun recordSuggestionFeedback(
         commandLine: String,
@@ -77,15 +78,14 @@ internal class CommandCompletionStatsIndex(
         workingDirectoryUri: String?,
         feedbackAtEpochMillis: Long,
     ): Boolean =
-        isRecordableStatsEvent(commandLine, feedbackAtEpochMillis) &&
-            mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
-                previous.copy(
-                    commandLine = previous.commandLineForEvent(canonical, feedbackAtEpochMillis),
-                    acceptedCount = incrementAccepted(previous.acceptedCount, feedback),
-                    dismissedCount = incrementDismissed(previous.dismissedCount, feedback),
-                    lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
-                )
-            }
+        mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
+            previous.copy(
+                commandLine = previous.commandLineForEvent(canonical, feedbackAtEpochMillis),
+                acceptedCount = incrementAccepted(previous.acceptedCount, feedback),
+                dismissedCount = incrementDismissed(previous.dismissedCount, feedback),
+                lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
+            )
+        }
 
     private fun mutate(
         commandLine: String,
@@ -96,17 +96,58 @@ internal class CommandCompletionStatsIndex(
         val canonical = commandLine.trim()
         val normalized = normalizeTerminalCommandLine(canonical)
         val context = CompletionLearningContextKey.of(profileId, workingDirectoryUri)
-        return rows.mutate(
-            key = CommandCompletionStatsKey(normalized, context),
-            initialRow = {
+        val key = CommandCompletionStatsKey(normalized, context)
+        val current = rowsByKey[key]
+        if (current != null) {
+            val updated = update(current, canonical)
+            if (updated == current) return false
+            check(orderedRows.remove(current)) { "indexed completion statistics row is missing from sorted storage" }
+            rowsByKey[key] = updated
+            insertOrdered(updated)
+            return true
+        }
+
+        val created =
+            update(
                 TerminalCommandCompletionStats(
                     commandLine = canonical,
                     profileId = context.profileId,
                     workingDirectoryUri = context.workingDirectoryUri,
-                )
-            },
-            update = { update(it, canonical) },
-        )
+                ),
+                canonical,
+            )
+        rowsByKey[key] = created
+        insertOrdered(created)
+        if (orderedRows.size <= capacity) return true
+
+        val evicted = orderedRows.removeAt(orderedRows.lastIndex)
+        rowsByKey.remove(evicted.key())
+        return evicted !== created
+    }
+
+    private fun rebuildOrder() {
+        orderedRows.clear()
+        orderedRows.addAll(rowsByKey.values)
+        orderedRows.sortWith(TERMINAL_COMMAND_COMPLETION_STATS_ORDER)
+        if (orderedRows.size > capacity) {
+            orderedRows.subList(capacity, orderedRows.size).clear()
+        }
+        rowsByKey.clear()
+        for (row in orderedRows) rowsByKey[row.key()] = row
+    }
+
+    private fun insertOrdered(row: TerminalCommandCompletionStats) {
+        var low = 0
+        var high = orderedRows.size
+        while (low < high) {
+            val middle = (low + high).ushr(1)
+            if (TERMINAL_COMMAND_COMPLETION_STATS_ORDER.compare(orderedRows[middle], row) <= 0) {
+                low = middle + 1
+            } else {
+                high = middle
+            }
+        }
+        orderedRows.add(low, row)
     }
 
     private data class CommandCompletionStatsKey(

@@ -24,7 +24,7 @@ class TerminalCompletionLearningStoreMergeTest {
     @Test
     fun `merge snapshot adds exact command aggregates by canonical context`() {
         val store = TerminalCompletionLearningStore()
-        store.replaceSnapshot(
+        store.mergeSnapshot(
             TerminalCommandCompletionStatsSnapshot(
                 commandStats = listOf(commandStats("Git Status", "file:///repo", 3, 1, 100)),
             ),

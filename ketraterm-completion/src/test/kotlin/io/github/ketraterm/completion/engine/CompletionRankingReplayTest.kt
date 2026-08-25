@@ -112,7 +112,7 @@ class CompletionRankingReplayTest {
         val engine =
             MergedCompletionEngine(
                 sources = listOf(TerminalCompletionSourceEntry(source, priority = 10)),
-                learningStore = TerminalCompletionLearningStore().apply { replaceSnapshot(snapshot) },
+                learningStore = TerminalCompletionLearningStore().apply { mergeSnapshot(snapshot) },
                 clockEpochMillis = { NOW },
             )
         return ReplayCase(engine.complete(request), request, expectedCommand)
