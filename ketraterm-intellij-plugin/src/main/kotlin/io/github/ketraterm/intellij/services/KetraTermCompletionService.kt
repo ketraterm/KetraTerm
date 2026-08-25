@@ -20,7 +20,6 @@ import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
@@ -33,15 +32,14 @@ import kotlinx.coroutines.runBlocking
 /**
  * Application-level owner of IntelliJ completion learning and session sources.
  *
- * The service owns persistent statistics and one [IntellijCompletionRegistry].
- * IntelliJ disposal closes all session providers and cancels registry-owned work.
+ * The service owns one [IntellijCompletionRegistry]. IntelliJ disposal closes
+ * all session providers and flushes registry-owned learning.
  */
 @Service(Service.Level.APP)
 internal class KetraTermCompletionService(
     coroutineScope: CoroutineScope,
 ) : Disposable {
     private val settings = KetraTermIntellijSettings.getInstance()
-    private val learningStore = TerminalCompletionLearningStore()
     private val persistencePath =
         PathManager
             .getSystemDir()
@@ -49,7 +47,6 @@ internal class KetraTermCompletionService(
             .resolve(TerminalCompletionLearningCoordinator.currentFileName())
     private val registry =
         IntellijCompletionRegistry(
-            statsSource = learningStore,
             persistencePath = persistencePath,
             persistenceEnabled = settings.completionLearningPersistenceEnabled(),
             coroutineScope = coroutineScope,

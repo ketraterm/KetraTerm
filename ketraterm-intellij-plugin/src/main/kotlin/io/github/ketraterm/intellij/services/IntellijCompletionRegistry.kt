@@ -20,8 +20,10 @@ import io.github.ketraterm.completion.api.TerminalCompletionSessionRegistry
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
+import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 import kotlinx.coroutines.CoroutineScope
 import java.nio.file.Path
@@ -33,7 +35,7 @@ import java.nio.file.Path
  * clears its previous session-local learning.
  *
  * @param specs immutable command specifications shared by every session.
- * @param statsSource bounded learned-statistics source.
+ * @param learningStore bounded exact-command learning store.
  * @param persistencePath fixed product-owned learning destination.
  * @param persistenceEnabled whether the fixed destination may initially be read and written.
  * @param sessionMruCapacity positive per-session MRU capacity.
@@ -42,7 +44,7 @@ import java.nio.file.Path
  */
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    statsSource: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
+    learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
     persistencePath: Path,
     persistenceEnabled: Boolean,
     sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
@@ -53,15 +55,19 @@ internal class IntellijCompletionRegistry(
     private val sessions =
         TerminalCompletionSessionRegistry(
             commandSpecs = specs,
-            learningStore = statsSource,
+            learningStore = learningStore,
             sessionMruCapacity = sessionMruCapacity,
         )
-    private val statistics =
-        IntellijCompletionStatisticsCoordinator(
-            statsSource = statsSource,
+    private val learning =
+        TerminalCompletionLearningCoordinator(
+            learningStore = learningStore,
             persistencePath = persistencePath,
             persistenceEnabled = persistenceEnabled,
             coroutineScope = coroutineScope,
+        )
+    private val feedbackRecorder =
+        SwingCompletionFeedbackRecorder(
+            recordSuggestionFeedback = learning::recordSuggestionFeedback,
         )
 
     /**
@@ -94,7 +100,7 @@ internal class IntellijCompletionRegistry(
                 )
             return IntellijCompletionSession(
                 provider = provider,
-                feedbackHandler = statistics.createFeedbackHandler(context::swingContext),
+                feedbackHandler = feedbackRecorder.createHandler(context::swingContext),
                 closeAction = completionSession::close,
             )
         } catch (failure: Throwable) {
@@ -127,7 +133,13 @@ internal class IntellijCompletionRegistry(
                     workingDirectoryUri = metadata.workingDirectoryUri,
                 )
             }
-            statistics.recordFinishedCommand(profileId, metadata)
+            learning.recordCommandResult(
+                commandLine = command,
+                successful = successful,
+                profileId = profileId,
+                workingDirectoryUri = metadata.workingDirectoryUri,
+                usedAtEpochMillis = metadata.finishedAtEpochMillis ?: System.currentTimeMillis(),
+            )
         }
     }
 
@@ -139,14 +151,14 @@ internal class IntellijCompletionRegistry(
     fun setPersistenceEnabled(enabled: Boolean) {
         synchronized(lock) {
             if (closed) return
-            statistics.setPersistenceEnabled(enabled)
+            learning.setPersistenceEnabled(enabled)
         }
     }
 
     /** Clears sessions and waits for the final dirty persistence write. */
     suspend fun closeAndFlush() {
         if (beginClose()) sessions.close()
-        statistics.closeAndFlush()
+        learning.closeAndFlush()
     }
 
     private fun beginClose(): Boolean =

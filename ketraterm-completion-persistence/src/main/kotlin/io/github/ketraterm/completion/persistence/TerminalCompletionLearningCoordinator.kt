@@ -47,21 +47,17 @@ class TerminalCompletionLearningCoordinator
          * @param coroutineScope caller-owned lifecycle scope for the persistence worker.
          * @param persistencePath fixed snapshot path owned by the product.
          * @param persistenceEnabled whether the snapshot may initially be read and written.
-         * @param onPersistenceFailure optional diagnostic callback for failed file access.
          */
-        @JvmOverloads
         constructor(
             learningStore: TerminalCompletionLearningStore,
             coroutineScope: CoroutineScope,
             persistencePath: Path,
             persistenceEnabled: Boolean,
-            onPersistenceFailure: (Throwable) -> Unit = {},
         ) : this(
             learningStore = learningStore,
             fileStore =
                 CompletionLearningFileStore(
                     path = persistencePath.toAbsolutePath().normalize(),
-                    onFailure = onPersistenceFailure,
                 ),
             coroutineScope = coroutineScope,
             persistenceEnabled = persistenceEnabled,

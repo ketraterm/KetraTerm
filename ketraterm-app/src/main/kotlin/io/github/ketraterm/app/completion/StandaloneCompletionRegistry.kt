@@ -21,30 +21,52 @@ import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
+import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
+import kotlinx.coroutines.CoroutineScope
+import java.nio.file.Path
 
 /**
  * Standalone completion wiring for one application window.
  *
  * The registry supplies standalone context and local-file access around the
- * shared [TerminalCompletionSessionRegistry].
+ * shared [TerminalCompletionSessionRegistry], and owns learned-command
+ * persistence for the same application lifecycle.
  *
+ * @param persistencePath fixed product-owned learning destination.
+ * @param persistenceEnabled whether the fixed destination may initially be read and written.
+ * @param coroutineScope host lifecycle scope that parents persistence work.
  * @param specs static command specs shared by providers created from this registry.
- * @param persistentStatsSource optional cross-session indexed statistics store
- * loaded and maintained by the standalone host.
+ * @param learningStore bounded learning shared by ranking and persistence.
  * @param sessionMruCapacity maximum distinct commands retained per terminal session.
  */
 internal class StandaloneCompletionRegistry(
+    persistencePath: Path,
+    persistenceEnabled: Boolean,
+    coroutineScope: CoroutineScope,
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    persistentStatsSource: TerminalCompletionLearningStore? = null,
+    learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
     sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
-) : AutoCloseable {
+) {
     private val sessions =
         TerminalCompletionSessionRegistry(
             commandSpecs = specs,
-            learningStore = persistentStatsSource,
+            learningStore = learningStore,
             sessionMruCapacity = sessionMruCapacity,
+        )
+    private val learning =
+        TerminalCompletionLearningCoordinator(
+            learningStore = learningStore,
+            coroutineScope = coroutineScope,
+            persistencePath = persistencePath,
+            persistenceEnabled = persistenceEnabled,
+        )
+    private val feedbackRecorder =
+        SwingCompletionFeedbackRecorder(
+            recordSuggestionFeedback = learning::recordSuggestionFeedback,
         )
 
     /**
@@ -86,28 +108,65 @@ internal class StandaloneCompletionRegistry(
     }
 
     /**
-     * Records one successful command for the owning session MRU source.
+     * Creates a feedback handler whose exact learning is recorded immediately.
      *
-     * Calls for missing sessions are ignored because command lifecycle events can
-     * race with tab close on shutdown.
+     * @param profileId stable standalone profile id for this session.
+     * @param workingDirectoryUriProvider supplier for the latest current-working-directory URI.
+     * @return feedback handler for accepted and dismissed suggestions.
+     */
+    fun createFeedbackHandler(
+        profileId: String?,
+        workingDirectoryUriProvider: () -> String?,
+    ): SwingShellSuggestionFeedbackHandler =
+        feedbackRecorder.createHandler {
+            SwingCompletionContext(
+                profileId = profileId,
+                workingDirectoryUri = workingDirectoryUriProvider(),
+            )
+        }
+
+    /**
+     * Records one completed command in global learning and, on success, the session MRU.
      *
      * @param sessionId workspace tab/session id that produced the command.
      * @param commandLine command text captured from shell integration metadata.
+     * @param successful whether the command completed successfully.
      * @param profileId profile id active when the command ran.
      * @param workingDirectoryUri current-working-directory URI captured at command start.
+     * @param usedAtEpochMillis non-negative completion timestamp.
      */
-    fun recordSuccessfulCommand(
+    fun recordFinishedCommand(
         sessionId: String,
         commandLine: String,
+        successful: Boolean,
         profileId: String?,
         workingDirectoryUri: String?,
+        usedAtEpochMillis: Long,
     ) {
-        sessions.recordSuccessfulCommand(
-            sessionId = sessionId,
+        learning.recordCommandResult(
             commandLine = commandLine,
+            successful = successful,
             profileId = profileId,
             workingDirectoryUri = workingDirectoryUri,
+            usedAtEpochMillis = usedAtEpochMillis,
         )
+        if (successful) {
+            sessions.recordSuccessfulCommand(
+                sessionId = sessionId,
+                commandLine = commandLine,
+                profileId = profileId,
+                workingDirectoryUri = workingDirectoryUri,
+            )
+        }
+    }
+
+    /**
+     * Changes whether the fixed learning destination may be read and written.
+     *
+     * @param enabled `true` to persist sanitized learning across application restarts.
+     */
+    fun setPersistenceEnabled(enabled: Boolean) {
+        learning.setPersistenceEnabled(enabled)
     }
 
     /**
@@ -119,9 +178,10 @@ internal class StandaloneCompletionRegistry(
         sessions.removeSession(sessionId)
     }
 
-    /** Permanently closes the registry and clears every session MRU. */
-    override fun close() {
+    /** Clears every session MRU and waits for the final dirty persistence write. */
+    suspend fun closeAndFlush() {
         sessions.close()
+        learning.closeAndFlush()
     }
 
     private companion object {

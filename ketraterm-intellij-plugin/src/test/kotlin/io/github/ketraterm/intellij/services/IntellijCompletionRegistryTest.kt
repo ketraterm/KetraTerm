@@ -190,7 +190,7 @@ class IntellijCompletionRegistryTest {
             val learningStore = TerminalCompletionLearningStore()
             val registry =
                 IntellijCompletionRegistry(
-                    statsSource = learningStore,
+                    learningStore = learningStore,
                     persistencePath = path,
                     persistenceEnabled = true,
                     coroutineScope = this,
@@ -213,6 +213,7 @@ class IntellijCompletionRegistryTest {
 
             registry.closeAndFlush()
 
+            assertEquals(listOf("git status"), learningStore.snapshot().commandStats.map { it.commandLine })
             assertEquals(listOf("git status"), persistedSnapshot(path).commandStats.map { it.commandLine })
         }
 

@@ -18,6 +18,7 @@ package io.github.ketraterm.app.completion
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.io.TempDir
@@ -27,17 +28,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
-class StandaloneCompletionStatisticsCoordinatorTest {
+class StandaloneCompletionRegistryPersistenceTest {
     @Test
     fun `shutdown persists the final learned command`(
         @TempDir directory: Path,
     ) = runBlocking {
         val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
         val learning = TerminalCompletionLearningStore()
-        val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, true, this)
+        val registry = registry(learning, path, persistenceEnabled = true)
 
-        coordinator.recordFinishedCommand("git status", true, "bash", "file:///repo", 42L)
-        coordinator.closeAndFlush()
+        registry.recordFinishedCommand("missing-session", "git status", true, "bash", "file:///repo", 42L)
+        registry.closeAndFlush()
 
         assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
         assertEquals(
@@ -52,10 +53,10 @@ class StandaloneCompletionStatisticsCoordinatorTest {
     ) = runBlocking {
         val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
         val learning = TerminalCompletionLearningStore()
-        val coordinator = StandaloneCompletionStatisticsCoordinator(learning, path, false, this)
-        coordinator.recordFinishedCommand("git status", true, null, null, 1L)
-        coordinator.recordFinishedCommand("npm test", true, null, null, 2L)
-        coordinator.closeAndFlush()
+        val registry = registry(learning, path, persistenceEnabled = false)
+        registry.recordFinishedCommand("missing-session", "git status", true, null, null, 1L)
+        registry.recordFinishedCommand("missing-session", "npm test", true, null, null, 2L)
+        registry.closeAndFlush()
 
         assertEquals(
             setOf("git status", "npm test"),
@@ -67,6 +68,19 @@ class StandaloneCompletionStatisticsCoordinatorTest {
         )
         assertFalse(Files.exists(path))
     }
+
+    private fun CoroutineScope.registry(
+        learning: TerminalCompletionLearningStore,
+        path: Path,
+        persistenceEnabled: Boolean,
+    ): StandaloneCompletionRegistry =
+        StandaloneCompletionRegistry(
+            persistencePath = path,
+            persistenceEnabled = persistenceEnabled,
+            coroutineScope = this,
+            specs = emptyList(),
+            learningStore = learning,
+        )
 
     private suspend fun persistedSnapshot(path: Path): TerminalCommandCompletionStatsSnapshot =
         coroutineScope {

@@ -16,11 +16,8 @@
 package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
-import io.github.ketraterm.app.completion.StandaloneCompletionStatisticsCoordinator
 import io.github.ketraterm.app.completion.completionShellCapabilities
 import io.github.ketraterm.app.config.KetraTermSettings
-import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
@@ -58,21 +55,13 @@ internal class TabManager(
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
     private val tabRoots = HashMap<String, SplitNode>()
     private val tabContainers = HashMap<String, JPanel>()
-    private val completionSpecs = TerminalCommandSpecs.defaults()
-    private val commandCompletionStatsSource = TerminalCompletionLearningStore()
     private val completionScope =
         CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("standalone-completion"))
-    private val completionStatistics =
-        StandaloneCompletionStatisticsCoordinator(
-            statsSource = commandCompletionStatsSource,
+    private val completionRegistry =
+        StandaloneCompletionRegistry(
             persistencePath = settings.commandCompletionStatsPath,
             persistenceEnabled = settings.persistentSuggestionLearningEnabled,
             coroutineScope = completionScope,
-        )
-    private val completionRegistry =
-        StandaloneCompletionRegistry(
-            specs = completionSpecs,
-            persistentStatsSource = commandCompletionStatsSource,
         )
     val selectedPane: TerminalPane?
         get() = tabBar.selectedId()?.let { getActivePane(it) }
@@ -295,10 +284,12 @@ internal class TabManager(
         for (tabId in tabIds) {
             tabRoots[tabId]?.let { closeTabWithoutConfirmation(tabId, it) }
         }
-        completionRegistry.close()
         workspace.close()
-        runBlocking { completionStatistics.closeAndFlush() }
-        completionScope.cancel()
+        try {
+            runBlocking { completionRegistry.closeAndFlush() }
+        } finally {
+            completionScope.cancel()
+        }
     }
 
     /** Propagates a settings reload to all live panes and the workspace. */
@@ -419,7 +410,7 @@ internal class TabManager(
             completionScope = completionScope,
             suggestionProvider = suggestionProvider,
             suggestionFeedbackHandler =
-                completionStatistics.createFeedbackHandler(
+                completionRegistry.createFeedbackHandler(
                     profileId = workspaceTab.profile.id,
                     workingDirectoryUriProvider = workingDirectoryUriProvider,
                 ),
@@ -775,25 +766,15 @@ internal class TabManager(
             if (event.marker != io.github.ketraterm.protocol.ShellIntegrationMarker.COMMAND_FINISHED) return
             val state = tab.session.shellIntegrationState
             val metadata = state.commandMetadata(state.latestCommandRecordId()) ?: return
-            val command = metadata.commandText
-            if (command != null) {
-                completionStatistics.recordFinishedCommand(
+            metadata.commandText?.let { command ->
+                completionRegistry.recordFinishedCommand(
+                    sessionId = tab.id,
                     commandLine = command,
                     successful = metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
                     profileId = tab.profile.id,
                     workingDirectoryUri = metadata.workingDirectoryUri,
                     usedAtEpochMillis = metadata.finishedAtEpochMillis ?: System.currentTimeMillis(),
                 )
-            }
-            if (metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED) {
-                command?.let {
-                    completionRegistry.recordSuccessfulCommand(
-                        sessionId = tab.id,
-                        commandLine = it,
-                        profileId = tab.profile.id,
-                        workingDirectoryUri = metadata.workingDirectoryUri,
-                    )
-                }
             }
         }
 
@@ -990,7 +971,7 @@ internal class TabManager(
     }
 
     private fun reconcileCommandPersistenceStores() {
-        completionStatistics.setPersistenceEnabled(settings.persistentSuggestionLearningEnabled)
+        completionRegistry.setPersistenceEnabled(settings.persistentSuggestionLearningEnabled)
     }
 
     private companion object {

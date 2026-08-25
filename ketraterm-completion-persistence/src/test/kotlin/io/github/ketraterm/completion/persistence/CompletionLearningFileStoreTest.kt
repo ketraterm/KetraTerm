@@ -193,47 +193,40 @@ class CompletionLearningFileStoreTest {
     }
 
     @Test
-    fun `input failure is reported separately`() {
+    fun `input failure is returned separately`() {
         val path = createTempDirectory("completion-store-failed").resolve(TerminalCompletionLearningCoordinator.currentFileName())
         Files.writeString(path, "KetraTerm_COMMAND_COMPLETION_STATS\t1")
-        val failures = mutableListOf<Throwable>()
         val expectedFailure = IOException("test read failure")
 
-        val outcome = CompletionLearningFileStore(path, failures::add, openInput = { throw expectedFailure }).loadSnapshot()
+        val outcome = CompletionLearningFileStore(path, openInput = { throw expectedFailure }).loadSnapshot()
 
         assertSame(CompletionLearningFileLoadOutcome.Failed, outcome)
-        assertSame(expectedFailure, failures.single())
         assertEquals("KetraTerm_COMMAND_COMPLETION_STATS\t1", Files.readString(path))
     }
 
     @Test
-    fun `output failure is reported and rethrown`() {
+    fun `output failure is rethrown`() {
         val path = createTempDirectory("completion-store-output-failed").resolve(TerminalCompletionLearningCoordinator.currentFileName())
-        val failures = mutableListOf<Throwable>()
         val expectedFailure = IOException("test write failure")
         val store =
             CompletionLearningFileStore(
                 path = path,
-                onFailure = failures::add,
                 createTemporaryFile = { _, _, _ -> throw expectedFailure },
             )
 
         assertSame(expectedFailure, assertFailsWith<IOException> { store.persist(snapshot("git status")) })
-        assertEquals(listOf<Throwable>(expectedFailure), failures)
     }
 
     @Test
     fun `malformed JVM text fails without replacing the existing file`() {
         val path = createTempDirectory("completion-store-malformed-text").resolve(TerminalCompletionLearningCoordinator.currentFileName())
-        val failures = mutableListOf<Throwable>()
-        val store = CompletionLearningFileStore(path, failures::add)
+        val store = CompletionLearningFileStore(path)
         store.persist(snapshot("git status"))
         val originalBytes = Files.readAllBytes(path)
 
         assertFailsWith<CharacterCodingException> { store.persist(snapshot("echo \uD800")) }
 
         assertContentEquals(originalBytes, Files.readAllBytes(path))
-        assertIs<CharacterCodingException>(failures.single())
     }
 
     private fun assertRejectedWithoutMutation(originalBytes: ByteArray) {

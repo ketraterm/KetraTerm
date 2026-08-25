@@ -65,12 +65,13 @@ bounded fixed-path file store, whose strict codec and atomic replacement run on
 the I/O dispatcher. There is no repository, child writer, control-command
 queue, per-event snapshot, or general flush operation.
 
-Each product supplies one fixed destination when it creates the coordinator and
-only toggles persistence on or off. Runtime path switching and cross-file import
-semantics are intentionally unsupported. Loads, rows, line sizes, and total file
-bytes are bounded before decoding or encoding, so neither startup nor settings
-changes read this file on the Swing event-dispatch thread. Derived matching keys
-are recomputed by completion models rather than stored as additional fields.
+Each product completion registry supplies one fixed destination when it creates
+the coordinator and only toggles persistence on or off. Runtime path switching
+and cross-file import semantics are intentionally unsupported. Loads, rows, line
+sizes, and total file bytes are bounded before decoding or encoding, so neither
+startup nor settings changes read this file on the Swing event-dispatch thread.
+Derived matching keys are recomputed by completion models rather than stored as
+additional fields.
 The coordinator merges this one file with live in-memory learning; callers must
 not separately preload the same aggregate file.
 
@@ -78,10 +79,7 @@ not separately preload the same aggregate file.
 
 Standalone persistent suggestion learning is disabled by default. It can be enabled with
 `suggestion_learning_persistence_enabled = true` under `[behavior]` in
-`config.toml`. KetraTerm does not store a raw command-history file. Older
-configs using `persistent_suggestion_learning_enabled` or
-`persistent_command_history_enabled` are accepted as load-only compatibility
-fallbacks, but new saves write only `suggestion_learning_persistence_enabled`.
+`config.toml`. KetraTerm does not store a raw command-history file.
 IntelliJ exposes **Remember learned suggestions across IDE restarts** and keeps
 it disabled by default. When a product starts disabled, it neither loads nor
 writes this file. Disabling at runtime synchronously prevents new writes and

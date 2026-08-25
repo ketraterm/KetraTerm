@@ -326,9 +326,9 @@ untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Gi
 
 IntelliJ dynamic completion is composed from ordinary source-producing functions and explicit prioritized source
 entries. There is no provider-factory or registration framework. The shared completion session registry owns
-session MRU/path/engine composition and strict close semantics; a thin IntelliJ statistics adapter
-maps host events into the shared learning coordinator. Standalone uses the same coordinator contract so completion files are
-never loaded on the Swing event-dispatch thread.
+session MRU/path/engine composition. Each product completion registry maps host events into the shared learning
+coordinator and owns the combined session-and-persistence shutdown boundary, so completion files are never loaded on
+the Swing event-dispatch thread.
 
 The engine-to-Swing request/candidate bridge and Swing-feedback-to-statistics mapping live in `ketraterm-ui-swing-host`.
 Product hosts inject context, privacy, scheduling, and persistence policy instead of copying the vocabulary conversion

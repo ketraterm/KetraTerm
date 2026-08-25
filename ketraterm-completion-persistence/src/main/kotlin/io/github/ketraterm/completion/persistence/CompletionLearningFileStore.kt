@@ -52,7 +52,6 @@ internal interface CompletionLearningSnapshotFileStore {
 /** Bounded local-file implementation used by the persistence coordinator. */
 internal class CompletionLearningFileStore(
     private val path: Path,
-    private val onFailure: (Throwable) -> Unit = {},
     private val openInput: (Path) -> InputStream = { Files.newInputStream(it) },
     private val createTemporaryFile: (Path, String, String) -> Path = Files::createTempFile,
 ) : CompletionLearningSnapshotFileStore {
@@ -73,32 +72,27 @@ internal class CompletionLearningFileStore(
             }
         } catch (_: NoSuchFileException) {
             CompletionLearningFileLoadOutcome.Missing
-        } catch (failure: Exception) {
-            failed(failure)
+        } catch (_: Exception) {
+            CompletionLearningFileLoadOutcome.Failed
         }
 
     override fun persist(snapshot: TerminalCommandCompletionStatsSnapshot) {
+        val sanitized = TerminalCompletionPersistencePolicy.sanitizeSnapshot(snapshot)
+        val lines = CompletionLearningSnapshotCodec.encode(boundedSnapshot(sanitized))
+        requireEncodedBounds(lines)
+        val absolutePath = path.toAbsolutePath().normalize()
+        val parent = requireNotNull(absolutePath.parent) { "persistence path must have a parent: $path" }
+        Files.createDirectories(parent)
+        val temporary = createTemporaryFile(parent, ".${absolutePath.fileName}.", ".tmp")
         try {
-            val sanitized = TerminalCompletionPersistencePolicy.sanitizeSnapshot(snapshot)
-            val lines = CompletionLearningSnapshotCodec.encode(boundedSnapshot(sanitized))
-            requireEncodedBounds(lines)
-            val absolutePath = path.toAbsolutePath().normalize()
-            val parent = requireNotNull(absolutePath.parent) { "persistence path must have a parent: $path" }
-            Files.createDirectories(parent)
-            val temporary = createTemporaryFile(parent, ".${absolutePath.fileName}.", ".tmp")
-            try {
-                Files.newBufferedWriter(temporary, StandardCharsets.UTF_8).use { writer ->
-                    for (line in lines) {
-                        writer.appendLine(line)
-                    }
+            Files.newBufferedWriter(temporary, StandardCharsets.UTF_8).use { writer ->
+                for (line in lines) {
+                    writer.appendLine(line)
                 }
-                replaceAtomically(temporary, absolutePath)
-            } finally {
-                Files.deleteIfExists(temporary)
             }
-        } catch (failure: Exception) {
-            reportFailure(failure)
-            throw failure
+            replaceAtomically(temporary, absolutePath)
+        } finally {
+            Files.deleteIfExists(temporary)
         }
     }
 
@@ -156,15 +150,6 @@ internal class CompletionLearningFileStore(
         if (size == MAX_FILE_LINES || byteCount > MAX_LINE_BYTES) return false
         add(String(bytes, start, byteCount, StandardCharsets.UTF_8))
         return true
-    }
-
-    private fun failed(failure: Throwable): CompletionLearningFileLoadOutcome {
-        reportFailure(failure)
-        return CompletionLearningFileLoadOutcome.Failed
-    }
-
-    private fun reportFailure(failure: Throwable) {
-        runCatching { onFailure(failure) }
     }
 
     private fun snapshotFitsBounds(snapshot: TerminalCommandCompletionStatsSnapshot): Boolean {

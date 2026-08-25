@@ -133,8 +133,6 @@ class TerminalWorkspaceConfigManager(
                     ?: default.acceptSelectedSuggestionWithEnter
             val persistentSuggestionLearningEnabled =
                 behavior[SUGGESTION_LEARNING_PERSISTENCE_KEY]?.toBooleanStrictOrNull()
-                    ?: behavior["persistent_suggestion_learning_enabled"]?.toBooleanStrictOrNull()
-                    ?: behavior["persistent_command_history_enabled"]?.toBooleanStrictOrNull()
                     ?: default.persistentSuggestionLearningEnabled
             val scrollOnOutput =
                 behavior["scroll_on_output"]?.toBooleanStrictOrNull()
