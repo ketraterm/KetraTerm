@@ -75,8 +75,8 @@ class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTerm
     /**
      * Returns whether learned completion statistics may be stored on disk.
      *
-     * Disabling persistence does not disable session-local MRU or in-memory
-     * ranking. It only prevents the IntelliJ host from reading or writing the
+     * Disabling persistence does not disable product-lifetime in-memory
+     * learning. It only prevents the IntelliJ host from reading or writing the
      * learned completion snapshot.
      *
      * @return `true` when completion learning may cross IDE restarts.

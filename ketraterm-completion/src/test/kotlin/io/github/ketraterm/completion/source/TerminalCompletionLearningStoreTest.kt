@@ -18,6 +18,7 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.CountDownLatch
@@ -62,7 +63,7 @@ class TerminalCompletionLearningStoreTest {
         runBlocking {
             val source = TerminalCompletionLearningStore()
             source.recordCommandResult(
-                commandLine = "git status",
+                commandLine = "tool status",
                 successful = true,
                 profileId = "pwsh",
                 workingDirectoryUri = "file:///repo",
@@ -70,17 +71,17 @@ class TerminalCompletionLearningStoreTest {
             )
 
             val candidates =
-                learnedHistory(source).complete(request("git s", profileId = "pwsh", workingDirectoryUri = "file:///repo"))
+                learnedHistory(source).complete(request("tool s", profileId = "pwsh", workingDirectoryUri = "file:///repo"))
 
             assertEquals(listOf("status"), candidates.map { it.replacementText })
-            assertEquals("mru", candidates.single().source)
-            assertEquals(TerminalCompletionCandidateKind.SUBCOMMAND, candidates.single().kind)
-            assertEquals(4, candidates.single().replacementStartOffset)
-            assertEquals(5, candidates.single().replacementEndOffset)
+            assertEquals("learned", candidates.single().source)
+            assertEquals(TerminalCompletionCandidateKind.ARGUMENT, candidates.single().kind)
+            assertEquals(5, candidates.single().replacementStartOffset)
+            assertEquals(6, candidates.single().replacementEndOffset)
         }
 
     @Test
-    fun `records compact success and failure counts for one normalized command`() =
+    fun `records case-distinct exact commands independently`() =
         runBlocking {
             val source = TerminalCompletionLearningStore()
 
@@ -105,12 +106,23 @@ class TerminalCompletionLearningStoreTest {
                         commandLine = "git status",
                         profileId = "bash",
                         workingDirectoryUri = null,
-                        useCount = 2,
-                        successCount = 1,
+                        useCount = 1,
+                        successCount = 0,
                         failureCount = 1,
                         acceptedCount = 0,
                         dismissedCount = 0,
                         lastUsedEpochMillis = 20,
+                    ),
+                    TerminalCommandCompletionStats(
+                        commandLine = "Git Status",
+                        profileId = "bash",
+                        workingDirectoryUri = null,
+                        useCount = 1,
+                        successCount = 1,
+                        failureCount = 0,
+                        acceptedCount = 0,
+                        dismissedCount = 0,
+                        lastUsedEpochMillis = 10,
                     ),
                 ),
                 source.snapshot().commandStats,
@@ -122,14 +134,14 @@ class TerminalCompletionLearningStoreTest {
         runBlocking {
             val source = TerminalCompletionLearningStore()
             source.recordCommandResult(
-                "git status",
+                "tool status",
                 successful = true,
                 profileId = null,
                 workingDirectoryUri = null,
                 usedAtEpochMillis = 100,
             )
             source.recordCommandResult(
-                "git switch main",
+                "tool switch main",
                 successful = true,
                 profileId = null,
                 workingDirectoryUri = null,
@@ -138,7 +150,7 @@ class TerminalCompletionLearningStoreTest {
 
             repeat(4) {
                 source.recordSuggestionFeedback(
-                    commandLine = "git switch main",
+                    commandLine = "tool switch main",
                     feedback = TerminalCompletionFeedbackKind.ACCEPTED,
                     profileId = null,
                     workingDirectoryUri = null,
@@ -147,7 +159,7 @@ class TerminalCompletionLearningStoreTest {
             }
             repeat(4) {
                 source.recordSuggestionFeedback(
-                    commandLine = "git status",
+                    commandLine = "tool status",
                     feedback = TerminalCompletionFeedbackKind.DISMISSED,
                     profileId = null,
                     workingDirectoryUri = null,
@@ -155,7 +167,7 @@ class TerminalCompletionLearningStoreTest {
                 )
             }
 
-            val candidates = learnedHistory(source).complete(request("git s"))
+            val candidates = learnedHistory(source).complete(request("tool s"))
 
             assertEquals(listOf("switch main", "status"), candidates.map { it.replacementText })
             assertTrue(candidates[0].score > candidates[1].score)
@@ -170,14 +182,14 @@ class TerminalCompletionLearningStoreTest {
                     commandStats =
                         listOf(
                             TerminalCommandCompletionStats(
-                                commandLine = "git alpha",
+                                commandLine = "tool alpha",
                                 useCount = 50,
                                 successCount = 50,
                                 acceptedCount = 50,
                                 lastUsedEpochMillis = 60_000,
                             ),
                             TerminalCommandCompletionStats(
-                                commandLine = "git beta",
+                                commandLine = "tool beta",
                                 useCount = 500,
                                 successCount = 500,
                                 acceptedCount = 500,
@@ -187,10 +199,9 @@ class TerminalCompletionLearningStoreTest {
                 ),
             )
 
-            val candidates = learnedHistory(source).complete(request("git "))
+            val candidates = learnedHistory(source).complete(request("tool "))
 
             assertEquals(listOf("alpha", "beta"), candidates.map { it.replacementText })
-            assertEquals(candidates[0].score, candidates[1].score)
         }
 
     @Test
@@ -198,14 +209,14 @@ class TerminalCompletionLearningStoreTest {
         runBlocking {
             val source = TerminalCompletionLearningStore()
             source.recordCommandResult(
-                "npm test",
+                "tool test",
                 successful = true,
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo-a",
                 usedAtEpochMillis = 100,
             )
             source.recordCommandResult(
-                "npm update",
+                "tool update",
                 successful = true,
                 profileId = "pwsh",
                 workingDirectoryUri = "file:///repo-b",
@@ -214,7 +225,7 @@ class TerminalCompletionLearningStoreTest {
 
             val candidates =
                 learnedHistory(source).complete(
-                    request("npm ", profileId = "pwsh", workingDirectoryUri = "file:///repo-b"),
+                    request("tool ", profileId = "pwsh", workingDirectoryUri = "file:///repo-b"),
                 )
 
             assertEquals(listOf("update", "test"), candidates.map { it.replacementText })
@@ -359,7 +370,7 @@ class TerminalCompletionLearningStoreTest {
         }
 
     @Test
-    fun `merge snapshot deduplicates by normalized command profile and directory`() =
+    fun `merge snapshot preserves command case while canonicalizing context`() =
         runBlocking {
             val source = TerminalCompletionLearningStore()
 
@@ -392,6 +403,7 @@ class TerminalCompletionLearningStoreTest {
             assertEquals(
                 listOf(
                     stats("git status", profileId = "bash", workingDirectoryUri = "file:///repo/", lastUsedEpochMillis = 20),
+                    stats("Git Status", profileId = "bash", workingDirectoryUri = "file:///repo/", lastUsedEpochMillis = 10),
                     stats("git status", profileId = "pwsh", workingDirectoryUri = "file:///repo/", lastUsedEpochMillis = 5),
                 ),
                 source.snapshot().commandStats,
@@ -468,7 +480,12 @@ class TerminalCompletionLearningStoreTest {
             shellCapabilities = shellCapabilities,
         )
 
-    private fun learnedHistory(source: TerminalCompletionLearningStore) = TerminalCompletionSources.sessionMru(learningStore = source)
+    private fun learnedHistory(source: TerminalCompletionLearningStore): TerminalCompletionEngine =
+        TerminalCompletionEngines.fromSources(
+            sources = emptyList(),
+            commandSpecs = listOf(TerminalCommandSpec(name = "tool")),
+            learningStore = source,
+        )
 
     private fun stats(
         commandLine: String,

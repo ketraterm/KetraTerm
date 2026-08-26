@@ -27,6 +27,5 @@ internal object IntellijWorkingDirectoryResolver {
      * Returns a local existing directory for [uriValue], or `null` when the URI
      * is absent, remote, malformed, or not a directory.
      */
-    fun resolve(uriValue: String?): Path? =
-        TerminalLocalFileUriResolver.resolve(uriValue)?.takeIf(Files::isDirectory)
+    fun resolve(uriValue: String?): Path? = TerminalLocalFileUriResolver.resolve(uriValue)?.takeIf(Files::isDirectory)
 }

@@ -16,7 +16,6 @@
 package io.github.ketraterm.completion.model
 
 import io.github.ketraterm.completion.internal.hasTerminalCompletionLineBreak
-import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
 
 /**
  * Aggregated command statistics used by indexed history completion.
@@ -25,8 +24,9 @@ import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
  * Hosts own persistence around
  * [io.github.ketraterm.completion.api.TerminalCompletionLearningStore]; this
  * shared model performs no I/O.
- * The normalized matching key is derived from [commandLine] so callers cannot
- * persist contradictory command text and lookup state.
+ * Exact learning identity preserves [commandLine] case because arguments and
+ * paths may be case-sensitive. Learning indexes derive separate lowercase
+ * values where case-insensitive prefix search is required.
  *
  * @property commandLine canonical command text shown to the user.
  * @property profileId optional host profile id associated with the stats row.
@@ -67,10 +67,4 @@ data class TerminalCommandCompletionStats
             require(dismissedCount >= 0) { "dismissedCount must be >= 0, was $dismissedCount" }
             require(lastUsedEpochMillis >= 0L) { "lastUsedEpochMillis must be >= 0, was $lastUsedEpochMillis" }
         }
-
-        /**
-         * Derived lowercase key used for prefix matching and exact-row
-         * deduplication. This value is not constructor-owned durable state.
-         */
-        val normalizedCommandLine: String = normalizeTerminalCommandLine(commandLine)
     }

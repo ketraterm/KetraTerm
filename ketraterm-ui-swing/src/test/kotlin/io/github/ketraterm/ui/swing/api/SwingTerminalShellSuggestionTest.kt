@@ -893,8 +893,8 @@ class SwingTerminalShellSuggestionTest {
                 replacementText = "git status",
                 commandText = commandText,
                 detail = "show working tree status",
-                source = "history",
-                kind = "HISTORY",
+                source = "learned",
+                kind = "SUBCOMMAND",
             ),
             suggestion(
                 replacementText = "git switch main",

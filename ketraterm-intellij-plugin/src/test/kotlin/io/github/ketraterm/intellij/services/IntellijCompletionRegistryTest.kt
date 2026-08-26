@@ -42,8 +42,8 @@ class IntellijCompletionRegistryTest {
                     persistenceEnabled = false,
                     coroutineScope = this,
                 )
-            val session =
-                registry.openSession(
+            val resources =
+                registry.createResources(
                     context(
                         scanner =
                             TerminalDirectoryScanner { _, _ ->
@@ -53,11 +53,10 @@ class IntellijCompletionRegistryTest {
                     ),
                 )
 
-            val suggestions = session.provider.suggestions(request("cd s")).last()
+            val suggestions = resources.provider.suggestions(request("cd s")).last()
 
             assertEquals(1, scans)
             assertEquals("src/", suggestions.first { it.source == "path" }.replacementText)
-            session.close()
             registry.closeAndFlush()
         }
 
@@ -80,17 +79,17 @@ class IntellijCompletionRegistryTest {
                     persistenceEnabled = false,
                     coroutineScope = this,
                 )
-            val session = registry.openSession(context(additionalSources = listOf(TerminalCompletionSourceEntry(source, 20))))
+            val resources =
+                registry.createResources(context(additionalSources = listOf(TerminalCompletionSourceEntry(source, 20))))
 
-            session.provider.suggestions(request("git switch m")).last()
+            resources.provider.suggestions(request("git switch m")).last()
 
             assertEquals(1, loads)
-            session.close()
             registry.closeAndFlush()
         }
 
     @Test
-    fun `successful commands feed session mru`() =
+    fun `successful commands feed shared learning`() =
         runBlocking {
             val registry =
                 IntellijCompletionRegistry(
@@ -98,10 +97,9 @@ class IntellijCompletionRegistryTest {
                     persistenceEnabled = false,
                     coroutineScope = this,
                 )
-            val first = registry.openSession(context(sessionId = "first"))
-            val second = registry.openSession(context(sessionId = "second"))
+            val first = registry.createResources(context())
+            val second = registry.createResources(context())
             registry.recordFinishedCommand(
-                "first",
                 "bash",
                 TerminalShellIntegrationCommandMetadata(
                     recordId = 1,
@@ -118,49 +116,14 @@ class IntellijCompletionRegistryTest {
                 first.provider
                     .suggestions(request("git s"))
                     .last()
-                    .any { it.source == "mru" },
+                    .any { it.source == "learned" },
             )
-            first.close()
-            second.close()
-            registry.closeAndFlush()
-        }
-
-    @Test
-    fun `closing a replaced session cannot remove its replacement`() =
-        runBlocking {
-            val registry =
-                IntellijCompletionRegistry(
-                    specs = emptyList(),
-                    persistencePath = memoryOnlyPath(),
-                    persistenceEnabled = false,
-                    coroutineScope = this,
-                )
-            val previous = registry.openSession(context(sessionId = "session"))
-            val replacement = registry.openSession(context(sessionId = "session"))
-
-            previous.close()
-            registry.recordFinishedCommand(
-                "session",
-                "bash",
-                TerminalShellIntegrationCommandMetadata(
-                    recordId = 1,
-                    commandText = "git status",
-                    lifecycle = TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
-                    workingDirectoryUri = "file:///repo",
-                    exitCode = 0,
-                    startedAtEpochMillis = 1L,
-                    finishedAtEpochMillis = 2L,
-                ),
-            )
-
-            assertEquals(
-                listOf("git status"),
-                replacement.provider
-                    .suggestions(request("git"))
+            assertTrue(
+                second.provider
+                    .suggestions(request("git s"))
                     .last()
-                    .map { it.replacementText },
+                    .any { it.source == "learned" },
             )
-            replacement.close()
             registry.closeAndFlush()
         }
 
@@ -177,7 +140,7 @@ class IntellijCompletionRegistryTest {
             registry.closeAndFlush()
             registry.closeAndFlush()
 
-            assertThrows(IllegalStateException::class.java) { registry.openSession(context()) }
+            assertThrows(IllegalStateException::class.java) { registry.createResources(context()) }
         }
 
     @Test
@@ -197,7 +160,6 @@ class IntellijCompletionRegistryTest {
                 )
 
             registry.recordFinishedCommand(
-                sessionId = "session",
                 profileId = "bash",
                 metadata =
                     TerminalShellIntegrationCommandMetadata(
@@ -237,11 +199,9 @@ class IntellijCompletionRegistryTest {
             .resolve(TerminalCompletionLearningCoordinator.currentFileName())
 
     private fun context(
-        sessionId: String = "session",
         additionalSources: List<TerminalCompletionSourceEntry> = emptyList(),
         scanner: TerminalDirectoryScanner = TerminalDirectoryScanner { _: Path, _: String -> emptyList() },
-    ) = IntellijCompletionSessionContext(
-        sessionId = sessionId,
+    ) = IntellijCompletionContext(
         profileId = "bash",
         workingDirectoryUriProvider = { "file:///repo" },
         shellCapabilities = TerminalShellCapabilities.POSIX,

@@ -52,9 +52,10 @@ class TerminalCompletionLearningStore
         /**
          * Adds distinct aggregate events from [snapshot] to retained learning.
          *
-         * Rows sharing a canonical command and context key have their counters
-         * added with saturation and retain the newest timestamp. Callers must
-         * not merge the same aggregate event set more than once.
+         * Rows sharing the same case-preserved command text and canonical
+         * context key have their counters added with saturation and retain the
+         * newest timestamp. Callers must not merge the same aggregate event set
+         * more than once.
          *
          * @param snapshot aggregate events not already represented by this store.
          */
@@ -85,7 +86,7 @@ class TerminalCompletionLearningStore
             }
         }
 
-        /** Returns identity-cached exact ranking and learned-history indexes. */
+        /** Returns identity-cached ranking, history, and observed-token indexes. */
         internal fun indexesFor(shellSyntax: TerminalShellSyntax): CompletionLearningIndexes =
             learningIndexCache.indexesFor(snapshot(), shellSyntax)
 

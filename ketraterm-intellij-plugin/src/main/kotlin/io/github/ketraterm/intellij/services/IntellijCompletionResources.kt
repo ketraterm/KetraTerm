@@ -22,22 +22,19 @@ import io.github.ketraterm.completion.host.TerminalDirectoryScanner
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Host context used to create one testable IntelliJ completion session.
+ * Host context used to create one testable IntelliJ completion provider.
  *
- * @property sessionId non-blank stable workspace-session identifier.
  * @property profileId non-blank stable terminal profile identifier.
  * @property workingDirectoryUriProvider thread-safe supplier sampled once when
  * constructing immutable completion request metadata.
  * @property shellCapabilities shell syntax and quoting capabilities.
  * @property additionalSources project-aware completion sources for this session.
  * @property directoryScanner suspending bounded directory scanner.
- * @throws IllegalArgumentException if [sessionId] or [profileId] is blank.
+ * @throws IllegalArgumentException if [profileId] is blank.
  */
-internal data class IntellijCompletionSessionContext(
-    val sessionId: String,
+internal data class IntellijCompletionContext(
     val profileId: String,
     val workingDirectoryUriProvider: () -> String?,
     val shellCapabilities: TerminalShellCapabilities,
@@ -45,7 +42,6 @@ internal data class IntellijCompletionSessionContext(
     val directoryScanner: TerminalDirectoryScanner = TerminalBoundedDirectoryScanner(),
 ) {
     init {
-        require(sessionId.isNotBlank()) { "sessionId must not be blank" }
         require(profileId.isNotBlank()) { "profileId must not be blank" }
     }
 
@@ -58,22 +54,12 @@ internal data class IntellijCompletionSessionContext(
 }
 
 /**
- * Session-owned completion resources consumed by one IntelliJ terminal pane.
+ * Immutable completion resources consumed by one IntelliJ terminal pane.
  *
  * @property provider popup-facing suggestion provider.
  * @property feedbackHandler acceptance and dismissal learning handler.
- * @property closeAction registry callback that removes and closes this session.
  */
-internal class IntellijCompletionSession(
+internal data class IntellijCompletionResources(
     val provider: SwingShellSuggestionProvider,
     val feedbackHandler: SwingShellSuggestionFeedbackHandler,
-    private val closeAction: () -> Unit,
-) : AutoCloseable {
-    private val closed = AtomicBoolean()
-
-    /** Releases registry-owned resources idempotently. */
-    override fun close() {
-        if (!closed.compareAndSet(false, true)) return
-        closeAction()
-    }
-}
+)

@@ -247,7 +247,7 @@ class SwingCompletionPopupLayoutTest {
             listOf(
                 suggestion("build/", kind = "PATH"),
                 suggestion("--help", kind = "OPTION"),
-                suggestion("git status", source = "history", kind = "HISTORY"),
+                suggestion("git status", source = "learned", kind = "SUBCOMMAND"),
             ),
             appearance(component),
             availableWidth = 440,

@@ -21,11 +21,6 @@ import kotlin.test.assertFailsWith
 
 class TerminalCommandCompletionStatsTest {
     @Test
-    fun `normalizes command line by trimming and lowercasing`() {
-        assertEquals("git status", TerminalCommandCompletionStats("  Git Status  ").normalizedCommandLine)
-    }
-
-    @Test
     fun `rejects blank and multiline commands`() {
         assertFailsWith<IllegalArgumentException> {
             TerminalCommandCompletionStats(commandLine = " ")

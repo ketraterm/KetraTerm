@@ -22,10 +22,7 @@ internal class CompletionMatchResult(
     val score: Int,
     val matchedRanges: TerminalCompletionMatchRanges,
 ) {
-    /**
-     * Maps matcher relevance into a source-local score while preserving legacy
-     * prefix scores exactly.
-     */
+    /** Maps matcher relevance into a source-local score with stable direct-prefix scoring. */
     fun sourceScore(
         baseScore: Int,
         query: String,

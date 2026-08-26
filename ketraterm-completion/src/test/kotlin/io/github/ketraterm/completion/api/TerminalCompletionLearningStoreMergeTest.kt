@@ -22,7 +22,7 @@ import kotlin.test.assertEquals
 
 class TerminalCompletionLearningStoreMergeTest {
     @Test
-    fun `merge snapshot adds exact command aggregates by canonical context`() {
+    fun `merge snapshot canonicalizes context without collapsing command case`() {
         val store = TerminalCompletionLearningStore()
         store.mergeSnapshot(
             TerminalCommandCompletionStatsSnapshot(
@@ -36,12 +36,12 @@ class TerminalCompletionLearningStoreMergeTest {
             ),
         )
 
-        val merged = store.snapshot().commandStats.single()
-        assertEquals("git status", merged.commandLine)
-        assertEquals("file:///repo/", merged.workingDirectoryUri)
-        assertEquals(7, merged.useCount)
-        assertEquals(3, merged.successCount)
-        assertEquals(200, merged.lastUsedEpochMillis)
+        val rows = store.snapshot().commandStats
+        assertEquals(listOf("git status", "Git Status"), rows.map { it.commandLine })
+        assertEquals(listOf("file:///repo/", "file:///repo/"), rows.map { it.workingDirectoryUri })
+        assertEquals(listOf(4, 3), rows.map { it.useCount })
+        assertEquals(listOf(2, 1), rows.map { it.successCount })
+        assertEquals(listOf(200L, 100L), rows.map { it.lastUsedEpochMillis })
     }
 
     private fun commandStats(

@@ -17,12 +17,11 @@ package io.github.ketraterm.completion.stats
 
 import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.TERMINAL_COMMAND_COMPLETION_STATS_ORDER
-import io.github.ketraterm.completion.internal.normalizeTerminalCommandLine
 import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncrement
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 
-/** Bounded exact-command stats index. */
+/** Bounded stats index keyed by case-preserved exact command text and context. */
 internal class CommandCompletionStatsIndex(
     private val capacity: Int,
 ) {
@@ -51,9 +50,8 @@ internal class CommandCompletionStatsIndex(
         workingDirectoryUri: String?,
         usedAtEpochMillis: Long,
     ): Boolean =
-        mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
+        mutate(commandLine, profileId, workingDirectoryUri) { previous ->
             previous.copy(
-                commandLine = previous.commandLineForEvent(canonical, usedAtEpochMillis),
                 useCount = saturatedCompletionCounterIncrement(previous.useCount),
                 successCount =
                     if (successful) {
@@ -78,9 +76,8 @@ internal class CommandCompletionStatsIndex(
         workingDirectoryUri: String?,
         feedbackAtEpochMillis: Long,
     ): Boolean =
-        mutate(commandLine, profileId, workingDirectoryUri) { previous, canonical ->
+        mutate(commandLine, profileId, workingDirectoryUri) { previous ->
             previous.copy(
-                commandLine = previous.commandLineForEvent(canonical, feedbackAtEpochMillis),
                 acceptedCount = incrementAccepted(previous.acceptedCount, feedback),
                 dismissedCount = incrementDismissed(previous.dismissedCount, feedback),
                 lastUsedEpochMillis = maxOf(previous.lastUsedEpochMillis, feedbackAtEpochMillis),
@@ -91,15 +88,14 @@ internal class CommandCompletionStatsIndex(
         commandLine: String,
         profileId: String?,
         workingDirectoryUri: String?,
-        update: (TerminalCommandCompletionStats, String) -> TerminalCommandCompletionStats,
+        update: (TerminalCommandCompletionStats) -> TerminalCommandCompletionStats,
     ): Boolean {
         val canonical = commandLine.trim()
-        val normalized = normalizeTerminalCommandLine(canonical)
         val context = CompletionLearningContextKey.of(profileId, workingDirectoryUri)
-        val key = CommandCompletionStatsKey(normalized, context)
+        val key = CommandCompletionStatsKey(canonical, context)
         val current = rowsByKey[key]
         if (current != null) {
-            val updated = update(current, canonical)
+            val updated = update(current)
             if (updated == current) return false
             check(orderedRows.remove(current)) { "indexed completion statistics row is missing from sorted storage" }
             rowsByKey[key] = updated
@@ -114,7 +110,6 @@ internal class CommandCompletionStatsIndex(
                     profileId = context.profileId,
                     workingDirectoryUri = context.workingDirectoryUri,
                 ),
-                canonical,
             )
         rowsByKey[key] = created
         insertOrdered(created)
@@ -151,19 +146,20 @@ internal class CommandCompletionStatsIndex(
     }
 
     private data class CommandCompletionStatsKey(
-        val normalizedCommandLine: String,
+        val commandLine: String,
         val context: CompletionLearningContextKey,
     )
 
     private fun TerminalCommandCompletionStats.key(): CommandCompletionStatsKey =
         CommandCompletionStatsKey(
-            normalizedCommandLine = normalizedCommandLine,
+            commandLine = commandLine,
             context = CompletionLearningContextKey.of(profileId, workingDirectoryUri),
         )
 
     private fun canonicalizeContext(record: TerminalCommandCompletionStats): TerminalCommandCompletionStats {
         val context = CompletionLearningContextKey.of(record.profileId, record.workingDirectoryUri)
         return record.copy(
+            commandLine = record.commandLine.trim(),
             profileId = context.profileId,
             workingDirectoryUri = context.workingDirectoryUri,
         )
@@ -186,9 +182,4 @@ internal class CommandCompletionStatsIndex(
             lastUsedEpochMillis = maxOf(current.lastUsedEpochMillis, incoming.lastUsedEpochMillis),
         )
     }
-
-    private fun TerminalCommandCompletionStats.commandLineForEvent(
-        eventCommandLine: String,
-        eventEpochMillis: Long,
-    ): String = if (eventEpochMillis >= lastUsedEpochMillis) eventCommandLine else commandLine
 }

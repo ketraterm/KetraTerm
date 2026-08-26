@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAccentRole
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
@@ -83,8 +84,7 @@ class SwingCompletionSuggestionProviderTest {
             val sources =
                 listOf(
                     "spec",
-                    "history",
-                    "stats",
+                    "learned",
                     "observed",
                     "intellij-git-branch",
                     "intellij-gradle-task",
@@ -112,14 +112,14 @@ class SwingCompletionSuggestionProviderTest {
                     },
                 )
 
-            val labels = provider.suggestions(request("x", cursorOffset = 1)).last().map { it.sourceDisplayText }
+            val suggestions = provider.suggestions(request("x", cursorOffset = 1)).last()
+            val labels = suggestions.map { it.sourceDisplayText }
 
             assertEquals(
                 listOf(
                     "Built-in",
-                    "Recent",
                     "Learned",
-                    "Session",
+                    "Learned",
                     "Git",
                     "Gradle",
                     "Project",
@@ -133,6 +133,8 @@ class SwingCompletionSuggestionProviderTest {
             assertTrue(labels.last().startsWith("Custom "))
             assertTrue(labels.last().endsWith("…"))
             assertTrue(labels.last().length <= 128)
+            assertEquals(SwingShellSuggestionAccentRole.HISTORY, suggestions[1].accentRole)
+            assertEquals(SwingShellSuggestionAccentRole.HISTORY, suggestions[2].accentRole)
         }
 
     @Test

@@ -107,6 +107,11 @@ class CompletionLearningFileStoreTest {
     }
 
     @Test
+    fun `previous format is rejected without changing bytes`() {
+        assertRejectedWithoutMutation("KetraTerm_COMMAND_COMPLETION_STATS\t1\n".encodeToByteArray())
+    }
+
+    @Test
     fun `unknown header is rejected without changing bytes`() {
         assertRejectedWithoutMutation("KetraTerm_COMMAND_COMPLETION_STATS\t999\nC\tignored".encodeToByteArray())
     }
@@ -118,7 +123,7 @@ class CompletionLearningFileStoreTest {
 
     @Test
     fun `oversized line is rejected without changing bytes`() {
-        val header = "KetraTerm_COMMAND_COMPLETION_STATS\t1\n".encodeToByteArray()
+        val header = "KetraTerm_COMMAND_COMPLETION_STATS\t2\n".encodeToByteArray()
         val oversizedLine = ByteArray(MAX_LINE_BYTES + 1) { 'x'.code.toByte() }
 
         assertRejectedWithoutMutation(header + oversizedLine)
@@ -129,7 +134,7 @@ class CompletionLearningFileStoreTest {
         val validRow = CompletionLearningSnapshotCodec.encode(snapshot("git status"))[1]
         val content =
             buildString {
-                appendLine("KetraTerm_COMMAND_COMPLETION_STATS\t1")
+                appendLine("KetraTerm_COMMAND_COMPLETION_STATS\t2")
                 repeat(MAX_FILE_LINES) { appendLine(validRow) }
             }.encodeToByteArray()
 
@@ -149,7 +154,7 @@ class CompletionLearningFileStoreTest {
     @Test
     fun `malformed exact row is rejected without changing bytes`() {
         assertRejectedWithoutMutation(
-            "KetraTerm_COMMAND_COMPLETION_STATS\t1\nC\tnot-base64\n".encodeToByteArray(),
+            "KetraTerm_COMMAND_COMPLETION_STATS\t2\nC\tnot-base64\n".encodeToByteArray(),
         )
     }
 
@@ -158,7 +163,7 @@ class CompletionLearningFileStoreTest {
         val validRow = CompletionLearningSnapshotCodec.encodeCommandRow(record("git status"))
         val overBoundRow = CompletionLearningSnapshotCodec.encodeCommandRow(record("x".repeat(MAX_TEXT_CHARS + 1)))
         val originalBytes =
-            listOf("KetraTerm_COMMAND_COMPLETION_STATS\t1", validRow, overBoundRow, validRow)
+            listOf("KetraTerm_COMMAND_COMPLETION_STATS\t2", validRow, overBoundRow, validRow)
                 .joinToString("\n", postfix = "\n")
                 .encodeToByteArray()
 
@@ -173,7 +178,7 @@ class CompletionLearningFileStoreTest {
         assertTrue(rowCount < MAX_FILE_LINES)
         val originalBytes =
             buildString {
-                appendLine("KetraTerm_COMMAND_COMPLETION_STATS\t1")
+                appendLine("KetraTerm_COMMAND_COMPLETION_STATS\t2")
                 repeat(rowCount) {
                     append(row)
                     append('\n')
@@ -195,13 +200,13 @@ class CompletionLearningFileStoreTest {
     @Test
     fun `input failure is returned separately`() {
         val path = createTempDirectory("completion-store-failed").resolve(TerminalCompletionLearningCoordinator.currentFileName())
-        Files.writeString(path, "KetraTerm_COMMAND_COMPLETION_STATS\t1")
+        Files.writeString(path, "KetraTerm_COMMAND_COMPLETION_STATS\t2")
         val expectedFailure = IOException("test read failure")
 
         val outcome = CompletionLearningFileStore(path, openInput = { throw expectedFailure }).loadSnapshot()
 
         assertSame(CompletionLearningFileLoadOutcome.Failed, outcome)
-        assertEquals("KetraTerm_COMMAND_COMPLETION_STATS\t1", Files.readString(path))
+        assertEquals("KetraTerm_COMMAND_COMPLETION_STATS\t2", Files.readString(path))
     }
 
     @Test

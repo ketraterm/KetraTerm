@@ -15,7 +15,10 @@
  */
 package io.github.ketraterm.ui.swing.host
 
-import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
+import io.github.ketraterm.completion.api.TerminalCompletionEngines
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
+import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
@@ -95,16 +98,9 @@ class SwingCompletionFeedbackRecorderTest {
             assertTrue(
                 TerminalCompletionEngines
                     .fromSources(
-                        sources =
-                            listOf(
-                                TerminalCompletionSourceEntry(
-                                    TerminalCompletionSources.sessionMru(
-                                        commandSpecs = emptyList(),
-                                        learningStore = source,
-                                    ),
-                                ),
-                            ),
+                        sources = emptyList(),
                         commandSpecs = emptyList(),
+                        learningStore = source,
                     ).completions(completionRequest("git s"))
                     .last()
                     .isEmpty(),

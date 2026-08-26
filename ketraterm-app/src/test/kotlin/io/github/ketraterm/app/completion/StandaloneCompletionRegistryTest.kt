@@ -16,19 +16,21 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.last
+import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import kotlin.test.*
 
 class StandaloneCompletionRegistryTest {
-    private val registryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val registries = ArrayList<StandaloneCompletionRegistry>()
     private val persistenceDirectory = Files.createTempDirectory("ketraterm-registry-test")
     private var eventTime = 0L
@@ -38,22 +40,19 @@ class StandaloneCompletionRegistryTest {
         runBlocking {
             registries.forEach { it.closeAndFlush() }
         }
-        registryScope.cancel()
         persistenceDirectory.toFile().deleteRecursively()
     }
 
     @Test
-    fun `session MRU competes as a semantic subcommand without full-line presentation`() =
+    fun `learned command competes as a semantic subcommand without full-line presentation`() =
         runBlocking {
             val registry = registry()
             val provider =
-                registry.createProvider(
-                    sessionId = "session-1",
+                registry.openProvider(
                     profileId = "bash",
                     workingDirectoryUriProvider = { "file:///repo" },
                 )
             registry.recordSuccess(
-                sessionId = "session-1",
                 commandLine = "git switch main",
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo",
@@ -61,11 +60,11 @@ class StandaloneCompletionRegistryTest {
 
             val suggestions = provider.suggestions(request("git s")).last()
 
-            val mruSuggestion = suggestions.first()
-            assertEquals("switch main", mruSuggestion.replacementText)
-            assertEquals("mru", mruSuggestion.source)
-            assertEquals(4, mruSuggestion.replacementStartOffset)
-            assertEquals(5, mruSuggestion.replacementEndOffset)
+            val learnedSuggestion = suggestions.first()
+            assertEquals("switch main", learnedSuggestion.replacementText)
+            assertEquals("learned", learnedSuggestion.source)
+            assertEquals(4, learnedSuggestion.replacementStartOffset)
+            assertEquals(5, learnedSuggestion.replacementEndOffset)
             assertTrue(suggestions.any { it.replacementText == "status" && it.source == "spec" })
         }
 
@@ -79,13 +78,11 @@ class StandaloneCompletionRegistryTest {
                 Files.writeString(directory.resolve("README.md"), "not a directory")
                 val registry = registry(specs = TerminalCommandSpecs.defaults())
                 val provider =
-                    registry.createProvider(
-                        sessionId = "session-1",
+                    registry.openProvider(
                         profileId = "pwsh",
                         workingDirectoryUriProvider = { directory.toUri().toString() },
                     )
                 registry.recordSuccess(
-                    sessionId = "session-1",
                     commandLine = "cd remembered",
                     profileId = "pwsh",
                     workingDirectoryUri = directory.toUri().toString(),
@@ -96,7 +93,7 @@ class StandaloneCompletionRegistryTest {
                 assertTrue(suggestions.any { it.replacementText == "alpha/" && it.source == "path" })
                 assertTrue(suggestions.none { it.replacementText == ".hidden/" })
                 assertTrue(suggestions.none { it.replacementText == "README.md" })
-                assertTrue(suggestions.any { it.replacementText == "remembered" && it.source == "mru" })
+                assertTrue(suggestions.any { it.replacementText == "remembered" && it.source == "learned" })
                 registry.closeAndFlush()
             } finally {
                 directory.toFile().deleteRecursively()
@@ -128,8 +125,7 @@ class StandaloneCompletionRegistryTest {
                 )
                 val registry = registry(specs = TerminalCommandSpecs.defaults(), learningStore = persistentStats)
                 val provider =
-                    registry.createProvider(
-                        sessionId = "learned-directory",
+                    registry.openProvider(
                         profileId = "pwsh",
                         workingDirectoryUriProvider = { directory.toUri().toString() },
                     )
@@ -138,7 +134,7 @@ class StandaloneCompletionRegistryTest {
 
                 assertEquals("IdeaProjects/KetraTerm/", suggestions.first().replacementText)
                 assertEquals("IdeaProjects/KetraTerm/", suggestions.first().displayText)
-                assertEquals("mru", suggestions.first().source)
+                assertEquals("learned", suggestions.first().source)
                 assertEquals("cd IdeaProjects/KetraTerm/", suggestions.first().commandTextAfterReplacement(request("cd I")))
                 assertTrue(suggestions.none { it.source == "stats" })
                 registry.closeAndFlush()
@@ -154,8 +150,7 @@ class StandaloneCompletionRegistryTest {
             try {
                 Files.createDirectory(directory.resolve("status"))
                 val provider =
-                    registry().createProvider(
-                        sessionId = "session-1",
+                    registry().openProvider(
                         profileId = "bash",
                         workingDirectoryUriProvider = { directory.toUri().toString() },
                     )
@@ -182,13 +177,11 @@ class StandaloneCompletionRegistryTest {
             )
             val registry = registry(learningStore = persistentStats)
             val provider =
-                registry.createProvider(
-                    sessionId = "session-1",
+                registry.openProvider(
                     profileId = "bash",
                     workingDirectoryUriProvider = { "file:///repo" },
                 )
             registry.recordSuccess(
-                sessionId = "session-1",
                 commandLine = "git switch main",
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo",
@@ -202,11 +195,11 @@ class StandaloneCompletionRegistryTest {
             assertTrue("git show --stat" in outcomes)
             assertTrue("git status" in outcomes)
             assertTrue(suggestions.none { it.source == "stats" })
-            assertEquals("mru", suggestions.single { it.commandTextAfterReplacement(request) == "git show --stat" }.source)
+            assertEquals("learned", suggestions.single { it.commandTextAfterReplacement(request) == "git show --stat" }.source)
         }
 
     @Test
-    fun `persistent stats source is shared across provider sessions`() =
+    fun `shared learning is visible to every provider`() =
         runBlocking {
             val persistentStats = TerminalCompletionLearningStore()
             persistentStats.recordCommandResult(
@@ -217,8 +210,8 @@ class StandaloneCompletionRegistryTest {
                 usedAtEpochMillis = 1_000,
             )
             val registry = registry(specs = emptyList(), learningStore = persistentStats)
-            val first = registry.createProvider("session-1", profileId = "bash") { "file:///repo" }
-            val second = registry.createProvider("session-2", profileId = "bash") { "file:///repo" }
+            val first = registry.openProvider(profileId = "bash") { "file:///repo" }
+            val second = registry.openProvider(profileId = "bash") { "file:///repo" }
 
             assertEquals(listOf("npm test"), first.suggestions(request("npm")).last().map { it.replacementText })
             assertEquals(listOf("npm test"), second.suggestions(request("npm")).last().map { it.replacementText })
@@ -251,8 +244,7 @@ class StandaloneCompletionRegistryTest {
             )
             val provider =
                 registry(learningStore = persistentStats)
-                    .createProvider(
-                        sessionId = "session-1",
+                    .openProvider(
                         profileId = "bash",
                         workingDirectoryUriProvider = { "file:///repo" },
                     )
@@ -282,8 +274,7 @@ class StandaloneCompletionRegistryTest {
             )
             val provider =
                 registry(learningStore = persistentStats)
-                    .createProvider(
-                        sessionId = "session-1",
+                    .openProvider(
                         profileId = "bash",
                         workingDirectoryUriProvider = { "file:///repo" },
                     )
@@ -295,23 +286,20 @@ class StandaloneCompletionRegistryTest {
         }
 
     @Test
-    fun `provider context boosts matching session MRU commands`() =
+    fun `provider context boosts matching learned commands`() =
         runBlocking {
             val registry = registry(listOf(TerminalCommandSpec("git")))
             val provider =
-                registry.createProvider(
-                    sessionId = "session-1",
+                registry.openProvider(
                     profileId = "bash",
                     workingDirectoryUriProvider = { "file:///repo" },
                 )
             registry.recordSuccess(
-                sessionId = "session-1",
                 commandLine = "git switch main",
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo",
             )
             registry.recordSuccess(
-                sessionId = "session-1",
                 commandLine = "git status",
                 profileId = "pwsh",
                 workingDirectoryUri = "file:///other",
@@ -322,7 +310,7 @@ class StandaloneCompletionRegistryTest {
 
             assertEquals(
                 listOf("git switch main", "git status"),
-                suggestions.filter { it.source == "mru" }.mapNotNull { it.commandTextAfterReplacement(request) },
+                suggestions.filter { it.source == "learned" }.mapNotNull { it.commandTextAfterReplacement(request) },
             )
         }
 
@@ -332,19 +320,16 @@ class StandaloneCompletionRegistryTest {
             val registry = registry(emptyList())
             var workingDirectoryUri = "file:///repo"
             val provider =
-                registry.createProvider(
-                    sessionId = "session-1",
+                registry.openProvider(
                     profileId = "bash",
                     workingDirectoryUriProvider = { workingDirectoryUri },
                 )
             registry.recordSuccess(
-                sessionId = "session-1",
                 commandLine = "git switch main",
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo",
             )
             registry.recordSuccess(
-                sessionId = "session-1",
                 commandLine = "git status",
                 profileId = "bash",
                 workingDirectoryUri = "file:///other",
@@ -359,14 +344,13 @@ class StandaloneCompletionRegistryTest {
         }
 
     @Test
-    fun `finished commands become learned suggestions across provider sessions`() =
+    fun `finished commands become shared learned suggestions`() =
         runBlocking {
             val registry = registry(emptyList())
-            val first = registry.createProvider("session-1")
-            val second = registry.createProvider("session-2")
+            val first = registry.openProvider()
+            val second = registry.openProvider()
 
             registry.recordSuccess(
-                sessionId = "session-1",
                 commandLine = "git status",
                 profileId = "bash",
                 workingDirectoryUri = null,
@@ -377,35 +361,17 @@ class StandaloneCompletionRegistryTest {
         }
 
     @Test
-    fun `removed session retains globally learned command`() =
+    fun `finished commands contribute global learning before a provider exists`() =
         runBlocking {
             val registry = registry(emptyList())
-            val provider = registry.createProvider("session-1")
+
             registry.recordSuccess(
-                sessionId = "session-1",
                 commandLine = "git status",
                 profileId = "bash",
                 workingDirectoryUri = null,
             )
 
-            registry.removeSession("session-1")
-
-            assertEquals(listOf("git status"), provider.suggestions(request("git")).last().map { it.replacementText })
-        }
-
-    @Test
-    fun `unregistered session records still contribute global learning`() =
-        runBlocking {
-            val registry = registry(emptyList())
-
-            registry.recordSuccess(
-                sessionId = "missing",
-                commandLine = "git status",
-                profileId = "bash",
-                workingDirectoryUri = null,
-            )
-
-            val provider = registry.createProvider("session-1")
+            val provider = registry.openProvider()
             assertEquals(listOf("git status"), provider.suggestions(request("git")).last().map { it.replacementText })
         }
 
@@ -415,20 +381,17 @@ class StandaloneCompletionRegistryTest {
             val registry = registry(listOf(TerminalCommandSpec("git")))
             var currentDirectory = "file:///repo-a"
             val provider =
-                registry.createProvider(
-                    sessionId = "session-1",
+                registry.openProvider(
                     profileId = "bash",
                     workingDirectoryUriProvider = { currentDirectory },
                 )
 
             registry.recordSuccess(
-                sessionId = "session-1",
                 commandLine = "git checkout feature-a",
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo-a",
             )
             registry.recordSuccess(
-                sessionId = "session-1",
                 commandLine = "git checkout feature-b",
                 profileId = "bash",
                 workingDirectoryUri = "file:///repo-b",
@@ -445,56 +408,66 @@ class StandaloneCompletionRegistryTest {
         }
 
     @Test
-    fun `session context ranks its own MRU first while global learning is shared`() =
+    fun `provider profile context ranks shared learning`() =
         runBlocking {
             val registry = registry(listOf(TerminalCommandSpec("build")))
-            val session1 = registry.createProvider("session-1", profileId = "bash")
-            val session2 = registry.createProvider("session-2", profileId = "zsh")
+            val bashProvider = registry.openProvider(profileId = "bash")
+            val zshProvider = registry.openProvider(profileId = "zsh")
 
-            registry.recordSuccess("session-1", "build --release", profileId = "bash", workingDirectoryUri = null)
-            registry.recordSuccess("session-2", "build --debug", profileId = "zsh", workingDirectoryUri = null)
+            registry.recordSuccess("build --release", profileId = "bash", workingDirectoryUri = null)
+            registry.recordSuccess("build --debug", profileId = "zsh", workingDirectoryUri = null)
 
-            val s1 = session1.suggestions(request("build")).last().map { it.replacementText }
-            val s2 = session2.suggestions(request("build")).last().map { it.replacementText }
+            val bashSuggestions = bashProvider.suggestions(request("build")).last().map { it.replacementText }
+            val zshSuggestions = zshProvider.suggestions(request("build")).last().map { it.replacementText }
 
-            assertEquals("build --release", s1.first())
-            assertEquals("build --debug", s2.first())
-            assertEquals(setOf("build --release", "build --debug"), s1.toSet())
-            assertEquals(setOf("build --release", "build --debug"), s2.toSet())
+            assertEquals("build --release", bashSuggestions.first())
+            assertEquals("build --debug", zshSuggestions.first())
+            assertEquals(setOf("build --release", "build --debug"), bashSuggestions.toSet())
+            assertEquals(setOf("build --release", "build --debug"), zshSuggestions.toSet())
         }
 
     @Test
     fun `closed registry rejects new providers`() =
         runBlocking {
             val registry = registry(emptyList())
+            val completionJob = requireNotNull(registry.completionScope.coroutineContext[Job])
 
             registry.closeAndFlush()
             registry.closeAndFlush()
 
-            assertFailsWith<IllegalStateException> { registry.createProvider("late-session") }
+            assertTrue(completionJob.isCancelled)
+            assertFailsWith<IllegalStateException> { registry.createResources() }
         }
 
     private fun registry(
         specs: List<TerminalCommandSpec> = specs(),
         learningStore: TerminalCompletionLearningStore? = null,
     ): StandaloneCompletionRegistry =
-        StandaloneCompletionRegistry(
-            persistencePath = persistenceDirectory.resolve("learning-${registries.size}.jsonl"),
-            persistenceEnabled = false,
-            coroutineScope = registryScope,
-            specs = specs,
-            learningStore = learningStore ?: TerminalCompletionLearningStore(),
-            sessionMruCapacity = 4,
-        ).also(registries::add)
+        StandaloneCompletionRegistry
+            .create(
+                persistencePath = persistenceDirectory.resolve("learning-${registries.size}.jsonl"),
+                persistenceEnabled = false,
+                specs = specs,
+                learningStore = learningStore ?: TerminalCompletionLearningStore(),
+            ).also(registries::add)
+
+    private fun StandaloneCompletionRegistry.openProvider(
+        profileId: String? = null,
+        shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
+        workingDirectoryUriProvider: () -> String? = { null },
+    ): SwingShellSuggestionProvider =
+        createResources(
+            profileId = profileId,
+            shellCapabilities = shellCapabilities,
+            workingDirectoryUriProvider = workingDirectoryUriProvider,
+        ).provider
 
     private fun StandaloneCompletionRegistry.recordSuccess(
-        sessionId: String,
         commandLine: String,
         profileId: String?,
         workingDirectoryUri: String?,
     ) {
         recordFinishedCommand(
-            sessionId = sessionId,
             commandLine = commandLine,
             successful = true,
             profileId = profileId,

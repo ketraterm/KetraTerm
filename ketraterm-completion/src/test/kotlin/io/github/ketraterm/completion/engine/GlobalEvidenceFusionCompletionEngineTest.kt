@@ -24,13 +24,13 @@ import kotlin.test.assertTrue
 
 class GlobalEvidenceFusionCompletionEngineTest {
     @Test
-    fun `mru and path outcomes fuse across quoting and trailing separator`() =
+    fun `learned and path outcomes fuse across quoting and trailing separator`() =
         runBlocking {
             val engine =
                 engine(
                     sources =
                         listOf(
-                            entry(source(candidate("cd build", 0, 3, "mru", TerminalCompletionCandidateKind.HISTORY)), 8),
+                            entry(source(candidate("cd build", 0, 3, "learned", TerminalCompletionCandidateKind.PATH)), 8),
                             entry(source(candidate("\"build/\"", 3, 3, "path", TerminalCompletionCandidateKind.PATH)), 12),
                         ),
                 )
@@ -49,7 +49,10 @@ class GlobalEvidenceFusionCompletionEngineTest {
                 engine(
                     sources =
                         listOf(
-                            entry(source(candidate("cd IdeaProjects/KetraTerm", 0, 2, "mru", TerminalCompletionCandidateKind.HISTORY)), 8),
+                            entry(
+                                source(candidate("cd IdeaProjects/KetraTerm", 0, 2, "learned", TerminalCompletionCandidateKind.PATH)),
+                                8,
+                            ),
                             entry(
                                 source(
                                     candidate(
@@ -57,7 +60,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                                         0,
                                         2,
                                         "learned",
-                                        TerminalCompletionCandidateKind.HISTORY,
+                                        TerminalCompletionCandidateKind.PATH,
                                     ),
                                 ),
                                 8,
@@ -72,7 +75,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
         }
 
     @Test
-    fun `session and persisted copies produce one learned directory candidate`() =
+    fun `learning store produces one learned directory candidate without a provider source`() =
         runBlocking {
             val snapshot =
                 TerminalCommandCompletionStatsSnapshot(
@@ -86,17 +89,9 @@ class GlobalEvidenceFusionCompletionEngineTest {
                         ),
                 )
             val learningStore = TerminalCompletionLearningStore().apply { mergeSnapshot(snapshot) }
-            val learnedSource =
-                TerminalCompletionSources.sessionMru(
-                    learningStore = learningStore,
-                )
-            learnedSource.recordSuccessfulCommand(
-                commandLine = "cd IdeaProjects/KetraTerm",
-                workingDirectoryUri = "file:///home",
-            )
             val engine =
                 TerminalCompletionEngines.fromSources(
-                    sources = listOf(entry(learnedSource, 8)),
+                    sources = emptyList(),
                     commandSpecs = TerminalCommandSpecs.defaults(),
                     learningStore = learningStore,
                 )
@@ -104,8 +99,8 @@ class GlobalEvidenceFusionCompletionEngineTest {
             val candidates = engine.complete(request("cd ", workingDirectoryUri = "file:///home"))
 
             assertEquals(1, candidates.size)
-            assertEquals("IdeaProjects/KetraTerm", candidates.single().replacementText)
-            assertEquals("mru", candidates.single().source)
+            assertEquals("IdeaProjects/KetraTerm/", candidates.single().replacementText)
+            assertEquals("learned", candidates.single().source)
             assertEquals(TerminalCompletionCandidateKind.PATH, candidates.single().kind)
         }
 
@@ -155,6 +150,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                             ),
                         ),
                     snapshot = snapshot,
+                    commandSpecs = TerminalCommandSpecs.defaults(),
                 )
 
             val candidates = engine.complete(request("cd ", workingDirectoryUri = "file:///repo"))
@@ -191,6 +187,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                             ),
                         ),
                     snapshot = snapshot,
+                    commandSpecs = TerminalCommandSpecs.defaults(),
                 ).complete(request("cd "))
 
             assertEquals("build/", candidates.first().replacementText)
@@ -214,8 +211,8 @@ class GlobalEvidenceFusionCompletionEngineTest {
                     "./gradlew :app:test",
                     0,
                     commandLine.length,
-                    "mru",
-                    TerminalCompletionCandidateKind.HISTORY,
+                    "learned",
+                    TerminalCompletionCandidateKind.SUBCOMMAND,
                 )
             val statistical = remembered.copy(source = "command-stats")
             val candidates =
@@ -261,6 +258,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                             ),
                         ),
                     snapshot = snapshot,
+                    commandSpecs = TerminalCommandSpecs.defaults(),
                 )
 
             val candidates = engine.complete(request("cd ", workingDirectoryUri = "file:///repo"))
@@ -375,10 +373,6 @@ class GlobalEvidenceFusionCompletionEngineTest {
                 engine(
                     sources =
                         listOf(
-                            entry(
-                                source(candidate("cd remembered", 0, 3, "mru", TerminalCompletionCandidateKind.HISTORY)),
-                                8,
-                            ),
                             entry(source(candidate("src/", 3, 3, "path", TerminalCompletionCandidateKind.PATH)), 12),
                         ),
                     snapshot = snapshot,
@@ -444,7 +438,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
             val engine =
                 engine(
                     listOf(
-                        entry(source(candidate("Build/", 3, 3, "mru", TerminalCompletionCandidateKind.PATH)), 0),
+                        entry(source(candidate("Build/", 3, 3, "learned", TerminalCompletionCandidateKind.PATH)), 0),
                         entry(source(candidate("build/", 3, 3, "path", TerminalCompletionCandidateKind.PATH)), 0),
                     ),
                 )
@@ -478,9 +472,9 @@ class GlobalEvidenceFusionCompletionEngineTest {
                     listOf(
                         entry(
                             source(
-                                candidate("tool --alpha --beta one", 0, 1, "one", TerminalCompletionCandidateKind.HISTORY),
-                                candidate("tool --alpha --beta two", 0, 1, "two", TerminalCompletionCandidateKind.HISTORY),
-                                candidate("tool --beta --alpha one", 0, 1, "reordered", TerminalCompletionCandidateKind.HISTORY),
+                                candidate("tool --alpha --beta one", 0, 1, "one", TerminalCompletionCandidateKind.COMMAND),
+                                candidate("tool --alpha --beta two", 0, 1, "two", TerminalCompletionCandidateKind.COMMAND),
+                                candidate("tool --beta --alpha one", 0, 1, "reordered", TerminalCompletionCandidateKind.COMMAND),
                             ),
                             0,
                         ),
@@ -498,7 +492,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                 engine(
                     listOf(
                         entry(
-                            source(candidate("git status", 0, commandLine.length, "history", TerminalCompletionCandidateKind.HISTORY)),
+                            source(candidate("git status", 0, commandLine.length, "learned", TerminalCompletionCandidateKind.SUBCOMMAND)),
                             8,
                         ),
                         entry(
@@ -569,7 +563,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                                     0,
                                     commandLine.length,
                                     "whole-line",
-                                    TerminalCompletionCandidateKind.HISTORY,
+                                    TerminalCompletionCandidateKind.SUBCOMMAND,
                                 ),
                             ),
                             0,
@@ -607,7 +601,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                                     0,
                                     commandLine.length,
                                     "whole-line",
-                                    TerminalCompletionCandidateKind.HISTORY,
+                                    TerminalCompletionCandidateKind.ARGUMENT,
                                 ),
                             ),
                             0,

@@ -19,7 +19,6 @@ import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
-import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.CompletionLearningIndexCache
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
@@ -72,6 +71,31 @@ class LearnedCompletionEvidenceIndexTest {
         val adjustment = index.exactAdjustment(key, CompletionLearningContextKey.from(request()), NOW)
 
         assertTrue(adjustment > 0)
+    }
+
+    @Test
+    fun `exact evidence keeps case-distinct command arguments separate`() {
+        val resolver = TerminalCompletionOutcomeKeyResolver()
+        val snapshot =
+            TerminalCommandCompletionStatsSnapshot(
+                commandStats =
+                    listOf(
+                        TerminalCommandCompletionStats(commandLine = "cat Foo", acceptedCount = 10),
+                        TerminalCommandCompletionStats(commandLine = "cat foo", dismissedCount = 10),
+                    ),
+            )
+        val index = CompletionLearningIndexCache().indexesFor(snapshot, TerminalShellSyntax.POSIX).evidence
+        val upperTokens = TerminalCommandLineTokenizer.parse("cat Foo", "cat Foo".length, TerminalShellSyntax.POSIX).tokens
+        val lowerTokens = TerminalCommandLineTokenizer.parse("cat foo", "cat foo".length, TerminalShellSyntax.POSIX).tokens
+        val context = CompletionLearningContextKey.from(request())
+
+        val upperAdjustment =
+            index.exactAdjustment(requireNotNull(resolver.learnedKey(upperTokens, -1, pathAware = false)), context, NOW)
+        val lowerAdjustment =
+            index.exactAdjustment(requireNotNull(resolver.learnedKey(lowerTokens, -1, pathAware = false)), context, NOW)
+
+        assertTrue(upperAdjustment > 0)
+        assertTrue(lowerAdjustment < 0)
     }
 
     private fun stats(

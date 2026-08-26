@@ -98,7 +98,7 @@ enum class SwingShellSuggestionAccentRole {
     /** Command option-name completion. */
     OPTION,
 
-    /** Session or persisted command-history completion. */
+    /** Completion derived from learned command history. */
     HISTORY,
 
     /** A value that does not belong to another presentation category. */
@@ -115,12 +115,11 @@ enum class SwingShellSuggestionAccentRole {
             source: String,
         ): SwingShellSuggestionAccentRole =
             when {
+                source.equals("learned", ignoreCase = true) ||
+                    source.equals("observed", ignoreCase = true) -> HISTORY
                 kind.equals("PATH", ignoreCase = true) -> PATH
                 kind.equals("OPTION", ignoreCase = true) -> OPTION
                 kind.equals("COMMAND", ignoreCase = true) || kind.equals("SUBCOMMAND", ignoreCase = true) -> COMMAND
-                source.equals("mru", ignoreCase = true) ||
-                    source.equals("history", ignoreCase = true) ||
-                    source.equals("stats", ignoreCase = true) -> HISTORY
                 else -> OTHER
             }
     }

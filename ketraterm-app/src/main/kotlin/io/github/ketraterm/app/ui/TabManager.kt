@@ -23,12 +23,13 @@ import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.workspace.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.runBlocking
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.*
 
 /**
@@ -55,14 +56,12 @@ internal class TabManager(
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
     private val tabRoots = HashMap<String, SplitNode>()
     private val tabContainers = HashMap<String, JPanel>()
-    private val completionScope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("standalone-completion"))
     private val completionRegistry =
-        StandaloneCompletionRegistry(
+        StandaloneCompletionRegistry.create(
             persistencePath = settings.commandCompletionStatsPath,
             persistenceEnabled = settings.persistentSuggestionLearningEnabled,
-            coroutineScope = completionScope,
         )
+    private val shutdownStarted = AtomicBoolean()
     val selectedPane: TerminalPane?
         get() = tabBar.selectedId()?.let { getActivePane(it) }
 
@@ -151,7 +150,15 @@ internal class TabManager(
         }
 
     init {
-        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(keyEventDispatcher)
+        val focusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        try {
+            focusManager.addKeyEventDispatcher(keyEventDispatcher)
+        } catch (failure: Throwable) {
+            var cleanupFailure: Throwable? = failure
+            cleanupFailure = captureCleanupFailure(cleanupFailure) { focusManager.removeKeyEventDispatcher(keyEventDispatcher) }
+            cleanupFailure = captureCleanupFailure(cleanupFailure) { runBlocking { completionRegistry.closeAndFlush() } }
+            throw requireNotNull(cleanupFailure)
+        }
     }
 
     fun selectTab(id: String) {
@@ -249,20 +256,21 @@ internal class TabManager(
         root: SplitNode,
     ) {
         val tabPanes = root.allPanes()
+        var failure: Throwable? = null
         for (pane in tabPanes) {
             panes.remove(pane)
-            pane.close()
-            completionRegistry.removeSession(pane.tab.id)
-            workspace.closeTab(pane.tab.id)
+            failure = captureCleanupFailure(failure, pane::close)
+            failure = captureCleanupFailure(failure) { workspace.closeTab(pane.tab.id) }
         }
         tabRoots.remove(id)
         val container = tabContainers.remove(id)
         if (container != null) {
-            tabContentPanel.remove(container)
+            failure = captureCleanupFailure(failure) { tabContentPanel.remove(container) }
         }
-        tabBar.removeTab(id)
-        updateFrameTitle()
-        selectedPane?.let { onTabSelected(it.tab.id) }
+        failure = captureCleanupFailure(failure) { tabBar.removeTab(id) }
+        failure = captureCleanupFailure(failure, ::updateFrameTitle)
+        failure = captureCleanupFailure(failure) { selectedPane?.let { onTabSelected(it.tab.id) } }
+        failure?.let { throw it }
     }
 
     /**
@@ -279,17 +287,21 @@ internal class TabManager(
 
     /** Closes every open tab without prompting; used after remote/session shutdown. */
     fun closeAllTabsWithoutConfirmation() {
-        KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(keyEventDispatcher)
+        if (!shutdownStarted.compareAndSet(false, true)) return
+        var failure: Throwable? = null
+        failure =
+            captureCleanupFailure(failure) {
+                KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(keyEventDispatcher)
+            }
         val tabIds = tabRoots.keys.toList()
         for (tabId in tabIds) {
-            tabRoots[tabId]?.let { closeTabWithoutConfirmation(tabId, it) }
+            tabRoots[tabId]?.let { root ->
+                failure = captureCleanupFailure(failure) { closeTabWithoutConfirmation(tabId, root) }
+            }
         }
-        workspace.close()
-        try {
-            runBlocking { completionRegistry.closeAndFlush() }
-        } finally {
-            completionScope.cancel()
-        }
+        failure = captureCleanupFailure(failure, workspace::close)
+        failure = captureCleanupFailure(failure) { runBlocking { completionRegistry.closeAndFlush() } }
+        failure?.let { throw it }
     }
 
     /** Propagates a settings reload to all live panes and the workspace. */
@@ -394,30 +406,28 @@ internal class TabManager(
         updateFrameTitle()
     }
 
-    private fun createTerminalPane(workspaceTab: TerminalWorkspaceTab): TerminalPane {
-        val workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri }
-        val shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities()
-        val suggestionProvider =
-            completionRegistry.createProvider(
-                sessionId = workspaceTab.id,
-                profileId = workspaceTab.profile.id,
-                workingDirectoryUriProvider = workingDirectoryUriProvider,
-                shellCapabilities = shellCapabilities,
-            )
-        return TerminalPane.create(
-            tab = workspaceTab,
-            settings = settings,
-            completionScope = completionScope,
-            suggestionProvider = suggestionProvider,
-            suggestionFeedbackHandler =
-                completionRegistry.createFeedbackHandler(
+    private fun createTerminalPane(workspaceTab: TerminalWorkspaceTab): TerminalPane =
+        try {
+            val workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri }
+            val shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities()
+            val completionResources =
+                completionRegistry.createResources(
                     profileId = workspaceTab.profile.id,
                     workingDirectoryUriProvider = workingDirectoryUriProvider,
-                ),
-        ) { pane, request ->
-            showPaneContextMenu(pane, request)
+                    shellCapabilities = shellCapabilities,
+                )
+            TerminalPane.create(
+                tab = workspaceTab,
+                settings = settings,
+                completionScope = completionRegistry.completionScope,
+                completionResources = completionResources,
+            ) { pane, request ->
+                showPaneContextMenu(pane, request)
+            }
+        } catch (failure: Throwable) {
+            val cleanupFailure = captureCleanupFailure(failure) { workspace.closeTab(workspaceTab.id) }
+            throw requireNotNull(cleanupFailure)
         }
-    }
 
     private fun splitNodeInTree(
         current: SplitNode,
@@ -471,24 +481,30 @@ internal class TabManager(
 
         if (!openReplacementWhenLastPane && !confirmClose(listOf(pane))) return
 
+        var failure: Throwable? = null
         val newRoot = root.removePane(pane)
         if (newRoot != null) {
             tabRoots[tabId] = newRoot
-            val container = tabContainers[tabId] ?: return
-            container.removeAll()
-            container.add(newRoot.component, BorderLayout.CENTER)
-            container.revalidate()
-            container.repaint()
+            val container = tabContainers[tabId]
+            if (container != null) {
+                failure =
+                    captureCleanupFailure(failure) {
+                        container.removeAll()
+                        container.add(newRoot.component, BorderLayout.CENTER)
+                        container.revalidate()
+                        container.repaint()
+                    }
+            }
         }
 
         panes.remove(pane)
-        pane.close()
-        completionRegistry.removeSession(pane.tab.id)
-        workspace.closeTab(pane.tab.id)
+        failure = captureCleanupFailure(failure, pane::close)
+        failure = captureCleanupFailure(failure) { workspace.closeTab(pane.tab.id) }
 
         val newActive = getActivePane(tabId)
-        newActive?.requestFocus()
-        updateFrameTitle()
+        failure = captureCleanupFailure(failure) { newActive?.requestFocus() }
+        failure = captureCleanupFailure(failure, ::updateFrameTitle)
+        failure?.let { throw it }
     }
 
     fun closeActivePane() {
@@ -768,7 +784,6 @@ internal class TabManager(
             val metadata = state.commandMetadata(state.latestCommandRecordId()) ?: return
             metadata.commandText?.let { command ->
                 completionRegistry.recordFinishedCommand(
-                    sessionId = tab.id,
                     commandLine = command,
                     successful = metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
                     profileId = tab.profile.id,

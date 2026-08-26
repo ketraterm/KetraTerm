@@ -36,9 +36,6 @@ enum class TerminalCompletionCandidateKind {
 
     /** File-system path candidate. */
     PATH,
-
-    /** Candidate learned from local command history or session MRU. */
-    HISTORY,
 }
 
 /**
@@ -50,7 +47,7 @@ enum class TerminalCompletionCandidateKind {
  * the original request command line.
  * @property replacementEndOffset exclusive UTF-16 replacement end offset in the
  * original request command line.
- * @property source compact source label, such as `spec`, `mru`, or `history`.
+ * @property source compact source label, such as `spec`, `learned`, or `path`.
  * @property kind semantic candidate category.
  * @property displayText primary text shown in suggestion UI.
  * @property detail optional secondary text explaining the candidate.

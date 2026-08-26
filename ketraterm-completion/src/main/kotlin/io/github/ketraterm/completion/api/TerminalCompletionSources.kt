@@ -15,43 +15,12 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.source.*
 
 /** Factories for dependency-free, host-composable completion sources. */
 object TerminalCompletionSources {
-    /**
-     * Creates a bounded in-memory source for commands observed in the current
-     * terminal session.
-     *
-     * @param capacity maximum number of distinct normalized commands and
-     * session-local observed-token transitions retained.
-     * @param commandSpecs immutable command catalog whose known command families
-     * are excluded from observed-token learning because specs are authoritative
-     * for those commands. Callers must not mutate this list while the source is
-     * alive.
-     * @param learningStore optional shared learning store used to recover
-     * positive commands across sessions. Its rows contribute through this
-     * single learned source and are not a separate completion provider.
-     * @return mutable session MRU completion source.
-     * @throws IllegalArgumentException if [capacity] is not positive.
-     */
-    @JvmStatic
-    @JvmOverloads
-    fun sessionMru(
-        capacity: Int = 128,
-        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-        learningStore: TerminalCompletionLearningStore? = null,
-    ): TerminalSessionMruCompletionSource =
-        SessionMruCompletionSourceImpl(
-            capacity = capacity,
-            commandSpecs = commandSpecs,
-            learningStore = learningStore,
-        )
-
     /**
      * Creates a path autocomplete source backed by a host-provided file system lister.
      *

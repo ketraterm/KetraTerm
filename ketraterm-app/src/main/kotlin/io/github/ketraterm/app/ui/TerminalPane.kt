@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.completion.StandaloneCompletionResources
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
@@ -23,12 +24,11 @@ import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.ui.swing.host.SwingLiveCompletionBinding
 import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.CoroutineScope
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JPanel
 
 /**
@@ -45,6 +45,7 @@ internal class TerminalPane private constructor(
     private val liveCompletion: SwingLiveCompletionBinding,
     private val searchBar: SwingTerminalSearchBar,
 ) : TerminalPaneActionTarget {
+    private val closed = AtomicBoolean()
     private var shortcutController: TerminalPaneShortcutController? = null
 
     fun requestFocus() {
@@ -102,11 +103,15 @@ internal class TerminalPane private constructor(
     }
 
     fun close() {
-        liveCompletion.close()
-        searchBar.close()
-        shortcutController?.dispose()
+        if (!closed.compareAndSet(false, true)) return
+        val shortcut = shortcutController
         shortcutController = null
-        terminal.dispose()
+        var failure: Throwable? = null
+        failure = captureCleanupFailure(failure, liveCompletion::close)
+        failure = captureCleanupFailure(failure, searchBar::close)
+        failure = captureCleanupFailure(failure) { shortcut?.dispose() }
+        failure = captureCleanupFailure(failure, terminal::dispose)
+        failure?.let { throw it }
     }
 
     internal companion object {
@@ -114,58 +119,78 @@ internal class TerminalPane private constructor(
             tab: TerminalWorkspaceTab,
             settings: KetraTermSettings,
             completionScope: CoroutineScope,
-            suggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
-            suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+            completionResources: StandaloneCompletionResources,
             onContextMenu: (TerminalPane, SwingTerminalContextMenuRequest) -> Unit,
         ): TerminalPane {
             val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
             val paneRef = arrayOfNulls<TerminalPane>(1)
-            val liveCompletion =
-                SwingLiveCompletionBinding(
-                    session = tab.session,
-                    coroutineScope = completionScope,
-                    suggestionsEnabled = { settings.shellSuggestionsEnabled },
-                    rankingContextKey = { tab.currentWorkingDirectoryUri },
-                    feedbackHandler = suggestionFeedbackHandler,
-                )
-            val terminal =
-                SwingTerminal(
-                    settingsProvider = { settings.current() },
-                    hostServices =
-                        SwingHostServices(
-                            shellSuggestionProvider = suggestionProvider,
-                            shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
-                            shellSuggestionFeedbackHandler = liveCompletion.suggestionFeedbackHandler,
-                            shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
-                            hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
-                            contextMenuHandler =
-                                SwingTerminalContextMenuHandler { request ->
-                                    val pane = paneRef[0] ?: return@SwingTerminalContextMenuHandler false
-                                    onContextMenu(pane, request)
-                                    true
-                                },
-                        ),
-                )
+            var ownedLiveCompletion: SwingLiveCompletionBinding? = null
+            var ownedTerminal: SwingTerminal? = null
+            var ownedSearchBar: SwingTerminalSearchBar? = null
+            var ownedPane: TerminalPane? = null
+            return try {
+                val liveCompletion =
+                    SwingLiveCompletionBinding(
+                        session = tab.session,
+                        coroutineScope = completionScope,
+                        suggestionsEnabled = { settings.shellSuggestionsEnabled },
+                        rankingContextKey = { tab.currentWorkingDirectoryUri },
+                        feedbackHandler = completionResources.feedbackHandler,
+                    )
+                ownedLiveCompletion = liveCompletion
+                val terminal =
+                    SwingTerminal(
+                        settingsProvider = { settings.current() },
+                        hostServices =
+                            SwingHostServices(
+                                shellSuggestionProvider = completionResources.provider,
+                                shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
+                                shellSuggestionFeedbackHandler = liveCompletion.suggestionFeedbackHandler,
+                                shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
+                                hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
+                                contextMenuHandler =
+                                    SwingTerminalContextMenuHandler { request ->
+                                        val pane = paneRef[0] ?: return@SwingTerminalContextMenuHandler false
+                                        onContextMenu(pane, request)
+                                        true
+                                    },
+                            ),
+                    )
 
-            terminal.bind(tab.session)
+                ownedTerminal = terminal
+                terminal.bind(tab.session)
 
-            val searchBar = SwingTerminalSearchBar(terminal)
-            val component = terminalPanel(terminal, searchBar)
-            val pane =
-                TerminalPane(
-                    tab = tab,
-                    terminal = terminal,
-                    component = component,
-                    settings = settings,
-                    liveCompletion = liveCompletion,
-                    searchBar = searchBar,
-                )
-            pane.shortcutController = TerminalPaneShortcutController(pane, settings)
-            shortcutControllerRef[0] = pane.shortcutController
-            paneRef[0] = pane
-            tab.session.requestRender(scrollbackOffset = 0)
-            liveCompletion.attach(terminal)
-            return pane
+                val searchBar = SwingTerminalSearchBar(terminal)
+                ownedSearchBar = searchBar
+                val component = terminalPanel(terminal, searchBar)
+                val pane =
+                    TerminalPane(
+                        tab = tab,
+                        terminal = terminal,
+                        component = component,
+                        settings = settings,
+                        liveCompletion = liveCompletion,
+                        searchBar = searchBar,
+                    )
+                ownedPane = pane
+                pane.shortcutController = TerminalPaneShortcutController(pane, settings)
+                shortcutControllerRef[0] = pane.shortcutController
+                paneRef[0] = pane
+                tab.session.requestRender(scrollbackOffset = 0)
+                liveCompletion.attach(terminal)
+                pane
+            } catch (failure: Throwable) {
+                var cleanupFailure: Throwable? = failure
+                val pane = ownedPane
+                if (pane != null) {
+                    cleanupFailure = captureCleanupFailure(cleanupFailure, pane::close)
+                } else {
+                    cleanupFailure = captureCleanupFailure(cleanupFailure) { ownedLiveCompletion?.close() }
+                    cleanupFailure = captureCleanupFailure(cleanupFailure) { ownedSearchBar?.close() }
+                    cleanupFailure = captureCleanupFailure(cleanupFailure) { ownedTerminal?.dispose() }
+                }
+                throw requireNotNull(cleanupFailure)
+            }
         }
 
         private fun terminalPanel(
@@ -179,3 +204,16 @@ internal class TerminalPane private constructor(
             }
     }
 }
+
+internal inline fun captureCleanupFailure(
+    previous: Throwable?,
+    action: () -> Unit,
+): Throwable? =
+    try {
+        action()
+        previous
+    } catch (failure: Throwable) {
+        previous?.apply {
+            if (this !== failure) addSuppressed(failure)
+        } ?: failure
+    }

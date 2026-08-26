@@ -15,9 +15,7 @@
  */
 package io.github.ketraterm.app.completion
 
-import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
-import io.github.ketraterm.completion.api.TerminalCompletionSessionRegistry
-import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -26,109 +24,104 @@ import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
-import kotlinx.coroutines.CoroutineScope
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import kotlinx.coroutines.*
 import java.nio.file.Path
 
 /**
  * Standalone completion wiring for one application window.
  *
- * The registry supplies standalone context and local-file access around the
- * shared [TerminalCompletionSessionRegistry], and owns learned-command
- * persistence for the same application lifecycle.
+ * The registry composes standalone path completion with shared learned-command
+ * ranking and owns persistence for the same application lifecycle.
  *
  * @param persistencePath fixed product-owned learning destination.
  * @param persistenceEnabled whether the fixed destination may initially be read and written.
- * @param coroutineScope host lifecycle scope that parents persistence work.
  * @param specs static command specs shared by providers created from this registry.
  * @param learningStore bounded learning shared by ranking and persistence.
- * @param sessionMruCapacity maximum distinct commands retained per terminal session.
  */
-internal class StandaloneCompletionRegistry(
+internal class StandaloneCompletionRegistry private constructor(
     persistencePath: Path,
     persistenceEnabled: Boolean,
-    coroutineScope: CoroutineScope,
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
-    sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
+    internal val completionScope: CoroutineScope,
 ) {
-    private val sessions =
-        TerminalCompletionSessionRegistry(
-            commandSpecs = specs,
-            learningStore = learningStore,
-            sessionMruCapacity = sessionMruCapacity,
-        )
+    private val lifecycleLock = Any()
+    private var closed = false
+    private val commandSpecs = specs
+    private val learningStore = learningStore
     private val learning =
         TerminalCompletionLearningCoordinator(
             learningStore = learningStore,
-            coroutineScope = coroutineScope,
+            coroutineScope = completionScope,
             persistencePath = persistencePath,
             persistenceEnabled = persistenceEnabled,
         )
     private val feedbackRecorder =
         SwingCompletionFeedbackRecorder(
-            recordSuggestionFeedback = learning::recordSuggestionFeedback,
+            recordSuggestionFeedback = { commandLine, feedback, profileId, workingDirectoryUri, feedbackAtEpochMillis ->
+                synchronized(lifecycleLock) {
+                    if (!closed) {
+                        learning.recordSuggestionFeedback(
+                            commandLine = commandLine,
+                            feedback = feedback,
+                            profileId = profileId,
+                            workingDirectoryUri = workingDirectoryUri,
+                            feedbackAtEpochMillis = feedbackAtEpochMillis,
+                        )
+                    }
+                }
+            },
         )
 
     /**
-     * Creates a standalone Swing suggestion provider for one terminal session.
+     * Creates completion resources for one standalone terminal pane.
      *
      * The returned provider reads [workingDirectoryUriProvider] every time
      * suggestions are requested so ranking can react to OSC 7 directory updates
      * without rebuilding the provider.
      *
-     * @param sessionId stable workspace tab/session id.
      * @param profileId stable standalone profile id for this session.
      * @param shellCapabilities shell lexical and replacement rules selected from the profile.
      * @param workingDirectoryUriProvider supplier for the latest current-working-directory URI.
-     * @return standalone Swing suggestion provider for the session.
+     * @return provider and feedback resources for the pane.
      * @throws IllegalStateException if this registry is closed.
      */
-    fun createProvider(
-        sessionId: String,
+    fun createResources(
         profileId: String? = null,
         shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
         workingDirectoryUriProvider: () -> String? = { null },
-    ): SwingCompletionSuggestionProvider {
-        val session = sessions.openSession(sessionId, TerminalLocalFileSystemProvider())
-        return try {
-            SwingCompletionSuggestionProvider(
-                engine = session.engine,
-                contextProvider = {
-                    SwingCompletionContext(
-                        profileId = profileId,
-                        workingDirectoryUri = workingDirectoryUriProvider(),
-                        shellCapabilities = shellCapabilities,
-                    )
-                },
-            )
-        } catch (failure: Throwable) {
-            session.close()
-            throw failure
-        }
-    }
-
-    /**
-     * Creates a feedback handler whose exact learning is recorded immediately.
-     *
-     * @param profileId stable standalone profile id for this session.
-     * @param workingDirectoryUriProvider supplier for the latest current-working-directory URI.
-     * @return feedback handler for accepted and dismissed suggestions.
-     */
-    fun createFeedbackHandler(
-        profileId: String?,
-        workingDirectoryUriProvider: () -> String?,
-    ): SwingShellSuggestionFeedbackHandler =
-        feedbackRecorder.createHandler {
-            SwingCompletionContext(
-                profileId = profileId,
-                workingDirectoryUri = workingDirectoryUriProvider(),
+    ): StandaloneCompletionResources =
+        synchronized(lifecycleLock) {
+            check(!closed) { "standalone completion registry is closed" }
+            val contextProvider = {
+                SwingCompletionContext(
+                    profileId = profileId,
+                    workingDirectoryUri = workingDirectoryUriProvider(),
+                    shellCapabilities = shellCapabilities,
+                )
+            }
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            TerminalCompletionSourceEntry(
+                                TerminalCompletionSources.path(TerminalLocalFileSystemProvider()),
+                                TerminalCompletionSourcePrior.DIRECTORY_PATH,
+                            ),
+                        ),
+                    commandSpecs = commandSpecs,
+                    learningStore = learningStore,
+                )
+            StandaloneCompletionResources(
+                provider = SwingCompletionSuggestionProvider(engine, contextProvider),
+                feedbackHandler = feedbackRecorder.createHandler(contextProvider),
             )
         }
 
     /**
-     * Records one completed command in global learning and, on success, the session MRU.
+     * Records one completed command in shared learning.
      *
-     * @param sessionId workspace tab/session id that produced the command.
      * @param commandLine command text captured from shell integration metadata.
      * @param successful whether the command completed successfully.
      * @param profileId profile id active when the command ran.
@@ -136,26 +129,20 @@ internal class StandaloneCompletionRegistry(
      * @param usedAtEpochMillis non-negative completion timestamp.
      */
     fun recordFinishedCommand(
-        sessionId: String,
         commandLine: String,
         successful: Boolean,
         profileId: String?,
         workingDirectoryUri: String?,
         usedAtEpochMillis: Long,
     ) {
-        learning.recordCommandResult(
-            commandLine = commandLine,
-            successful = successful,
-            profileId = profileId,
-            workingDirectoryUri = workingDirectoryUri,
-            usedAtEpochMillis = usedAtEpochMillis,
-        )
-        if (successful) {
-            sessions.recordSuccessfulCommand(
-                sessionId = sessionId,
+        synchronized(lifecycleLock) {
+            if (closed) return
+            learning.recordCommandResult(
                 commandLine = commandLine,
+                successful = successful,
                 profileId = profileId,
                 workingDirectoryUri = workingDirectoryUri,
+                usedAtEpochMillis = usedAtEpochMillis,
             )
         }
     }
@@ -166,25 +153,55 @@ internal class StandaloneCompletionRegistry(
      * @param enabled `true` to persist sanitized learning across application restarts.
      */
     fun setPersistenceEnabled(enabled: Boolean) {
-        learning.setPersistenceEnabled(enabled)
+        synchronized(lifecycleLock) {
+            if (!closed) learning.setPersistenceEnabled(enabled)
+        }
     }
 
-    /**
-     * Removes completion state for a closed terminal session.
-     *
-     * @param sessionId workspace tab/session id to remove.
-     */
-    fun removeSession(sessionId: String) {
-        sessions.removeSession(sessionId)
-    }
-
-    /** Clears every session MRU and waits for the final dirty persistence write. */
+    /** Stops accepting learning events and waits for the final dirty persistence write. */
     suspend fun closeAndFlush() {
-        sessions.close()
-        learning.closeAndFlush()
+        synchronized(lifecycleLock) {
+            closed = true
+        }
+        try {
+            learning.closeAndFlush()
+        } finally {
+            completionScope.cancel()
+        }
     }
 
-    private companion object {
-        private const val DEFAULT_SESSION_MRU_CAPACITY = 128
+    internal companion object {
+        fun create(
+            persistencePath: Path,
+            persistenceEnabled: Boolean,
+            specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+            learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
+        ): StandaloneCompletionRegistry {
+            val completionScope =
+                CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("standalone-completion"))
+            return try {
+                StandaloneCompletionRegistry(
+                    persistencePath = persistencePath,
+                    persistenceEnabled = persistenceEnabled,
+                    specs = specs,
+                    learningStore = learningStore,
+                    completionScope = completionScope,
+                )
+            } catch (failure: Throwable) {
+                completionScope.cancel()
+                throw failure
+            }
+        }
     }
 }
+
+/**
+ * Immutable completion resources consumed by one standalone terminal pane.
+ *
+ * @property provider popup-facing suggestion provider.
+ * @property feedbackHandler acceptance and dismissal learning handler.
+ */
+internal data class StandaloneCompletionResources(
+    val provider: SwingShellSuggestionProvider,
+    val feedbackHandler: SwingShellSuggestionFeedbackHandler,
+)

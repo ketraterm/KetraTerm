@@ -38,10 +38,4 @@ object TerminalCompletionSourcePrior {
 
     /** Prior for fuzzy paths from a bounded project index. */
     const val PROJECT_FUZZY_PATH: Int = 10
-
-    /** Prior for session commands, observed tokens, and persisted learned fallback candidates. */
-    const val SESSION_MRU: Int = 8
-
-    /** Prior for deterministic candidates declared by static command specifications. */
-    const val STATIC_SPECIFICATION: Int = 0
 }

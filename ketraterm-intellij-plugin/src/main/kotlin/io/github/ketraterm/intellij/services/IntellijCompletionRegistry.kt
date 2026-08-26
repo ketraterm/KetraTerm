@@ -15,8 +15,7 @@
  */
 package io.github.ketraterm.intellij.services
 
-import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
-import io.github.ketraterm.completion.api.TerminalCompletionSessionRegistry
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -29,35 +28,25 @@ import kotlinx.coroutines.CoroutineScope
 import java.nio.file.Path
 
 /**
- * Plugin-owned bridge from IntelliJ session context to shared completion sessions and learned statistics.
- *
- * Session registration is synchronized and replacing an existing session id
- * clears its previous session-local learning.
+ * Plugin-owned bridge from IntelliJ context to completion sources and shared learning.
  *
  * @param specs immutable command specifications shared by every session.
  * @param learningStore bounded exact-command learning store.
  * @param persistencePath fixed product-owned learning destination.
  * @param persistenceEnabled whether the fixed destination may initially be read and written.
- * @param sessionMruCapacity positive per-session MRU capacity.
  * @param coroutineScope host lifecycle scope that parents completion work.
- * @throws IllegalArgumentException if [sessionMruCapacity] is not positive.
  */
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
     persistencePath: Path,
     persistenceEnabled: Boolean,
-    sessionMruCapacity: Int = DEFAULT_SESSION_MRU_CAPACITY,
     coroutineScope: CoroutineScope,
 ) {
     private val lock = Any()
     private var closed = false
-    private val sessions =
-        TerminalCompletionSessionRegistry(
-            commandSpecs = specs,
-            learningStore = learningStore,
-            sessionMruCapacity = sessionMruCapacity,
-        )
+    private val commandSpecs = specs
+    private val learningStore = learningStore
     private val learning =
         TerminalCompletionLearningCoordinator(
             learningStore = learningStore,
@@ -67,57 +56,62 @@ internal class IntellijCompletionRegistry(
         )
     private val feedbackRecorder =
         SwingCompletionFeedbackRecorder(
-            recordSuggestionFeedback = learning::recordSuggestionFeedback,
+            recordSuggestionFeedback = { commandLine, feedback, profileId, workingDirectoryUri, feedbackAtEpochMillis ->
+                synchronized(lock) {
+                    if (!closed) {
+                        learning.recordSuggestionFeedback(
+                            commandLine = commandLine,
+                            feedback = feedback,
+                            profileId = profileId,
+                            workingDirectoryUri = workingDirectoryUri,
+                            feedbackAtEpochMillis = feedbackAtEpochMillis,
+                        )
+                    }
+                }
+            },
         )
 
     /**
-     * Creates and registers all completion sources for one terminal session.
+     * Creates completion resources for one terminal pane.
      *
      * @param context host capabilities and additional suspending sources for the session.
-     * @return closeable session-facing provider and feedback resources.
+     * @return provider and feedback resources for the pane.
      * @throws IllegalStateException if this registry is closed.
      */
-    fun openSession(context: IntellijCompletionSessionContext): IntellijCompletionSession {
+    fun createResources(context: IntellijCompletionContext): IntellijCompletionResources {
         synchronized(lock) {
             check(!closed) { "IntelliJ completion registry is closed" }
-            return createSession(context)
-        }
-    }
-
-    private fun createSession(context: IntellijCompletionSessionContext): IntellijCompletionSession {
-        val fileSystemProvider = TerminalLocalFileSystemProvider(scanner = context.directoryScanner)
-        val completionSession =
-            sessions.openSession(
-                sessionId = context.sessionId,
-                fileSystemProvider = fileSystemProvider,
-                additionalSources = context.additionalSources,
-            )
-        try {
-            val provider =
-                SwingCompletionSuggestionProvider(
-                    engine = completionSession.engine,
-                    contextProvider = { context.swingContext() },
+            val fileSystemProvider = TerminalLocalFileSystemProvider(scanner = context.directoryScanner)
+            val sources =
+                buildList(context.additionalSources.size + 1) {
+                    add(
+                        TerminalCompletionSourceEntry(
+                            TerminalCompletionSources.path(fileSystemProvider),
+                            TerminalCompletionSourcePrior.DIRECTORY_PATH,
+                        ),
+                    )
+                    addAll(context.additionalSources)
+                }
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources = sources,
+                    commandSpecs = commandSpecs,
+                    learningStore = learningStore,
                 )
-            return IntellijCompletionSession(
-                provider = provider,
+            return IntellijCompletionResources(
+                provider = SwingCompletionSuggestionProvider(engine, context::swingContext),
                 feedbackHandler = feedbackRecorder.createHandler(context::swingContext),
-                closeAction = completionSession::close,
             )
-        } catch (failure: Throwable) {
-            completionSession.close()
-            throw failure
         }
     }
 
     /**
-     * Updates session MRU state and records privacy-filtered persistent learning.
+     * Records privacy-filtered shared learning from one finished command.
      *
-     * @param sessionId terminal session that produced the command.
      * @param profileId stable terminal profile identifier used for ranking context.
      * @param metadata trusted shell-integration lifecycle metadata.
      */
     fun recordFinishedCommand(
-        sessionId: String,
         profileId: String,
         metadata: TerminalShellIntegrationCommandMetadata,
     ) {
@@ -125,14 +119,6 @@ internal class IntellijCompletionRegistry(
         val successful = metadata.lifecycle == TerminalShellIntegrationCommandLifecycle.SUCCEEDED
         synchronized(lock) {
             if (closed) return
-            if (successful) {
-                sessions.recordSuccessfulCommand(
-                    sessionId = sessionId,
-                    commandLine = command,
-                    profileId = profileId,
-                    workingDirectoryUri = metadata.workingDirectoryUri,
-                )
-            }
             learning.recordCommandResult(
                 commandLine = command,
                 successful = successful,
@@ -155,20 +141,11 @@ internal class IntellijCompletionRegistry(
         }
     }
 
-    /** Clears sessions and waits for the final dirty persistence write. */
+    /** Stops accepting learning events and waits for the final dirty persistence write. */
     suspend fun closeAndFlush() {
-        if (beginClose()) sessions.close()
-        learning.closeAndFlush()
-    }
-
-    private fun beginClose(): Boolean =
         synchronized(lock) {
-            if (closed) return@synchronized false
             closed = true
-            true
         }
-
-    private companion object {
-        private const val DEFAULT_SESSION_MRU_CAPACITY = 128
+        learning.closeAndFlush()
     }
 }

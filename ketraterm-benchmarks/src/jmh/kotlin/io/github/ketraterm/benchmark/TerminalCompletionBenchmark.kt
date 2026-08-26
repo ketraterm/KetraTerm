@@ -51,7 +51,7 @@ open class TerminalCompletionBenchmark {
     private lateinit var learnedSnapshot: TerminalCommandCompletionStatsSnapshot
     private lateinit var coldStartFusionEngine: TerminalCompletionEngine
     private lateinit var learnedFusionEngine: TerminalCompletionEngine
-    private lateinit var indexedPersistedHistoryEngine: TerminalCompletionEngine
+    private lateinit var indexedLearnedHistoryEngine: TerminalCompletionEngine
     private lateinit var duplicateFusionEngine: TerminalCompletionEngine
     private lateinit var hostileFusionEngine: TerminalCompletionEngine
     private lateinit var fuzzyPathEngine: TerminalCompletionEngine
@@ -94,29 +94,13 @@ open class TerminalCompletionBenchmark {
             )
         val persistedStatsSource = TerminalCompletionLearningStore(capacity = 2_048)
         persistedStatsSource.mergeSnapshot(learnedSnapshot)
-        val sessionMru =
-            TerminalCompletionSources.sessionMru(
-                commandSpecs = commandSpecs,
-                learningStore = persistedStatsSource,
-            )
-        sessionMru.recordSuccessfulCommand(
-            commandLine = "git switch main",
-            profileId = "benchmark",
-            workingDirectoryUri = "file:///repo",
-        )
-        indexedPersistedHistoryEngine =
+        indexedLearnedHistoryEngine =
             TerminalCompletionEngines.fromSources(
-                sources =
-                    listOf(
-                        TerminalCompletionSourceEntry(
-                            source = sessionMru,
-                            priority = TerminalCompletionSourcePrior.SESSION_MRU,
-                        ),
-                    ),
+                sources = emptyList(),
                 commandSpecs = commandSpecs,
                 learningStore = persistedStatsSource,
             )
-        runBlocking { indexedPersistedHistoryEngine.completions(fusionRequest).last() }
+        runBlocking { indexedLearnedHistoryEngine.completions(fusionRequest).last() }
         duplicateFusionEngine = TerminalCompletionEngines.fromSources(List(8) { sourceEntry(it, 32, duplicateMain = true) }, commandSpecs)
         hostileFusionEngine = TerminalCompletionEngines.fromSources(List(10) { sourceEntry(it, 256, duplicateMain = false) }, commandSpecs)
         val fuzzyPaths =
@@ -183,8 +167,8 @@ open class TerminalCompletionBenchmark {
 
     /** Measures hot indexed lookup across a full 2,048-row learned snapshot. */
     @Benchmark
-    open fun completeIndexedPersistedHistory(blackhole: Blackhole) {
-        blackhole.consume(runBlocking { indexedPersistedHistoryEngine.completions(fusionRequest).last() })
+    open fun completeIndexedLearnedHistory(blackhole: Blackhole) {
+        blackhole.consume(runBlocking { indexedLearnedHistoryEngine.completions(fusionRequest).last() })
     }
 
     @Benchmark

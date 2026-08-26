@@ -17,18 +17,9 @@ package io.github.ketraterm.completion.api
 
 /**
  * Suspending completion source contract for one provider such as static
- * command specs, session MRU, indexed history, path completion, or IDE context.
+ * command specs, path completion, or IDE context.
  */
 fun interface TerminalCompletionSource {
-    /**
-     * Role used when this source supplies presentation metadata for a fused
-     * outcome. The default is [TerminalCompletionSourcePresentationRole.PRIMARY].
-     * The role changes neither the proposed shell edit nor this source's ranking
-     * contribution.
-     */
-    val presentationRole: TerminalCompletionSourcePresentationRole
-        get() = TerminalCompletionSourcePresentationRole.PRIMARY
-
     /**
      * Whether this source operates strictly in memory without suspending or blocking I/O.
      * Fast in-memory sources are evaluated synchronously on the request coroutine for immediate UI emission.

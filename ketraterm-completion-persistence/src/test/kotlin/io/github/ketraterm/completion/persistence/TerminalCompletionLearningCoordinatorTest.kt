@@ -259,17 +259,47 @@ class TerminalCompletionLearningCoordinatorTest {
         }
 
     @Test
-    fun `privacy rejected and invalid events never dirty persistence`() =
+    fun `memory changes advance the dirty revision before file store sanitization`() =
         runTest {
             val files = RecordingSnapshotFiles()
             val learning = TerminalCompletionLearningStore()
             val coordinator = coordinator(learning, files)
 
-            coordinator.recordCommandResult("docker login --password secret", true, null, null, 42L)
+            coordinator.recordCommandResult("npm token list", true, null, null, 42L)
+            coordinator.closeAndFlush()
+
+            assertEquals(1, files.writes.size)
+            assertEquals(
+                "npm token list",
+                files.writes
+                    .single()
+                    .commandStats
+                    .single()
+                    .commandLine,
+            )
+        }
+
+    @Test
+    fun `persistence policy does not suppress in-memory learning`() =
+        runTest {
+            val files = RecordingSnapshotFiles()
+            val learning = TerminalCompletionLearningStore()
+            val coordinator = coordinator(learning, files, enabled = false)
+
+            coordinator.recordCommandResult("npm token list", true, null, null, 42L)
+            coordinator.recordSuggestionFeedback(
+                commandLine = "npm token create",
+                feedback = TerminalCompletionFeedbackKind.ACCEPTED,
+                profileId = null,
+                workingDirectoryUri = null,
+                feedbackAtEpochMillis = 2L,
+            )
             coordinator.recordCommandResult("git status", true, null, null, -1L)
             coordinator.closeAndFlush()
 
-            assertTrue(learning.snapshot().commandStats.isEmpty())
+            val learned = learning.snapshot().commandStats.associateBy { it.commandLine }
+            assertEquals(setOf("npm token list", "npm token create"), learned.keys)
+            assertEquals(1, learned.getValue("npm token create").acceptedCount)
             assertTrue(files.writes.isEmpty())
         }
 

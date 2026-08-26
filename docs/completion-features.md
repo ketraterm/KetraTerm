@@ -50,7 +50,7 @@ Characters that match your search query are highlighted in **bold** with your ac
 - Suggestion learning works in memory by default. Both standalone KetraTerm and the IntelliJ plugin require an explicit setting before learned statistics are loaded from or written to disk.
 - When enabled, the local file stores sanitized aggregate exact-command rows, including command text plus optional profile and working-directory context.
 - Commands with leading whitespace and common secret-bearing patterns are filtered. Filtering is a safeguard rather than a guarantee: arguments, paths, URLs, or secrets that do not match a filter can still appear in an exact-command row.
-- The persistence file is Base64URL-encoded TSV, not encrypted. Session MRU remains in memory and is cleared with its terminal tab.
+- The v2 persistence file is Base64URL-encoded TSV, not encrypted. One product-lifetime in-memory store supplies learned history, observed unknown-command tokens, and ranking evidence; disk privacy filtering does not suppress current-lifetime learning.
 
 ---
 

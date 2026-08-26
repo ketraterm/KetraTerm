@@ -18,15 +18,12 @@ package io.github.ketraterm.app.completion
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import org.junit.jupiter.api.io.TempDir
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import kotlin.test.*
 
 class StandaloneCompletionRegistryPersistenceTest {
     @Test
@@ -37,7 +34,7 @@ class StandaloneCompletionRegistryPersistenceTest {
         val learning = TerminalCompletionLearningStore()
         val registry = registry(learning, path, persistenceEnabled = true)
 
-        registry.recordFinishedCommand("missing-session", "git status", true, "bash", "file:///repo", 42L)
+        registry.recordFinishedCommand("git status", true, "bash", "file:///repo", 42L)
         registry.closeAndFlush()
 
         assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
@@ -54,8 +51,8 @@ class StandaloneCompletionRegistryPersistenceTest {
         val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
         val learning = TerminalCompletionLearningStore()
         val registry = registry(learning, path, persistenceEnabled = false)
-        registry.recordFinishedCommand("missing-session", "git status", true, null, null, 1L)
-        registry.recordFinishedCommand("missing-session", "npm test", true, null, null, 2L)
+        registry.recordFinishedCommand("git status", true, null, null, 1L)
+        registry.recordFinishedCommand("npm test", true, null, null, 2L)
         registry.closeAndFlush()
 
         assertEquals(
@@ -69,15 +66,46 @@ class StandaloneCompletionRegistryPersistenceTest {
         assertFalse(Files.exists(path))
     }
 
-    private fun CoroutineScope.registry(
+    @Test
+    fun `failed final write still closes the registry and remains idempotent`(
+        @TempDir directory: Path,
+    ) = runBlocking {
+        val parent = directory.resolve("learning")
+        val path = parent.resolve(TerminalCompletionLearningCoordinator.currentFileName())
+        val seedLearning = TerminalCompletionLearningStore()
+        val seedRegistry = registry(seedLearning, path, persistenceEnabled = true)
+        seedRegistry.recordFinishedCommand("git status", true, null, null, 1L)
+        seedRegistry.closeAndFlush()
+
+        val learning = TerminalCompletionLearningStore()
+        val registry = registry(learning, path, persistenceEnabled = true)
+        withTimeout(5_000L) {
+            while (learning.snapshot().commandStats.none { it.commandLine == "git status" }) {
+                delay(10L)
+            }
+        }
+        Files.delete(path)
+        Files.delete(parent)
+        Files.writeString(parent, "blocks the persistence directory")
+        registry.recordFinishedCommand("npm test", true, null, null, 2L)
+        val completionJob = requireNotNull(registry.completionScope.coroutineContext[Job])
+
+        assertFailsWith<IOException> { registry.closeAndFlush() }
+        assertTrue(completionJob.isCancelled)
+        assertFailsWith<IOException> { registry.closeAndFlush() }
+        assertFailsWith<IllegalStateException> { registry.createResources() }
+        registry.recordFinishedCommand("late command", true, null, null, 3L)
+        assertFalse(learning.snapshot().commandStats.any { it.commandLine == "late command" })
+    }
+
+    private fun registry(
         learning: TerminalCompletionLearningStore,
         path: Path,
         persistenceEnabled: Boolean,
     ): StandaloneCompletionRegistry =
-        StandaloneCompletionRegistry(
+        StandaloneCompletionRegistry.create(
             persistencePath = path,
             persistenceEnabled = persistenceEnabled,
-            coroutineScope = this,
             specs = emptyList(),
             learningStore = learning,
         )

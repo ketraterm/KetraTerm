@@ -22,7 +22,7 @@ import kotlin.test.assertEquals
 
 class CompletionStatsIndexesTest {
     @Test
-    fun `exact command index merges duplicates and keeps stable relevance order`() {
+    fun `exact command index preserves case and merges only identical command text`() {
         val index = CommandCompletionStatsIndex(capacity = 8)
 
         index.mergeAll(
@@ -30,12 +30,13 @@ class CompletionStatsIndexesTest {
                 commandStats("Git Status", lastUsedEpochMillis = 10),
                 commandStats("npm test", lastUsedEpochMillis = 30),
                 commandStats("git status", lastUsedEpochMillis = 20),
+                commandStats("Git Status", lastUsedEpochMillis = 40),
             ),
         )
 
-        assertEquals(listOf("npm test", "git status"), index.snapshot().map { it.commandLine })
-        assertEquals(listOf(30L, 20L), index.snapshot().map { it.lastUsedEpochMillis })
-        assertEquals(2, index.snapshot()[1].successCount)
+        assertEquals(listOf("Git Status", "npm test", "git status"), index.snapshot().map { it.commandLine })
+        assertEquals(listOf(40L, 30L, 20L), index.snapshot().map { it.lastUsedEpochMillis })
+        assertEquals(listOf(2, 1, 1), index.snapshot().map { it.successCount })
     }
 
     @Test
@@ -68,7 +69,7 @@ class CompletionStatsIndexesTest {
     }
 
     @Test
-    fun `exact command index keeps display casing from newest event when older feedback arrives later`() {
+    fun `exact command feedback updates only the matching case-sensitive identity`() {
         val index = CommandCompletionStatsIndex(capacity = 8)
 
         index.recordCommandResult(
@@ -86,9 +87,9 @@ class CompletionStatsIndexesTest {
             feedbackAtEpochMillis = 50,
         )
 
-        assertEquals("Git Status", index.snapshot().single().commandLine)
-        assertEquals(1, index.snapshot().single().acceptedCount)
-        assertEquals(100L, index.snapshot().single().lastUsedEpochMillis)
+        assertEquals(listOf("Git Status", "git status"), index.snapshot().map { it.commandLine })
+        assertEquals(listOf(0, 1), index.snapshot().map { it.acceptedCount })
+        assertEquals(listOf(100L, 50L), index.snapshot().map { it.lastUsedEpochMillis })
     }
 
     @Test

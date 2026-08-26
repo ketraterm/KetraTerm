@@ -23,7 +23,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBScrollBar
-import io.github.ketraterm.intellij.services.IntellijCompletionSession
+import io.github.ketraterm.intellij.services.IntellijCompletionResources
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.*
@@ -51,7 +51,6 @@ internal class KetraTermTerminalPane private constructor(
     val component: JPanel,
     private val searchBar: SwingTerminalSearchBar,
     private val hostActions: KetraTermTerminalPaneHostActions,
-    private val completionSession: IntellijCompletionSession,
     private val liveCompletion: SwingLiveCompletionBinding,
 ) {
     private var shortcutController: KetraTermTerminalShortcutController? = null
@@ -225,7 +224,6 @@ internal class KetraTermTerminalPane private constructor(
      */
     fun close() {
         liveCompletion.close()
-        completionSession.close()
         searchBar.close()
         shortcutController?.dispose()
         shortcutController = null
@@ -245,20 +243,15 @@ internal class KetraTermTerminalPane private constructor(
             completionScope: CoroutineScope,
             hostActions: KetraTermTerminalPaneHostActions = KetraTermTerminalPaneHostActions.NONE,
         ): KetraTermTerminalPane {
-            val completionSession = KetraTermCompletionService.getInstance().openSession(project, tab)
-            return try {
-                createBound(project, tab, hostActions, completionSession, completionScope)
-            } catch (failure: Throwable) {
-                completionSession.close()
-                throw failure
-            }
+            val completionResources = KetraTermCompletionService.getInstance().createResources(project, tab)
+            return createBound(project, tab, hostActions, completionResources, completionScope)
         }
 
         private fun createBound(
             project: Project,
             tab: TerminalWorkspaceTab,
             hostActions: KetraTermTerminalPaneHostActions,
-            completionSession: IntellijCompletionSession,
+            completionResources: IntellijCompletionResources,
             completionScope: CoroutineScope,
         ): KetraTermTerminalPane {
             val scrollbar = JBScrollBar(Adjustable.VERTICAL)
@@ -271,7 +264,7 @@ internal class KetraTermTerminalPane private constructor(
                     coroutineScope = completionScope,
                     suggestionsEnabled = { KetraTermIntellijSettings.current().shellSuggestionsEnabled },
                     rankingContextKey = { tab.currentWorkingDirectoryUri },
-                    feedbackHandler = completionSession.feedbackHandler,
+                    feedbackHandler = completionResources.feedbackHandler,
                 )
             val terminal =
                 SwingTerminal(
@@ -282,7 +275,7 @@ internal class KetraTermTerminalPane private constructor(
                             hyperlinkDetector = IntellijTerminalHyperlinkDetector(project),
                             viewportListener = scrollbarAdapter,
                             scrollbarOverlayEnabled = false,
-                            shellSuggestionProvider = completionSession.provider,
+                            shellSuggestionProvider = completionResources.provider,
                             shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
                             shellSuggestionFeedbackHandler = liveCompletion.suggestionFeedbackHandler,
                             shellSuggestionKeymap = KetraTermShellSuggestionKeymap,
@@ -320,7 +313,6 @@ internal class KetraTermTerminalPane private constructor(
                 component = component,
                 searchBar = searchBar,
                 hostActions = hostActions,
-                completionSession = completionSession,
                 liveCompletion = liveCompletion,
             ).also { pane ->
                 pane.shortcutController = KetraTermTerminalShortcutController(pane)

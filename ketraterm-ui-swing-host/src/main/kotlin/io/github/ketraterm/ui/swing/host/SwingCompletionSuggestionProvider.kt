@@ -15,7 +15,10 @@
  */
 package io.github.ketraterm.ui.swing.host
 
-import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.api.TerminalCompletionCandidate
+import io.github.ketraterm.completion.api.TerminalCompletionEngine
+import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -70,17 +73,7 @@ class SwingCompletionSuggestionProvider(
                 kind = kind.name,
                 displayText = displayText,
                 detail = detail,
-                accentRole =
-                    when (kind) {
-                        TerminalCompletionCandidateKind.COMMAND,
-                        TerminalCompletionCandidateKind.SUBCOMMAND,
-                        -> SwingShellSuggestionAccentRole.COMMAND
-
-                        TerminalCompletionCandidateKind.PATH -> SwingShellSuggestionAccentRole.PATH
-                        TerminalCompletionCandidateKind.OPTION -> SwingShellSuggestionAccentRole.OPTION
-                        TerminalCompletionCandidateKind.HISTORY -> SwingShellSuggestionAccentRole.HISTORY
-                        else -> SwingShellSuggestionAccentRole.OTHER
-                    },
+                accentRole = SwingShellSuggestionAccentRole.from(kind.name, source),
                 matchedRanges =
                     SwingShellSuggestionMatchRanges.fromPackedOffsets(
                         displayText,
@@ -92,9 +85,7 @@ class SwingCompletionSuggestionProvider(
             val normalized = trim().boundedSourceLabel().lowercase(Locale.ROOT).boundedSourceLabel()
             return when {
                 normalized == "spec" -> "Built-in"
-                normalized == "mru" || normalized == "history" -> "Recent"
-                normalized == "stats" -> "Learned"
-                normalized == "observed" -> "Session"
+                normalized == "learned" || normalized == "observed" -> "Learned"
                 normalized.containsIdentifierToken("gradle") -> "Gradle"
                 normalized.containsIdentifierToken("git") -> "Git"
                 normalized.containsIdentifierToken("project") && normalized.containsIdentifierToken("file") -> "Project"

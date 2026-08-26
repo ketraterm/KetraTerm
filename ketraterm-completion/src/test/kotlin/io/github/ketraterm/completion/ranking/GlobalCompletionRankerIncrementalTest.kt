@@ -18,7 +18,6 @@ package io.github.ketraterm.completion.ranking
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.api.TerminalCompletionSourcePresentationRole
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
 import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
 import kotlin.test.*
@@ -34,8 +33,8 @@ class GlobalCompletionRankerIncrementalTest {
                 commandSpecs = emptyList(),
             )
         val state =
-            GlobalCompletionRanker(learningStore = null, clockEpochMillis = { 0L })
-                .createRequestState(request, context, resultLimit = 2)
+            GlobalCompletionRanker()
+                .createRequestState(request, context, resultLimit = 2, nowEpochMillis = 0L)
         state.ingest(
             CompletionSourceCandidates(
                 sourceIndex = 0,
@@ -75,13 +74,13 @@ class GlobalCompletionRankerIncrementalTest {
             CompletionSourceCandidates(
                 sourceIndex = 0,
                 priority = 100,
-                presentationRole = TerminalCompletionSourcePresentationRole.FALLBACK,
+                isFallback = true,
                 candidates =
                     listOf(
                         candidate(
                             replacement = "gradle",
                             score = 20,
-                            source = "mru",
+                            source = "learned",
                             detail = "learned command",
                         ),
                     ),
@@ -104,7 +103,7 @@ class GlobalCompletionRankerIncrementalTest {
         val fallbackFirst = requestState()
         fallbackFirst.ingest(fallback)
         val fallbackOnly = fallbackFirst.rankedCandidates()
-        assertEquals("mru", fallbackOnly.single().source)
+        assertEquals("learned", fallbackOnly.single().source)
 
         fallbackFirst.ingest(primary)
         val fallbackThenPrimary = fallbackFirst.rankedCandidates()
@@ -128,8 +127,8 @@ class GlobalCompletionRankerIncrementalTest {
                 lineContext = TerminalCommandLineTokenizer.parse(request.commandLine, request.cursorOffset),
                 commandSpecs = emptyList(),
             )
-        return GlobalCompletionRanker(learningStore = null, clockEpochMillis = { 0L })
-            .createRequestState(request, context, resultLimit = 2)
+        return GlobalCompletionRanker()
+            .createRequestState(request, context, resultLimit = 2, nowEpochMillis = 0L)
     }
 
     private fun candidate(

@@ -12,7 +12,7 @@ The completion system is built on strict layer boundaries:
 
 - **`ketraterm-completion`**: Pure Kotlin completion engine with zero external dependencies (no Swing, no IntelliJ SDK, no disk I/O, no process execution). It owns lexical tokenization, command specification models, parallel source evaluation via structured concurrency, CamelHump/prefix matching, and evidence-fusion ranking.
 - **`ketraterm-completion-host`**: Host-neutral suspending abstractions for local path resolution and bounded directory scanning (`Files.newDirectoryStream`).
-- **`ketraterm-completion-persistence`**: Optional bounded local storage (`command-completion-stats-v1.tsv`) for sanitized exact-command aggregates. Learning updates memory synchronously; one worker checkpoints the latest dirty state every 30 seconds and at shutdown.
+- **`ketraterm-completion-persistence`**: Optional bounded local storage (`command-completion-stats-v2.tsv`) for sanitized exact-command aggregates. Learning updates memory synchronously; one worker checkpoints the latest dirty state every 30 seconds and at shutdown.
 - **`ketraterm-ui-swing`**: Shared completion interaction contract, bounded viewport controller, and the standalone custom-painted completion list. It owns selection and acceptance semantics, but not sources or ranking.
 - **`ketraterm-ui-swing-host`**: Reusable adapter converting engine results into immutable renderer-neutral suggestions. It resolves semantic accent roles, match ranges, and source display labels once before either UI sees them.
 - **`ketraterm-intellij-plugin`**: IntelliJ Platform adapters delegating path, Git, and Gradle completion to IntelliJ project models and bounded Git history queries (`GotoFileModel`, `GitRepositoryManager`, `GitHistoryUtils`, `ChangeListManager`, `ProjectDataManager`, and `VirtualFileManager`). It owns a separate platform-native `JBList` completion renderer.
@@ -92,13 +92,13 @@ The global ranker combines source rank and priority, semantic context, and bound
 
 ## 5. Privacy & Persistence Model
 
-Completion learning always works in memory. Disk persistence is separately opt-in in both products and uses one fixed product-owned destination named `command-completion-stats-v1.tsv`; settings enable or disable that destination rather than switching or importing arbitrary paths at runtime.
+Completion learning always works in memory. Disk persistence is separately opt-in in both products and uses one fixed product-owned destination named `command-completion-stats-v2.tsv`; settings enable or disable that destination rather than switching or importing arbitrary paths at runtime.
 
 When enabled, the file contains sanitized aggregate exact-command rows, including command text, optional profile and working-directory context, bounded outcome/feedback counters, and a last-used timestamp.
 
 The persistence policy rejects leading-whitespace, blank, multiline, and common secret-bearing command patterns before rows are admitted. This reduces accidental disclosure, but it cannot guarantee that every argument, path, URL, credential, or other sensitive value is recognized. Text fields use Base64URL so they fit safely in TSV fields; this is encoding, not encryption. Users should treat the file as local command-derived data.
 
-When persistence is disabled, the product neither loads nor writes the file. Product-lifetime learning remains in memory, and per-tab MRU/observed-token indexes are discarded with their owning terminal session.
+When persistence is disabled, the product neither loads nor writes the file. Product-lifetime learning remains in memory. History candidates, observed tokens for unknown commands, and ranking evidence are derived from that same bounded store.
 
 ---
 

@@ -102,7 +102,7 @@ internal object CompletionLearningSnapshotCodec {
             .decode(ByteBuffer.wrap(decoder.decode(value)))
             .toString()
 
-    private const val FORMAT_VERSION = 1
+    private const val FORMAT_VERSION = 2
     private const val FILE_NAME = "command-completion-stats-v$FORMAT_VERSION.tsv"
     private const val HEADER = "KetraTerm_COMMAND_COMPLETION_STATS\t$FORMAT_VERSION"
     private const val COMMAND_STATS_FIELD_COUNT = 10

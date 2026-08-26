@@ -23,6 +23,7 @@ import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapsh
 import io.github.ketraterm.completion.ranking.LearnedCompletionEvidenceIndex
 import io.github.ketraterm.completion.ranking.TerminalCompletionOutcomeKeyResolver
 import io.github.ketraterm.completion.source.LearnedHistoryCandidateIndex
+import io.github.ketraterm.completion.source.LearnedObservedTokenIndex
 
 /** Compiles and shares derived learning indexes for one current snapshot. */
 internal class CompletionLearningIndexCache {
@@ -56,6 +57,7 @@ internal class CompletionLearningIndexCache {
         return CompletionLearningIndexes(
             evidence = LearnedCompletionEvidenceIndex.build(parsedRows, LEARNED_KEY_RESOLVER),
             history = LearnedHistoryCandidateIndex.build(parsedRows),
+            observed = LearnedObservedTokenIndex.build(parsedRows),
         )
     }
 
@@ -68,9 +70,10 @@ internal class CompletionLearningIndexCache {
 internal class CompletionLearningIndexes(
     val evidence: LearnedCompletionEvidenceIndex,
     val history: LearnedHistoryCandidateIndex,
+    val observed: LearnedObservedTokenIndex,
 )
 
-/** One learned row tokenized for both derived indexes. */
+/** One learned row tokenized for every derived index. */
 internal class ParsedLearnedStatsRow(
     val stats: TerminalCommandCompletionStats,
     val lineContext: TerminalCommandLineContext,

@@ -145,6 +145,6 @@ internal fun intellijProjectFileCompletionSource(loader: suspend (String?, Strin
     TerminalCompletionSources.fuzzyPath(
         sourceId = "intellij-project-file",
         entriesProvider = { request, prefix ->
-                loader(request.workingDirectoryUri, prefix)
-            },
+            loader(request.workingDirectoryUri, prefix)
+        },
     )

@@ -20,6 +20,7 @@ scheduling are supplied by the separate
 infrastructure belongs to `ketraterm-completion-host`.
 
 Completion sources such as curated command specs, Fig-style spec importers,
-session MRU, profile/directory history indexes, path providers, and IDE context
-providers should adapt into this module's stable model rather than leaking their
-source-specific representation into terminal UI code.
+path providers, and IDE context providers should adapt into this module's stable
+model rather than leaking their source-specific representation into terminal UI
+code. The engine derives all learned candidates and ranking evidence from its
+single bounded learning store.

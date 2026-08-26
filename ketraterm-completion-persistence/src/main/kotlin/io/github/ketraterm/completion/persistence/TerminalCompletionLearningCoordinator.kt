@@ -16,7 +16,6 @@
 package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
-import io.github.ketraterm.completion.api.TerminalCompletionPersistencePolicy
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -89,7 +88,7 @@ class TerminalCompletionLearningCoordinator
             }
 
         /**
-         * Records one completed command when the shared persistence privacy policy permits it.
+         * Records one completed command in memory and marks a changed snapshot dirty for optional persistence.
          *
          * @param commandLine command text reported by shell integration.
          * @param successful whether the command completed successfully.
@@ -104,7 +103,7 @@ class TerminalCompletionLearningCoordinator
             workingDirectoryUri: String?,
             usedAtEpochMillis: Long,
         ) {
-            if (!TerminalCompletionPersistencePolicy.allowsCommand(commandLine) || usedAtEpochMillis < 0L) return
+            if (usedAtEpochMillis < 0L) return
             synchronized(stateLock) {
                 check(acceptingEvents) { "completion-learning owner is closed" }
                 val changed =
@@ -135,7 +134,7 @@ class TerminalCompletionLearningCoordinator
             workingDirectoryUri: String?,
             feedbackAtEpochMillis: Long,
         ) {
-            if (!TerminalCompletionPersistencePolicy.allowsCommand(commandLine) || feedbackAtEpochMillis < 0L) return
+            if (feedbackAtEpochMillis < 0L) return
             synchronized(stateLock) {
                 check(acceptingEvents) { "completion-learning owner is closed" }
                 val changed =

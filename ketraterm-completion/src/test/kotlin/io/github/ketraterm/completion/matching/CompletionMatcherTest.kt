@@ -95,7 +95,7 @@ class CompletionMatcherTest {
     }
 
     @Test
-    fun `source score preserves legacy prefix scoring`() {
+    fun `source score preserves direct prefix scoring`() {
         val match = CompletionMatcher.match("status", "st")!!
 
         assertEquals(300 + 40 - ("status".length - "st".length) - 3, match.sourceScore(300, "st", 3))

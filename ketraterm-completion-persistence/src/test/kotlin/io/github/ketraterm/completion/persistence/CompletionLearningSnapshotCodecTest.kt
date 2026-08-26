@@ -22,7 +22,10 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class CompletionLearningSnapshotCodecTest {
     @Test
@@ -30,7 +33,7 @@ class CompletionLearningSnapshotCodecTest {
         val encoded = CompletionLearningSnapshotCodec.encode(TerminalCommandCompletionStatsSnapshot.EMPTY)
         val storageDoc = Files.readString(repositoryRoot.resolve("docs/persistent-terminal-storage.md"))
 
-        assertEquals("command-completion-stats-v1.tsv", TerminalCompletionLearningCoordinator.currentFileName())
+        assertEquals("command-completion-stats-v2.tsv", TerminalCompletionLearningCoordinator.currentFileName())
         assertEquals(listOf(HEADER), encoded)
         assertTrue(storageDoc.contains("`${TerminalCompletionLearningCoordinator.currentFileName()}`"))
         assertTrue(storageDoc.contains(HEADER.replace("\t", "<TAB>")) || storageDoc.contains(HEADER))
@@ -76,6 +79,13 @@ class CompletionLearningSnapshotCodecTest {
     }
 
     @Test
+    fun `previous exact-incompatible schema is rejected`() {
+        val decoded = CompletionLearningSnapshotCodec.decode(listOf("KetraTerm_COMMAND_COMPLETION_STATS\t1"))
+
+        assertNull(decoded)
+    }
+
+    @Test
     fun `unknown header is rejected`() {
         val decoded = CompletionLearningSnapshotCodec.decode(listOf("KetraTerm_COMMAND_COMPLETION_STATS\t999"))
 
@@ -87,22 +97,6 @@ class CompletionLearningSnapshotCodecTest {
         assertEquals(
             TerminalCommandCompletionStatsSnapshot.EMPTY,
             CompletionLearningSnapshotCodec.decode(listOf(HEADER)),
-        )
-    }
-
-    @Test
-    fun `encoded rows omit the derived normalized command key`() {
-        val record = commandStats("Git   Status")
-        val lines =
-            CompletionLearningSnapshotCodec.encode(
-                TerminalCommandCompletionStatsSnapshot(commandStats = listOf(record)),
-            )
-
-        assertEquals(2, lines.size)
-        assertFalse(lines[1].contains(encodeText(record.normalizedCommandLine)))
-        assertEquals(
-            TerminalCommandCompletionStatsSnapshot(commandStats = listOf(record)),
-            CompletionLearningSnapshotCodec.decode(lines),
         )
     }
 
@@ -141,7 +135,7 @@ class CompletionLearningSnapshotCodecTest {
         Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray(StandardCharsets.UTF_8))
 
     private companion object {
-        private const val HEADER = "KetraTerm_COMMAND_COMPLETION_STATS\t1"
+        private const val HEADER = "KetraTerm_COMMAND_COMPLETION_STATS\t2"
         private val workingDirectory: Path = Paths.get("").toAbsolutePath()
         private val repositoryRoot: Path =
             if (Files.isRegularFile(workingDirectory.resolve("docs/persistent-terminal-storage.md"))) {

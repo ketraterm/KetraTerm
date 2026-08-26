@@ -53,14 +53,4 @@ object TerminalCompletionEngines {
             learningStore = learningStore,
             sourceFailureHandler = sourceFailureHandler,
         )
-
-    /**
-     * Creates a deterministic merged engine from equal-priority sources.
-     *
-     * @param sources completion sources queried in declaration order.
-     * @return merged completion engine.
-     */
-    @JvmStatic
-    fun fromSources(vararg sources: TerminalCompletionSource): TerminalCompletionEngine =
-        fromSources(sources.map { TerminalCompletionSourceEntry(it) })
 }

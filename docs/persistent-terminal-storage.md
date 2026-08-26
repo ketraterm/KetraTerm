@@ -22,7 +22,7 @@ The workspace configuration path is resolved by
 
 Standalone backup and completion-learning files are stored next to the resolved
 `config.toml`. The IntelliJ plugin stores its application-level completion index under the IDE system directory at
-`ketraterm/command-completion-stats-v1.tsv`.
+`ketraterm/command-completion-stats-v2.tsv`.
 
 ## Files
 
@@ -38,14 +38,14 @@ comments.
 If the config manager encounters a fatal parse error, it copies the malformed
 file to `config.toml.broken`, then writes clean defaults so the app can start.
 
-### `command-completion-stats-v1.tsv`
+### `command-completion-stats-v2.tsv`
 
 For both standalone and IntelliJ this is an opt-in compact suggestion-learning
 index rather than a replayable terminal transcript. It stores sanitized
 aggregate exact-command counters used by the completion engine:
 
 ```tsv
-KetraTerm_COMMAND_COMPLETION_STATS	1
+KetraTerm_COMMAND_COMPLETION_STATS	2
 C	<commandBase64>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
 ```
 
@@ -87,7 +87,7 @@ invalidates a pending checkpoint; an atomic file operation already in progress
 may finish. Hydration that already started may also finish and merge because
 disabling does not clear in-memory learning. The first enable hydrates the fixed
 file once, and later toggles do not reload it. A rejected or unreadable file is
-not overwritten during that lifecycle. Session MRU and in-memory learning remain active. The plugin's
+not overwritten during that lifecycle. Product-lifetime in-memory learning remains active. The plugin's
 enabled store lives in the IDE system directory described above.
 
 Before any exact-command row enters persistent learning, the shared coordinator
@@ -104,5 +104,5 @@ applies `TerminalCompletionPersistencePolicy`:
 Exact rows retain command text and optional profile and
 working-directory context. The filters block common accidental disclosures but
 cannot recognize every argument, path, URL, credential, or user-defined secret.
-Treat `command-completion-stats-v1.tsv` as sensitive local command-derived data
+Treat `command-completion-stats-v2.tsv` as sensitive local command-derived data
 and protect it with normal filesystem permissions.

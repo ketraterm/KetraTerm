@@ -13,14 +13,13 @@ External modules should import only:
 - `io.github.ketraterm.completion.model`
 
 The `api` package exposes host-facing engines, source factories, request and
-candidate contracts, a mutable session-history source, a shared session registry,
-and one concrete bounded learning store. The registry owns the lifecycle and
-composition of each session MRU, path source, and merged engine while hosts
-supply file-system access and additional product sources. The engine automatically evaluates its
+candidate contracts, and one concrete bounded learning store. Product registries
+compose their path and dynamic providers directly and pass the shared learning
+store to the engine. The engine automatically evaluates its
 command specs as one static source, so hosts cannot wire parsing specs and
 static candidates inconsistently. Statistics are
-ranking evidence and persisted fallback data; they are never composed as an
-independent candidate provider or ranking vote.
+the single source of learned history, observed tokens, and ranking evidence;
+they never become a second independent provider vote.
 
 `TerminalCompletionMatchRanges` is the immutable primitive-backed display-range
 contract carried by completion candidates. Construction validates ordered,
@@ -48,9 +47,11 @@ or construct:
 command may be persisted and sanitizes a complete snapshot before a host crosses a storage boundary. Its conservative
 keyword list remains internal because hosts do not need to branch on individual rejection reasons.
 
-Model constructors expose durable host-owned fields only. Derived matching keys,
-such as normalized command text, are computed by completion internals instead
-of being caller-owned constructor state.
+Model constructors expose durable host-owned fields only. Derived matching
+values, such as lowercase command text, are computed by completion internals
+instead of being caller-owned constructor state. Exact command identity uses
+trimmed, case-preserved text; lowercase values are only for case-insensitive
+prefix search.
 
 Types used only to tokenize, classify, rank, merge, or index suggestions belong
 in implementation packages and must stay `internal`.
@@ -115,12 +116,13 @@ decision explicitly promotes a type into `api` or `model`.
 
 Implementation files follow the completion request directly. One semantic
 token pass resolves command paths, inherited options, repeatable subcommands,
-option values, and positional arguments for live completion. Session MRU coordinates bounded command-history
-and observed-token indexes, projects learned commands into the active
-replacement range, and recovers positive persisted commands as one learned
-fallback stream. The shared learning store publishes one immutable aggregate
-snapshot and owns the identity-aware compiled-index cache reused by learned
-history and ranking. Snapshot models remain pure persistence data. One scoring
+option values, and positional arguments for live completion. The merged engine
+captures one compiled learning-index set per request and uses it for positive
+history candidates, observed tokens for unknown commands, and exact ranking
+evidence. All three views therefore observe the same immutable mutation state
+and contribute as one learned source. The shared learning store publishes
+immutable aggregate snapshots and owns the identity-aware compiled-index cache.
+Snapshot models remain pure persistence data. One scoring
 policy owns bounded counter math. Global fusion owns
 outcome grouping, explicit score components, semantic relevance,
 representative selection, and deterministic final ordering.
@@ -169,15 +171,15 @@ popup. A full command is retained only when the executable itself is active;
 history rows that cannot be projected safely into the active context are not
 offered.
 
-Session MRU also maintains a separate bounded, in-memory observed-token index
-for executables that have no static `TerminalCommandSpec`. Successful commands
+The learning compiler derives a bounded observed-token index from successful
+exact rows for executables that have no static `TerminalCommandSpec`. Commands
 such as `abc de -g`, `abc de -f`, and `abc as` can therefore offer `de` and
 `as` after `abc `, and `-g`/`-f` after `abc de `. These are `ARGUMENT`
-candidates labeled as observed session usage, not inferred subcommands or a
+candidates labeled as learned observations, not inferred subcommands or a
 claimed command grammar. The index learns only the first non-option token after
 an unknown executable and option names; it never learns later positional values
-or option values. It is cleared with the session MRU and is never part of
-persisted command statistics.
+or option values. It is a derived view of exact rows, not a second mutable or
+persisted learning family.
 
 For supported POSIX and PowerShell syntax, the tokenizer uses one bounded
 single-pass lexical scan per merged-engine request to select the cursor's
@@ -325,10 +327,9 @@ supplies changed and
 untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Git process.
 
 IntelliJ dynamic completion is composed from ordinary source-producing functions and explicit prioritized source
-entries. There is no provider-factory or registration framework. The shared completion session registry owns
-session MRU/path/engine composition. Each product completion registry maps host events into the shared learning
-coordinator and owns the combined session-and-persistence shutdown boundary, so completion files are never loaded on
-the Swing event-dispatch thread.
+entries. There is no provider-factory or registration framework. Each product completion registry composes its
+providers with the shared learning store, maps host events into the learning coordinator, and
+owns the persistence shutdown boundary, so completion files are never loaded on the Swing event-dispatch thread.
 
 The engine-to-Swing request/candidate bridge and Swing-feedback-to-statistics mapping live in `ketraterm-ui-swing-host`.
 Product hosts inject context, privacy, scheduling, and persistence policy instead of copying the vocabulary conversion
@@ -340,15 +341,17 @@ deduplicate, and rank candidates.
 `ketraterm-completion` must stay pure: it should not shell out to Git, read IDE
 indexes, watch files, or block on host I/O.
 
-Learned statistics mutate one bounded exact index and publish its immutable snapshot lazily on the next ranking,
-history, persistence, or explicit snapshot read. Multiple events before that read therefore avoid rebuilding the full row
+Learned statistics mutate one bounded exact index and publish its immutable snapshot lazily on the next completion,
+persistence, or explicit snapshot read. Multiple events before that read therefore avoid rebuilding the full row
 list. No-op or rejected events retain the current snapshot identity. There is no
 second row-snapshot cache inside the mutable index.
 
 On first use of a snapshot identity and shell syntax, one compiler tokenizes
-each learned row once and feeds that parsed context to both the direct ranking
-lookup and the positive-history prefix index. One flat syntax-indexed cache
-reuses the resulting pair for subsequent requests. History lookup groups rows
+each learned row once and feeds that parsed context to the direct ranking lookup,
+positive-history prefix index, and observed-token index. A completion request
+captures that index set once before source evaluation and uses it throughout the
+request even if learning mutates while sources run. One flat syntax-indexed cache
+reuses the result for subsequent requests. History lookup groups rows
 by normalized tokens before the active position and binary-searches the active
 token prefix, so a hot request does not rescan the bounded 2,048-row snapshot.
 
@@ -382,12 +385,11 @@ quoted equivalent to share evidence without resolving `..`, symlinks,
 authorities, environment variables, or filesystem case.
 
 Provider support uses reciprocal-rank fusion. Candidate scores are meaningful
-only within their producing source; an MRU score is never compared numerically
+only within their producing source; a learned score is never compared numerically
 with a path or specification score. Each distinct semantic or learned source
 entry contributes its best local rank for an outcome and a source prior clamped to
-`[-20, 20]`. Persistent statistics
-do not constitute a source entry, so the same command execution cannot gain a
-second provider vote merely because it exists in both MRU and persisted stats.
+`[-20, 20]`. Exact learning evidence does not constitute another source entry,
+so one learned command cannot gain a second provider vote from its ranking row.
 Duplicate candidates from the same source do not multiply support.
 
 The global ranker applies the strongest semantic adjustment among contributors.
@@ -398,14 +400,16 @@ closure is neutral.
 
 The edit representative favors semantic fit, a narrow replacement range, the
 bounded prior, local rank, and stable declaration order. Presentation selection
-cannot change that edit. Among contributors with identical replacement text and
-range, it first preserves the strongest semantic fit and then prefers a primary
-source over a fallback source before applying the ordinary prior and stable
-tie-breakers. The selected contributor supplies the complete candidate atomically;
-the engine never mixes display text, match ranges, detail, kind, or source labels
-from different candidates. Session and persisted MRU candidates are presentation
-fallbacks, so they strengthen matching specification or provider outcomes without
-replacing authoritative metadata. Unique learned outcomes remain visible.
+cannot change that edit. The engine marks its derived learned batch as an
+internal fallback and applies a small bounded penalty, increased for path edits
+where live filesystem results are authoritative. Among contributors with an
+identical edit, non-learned metadata wins after semantic fit and before the
+ordinary prior and stable tie-breakers. The selected contributor supplies the
+complete candidate atomically; the engine never mixes display text, match
+ranges, detail, kind, or source labels from different candidates. Learned
+evidence still strengthens matching specification or provider outcomes, and
+unique learned outcomes remain visible. This fallback policy is not a public
+source role or host configuration surface.
 
 Returned candidate scores are the fused global score. Final ordering continues to
 use the edit representative, so presentation ownership cannot change ranking.
@@ -422,7 +426,7 @@ Source collection uses one cold structured `channelFlow`. The engine parses
 once, resolves one context, launches one child per source under a supervisor,
 and serially incorporates completed-source events in the parent. Each changed
 global ranking is emitted immediately, so a slow Git or index source cannot
-block a fast spec, MRU, or direct-path result. Individual sources remain
+block a fast spec, learned, or direct-path result. Individual sources remain
 ordinary suspending functions and never own scopes or child jobs. A non-cancellation source failure is reported through
 `TerminalCompletionSourceFailureHandler` and contributes an empty result; request cancellation reaches every child,
 and source declaration order remains the deterministic final-fusion tie-breaker.
@@ -438,7 +442,7 @@ added before tuning a weight so calibration cannot optimize only one provider.
 
 Performance changes must also run `TerminalCompletionBenchmark`. The benchmark
 includes eight-provider fusion, 2,048 learned rows, duplicate-heavy evidence,
-hostile collection-cap input, and a real session-MRU lookup backed by the full
-persisted snapshot. The persisted-history case is prewarmed deliberately: it
+hostile collection-cap input, and a real learned-history lookup backed by the
+full snapshot. The learned-history case is prewarmed deliberately: it
 measures the normal learning-store-owned compiled-index cache hit, while index
 construction stays bounded to first use of a new snapshot or shell syntax.
