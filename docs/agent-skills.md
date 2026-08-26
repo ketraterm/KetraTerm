@@ -7,6 +7,7 @@ same terminal-emulator workflows instead of rediscovering the architecture.
 
 Available skills:
 
+- `.agents/skills/kotlin-idioms/SKILL.md`
 - `.agents/skills/terminal-feature-work/SKILL.md`
 - `.agents/skills/terminal-parser-fsm/SKILL.md`
 - `.agents/skills/terminal-core-grid-physics/SKILL.md`

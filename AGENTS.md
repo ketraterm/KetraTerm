@@ -58,6 +58,22 @@ Preserve SRP and existing module APIs. Feature scope, non-goals, support status,
 and deferred work belong only in the canonical feature and gap maps; never copy
 those inventories into `AGENTS.md` files.
 
+Prefer the smallest design that satisfies current behavior:
+
+- Add an abstraction only when it enforces a real boundary or invariant, removes
+  repeated stable behavior, supports a required independent implementation, or
+  provides a necessary lifecycle/test seam.
+- Do not add speculative interfaces, factories, registries, adapters, models,
+  mappers, builders, configuration, coroutines, or event streams for possible
+  future use. One implementation may use an interface at a genuine module
+  boundary; otherwise prefer the concrete type.
+- Keep one authoritative representation of each fact. A pass-through layer that
+  only renames or forwards calls is a liability, not separation of concerns.
+- Apply DRY to duplicated knowledge and behavior, not coincidentally similar
+  syntax.
+- Before finishing, remove unused extension points and collapse one-use wrappers
+  when doing so preserves ownership and makes the data flow easier to follow.
+
 - Query/response features must update the explicit security allowlist and return
   protocol-defined failure responses for unsupported or unauthorized queries.
 - Keep parser/core hot paths allocation-minimal; avoid regex, ICU,
@@ -108,5 +124,5 @@ use the CLI directly.
 - Save results only for reusable cross-file findings, confirmed dead ends, or
   corrections.
 - After structural or cross-file code changes, run `graphify update .`. Skip it
-  for documentation-only or localized changes that cannot affect graph
+  for documentation-only or localized changes that cannot affect the graph
   structure.
