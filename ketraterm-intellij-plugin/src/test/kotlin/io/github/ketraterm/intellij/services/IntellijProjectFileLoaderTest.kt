@@ -71,7 +71,7 @@ class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
             }
         val loading =
             AppExecutorUtil.getAppExecutorService().submit(
-                Callable { runBlocking { loader.load(projectDirectoryUri(), "sgk") } },
+                Callable { runBlocking { loader.load(projectDirectoryUri(), "sgk", 256) } },
             )
 
         assertTrue("project-file read did not start", enteredRead.await(10, TimeUnit.SECONDS))
@@ -82,7 +82,19 @@ class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
         assertTrue("read action was not restarted", resolutions.get() >= 2)
     }
 
-    private fun load(prefix: String) = runBlocking { loader().load(projectDirectoryUri(), prefix) }
+    /** Verifies that the host query does not retain more paths than the source requested. */
+    fun testRequestedCountBoundsProjectFileSearch() {
+        repeat(10) { index -> myFixture.addFileToProject("BoundedFile$index.kt", "") }
+
+        val entries = load("BoundedFile", limit = 3)
+
+        assertEquals(3, entries.size)
+    }
+
+    private fun load(
+        prefix: String,
+        limit: Int = 256,
+    ) = runBlocking { loader().load(projectDirectoryUri(), prefix, limit) }
 
     private fun loader(): IntellijProjectFileLoader {
         val projectDirectory = Path.of(requireNotNull(project.basePath))

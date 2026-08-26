@@ -31,7 +31,7 @@ import io.github.ketraterm.completion.matching.CompletionMatcher
  */
 internal class GradleTaskCompletionSource(
     private val sourceId: String,
-    private val tasksProvider: suspend (TerminalCompletionRequest) -> List<TerminalGradleTask>,
+    private val tasksProvider: suspend (TerminalCompletionRequest, Int) -> List<TerminalGradleTask>,
 ) : TerminalCompletionSource {
     init {
         require(sourceId.isNotBlank()) { "sourceId must not be blank" }
@@ -42,6 +42,7 @@ internal class GradleTaskCompletionSource(
         context: TerminalCompletionContext,
         limit: Int,
     ): List<TerminalCompletionCandidate> {
+        require(limit > 0) { "limit must be > 0, was $limit" }
         if (context.command?.name != GradleCompletionSyntax.COMMAND_NAME ||
             context.activePosition != TerminalCompletionActivePosition.SUBCOMMAND
         ) {
@@ -50,7 +51,7 @@ internal class GradleTaskCompletionSource(
 
         val prefix = context.activePrefix
         val projectDirectory = projectDirectoryBeforeActiveToken(context)
-        val tasks = tasksProvider(request)
+        val tasks = tasksProvider(request, limit)
         if (tasks.isEmpty()) return emptyList()
 
         val candidates = ArrayList<TerminalCompletionCandidate>(minOf(tasks.size, limit))

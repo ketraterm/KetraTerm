@@ -26,7 +26,7 @@ class FuzzyPathCompletionSourceTest {
     private val source =
         TerminalCompletionSources.fuzzyPath(
             sourceId = "project-file",
-            entriesProvider = { _ ->
+            entriesProvider = { _, _ ->
                 listOf(
                     TerminalFuzzyPathEntry("src/main/kotlin/FuzzyTarget.kt", isDirectory = false),
                     TerminalFuzzyPathEntry("src/main/resources", isDirectory = true),
@@ -56,13 +56,15 @@ class FuzzyPathCompletionSourceTest {
         runBlocking {
             var requestedDirectory: String? = null
             var requestedPrefix: String? = null
+            var requestedLimit = 0
             val queryAwareSource =
                 TerminalCompletionSources.fuzzyPath(
                     sourceId = "query-aware-project-file",
                     entriesProvider =
-                        TerminalFuzzyPathProvider { request, prefix ->
+                        TerminalFuzzyPathProvider { request, prefix, limit ->
                             requestedDirectory = request.workingDirectoryUri
                             requestedPrefix = prefix
+                            requestedLimit = limit
                             listOf(TerminalFuzzyPathEntry("settings.gradle.kts", isDirectory = false))
                         },
                 )
@@ -71,6 +73,7 @@ class FuzzyPathCompletionSourceTest {
 
             assertEquals("file:///project", requestedDirectory)
             assertEquals("sgk", requestedPrefix)
+            assertEquals(256, requestedLimit)
             assertEquals(listOf("settings.gradle.kts"), candidates.map(TerminalCompletionCandidate::replacementText))
         }
 
@@ -95,7 +98,7 @@ class FuzzyPathCompletionSourceTest {
             val statusSource =
                 TerminalCompletionSources.fuzzyPath(
                     sourceId = "git-status-path",
-                    entriesProvider = { _ -> listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false)) },
+                    entriesProvider = { _, _ -> listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false)) },
                     requiresNonEmptyPrefix = false,
                     allowedCommandNames = setOf("add", "restore", "rm", "diff"),
                 )

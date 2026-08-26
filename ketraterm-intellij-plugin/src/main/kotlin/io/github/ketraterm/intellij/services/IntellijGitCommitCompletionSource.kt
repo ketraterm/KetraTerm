@@ -234,28 +234,36 @@ internal class IntellijGitCommitCompletionLoader(
      * Loads recent commits reachable from HEAD, branches, remotes, or tags.
      *
      * @param workingDirectoryUri local `file` URI used to select the containing repository.
-     * @return at most 50 newest commit values, preserving Git history order.
+     * @param limit positive maximum number of commit values requested by the source.
+     * @return at most the smaller of [limit] and 50 newest commit values, preserving Git history order.
      */
-    suspend fun load(workingDirectoryUri: String?): List<TerminalCompletionDomainValue> {
+    suspend fun load(
+        workingDirectoryUri: String?,
+        limit: Int,
+    ): List<TerminalCompletionDomainValue> {
+        require(limit > 0) { "limit must be > 0, was $limit" }
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
-        val commits = readPort.read(workingDirectoryUri, MAX_RECENT_COMMITS) ?: return emptyList()
-        val values = ArrayList<TerminalCompletionDomainValue>(MAX_RECENT_COMMITS)
+        val loadLimit = minOf(limit, MAX_RECENT_COMMITS)
+        val commits = readPort.read(workingDirectoryUri, loadLimit) ?: return emptyList()
+        val values = ArrayList<TerminalCompletionDomainValue>(loadLimit)
         val visitBudget =
-            BoundedVisitBudget(MAX_RECENT_COMMITS) {
+            BoundedVisitBudget(loadLimit) {
                 cancellationContext.ensureActive()
                 ProgressManager.checkCanceled()
             }
         visitBudget.visit(commits) { commit ->
             val fullHash = commit.fullHash.trim()
             val shortHash = commit.shortHash.trim()
-            if (fullHash.isEmpty() || shortHash.isEmpty()) return@visit
-            values +=
-                TerminalCompletionDomainValue(
-                    value = fullHash,
-                    displayText = shortHash,
-                    detail = sanitizeCommitSubject(commit.subject),
-                )
+            if (fullHash.isNotEmpty() && shortHash.isNotEmpty()) {
+                values +=
+                    TerminalCompletionDomainValue(
+                        value = fullHash,
+                        displayText = shortHash,
+                        detail = sanitizeCommitSubject(commit.subject),
+                    )
+            }
+            values.size < loadLimit
         }
         return values
     }
@@ -263,7 +271,7 @@ internal class IntellijGitCommitCompletionLoader(
 
 /** Creates recent-commit completion without exposing Git4Idea objects to the shared engine. */
 internal fun intellijGitCommitCompletionSource(
-    loader: suspend (String?) -> List<TerminalCompletionDomainValue>,
+    loader: suspend (String?, Int) -> List<TerminalCompletionDomainValue>,
 ): TerminalCompletionSource =
     TerminalCompletionSource { request, context, limit ->
         val commandName = context.currentCommand?.name
@@ -282,7 +290,7 @@ internal fun intellijGitCommitCompletionSource(
             context = context,
             domain = TerminalCompletionValueDomain.GIT_COMMIT,
             sourceId = GIT_COMMIT_SOURCE_ID,
-            values = loader(request.workingDirectoryUri),
+            values = loader(request.workingDirectoryUri, limit),
             limit = limit,
         )
     }

@@ -31,6 +31,7 @@ class IntellijGitCommitCompletionSourceTest {
     fun `commit candidates display short hashes and insert full hashes`() =
         runBlocking {
             var requestedDirectory: String? = null
+            var requestedLimit = 0
             val values =
                 listOf(
                     TerminalCompletionDomainValue(
@@ -40,12 +41,14 @@ class IntellijGitCommitCompletionSourceTest {
                     ),
                 )
             val candidates =
-                engine { workingDirectoryUri ->
+                engine { workingDirectoryUri, limit ->
                     requestedDirectory = workingDirectoryUri
+                    requestedLimit = limit
                     values
                 }.complete(request("git show a3"))
 
             assertEquals("file:///repo", requestedDirectory)
+            assertEquals(256, requestedLimit)
             assertEquals(1, candidates.size)
             val candidate = candidates.single()
             assertEquals(FIRST_FULL_HASH, candidate.replacementText)
@@ -61,7 +64,7 @@ class IntellijGitCommitCompletionSourceTest {
         runBlocking {
             var loads = 0
             val engine =
-                engine {
+                engine { _, _ ->
                     loads++
                     listOf(TerminalCompletionDomainValue(FIRST_FULL_HASH, displayText = FIRST_SHORT_HASH))
                 }
@@ -78,7 +81,7 @@ class IntellijGitCommitCompletionSourceTest {
         runBlocking {
             var loads = 0
             val engine =
-                engine {
+                engine { _, _ ->
                     loads++
                     listOf(TerminalCompletionDomainValue(FIRST_FULL_HASH, displayText = FIRST_SHORT_HASH))
                 }
@@ -105,7 +108,7 @@ class IntellijGitCommitCompletionSourceTest {
                     },
                 )
 
-            val values = loader.load("file:///repo")
+            val values = loader.load("file:///repo", 50)
 
             assertEquals(50, requestedLimit)
             assertEquals(listOf(FIRST_FULL_HASH, SECOND_FULL_HASH), values.map { it.value })
@@ -223,7 +226,7 @@ class IntellijGitCommitCompletionSourceTest {
             )
         }
 
-    private fun engine(loader: suspend (String?) -> List<TerminalCompletionDomainValue>): TerminalCompletionEngine =
+    private fun engine(loader: suspend (String?, Int) -> List<TerminalCompletionDomainValue>): TerminalCompletionEngine =
         TerminalCompletionEngines.fromSources(
             sources =
                 listOf(

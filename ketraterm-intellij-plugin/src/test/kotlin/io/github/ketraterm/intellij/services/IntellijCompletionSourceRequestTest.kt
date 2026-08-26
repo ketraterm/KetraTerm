@@ -26,15 +26,18 @@ class IntellijCompletionSourceRequestTest {
     fun `Git status loader uses the request working directory`() =
         runBlocking {
             var requestedDirectory: String? = null
+            var requestedLimit = 0
             val source =
-                intellijGitStatusPathCompletionSource { workingDirectoryUri ->
+                intellijGitStatusPathCompletionSource { workingDirectoryUri, limit ->
                     requestedDirectory = workingDirectoryUri
+                    requestedLimit = limit
                     listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false))
                 }
 
             val candidates = engine(source).complete(request("git add "))
 
             assertEquals(WORKING_DIRECTORY, requestedDirectory)
+            assertEquals(256, requestedLimit)
             assertTrue(candidates.any { it.replacementText == "src/Changed.kt" })
         }
 
@@ -42,15 +45,18 @@ class IntellijCompletionSourceRequestTest {
     fun `Gradle loader uses the request working directory`() =
         runBlocking {
             var requestedDirectory: String? = null
+            var requestedLimit = 0
             val source =
-                intellijGradleTaskCompletionSource { workingDirectoryUri ->
+                intellijGradleTaskCompletionSource { workingDirectoryUri, limit ->
                     requestedDirectory = workingDirectoryUri
+                    requestedLimit = limit
                     listOf(TerminalGradleTask(":test", projectDirectory = "."))
                 }
 
             val candidates = engine(source).complete(request("gradle te"))
 
             assertEquals(WORKING_DIRECTORY, requestedDirectory)
+            assertEquals(256, requestedLimit)
             assertTrue(candidates.any { it.replacementText == "test" })
         }
 
@@ -59,10 +65,12 @@ class IntellijCompletionSourceRequestTest {
         runBlocking {
             var requestedDirectory: String? = null
             var requestedPrefix: String? = null
+            var requestedLimit = 0
             val source =
-                intellijProjectFileCompletionSource { workingDirectoryUri, prefix ->
+                intellijProjectFileCompletionSource { workingDirectoryUri, prefix, limit ->
                     requestedDirectory = workingDirectoryUri
                     requestedPrefix = prefix
+                    requestedLimit = limit
                     listOf(TerminalFuzzyPathEntry("src/main.kt", isDirectory = false))
                 }
 
@@ -70,6 +78,7 @@ class IntellijCompletionSourceRequestTest {
 
             assertEquals(WORKING_DIRECTORY, requestedDirectory)
             assertEquals("ma", requestedPrefix)
+            assertEquals(256, requestedLimit)
             assertTrue(candidates.any { it.replacementText == "src/main.kt" })
         }
 

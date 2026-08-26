@@ -28,10 +28,12 @@ class IntellijGitCompletionSourceTest {
         runBlocking {
             var loads = 0
             var requestedDirectory: String? = null
+            var requestedLimit = 0
             val engine =
-                engine { workingDirectoryUri ->
+                engine { workingDirectoryUri, limit ->
                     loads++
                     requestedDirectory = workingDirectoryUri
+                    requestedLimit = limit
                     snapshot()
                 }
 
@@ -39,6 +41,7 @@ class IntellijGitCompletionSourceTest {
 
             assertEquals(1, loads)
             assertEquals("file:///repo", requestedDirectory)
+            assertEquals(256, requestedLimit)
             assertEquals(
                 setOf("intellij-git-branch", "intellij-git-remote-branch", "intellij-git-tag"),
                 candidates.mapTo(HashSet(), TerminalCompletionCandidate::source),
@@ -48,7 +51,7 @@ class IntellijGitCompletionSourceTest {
     @Test
     fun `switch exposes local branches only`() =
         runBlocking {
-            val candidates = engine { snapshot() }.complete(request("git switch "))
+            val candidates = engine { _, _ -> snapshot() }.complete(request("git switch "))
 
             assertEquals(listOf("intellij-git-branch"), candidates.map { it.source }.distinct())
             assertEquals(listOf("feature/local"), candidates.map { it.replacementText })
@@ -58,7 +61,7 @@ class IntellijGitCompletionSourceTest {
     fun `merge and rebase expose every reference group`() =
         runBlocking {
             for (subcommand in listOf("merge", "rebase")) {
-                val candidates = engine { snapshot() }.complete(request("git $subcommand "))
+                val candidates = engine { _, _ -> snapshot() }.complete(request("git $subcommand "))
 
                 assertEquals(
                     setOf("intellij-git-branch", "intellij-git-remote-branch", "intellij-git-tag"),
@@ -72,7 +75,7 @@ class IntellijGitCompletionSourceTest {
         runBlocking {
             var loads = 0
             val engine =
-                engine {
+                engine { _, _ ->
                     loads++
                     snapshot()
                 }
@@ -86,14 +89,14 @@ class IntellijGitCompletionSourceTest {
     @Test
     fun `candidate limit remains bounded after combining reference groups`() =
         runBlocking {
-            val engine = engine { snapshot() }
+            val engine = engine { _, _ -> snapshot() }
 
             val candidates = engine.complete(request("git checkout "))
 
             assertEquals(3, candidates.size)
         }
 
-    private fun engine(loader: suspend (String?) -> IntellijGitCompletionSnapshot): TerminalCompletionEngine =
+    private fun engine(loader: suspend (String?, Int) -> IntellijGitCompletionSnapshot): TerminalCompletionEngine =
         TerminalCompletionEngines.fromSources(
             sources =
                 listOf(

@@ -129,7 +129,7 @@ open class TerminalCompletionBenchmark {
                         TerminalCompletionSourceEntry(
                             TerminalCompletionSources.fuzzyPath(
                                 sourceId = "benchmark-project-path",
-                                entriesProvider = { _ -> fuzzyPaths },
+                                entriesProvider = { _, limit -> fuzzyPaths.take(limit) },
                             ),
                         ),
                     ),

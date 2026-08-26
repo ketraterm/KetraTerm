@@ -60,10 +60,12 @@ fun interface TerminalFuzzyPathProvider {
      * @param request immutable completion request whose working-directory URI
      * scopes host-relative paths.
      * @param prefix decoded active terminal path token.
-     * @return bounded immutable path result, or an empty list when no match is available.
+     * @param limit positive maximum number of entries to load.
+     * @return at most [limit] immutable path entries, or an empty list when no match is available.
      */
     suspend fun entries(
         request: TerminalCompletionRequest,
         prefix: String,
+        limit: Int,
     ): List<TerminalFuzzyPathEntry>
 }

@@ -88,13 +88,17 @@ internal class IntellijGitCompletionLoader(
 ) {
     constructor(project: Project) : this(IntellijGitReferenceReadPort(project))
 
-    suspend fun load(workingDirectoryUri: String?): IntellijGitCompletionSnapshot {
+    suspend fun load(
+        workingDirectoryUri: String?,
+        limit: Int,
+    ): IntellijGitCompletionSnapshot {
+        require(limit > 0) { "limit must be > 0, was $limit" }
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
         return readPort.read(workingDirectoryUri) { model ->
             IntellijGitCompletionSnapshot(
                 localBranches =
-                    collectValues(model.localBranchNames, cancellationContext) { branchName ->
+                    collectValues(model.localBranchNames, limit, cancellationContext) { branchName ->
                         if (branchName == model.currentBranchName) {
                             null
                         } else {
@@ -106,7 +110,7 @@ internal class IntellijGitCompletionLoader(
                         }
                     },
                 remoteBranches =
-                    collectValues(model.remoteBranchNames, cancellationContext) { branchName ->
+                    collectValues(model.remoteBranchNames, limit, cancellationContext) { branchName ->
                         TerminalCompletionDomainValue(
                             value = branchName,
                             detail = "remote branch",
@@ -114,7 +118,7 @@ internal class IntellijGitCompletionLoader(
                         )
                     },
                 tags =
-                    collectValues(model.tagNames, cancellationContext) { tagName ->
+                    collectValues(model.tagNames, limit, cancellationContext) { tagName ->
                         TerminalCompletionDomainValue(tagName, detail = "tag")
                     },
             )
@@ -123,10 +127,11 @@ internal class IntellijGitCompletionLoader(
 
     private fun collectValues(
         values: Iterable<String>,
+        limit: Int,
         cancellationContext: CoroutineContext,
         toValue: (String) -> TerminalCompletionDomainValue?,
     ): List<TerminalCompletionDomainValue> {
-        val retained = BoundedSnapshotCollector(MAX_VALUES_PER_GROUP, VALUE_ORDER)
+        val retained = ArrayList<TerminalCompletionDomainValue>(limit)
         val visitBudget =
             BoundedVisitBudget(MAX_VISITED_VALUES_PER_GROUP) {
                 cancellationContext.ensureActive()
@@ -134,13 +139,14 @@ internal class IntellijGitCompletionLoader(
             }
         visitBudget.visit(values) { value ->
             toValue(value)?.let(retained::add)
+            retained.size < limit
         }
-        return retained.toSortedList()
+        retained.sortWith(VALUE_ORDER)
+        return retained
     }
 
     private companion object {
         private const val MAX_VISITED_VALUES_PER_GROUP = 8_192
-        private const val MAX_VALUES_PER_GROUP = 2_048
         private const val LOCAL_SCORE_ADJUSTMENT = 2
         private const val REMOTE_SCORE_ADJUSTMENT = 1
         private val VALUE_ORDER =
@@ -150,13 +156,13 @@ internal class IntellijGitCompletionLoader(
 }
 
 /** Creates one completion source backed by one composite Git-reference load per request. */
-internal fun intellijGitCompletionSource(loader: suspend (String?) -> IntellijGitCompletionSnapshot): TerminalCompletionSource =
+internal fun intellijGitCompletionSource(loader: suspend (String?, Int) -> IntellijGitCompletionSnapshot): TerminalCompletionSource =
     TerminalCompletionSource { request, context, limit ->
         if (context.expectedValueDomain != TerminalCompletionValueDomain.GIT_BRANCH) {
             return@TerminalCompletionSource emptyList()
         }
         val commandName = context.currentCommand?.name
-        val snapshot = loader(request.workingDirectoryUri)
+        val snapshot = loader(request.workingDirectoryUri, limit)
         val candidates = ArrayList<TerminalCompletionCandidate>(limit)
         candidates += projectValues(request, context, LOCAL_SOURCE_ID, snapshot.localBranches, limit)
         if (commandName in REMOTE_REFERENCE_COMMANDS) {

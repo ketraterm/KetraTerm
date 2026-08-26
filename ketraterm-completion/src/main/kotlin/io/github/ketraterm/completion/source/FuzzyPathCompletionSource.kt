@@ -38,6 +38,7 @@ internal class FuzzyPathCompletionSource(
         context: TerminalCompletionContext,
         limit: Int,
     ): List<TerminalCompletionCandidate> {
+        require(limit > 0) { "limit must be > 0, was $limit" }
         if (allowedCommandNames.isNotEmpty() && context.currentCommand?.name !in allowedCommandNames) {
             return emptyList()
         }
@@ -51,7 +52,9 @@ internal class FuzzyPathCompletionSource(
         val pathSeparator = if (prefix.contains('\\')) '\\' else '/'
         val candidates = BoundedCompletionCandidateCollector(limit)
         var orderIndex = 0
-        for (entry in entriesProvider.entries(request, prefix)) {
+        var loadedEntries = 0
+        for (entry in entriesProvider.entries(request, prefix, limit)) {
+            if (loadedEntries++ == limit) break
             if (!context.expectedPathKind.acceptsPathEntry(entry.isDirectory)) continue
             if (!context.expectedHiddenPathPolicy.acceptsPath(entry.path, prefix)) continue
             val rawPath = if (pathSeparator == '\\') entry.path.replace('/', '\\') else entry.path
@@ -90,13 +93,15 @@ internal class FuzzyPathCompletionSource(
 
 /** Matches one bounded path result for hosts without a queryable index. */
 internal class BoundedFuzzyPathProvider(
-    private val entriesProvider: suspend (TerminalCompletionRequest) -> List<TerminalFuzzyPathEntry>,
+    private val entriesProvider: suspend (TerminalCompletionRequest, Int) -> List<TerminalFuzzyPathEntry>,
 ) : TerminalFuzzyPathProvider {
     override suspend fun entries(
         request: TerminalCompletionRequest,
         prefix: String,
+        limit: Int,
     ): List<TerminalFuzzyPathEntry> =
-        entriesProvider(request)
+        entriesProvider(request, limit)
+            .take(limit)
             .mapNotNull { entry -> fuzzyScore(entry.path, prefix)?.let { score -> ScoredEntry(entry, score) } }
             .sortedWith(ENTRY_ORDER)
             .map(ScoredEntry::entry)

@@ -38,7 +38,7 @@ import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 internal class ValueDomainCompletionSource(
     private val domain: TerminalCompletionValueDomain,
     private val sourceId: String,
-    private val valuesProvider: suspend () -> List<TerminalCompletionDomainValue>,
+    private val valuesProvider: suspend (Int) -> List<TerminalCompletionDomainValue>,
     private val allowedCommandNames: Set<String>,
 ) : TerminalCompletionSource {
     init {
@@ -61,13 +61,14 @@ internal class ValueDomainCompletionSource(
         context: TerminalCompletionContext,
         limit: Int,
     ): List<TerminalCompletionCandidate> {
+        require(limit > 0) { "limit must be > 0, was $limit" }
         if (context.expectedValueDomain != domain ||
             (allowedCommandNames.isNotEmpty() && context.currentCommand?.name !in allowedCommandNames)
         ) {
             return emptyList()
         }
 
-        val values = valuesProvider()
+        val values = valuesProvider(limit)
         return projectValueDomainCandidates(request, context, domain, sourceId, values, limit)
     }
 }

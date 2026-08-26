@@ -87,13 +87,19 @@ internal class IntellijGitStatusPathLoader(
      * Renamed paths use their post-rename path when available; deleted paths use their prior path.
      *
      * @param workingDirectoryUri local `file` URI used to select and relativize a repository.
-     * @return at most 2,048 changed paths, or an empty list for unusable project, URI, or repository state.
+     * @param limit positive maximum number of changed paths to load.
+     * @return at most [limit] changed paths, or an empty list for unusable project, URI, or repository state.
      */
-    suspend fun load(workingDirectoryUri: String?): List<TerminalFuzzyPathEntry> {
+    suspend fun load(
+        workingDirectoryUri: String?,
+        limit: Int,
+    ): List<TerminalFuzzyPathEntry> {
+        require(limit > 0) { "limit must be > 0, was $limit" }
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
         return readPort.read(workingDirectoryUri) { model ->
-            val retained = BoundedSnapshotCollector(MAX_RETAINED_PATHS, ENTRY_ORDER)
+            val retained = ArrayList<TerminalFuzzyPathEntry>(limit)
+            val retainedPaths = HashSet<String>(limit)
             val visitBudget =
                 BoundedVisitBudget(MAX_VISITED_CHANGES) {
                     cancellationContext.ensureActive()
@@ -107,18 +113,24 @@ internal class IntellijGitStatusPathLoader(
             ) {
                 if (!path.startsWith(model.repositoryRoot)) return
                 val relativePath = relativePath(model.workingDirectory, path) ?: return
-                val entry = TerminalFuzzyPathEntry(relativePath, isDirectory = isDirectory, detail = detail)
-                retained.add(entry)
+                if (retainedPaths.add(relativePath)) {
+                    retained += TerminalFuzzyPathEntry(relativePath, isDirectory = isDirectory, detail = detail)
+                }
             }
             visitBudget.visit(model.changedPathValues) { pathValue ->
-                val path = pathValue?.let { runCatching { Path.of(it) }.getOrNull() } ?: return@visit
-                retain(path, isDirectory = false, detail = "changed file")
+                pathValue?.let { runCatching { Path.of(it) }.getOrNull() }?.let { path ->
+                    retain(path, isDirectory = false, detail = "changed file")
+                }
+                retained.size < limit
             }
             visitBudget.visit(model.unversionedPathValues) { pathValue ->
-                val path = pathValue?.let { runCatching { Path.of(it) }.getOrNull() } ?: return@visit
-                retain(path, isDirectory = false, detail = "untracked file")
+                pathValue?.let { runCatching { Path.of(it) }.getOrNull() }?.let { path ->
+                    retain(path, isDirectory = false, detail = "untracked file")
+                }
+                retained.size < limit
             }
-            retained.toSortedList()
+            retained.sortWith(ENTRY_ORDER)
+            retained
         } ?: emptyList()
     }
 
@@ -129,7 +141,6 @@ internal class IntellijGitStatusPathLoader(
 
     private companion object {
         private const val MAX_VISITED_CHANGES = 8_192
-        private const val MAX_RETAINED_PATHS = 2_048
         private val ENTRY_ORDER =
             compareBy<TerminalFuzzyPathEntry, String>(String.CASE_INSENSITIVE_ORDER) { it.path }
                 .thenBy { it.path }
@@ -137,10 +148,10 @@ internal class IntellijGitStatusPathLoader(
 }
 
 /** Creates changed-Git-path completion without exposing IntelliJ VCS APIs to the shared engine. */
-internal fun intellijGitStatusPathCompletionSource(loader: suspend (String?) -> List<TerminalFuzzyPathEntry>) =
+internal fun intellijGitStatusPathCompletionSource(loader: suspend (String?, Int) -> List<TerminalFuzzyPathEntry>) =
     TerminalCompletionSources.fuzzyPath(
         sourceId = "intellij-git-status-path",
-        entriesProvider = { request -> loader(request.workingDirectoryUri) },
+        entriesProvider = { request, limit -> loader(request.workingDirectoryUri, limit) },
         requiresNonEmptyPrefix = false,
         allowedCommandNames = setOf("add", "restore", "rm", "diff"),
     )

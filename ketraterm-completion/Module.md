@@ -28,6 +28,8 @@ infrastructure belongs to `ketraterm-completion-host`.
 Completion sources such as curated command specs, Fig-style spec importers,
 path providers, and IDE context providers should adapt into this module's stable
 model rather than leaking their source-specific representation into terminal UI
-code. One bounded learning aggregate publishes separate opaque ranking and
+code. The fixed source count is passed directly to fuzzy-path, Gradle-task, and
+value-domain loaders so hosts can stop enumeration before constructing excess
+rows. One bounded learning aggregate publishes separate opaque ranking and
 positive, policy-approved replay projections; the latter alone feeds history and
 observed-token candidates.

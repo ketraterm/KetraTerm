@@ -73,7 +73,8 @@ in implementation packages and must stay `internal`.
 `TerminalCompletionSources.valueDomain(...)` adapts a suspending host loader for one declared
 `TerminalCompletionValueDomain`. It resolves the active spec context through the shared tokenizer, applies the request's
 shell quoting policy, and emits domain-tagged argument candidates. A provider may perform bounded host I/O and must
-cooperate with cancellation. A provider may additionally restrict itself to canonical command/subcommand names when a
+cooperate with cancellation. The source passes its count limit into the loader so host enumeration stops before building
+an oversized value snapshot. A provider may additionally restrict itself to canonical command/subcommand names when a
 value domain has command-specific validity.
 Aggregate host sources that load several provider groups in one operation use
 `TerminalCompletionSources.valueDomainCandidates(...)` to project each already-loaded group through the identical
@@ -83,7 +84,8 @@ matching, quoting, replacement, and scoring policy without constructing nested s
 `TerminalFuzzyPathProvider` for context-aware fuzzy path completion. Bounded list loaders use the shared dependency-free
 matcher once. Both loader forms receive the same immutable completion request used by the engine, so host-relative
 results use its captured working-directory URI instead of resampling mutable session state. Query-aware providers also
-receive the decoded active prefix and return already matched, relevance-ordered entries; the source never repeats that
+receive the decoded active prefix. Both forms receive the source count limit and return no more entries than requested;
+query-aware providers return already matched, relevance-ordered entries, so the source never repeats that
 match. The shared source retains path-kind filtering, explicit replacement ranges, and shell-safe quoting. It
 requires typed path text by default; a small, context-specific provider such as Git status paths may opt in to
 empty-prefix suggestions.
@@ -440,7 +442,9 @@ use the edit representative, so presentation ownership cannot change ranking.
 Ordering and all tie-breakers are deterministic.
 
 Source safety and presentation are independent. Every source receives a fixed
-256-candidate safety budget. The engine globally fuses the complete bounded
+256-candidate safety budget. Fuzzy-path, Gradle-task, and value-domain sources pass that same count into their loaders;
+hosts stop enumerating once they have enough usable rows instead of materializing a larger snapshot for later truncation.
+There is no universal deadline or provider-budget protocol. The engine globally fuses the complete bounded
 union and has no popup-size parameter; the Swing controller alone presents an
 eight-row sliding viewport across the ranked snapshot. The snapshot also carries
 absolute overflow metadata so each physical renderer can expose range and scroll

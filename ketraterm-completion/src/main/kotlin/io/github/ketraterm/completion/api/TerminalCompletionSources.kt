@@ -41,7 +41,8 @@ object TerminalCompletionSources {
      *
      * @param sourceId stable candidate-source id used by ranking feedback.
      * @param entriesProvider suspending loader for bounded indexed paths. The
-     * immutable request supplies the authoritative working-directory URI.
+     * immutable request supplies the authoritative working-directory URI and
+     * the count argument is the maximum number of entries to load.
      * @param requiresNonEmptyPrefix whether this source waits for explicit path
      * text before matching. Use `false` only for small, context-specific
      * result sets such as changed Git paths.
@@ -55,7 +56,7 @@ object TerminalCompletionSources {
     @JvmOverloads
     fun fuzzyPath(
         sourceId: String,
-        entriesProvider: suspend (TerminalCompletionRequest) -> List<TerminalFuzzyPathEntry>,
+        entriesProvider: suspend (TerminalCompletionRequest, Int) -> List<TerminalFuzzyPathEntry>,
         requiresNonEmptyPrefix: Boolean = true,
         allowedCommandNames: Set<String> = emptySet(),
     ): TerminalCompletionSource {
@@ -115,14 +116,15 @@ object TerminalCompletionSources {
      *
      * @param sourceId stable candidate-source id used by ranking feedback.
      * @param tasksProvider suspending bounded Gradle-task loader. The immutable
-     * request supplies the authoritative working-directory URI.
+     * request supplies the authoritative working-directory URI and the count
+     * argument is the maximum number of tasks to load.
      * @return context-aware Gradle task completion source.
      * @throws IllegalArgumentException if [sourceId] is blank.
      */
     @JvmStatic
     fun gradleTask(
         sourceId: String,
-        tasksProvider: suspend (TerminalCompletionRequest) -> List<TerminalGradleTask>,
+        tasksProvider: suspend (TerminalCompletionRequest, Int) -> List<TerminalGradleTask>,
     ): TerminalCompletionSource =
         GradleTaskCompletionSource(
             sourceId = sourceId,
@@ -138,7 +140,8 @@ object TerminalCompletionSources {
      *
      * @param domain command-spec value domain served by this source.
      * @param sourceId stable candidate-source id used by ranking feedback.
-     * @param valuesProvider suspending bounded value loader.
+     * @param valuesProvider suspending bounded value loader whose count
+     * argument is the maximum number of values to load.
      * @param allowedCommandNames optional canonical command/subcommand names to
      * which this source is restricted. An empty set permits every matching
      * value-domain position.
@@ -151,7 +154,7 @@ object TerminalCompletionSources {
     fun valueDomain(
         domain: TerminalCompletionValueDomain,
         sourceId: String,
-        valuesProvider: suspend () -> List<TerminalCompletionDomainValue>,
+        valuesProvider: suspend (Int) -> List<TerminalCompletionDomainValue>,
         allowedCommandNames: Set<String> = emptySet(),
     ): TerminalCompletionSource =
         ValueDomainCompletionSource(

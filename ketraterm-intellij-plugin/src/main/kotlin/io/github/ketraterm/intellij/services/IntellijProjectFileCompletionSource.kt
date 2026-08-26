@@ -55,13 +55,16 @@ internal class IntellijProjectFileLoader(
      *
      * @param workingDirectoryUri local `file` URI used to relativize project entries.
      * @param prefix decoded active terminal path token.
-     * @return ready project paths, or an empty list for disposed projects and
+     * @param limit positive maximum number of project paths to load.
+     * @return at most [limit] ready project paths, or an empty list for disposed projects and
      * unsupported working-directory URIs.
      */
     suspend fun load(
         workingDirectoryUri: String?,
         prefix: String,
+        limit: Int,
     ): List<TerminalFuzzyPathEntry> {
+        require(limit > 0) { "limit must be > 0, was $limit" }
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
         if (project.isDisposed) return emptyList()
@@ -79,9 +82,10 @@ internal class IntellijProjectFileLoader(
             try {
                 val itemProvider = model.getItemProvider(null)
                 if (itemProvider !is ChooseByNameInScopeItemProvider) return@readAction emptyList()
-                val viewModel = IntellijProjectFileSearchViewModel(project, model)
-                val results = ArrayList<TerminalFuzzyPathEntry>(INITIAL_RESULT_CAPACITY)
-                val paths = HashSet<String>(INITIAL_RESULT_CAPACITY)
+                val viewModel = IntellijProjectFileSearchViewModel(project, model, limit)
+                val initialCapacity = minOf(INITIAL_RESULT_CAPACITY, limit)
+                val results = ArrayList<TerminalFuzzyPathEntry>(initialCapacity)
+                val paths = HashSet<String>(initialCapacity)
                 var visited = 0
                 val indicator = ProgressManager.getInstance().progressIndicator ?: EmptyProgressIndicator()
                 val parameters = FindSymbolParameters.wrap(normalizedPrefix, GlobalSearchScope.projectScope(project))
@@ -100,7 +104,7 @@ internal class IntellijProjectFileLoader(
                         if (paths.add(path)) {
                             results.add(TerminalFuzzyPathEntry(path, file.isDirectory))
                         }
-                        results.size < MAX_RETAINED_ENTRIES
+                        results.size < limit
                     },
                 )
                 results
@@ -118,7 +122,6 @@ internal class IntellijProjectFileLoader(
     private companion object {
         private const val INITIAL_RESULT_CAPACITY = 64
         private const val MAX_VISITED_ENTRIES = 8_192
-        private const val MAX_RETAINED_ENTRIES = 4_096
     }
 }
 
@@ -126,6 +129,7 @@ internal class IntellijProjectFileLoader(
 private class IntellijProjectFileSearchViewModel(
     private val project: Project,
     private val model: ChooseByNameModel,
+    private val limit: Int,
 ) : ChooseByNameViewModel {
     override fun getProject(): Project = project
 
@@ -137,14 +141,14 @@ private class IntellijProjectFileSearchViewModel(
 
     override fun canShowListForEmptyPattern(): Boolean = false
 
-    override fun getMaximumListSizeLimit(): Int = 0
+    override fun getMaximumListSizeLimit(): Int = limit
 }
 
 /** Creates query-aware IntelliJ project paths without exposing VFS APIs to the shared engine. */
-internal fun intellijProjectFileCompletionSource(loader: suspend (String?, String) -> List<TerminalFuzzyPathEntry>) =
+internal fun intellijProjectFileCompletionSource(loader: suspend (String?, String, Int) -> List<TerminalFuzzyPathEntry>) =
     TerminalCompletionSources.fuzzyPath(
         sourceId = "intellij-project-file",
-        entriesProvider = { request, prefix ->
-            loader(request.workingDirectoryUri, prefix)
+        entriesProvider = { request, prefix, limit ->
+            loader(request.workingDirectoryUri, prefix, limit)
         },
     )
