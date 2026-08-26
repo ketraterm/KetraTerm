@@ -13,14 +13,21 @@ each consumer.
 The module does not spawn shells, perform I/O, depend on UI frameworks, or parse
 terminal output.
 
-Its public persistence policy evaluates and sanitizes host-owned learning
-snapshots without performing I/O. Optional local-file storage and write
-scheduling are supplied by the separate
+Its best-effort replay policy decides whether bounded plaintext may enter
+retained history or observed-token learning; approval is not a guarantee that a
+command contains no secret. Ranking evidence uses a case-sensitive opaque command
+identity and remains available even when plaintext replay is rejected.
+Only successful or accepted outcomes can retain that replay projection. Replay
+history and observed-token inference require an exact profile and canonical
+working-directory match at request time, including exact null context; opaque
+ranking evidence retains its context-fallback semantics.
+Optional local-file storage and write scheduling are supplied by the separate
 `ketraterm-completion-persistence` module, while asynchronous provider
 infrastructure belongs to `ketraterm-completion-host`.
 
 Completion sources such as curated command specs, Fig-style spec importers,
 path providers, and IDE context providers should adapt into this module's stable
 model rather than leaking their source-specific representation into terminal UI
-code. The engine derives all learned candidates and ranking evidence from its
-single bounded learning store.
+code. One bounded learning aggregate publishes separate opaque ranking and
+positive, policy-approved replay projections; the latter alone feeds history and
+observed-token candidates.

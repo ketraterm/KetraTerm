@@ -41,25 +41,16 @@ class SwingCompletionFeedbackRecorder(
     ) -> Unit,
     private val clockEpochMillis: () -> Long = System::currentTimeMillis,
 ) {
-    /**
-     * Creates a feedback handler that reads current context per event.
-     *
-     * @param contextProvider supplier for current profile and directory state.
-     * @return reusable Swing feedback handler.
-     */
-    fun createHandler(contextProvider: () -> SwingCompletionContext): SwingShellSuggestionFeedbackHandler =
-        SwingShellSuggestionFeedbackHandler { feedback -> record(feedback, contextProvider()) }
+    /** Creates a handler that records feedback against each suggestion's immutable request context. */
+    fun createHandler(): SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler(::record)
 
     /**
      * Validates and records one accepted or dismissed suggestion.
      *
      * @param feedback Swing popup feedback event.
-     * @param context host metadata active for the event.
      */
-    fun record(
-        feedback: SwingShellSuggestionFeedback,
-        context: SwingCompletionContext,
-    ) {
+    fun record(feedback: SwingShellSuggestionFeedback) {
+        val context = feedback.suggestion.interactionContext as? SwingCompletionContext ?: return
         val commandLine =
             feedback.suggestion
                 .commandTextAfterReplacement(feedback.request)

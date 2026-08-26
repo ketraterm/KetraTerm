@@ -17,26 +17,60 @@ package io.github.ketraterm.completion.internal
 
 import io.github.ketraterm.completion.api.TerminalCompletionCandidate
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 
 internal val TERMINAL_COMPLETION_CANDIDATE_ORDER: Comparator<TerminalCompletionCandidate> =
     compareByDescending<TerminalCompletionCandidate> { it.score }
         .thenBy { it.displayText }
         .thenBy { it.replacementText }
 
-internal val TERMINAL_COMMAND_COMPLETION_STATS_ORDER: Comparator<TerminalCommandCompletionStats> =
-    compareByDescending<TerminalCommandCompletionStats> { it.lastUsedEpochMillis }
-        .thenByDescending { it.acceptedCount }
-        .thenByDescending { it.successCount }
-        .thenBy { it.dismissedCount }
-        .thenBy { it.commandLine }
-        .thenBy { it.profileId.orEmpty() }
-        .thenBy { it.workingDirectoryUri.orEmpty() }
-
 internal fun isRecordableTerminalCompletionCommand(commandLine: String): Boolean =
-    commandLine.isNotBlank() && !commandLine.hasTerminalCompletionLineBreak()
+    commandLine.isNotBlank() &&
+        !commandLine.hasTerminalCompletionLineBreak() &&
+        commandLine.hasWellFormedTerminalCompletionUtf16()
 
 internal fun String.hasTerminalCompletionLineBreak(): Boolean = indexOf('\n') >= 0 || indexOf('\r') >= 0
+
+private fun String.hasWellFormedTerminalCompletionUtf16(): Boolean {
+    var index = 0
+    while (index < length) {
+        val character = this[index]
+        when {
+            Character.isHighSurrogate(character) -> {
+                if (index + 1 >= length || !Character.isLowSurrogate(this[index + 1])) return false
+                index++
+            }
+            Character.isLowSurrogate(character) -> return false
+        }
+        index++
+    }
+    return true
+}
+
+/** Returns whether command text is structurally safe and bounded for retained plaintext replay. */
+internal fun isStructurallyValidTerminalCompletionReplay(commandLine: String): Boolean {
+    if (!isRecordableTerminalCompletionCommand(commandLine)) return false
+    if (commandLine.length > MAX_REPLAY_UTF16_CHARS) return false
+
+    var utf8Bytes = 0
+    var index = 0
+    while (index < commandLine.length) {
+        val character = commandLine[index]
+        if (Character.isISOControl(character) && character != '\t') return false
+        utf8Bytes +=
+            when {
+                character.code <= 0x7F -> 1
+                character.code <= 0x7FF -> 2
+                Character.isHighSurrogate(character) -> {
+                    index++
+                    4
+                }
+                else -> 3
+            }
+        if (utf8Bytes > MAX_REPLAY_UTF8_BYTES) return false
+        index++
+    }
+    return true
+}
 
 /**
  * Returns whether [offset] is a valid UTF-16 scalar boundary in this string.
@@ -78,3 +112,6 @@ internal fun canonicalizeWorkingDirectoryUri(uri: String): String {
     val trimmed = uri.trim()
     return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
 }
+
+private const val MAX_REPLAY_UTF16_CHARS = 4_096
+private const val MAX_REPLAY_UTF8_BYTES = 8_192

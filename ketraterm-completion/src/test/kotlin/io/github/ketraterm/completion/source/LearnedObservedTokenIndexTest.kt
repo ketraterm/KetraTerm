@@ -18,9 +18,11 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.CompletionLearningIndexCache
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
+import io.github.ketraterm.completion.testing.TestCommandLearning
+import io.github.ketraterm.completion.testing.commandLearning
+import io.github.ketraterm.completion.testing.learningSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -84,8 +86,8 @@ class LearnedObservedTokenIndexTest {
         val index =
             index(
                 positive("abc success"),
-                TerminalCommandCompletionStats(commandLine = "abc failed", useCount = 1, failureCount = 1),
-                TerminalCommandCompletionStats(commandLine = "abc accepted", acceptedCount = 1),
+                commandLearning(commandLine = "abc failed", useCount = 1, failureCount = 1),
+                commandLearning(commandLine = "abc accepted", acceptedCount = 1),
             )
 
         assertEquals(listOf("success"), candidates(index, "abc ").map { it.replacementText })
@@ -106,36 +108,43 @@ class LearnedObservedTokenIndexTest {
     }
 
     @Test
-    fun `aggregates duplicate transitions and retains their best matching host context`() {
+    fun `partitions transitions and success counts by exact canonical learning context`() {
         val index =
             index(
                 positive(
-                    commandLine = "abc deploy --fast",
-                    successCount = 2,
+                    commandLine = "abc deploy",
+                    successCount = 1,
                     profileId = "bash",
                     workingDirectoryUri = "file:///repo",
                 ),
                 positive(
-                    commandLine = "abc deploy --force",
-                    successCount = 3,
-                    profileId = "pwsh",
+                    commandLine = "abc deploy",
+                    successCount = 20,
+                    profileId = "bash",
                     workingDirectoryUri = "file:///other",
                 ),
                 positive(
                     commandLine = "abc debug",
-                    successCount = 5,
+                    successCount = 2,
+                    profileId = "bash",
+                    workingDirectoryUri = "file:///repo",
                 ),
+                positive(commandLine = "abc unknown", successCount = 20),
             )
 
-        val matching = candidates(index, "abc d", profileId = "bash", workingDirectoryUri = "file:///repo")
-        val neutral = candidates(index, "abc d")
+        val exact = candidates(index, "abc d", profileId = "bash", workingDirectoryUri = "file:///repo/")
 
-        assertEquals(1, matching.count { it.replacementText == "deploy" })
-        assertTrue(matching.single { it.replacementText == "deploy" }.score > matching.single { it.replacementText == "debug" }.score)
+        assertEquals(setOf("debug", "deploy"), exact.mapTo(mutableSetOf()) { it.replacementText })
+        assertTrue(exact.single { it.replacementText == "debug" }.score > exact.single { it.replacementText == "deploy" }.score)
+        assertTrue(candidates(index, "abc d", profileId = "pwsh", workingDirectoryUri = "file:///repo").isEmpty())
         assertEquals(
-            neutral.single { it.replacementText == "debug" }.score,
-            neutral.single { it.replacementText == "deploy" }.score,
+            listOf("deploy"),
+            candidates(index, "abc d", profileId = "bash", workingDirectoryUri = "file:///other")
+                .map { it.replacementText },
         )
+        assertTrue(candidates(index, "abc d", profileId = "bash").isEmpty())
+        assertEquals(listOf("unknown"), candidates(index, "abc u").map { it.replacementText })
+        assertTrue(candidates(index, "abc u", profileId = "bash", workingDirectoryUri = "file:///repo").isEmpty())
     }
 
     @Test
@@ -158,13 +167,12 @@ class LearnedObservedTokenIndexTest {
         assertTrue("token2049" in replacements)
     }
 
-    private fun index(vararg rows: TerminalCommandCompletionStats): LearnedObservedTokenIndex =
+    private fun index(vararg rows: TestCommandLearning): LearnedObservedTokenIndex =
         CompletionLearningIndexCache()
             .indexesFor(snapshot(*rows), TerminalShellSyntax.POSIX)
             .observed
 
-    private fun snapshot(vararg rows: TerminalCommandCompletionStats): TerminalCommandCompletionStatsSnapshot =
-        TerminalCommandCompletionStatsSnapshot(rows.toList())
+    private fun snapshot(vararg rows: TestCommandLearning): TerminalCompletionLearningSnapshot = learningSnapshot(rows.toList())
 
     private fun candidates(
         index: LearnedObservedTokenIndex,
@@ -202,8 +210,8 @@ class LearnedObservedTokenIndexTest {
         successCount: Int = 1,
         profileId: String? = null,
         workingDirectoryUri: String? = null,
-    ): TerminalCommandCompletionStats =
-        TerminalCommandCompletionStats(
+    ): TestCommandLearning =
+        commandLearning(
             commandLine = commandLine,
             profileId = profileId,
             workingDirectoryUri = workingDirectoryUri,

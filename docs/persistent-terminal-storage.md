@@ -1,8 +1,9 @@
 # Persistent Terminal Storage Layout
 
 This document describes how KetraTerm stores local configuration, backups, and
-command-completion learning data. Stored command data is intended for ranking
-local suggestions only; raw terminal stdout/stderr is never saved.
+command-completion learning data. Stored command data is used only for local
+ranking and policy-approved replay suggestions; raw terminal stdout/stderr is
+never saved.
 
 ## Directory Resolution Hierarchy
 
@@ -22,7 +23,7 @@ The workspace configuration path is resolved by
 
 Standalone backup and completion-learning files are stored next to the resolved
 `config.toml`. The IntelliJ plugin stores its application-level completion index under the IDE system directory at
-`ketraterm/command-completion-stats-v2.tsv`.
+`ketraterm/command-completion-learning-v3.tsv`.
 
 ## Files
 
@@ -38,21 +39,29 @@ comments.
 If the config manager encounters a fatal parse error, it copies the malformed
 file to `config.toml.broken`, then writes clean defaults so the app can start.
 
-### `command-completion-stats-v2.tsv`
+### `command-completion-learning-v3.tsv`
 
 For both standalone and IntelliJ this is an opt-in compact suggestion-learning
-index rather than a replayable terminal transcript. It stores sanitized
-aggregate exact-command counters used by the completion engine:
+index rather than a terminal transcript. It stores opaque exact-command
+ranking evidence separately from the smaller set of commands approved for
+plaintext replay:
 
 ```tsv
-KetraTerm_COMMAND_COMPLETION_STATS	2
-C	<commandBase64>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
+KetraTerm_COMMAND_COMPLETION_LEARNING	3
+R	<identityDigest>	<profileBase64>	<cwdBase64>	<useCount>	<successCount>	<failureCount>	<acceptedCount>	<dismissedCount>	<lastUsedEpochMillis>
+H	<identityDigest>	<commandBase64>	<profileBase64>	<cwdBase64>
 ```
 
-Text fields are Base64URL-encoded without padding so tabs and Unicode text do
-not corrupt the TSV layout. Base64URL is not encryption. The decoder accepts
-only the header and exact `C` rows shown above; unsupported or malformed rows
-reject the complete file.
+`R` rows contain no command text. Their Base64URL SHA-256 identity preserves
+the exact single-line command, including case and trailing whitespace. A deterministic digest is not directly
+decodable, but common commands remain guessable by hashing candidate strings.
+`H` rows contain successful or accepted, policy-approved plaintext for history replay and
+observed-token inference; each must match an `R` row with the same identity and
+context. Text fields are Base64URL-encoded without padding so tabs and Unicode
+do not corrupt the TSV layout. Base64URL is not encryption. The decoder accepts
+only the version 3 header, followed by `R` rows and then `H` rows. Legacy,
+unsupported, malformed, or internally inconsistent files are rejected as a
+whole.
 
 `TerminalCompletionLearningCoordinator` is the single runtime owner. Each
 bounded learning event updates memory before its recording call returns, so
@@ -90,19 +99,27 @@ file once, and later toggles do not reload it. A rejected or unreadable file is
 not overwritten during that lifecycle. Product-lifetime in-memory learning remains active. The plugin's
 enabled store lives in the IDE system directory described above.
 
-Before any exact-command row enters persistent learning, the shared coordinator
-applies `TerminalCompletionPersistencePolicy`:
+Before plaintext enters retained learning, `TerminalCompletionLearningStore`
+applies `TerminalCompletionReplayPolicy`. The file store rechecks the same
+eligibility before encoding:
 
 1. Commands starting with a space or tab are ignored, matching the common shell
    `HISTCONTROL=ignorespace` convention.
-2. Blank and multi-line commands are ignored.
-3. Commands containing sensitive substrings are ignored,
+2. Blank, multi-line, and malformed UTF-16 commands are not learned.
+3. Text containing ISO controls other than internal tabs, more than 4,096
+   UTF-16 code units, or more than 8,192 UTF-8 bytes is excluded from replay.
+4. Commands containing sensitive substrings are excluded from replay,
    including password/passwd, secret, token, apikey/api_key, private_key,
    access_key, secret_key, bearer, authorization, credential/credentials,
    passcode, passphrase, jwt, key markers, and auth markers.
+5. Common credential-bearing option forms for Curl, MySQL/MariaDB, Docker
+   login, Redis, and `sshpass` are excluded.
+6. URI authority user-info containing a password is excluded from replay.
 
-Exact rows retain command text and optional profile and
-working-directory context. The filters block common accidental disclosures but
-cannot recognize every argument, path, URL, credential, or user-defined secret.
-Treat `command-completion-stats-v2.tsv` as sensitive local command-derived data
+Well-formed commands rejected by the replay policy can still update and persist
+opaque ranking counters, but they cannot be replayed or used for observed-token inference. Approved replay rows
+retain command text and optional profile and working-directory context. The
+filters block common accidental disclosures but cannot recognize every
+argument, path, URL, credential, or user-defined secret. Treat
+`command-completion-learning-v3.tsv` as sensitive local command-derived data
 and protect it with normal filesystem permissions.

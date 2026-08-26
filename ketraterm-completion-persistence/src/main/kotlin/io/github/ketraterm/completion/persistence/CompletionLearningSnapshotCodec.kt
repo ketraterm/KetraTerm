@@ -15,42 +15,55 @@
  */
 package io.github.ketraterm.completion.persistence
 
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.model.TerminalCommandReplay
+import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
+import io.github.ketraterm.completion.model.TerminalCompletionRankingStats
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import java.util.*
 
-/** Strict internal line codec for exact-command completion-learning statistics. */
+/** Strict internal line codec for split completion learning. */
 internal object CompletionLearningSnapshotCodec {
     fun currentFileName(): String = FILE_NAME
 
-    fun encode(snapshot: TerminalCommandCompletionStatsSnapshot): List<String> =
-        buildList(1 + snapshot.commandStats.size) {
+    fun encode(snapshot: TerminalCompletionLearningSnapshot): List<String> =
+        buildList(1 + snapshot.rankingStats.size + snapshot.replayCommands.size) {
             add(HEADER)
-            for (record in snapshot.commandStats) add(encodeCommandRow(record))
+            for (record in snapshot.rankingStats) add(encodeRankingRow(record))
+            for (record in snapshot.replayCommands) add(encodeReplayRow(record))
         }
 
-    fun decode(lines: List<String>): TerminalCommandCompletionStatsSnapshot? {
+    fun decode(lines: List<String>): TerminalCompletionLearningSnapshot? {
         if (lines.firstOrNull() != HEADER) return null
 
-        val commandRecords = ArrayList<TerminalCommandCompletionStats>(lines.size - 1)
+        val rankingStats = ArrayList<TerminalCompletionRankingStats>()
+        val replayCommands = ArrayList<TerminalCommandReplay>()
+        var replayRowsStarted = false
         var index = 1
         while (index < lines.size) {
             val fields = lines[index].split('\t')
-            if (fields.firstOrNull() != ROW_COMMAND) return null
-            commandRecords += decodeCommandRow(fields) ?: return null
+            when (fields.firstOrNull()) {
+                ROW_RANKING -> {
+                    if (replayRowsStarted) return null
+                    rankingStats += decodeRankingRow(fields) ?: return null
+                }
+                ROW_REPLAY -> {
+                    replayRowsStarted = true
+                    replayCommands += decodeReplayRow(fields) ?: return null
+                }
+                else -> return null
+            }
             index++
         }
-        return TerminalCommandCompletionStatsSnapshot(commandStats = commandRecords)
+        return TerminalCompletionLearningSnapshot(rankingStats, replayCommands)
     }
 
-    fun encodeCommandRow(record: TerminalCommandCompletionStats): String =
+    fun encodeRankingRow(record: TerminalCompletionRankingStats): String =
         listOf(
-            ROW_COMMAND,
-            encodeText(record.commandLine),
+            ROW_RANKING,
+            record.identityDigest,
             encodeText(record.profileId.orEmpty()),
             encodeText(record.workingDirectoryUri.orEmpty()),
             record.useCount.toString(),
@@ -61,11 +74,20 @@ internal object CompletionLearningSnapshotCodec {
             record.lastUsedEpochMillis.toString(),
         ).joinToString("\t")
 
-    private fun decodeCommandRow(fields: List<String>): TerminalCommandCompletionStats? {
-        if (fields.size != COMMAND_STATS_FIELD_COUNT) return null
+    fun encodeReplayRow(record: TerminalCommandReplay): String =
+        listOf(
+            ROW_REPLAY,
+            record.identityDigest,
+            encodeText(record.commandLine),
+            encodeText(record.profileId.orEmpty()),
+            encodeText(record.workingDirectoryUri.orEmpty()),
+        ).joinToString("\t")
+
+    private fun decodeRankingRow(fields: List<String>): TerminalCompletionRankingStats? {
+        if (fields.size != RANKING_FIELD_COUNT) return null
         return try {
-            TerminalCommandCompletionStats(
-                commandLine = decodeText(fields[1]),
+            TerminalCompletionRankingStats(
+                identityDigest = fields[1],
                 profileId = decodeText(fields[2]).takeIf(String::isNotEmpty),
                 workingDirectoryUri = decodeText(fields[3]).takeIf(String::isNotEmpty),
                 useCount = fields[4].toInt(),
@@ -74,6 +96,22 @@ internal object CompletionLearningSnapshotCodec {
                 acceptedCount = fields[7].toInt(),
                 dismissedCount = fields[8].toInt(),
                 lastUsedEpochMillis = fields[9].toLong(),
+            )
+        } catch (_: IllegalArgumentException) {
+            null
+        } catch (_: CharacterCodingException) {
+            null
+        }
+    }
+
+    private fun decodeReplayRow(fields: List<String>): TerminalCommandReplay? {
+        if (fields.size != REPLAY_FIELD_COUNT) return null
+        return try {
+            TerminalCommandReplay(
+                identityDigest = fields[1],
+                commandLine = decodeText(fields[2]),
+                profileId = decodeText(fields[3]).takeIf(String::isNotEmpty),
+                workingDirectoryUri = decodeText(fields[4]).takeIf(String::isNotEmpty),
             )
         } catch (_: IllegalArgumentException) {
             null
@@ -102,11 +140,13 @@ internal object CompletionLearningSnapshotCodec {
             .decode(ByteBuffer.wrap(decoder.decode(value)))
             .toString()
 
-    private const val FORMAT_VERSION = 2
-    private const val FILE_NAME = "command-completion-stats-v$FORMAT_VERSION.tsv"
-    private const val HEADER = "KetraTerm_COMMAND_COMPLETION_STATS\t$FORMAT_VERSION"
-    private const val COMMAND_STATS_FIELD_COUNT = 10
-    private const val ROW_COMMAND = "C"
+    private const val FORMAT_VERSION = 3
+    private const val FILE_NAME = "command-completion-learning-v$FORMAT_VERSION.tsv"
+    private const val HEADER = "KetraTerm_COMMAND_COMPLETION_LEARNING\t$FORMAT_VERSION"
+    private const val RANKING_FIELD_COUNT = 10
+    private const val REPLAY_FIELD_COUNT = 5
+    private const val ROW_RANKING = "R"
+    private const val ROW_REPLAY = "H"
     private val encoder = Base64.getUrlEncoder().withoutPadding()
     private val decoder = Base64.getUrlDecoder()
 }

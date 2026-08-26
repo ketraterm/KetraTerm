@@ -46,24 +46,26 @@ class SwingCompletionSuggestionProvider(
      * @return cold ordered Swing suggestion snapshots, or one empty snapshot when conversion is invalid.
      */
     override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> {
-        val context = contextProvider()
+        val requestContext = contextProvider()
         val completionRequest =
             try {
                 TerminalCompletionRequest(
                     commandLine = request.commandText,
                     cursorOffset = request.cursorOffset,
-                    workingDirectoryUri = context.workingDirectoryUri,
-                    profileId = context.profileId,
-                    shellCapabilities = context.shellCapabilities,
+                    workingDirectoryUri = requestContext.workingDirectoryUri,
+                    profileId = requestContext.profileId,
+                    shellCapabilities = requestContext.shellCapabilities,
                 )
             } catch (_: IllegalArgumentException) {
                 return flowOf(emptyList())
             }
-        return engine.completions(completionRequest).map { candidates -> candidates.map { it.toSwingSuggestion() } }
+        return engine
+            .completions(completionRequest)
+            .map { candidates -> candidates.map { it.toSwingSuggestion(requestContext) } }
     }
 
     private companion object {
-        private fun TerminalCompletionCandidate.toSwingSuggestion(): SwingShellSuggestion =
+        private fun TerminalCompletionCandidate.toSwingSuggestion(requestContext: SwingCompletionContext): SwingShellSuggestion =
             SwingShellSuggestion(
                 replacementText = replacementText,
                 replacementStartOffset = replacementStartOffset,
@@ -74,6 +76,7 @@ class SwingCompletionSuggestionProvider(
                 displayText = displayText,
                 detail = detail,
                 accentRole = SwingShellSuggestionAccentRole.from(kind.name, source),
+                interactionContext = requestContext,
                 matchedRanges =
                     SwingShellSuggestionMatchRanges.fromPackedOffsets(
                         displayText,

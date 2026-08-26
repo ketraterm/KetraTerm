@@ -25,12 +25,12 @@ import io.github.ketraterm.completion.commandline.isTerminalOptionToken
 import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
 import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.internal.ParsedLearnedStatsRow
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCompletionRankingStats
 import io.github.ketraterm.completion.stats.saturatedCounterSum
 
-/** Immutable observed-token transitions derived from successful exact-command rows. */
+/** Immutable exact-host-context observed-token transitions derived from successful command rows. */
 internal class LearnedObservedTokenIndex private constructor(
-    private val buckets: Map<List<String>, List<Entry>>,
+    private val buckets: Map<ObservedBucketKey, List<Entry>>,
 ) {
     /** Appends matching transitions for executable families without a static command specification. */
     fun appendCandidates(
@@ -39,7 +39,7 @@ internal class LearnedObservedTokenIndex private constructor(
         destination: MutableList<TerminalCompletionCandidate>,
     ) {
         val observedContext = context.observedContext() ?: return
-        val bucket = buckets[observedContext] ?: return
+        val bucket = buckets[ObservedBucketKey(CompletionLearningContextKey.from(request), observedContext)] ?: return
         val prefix = normalizeTerminalCommandToken(context.activePrefix)
         var index = bucket.lowerBound(prefix)
         while (index < bucket.size) {
@@ -102,25 +102,11 @@ internal class LearnedObservedTokenIndex private constructor(
                 } else {
                     TerminalCompletionCandidateKind.ARGUMENT
                 },
-            score = score(request),
+            score = score(),
         )
     }
 
-    private fun Entry.score(request: TerminalCompletionRequest): Int {
-        var bestContextBoost = 0
-        val requestContext = CompletionLearningContextKey.from(request)
-        for (context in contexts) {
-            var boost = 0
-            if (context.profileId != null && context.profileId == requestContext.profileId) boost += PROFILE_MATCH_SCORE
-            if (context.workingDirectoryUri != null && context.workingDirectoryUri == requestContext.workingDirectoryUri) {
-                boost += WORKING_DIRECTORY_MATCH_SCORE
-            }
-            bestContextBoost = maxOf(bestContextBoost, boost)
-        }
-        return BASE_SCORE +
-            minOf(successCount, MAX_SUCCESS_SCORE_UNITS) * SUCCESS_SCORE +
-            bestContextBoost
-    }
+    private fun Entry.score(): Int = BASE_SCORE + minOf(successCount, MAX_SUCCESS_SCORE_UNITS) * SUCCESS_SCORE
 
     companion object {
         /** Builds one deterministic bounded index from rows parsed by the shared learning compiler. */
@@ -135,10 +121,10 @@ internal class LearnedObservedTokenIndex private constructor(
                 aggregates.values
                     .sortedWith(RETENTION_ORDER)
                     .take(MAX_ENTRY_COUNT)
-            val mutableBuckets = HashMap<List<String>, MutableList<Entry>>()
+            val mutableBuckets = HashMap<ObservedBucketKey, MutableList<Entry>>()
             for (aggregate in retained) {
                 mutableBuckets
-                    .getOrPut(aggregate.context, ::ArrayList)
+                    .getOrPut(aggregate.bucketKey, ::ArrayList)
                     .add(aggregate.freeze())
             }
             return LearnedObservedTokenIndex(
@@ -159,6 +145,7 @@ internal class LearnedObservedTokenIndex private constructor(
             val executable = normalizeTerminalCommandToken(tokens[tokenIndex].text)
             if (executable.isBlank()) return
 
+            val learningContext = CompletionLearningContextKey.of(row.stats.profileId, row.stats.workingDirectoryUri)
             val context = ArrayList<String>()
             context += executable
             tokenIndex++
@@ -171,12 +158,12 @@ internal class LearnedObservedTokenIndex private constructor(
                     normalizedToken.isBlank() -> Unit
                     normalizedToken in COMMAND_OPERATORS || normalizedToken == TERMINAL_COMMAND_OPTION_TERMINATOR -> return
                     normalizedToken.isTerminalOptionToken() -> {
-                        token.observedOptionToken()?.let { retain(context, it, row.stats, aggregates) }
+                        token.observedOptionToken()?.let { retain(context, it, learningContext, row.stats, aggregates) }
                         context += normalizedToken
                         encounteredOption = true
                     }
                     !observedFirstArgument && !encounteredOption -> {
-                        retain(context, token, row.stats, aggregates)
+                        retain(context, token, learningContext, row.stats, aggregates)
                         context += normalizedToken
                         observedFirstArgument = true
                     }
@@ -189,21 +176,21 @@ internal class LearnedObservedTokenIndex private constructor(
         private fun retain(
             context: List<String>,
             token: String,
-            stats: TerminalCommandCompletionStats,
+            learningContext: CompletionLearningContextKey,
+            stats: TerminalCompletionRankingStats,
             aggregates: MutableMap<TransitionKey, MutableEntry>,
         ) {
             if (token.isBlank()) return
-            val key = TransitionKey(context.toList(), token)
+            val key = TransitionKey(ObservedBucketKey(learningContext, context.toList()), token)
             val aggregate =
                 aggregates.getOrPut(key) {
                     MutableEntry(
-                        context = key.context,
+                        bucketKey = key.bucketKey,
                         token = key.token,
                         normalizedToken = normalizeTerminalCommandToken(key.token),
                     )
                 }
             aggregate.successCount = saturatedCounterSum(aggregate.successCount, stats.successCount)
-            aggregate.contexts += CompletionLearningContextKey.of(stats.profileId, stats.workingDirectoryUri)
         }
 
         private fun String.observedOptionToken(): String? =
@@ -215,41 +202,44 @@ internal class LearnedObservedTokenIndex private constructor(
 
         private val RETENTION_ORDER =
             compareByDescending<MutableEntry> { it.successCount }
-                .thenBy { it.context.joinToString(CONTEXT_SEPARATOR) }
+                .thenBy { it.bucketKey.observedContext.joinToString(CONTEXT_SEPARATOR) }
                 .thenBy { it.normalizedToken }
                 .thenBy { it.token }
+                .thenBy { it.bucketKey.learningContext.profileId }
+                .thenBy { it.bucketKey.learningContext.workingDirectoryUri }
 
         private const val SOURCE_ID = "observed"
         private const val DETAIL = "learned from successful commands"
         private const val BASE_SCORE = 760
         private const val SUCCESS_SCORE = 30
         private const val MAX_SUCCESS_SCORE_UNITS = 20
-        private const val PROFILE_MATCH_SCORE = 60
-        private const val WORKING_DIRECTORY_MATCH_SCORE = 90
         private const val MAX_ENTRY_COUNT = 2048
         private const val CONTEXT_SEPARATOR = "\u0000"
         private const val SHORT_OPTION_LENGTH = 2
         private val COMMAND_OPERATORS = setOf("&&", "||", "|", "|&", ";", "&")
     }
 
+    private data class ObservedBucketKey(
+        val learningContext: CompletionLearningContextKey,
+        val observedContext: List<String>,
+    )
+
     private data class TransitionKey(
-        val context: List<String>,
+        val bucketKey: ObservedBucketKey,
         val token: String,
     )
 
     private class MutableEntry(
-        val context: List<String>,
+        val bucketKey: ObservedBucketKey,
         val token: String,
         val normalizedToken: String,
         var successCount: Int = 0,
-        val contexts: MutableSet<CompletionLearningContextKey> = HashSet(),
     ) {
         fun freeze(): Entry =
             Entry(
                 token = token,
                 normalizedToken = normalizedToken,
                 successCount = successCount,
-                contexts = contexts.toList(),
             )
     }
 
@@ -257,6 +247,5 @@ internal class LearnedObservedTokenIndex private constructor(
         val token: String,
         val normalizedToken: String,
         val successCount: Int,
-        val contexts: List<CompletionLearningContextKey>,
     )
 }

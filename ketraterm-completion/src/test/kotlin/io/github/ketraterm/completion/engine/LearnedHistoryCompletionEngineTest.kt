@@ -16,10 +16,10 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.testing.commandLearning
+import io.github.ketraterm.completion.testing.learningSnapshot
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,7 +46,7 @@ class LearnedHistoryCompletionEngineTest {
         }
 
     @Test
-    fun `relative learned cd commands remain scoped to their recorded directory`() =
+    fun `every learned command remains scoped to its recorded directory`() =
         runBlocking {
             val recordedDirectory = "file:///C:/Users/gagik"
             val learningStore = TerminalCompletionLearningStore()
@@ -62,11 +62,24 @@ class LearnedHistoryCompletionEngineTest {
                 engine
                     .complete(request("c", workingDirectoryUri = "$recordedDirectory/IdeaProjects/JvTerm"))
                     .filter { it.source == "learned" }
-                    .map { it.replacementText }
+            assertTrue(otherDirectoryCandidates.isEmpty())
+
+            val matchingDirectoryCandidates =
+                engine
+                    .complete(request("c", workingDirectoryUri = "$recordedDirectory/"))
+                    .filter { it.source == "learned" }
+                    .mapTo(mutableSetOf()) { it.replacementText }
 
             assertEquals(
-                setOf("cd /usr/bin", "cd ..", "cat relative/file.txt", "cd -- /opt/tools"),
-                otherDirectoryCandidates.toSet(),
+                setOf(
+                    "cd IdeaProjects/JvTerm/",
+                    "cd /usr/bin",
+                    "cd ..",
+                    "cat relative/file.txt",
+                    "cd -- /opt/tools",
+                    "cd -- sibling",
+                ),
+                matchingDirectoryCandidates,
             )
 
             val matchingDirectoryCandidate =
@@ -77,27 +90,6 @@ class LearnedHistoryCompletionEngineTest {
             assertEquals("IdeaProjects/JvTerm/", matchingDirectoryCandidate.replacementText)
             assertEquals(TerminalCompletionCandidateKind.PATH, matchingDirectoryCandidate.kind)
             assertEquals("learned directory", matchingDirectoryCandidate.detail)
-        }
-
-    @Test
-    fun `PowerShell path option is classified from the shared parsed row`() =
-        runBlocking {
-            val recordedDirectory = "file:///C:/Users/gagik"
-            val learningStore = TerminalCompletionLearningStore()
-            learningStore.recordCommandResult("Set-Location -Path C:\\Windows", true, null, recordedDirectory, 10)
-            learningStore.recordCommandResult("Set-Location -Path child", true, null, recordedDirectory, 20)
-
-            val candidates =
-                engine(learningStore)
-                    .complete(
-                        request(
-                            "Set",
-                            workingDirectoryUri = "file:///C:/Elsewhere",
-                            shellCapabilities = TerminalShellCapabilities.POWERSHELL,
-                        ),
-                    ).filter { it.source == "learned" }
-
-            assertEquals(listOf("Set-Location -Path C:\\Windows"), candidates.map { it.replacementText })
         }
 
     @Test
@@ -137,15 +129,15 @@ class LearnedHistoryCompletionEngineTest {
             val learningStore =
                 TerminalCompletionLearningStore().apply {
                     mergeSnapshot(
-                        TerminalCommandCompletionStatsSnapshot(
-                            commandStats =
+                        learningSnapshot(
+                            rows =
                                 listOf(
-                                    TerminalCommandCompletionStats(
+                                    commandLearning(
                                         commandLine = "tool a-old",
                                         successCount = 1,
                                         lastUsedEpochMillis = now - 31L * 24L * 60L * 60L * 1_000L,
                                     ),
-                                    TerminalCommandCompletionStats(
+                                    commandLearning(
                                         commandLine = "tool z-new",
                                         successCount = 1,
                                         lastUsedEpochMillis = now - 60L * 1_000L,

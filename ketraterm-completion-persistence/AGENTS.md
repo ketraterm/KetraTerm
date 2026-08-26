@@ -1,13 +1,13 @@
 # Terminal Completion Persistence Agent Guide
 
-`ketraterm-completion-persistence` owns bounded local filesystem persistence for exact-command learning snapshots.
+`ketraterm-completion-persistence` owns bounded local filesystem persistence for split exact-command learning snapshots.
 
 ## Responsibility
 
 This module may:
 
-- encode and decode exact-command snapshots through public completion contracts.
-- sanitize snapshots at the storage boundary.
+- encode and decode opaque ranking evidence plus optional plaintext replay rows through public completion contracts.
+- recheck replay eligibility at the storage boundary.
 - perform versioned, atomic local-file replacement.
 - apply bounded in-memory learning synchronously in one lifecycle coordinator.
 - checkpoint dirty snapshots periodically through one conflated worker.
@@ -22,7 +22,7 @@ This module must not:
 - depend on Swing, IntelliJ Platform, session, workspace, PTY, or app modules.
 - choose product-specific storage directories or persistence settings.
 - create or implicitly own coroutine scopes.
-- persist any learning family beyond exact-command aggregates.
+- persist any learning family beyond opaque exact-command evidence and its optional replay projection.
 
 The persistence coordinator may create one worker in its caller-supplied scope;
 it must not create an executor or independent scope. Learning must become

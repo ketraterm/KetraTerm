@@ -16,9 +16,9 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.testing.commandLearning
+import io.github.ketraterm.completion.testing.learningSnapshot
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -87,10 +87,10 @@ class CompletionRankingReplayTest {
                 }
             }
         val snapshot =
-            TerminalCommandCompletionStatsSnapshot(
-                commandStats =
+            learningSnapshot(
+                rows =
                     listOf(
-                        TerminalCommandCompletionStats(
+                        commandLearning(
                             commandLine = learnedCommand,
                             profileId = PROFILE,
                             workingDirectoryUri = WORKING_DIRECTORY,

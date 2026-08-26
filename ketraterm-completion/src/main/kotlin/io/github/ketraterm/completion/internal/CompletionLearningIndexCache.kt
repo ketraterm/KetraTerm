@@ -18,21 +18,21 @@ package io.github.ketraterm.completion.internal
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.model.TerminalCommandReplay
+import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
+import io.github.ketraterm.completion.model.TerminalCompletionRankingStats
 import io.github.ketraterm.completion.ranking.LearnedCompletionEvidenceIndex
-import io.github.ketraterm.completion.ranking.TerminalCompletionOutcomeKeyResolver
 import io.github.ketraterm.completion.source.LearnedHistoryCandidateIndex
 import io.github.ketraterm.completion.source.LearnedObservedTokenIndex
 
 /** Compiles and shares derived learning indexes for one current snapshot. */
 internal class CompletionLearningIndexCache {
     private val lock = Any()
-    private var cachedSnapshot: TerminalCommandCompletionStatsSnapshot? = null
+    private var cachedSnapshot: TerminalCompletionLearningSnapshot? = null
     private val indexesBySyntax = arrayOfNulls<CompletionLearningIndexes>(TerminalShellSyntax.entries.size)
 
     fun indexesFor(
-        snapshot: TerminalCommandCompletionStatsSnapshot,
+        snapshot: TerminalCompletionLearningSnapshot,
         shellSyntax: TerminalShellSyntax,
     ): CompletionLearningIndexes =
         synchronized(lock) {
@@ -46,23 +46,22 @@ internal class CompletionLearningIndexCache {
         }
 
     private fun buildIndexes(
-        snapshot: TerminalCommandCompletionStatsSnapshot,
+        snapshot: TerminalCompletionLearningSnapshot,
         shellSyntax: TerminalShellSyntax,
     ): CompletionLearningIndexes {
-        val parsedRows = ArrayList<ParsedLearnedStatsRow>(snapshot.commandStats.size)
-        for (stats in snapshot.commandStats) {
-            val line = TerminalCommandLineTokenizer.parse(stats.commandLine, stats.commandLine.length, shellSyntax)
-            parsedRows += ParsedLearnedStatsRow(stats, line)
+        val rankingByKey = HashMap<LearningRowKey, TerminalCompletionRankingStats>(snapshot.rankingStats.size)
+        for (stats in snapshot.rankingStats) rankingByKey[stats.rowKey()] = stats
+        val parsedRows = ArrayList<ParsedLearnedStatsRow>(snapshot.replayCommands.size)
+        for (replay in snapshot.replayCommands) {
+            val stats = rankingByKey[replay.rowKey()] ?: continue
+            val line = TerminalCommandLineTokenizer.parse(replay.commandLine, replay.commandLine.length, shellSyntax)
+            parsedRows += ParsedLearnedStatsRow(stats, replay, line)
         }
         return CompletionLearningIndexes(
-            evidence = LearnedCompletionEvidenceIndex.build(parsedRows, LEARNED_KEY_RESOLVER),
+            evidence = LearnedCompletionEvidenceIndex.build(snapshot.rankingStats),
             history = LearnedHistoryCandidateIndex.build(parsedRows),
             observed = LearnedObservedTokenIndex.build(parsedRows),
         )
-    }
-
-    private companion object {
-        private val LEARNED_KEY_RESOLVER = TerminalCompletionOutcomeKeyResolver()
     }
 }
 
@@ -75,6 +74,18 @@ internal class CompletionLearningIndexes(
 
 /** One learned row tokenized for every derived index. */
 internal class ParsedLearnedStatsRow(
-    val stats: TerminalCommandCompletionStats,
+    val stats: TerminalCompletionRankingStats,
+    val replay: TerminalCommandReplay,
     val lineContext: TerminalCommandLineContext,
 )
+
+private data class LearningRowKey(
+    val identityDigest: String,
+    val context: CompletionLearningContextKey,
+)
+
+private fun TerminalCompletionRankingStats.rowKey(): LearningRowKey =
+    LearningRowKey(identityDigest, CompletionLearningContextKey.of(profileId, workingDirectoryUri))
+
+private fun TerminalCommandReplay.rowKey(): LearningRowKey =
+    LearningRowKey(identityDigest, CompletionLearningContextKey.of(profileId, workingDirectoryUri))

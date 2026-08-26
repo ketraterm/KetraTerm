@@ -48,9 +48,9 @@ Characters that match your search query are highlighted in **bold** with your ac
 
 ### 7. Local, Opt-In Learning
 - Suggestion learning works in memory by default. Both standalone KetraTerm and the IntelliJ plugin require an explicit setting before learned statistics are loaded from or written to disk.
-- When enabled, the local file stores sanitized aggregate exact-command rows, including command text plus optional profile and working-directory context.
-- Commands with leading whitespace and common secret-bearing patterns are filtered. Filtering is a safeguard rather than a guarantee: arguments, paths, URLs, or secrets that do not match a filter can still appear in an exact-command row.
-- The v2 persistence file is Base64URL-encoded TSV, not encrypted. One product-lifetime in-memory store supplies learned history, observed unknown-command tokens, and ranking evidence; disk privacy filtering does not suppress current-lifetime learning.
+- When enabled, the version 3 local file stores opaque exact-command ranking counters separately from optional plaintext replay rows. Replay is limited to successful or accepted commands in the exact recorded profile and working-directory context.
+- Leading whitespace, malformed or control-bearing text, oversized commands, and common credential patterns are excluded from plaintext replay. Filtering is best-effort rather than a guarantee: unrecognized sensitive values may still appear in an approved replay row.
+- The file uses Base64URL encoding, not encryption, and deterministic command digests remain guessable. Commands rejected for replay may still contribute opaque ranking evidence, but cannot produce history or observed-token suggestions.
 
 ---
 

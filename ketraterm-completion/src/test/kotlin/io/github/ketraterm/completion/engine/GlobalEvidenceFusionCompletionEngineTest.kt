@@ -16,7 +16,12 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.*
+import io.github.ketraterm.completion.model.TerminalCommandSpec
+import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
+import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.testing.commandLearning
+import io.github.ketraterm.completion.testing.learningSnapshot
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -78,11 +83,12 @@ class GlobalEvidenceFusionCompletionEngineTest {
     fun `learning store produces one learned directory candidate without a provider source`() =
         runBlocking {
             val snapshot =
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
+                learningSnapshot(
+                    rows =
                         listOf(
-                            TerminalCommandCompletionStats(
+                            commandLearning(
                                 commandLine = "cd IdeaProjects/KetraTerm/",
+                                profileId = "profile",
                                 workingDirectoryUri = "file:///home",
                                 successCount = 4,
                             ),
@@ -125,10 +131,10 @@ class GlobalEvidenceFusionCompletionEngineTest {
     fun `accepted exact outcome promotes matching path candidate`() =
         runBlocking {
             val snapshot =
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
+                learningSnapshot(
+                    rows =
                         listOf(
-                            TerminalCommandCompletionStats(
+                            commandLearning(
                                 commandLine = "cd build",
                                 profileId = "profile",
                                 workingDirectoryUri = "file:///repo",
@@ -162,11 +168,12 @@ class GlobalEvidenceFusionCompletionEngineTest {
     fun `successful directory history promotes the equivalent path outcome`() =
         runBlocking {
             val snapshot =
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
+                learningSnapshot(
+                    rows =
                         listOf(
-                            TerminalCommandCompletionStats(
+                            commandLearning(
                                 commandLine = "cd build",
+                                profileId = "profile",
                                 workingDirectoryUri = "file:///repo",
                                 useCount = 12,
                                 successCount = 12,
@@ -229,14 +236,14 @@ class GlobalEvidenceFusionCompletionEngineTest {
         }
 
     @Test
-    fun `relative path learning does not cross working directories`() =
+    fun `learned command replay does not cross working directories`() =
         runBlocking {
             val snapshot =
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
+                learningSnapshot(
+                    rows =
                         listOf(
-                            TerminalCommandCompletionStats(
-                                commandLine = "cd build",
+                            commandLearning(
+                                commandLine = "tool deploy",
                                 profileId = "profile",
                                 workingDirectoryUri = "file:///other",
                                 acceptedCount = 100,
@@ -245,35 +252,21 @@ class GlobalEvidenceFusionCompletionEngineTest {
                             ),
                         ),
                 )
-            val engine =
-                engine(
-                    sources =
-                        listOf(
-                            entry(
-                                source(
-                                    candidate("cache/", 3, 3, "path", TerminalCompletionCandidateKind.PATH, score = 100),
-                                    candidate("build/", 3, 3, "path", TerminalCompletionCandidateKind.PATH, score = 1),
-                                ),
-                                12,
-                            ),
-                        ),
-                    snapshot = snapshot,
-                    commandSpecs = TerminalCommandSpecs.defaults(),
-                )
+            val engine = engine(sources = emptyList(), snapshot = snapshot)
 
-            val candidates = engine.complete(request("cd ", workingDirectoryUri = "file:///repo"))
+            val candidates = engine.complete(request("tool d", workingDirectoryUri = "file:///repo"))
 
-            assertEquals("cache/", candidates.first().replacementText)
+            assertTrue(candidates.isEmpty())
         }
 
     @Test
     fun `explicit dismissal lowers one exact outcome`() =
         runBlocking {
             val snapshot =
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
+                learningSnapshot(
+                    rows =
                         listOf(
-                            TerminalCommandCompletionStats(
+                            commandLearning(
                                 commandLine = "git switch main",
                                 dismissedCount = 12,
                                 lastUsedEpochMillis = NOW,
@@ -320,16 +313,16 @@ class GlobalEvidenceFusionCompletionEngineTest {
     fun `successful executions help and failed executions hurt`() =
         runBlocking {
             val snapshot =
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
+                learningSnapshot(
+                    rows =
                         listOf(
-                            TerminalCommandCompletionStats(
+                            commandLearning(
                                 commandLine = "git switch main",
                                 useCount = 10,
                                 successCount = 10,
                                 lastUsedEpochMillis = NOW,
                             ),
-                            TerminalCommandCompletionStats(
+                            commandLearning(
                                 commandLine = "git switch maint",
                                 useCount = 10,
                                 failureCount = 10,
@@ -359,10 +352,10 @@ class GlobalEvidenceFusionCompletionEngineTest {
     fun `one learned event cannot overwhelm a stronger semantic context`() =
         runBlocking {
             val snapshot =
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
+                learningSnapshot(
+                    rows =
                         listOf(
-                            TerminalCommandCompletionStats(
+                            commandLearning(
                                 commandLine = "cd remembered",
                                 acceptedCount = 1,
                                 lastUsedEpochMillis = NOW,
@@ -386,11 +379,11 @@ class GlobalEvidenceFusionCompletionEngineTest {
     fun `recent evidence receives a larger boost than old evidence`() =
         runBlocking {
             val snapshot =
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
+                learningSnapshot(
+                    rows =
                         listOf(
-                            TerminalCommandCompletionStats(commandLine = "git switch main", useCount = 1, lastUsedEpochMillis = NOW),
-                            TerminalCommandCompletionStats(
+                            commandLearning(commandLine = "git switch main", useCount = 1, lastUsedEpochMillis = NOW),
+                            commandLearning(
                                 commandLine = "git switch maint",
                                 useCount = 1,
                                 lastUsedEpochMillis =
@@ -629,10 +622,10 @@ class GlobalEvidenceFusionCompletionEngineTest {
     fun `maximum counters future timestamps and extreme priorities remain bounded`() =
         runBlocking {
             val snapshot =
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
+                learningSnapshot(
+                    rows =
                         listOf(
-                            TerminalCommandCompletionStats(
+                            commandLearning(
                                 commandLine = "git switch main",
                                 useCount = Int.MAX_VALUE,
                                 successCount = Int.MAX_VALUE,
@@ -659,7 +652,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
 
     private fun engine(
         sources: List<TerminalCompletionSourceEntry>,
-        snapshot: TerminalCommandCompletionStatsSnapshot = TerminalCommandCompletionStatsSnapshot.EMPTY,
+        snapshot: TerminalCompletionLearningSnapshot = TerminalCompletionLearningSnapshot.EMPTY,
         commandSpecs: List<TerminalCommandSpec> = emptyList(),
     ): TerminalCompletionEngine =
         MergedCompletionEngine(

@@ -15,8 +15,9 @@
  */
 package io.github.ketraterm.completion.persistence
 
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
+import io.github.ketraterm.completion.model.TerminalCommandReplay
+import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
 import java.io.IOException
 import java.nio.file.Files
 import kotlin.io.path.createTempDirectory
@@ -25,7 +26,7 @@ import kotlin.test.*
 class CompletionLearningFileStoreTest {
     @Test
     fun `persist replaces the file synchronously`() {
-        val path = createTempDirectory("completion-store").resolve(TerminalCompletionLearningCoordinator.currentFileName())
+        val path = path("completion-store")
         val store = CompletionLearningFileStore(path)
         val first = snapshot("git status")
         val second = snapshot("npm test")
@@ -37,35 +38,79 @@ class CompletionLearningFileStoreTest {
     }
 
     @Test
-    fun `private command rows are removed before writing`() {
-        val path = createTempDirectory("completion-store-private").resolve(TerminalCompletionLearningCoordinator.currentFileName())
+    fun `credential events round trip as opaque evidence without replay text`() {
+        val path = path("completion-store-private")
         val store = CompletionLearningFileStore(path)
-        store.persist(
-            TerminalCommandCompletionStatsSnapshot(
-                commandStats =
-                    listOf(
-                        record("git status"),
-                        record("docker login --password hunter2"),
-                    ),
-            ),
-        )
+        val curl = "curl -u alice:s3cr3t https://example.test"
+        val mysql = "mysql -p hunter2"
+        val docker = "docker login -u alice -p hunter2"
+        val redis = "redis-cli -a hunter2"
+        val sshpass = "sshpass -p hunter2 ssh host"
+        val learned = snapshot(curl, mysql, docker, redis, sshpass)
 
-        assertEquals(listOf(record("git status")), store.loadSnapshot().loadedSnapshot().commandStats)
+        assertEquals(5, learned.rankingStats.size)
+        assertTrue(learned.replayCommands.isEmpty())
+        store.persist(learned)
+
+        val loaded = store.loadSnapshot().loadedSnapshot()
+        val persistedText = Files.readString(path)
+        assertEquals(learned.rankingStats, loaded.rankingStats)
+        assertTrue(loaded.replayCommands.isEmpty())
+        assertEquals(5, persistedText.lineSequence().count { it.startsWith("R\t") })
+        assertFalse(persistedText.lineSequence().any { it.startsWith("H\t") })
+        assertFalse("s3cr3t" in persistedText)
+        assertFalse("hunter2" in persistedText)
     }
 
     @Test
-    fun `encoded byte bound rejects a multibyte row without dropping later commands`() {
-        val path = createTempDirectory("completion-store-encoded-bound").resolve(TerminalCompletionLearningCoordinator.currentFileName())
-        val retained = record("git status")
+    fun `storage boundary removes an injected sensitive replay projection`() {
+        val path = path("completion-store-injected-private")
+        val store = CompletionLearningFileStore(path)
+        val command = "mysql -p hunter2"
+        val learned = snapshot(command)
+        val stats = learned.rankingStats.single()
+        val injected =
+            TerminalCommandReplay(
+                identityDigest = stats.identityDigest,
+                commandLine = command,
+                profileId = stats.profileId,
+                workingDirectoryUri = stats.workingDirectoryUri,
+            )
 
-        CompletionLearningFileStore(path).persist(
-            TerminalCommandCompletionStatsSnapshot(
-                commandStats = listOf(record("界".repeat(4_096)), retained),
-            ),
-        )
+        store.persist(TerminalCompletionLearningSnapshot(learned.rankingStats, listOf(injected)))
+
+        val loaded = store.loadSnapshot().loadedSnapshot()
+        assertEquals(learned.rankingStats, loaded.rankingStats)
+        assertTrue(loaded.replayCommands.isEmpty())
+    }
+
+    @Test
+    fun `storage boundary removes replay backed only by failed evidence`() {
+        val path = path("completion-store-negative-replay")
+        val store = CompletionLearningFileStore(path)
+        val command = "git failed-safe-command"
+        val learning = TerminalCompletionLearningStore()
+        learning.recordCommandResult(command, false, null, null, 1L)
+        val stats = learning.snapshot().rankingStats.single()
+        val injected = TerminalCommandReplay(stats.identityDigest, command)
+
+        store.persist(TerminalCompletionLearningSnapshot(listOf(stats), listOf(injected)))
+
+        val loaded = store.loadSnapshot().loadedSnapshot()
+        assertEquals(listOf(stats), loaded.rankingStats)
+        assertTrue(loaded.replayCommands.isEmpty())
+    }
+
+    @Test
+    fun `over-bound replay row is dropped without dropping later evidence or replay`() {
+        val path = path("completion-store-encoded-bound")
+        val learned = snapshot("界".repeat(4_096), "git status")
+
+        CompletionLearningFileStore(path).persist(learned)
 
         val loaded = CompletionLearningFileStore(path).loadSnapshot().loadedSnapshot()
-        assertEquals(listOf(retained), loaded.commandStats)
+        assertEquals(2, loaded.rankingStats.size)
+        assertEquals(listOf("git status"), loaded.replayCommands.map { it.commandLine })
         assertTrue(Files.readAllLines(path).all { it.toByteArray().size <= MAX_LINE_BYTES })
     }
 
@@ -93,7 +138,7 @@ class CompletionLearningFileStoreTest {
             CompletionLearningFileStore(path)
                 .loadSnapshot()
                 .loadedSnapshot()
-                .commandStats
+                .replayCommands
                 .single()
                 .commandLine,
         )
@@ -101,166 +146,93 @@ class CompletionLearningFileStoreTest {
 
     @Test
     fun `missing file is reported separately`() {
-        val path = createTempDirectory("completion-store-missing").resolve(TerminalCompletionLearningCoordinator.currentFileName())
-
-        assertSame(CompletionLearningFileLoadOutcome.Missing, CompletionLearningFileStore(path).loadSnapshot())
+        assertSame(CompletionLearningFileLoadOutcome.Missing, CompletionLearningFileStore(path("completion-store-missing")).loadSnapshot())
     }
 
     @Test
-    fun `previous format is rejected without changing bytes`() {
-        assertRejectedWithoutMutation("KetraTerm_COMMAND_COMPLETION_STATS\t1\n".encodeToByteArray())
+    fun `legacy unknown and malformed formats are rejected without changing bytes`() {
+        val valid = CompletionLearningSnapshotCodec.encode(snapshot("git status"))
+        val cases =
+            listOf(
+                "KetraTerm_COMMAND_COMPLETION_STATS\t2\n".encodeToByteArray(),
+                "KetraTerm_COMMAND_COMPLETION_LEARNING\t999\n".encodeToByteArray(),
+                (valid + "X\tunsupported").joinToString("\n", postfix = "\n").encodeToByteArray(),
+                (valid.take(2) + "H\ttoo-short").joinToString("\n", postfix = "\n").encodeToByteArray(),
+            )
+        for (bytes in cases) assertRejectedWithoutMutation(bytes)
     }
 
     @Test
-    fun `unknown header is rejected without changing bytes`() {
-        assertRejectedWithoutMutation("KetraTerm_COMMAND_COMPLETION_STATS\t999\nC\tignored".encodeToByteArray())
-    }
-
-    @Test
-    fun `oversized input file is rejected without changing bytes`() {
+    fun `oversized input file line and line count are rejected`() {
         assertRejectedWithoutMutation(ByteArray(MAX_FILE_BYTES + 1) { 'x'.code.toByte() })
-    }
+        assertRejectedWithoutMutation(HEADER.encodeToByteArray() + ByteArray(MAX_LINE_BYTES + 1) { 'x'.code.toByte() })
 
-    @Test
-    fun `oversized line is rejected without changing bytes`() {
-        val header = "KetraTerm_COMMAND_COMPLETION_STATS\t2\n".encodeToByteArray()
-        val oversizedLine = ByteArray(MAX_LINE_BYTES + 1) { 'x'.code.toByte() }
-
-        assertRejectedWithoutMutation(header + oversizedLine)
-    }
-
-    @Test
-    fun `excessive line count is rejected without changing bytes`() {
-        val validRow = CompletionLearningSnapshotCodec.encode(snapshot("git status"))[1]
-        val content =
+        val row = CompletionLearningSnapshotCodec.encode(snapshot("git status"))[1]
+        val excessiveRows =
             buildString {
-                appendLine("KetraTerm_COMMAND_COMPLETION_STATS\t2")
-                repeat(MAX_FILE_LINES) { appendLine(validRow) }
+                appendLine(HEADER.trimEnd())
+                repeat(MAX_FILE_LINES) { appendLine(row) }
             }.encodeToByteArray()
-
-        assertRejectedWithoutMutation(content)
-    }
-
-    @Test
-    fun `unsupported and removed row families are rejected without changing bytes`() {
-        val exactLines = CompletionLearningSnapshotCodec.encode(snapshot("git status"))
-
-        for (rowTag in listOf("S", "F", "X")) {
-            val originalBytes = (exactLines + "$rowTag\tunsupported").joinToString("\n", postfix = "\n").encodeToByteArray()
-            assertRejectedWithoutMutation(originalBytes)
-        }
-    }
-
-    @Test
-    fun `malformed exact row is rejected without changing bytes`() {
-        assertRejectedWithoutMutation(
-            "KetraTerm_COMMAND_COMPLETION_STATS\t2\nC\tnot-base64\n".encodeToByteArray(),
-        )
-    }
-
-    @Test
-    fun `over-bound exact row rejects the complete file`() {
-        val validRow = CompletionLearningSnapshotCodec.encodeCommandRow(record("git status"))
-        val overBoundRow = CompletionLearningSnapshotCodec.encodeCommandRow(record("x".repeat(MAX_TEXT_CHARS + 1)))
-        val originalBytes =
-            listOf("KetraTerm_COMMAND_COMPLETION_STATS\t2", validRow, overBoundRow, validRow)
-                .joinToString("\n", postfix = "\n")
-                .encodeToByteArray()
-
-        assertRejectedWithoutMutation(originalBytes)
-    }
-
-    @Test
-    fun `aggregate exact-row byte overflow rejects the complete file`() {
-        val row = CompletionLearningSnapshotCodec.encodeCommandRow(record("x".repeat(512)))
-        val rowBytes = row.encodeToByteArray().size
-        val rowCount = MAX_ENCODED_COMMAND_BYTES / (rowBytes + MAX_NEWLINE_BYTES) + 1
-        assertTrue(rowCount < MAX_FILE_LINES)
-        val originalBytes =
-            buildString {
-                appendLine("KetraTerm_COMMAND_COMPLETION_STATS\t2")
-                repeat(rowCount) {
-                    append(row)
-                    append('\n')
-                }
-            }.encodeToByteArray()
-        assertTrue(originalBytes.size <= MAX_FILE_BYTES)
-
-        assertRejectedWithoutMutation(originalBytes)
+        assertRejectedWithoutMutation(excessiveRows)
     }
 
     @Test
     fun `non-file path is rejected`() {
-        val path = createTempDirectory("completion-store-directory")
+        val directory = createTempDirectory("completion-store-directory")
 
-        assertSame(CompletionLearningFileLoadOutcome.Rejected, CompletionLearningFileStore(path).loadSnapshot())
-        assertTrue(Files.isDirectory(path))
+        assertSame(CompletionLearningFileLoadOutcome.Rejected, CompletionLearningFileStore(directory).loadSnapshot())
+        assertTrue(Files.isDirectory(directory))
     }
 
     @Test
     fun `input failure is returned separately`() {
-        val path = createTempDirectory("completion-store-failed").resolve(TerminalCompletionLearningCoordinator.currentFileName())
-        Files.writeString(path, "KetraTerm_COMMAND_COMPLETION_STATS\t2")
+        val path = path("completion-store-failed")
+        Files.writeString(path, HEADER.trimEnd())
         val expectedFailure = IOException("test read failure")
 
         val outcome = CompletionLearningFileStore(path, openInput = { throw expectedFailure }).loadSnapshot()
 
         assertSame(CompletionLearningFileLoadOutcome.Failed, outcome)
-        assertEquals("KetraTerm_COMMAND_COMPLETION_STATS\t2", Files.readString(path))
+        assertEquals(HEADER.trimEnd(), Files.readString(path))
     }
 
     @Test
     fun `output failure is rethrown`() {
-        val path = createTempDirectory("completion-store-output-failed").resolve(TerminalCompletionLearningCoordinator.currentFileName())
         val expectedFailure = IOException("test write failure")
         val store =
             CompletionLearningFileStore(
-                path = path,
+                path = path("completion-store-output-failed"),
                 createTemporaryFile = { _, _, _ -> throw expectedFailure },
             )
 
         assertSame(expectedFailure, assertFailsWith<IOException> { store.persist(snapshot("git status")) })
     }
 
-    @Test
-    fun `malformed JVM text fails without replacing the existing file`() {
-        val path = createTempDirectory("completion-store-malformed-text").resolve(TerminalCompletionLearningCoordinator.currentFileName())
-        val store = CompletionLearningFileStore(path)
-        store.persist(snapshot("git status"))
-        val originalBytes = Files.readAllBytes(path)
-
-        assertFailsWith<CharacterCodingException> { store.persist(snapshot("echo \uD800")) }
-
-        assertContentEquals(originalBytes, Files.readAllBytes(path))
-    }
-
     private fun assertRejectedWithoutMutation(originalBytes: ByteArray) {
-        val path = createTempDirectory("completion-store-large").resolve(TerminalCompletionLearningCoordinator.currentFileName())
+        val path = path("completion-store-rejected")
         Files.write(path, originalBytes)
 
         assertSame(CompletionLearningFileLoadOutcome.Rejected, CompletionLearningFileStore(path).loadSnapshot())
         assertContentEquals(originalBytes, Files.readAllBytes(path))
     }
 
-    private fun CompletionLearningFileLoadOutcome.loadedSnapshot(): TerminalCommandCompletionStatsSnapshot =
+    private fun CompletionLearningFileLoadOutcome.loadedSnapshot(): TerminalCompletionLearningSnapshot =
         assertIs<CompletionLearningFileLoadOutcome.Loaded>(this).snapshot
 
-    private fun snapshot(command: String) = TerminalCommandCompletionStatsSnapshot(commandStats = listOf(record(command)))
+    private fun snapshot(vararg commands: String): TerminalCompletionLearningSnapshot {
+        val learning = TerminalCompletionLearningStore()
+        for ((index, command) in commands.withIndex()) {
+            learning.recordCommandResult(command, true, null, null, index + 1L)
+        }
+        return learning.snapshot()
+    }
 
-    private fun record(command: String) =
-        TerminalCommandCompletionStats(
-            commandLine = command,
-            successCount = 1,
-            failureCount = 0,
-            lastUsedEpochMillis = 42L,
-        )
+    private fun path(prefix: String) = createTempDirectory(prefix).resolve(TerminalCompletionLearningCoordinator.currentFileName())
 
     private companion object {
-        private const val MAX_FILE_BYTES = 1_000_000 + 128
-        private const val MAX_FILE_LINES = 1 + 2_048
+        private const val HEADER = "KetraTerm_COMMAND_COMPLETION_LEARNING\t3\n"
+        private const val MAX_FILE_BYTES = 2_000_256
+        private const val MAX_FILE_LINES = 1 + 2_048 + 2_048
         private const val MAX_LINE_BYTES = 16 * 1024
-        private const val MAX_ENCODED_COMMAND_BYTES = 1_000_000
-        private const val MAX_NEWLINE_BYTES = 2
-        private const val MAX_TEXT_CHARS = 4 * 1024
     }
 }

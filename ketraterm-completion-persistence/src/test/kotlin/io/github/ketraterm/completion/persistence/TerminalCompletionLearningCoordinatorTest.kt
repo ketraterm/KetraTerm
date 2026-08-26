@@ -16,8 +16,8 @@
 package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
+import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
 import java.io.IOException
@@ -50,7 +50,7 @@ class TerminalCompletionLearningCoordinatorTest {
                 BURST_SIZE,
                 learning
                     .snapshot()
-                    .commandStats
+                    .rankingStats
                     .single()
                     .useCount,
             )
@@ -88,7 +88,7 @@ class TerminalCompletionLearningCoordinatorTest {
                 2,
                 files.writes
                     .single()
-                    .commandStats
+                    .rankingStats
                     .single()
                     .useCount,
             )
@@ -135,14 +135,14 @@ class TerminalCompletionLearningCoordinatorTest {
             try {
                 assertTrue(loadStarted.await(5L, TimeUnit.SECONDS))
                 coordinator.recordCommandResult("npm test", true, null, null, 2L)
-                assertEquals(listOf("npm test"), learning.snapshot().commandStats.map { it.commandLine })
+                assertEquals(listOf("npm test"), learning.snapshot().replayCommands.map { it.commandLine })
 
                 releaseLoad.countDown()
                 coordinator.closeAndFlush()
 
                 assertEquals(
                     setOf("git status", "npm test"),
-                    learning.snapshot().commandStats.mapTo(mutableSetOf()) { it.commandLine },
+                    learning.snapshot().replayCommands.mapTo(mutableSetOf()) { it.commandLine },
                 )
                 assertEquals(listOf(learning.snapshot()), files.writes)
             } finally {
@@ -175,7 +175,7 @@ class TerminalCompletionLearningCoordinatorTest {
 
                 assertEquals(
                     setOf("git status", "npm test"),
-                    learning.snapshot().commandStats.mapTo(mutableSetOf()) { it.commandLine },
+                    learning.snapshot().replayCommands.mapTo(mutableSetOf()) { it.commandLine },
                 )
                 assertTrue(files.writes.isEmpty())
             } finally {
@@ -203,7 +203,7 @@ class TerminalCompletionLearningCoordinatorTest {
                 BURST_SIZE,
                 learning
                     .snapshot()
-                    .commandStats
+                    .rankingStats
                     .single()
                     .useCount,
             )
@@ -235,9 +235,11 @@ class TerminalCompletionLearningCoordinatorTest {
             coordinator.closeAndFlush()
 
             assertEquals(1, files.loadCount.get())
+            val learned = learning.snapshot()
+            val statsByIdentity = learned.rankingStats.associateBy { it.identityDigest }
             assertEquals(
                 mapOf("git status" to 1, "npm test" to 2),
-                learning.snapshot().commandStats.associate { it.commandLine to it.useCount },
+                learned.replayCommands.associate { it.commandLine to statsByIdentity.getValue(it.identityDigest).useCount },
             )
             assertEquals(2, files.writes.size)
             assertEquals(learning.snapshot(), files.writes.last())
@@ -256,12 +258,12 @@ class TerminalCompletionLearningCoordinatorTest {
             runCurrent()
             coordinator.closeAndFlush()
 
-            assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
+            assertEquals(listOf("git status"), learning.snapshot().replayCommands.map { it.commandLine })
             assertTrue(files.writes.isEmpty())
         }
 
     @Test
-    fun `memory changes advance the dirty revision before file store sanitization`() =
+    fun `sensitive memory changes advance the dirty opaque revision`() =
         runTest {
             val files = RecordingSnapshotFiles()
             val learning = TerminalCompletionLearningStore()
@@ -271,18 +273,13 @@ class TerminalCompletionLearningCoordinatorTest {
             coordinator.closeAndFlush()
 
             assertEquals(1, files.writes.size)
-            assertEquals(
-                "npm token list",
-                files.writes
-                    .single()
-                    .commandStats
-                    .single()
-                    .commandLine,
-            )
+            val persisted = files.writes.single()
+            assertEquals(1, persisted.rankingStats.single().useCount)
+            assertTrue(persisted.replayCommands.isEmpty())
         }
 
     @Test
-    fun `persistence policy does not suppress in-memory learning`() =
+    fun `replay policy suppresses plaintext but not opaque in-memory learning`() =
         runTest {
             val files = RecordingSnapshotFiles()
             val learning = TerminalCompletionLearningStore()
@@ -299,14 +296,15 @@ class TerminalCompletionLearningCoordinatorTest {
             coordinator.recordCommandResult("git status", true, null, null, -1L)
             coordinator.closeAndFlush()
 
-            val learned = learning.snapshot().commandStats.associateBy { it.commandLine }
-            assertEquals(setOf("npm token list", "npm token create"), learned.keys)
-            assertEquals(1, learned.getValue("npm token create").acceptedCount)
+            val learned = learning.snapshot()
+            assertEquals(2, learned.rankingStats.size)
+            assertEquals(listOf(0, 1), learned.rankingStats.map { it.acceptedCount }.sorted())
+            assertTrue(learned.replayCommands.isEmpty())
             assertTrue(files.writes.isEmpty())
         }
 
     @Test
-    fun `leading-space command remains in memory but is removed at the file boundary`() =
+    fun `leading-space command retains only opaque evidence in memory and on disk`() =
         runTest {
             val path =
                 createTempDirectory("completion-leading-space")
@@ -326,17 +324,16 @@ class TerminalCompletionLearningCoordinatorTest {
             coordinator.recordCommandResult(" historyless-command", true, null, null, 42L)
             coordinator.closeAndFlush()
 
-            assertEquals(
-                listOf(" historyless-command"),
-                learning.snapshot().commandStats.map { it.commandLine },
-            )
+            assertEquals(1, learning.snapshot().rankingStats.size)
+            assertTrue(learning.snapshot().replayCommands.isEmpty())
             val persisted =
                 requireNotNull(
                     CompletionLearningSnapshotCodec.decode(
                         Files.readAllLines(path),
                     ),
                 )
-            assertTrue(persisted.commandStats.isEmpty())
+            assertEquals(1, persisted.rankingStats.size)
+            assertTrue(persisted.replayCommands.isEmpty())
         }
 
     @Test
@@ -359,7 +356,7 @@ class TerminalCompletionLearningCoordinatorTest {
                 1,
                 learning
                     .snapshot()
-                    .commandStats
+                    .rankingStats
                     .single()
                     .acceptedCount,
             )
@@ -377,7 +374,7 @@ class TerminalCompletionLearningCoordinatorTest {
             coordinator.recordCommandResult("obsolete", true, null, null, 1L)
             coordinator.closeAndFlush()
 
-            assertEquals(listOf("retained"), learning.snapshot().commandStats.map { it.commandLine })
+            assertEquals(listOf("retained"), learning.snapshot().replayCommands.map { it.commandLine })
             assertTrue(files.writes.isEmpty())
         }
 
@@ -398,7 +395,7 @@ class TerminalCompletionLearningCoordinatorTest {
                 coordinator.recordCommandResult("git status", true, null, null, 42L)
                 coordinator.closeAndFlush()
 
-                assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
+                assertEquals(listOf("git status"), learning.snapshot().replayCommands.map { it.commandLine })
                 assertTrue(files.writes.isEmpty())
             }
         }
@@ -486,7 +483,7 @@ class TerminalCompletionLearningCoordinatorTest {
                     1,
                     files.writes
                         .first()
-                        .commandStats
+                        .rankingStats
                         .single()
                         .useCount,
                 )
@@ -494,7 +491,7 @@ class TerminalCompletionLearningCoordinatorTest {
                     2,
                     files.writes
                         .last()
-                        .commandStats
+                        .rankingStats
                         .single()
                         .useCount,
                 )
@@ -541,7 +538,7 @@ class TerminalCompletionLearningCoordinatorTest {
                     1,
                     files.writes
                         .single()
-                        .commandStats
+                        .rankingStats
                         .single()
                         .useCount,
                 )
@@ -549,7 +546,7 @@ class TerminalCompletionLearningCoordinatorTest {
                     2,
                     learning
                         .snapshot()
-                        .commandStats
+                        .rankingStats
                         .single()
                         .useCount,
                 )
@@ -610,7 +607,7 @@ class TerminalCompletionLearningCoordinatorTest {
             val retained =
                 learning
                     .snapshot()
-                    .commandStats
+                    .rankingStats
                     .singleOrNull()
                     ?.useCount ?: 0
             assertEquals(accepted, retained)
@@ -620,8 +617,8 @@ class TerminalCompletionLearningCoordinatorTest {
                 assertEquals(
                     accepted,
                     files.writes
-                        .single()
-                        .commandStats
+                        .last()
+                        .rankingStats
                         .single()
                         .useCount,
                 )
@@ -670,7 +667,7 @@ class TerminalCompletionLearningCoordinatorTest {
 
         val loadCount = AtomicInteger()
         val writeAttempts = AtomicInteger()
-        val writes = CopyOnWriteArrayList<TerminalCommandCompletionStatsSnapshot>()
+        val writes = CopyOnWriteArrayList<TerminalCompletionLearningSnapshot>()
 
         override fun loadSnapshot(): CompletionLearningFileLoadOutcome {
             beforeLoad()
@@ -680,7 +677,7 @@ class TerminalCompletionLearningCoordinatorTest {
             return outcome
         }
 
-        override fun persist(snapshot: TerminalCommandCompletionStatsSnapshot) {
+        override fun persist(snapshot: TerminalCompletionLearningSnapshot) {
             val attempt = writeAttempts.incrementAndGet()
             beforePersist(attempt)
             writeFailure?.let { throw it }
@@ -691,7 +688,7 @@ class TerminalCompletionLearningCoordinatorTest {
     private fun snapshot(
         commandLine: String,
         timestamp: Long,
-    ): TerminalCommandCompletionStatsSnapshot =
+    ): TerminalCompletionLearningSnapshot =
         TerminalCompletionLearningStore()
             .apply { recordCommandResult(commandLine, true, null, null, timestamp) }
             .snapshot()

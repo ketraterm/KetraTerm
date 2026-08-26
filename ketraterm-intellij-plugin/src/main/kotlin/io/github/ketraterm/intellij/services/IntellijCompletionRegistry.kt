@@ -38,7 +38,7 @@ import java.nio.file.Path
  */
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
+    private val learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
     persistencePath: Path,
     persistenceEnabled: Boolean,
     coroutineScope: CoroutineScope,
@@ -46,7 +46,6 @@ internal class IntellijCompletionRegistry(
     private val lock = Any()
     private var closed = false
     private val commandSpecs = specs
-    private val learningStore = learningStore
     private val learning =
         TerminalCompletionLearningCoordinator(
             learningStore = learningStore,
@@ -100,7 +99,7 @@ internal class IntellijCompletionRegistry(
                 )
             return IntellijCompletionResources(
                 provider = SwingCompletionSuggestionProvider(engine, context::swingContext),
-                feedbackHandler = feedbackRecorder.createHandler(context::swingContext),
+                feedbackHandler = feedbackRecorder.createHandler(),
             )
         }
     }

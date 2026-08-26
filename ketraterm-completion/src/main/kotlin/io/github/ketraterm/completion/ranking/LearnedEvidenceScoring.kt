@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.completion.ranking
 
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
+import io.github.ketraterm.completion.model.TerminalCompletionRankingStats
 
 /** Saturating aggregate for exact command learning. */
 internal class LearnedEvidenceCounts(
@@ -26,7 +26,7 @@ internal class LearnedEvidenceCounts(
     var dismissedCount: Long = 0,
     var lastUsedEpochMillis: Long = 0,
 ) {
-    fun add(row: TerminalCommandCompletionStats) {
+    fun add(row: TerminalCompletionRankingStats) {
         useCount = saturatedAdd(useCount, row.useCount.toLong())
         successCount = saturatedAdd(successCount, row.successCount.toLong())
         failureCount = saturatedAdd(failureCount, row.failureCount.toLong())

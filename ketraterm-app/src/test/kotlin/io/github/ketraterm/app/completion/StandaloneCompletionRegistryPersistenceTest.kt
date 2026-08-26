@@ -16,7 +16,7 @@
 package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
+import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.io.TempDir
@@ -24,6 +24,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.*
+import kotlin.time.Duration.Companion.milliseconds
 
 class StandaloneCompletionRegistryPersistenceTest {
     @Test
@@ -37,10 +38,10 @@ class StandaloneCompletionRegistryPersistenceTest {
         registry.recordFinishedCommand("git status", true, "bash", "file:///repo", 42L)
         registry.closeAndFlush()
 
-        assertEquals(listOf("git status"), learning.snapshot().commandStats.map { it.commandLine })
+        assertEquals(listOf("git status"), learning.snapshot().replayCommands.map { it.commandLine })
         assertEquals(
             listOf("git status"),
-            persistedSnapshot(path).commandStats.map { it.commandLine },
+            persistedSnapshot(path).replayCommands.map { it.commandLine },
         )
     }
 
@@ -59,7 +60,7 @@ class StandaloneCompletionRegistryPersistenceTest {
             setOf("git status", "npm test"),
             learning
                 .snapshot()
-                .commandStats
+                .replayCommands
                 .map { it.commandLine }
                 .toSet(),
         )
@@ -79,9 +80,9 @@ class StandaloneCompletionRegistryPersistenceTest {
 
         val learning = TerminalCompletionLearningStore()
         val registry = registry(learning, path, persistenceEnabled = true)
-        withTimeout(5_000L) {
-            while (learning.snapshot().commandStats.none { it.commandLine == "git status" }) {
-                delay(10L)
+        withTimeout(5_000L.milliseconds) {
+            while (learning.snapshot().replayCommands.none { it.commandLine == "git status" }) {
+                delay(10L.milliseconds)
             }
         }
         Files.delete(path)
@@ -95,7 +96,7 @@ class StandaloneCompletionRegistryPersistenceTest {
         assertFailsWith<IOException> { registry.closeAndFlush() }
         assertFailsWith<IllegalStateException> { registry.createResources() }
         registry.recordFinishedCommand("late command", true, null, null, 3L)
-        assertFalse(learning.snapshot().commandStats.any { it.commandLine == "late command" })
+        assertFalse(learning.snapshot().replayCommands.any { it.commandLine == "late command" })
     }
 
     private fun registry(
@@ -110,7 +111,7 @@ class StandaloneCompletionRegistryPersistenceTest {
             learningStore = learning,
         )
 
-    private suspend fun persistedSnapshot(path: Path): TerminalCommandCompletionStatsSnapshot =
+    private suspend fun persistedSnapshot(path: Path): TerminalCompletionLearningSnapshot =
         coroutineScope {
             val learning = TerminalCompletionLearningStore()
             val coordinator =

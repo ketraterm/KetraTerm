@@ -16,9 +16,9 @@
 package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
+import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
+import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
@@ -48,7 +48,7 @@ open class TerminalCompletionBenchmark {
     private lateinit var unclosedQuoteRequest: TerminalCompletionRequest
     private lateinit var fusionRequest: TerminalCompletionRequest
     private lateinit var realisticSources: List<TerminalCompletionSourceEntry>
-    private lateinit var learnedSnapshot: TerminalCommandCompletionStatsSnapshot
+    private lateinit var learnedSnapshot: TerminalCompletionLearningSnapshot
     private lateinit var coldStartFusionEngine: TerminalCompletionEngine
     private lateinit var learnedFusionEngine: TerminalCompletionEngine
     private lateinit var indexedLearnedHistoryEngine: TerminalCompletionEngine
@@ -71,21 +71,33 @@ open class TerminalCompletionBenchmark {
             )
         realisticSources = List(8) { sourceIndex -> sourceEntry(sourceIndex, 32, duplicateMain = true) }
         coldStartFusionEngine = TerminalCompletionEngines.fromSources(realisticSources, commandSpecs)
-        learnedSnapshot =
-            TerminalCommandCompletionStatsSnapshot(
-                commandStats =
-                    List(2_048) { index ->
-                        TerminalCommandCompletionStats(
-                            commandLine = if (index == 0) "git switch main" else "git switch branch-$index",
-                            profileId = "benchmark",
-                            workingDirectoryUri = "file:///repo",
-                            useCount = index % 20,
-                            successCount = index % 17,
-                            acceptedCount = index % 7,
-                            lastUsedEpochMillis = 2_000_000_000_000L - index,
-                        )
-                    },
-            )
+        val learnedSeed = TerminalCompletionLearningStore(capacity = 2_048)
+        repeat(2_048) { index ->
+            val commandLine = if (index == 0) "git switch main" else "git switch branch-$index"
+            val eventTime = 2_000_000_000_000L - index
+            val executionCount = (index % 20) + 1
+            val successCount = if (index == 0) executionCount else minOf(executionCount, index % 17)
+            repeat(executionCount) { eventIndex ->
+                learnedSeed.recordCommandResult(
+                    commandLine = commandLine,
+                    successful = eventIndex < successCount,
+                    profileId = "benchmark",
+                    workingDirectoryUri = "file:///repo",
+                    usedAtEpochMillis = eventTime,
+                )
+            }
+            val acceptedCount = if (index == 0) 4 else index % 7
+            repeat(acceptedCount) {
+                learnedSeed.recordSuggestionFeedback(
+                    commandLine = commandLine,
+                    feedback = TerminalCompletionFeedbackKind.ACCEPTED,
+                    profileId = "benchmark",
+                    workingDirectoryUri = "file:///repo",
+                    feedbackAtEpochMillis = eventTime,
+                )
+            }
+        }
+        learnedSnapshot = learnedSeed.snapshot()
         learnedFusionEngine =
             TerminalCompletionEngines.fromSources(
                 realisticSources,
@@ -153,7 +165,7 @@ open class TerminalCompletionBenchmark {
         blackhole.consume(runBlocking { learnedFusionEngine.completions(fusionRequest).last() })
     }
 
-    /** Measures cold construction of both 2,048-row learned indexes and one ranked completion. */
+    /** Measures cold construction of the full 2,048-row learned view and its indexes, then one ranked completion. */
     @Benchmark
     open fun buildLearnedIndexAndComplete(blackhole: Blackhole) {
         val coldEngine =

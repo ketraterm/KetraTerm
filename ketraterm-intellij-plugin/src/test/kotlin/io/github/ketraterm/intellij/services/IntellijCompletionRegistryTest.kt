@@ -17,11 +17,14 @@ package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.host.TerminalDirectoryScanner
+import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.last
@@ -128,6 +131,53 @@ class IntellijCompletionRegistryTest {
         }
 
     @Test
+    fun `suggestion feedback keeps the working directory captured by its request`() =
+        runBlocking {
+            val learningStore = TerminalCompletionLearningStore()
+            val registry =
+                IntellijCompletionRegistry(
+                    specs =
+                        listOf(
+                            TerminalCommandSpec(
+                                name = "git",
+                                subcommands = listOf(TerminalCommandSpec("status")),
+                            ),
+                        ),
+                    learningStore = learningStore,
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
+            var workingDirectoryUri = "file:///repo-a"
+            val resources =
+                registry.createResources(
+                    context(workingDirectoryUriProvider = { workingDirectoryUri }),
+                )
+            val request = request("git s")
+            val suggestion =
+                resources.provider
+                    .suggestions(request)
+                    .last()
+                    .first { it.replacementText == "status" }
+
+            workingDirectoryUri = "file:///repo-b"
+            resources.feedbackHandler.onSuggestionFeedback(
+                SwingShellSuggestionFeedback(
+                    kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
+                    suggestion = suggestion,
+                    index = 0,
+                    request = request,
+                ),
+            )
+
+            val learned = learningStore.snapshot().replayCommands.single()
+            assertEquals("git status", learned.commandLine)
+            assertEquals("bash", learned.profileId)
+            assertEquals("file:///repo-a/", learned.workingDirectoryUri)
+            registry.closeAndFlush()
+        }
+
+    @Test
     fun `closed registry rejects new sessions`(): Unit =
         runBlocking {
             val registry =
@@ -175,8 +225,8 @@ class IntellijCompletionRegistryTest {
 
             registry.closeAndFlush()
 
-            assertEquals(listOf("git status"), learningStore.snapshot().commandStats.map { it.commandLine })
-            assertEquals(listOf("git status"), persistedSnapshot(path).commandStats.map { it.commandLine })
+            assertEquals(listOf("git status"), learningStore.snapshot().replayCommands.map { it.commandLine })
+            assertEquals(listOf("git status"), persistedSnapshot(path).replayCommands.map { it.commandLine })
         }
 
     private suspend fun persistedSnapshot(path: Path) =
@@ -201,9 +251,10 @@ class IntellijCompletionRegistryTest {
     private fun context(
         additionalSources: List<TerminalCompletionSourceEntry> = emptyList(),
         scanner: TerminalDirectoryScanner = TerminalDirectoryScanner { _: Path, _: String -> emptyList() },
+        workingDirectoryUriProvider: () -> String? = { "file:///repo" },
     ) = IntellijCompletionContext(
         profileId = "bash",
-        workingDirectoryUriProvider = { "file:///repo" },
+        workingDirectoryUriProvider = workingDirectoryUriProvider,
         shellCapabilities = TerminalShellCapabilities.POSIX,
         additionalSources = additionalSources,
         directoryScanner = scanner,

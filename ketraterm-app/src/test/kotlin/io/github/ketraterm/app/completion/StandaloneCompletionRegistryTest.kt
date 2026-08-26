@@ -17,13 +17,10 @@ package io.github.ketraterm.app.completion
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.api.TerminalShellCapabilities
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
-import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
+import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
+import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
@@ -107,21 +104,23 @@ class StandaloneCompletionRegistryTest {
             try {
                 Files.createDirectories(directory.resolve("IdeaProjects/KetraTerm"))
                 val persistentStats = TerminalCompletionLearningStore()
-                persistentStats.mergeSnapshot(
-                    TerminalCommandCompletionStatsSnapshot(
-                        commandStats =
-                            listOf(
-                                TerminalCommandCompletionStats(
-                                    commandLine = "cd IdeaProjects/KetraTerm/",
-                                    profileId = "pwsh",
-                                    workingDirectoryUri = directory.toUri().toString(),
-                                    useCount = 8,
-                                    successCount = 8,
-                                    acceptedCount = 2,
-                                    lastUsedEpochMillis = System.currentTimeMillis(),
-                                ),
-                            ),
-                    ),
+                val eventTime = System.currentTimeMillis()
+                repeat(8) {
+                    persistentStats.recordCommandResult(
+                        commandLine = "cd IdeaProjects/KetraTerm/",
+                        successful = true,
+                        profileId = "pwsh",
+                        workingDirectoryUri = directory.toUri().toString(),
+                        usedAtEpochMillis = eventTime,
+                    )
+                }
+                persistentStats.recordFeedback(
+                    commandLine = "cd IdeaProjects/KetraTerm/",
+                    feedback = TerminalCompletionFeedbackKind.ACCEPTED,
+                    count = 2,
+                    profileId = "pwsh",
+                    workingDirectoryUri = directory.toUri().toString(),
+                    eventTime = eventTime,
                 )
                 val registry = registry(specs = TerminalCommandSpecs.defaults(), learningStore = persistentStats)
                 val provider =
@@ -221,26 +220,21 @@ class StandaloneCompletionRegistryTest {
     fun `learned command stats boost matching suggestions`() =
         runBlocking {
             val persistentStats = TerminalCompletionLearningStore()
-            persistentStats.mergeSnapshot(
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
-                        listOf(
-                            TerminalCommandCompletionStats(
-                                commandLine = "git switch",
-                                acceptedCount = 10,
-                                profileId = "bash",
-                                workingDirectoryUri = "file:///repo",
-                                lastUsedEpochMillis = 1_000,
-                            ),
-                            TerminalCommandCompletionStats(
-                                commandLine = "git status",
-                                dismissedCount = 10,
-                                profileId = "bash",
-                                workingDirectoryUri = "file:///repo",
-                                lastUsedEpochMillis = 1_000,
-                            ),
-                        ),
-                ),
+            persistentStats.recordFeedback(
+                commandLine = "git switch",
+                feedback = TerminalCompletionFeedbackKind.ACCEPTED,
+                count = 10,
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo",
+                eventTime = 1_000L,
+            )
+            persistentStats.recordFeedback(
+                commandLine = "git status",
+                feedback = TerminalCompletionFeedbackKind.DISMISSED,
+                count = 10,
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo",
+                eventTime = 1_000L,
             )
             val provider =
                 registry(learningStore = persistentStats)
@@ -258,19 +252,13 @@ class StandaloneCompletionRegistryTest {
     fun `learned command stats demote repeatedly dismissed suggestions`() =
         runBlocking {
             val persistentStats = TerminalCompletionLearningStore()
-            persistentStats.mergeSnapshot(
-                TerminalCommandCompletionStatsSnapshot(
-                    commandStats =
-                        listOf(
-                            TerminalCommandCompletionStats(
-                                commandLine = "git status",
-                                dismissedCount = 20,
-                                profileId = "bash",
-                                workingDirectoryUri = "file:///repo",
-                                lastUsedEpochMillis = 1_000,
-                            ),
-                        ),
-                ),
+            persistentStats.recordFeedback(
+                commandLine = "git status",
+                feedback = TerminalCompletionFeedbackKind.DISMISSED,
+                count = 20,
+                profileId = "bash",
+                workingDirectoryUri = "file:///repo",
+                eventTime = 1_000L,
             )
             val provider =
                 registry(learningStore = persistentStats)
@@ -286,7 +274,7 @@ class StandaloneCompletionRegistryTest {
         }
 
     @Test
-    fun `provider context boosts matching learned commands`() =
+    fun `provider context isolates learned commands`() =
         runBlocking {
             val registry = registry(listOf(TerminalCommandSpec("git")))
             val provider =
@@ -309,7 +297,7 @@ class StandaloneCompletionRegistryTest {
             val suggestions = provider.suggestions(request).last()
 
             assertEquals(
-                listOf("git switch main", "git status"),
+                listOf("git switch main"),
                 suggestions.filter { it.source == "learned" }.mapNotNull { it.commandTextAfterReplacement(request) },
             )
         }
@@ -344,11 +332,45 @@ class StandaloneCompletionRegistryTest {
         }
 
     @Test
+    fun `suggestion feedback keeps the working directory captured by its request`() =
+        runBlocking {
+            val learningStore = TerminalCompletionLearningStore()
+            val registry = registry(learningStore = learningStore)
+            var workingDirectoryUri = "file:///repo-a"
+            val resources =
+                registry.createResources(
+                    profileId = "bash",
+                    workingDirectoryUriProvider = { workingDirectoryUri },
+                )
+            val request = request("git s")
+            val suggestion =
+                resources.provider
+                    .suggestions(request)
+                    .last()
+                    .first { it.replacementText == "status" }
+
+            workingDirectoryUri = "file:///repo-b"
+            resources.feedbackHandler.onSuggestionFeedback(
+                SwingShellSuggestionFeedback(
+                    kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
+                    suggestion = suggestion,
+                    index = 0,
+                    request = request,
+                ),
+            )
+
+            val learned = learningStore.snapshot().replayCommands.single()
+            assertEquals("git status", learned.commandLine)
+            assertEquals("bash", learned.profileId)
+            assertEquals("file:///repo-a/", learned.workingDirectoryUri)
+        }
+
+    @Test
     fun `finished commands become shared learned suggestions`() =
         runBlocking {
             val registry = registry(emptyList())
-            val first = registry.openProvider()
-            val second = registry.openProvider()
+            val first = registry.openProvider(profileId = "bash")
+            val second = registry.openProvider(profileId = "bash")
 
             registry.recordSuccess(
                 commandLine = "git status",
@@ -371,7 +393,7 @@ class StandaloneCompletionRegistryTest {
                 workingDirectoryUri = null,
             )
 
-            val provider = registry.openProvider()
+            val provider = registry.openProvider(profileId = "bash")
             assertEquals(listOf("git status"), provider.suggestions(request("git")).last().map { it.replacementText })
         }
 
@@ -408,7 +430,7 @@ class StandaloneCompletionRegistryTest {
         }
 
     @Test
-    fun `provider profile context ranks shared learning`() =
+    fun `provider profile context isolates replay learning`() =
         runBlocking {
             val registry = registry(listOf(TerminalCommandSpec("build")))
             val bashProvider = registry.openProvider(profileId = "bash")
@@ -420,14 +442,12 @@ class StandaloneCompletionRegistryTest {
             val bashSuggestions = bashProvider.suggestions(request("build")).last().map { it.replacementText }
             val zshSuggestions = zshProvider.suggestions(request("build")).last().map { it.replacementText }
 
-            assertEquals("build --release", bashSuggestions.first())
-            assertEquals("build --debug", zshSuggestions.first())
-            assertEquals(setOf("build --release", "build --debug"), bashSuggestions.toSet())
-            assertEquals(setOf("build --release", "build --debug"), zshSuggestions.toSet())
+            assertEquals(listOf("build --release"), bashSuggestions)
+            assertEquals(listOf("build --debug"), zshSuggestions)
         }
 
     @Test
-    fun `closed registry rejects new providers`() =
+    fun `closed registry rejects new providers`(): Unit =
         runBlocking {
             val registry = registry(emptyList())
             val completionJob = requireNotNull(registry.completionScope.coroutineContext[Job])
@@ -474,6 +494,25 @@ class StandaloneCompletionRegistryTest {
             workingDirectoryUri = workingDirectoryUri,
             usedAtEpochMillis = ++eventTime,
         )
+    }
+
+    private fun TerminalCompletionLearningStore.recordFeedback(
+        commandLine: String,
+        feedback: TerminalCompletionFeedbackKind,
+        count: Int,
+        profileId: String?,
+        workingDirectoryUri: String?,
+        eventTime: Long,
+    ) {
+        repeat(count) {
+            recordSuggestionFeedback(
+                commandLine = commandLine,
+                feedback = feedback,
+                profileId = profileId,
+                workingDirectoryUri = workingDirectoryUri,
+                feedbackAtEpochMillis = eventTime,
+            )
+        }
     }
 
     private fun specs(): List<TerminalCommandSpec> =

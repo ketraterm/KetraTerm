@@ -77,23 +77,23 @@ internal class TerminalCompletionOutcomeKeyResolver {
             }
 
         if (tokens.firstCommandTokenIndex() >= tokens.size) return null
-        val learnedKey =
-            learnedKey(
+        val outcomeKey =
+            outcomeKey(
                 tokens = tokens,
                 pathTokenIndex = activeIndex,
                 pathAware = pathAware,
             ) ?: return null
         return ResolvedCompletionOutcome(
-            groupKey = learnedKey.tokens,
-            learnedKey = learnedKey,
+            groupKey = outcomeKey,
+            exactCommandLine = commandLine,
         )
     }
 
-    fun learnedKey(
+    private fun outcomeKey(
         tokens: List<TerminalCommandLineToken>,
         pathTokenIndex: Int,
         pathAware: Boolean,
-    ): LearnedCompletionOutcomeKey? {
+    ): List<String>? {
         if (tokens.isEmpty()) return null
         val normalizedPathIndex = if (pathAware && pathTokenIndex in tokens.indices) pathTokenIndex else NO_PATH_TOKEN
         val resultTokens = ArrayList<String>(tokens.size)
@@ -103,10 +103,7 @@ internal class TerminalCompletionOutcomeKeyResolver {
             resultTokens += if (index == normalizedPathIndex) normalizePathToken(tokenText) else tokenText
             index++
         }
-        return LearnedCompletionOutcomeKey(
-            tokens = resultTokens,
-            pathTokenIndex = normalizedPathIndex,
-        )
+        return resultTokens
     }
 
     private fun hasSpecialSyntax(text: String): Boolean {
@@ -153,10 +150,5 @@ internal class TerminalCompletionOutcomeKeyResolver {
 
 internal data class ResolvedCompletionOutcome(
     val groupKey: List<String>,
-    val learnedKey: LearnedCompletionOutcomeKey,
-)
-
-internal data class LearnedCompletionOutcomeKey(
-    val tokens: List<String>,
-    val pathTokenIndex: Int,
+    val exactCommandLine: String,
 )

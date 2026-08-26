@@ -21,16 +21,19 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class SwingCompletionSuggestionProviderTest {
     @Test
     fun `forwards live host context and adapts candidates`() =
         runBlocking {
             lateinit var captured: TerminalCompletionRequest
+            val requestContext =
+                SwingCompletionContext(
+                    profileId = "bash",
+                    workingDirectoryUri = "file:///repo",
+                    shellCapabilities = TerminalShellCapabilities.POSIX,
+                )
             val provider =
                 SwingCompletionSuggestionProvider(
                     engine =
@@ -55,13 +58,7 @@ class SwingCompletionSuggestionProviderTest {
                                 ),
                             )
                         },
-                    contextProvider = {
-                        SwingCompletionContext(
-                            profileId = "bash",
-                            workingDirectoryUri = "file:///repo",
-                            shellCapabilities = TerminalShellCapabilities.POSIX,
-                        )
-                    },
+                    contextProvider = { requestContext },
                 )
 
             val suggestions = provider.suggestions(request("git ste", cursorOffset = 6)).last()
@@ -75,6 +72,7 @@ class SwingCompletionSuggestionProviderTest {
             assertEquals("show status", suggestions.single().detail)
             assertEquals("SUBCOMMAND", suggestions.single().kind)
             assertEquals("Built-in", suggestions.single().sourceDisplayText)
+            assertSame(requestContext, suggestions.single().interactionContext)
             assertContentEquals(intArrayOf(0, 2), suggestions.single().matchedRanges.copyPackedOffsets())
         }
 

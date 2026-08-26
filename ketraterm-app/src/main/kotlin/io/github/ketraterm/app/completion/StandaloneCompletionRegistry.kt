@@ -43,13 +43,12 @@ internal class StandaloneCompletionRegistry private constructor(
     persistencePath: Path,
     persistenceEnabled: Boolean,
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
-    learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
+    private val learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
     internal val completionScope: CoroutineScope,
 ) {
     private val lifecycleLock = Any()
     private var closed = false
     private val commandSpecs = specs
-    private val learningStore = learningStore
     private val learning =
         TerminalCompletionLearningCoordinator(
             learningStore = learningStore,
@@ -115,7 +114,7 @@ internal class StandaloneCompletionRegistry private constructor(
                 )
             StandaloneCompletionResources(
                 provider = SwingCompletionSuggestionProvider(engine, contextProvider),
-                feedbackHandler = feedbackRecorder.createHandler(contextProvider),
+                feedbackHandler = feedbackRecorder.createHandler(),
             )
         }
 

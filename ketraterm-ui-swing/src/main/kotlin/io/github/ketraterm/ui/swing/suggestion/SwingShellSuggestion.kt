@@ -41,6 +41,8 @@ import java.util.regex.Pattern
  * @property kind compact semantic candidate kind label supplied by the host.
  * @property accentRole stable visual category supplied by the host or derived
  * from [kind] for generic providers.
+ * @property interactionContext opaque host-owned request context preserved by
+ * Swing and returned unchanged with acceptance or dismissal feedback.
  * @property replacementStartOffset inclusive UTF-16 start offset in the request
  * command text.
  * @property replacementEndOffset exclusive UTF-16 end offset in the request
@@ -64,6 +66,7 @@ data class SwingShellSuggestion
         val accentRole: SwingShellSuggestionAccentRole = SwingShellSuggestionAccentRole.from(kind, source),
         val matchedRanges: SwingShellSuggestionMatchRanges = SwingShellSuggestionMatchRanges.EMPTY,
         val sourceDisplayText: String = source,
+        val interactionContext: Any? = null,
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }

@@ -15,133 +15,93 @@
  */
 package io.github.ketraterm.completion.persistence
 
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
-import io.github.ketraterm.completion.model.TerminalCommandCompletionStatsSnapshot
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
-import java.util.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
+import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
+import kotlin.test.*
 
 class CompletionLearningSnapshotCodecTest {
     @Test
-    fun `current file name header and docs share the same format version`() {
-        val encoded = CompletionLearningSnapshotCodec.encode(TerminalCommandCompletionStatsSnapshot.EMPTY)
-        val storageDoc = Files.readString(repositoryRoot.resolve("docs/persistent-terminal-storage.md"))
-
-        assertEquals("command-completion-stats-v2.tsv", TerminalCompletionLearningCoordinator.currentFileName())
-        assertEquals(listOf(HEADER), encoded)
-        assertTrue(storageDoc.contains("`${TerminalCompletionLearningCoordinator.currentFileName()}`"))
-        assertTrue(storageDoc.contains(HEADER.replace("\t", "<TAB>")) || storageDoc.contains(HEADER))
+    fun `current file name and header use the split schema version`() {
+        assertEquals("command-completion-learning-v3.tsv", TerminalCompletionLearningCoordinator.currentFileName())
+        assertEquals(listOf(HEADER), CompletionLearningSnapshotCodec.encode(TerminalCompletionLearningSnapshot.EMPTY))
     }
 
     @Test
-    fun `round trips exact command statistics with unicode text`() {
-        val snapshot =
-            TerminalCommandCompletionStatsSnapshot(
-                commandStats = listOf(commandStats("git commit -m 'Բարև աշխարհ'")),
-            )
+    fun `round trips opaque evidence and replay text with unicode`() {
+        val snapshot = snapshot("git commit -m 'Բարև աշխարհ'")
 
         assertEquals(snapshot, CompletionLearningSnapshotCodec.decode(CompletionLearningSnapshotCodec.encode(snapshot)))
     }
 
     @Test
-    fun `unsupported and malformed rows reject the complete snapshot`() {
-        val valid = commandStats("git status")
-        val malformedCount = commandRow(valid).replace("\t4\t", "\tinvalid\t")
-        val malformedUtf8 =
-            commandRow(valid)
+    fun `credential commands encode only opaque ranking rows`() {
+        val snapshot =
+            snapshot(
+                "curl -u alice:s3cr3t https://example.test",
+                "mysql -p hunter2",
+            )
+
+        val encoded = CompletionLearningSnapshotCodec.encode(snapshot)
+        val decoded = requireNotNull(CompletionLearningSnapshotCodec.decode(encoded))
+
+        assertEquals(2, decoded.rankingStats.size)
+        assertTrue(decoded.replayCommands.isEmpty())
+        assertTrue(encoded.drop(1).all { it.startsWith("R\t") })
+        assertFalse(encoded.any { "s3cr3t" in it || "hunter2" in it })
+    }
+
+    @Test
+    fun `malformed rows reject the complete snapshot`() {
+        val validLines = CompletionLearningSnapshotCodec.encode(snapshot("git status"))
+        val ranking = validLines.first { it.startsWith("R\t") }
+        val replay = validLines.first { it.startsWith("H\t") }
+        val malformedCount =
+            ranking
                 .split('\t')
                 .toMutableList()
-                .also { it[1] = "_w" }
+                .also { it[4] = "invalid" }
                 .joinToString("\t")
-        val invalidRows =
-            listOf(
-                malformedCount,
-                malformedUtf8,
-                "C\tnot-base64",
-                "S\tremoved",
-                "F\tremoved",
-                "X\tunknown",
-            )
+        val malformedReplay =
+            replay
+                .split('\t')
+                .toMutableList()
+                .also { it[1] = OTHER_DIGEST }
+                .joinToString("\t")
 
-        for (invalidRow in invalidRows) {
-            assertNull(
-                CompletionLearningSnapshotCodec.decode(
-                    listOf(HEADER, commandRow(valid), invalidRow),
-                ),
-            )
+        for (invalidRow in listOf(malformedCount, malformedReplay, "R\ttoo-short", "H\ttoo-short", "X\tunknown")) {
+            assertNull(CompletionLearningSnapshotCodec.decode(listOf(HEADER, invalidRow)))
         }
+        assertNull(CompletionLearningSnapshotCodec.decode(listOf(HEADER, replay, ranking)))
     }
 
     @Test
-    fun `previous exact-incompatible schema is rejected`() {
-        val decoded = CompletionLearningSnapshotCodec.decode(listOf("KetraTerm_COMMAND_COMPLETION_STATS\t1"))
+    fun `malformed UTF-8 replay text rejects the complete snapshot`() {
+        val invalidUtf8Replay = "H\t$OTHER_DIGEST\twyg\t\t"
 
-        assertNull(decoded)
+        assertNull(CompletionLearningSnapshotCodec.decode(listOf(HEADER, invalidUtf8Replay)))
     }
 
     @Test
-    fun `unknown header is rejected`() {
-        val decoded = CompletionLearningSnapshotCodec.decode(listOf("KetraTerm_COMMAND_COMPLETION_STATS\t999"))
-
-        assertNull(decoded)
+    fun `legacy and unknown schemas are rejected`() {
+        assertNull(CompletionLearningSnapshotCodec.decode(listOf("KetraTerm_COMMAND_COMPLETION_STATS\t2")))
+        assertNull(CompletionLearningSnapshotCodec.decode(listOf("KetraTerm_COMMAND_COMPLETION_LEARNING\t999")))
     }
 
     @Test
     fun `header-only file decodes to an empty snapshot`() {
-        assertEquals(
-            TerminalCommandCompletionStatsSnapshot.EMPTY,
-            CompletionLearningSnapshotCodec.decode(listOf(HEADER)),
-        )
+        assertEquals(CompletionLearningSnapshotCodec.decode(listOf(HEADER)), TerminalCompletionLearningSnapshot.EMPTY)
     }
 
-    private fun commandStats(
-        commandLine: String,
-        profileId: String? = "bash",
-        workingDirectoryUri: String? = "file:///repo",
-    ): TerminalCommandCompletionStats =
-        TerminalCommandCompletionStats(
-            commandLine = commandLine,
-            profileId = profileId,
-            workingDirectoryUri = workingDirectoryUri,
-            useCount = 4,
-            successCount = 3,
-            failureCount = 1,
-            acceptedCount = 2,
-            dismissedCount = 1,
-            lastUsedEpochMillis = 1234,
-        )
-
-    private fun commandRow(record: TerminalCommandCompletionStats): String =
-        listOf(
-            "C",
-            encodeText(record.commandLine),
-            encodeText(record.profileId.orEmpty()),
-            encodeText(record.workingDirectoryUri.orEmpty()),
-            record.useCount.toString(),
-            record.successCount.toString(),
-            record.failureCount.toString(),
-            record.acceptedCount.toString(),
-            record.dismissedCount.toString(),
-            record.lastUsedEpochMillis.toString(),
-        ).joinToString("\t")
-
-    private fun encodeText(value: String): String =
-        Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray(StandardCharsets.UTF_8))
+    private fun snapshot(vararg commands: String): TerminalCompletionLearningSnapshot {
+        val learning = TerminalCompletionLearningStore()
+        for ((index, command) in commands.withIndex()) {
+            learning.recordCommandResult(command, true, "bash", "file:///repo", index + 1L)
+        }
+        return learning.snapshot()
+    }
 
     private companion object {
-        private const val HEADER = "KetraTerm_COMMAND_COMPLETION_STATS\t2"
-        private val workingDirectory: Path = Paths.get("").toAbsolutePath()
-        private val repositoryRoot: Path =
-            if (Files.isRegularFile(workingDirectory.resolve("docs/persistent-terminal-storage.md"))) {
-                workingDirectory
-            } else {
-                workingDirectory.parent
-            }
+        private const val HEADER = "KetraTerm_COMMAND_COMPLETION_LEARNING\t3"
+        private const val OTHER_DIGEST = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     }
 }

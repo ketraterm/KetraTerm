@@ -17,9 +17,9 @@ candidate contracts, and one concrete bounded learning store. Product registries
 compose their path and dynamic providers directly and pass the shared learning
 store to the engine. The engine automatically evaluates its
 command specs as one static source, so hosts cannot wire parsing specs and
-static candidates inconsistently. Statistics are
-the single source of learned history, observed tokens, and ranking evidence;
-they never become a second independent provider vote.
+static candidates inconsistently. One bounded aggregate owns learning. It
+publishes opaque ranking evidence plus an optional, positive, policy-approved plaintext
+replay projection; learning never becomes a second independent provider vote.
 
 `TerminalCompletionMatchRanges` is the immutable primitive-backed display-range
 contract carried by completion candidates. Construction validates ordered,
@@ -39,18 +39,32 @@ or construct:
 - `TerminalPathArgumentKind`
 - `TerminalCompletionValueDomain`
 - `TerminalCommandSpecs`
-- `TerminalCommandCompletionStats`
 - `TerminalCompletionFeedbackKind`
-- `TerminalCommandCompletionStatsSnapshot`
+- `TerminalCompletionRankingStats`
+- `TerminalCommandReplay`
+- `TerminalCompletionLearningSnapshot`
 
-`TerminalCompletionPersistencePolicy` is the reviewed host-facing privacy boundary. It answers whether an exact
-command may be persisted and sanitizes a complete snapshot before a host crosses a storage boundary. Its conservative
-keyword list remains internal because hosts do not need to branch on individual rejection reasons.
+`TerminalCompletionReplayPolicy` is a best-effort conservative plaintext
+eligibility filter, not proof that a command contains no secret. Malformed
+UTF-16 is rejected before any evidence is recorded. For otherwise recordable
+commands, the policy rejects multiline text, ISO controls other than internal
+tabs, more than 4,096 UTF-16 code units, or more than 8,192 UTF-8 bytes. It then
+applies leading-whitespace privacy and a small credential classifier. Those
+well-formed commands may still update ranking through a stable, case-sensitive
+SHA-256 identity, but only successful or accepted commands approved by the
+filter can enter retained replay history or the observed-token compiler. Persistence
+rechecks the same eligibility at its storage boundary. The digest is not
+directly decodable, but common command strings can still be guessed and hashed
+for comparison. At request time, plaintext history and observed tokens require
+the recorded profile and canonical working-directory context to equal the
+request context exactly, including null. Unknown replay context is not a
+wildcard. Opaque ranking evidence keeps its existing context fallback.
 
 Model constructors expose durable host-owned fields only. Derived matching
 values, such as lowercase command text, are computed by completion internals
-instead of being caller-owned constructor state. Exact command identity removes
-trailing whitespace while preserving case and leading privacy whitespace;
+instead of being caller-owned constructor state. Exact command identity
+preserves the full single-line command, including case, leading whitespace, and
+syntactically meaningful trailing whitespace;
 lowercase values are only for case-insensitive prefix search.
 
 Types used only to tokenize, classify, rank, merge, or index suggestions belong
@@ -120,8 +134,10 @@ option values, and positional arguments for live completion. The merged engine
 captures one compiled learning-index set per request and uses it for positive
 history candidates, observed tokens for unknown commands, and exact ranking
 evidence. All three views therefore observe the same immutable mutation state
-and contribute as one learned source. The shared learning store publishes
-immutable aggregate snapshots and owns the identity-aware compiled-index cache.
+and contribute as one learned source. Ranking compiles directly from opaque
+rows. Replay rows are joined to their matching evidence and tokenized once for
+both history and observed-token indexes. The shared learning store publishes
+immutable split snapshots and owns the identity-aware compiled-index cache.
 Snapshot models remain pure persistence data. One scoring
 policy owns bounded counter math. Global fusion owns
 outcome grouping, explicit score components, semantic relevance,
@@ -131,8 +147,8 @@ implementations each live in their matching file in `ketraterm-completion-host`.
 
 ## Host Ownership
 
-Hosts are responsible for choosing whether and where persistence is enabled. The shared persistence coordinator applies
-`TerminalCompletionPersistencePolicy` to authoritative command records. `TerminalCompletionLearningStore` merges its one
+Hosts are responsible for choosing whether and where persistence is enabled. `TerminalCompletionLearningStore` applies
+`TerminalCompletionReplayPolicy` before plaintext enters retained memory and merges its one
 persisted hydration snapshot and accepts live feedback events, but it is not a completion source and never contributes a second visible candidate. Completion components never
 read files, scan raw shell history, spawn shells, or talk to UI frameworks.
 
@@ -140,7 +156,9 @@ Optional disk I/O belongs to the separately published
 `ketraterm-completion-persistence` module. Its
 `TerminalCompletionLearningCoordinator` owns the public fixed-path lifecycle. Learning mutates its bounded in-memory
 store synchronously; one conflated worker hydrates once, observes last-value enablement, and checkpoints the latest dirty
-snapshot every 30 seconds. It talks directly to one bounded file store and forces the final dirty write during shutdown.
+snapshot every 30 seconds. The file store persists opaque evidence and only
+positive, policy-approved replay rows, rechecking replay eligibility before encoding. It
+talks directly to one bounded file store and forces the final dirty write during shutdown.
 There is no runtime path switching, repository lifecycle, separate writer, control actor, or arbitrary flush barrier.
 Product hosts own the fixed destination, enablement policy, diagnostics, and the point at which graceful shutdown
 becomes blocking.
@@ -171,14 +189,15 @@ popup. A full command is retained only when the executable itself is active;
 history rows that cannot be projected safely into the active context are not
 offered.
 
-The learning compiler derives a bounded observed-token index from successful
-exact rows for executables that have no static `TerminalCommandSpec`. Commands
+The learning compiler derives a bounded observed-token index from successful,
+policy-approved replay rows for executables that have no static `TerminalCommandSpec`. Commands
 such as `abc de -g`, `abc de -f`, and `abc as` can therefore offer `de` and
 `as` after `abc `, and `-g`/`-f` after `abc de `. These are `ARGUMENT`
 candidates labeled as learned observations, not inferred subcommands or a
 claimed command grammar. The index learns only the first non-option token after
 an unknown executable and option names; it never learns later positional values
-or option values. It is a derived view of exact rows, not a second mutable or
+or option values. It is a derived view of replay rows joined to opaque evidence,
+not a second mutable or
 persisted learning family.
 
 For supported POSIX and PowerShell syntax, the tokenizer uses one bounded
@@ -341,19 +360,23 @@ deduplicate, and rank candidates.
 `ketraterm-completion` must stay pure: it should not shell out to Git, read IDE
 indexes, watch files, or block on host I/O.
 
-Learned statistics mutate one bounded exact index and publish its immutable snapshot lazily on the next completion,
+Learned events mutate one bounded exact aggregate and publish its immutable split snapshot lazily on the next completion,
 persistence, or explicit snapshot read. Multiple events before that read therefore avoid rebuilding the full row
 list. No-op or rejected events retain the current snapshot identity. There is no
 second row-snapshot cache inside the mutable index.
 
 On first use of a snapshot identity and shell syntax, one compiler tokenizes
-each learned row once and feeds that parsed context to the direct ranking lookup,
-positive-history prefix index, and observed-token index. A completion request
+each replay row once and feeds that parsed context to the positive-history
+prefix index and observed-token index. The direct ranking lookup consumes only
+opaque evidence and never requires plaintext. A completion request
 captures that index set once before source evaluation and uses it throughout the
 request even if learning mutates while sources run. One flat syntax-indexed cache
 reuses the result for subsequent requests. History lookup groups rows
-by normalized tokens before the active position and binary-searches the active
-token prefix, so a hot request does not rescan the bounded 2,048-row snapshot.
+by exact canonical host context and normalized tokens before the active position,
+then binary-searches the active token prefix. Observed-token success counts are
+retained per exact host context, so neither visibility nor score can borrow
+evidence from another profile or directory. A hot request does not rescan the
+bounded 2,048-row snapshot.
 
 The standalone host currently maps PowerShell to `POWERSHELL`, its tested
 POSIX-profile categories to `POSIX`, and Command Prompt, Fish, Nushell, and
