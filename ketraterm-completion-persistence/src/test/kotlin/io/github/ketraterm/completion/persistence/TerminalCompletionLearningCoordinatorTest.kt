@@ -21,10 +21,12 @@ import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
 import java.io.IOException
+import java.nio.file.Files
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -301,6 +303,40 @@ class TerminalCompletionLearningCoordinatorTest {
             assertEquals(setOf("npm token list", "npm token create"), learned.keys)
             assertEquals(1, learned.getValue("npm token create").acceptedCount)
             assertTrue(files.writes.isEmpty())
+        }
+
+    @Test
+    fun `leading-space command remains in memory but is removed at the file boundary`() =
+        runTest {
+            val path =
+                createTempDirectory("completion-leading-space")
+                    .resolve(TerminalCompletionLearningCoordinator.currentFileName())
+            val learning = TerminalCompletionLearningStore()
+            val coordinator =
+                TerminalCompletionLearningCoordinator(
+                    learningStore = learning,
+                    fileStore = CompletionLearningFileStore(path),
+                    coroutineScope = this,
+                    persistenceEnabled = true,
+                    checkpointIntervalMillis = CHECKPOINT_INTERVAL_MILLIS,
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            runCurrent()
+
+            coordinator.recordCommandResult(" historyless-command", true, null, null, 42L)
+            coordinator.closeAndFlush()
+
+            assertEquals(
+                listOf(" historyless-command"),
+                learning.snapshot().commandStats.map { it.commandLine },
+            )
+            val persisted =
+                requireNotNull(
+                    CompletionLearningSnapshotCodec.decode(
+                        Files.readAllLines(path),
+                    ),
+                )
+            assertTrue(persisted.commandStats.isEmpty())
         }
 
     @Test

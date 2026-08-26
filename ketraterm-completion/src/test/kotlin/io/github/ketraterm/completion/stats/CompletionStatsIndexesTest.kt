@@ -22,6 +22,26 @@ import kotlin.test.assertEquals
 
 class CompletionStatsIndexesTest {
     @Test
+    fun `exact command index preserves leading privacy whitespace and removes trailing whitespace`() {
+        val index = CommandCompletionStatsIndex(capacity = 8)
+
+        index.recordCommandResult(
+            commandLine = " git status  ",
+            successful = true,
+            profileId = null,
+            workingDirectoryUri = null,
+            usedAtEpochMillis = 10,
+        )
+        index.mergeAll(
+            listOf(
+                commandStats("\tnpm test  ", lastUsedEpochMillis = 20),
+            ),
+        )
+
+        assertEquals(listOf("\tnpm test", " git status"), index.snapshot().map { it.commandLine })
+    }
+
+    @Test
     fun `exact command index preserves case and merges only identical command text`() {
         val index = CommandCompletionStatsIndex(capacity = 8)
 

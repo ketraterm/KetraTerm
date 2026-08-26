@@ -20,7 +20,7 @@ import io.github.ketraterm.completion.internal.ParsedLearnedStatsRow
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import java.util.*
 
-/** Immutable prefix-context index for positive persisted command rows. */
+/** Immutable prefix-context index for positive learned command rows. */
 internal class LearnedHistoryCandidateIndex private constructor(
     private val buckets: Map<List<String>, List<IndexedLearnedCommand>>,
 ) {

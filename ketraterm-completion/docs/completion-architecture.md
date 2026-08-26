@@ -49,9 +49,9 @@ keyword list remains internal because hosts do not need to branch on individual 
 
 Model constructors expose durable host-owned fields only. Derived matching
 values, such as lowercase command text, are computed by completion internals
-instead of being caller-owned constructor state. Exact command identity uses
-trimmed, case-preserved text; lowercase values are only for case-insensitive
-prefix search.
+instead of being caller-owned constructor state. Exact command identity removes
+trailing whitespace while preserving case and leading privacy whitespace;
+lowercase values are only for case-insensitive prefix search.
 
 Types used only to tokenize, classify, rank, merge, or index suggestions belong
 in implementation packages and must stay `internal`.

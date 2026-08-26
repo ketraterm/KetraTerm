@@ -21,7 +21,7 @@ import io.github.ketraterm.completion.internal.saturatedCompletionCounterIncreme
 import io.github.ketraterm.completion.model.TerminalCommandCompletionStats
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 
-/** Bounded stats index keyed by case-preserved exact command text and context. */
+/** Bounded stats index keyed by trailing-whitespace-normalized exact command text and context. */
 internal class CommandCompletionStatsIndex(
     private val capacity: Int,
 ) {
@@ -90,7 +90,7 @@ internal class CommandCompletionStatsIndex(
         workingDirectoryUri: String?,
         update: (TerminalCommandCompletionStats) -> TerminalCommandCompletionStats,
     ): Boolean {
-        val canonical = commandLine.trim()
+        val canonical = commandLine.trimEnd()
         val context = CompletionLearningContextKey.of(profileId, workingDirectoryUri)
         val key = CommandCompletionStatsKey(canonical, context)
         val current = rowsByKey[key]
@@ -159,7 +159,7 @@ internal class CommandCompletionStatsIndex(
     private fun canonicalizeContext(record: TerminalCommandCompletionStats): TerminalCommandCompletionStats {
         val context = CompletionLearningContextKey.of(record.profileId, record.workingDirectoryUri)
         return record.copy(
-            commandLine = record.commandLine.trim(),
+            commandLine = record.commandLine.trimEnd(),
             profileId = context.profileId,
             workingDirectoryUri = context.workingDirectoryUri,
         )
