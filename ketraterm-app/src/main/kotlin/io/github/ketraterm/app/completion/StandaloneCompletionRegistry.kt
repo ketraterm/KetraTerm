@@ -50,7 +50,6 @@ internal class StandaloneCompletionRegistry private constructor(
 ) {
     private val lifecycleLock = Any()
     private var closed = false
-    private val commandSpecs = specs
     private val learning =
         TerminalCompletionLearningCoordinator(
             learningStore = learningStore,
@@ -58,6 +57,18 @@ internal class StandaloneCompletionRegistry private constructor(
             persistencePath = persistencePath,
             persistenceEnabled = persistenceEnabled,
             onPersistenceLoadFailure = onPersistenceLoadFailure,
+        )
+    private val engine =
+        TerminalCompletionEngines.fromSources(
+            sources =
+                listOf(
+                    TerminalCompletionSourceEntry(
+                        TerminalCompletionSources.path(TerminalLocalFileSystemProvider()),
+                        TerminalCompletionSourcePrior.DIRECTORY_PATH,
+                    ),
+                ),
+            commandSpecs = specs,
+            learningStore = learningStore,
         )
     private val feedbackRecorder =
         SwingCompletionFeedbackRecorder(
@@ -103,18 +114,6 @@ internal class StandaloneCompletionRegistry private constructor(
                     shellCapabilities = shellCapabilities,
                 )
             }
-            val engine =
-                TerminalCompletionEngines.fromSources(
-                    sources =
-                        listOf(
-                            TerminalCompletionSourceEntry(
-                                TerminalCompletionSources.path(TerminalLocalFileSystemProvider()),
-                                TerminalCompletionSourcePrior.DIRECTORY_PATH,
-                            ),
-                        ),
-                    commandSpecs = commandSpecs,
-                    learningStore = learningStore,
-                )
             StandaloneCompletionResources(
                 provider = SwingCompletionSuggestionProvider(engine, contextProvider),
                 feedbackHandler = feedbackRecorder.createHandler(),

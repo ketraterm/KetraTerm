@@ -31,9 +31,6 @@ internal class SpecCompletionSource(
         require(specs.none { it.name.isBlank() }) { "specs must not contain blank command names" }
     }
 
-    override val isFastInMemory: Boolean
-        get() = true
-
     override suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,

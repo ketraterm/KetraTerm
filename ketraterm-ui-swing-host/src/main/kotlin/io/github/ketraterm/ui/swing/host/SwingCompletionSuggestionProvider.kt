@@ -86,32 +86,14 @@ class SwingCompletionSuggestionProvider(
 
         private fun String.toDisplayText(): String {
             val normalized = trim().boundedSourceLabel().lowercase(Locale.ROOT).boundedSourceLabel()
-            return when {
-                normalized == "spec" -> "Built-in"
-                normalized == "learned" || normalized == "observed" -> "Learned"
-                normalized.containsIdentifierToken("gradle") -> "Gradle"
-                normalized.containsIdentifierToken("git") -> "Git"
-                normalized.containsIdentifierToken("project") && normalized.containsIdentifierToken("file") -> "Project"
-                normalized.containsIdentifierToken("path") || normalized.containsIdentifierToken("file") -> "Path"
-                else ->
+            return SOURCE_DISPLAY_TEXT[normalized]
+                ?: run {
                     normalized
                         .removePrefix("intellij-")
                         .humanizeSourceIdentifier()
                         .replaceFirstChar { character -> character.titlecase(Locale.ROOT) }
                         .boundedSourceLabel()
-            }
-        }
-
-        private fun String.containsIdentifierToken(token: String): Boolean {
-            var startIndex = indexOf(token)
-            while (startIndex >= 0) {
-                val endIndex = startIndex + token.length
-                val startsAtBoundary = startIndex == 0 || !this[startIndex - 1].isLetterOrDigit()
-                val endsAtBoundary = endIndex == length || !this[endIndex].isLetterOrDigit()
-                if (startsAtBoundary && endsAtBoundary) return true
-                startIndex = indexOf(token, startIndex + 1)
-            }
-            return false
+                }
         }
 
         private fun String.humanizeSourceIdentifier(): String {
@@ -142,6 +124,20 @@ class SwingCompletionSuggestionProvider(
 
         private const val MAXIMUM_SOURCE_LABEL_CODE_UNITS = 128
         private const val ELLIPSIS = "…"
+        private val SOURCE_DISPLAY_TEXT =
+            mapOf(
+                "spec" to "Built-in",
+                "learned" to "Learned",
+                "observed" to "Learned",
+                "path" to "Path",
+                "intellij-project-file" to "Project",
+                "intellij-gradle-task" to "Gradle",
+                "intellij-git-branch" to "Git",
+                "intellij-git-remote-branch" to "Git",
+                "intellij-git-tag" to "Git",
+                "intellij-git-commit" to "Git",
+                "intellij-git-status-path" to "Git",
+            )
     }
 }
 

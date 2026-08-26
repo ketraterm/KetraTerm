@@ -16,6 +16,7 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import kotlinx.coroutines.*
@@ -63,6 +64,44 @@ class MergedCompletionEngineTest {
             val emissions = collected.await()
             assertEquals(listOf("fast"), emissions.first().map { it.replacementText })
             assertEquals(listOf("slow", "fast"), emissions.last().map { it.replacementText })
+        }
+
+    @Test
+    fun `specs publish directly before suspending host sources`() =
+        runBlocking {
+            val hostStarted = CompletableDeferred<Unit>()
+            val releaseHost = CompletableDeferred<Unit>()
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            entry(
+                                TerminalCompletionSource { _, _, _ ->
+                                    hostStarted.complete(Unit)
+                                    releaseHost.await()
+                                    listOf(
+                                        candidate(
+                                            replacement = "storage",
+                                            end = 2,
+                                            source = "host",
+                                            kind = TerminalCompletionCandidateKind.COMMAND,
+                                        ),
+                                    )
+                                },
+                                priority = 0,
+                            ),
+                        ),
+                    commandSpecs = listOf(TerminalCommandSpec("status")),
+                )
+
+            val collected = async { engine.completions(request("st")).toList() }
+            hostStarted.await()
+            releaseHost.complete(Unit)
+
+            val emissions = collected.await()
+            assertEquals(listOf("status"), emissions.first().map { it.replacementText })
+            assertEquals("spec", emissions.first().single().source)
+            assertTrue(emissions.last().any { it.source == "host" })
         }
 
     @Test
@@ -802,23 +841,15 @@ class MergedCompletionEngineTest {
             )
             var mutationTimestamp = 2L
             val mutatingSource =
-                object : TerminalCompletionSource {
-                    override val isFastInMemory: Boolean = true
-
-                    override suspend fun complete(
-                        request: TerminalCompletionRequest,
-                        context: TerminalCompletionContext,
-                        limit: Int,
-                    ): List<TerminalCompletionCandidate> {
-                        learningStore.recordCommandResult(
-                            commandLine = "tool new",
-                            successful = true,
-                            profileId = null,
-                            workingDirectoryUri = null,
-                            usedAtEpochMillis = mutationTimestamp++,
-                        )
-                        return emptyList()
-                    }
+                TerminalCompletionSource { _, _, _ ->
+                    learningStore.recordCommandResult(
+                        commandLine = "tool new",
+                        successful = true,
+                        profileId = null,
+                        workingDirectoryUri = null,
+                        usedAtEpochMillis = mutationTimestamp++,
+                    )
+                    emptyList()
                 }
             val engine =
                 TerminalCompletionEngines.fromSources(

@@ -21,13 +21,6 @@ package io.github.ketraterm.completion.api
  */
 fun interface TerminalCompletionSource {
     /**
-     * Whether this source operates strictly in memory without suspending or blocking I/O.
-     * Fast in-memory sources are evaluated synchronously on the request coroutine for immediate UI emission.
-     */
-    val isFastInMemory: Boolean
-        get() = false
-
-    /**
      * Returns candidates produced by this source for [request] and [context].
      *
      * Implementations may suspend for bounded host I/O. Cancellation must stop

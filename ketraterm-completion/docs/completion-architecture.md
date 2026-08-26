@@ -274,6 +274,8 @@ Presentation is intentionally platform-owned. The standalone host custom-paints
 a compact completion list; the IntelliJ plugin owns a separate native `JBList`.
 Both consume `SwingShellSuggestionViewSnapshot` and the same authoritative
 display text, detail, source label, semantic accent role, and matched ranges.
+The Swing adapter maps the products' stable source identities through one private
+exact table; unknown identities use a bounded human-readable fallback.
 Physical renderers may follow their platform's visuals and mechanics but do not
 reparse engine kinds or provider identifiers.
 
@@ -324,12 +326,13 @@ moves to an injected IO dispatcher.
 Enumeration has visit, result, and elapsed-time caps. The defaults (8,192 visited entries, 256 matches, and a 50 ms scan
 budget) are an explicit desktop baseline covered by JMH directory-scan benchmarks; change them only with representative
 local and remote-filesystem measurements.
-Direct local and project-VFS scanners retain one replace-only raw snapshot for
-the last directory when an authoritative directory identity and modification
-version are available. The snapshot is capped at 8,192 sorted entries and is
-filtered per prefix to at most 256 source candidates. Incomplete, cancelled,
-failed, or version-changing scans are never published into the cache. There is
-no TTL, refresh callback, worker, or merged-candidate cache.
+The direct local NIO scanner performs one bounded scan per request and retains no
+directory cache. IntelliJ's project-VFS scanner alone may retain one replace-only
+raw snapshot when its directory URL, VFS modification stamp, and project-roots
+modification count still match. That VFS snapshot is capped at 8,192 sorted
+entries and filtered per prefix to at most 256 source candidates. Incomplete,
+cancelled, failed, or version-changing VFS scans are never cached. There is no
+TTL, refresh callback, worker, or merged-candidate cache.
 `runInterruptible` makes local directory scans cooperatively interruptible. The app resolves
 local and `localhost` file URIs, explicit home paths,
 Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses
@@ -356,6 +359,9 @@ owns the persistence shutdown boundary, so completion files are never loaded on 
 The engine-to-Swing request/candidate bridge and Swing-feedback-to-statistics mapping live in `ketraterm-ui-swing-host`.
 Product hosts inject context, privacy, scheduling, and persistence policy instead of copying the vocabulary conversion
 logic.
+
+Standalone owns one stateless completion engine and local-filesystem provider per application registry. Pane resources
+add only their request-context supplier and feedback binding.
 
 Both hosts should map their data into the shared request/candidate/source
 contracts and let the shared engine resolve outcomes, fuse provider evidence,
@@ -451,8 +457,9 @@ absolute overflow metadata so each physical renderer can expose range and scroll
 position without gaining access to ranking state.
 
 Source collection uses one cold structured `channelFlow`. The engine parses
-once, resolves one context, launches one child per source under a supervisor,
-and serially incorporates completed-source events in the parent. Each changed
+once, resolves one context, evaluates its internal spec source directly, launches
+one child per host source under a supervisor, and serially incorporates
+completed-source events in the parent. Each changed
 global ranking is emitted immediately, so a slow Git or index source cannot
 block a fast spec, learned, or direct-path result. Individual sources remain
 ordinary suspending functions and never own scopes or child jobs. A non-cancellation source failure is reported through

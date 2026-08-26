@@ -217,6 +217,26 @@ class StandaloneCompletionRegistryTest {
         }
 
     @Test
+    fun `shared engine keeps pane working directories request scoped`() =
+        runBlocking {
+            val firstDirectory = Files.createTempDirectory("ketraterm-first-pane")
+            val secondDirectory = Files.createTempDirectory("ketraterm-second-pane")
+            try {
+                Files.createDirectory(firstDirectory.resolve("alpha"))
+                Files.createDirectory(secondDirectory.resolve("beta"))
+                val registry = registry(TerminalCommandSpecs.defaults())
+                val first = registry.openProvider(workingDirectoryUriProvider = { firstDirectory.toUri().toString() })
+                val second = registry.openProvider(workingDirectoryUriProvider = { secondDirectory.toUri().toString() })
+
+                assertEquals(listOf("alpha/"), first.suggestions(request("cd a")).last().map { it.replacementText })
+                assertEquals(listOf("beta/"), second.suggestions(request("cd b")).last().map { it.replacementText })
+            } finally {
+                firstDirectory.toFile().deleteRecursively()
+                secondDirectory.toFile().deleteRecursively()
+            }
+        }
+
+    @Test
     fun `learned command stats boost matching suggestions`() =
         runBlocking {
             val persistentStats = TerminalCompletionLearningStore()

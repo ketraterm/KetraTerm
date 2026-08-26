@@ -18,7 +18,7 @@ package io.github.ketraterm.completion.host
 import io.github.ketraterm.completion.api.TerminalFileEntry
 import java.nio.file.Path
 
-/** Suspending bounded directory-scan contract used by snapshot providers. */
+/** Suspending bounded direct-directory scan contract used by completion providers. */
 fun interface TerminalDirectoryScanner {
     /**
      * Scans direct children beginning with [entryNamePrefix].
