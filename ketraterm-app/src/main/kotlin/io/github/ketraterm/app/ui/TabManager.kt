@@ -24,13 +24,17 @@ import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.workspace.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.logging.Level
+import java.util.logging.Logger
 import javax.swing.*
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Owns standalone terminal tabs and tab-scoped session lifecycle.
@@ -60,6 +64,13 @@ internal class TabManager(
         StandaloneCompletionRegistry.create(
             persistencePath = settings.commandCompletionStatsPath,
             persistenceEnabled = settings.persistentSuggestionLearningEnabled,
+            onPersistenceLoadFailure = { failure ->
+                LOGGER.log(
+                    Level.WARNING,
+                    "Completion learning persistence was disabled because existing data could not be loaded",
+                    failure,
+                )
+            },
         )
     private val shutdownStarted = AtomicBoolean()
     val selectedPane: TerminalPane?
@@ -156,7 +167,7 @@ internal class TabManager(
         } catch (failure: Throwable) {
             var cleanupFailure: Throwable? = failure
             cleanupFailure = captureCleanupFailure(cleanupFailure) { focusManager.removeKeyEventDispatcher(keyEventDispatcher) }
-            cleanupFailure = captureCleanupFailure(cleanupFailure) { runBlocking { completionRegistry.closeAndFlush() } }
+            cleanupFailure = captureCleanupFailure(cleanupFailure, ::closeCompletionLearningWithinBudget)
             throw requireNotNull(cleanupFailure)
         }
     }
@@ -285,7 +296,7 @@ internal class TabManager(
         return true
     }
 
-    /** Closes every open tab without prompting; used after remote/session shutdown. */
+    /** Closes every open tab and starts bounded completion persistence without blocking the Swing EDT. */
     fun closeAllTabsWithoutConfirmation() {
         if (!shutdownStarted.compareAndSet(false, true)) return
         var failure: Throwable? = null
@@ -300,8 +311,38 @@ internal class TabManager(
             }
         }
         failure = captureCleanupFailure(failure, workspace::close)
-        failure = captureCleanupFailure(failure) { runBlocking { completionRegistry.closeAndFlush() } }
+        failure = captureCleanupFailure(failure, ::startCompletionLearningShutdown)
         failure?.let { throw it }
+    }
+
+    private fun startCompletionLearningShutdown() {
+        Thread
+            .ofPlatform()
+            .name("ketraterm-completion-shutdown")
+            .daemon(false)
+            .start {
+                try {
+                    closeCompletionLearningWithinBudget()
+                } catch (failure: Throwable) {
+                    LOGGER.log(Level.WARNING, "Final completion learning persistence failed during shutdown", failure)
+                }
+            }
+    }
+
+    private fun closeCompletionLearningWithinBudget() {
+        val completed =
+            runBlocking {
+                withTimeoutOrNull(COMPLETION_PERSISTENCE_DURABILITY_BUDGET_MILLIS.milliseconds) {
+                    completionRegistry.closeAndFlush()
+                    true
+                } ?: false
+            }
+        if (!completed) {
+            LOGGER.warning(
+                "Completion learning persistence exceeded its " +
+                    "$COMPLETION_PERSISTENCE_DURABILITY_BUDGET_MILLIS ms shutdown budget; continuing shutdown",
+            )
+        }
     }
 
     /** Propagates a settings reload to all live panes and the workspace. */
@@ -990,7 +1031,9 @@ internal class TabManager(
     }
 
     private companion object {
+        private val LOGGER: Logger = Logger.getLogger(TabManager::class.java.name)
         private const val INITIAL_TAB_CAPACITY = 4
+        private const val COMPLETION_PERSISTENCE_DURABILITY_BUDGET_MILLIS = 500L
 
         private fun targetsHostClipboard(selection: String): Boolean = selection.isEmpty() || selection.indexOf('c') >= 0
 

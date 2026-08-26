@@ -38,12 +38,14 @@ import java.nio.file.Path
  * @param persistenceEnabled whether the fixed destination may initially be read and written.
  * @param specs static command specs shared by providers created from this registry.
  * @param learningStore bounded learning shared by ranking and persistence.
+ * @param onPersistenceLoadFailure host diagnostic invoked when existing learning cannot be loaded safely.
  */
 internal class StandaloneCompletionRegistry private constructor(
     persistencePath: Path,
     persistenceEnabled: Boolean,
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
     private val learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
+    onPersistenceLoadFailure: (Throwable) -> Unit = {},
     internal val completionScope: CoroutineScope,
 ) {
     private val lifecycleLock = Any()
@@ -55,6 +57,7 @@ internal class StandaloneCompletionRegistry private constructor(
             coroutineScope = completionScope,
             persistencePath = persistencePath,
             persistenceEnabled = persistenceEnabled,
+            onPersistenceLoadFailure = onPersistenceLoadFailure,
         )
     private val feedbackRecorder =
         SwingCompletionFeedbackRecorder(
@@ -175,6 +178,7 @@ internal class StandaloneCompletionRegistry private constructor(
             persistenceEnabled: Boolean,
             specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
             learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
+            onPersistenceLoadFailure: (Throwable) -> Unit = {},
         ): StandaloneCompletionRegistry {
             val completionScope =
                 CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("standalone-completion"))
@@ -184,6 +188,7 @@ internal class StandaloneCompletionRegistry private constructor(
                     persistenceEnabled = persistenceEnabled,
                     specs = specs,
                     learningStore = learningStore,
+                    onPersistenceLoadFailure = onPersistenceLoadFailure,
                     completionScope = completionScope,
                 )
             } catch (failure: Throwable) {

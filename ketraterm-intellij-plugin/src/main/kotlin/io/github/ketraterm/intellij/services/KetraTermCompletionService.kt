@@ -19,6 +19,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import io.github.ketraterm.completion.api.TerminalCompletionSourceEntry
 import io.github.ketraterm.completion.api.TerminalCompletionSourcePrior
@@ -28,6 +29,7 @@ import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.*
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Application-level owner of IntelliJ completion learning and product sources.
@@ -60,7 +62,7 @@ internal class KetraTermCompletionService : Disposable {
             settings.addChangeListener(settingsListener)
         } catch (failure: Throwable) {
             try {
-                runBlocking { completionRuntime.registry.closeAndFlush() }
+                closeCompletionLearningWithinBudget()
             } catch (closeFailure: Throwable) {
                 if (failure !== closeFailure) failure.addSuppressed(closeFailure)
             } finally {
@@ -157,7 +159,7 @@ internal class KetraTermCompletionService : Disposable {
             failure = listenerFailure
         }
         try {
-            runBlocking { completionRuntime.registry.closeAndFlush() }
+            closeCompletionLearningWithinBudget()
         } catch (flushFailure: Throwable) {
             val firstFailure = failure
             if (firstFailure == null) {
@@ -168,6 +170,22 @@ internal class KetraTermCompletionService : Disposable {
         }
         completionRuntime.scope.cancel()
         failure?.let { throw it }
+    }
+
+    private fun closeCompletionLearningWithinBudget() {
+        val completed =
+            runBlocking {
+                withTimeoutOrNull(COMPLETION_PERSISTENCE_DURABILITY_BUDGET_MILLIS.milliseconds) {
+                    completionRuntime.registry.closeAndFlush()
+                    true
+                } ?: false
+            }
+        if (!completed) {
+            LOG.warn(
+                "Completion learning persistence exceeded its " +
+                    "$COMPLETION_PERSISTENCE_DURABILITY_BUDGET_MILLIS ms shutdown budget; continuing disposal",
+            )
+        }
     }
 
     private class CompletionRuntime(
@@ -190,6 +208,12 @@ internal class KetraTermCompletionService : Disposable {
                             persistencePath = persistencePath,
                             persistenceEnabled = persistenceEnabled,
                             coroutineScope = scope,
+                            onPersistenceLoadFailure = { failure ->
+                                LOG.warn(
+                                    "Completion learning persistence was disabled because existing data could not be loaded",
+                                    failure,
+                                )
+                            },
                         ),
                 )
             } catch (failure: Throwable) {
@@ -204,6 +228,9 @@ internal class KetraTermCompletionService : Disposable {
          * @return IntelliJ-managed completion service.
          */
         fun getInstance(): KetraTermCompletionService = service()
+
+        private val LOG: Logger = Logger.getInstance(KetraTermCompletionService::class.java)
+        private const val COMPLETION_PERSISTENCE_DURABILITY_BUDGET_MILLIS = 500L
     }
 }
 

@@ -96,8 +96,13 @@ invalidates a pending checkpoint; an atomic file operation already in progress
 may finish. Hydration that already started may also finish and merge because
 disabling does not clear in-memory learning. The first enable hydrates the fixed
 file once, and later toggles do not reload it. A rejected or unreadable file is
-not overwritten during that lifecycle. Product-lifetime in-memory learning remains active. The plugin's
-enabled store lives in the IDE system directory described above.
+not overwritten during that lifecycle, and the product logs one diagnostic with
+the original read exception when available. Product-lifetime in-memory learning remains active. The plugin's
+enabled store lives in the IDE system directory described above. During shutdown,
+each product waits at most 500 ms for final completion persistence before cancelling
+its persistence scope and continuing shutdown. Standalone performs that bounded wait
+on a non-daemon shutdown thread so the Swing event thread can dispose the window immediately;
+IntelliJ applies the same budget to its synchronous disposal callback.
 
 Before plaintext enters retained learning, `TerminalCompletionLearningStore`
 applies `TerminalCompletionReplayPolicy`. The file store rechecks the same

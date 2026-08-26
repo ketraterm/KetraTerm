@@ -35,6 +35,7 @@ import java.nio.file.Path
  * @param persistencePath fixed product-owned learning destination.
  * @param persistenceEnabled whether the fixed destination may initially be read and written.
  * @param coroutineScope host lifecycle scope that parents completion work.
+ * @param onPersistenceLoadFailure host diagnostic invoked when existing learning cannot be loaded safely.
  */
 internal class IntellijCompletionRegistry(
     specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
@@ -42,6 +43,7 @@ internal class IntellijCompletionRegistry(
     persistencePath: Path,
     persistenceEnabled: Boolean,
     coroutineScope: CoroutineScope,
+    onPersistenceLoadFailure: (Throwable) -> Unit = {},
 ) {
     private val lock = Any()
     private var closed = false
@@ -52,6 +54,7 @@ internal class IntellijCompletionRegistry(
             persistencePath = persistencePath,
             persistenceEnabled = persistenceEnabled,
             coroutineScope = coroutineScope,
+            onPersistenceLoadFailure = onPersistenceLoadFailure,
         )
     private val feedbackRecorder =
         SwingCompletionFeedbackRecorder(

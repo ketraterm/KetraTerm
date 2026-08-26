@@ -25,4 +25,6 @@ The coordinator talks directly to one bounded file store. There is no
 repository, separate writer, control-command actor, arbitrary flush barrier,
 nullable path, or per-event persistence request. Hydration merges the fixed
 file with live rows in the supplied store; callers must not separately preload
-the same aggregate file. Legacy schemas are rejected rather than imported.
+the same aggregate file. Legacy schemas are rejected rather than imported. A
+rejected or unreadable file blocks overwrite for that lifecycle and invokes one
+host-supplied diagnostic callback with the original read exception when one exists.

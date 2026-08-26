@@ -38,6 +38,7 @@ class TerminalCompletionLearningCoordinator
         persistenceEnabled: Boolean,
         private val checkpointIntervalMillis: Long,
         private val ioDispatcher: CoroutineDispatcher,
+        private val onPersistenceLoadFailure: (Throwable) -> Unit = {},
     ) {
         /**
          * Creates a lifecycle-bound learning owner for one fixed persistence path.
@@ -46,12 +47,15 @@ class TerminalCompletionLearningCoordinator
          * @param coroutineScope caller-owned lifecycle scope for the persistence worker.
          * @param persistencePath fixed snapshot path owned by the product.
          * @param persistenceEnabled whether the snapshot may initially be read and written.
+         * @param onPersistenceLoadFailure invoked once when an existing file is rejected or cannot be read.
+         * Exceptions thrown by this diagnostic callback are ignored.
          */
         constructor(
             learningStore: TerminalCompletionLearningStore,
             coroutineScope: CoroutineScope,
             persistencePath: Path,
             persistenceEnabled: Boolean,
+            onPersistenceLoadFailure: (Throwable) -> Unit,
         ) : this(
             learningStore = learningStore,
             fileStore =
@@ -62,6 +66,7 @@ class TerminalCompletionLearningCoordinator
             persistenceEnabled = persistenceEnabled,
             checkpointIntervalMillis = DEFAULT_CHECKPOINT_INTERVAL_MILLIS,
             ioDispatcher = Dispatchers.IO,
+            onPersistenceLoadFailure = onPersistenceLoadFailure,
         )
 
         init {
@@ -221,16 +226,24 @@ class TerminalCompletionLearningCoordinator
 
         private suspend fun hydrate() {
             val outcome = withContext(ioDispatcher) { fileStore.loadSnapshot() }
+            val loadFailure =
+                when (outcome) {
+                    CompletionLearningFileLoadOutcome.Rejected ->
+                        IllegalStateException(
+                            "Completion-learning persistence was disabled because the existing snapshot was rejected",
+                        )
+                    is CompletionLearningFileLoadOutcome.Failed -> outcome.cause
+                    else -> null
+                }
             synchronized(stateLock) {
                 if (outcome is CompletionLearningFileLoadOutcome.Loaded) {
                     learningStore.mergeSnapshot(outcome.snapshot)
                 }
-                if (outcome === CompletionLearningFileLoadOutcome.Rejected ||
-                    outcome === CompletionLearningFileLoadOutcome.Failed
-                ) {
-                    loadBlocked = true
-                }
+                loadBlocked = loadFailure != null
                 hydrated = true
+            }
+            if (loadFailure != null) {
+                runCatching { onPersistenceLoadFailure(loadFailure) }
             }
         }
 

@@ -192,7 +192,7 @@ class CompletionLearningFileStoreTest {
 
         val outcome = CompletionLearningFileStore(path, openInput = { throw expectedFailure }).loadSnapshot()
 
-        assertSame(CompletionLearningFileLoadOutcome.Failed, outcome)
+        assertSame(expectedFailure, assertIs<CompletionLearningFileLoadOutcome.Failed>(outcome).cause)
         assertEquals(HEADER.trimEnd(), Files.readString(path))
     }
 

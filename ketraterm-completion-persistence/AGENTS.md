@@ -13,6 +13,7 @@ This module may:
 - checkpoint dirty snapshots periodically through one conflated worker.
 - expose bounded fixed-path file-store I/O.
 - force and await one final dirty write during lifecycle shutdown.
+- notify one host callback when hydration is rejected or fails, without adding a health-event subsystem.
 
 ## Boundary
 
@@ -33,7 +34,8 @@ must not enqueue per-event snapshots or controls.
 
 Product hosts choose one non-null fixed destination at coordinator
 construction, supply the scope, and own enablement, lifecycle, and user-facing
-settings. Do not add runtime path switching, snapshot-import semantics,
+settings. Hosts also own a bounded final-durability wait and must cancel their
+scope and continue shutdown when that budget expires. Do not add runtime path switching, snapshot-import semantics,
 arbitrary flush barriers, a repository layer, or a separate writer. The
 dependency-free completion engine remains free of filesystem and scheduling
 concerns.

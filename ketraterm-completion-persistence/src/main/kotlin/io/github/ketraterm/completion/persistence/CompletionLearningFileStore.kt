@@ -38,7 +38,9 @@ internal sealed interface CompletionLearningFileLoadOutcome {
     data object Rejected : CompletionLearningFileLoadOutcome
 
     /** The file could not be inspected or read. */
-    data object Failed : CompletionLearningFileLoadOutcome
+    data class Failed(
+        val cause: Exception,
+    ) : CompletionLearningFileLoadOutcome
 }
 
 /** Fixed-path snapshot operations used by the persistence coordinator. */
@@ -72,8 +74,8 @@ internal class CompletionLearningFileStore(
             }
         } catch (_: NoSuchFileException) {
             CompletionLearningFileLoadOutcome.Missing
-        } catch (_: Exception) {
-            CompletionLearningFileLoadOutcome.Failed
+        } catch (failure: Exception) {
+            CompletionLearningFileLoadOutcome.Failed(failure)
         }
 
     override fun persist(snapshot: TerminalCompletionLearningSnapshot) {

@@ -27,10 +27,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.createTempDirectory
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -379,25 +376,87 @@ class TerminalCompletionLearningCoordinatorTest {
         }
 
     @Test
-    fun `rejected and failed hydration block overwrite for the lifecycle`() =
+    fun `failed hydration reports the original cause once and blocks overwrite`() =
         runTest {
-            for (
-            outcome in
-            listOf(
-                CompletionLearningFileLoadOutcome.Rejected,
-                CompletionLearningFileLoadOutcome.Failed,
+            val expectedFailure = IOException("test load failure")
+            val diagnostics = CopyOnWriteArrayList<Throwable>()
+            val files =
+                RecordingSnapshotFiles(
+                    initialLoadOutcome = CompletionLearningFileLoadOutcome.Failed(expectedFailure),
+                )
+            val learning = TerminalCompletionLearningStore()
+            val coordinator =
+                coordinator(
+                    learning = learning,
+                    files = files,
+                    onPersistenceLoadFailure = diagnostics::add,
+                )
+
+            coordinator.recordCommandResult("git status", true, null, null, 42L)
+            coordinator.closeAndFlush()
+            coordinator.closeAndFlush()
+
+            assertEquals(listOf("git status"), learning.snapshot().replayCommands.map { it.commandLine })
+            assertTrue(files.writes.isEmpty())
+            assertEquals(1, diagnostics.size)
+            assertSame(expectedFailure, diagnostics.single())
+        }
+
+    @Test
+    fun `rejected hydration reports once and blocks overwrite`() =
+        runTest {
+            val diagnostics = CopyOnWriteArrayList<Throwable>()
+            val files =
+                RecordingSnapshotFiles(
+                    initialLoadOutcome = CompletionLearningFileLoadOutcome.Rejected,
+                )
+            val learning = TerminalCompletionLearningStore()
+            val coordinator =
+                coordinator(
+                    learning = learning,
+                    files = files,
+                    onPersistenceLoadFailure = diagnostics::add,
+                )
+
+            coordinator.recordCommandResult("git status", true, null, null, 42L)
+            coordinator.closeAndFlush()
+            coordinator.closeAndFlush()
+
+            assertEquals(listOf("git status"), learning.snapshot().replayCommands.map { it.commandLine })
+            assertTrue(files.writes.isEmpty())
+            assertEquals(1, diagnostics.size)
+            assertTrue(
+                diagnostics
+                    .single()
+                    .message
+                    .orEmpty()
+                    .contains("snapshot was rejected"),
             )
-            ) {
-                val files = RecordingSnapshotFiles(initialLoadOutcome = outcome)
-                val learning = TerminalCompletionLearningStore()
-                val coordinator = coordinator(learning, files)
+        }
 
-                coordinator.recordCommandResult("git status", true, null, null, 42L)
-                coordinator.closeAndFlush()
+    @Test
+    fun `diagnostic callback failure does not destabilize the worker`() =
+        runTest {
+            val callbackCount = AtomicInteger()
+            val files =
+                RecordingSnapshotFiles(
+                    initialLoadOutcome = CompletionLearningFileLoadOutcome.Rejected,
+                )
+            val coordinator =
+                coordinator(
+                    learning = TerminalCompletionLearningStore(),
+                    files = files,
+                    onPersistenceLoadFailure = {
+                        callbackCount.incrementAndGet()
+                        error("test diagnostic failure")
+                    },
+                )
 
-                assertEquals(listOf("git status"), learning.snapshot().replayCommands.map { it.commandLine })
-                assertTrue(files.writes.isEmpty())
-            }
+            coordinator.recordCommandResult("git status", true, null, null, 42L)
+            coordinator.closeAndFlush()
+
+            assertEquals(1, callbackCount.get())
+            assertTrue(files.writes.isEmpty())
         }
 
     @Test
@@ -570,6 +629,47 @@ class TerminalCompletionLearningCoordinatorTest {
         }
 
     @Test
+    fun `cancelling a close waiter does not wait for blocked file IO`() =
+        runBlocking {
+            val loadFinished = CountDownLatch(1)
+            val writeStarted = CountDownLatch(1)
+            val releaseWrite = CountDownLatch(1)
+            val workerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            try {
+                val files =
+                    RecordingSnapshotFiles(
+                        afterLoad = loadFinished::countDown,
+                        beforePersist = {
+                            writeStarted.countDown()
+                            releaseWrite.await()
+                        },
+                    )
+                val coordinator =
+                    TerminalCompletionLearningCoordinator(
+                        learningStore = TerminalCompletionLearningStore(),
+                        fileStore = files,
+                        coroutineScope = workerScope,
+                        persistenceEnabled = true,
+                        checkpointIntervalMillis = CHECKPOINT_INTERVAL_MILLIS,
+                        ioDispatcher = Dispatchers.IO,
+                    )
+                assertTrue(loadFinished.await(5L, TimeUnit.SECONDS))
+                coordinator.recordCommandResult("git status", true, null, null, 42L)
+
+                val closeWaiter = async(Dispatchers.Default) { coordinator.closeAndFlush() }
+                assertTrue(writeStarted.await(5L, TimeUnit.SECONDS))
+                closeWaiter.cancel()
+                withTimeout(500L.milliseconds) { closeWaiter.join() }
+
+                assertTrue(closeWaiter.isCancelled)
+                assertEquals(1, files.writeAttempts.get())
+            } finally {
+                releaseWrite.countDown()
+                workerScope.cancel()
+            }
+        }
+
+    @Test
     fun `concurrent close persists every mutation that returned normally`() =
         runTest {
             val files = RecordingSnapshotFiles()
@@ -645,6 +745,7 @@ class TerminalCompletionLearningCoordinatorTest {
         files: RecordingSnapshotFiles,
         enabled: Boolean = true,
         ioDispatcher: CoroutineDispatcher = StandardTestDispatcher(testScheduler, name = "learning-io"),
+        onPersistenceLoadFailure: (Throwable) -> Unit = {},
     ): TerminalCompletionLearningCoordinator =
         TerminalCompletionLearningCoordinator(
             learningStore = learning,
@@ -653,6 +754,7 @@ class TerminalCompletionLearningCoordinatorTest {
             persistenceEnabled = enabled,
             checkpointIntervalMillis = CHECKPOINT_INTERVAL_MILLIS,
             ioDispatcher = ioDispatcher,
+            onPersistenceLoadFailure = onPersistenceLoadFailure,
         )
 
     private class RecordingSnapshotFiles(

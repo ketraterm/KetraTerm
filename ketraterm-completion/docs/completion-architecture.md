@@ -160,8 +160,9 @@ snapshot every 30 seconds. The file store persists opaque evidence and only
 positive, policy-approved replay rows, rechecking replay eligibility before encoding. It
 talks directly to one bounded file store and forces the final dirty write during shutdown.
 There is no runtime path switching, repository lifecycle, separate writer, control actor, or arbitrary flush barrier.
-Product hosts own the fixed destination, enablement policy, diagnostics, and the point at which graceful shutdown
-becomes blocking.
+Product hosts own the fixed destination, enablement policy, one load-failure diagnostic callback, and a bounded
+shutdown durability budget. If final Java NIO does not finish within that budget, the host cancels its persistence
+scope and stops waiting; the timeout is not presented as an interrupt guarantee for the filesystem operation.
 Completion persistence is not a workspace responsibility.
 
 The standalone app and IntelliJ plugin should compose completion sources through

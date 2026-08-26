@@ -120,6 +120,7 @@ class StandaloneCompletionRegistryPersistenceTest {
                     coroutineScope = this,
                     persistencePath = path,
                     persistenceEnabled = true,
+                    onPersistenceLoadFailure = {},
                 )
             coordinator.closeAndFlush()
             learning.snapshot()
