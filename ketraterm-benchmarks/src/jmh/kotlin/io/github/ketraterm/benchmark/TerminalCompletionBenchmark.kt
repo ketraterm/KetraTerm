@@ -115,10 +115,10 @@ open class TerminalCompletionBenchmark {
         runBlocking { indexedLearnedHistoryEngine.completions(fusionRequest).last() }
         duplicateFusionEngine = TerminalCompletionEngines.fromSources(List(8) { sourceEntry(it, 32, duplicateMain = true) }, commandSpecs)
         hostileFusionEngine = TerminalCompletionEngines.fromSources(List(10) { sourceEntry(it, 256, duplicateMain = false) }, commandSpecs)
-        val fuzzyPaths =
-            List(FUZZY_PATH_ENTRY_COUNT) { index ->
+        val fuzzyPathMatches =
+            List(FUZZY_PATH_MATCH_COUNT) { index ->
                 TerminalFuzzyPathEntry(
-                    path = "src/module-${index and 63}/GeneratedFile$index.kt",
+                    path = "src/module-${index and 63}/GenF327Match$index.kt",
                     isDirectory = false,
                 )
             }
@@ -129,7 +129,7 @@ open class TerminalCompletionBenchmark {
                         TerminalCompletionSourceEntry(
                             TerminalCompletionSources.fuzzyPath(
                                 sourceId = "benchmark-project-path",
-                                entriesProvider = { _, limit -> fuzzyPaths.take(limit) },
+                                entriesProvider = { _, _ -> fuzzyPathMatches },
                             ),
                         ),
                     ),
@@ -243,6 +243,6 @@ open class TerminalCompletionBenchmark {
     }
 
     private companion object {
-        private const val FUZZY_PATH_ENTRY_COUNT = 32_768
+        private const val FUZZY_PATH_MATCH_COUNT = 8_192
     }
 }

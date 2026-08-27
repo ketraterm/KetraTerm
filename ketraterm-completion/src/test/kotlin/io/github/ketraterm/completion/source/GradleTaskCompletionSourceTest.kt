@@ -130,6 +130,26 @@ class GradleTaskCompletionSourceTest {
             assertEquals(listOf("needleTask"), candidates.map { it.replacementText })
         }
 
+    @Test
+    fun `retains a higher-ranked late task within the final candidate bound`() =
+        runBlocking {
+            val boundedSource =
+                TerminalCompletionSources.gradleTask(
+                    sourceId = "bounded-gradle-task",
+                    tasksProvider = { _, _ ->
+                        buildList {
+                            repeat(300) { index -> add(TerminalGradleTask(":task-run-$index", projectDirectory = ".")) }
+                            add(TerminalGradleTask(":tr-target", projectDirectory = "."))
+                        }
+                    },
+                )
+
+            val candidates = boundedSource.complete(request("gradle tr"))
+
+            assertEquals(256, candidates.size)
+            assertTrue(candidates.any { it.replacementText == "tr-target" })
+        }
+
     private fun request(commandLine: String): TerminalCompletionRequest =
         TerminalCompletionRequest(
             commandLine = commandLine,

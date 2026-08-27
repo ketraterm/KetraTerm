@@ -168,6 +168,27 @@ class ValueDomainCompletionSourceTest {
             assertEquals(listOf("feature/needle"), candidates.map { it.replacementText })
         }
 
+    @Test
+    fun `retains a higher-ranked late value within the final candidate bound`() =
+        runBlocking {
+            val boundedSource =
+                TerminalCompletionSources.valueDomain(
+                    domain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    sourceId = "git",
+                    valuesProvider = { _, _ ->
+                        buildList {
+                            repeat(300) { index -> add(TerminalCompletionDomainValue("feature/branch-$index")) }
+                            add(TerminalCompletionDomainValue("feature/priority", scoreAdjustment = 1_000))
+                        }
+                    },
+                )
+
+            val candidates = boundedSource.complete(request("git switch feature/"))
+
+            assertEquals(256, candidates.size)
+            assertTrue(candidates.any { it.replacementText == "feature/priority" })
+        }
+
     private fun request(
         commandLine: String,
         capabilities: TerminalShellCapabilities = TerminalShellCapabilities.POSIX,

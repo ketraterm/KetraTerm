@@ -16,8 +16,7 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
-import io.github.ketraterm.completion.internal.boundedTo
+import io.github.ketraterm.completion.internal.BoundedCompletionCandidateCollector
 import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
@@ -85,11 +84,21 @@ internal fun projectValueDomainCandidates(
 ): List<TerminalCompletionCandidate> {
     if (context.expectedValueDomain != domain || values.isEmpty()) return emptyList()
     val prefix = context.activePrefix
-    val candidates = ArrayList<TerminalCompletionCandidate>(minOf(values.size, limit))
+    val candidates = BoundedCompletionCandidateCollector(limit)
     for (index in values.indices) {
         val value = values[index]
         if (prefix.isNotEmpty() && value.value.equals(prefix, ignoreCase = true)) continue
         val match = CompletionMatcher.match(value.value, prefix) ?: continue
+        if (!ShellReplacementText.canEncode(value.value, context.activeTokenQuote, request.shellCapabilities.quoting)) {
+            continue
+        }
+        val candidateScore =
+            match.sourceScore(
+                baseScore = VALUE_DOMAIN_BASE_SCORE + value.scoreAdjustment,
+                query = prefix,
+                orderIndex = index,
+            )
+        if (!candidates.shouldMaterialize(candidateScore)) continue
         val displayMatchRanges =
             if (value.displayText == value.value) {
                 match.matchedRanges
@@ -102,7 +111,7 @@ internal fun projectValueDomainCandidates(
                 activeTokenQuote = context.activeTokenQuote,
                 policy = request.shellCapabilities.quoting,
             ) ?: continue
-        candidates +=
+        candidates.offer(
             TerminalCompletionCandidate(
                 replacementText = replacement,
                 replacementStartOffset = context.replacementStartOffset,
@@ -111,18 +120,13 @@ internal fun projectValueDomainCandidates(
                 detail = value.detail,
                 source = sourceId,
                 kind = TerminalCompletionCandidateKind.ARGUMENT,
-                score =
-                    match.sourceScore(
-                        baseScore = VALUE_DOMAIN_BASE_SCORE + value.scoreAdjustment,
-                        query = prefix,
-                        orderIndex = index,
-                    ),
+                score = candidateScore,
                 valueDomain = domain,
                 matchedRanges = displayMatchRanges,
-            )
+            ),
+        )
     }
-    candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-    return candidates.boundedTo(limit)
+    return candidates.finish()
 }
 
 private const val VALUE_DOMAIN_BASE_SCORE = 260

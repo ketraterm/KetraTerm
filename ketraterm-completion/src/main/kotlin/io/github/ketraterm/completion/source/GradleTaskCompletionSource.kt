@@ -16,9 +16,8 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.internal.BoundedCompletionCandidateCollector
 import io.github.ketraterm.completion.internal.GradleCompletionSyntax
-import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
-import io.github.ketraterm.completion.internal.boundedTo
 import io.github.ketraterm.completion.matching.CompletionMatcher
 
 /**
@@ -55,20 +54,33 @@ internal class GradleTaskCompletionSource(
         val tasks = tasksProvider(request, context)
         if (tasks.isEmpty()) return emptyList()
 
-        val candidates = ArrayList<TerminalCompletionCandidate>(minOf(tasks.size, limit))
+        val candidates = BoundedCompletionCandidateCollector(limit)
         val emitted = HashSet<String>()
         for ((index, task) in tasks.withIndex()) {
             val replacement = replacementFor(task, prefix, projectDirectory) ?: continue
             if (prefix.isNotEmpty() && replacement.equals(prefix, ignoreCase = true)) continue
             val match = CompletionMatcher.match(replacement, prefix) ?: continue
             if (!emitted.add(replacement)) continue
+            if (!ShellReplacementText.canEncode(replacement, context.activeTokenQuote, request.shellCapabilities.quoting)) {
+                continue
+            }
+            val candidateScore =
+                match.sourceScore(
+                    baseScore =
+                        BASE_SCORE +
+                            (if (task.isRootProjectTask) ROOT_TASK_BONUS else 0) +
+                            (if (prefix.isEmpty()) EMPTY_PREFIX_BONUS else 0),
+                    query = prefix,
+                    orderIndex = index,
+                )
+            if (!candidates.shouldMaterialize(candidateScore)) continue
             val encodedReplacement =
                 ShellReplacementText.encode(
                     value = replacement,
                     activeTokenQuote = context.activeTokenQuote,
                     policy = request.shellCapabilities.quoting,
                 ) ?: continue
-            candidates +=
+            candidates.offer(
                 TerminalCompletionCandidate(
                     replacementText = encodedReplacement,
                     replacementStartOffset = context.replacementStartOffset,
@@ -77,20 +89,12 @@ internal class GradleTaskCompletionSource(
                     detail = task.description.ifBlank { "Gradle task ${task.path}" },
                     source = sourceId,
                     kind = TerminalCompletionCandidateKind.SUBCOMMAND,
-                    score =
-                        match.sourceScore(
-                            baseScore =
-                                BASE_SCORE +
-                                    (if (task.isRootProjectTask) ROOT_TASK_BONUS else 0) +
-                                    (if (prefix.isEmpty()) EMPTY_PREFIX_BONUS else 0),
-                            query = prefix,
-                            orderIndex = index,
-                        ),
+                    score = candidateScore,
                     matchedRanges = match.matchedRanges,
-                )
+                ),
+            )
         }
-        candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-        return candidates.boundedTo(limit)
+        return candidates.finish()
     }
 
     private fun replacementFor(
