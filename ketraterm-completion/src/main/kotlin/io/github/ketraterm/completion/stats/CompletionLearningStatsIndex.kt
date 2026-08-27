@@ -78,7 +78,6 @@ internal class CompletionLearningStatsIndex(
 
     fun recordSuggestionFeedback(
         identityDigest: String,
-        replayCommandLine: String?,
         feedback: TerminalCompletionFeedbackKind,
         profileId: String?,
         workingDirectoryUri: String?,
@@ -86,7 +85,7 @@ internal class CompletionLearningStatsIndex(
     ): Boolean =
         mutate(
             identityDigest,
-            replayCommandLine.takeIf { feedback == TerminalCompletionFeedbackKind.ACCEPTED },
+            null,
             profileId,
             workingDirectoryUri,
         ) { previous ->
@@ -152,7 +151,7 @@ internal class CompletionLearningStatsIndex(
         val context = CompletionLearningContextKey.of(replay.profileId, replay.workingDirectoryUri)
         val key = CompletionLearningStatsKey(replay.identityDigest, context)
         val current = rowsByKey[key] ?: return
-        if (!current.rankingStats.hasPositiveReplaySignal()) return
+        if (!current.rankingStats.hasSuccessfulExecution()) return
         if (current.replay != null) return
         val retainedReplay =
             if (replay.profileId == current.rankingStats.profileId &&
@@ -257,7 +256,7 @@ internal class CompletionLearningStatsIndex(
 
     private companion object {
         private val RANKING_STATS_ORDER =
-            compareByDescending<TerminalCompletionRankingStats> { it.hasPositiveReplaySignal() }
+            compareByDescending<TerminalCompletionRankingStats> { it.hasSuccessfulExecution() }
                 .thenByDescending { it.lastUsedEpochMillis }
                 .thenByDescending { it.acceptedCount }
                 .thenByDescending { it.successCount }
@@ -272,4 +271,4 @@ internal class CompletionLearningStatsIndex(
     }
 }
 
-private fun TerminalCompletionRankingStats.hasPositiveReplaySignal(): Boolean = successCount > 0 || acceptedCount > 0
+private fun TerminalCompletionRankingStats.hasSuccessfulExecution(): Boolean = successCount > 0

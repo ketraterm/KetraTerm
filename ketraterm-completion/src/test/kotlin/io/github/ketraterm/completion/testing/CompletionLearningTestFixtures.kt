@@ -70,14 +70,14 @@ internal fun learningSnapshot(rows: List<TestCommandLearning>): TerminalCompleti
                 identityDigest = identity,
                 profileId = row.profileId,
                 workingDirectoryUri = row.workingDirectoryUri,
-                useCount = row.useCount,
+                useCount = maxOf(row.useCount, row.successCount),
                 successCount = row.successCount,
                 failureCount = row.failureCount,
                 acceptedCount = row.acceptedCount,
                 dismissedCount = row.dismissedCount,
                 lastUsedEpochMillis = row.lastUsedEpochMillis,
             )
-        if (row.replay) {
+        if (row.replay && row.successCount > 0) {
             replayCommands +=
                 TerminalCommandReplay(
                     identityDigest = identity,

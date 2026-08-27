@@ -223,14 +223,14 @@ internal class CompletionLearningFileStore(
     }
 
     private fun TerminalCompletionLearningSnapshot.sanitizeReplay(): TerminalCompletionLearningSnapshot {
-        val positiveKeys =
+        val successfulKeys =
             rankingStats
                 .asSequence()
-                .filter { it.successCount > 0 || it.acceptedCount > 0 }
+                .filter { it.successCount > 0 }
                 .mapTo(HashSet()) { it.rowKey() }
         val retained =
             replayCommands.filter {
-                it.rowKey() in positiveKeys && TerminalCompletionReplayPolicy.allowsPlaintext(it.commandLine)
+                it.rowKey() in successfulKeys && TerminalCompletionReplayPolicy.allowsPlaintext(it.commandLine)
             }
         return if (retained.size == replayCommands.size) this else copy(replayCommands = retained)
     }

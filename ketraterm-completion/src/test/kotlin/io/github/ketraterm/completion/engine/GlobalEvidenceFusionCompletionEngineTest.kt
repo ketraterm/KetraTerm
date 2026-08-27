@@ -135,7 +135,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                     rows =
                         listOf(
                             commandLearning(
-                                commandLine = "cd build",
+                                commandLine = "cd build/",
                                 profileId = "profile",
                                 workingDirectoryUri = "file:///repo",
                                 acceptedCount = 8,
@@ -310,7 +310,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
         }
 
     @Test
-    fun `successful executions help and failed executions hurt`() =
+    fun `nonzero exits contribute usage without a ranking penalty`() =
         runBlocking {
             val snapshot =
                 learningSnapshot(
@@ -321,12 +321,14 @@ class GlobalEvidenceFusionCompletionEngineTest {
                                 useCount = 10,
                                 successCount = 10,
                                 lastUsedEpochMillis = NOW,
+                                replay = false,
                             ),
                             commandLearning(
                                 commandLine = "git switch maint",
                                 useCount = 10,
                                 failureCount = 10,
                                 lastUsedEpochMillis = NOW,
+                                replay = false,
                             ),
                         ),
                 )
@@ -345,7 +347,7 @@ class GlobalEvidenceFusionCompletionEngineTest {
                     snapshot = snapshot,
                 ).complete(request("git switch ma"))
 
-            assertEquals("main", candidates.first().replacementText)
+            assertEquals("maint", candidates.first().replacementText)
         }
 
     @Test
@@ -629,7 +631,6 @@ class GlobalEvidenceFusionCompletionEngineTest {
                                 commandLine = "git switch main",
                                 useCount = Int.MAX_VALUE,
                                 successCount = Int.MAX_VALUE,
-                                failureCount = Int.MAX_VALUE,
                                 acceptedCount = Int.MAX_VALUE,
                                 dismissedCount = Int.MAX_VALUE,
                                 lastUsedEpochMillis = Long.MAX_VALUE,

@@ -15,6 +15,10 @@
  */
 package io.github.ketraterm.completion.api
 
+import io.github.ketraterm.completion.internal.terminalCompletionRankingIdentity
+import io.github.ketraterm.completion.model.TerminalCommandReplay
+import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
+import io.github.ketraterm.completion.model.TerminalCompletionRankingStats
 import io.github.ketraterm.completion.testing.commandLearning
 import io.github.ketraterm.completion.testing.learningSnapshot
 import kotlin.test.Test
@@ -46,17 +50,24 @@ class TerminalCompletionLearningStoreMergeTest {
     }
 
     @Test
-    fun `merge drops replay projections backed only by negative evidence`() {
+    fun `merge drops replay projections without a successful execution`() {
         val store = TerminalCompletionLearningStore()
+        val acceptedCommand = "git accepted"
+        val acceptedIdentity = terminalCompletionRankingIdentity(acceptedCommand)
 
         store.mergeSnapshot(
-            learningSnapshot(
-                commandLearning("git failed", failureCount = 1),
-                commandLearning("git dismissed", dismissedCount = 1),
+            TerminalCompletionLearningSnapshot(
+                rankingStats =
+                    listOf(
+                        TerminalCompletionRankingStats(acceptedIdentity, acceptedCount = 1),
+                        learningSnapshot(commandLearning("git failed", useCount = 1, failureCount = 1)).rankingStats.single(),
+                        learningSnapshot(commandLearning("git dismissed", dismissedCount = 1)).rankingStats.single(),
+                    ),
+                replayCommands = listOf(TerminalCommandReplay(acceptedIdentity, acceptedCommand)),
             ),
         )
 
-        assertEquals(2, store.snapshot().rankingStats.size)
+        assertEquals(3, store.snapshot().rankingStats.size)
         assertTrue(store.snapshot().replayCommands.isEmpty())
     }
 

@@ -86,7 +86,7 @@ The shared controller retains the complete ranked snapshot and owns navigation, 
 
 ### Ranking Evidence
 
-The global ranker combines source rank and priority, semantic context, and bounded exact-command evidence. Successful executions and accepted suggestions raise a matching outcome; failures and dismissals lower it. More specific profile and working-directory rows take precedence over global rows, and recent evidence receives a bounded boost. Candidates are sorted deterministically after score fusion.
+The global ranker combines source rank and priority, semantic context, and bounded exact-command evidence. Repeated executions and accepted suggestions raise a matching outcome, while explicit dismissals lower it. Nonzero exits are usage rather than negative feedback. More specific profile and working-directory rows take precedence over global rows, and recent evidence receives a bounded boost. Candidates are sorted deterministically after score fusion.
 
 ---
 
@@ -94,7 +94,7 @@ The global ranker combines source rank and priority, semantic context, and bound
 
 Completion learning always works in memory. Disk persistence is separately opt-in in both products and uses one fixed product-owned destination named `command-completion-learning-v3.tsv`; settings enable or disable that destination rather than switching or importing arbitrary paths at runtime.
 
-When enabled, version 3 stores two projections. Opaque ranking rows contain a stable case-sensitive command digest, optional profile and working-directory context, bounded outcome/feedback counters, and a last-used timestamp. Counter-free replay rows contain plaintext only for successful or accepted commands approved by the replay policy.
+When enabled, version 3 stores two projections. Opaque ranking rows contain a stable case-sensitive command digest, optional profile and working-directory context, bounded usage/feedback counters, and a last-used timestamp. Counter-free replay rows contain plaintext only for successful commands approved by the replay policy. Accepting or dismissing an existing suggestion updates only its opaque ranking evidence.
 
 Malformed UTF-16 is not learned. For otherwise recordable commands, the best-effort replay policy rejects leading-whitespace, blank, multiline, control-bearing, and oversized text before plaintext enters retained memory. It also recognizes a small set of common credential options and password-bearing URI user-info. Approval is not proof that a command contains no secret. Well-formed commands rejected by the replay policy may still update opaque ranking evidence, but cannot feed history replay or observed-token inference. The file boundary rechecks the policy. Text fields use Base64URL so they fit safely in TSV fields; this is encoding, not encryption. Deterministic digests of common commands remain guessable. Users should treat the file as local command-derived data.
 

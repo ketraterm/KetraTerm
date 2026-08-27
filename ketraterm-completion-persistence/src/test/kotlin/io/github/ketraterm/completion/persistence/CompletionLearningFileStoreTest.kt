@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCommandReplay
+import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
 import java.io.IOException
 import java.nio.file.Files
@@ -91,6 +92,23 @@ class CompletionLearningFileStoreTest {
         val command = "git failed-safe-command"
         val learning = TerminalCompletionLearningStore()
         learning.recordCommandResult(command, false, null, null, 1L)
+        val stats = learning.snapshot().rankingStats.single()
+        val injected = TerminalCommandReplay(stats.identityDigest, command)
+
+        store.persist(TerminalCompletionLearningSnapshot(listOf(stats), listOf(injected)))
+
+        val loaded = store.loadSnapshot().loadedSnapshot()
+        assertEquals(listOf(stats), loaded.rankingStats)
+        assertTrue(loaded.replayCommands.isEmpty())
+    }
+
+    @Test
+    fun `storage boundary removes replay backed only by accepted feedback`() {
+        val path = path("completion-store-accepted-replay")
+        val store = CompletionLearningFileStore(path)
+        val command = "git status"
+        val learning = TerminalCompletionLearningStore()
+        learning.recordSuggestionFeedback(command, TerminalCompletionFeedbackKind.ACCEPTED, null, null, 1L)
         val stats = learning.snapshot().rankingStats.single()
         val injected = TerminalCommandReplay(stats.identityDigest, command)
 

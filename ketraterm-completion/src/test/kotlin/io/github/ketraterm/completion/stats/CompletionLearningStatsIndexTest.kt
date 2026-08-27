@@ -48,12 +48,14 @@ class CompletionLearningStatsIndexTest {
 
         val byIdentity = index.snapshot().rankingStats.associateBy { it.identityDigest }
         assertEquals(1, byIdentity.getValue(upper).successCount)
+        assertEquals(1, byIdentity.getValue(lower).useCount)
+        assertEquals(0, byIdentity.getValue(lower).successCount)
         assertEquals(1, byIdentity.getValue(lower).failureCount)
     }
 
     @Test
-    fun `records counters and evicts least relevant aggregate`() {
-        val index = CompletionLearningStatsIndex(capacity = 2)
+    fun `records execution and feedback counters without replaying unsuccessful commands`() {
+        val index = CompletionLearningStatsIndex(capacity = 3)
 
         fun record(
             command: String,
@@ -65,7 +67,6 @@ class CompletionLearningStatsIndexTest {
         record("two", false, 2)
         index.recordSuggestionFeedback(
             terminalCompletionRankingIdentity("two"),
-            "two",
             TerminalCompletionFeedbackKind.ACCEPTED,
             null,
             null,
@@ -73,7 +74,6 @@ class CompletionLearningStatsIndexTest {
         )
         index.recordSuggestionFeedback(
             terminalCompletionRankingIdentity("two"),
-            "two",
             TerminalCompletionFeedbackKind.DISMISSED,
             null,
             null,
@@ -82,8 +82,10 @@ class CompletionLearningStatsIndexTest {
         record("three", true, 5)
 
         val snapshot = index.snapshot()
-        assertEquals(listOf("three", "two"), snapshot.replayCommands.map { it.commandLine })
+        assertEquals(listOf("three", "one"), snapshot.replayCommands.map { it.commandLine })
         val two = snapshot.rankingStats.single { it.identityDigest == terminalCompletionRankingIdentity("two") }
+        assertEquals(1, two.useCount)
+        assertEquals(0, two.successCount)
         assertEquals(1, two.failureCount)
         assertEquals(1, two.acceptedCount)
         assertEquals(1, two.dismissedCount)
@@ -110,7 +112,7 @@ class CompletionLearningStatsIndexTest {
     }
 
     @Test
-    fun `negative-only live and merged evidence retain no replay projection`() {
+    fun `non-successful live and merged evidence retain no replay projection`() {
         val index = CompletionLearningStatsIndex(capacity = 8)
         val failedCommand = "git failing-safe-command"
 

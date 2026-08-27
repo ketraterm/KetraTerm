@@ -193,7 +193,6 @@ class TerminalCompletionLearningStoreTest {
                         workingDirectoryUri = null,
                         useCount = 1,
                         successCount = 1,
-                        failureCount = 0,
                         acceptedCount = 0,
                         dismissedCount = 0,
                         lastUsedEpochMillis = 10,
@@ -214,6 +213,37 @@ class TerminalCompletionLearningStoreTest {
                 source.snapshot(),
             )
         }
+
+    @Test
+    fun `accepted feedback affects ranking but only later success creates replay`() {
+        val source = TerminalCompletionLearningStore()
+
+        source.recordSuggestionFeedback(
+            commandLine = "git status",
+            feedback = TerminalCompletionFeedbackKind.ACCEPTED,
+            profileId = "bash",
+            workingDirectoryUri = "file:///repo",
+            feedbackAtEpochMillis = 10,
+        )
+
+        val accepted = source.snapshot()
+        assertTrue(accepted.replayCommands.isEmpty())
+        assertEquals(1, accepted.rankingStats.single().acceptedCount)
+
+        source.recordCommandResult(
+            commandLine = "git status",
+            successful = true,
+            profileId = "bash",
+            workingDirectoryUri = "file:///repo",
+            usedAtEpochMillis = 20,
+        )
+
+        val executed = source.snapshot()
+        assertEquals(listOf("git status"), executed.replayCommands.map { it.commandLine })
+        assertEquals(1, executed.rankingStats.single().acceptedCount)
+        assertEquals(1, executed.rankingStats.single().useCount)
+        assertEquals(1, executed.rankingStats.single().successCount)
+    }
 
     @Test
     fun `accepted feedback boosts candidate above dismissed candidate`() =
@@ -599,9 +629,8 @@ class TerminalCompletionLearningStoreTest {
             commandLine = commandLine,
             profileId = profileId,
             workingDirectoryUri = workingDirectoryUri,
-            useCount = 0,
+            useCount = 1,
             successCount = 1,
-            failureCount = 0,
             acceptedCount = 0,
             dismissedCount = 0,
             lastUsedEpochMillis = lastUsedEpochMillis,

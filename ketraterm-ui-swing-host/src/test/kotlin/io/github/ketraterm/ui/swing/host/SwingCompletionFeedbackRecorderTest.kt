@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
 
 class SwingCompletionFeedbackRecorderTest {
     @Test
-    fun `accepted range suggestion records resulting command and publishes snapshot`() {
+    fun `accepted range suggestion records opaque ranking evidence and publishes snapshot`() {
         val source = TerminalCompletionLearningStore()
         val published = ArrayList<TerminalCompletionLearningSnapshot>()
         val recorder = recorder(source, afterMutation = published::add, clockEpochMillis = { 1_000L })
@@ -47,12 +47,10 @@ class SwingCompletionFeedbackRecorderTest {
         )
 
         val snapshot = source.snapshot()
-        val replay = snapshot.replayCommands.single()
         val ranking = snapshot.rankingStats.single()
-        assertEquals("git status", replay.commandLine)
-        assertEquals("bash", replay.profileId)
-        assertEquals("file:///repo/", replay.workingDirectoryUri)
-        assertEquals(replay.identityDigest, ranking.identityDigest)
+        assertTrue(snapshot.replayCommands.isEmpty())
+        assertEquals("bash", ranking.profileId)
+        assertEquals("file:///repo/", ranking.workingDirectoryUri)
         assertEquals(1, ranking.acceptedCount)
         assertEquals(1_000L, ranking.lastUsedEpochMillis)
         assertEquals(snapshot, published.single())
@@ -143,7 +141,7 @@ class SwingCompletionFeedbackRecorderTest {
     }
 
     @Test
-    fun `explicit Unicode range records same command accepted by Swing handler`() {
+    fun `explicit Unicode range records acceptance without replay text`() {
         val source = TerminalCompletionLearningStore()
         val published = ArrayList<TerminalCompletionLearningSnapshot>()
         val recorder = recorder(source, afterMutation = published::add, clockEpochMillis = { 2_500L })
@@ -160,22 +158,16 @@ class SwingCompletionFeedbackRecorderTest {
                 ),
         )
 
+        assertTrue(source.snapshot().replayCommands.isEmpty())
         assertEquals(
-            "echo ok",
+            1,
             source
                 .snapshot()
-                .replayCommands
+                .rankingStats
                 .single()
-                .commandLine,
+                .acceptedCount,
         )
-        assertEquals(
-            "echo ok",
-            published
-                .single()
-                .replayCommands
-                .single()
-                .commandLine,
-        )
+        assertTrue(published.single().replayCommands.isEmpty())
     }
 
     @Test
@@ -242,7 +234,7 @@ class SwingCompletionFeedbackRecorderTest {
                 "file:///first/",
                 source
                     .snapshot()
-                    .replayCommands
+                    .rankingStats
                     .single()
                     .workingDirectoryUri,
             )

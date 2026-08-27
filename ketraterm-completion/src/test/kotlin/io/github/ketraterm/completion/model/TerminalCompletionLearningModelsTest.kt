@@ -31,6 +31,15 @@ class TerminalCompletionLearningModelsTest {
             stats(useCount = -1)
         }
         assertFailsWith<IllegalArgumentException> {
+            stats(useCount = 1, successCount = 2)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            TerminalCompletionRankingStats(
+                identityDigest = terminalCompletionRankingIdentity("git status"),
+                failureCount = -1,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
             stats(lastUsedEpochMillis = -1)
         }
     }
@@ -112,11 +121,13 @@ class TerminalCompletionLearningModelsTest {
     private fun stats(
         identityDigest: String = terminalCompletionRankingIdentity("git status"),
         useCount: Int = 0,
+        successCount: Int = 0,
         lastUsedEpochMillis: Long = 0,
     ): TerminalCompletionRankingStats =
         TerminalCompletionRankingStats(
             identityDigest = identityDigest,
             useCount = useCount,
+            successCount = successCount,
             lastUsedEpochMillis = lastUsedEpochMillis,
         )
 }

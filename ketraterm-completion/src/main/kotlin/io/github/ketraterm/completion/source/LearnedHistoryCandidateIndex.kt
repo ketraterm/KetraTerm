@@ -63,7 +63,7 @@ internal class LearnedHistoryCandidateIndex private constructor(
             for (snapshotRank in rows.indices) {
                 val parsedRow = rows[snapshotRank]
                 val stats = parsedRow.stats
-                if (!stats.hasPositiveSuggestionSignal()) continue
+                if (!stats.hasSuccessfulExecution()) continue
                 val line = parsedRow.lineContext
                 val learningContext = CompletionLearningContextKey.of(stats.profileId, stats.workingDirectoryUri)
                 val normalizedTokens = line.tokens.map { it.text.lowercase(Locale.ROOT) }
@@ -109,4 +109,4 @@ internal data class IndexedLearnedCommand(
     val snapshotRank: Int,
 )
 
-private fun TerminalCompletionRankingStats.hasPositiveSuggestionSignal(): Boolean = successCount > 0 || acceptedCount > 0
+private fun TerminalCompletionRankingStats.hasSuccessfulExecution(): Boolean = successCount > 0

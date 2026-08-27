@@ -30,8 +30,8 @@ import io.github.ketraterm.completion.stats.isRecordableStatsEvent
  * persistence may hydrate the store once through [mergeSnapshot] and persist
  * [snapshot] values. The store performs no I/O and does not emit candidates.
  * Mutations are serialized around one mutable exact index. Ranking rows retain
- * only opaque identities; plaintext replay is attached only to successful or
- * accepted commands that [TerminalCompletionReplayPolicy] approves. Published
+ * only opaque identities; plaintext replay is attached only to successful
+ * commands that [TerminalCompletionReplayPolicy] approves. Published
  * snapshots are immutable and retain identity until their contents change.
  *
  * @param capacity maximum distinct exact-command rows retained.
@@ -157,16 +157,10 @@ class TerminalCompletionLearningStore
         ): Boolean {
             if (!isRecordableStatsEvent(commandLine, feedbackAtEpochMillis)) return false
             val identityDigest = terminalCompletionRankingIdentity(commandLine)
-            val replayCommand =
-                commandLine.takeIf {
-                    feedback == TerminalCompletionFeedbackKind.ACCEPTED &&
-                        TerminalCompletionReplayPolicy.allowsPlaintext(commandLine)
-                }
             return synchronized(lock) {
                 val changed =
                     learningStats.recordSuggestionFeedback(
                         identityDigest = identityDigest,
-                        replayCommandLine = replayCommand,
                         feedback = feedback,
                         profileId = profileId,
                         workingDirectoryUri = workingDirectoryUri,

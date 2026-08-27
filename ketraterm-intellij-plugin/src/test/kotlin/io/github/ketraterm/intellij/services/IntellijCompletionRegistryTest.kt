@@ -170,10 +170,12 @@ class IntellijCompletionRegistryTest {
                 ),
             )
 
-            val learned = learningStore.snapshot().replayCommands.single()
-            assertEquals("git status", learned.commandLine)
-            assertEquals("bash", learned.profileId)
-            assertEquals("file:///repo-a/", learned.workingDirectoryUri)
+            val snapshot = learningStore.snapshot()
+            assertTrue(snapshot.replayCommands.isEmpty())
+            val ranking = snapshot.rankingStats.single()
+            assertEquals("bash", ranking.profileId)
+            assertEquals("file:///repo-a/", ranking.workingDirectoryUri)
+            assertEquals(1, ranking.acceptedCount)
             registry.closeAndFlush()
         }
 

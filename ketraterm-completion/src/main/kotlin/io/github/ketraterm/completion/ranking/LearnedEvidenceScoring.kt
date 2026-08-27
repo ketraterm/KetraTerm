@@ -20,16 +20,12 @@ import io.github.ketraterm.completion.model.TerminalCompletionRankingStats
 /** Saturating aggregate for exact command learning. */
 internal class LearnedEvidenceCounts(
     var useCount: Long = 0,
-    var successCount: Long = 0,
-    var failureCount: Long = 0,
     var acceptedCount: Long = 0,
     var dismissedCount: Long = 0,
     var lastUsedEpochMillis: Long = 0,
 ) {
     fun add(row: TerminalCompletionRankingStats) {
         useCount = saturatedAdd(useCount, row.useCount.toLong())
-        successCount = saturatedAdd(successCount, row.successCount.toLong())
-        failureCount = saturatedAdd(failureCount, row.failureCount.toLong())
         acceptedCount = saturatedAdd(acceptedCount, row.acceptedCount.toLong())
         dismissedCount = saturatedAdd(dismissedCount, row.dismissedCount.toLong())
         lastUsedEpochMillis = maxOf(lastUsedEpochMillis, row.lastUsedEpochMillis)
@@ -51,15 +47,11 @@ internal object LearnedEvidenceScoring {
         nowEpochMillis: Long,
     ): Int {
         var score = minOf(counts.useCount, EXACT_MAX_USE_COUNT) * EXACT_USE_SCORE
-        score +=
-            if (counts.successCount >= counts.failureCount) {
-                minOf(counts.successCount, 10L) * 4L
-            } else {
-                -minOf(counts.failureCount, 10L) * 4L
-            }
         score += (counts.acceptedCount - counts.dismissedCount).coerceIn(-20L, 20L) * 10L
-        score += contextBoost
-        score += recencyBoost(nowEpochMillis, counts.lastUsedEpochMillis)
+        if (counts.useCount > 0 || counts.acceptedCount > 0) {
+            score += contextBoost
+            score += recencyBoost(nowEpochMillis, counts.lastUsedEpochMillis)
+        }
         return score.coerceIn(EXACT_MIN_ADJUSTMENT, EXACT_MAX_ADJUSTMENT).toInt()
     }
 

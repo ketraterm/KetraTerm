@@ -28,12 +28,12 @@ package io.github.ketraterm.completion.model
  * @property workingDirectoryUri optional working-directory URI associated with the evidence.
  * @property useCount number of observed command executions.
  * @property successCount number of successful executions.
- * @property failureCount number of unsuccessful executions.
+ * @property failureCount number of unsuccessful executions. This is observational and does not penalize ranking.
  * @property acceptedCount number of accepted suggestions producing this outcome.
  * @property dismissedCount number of dismissed suggestions producing this outcome.
  * @property lastUsedEpochMillis newest execution or feedback timestamp represented by this row.
  * @throws IllegalArgumentException if the digest shape is invalid, a counter is
- * negative, or [lastUsedEpochMillis] is negative.
+ * negative, successful executions exceed total executions, or [lastUsedEpochMillis] is negative.
  */
 data class TerminalCompletionRankingStats
     @JvmOverloads
@@ -52,6 +52,7 @@ data class TerminalCompletionRankingStats
             requireValidTerminalCompletionRankingDigest(identityDigest)
             require(useCount >= 0) { "useCount must be >= 0, was $useCount" }
             require(successCount >= 0) { "successCount must be >= 0, was $successCount" }
+            require(successCount <= useCount) { "successCount must be <= useCount, was $successCount > $useCount" }
             require(failureCount >= 0) { "failureCount must be >= 0, was $failureCount" }
             require(acceptedCount >= 0) { "acceptedCount must be >= 0, was $acceptedCount" }
             require(dismissedCount >= 0) { "dismissedCount must be >= 0, was $dismissedCount" }

@@ -55,7 +55,8 @@ H	<identityDigest>	<commandBase64>	<profileBase64>	<cwdBase64>
 `R` rows contain no command text. Their Base64URL SHA-256 identity preserves
 the exact single-line command, including case and trailing whitespace. A deterministic digest is not directly
 decodable, but common commands remain guessable by hashing candidate strings.
-`H` rows contain successful or accepted, policy-approved plaintext for history replay and
+Failure counts remain observational and never penalize completion ordering.
+`H` rows contain successful, policy-approved plaintext for history replay and
 observed-token inference; each must match an `R` row with the same identity and
 context. Text fields are Base64URL-encoded without padding so tabs and Unicode
 do not corrupt the TSV layout. Base64URL is not encryption. The decoder accepts

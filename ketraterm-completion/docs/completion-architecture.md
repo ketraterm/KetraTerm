@@ -51,7 +51,7 @@ commands, the policy rejects multiline text, ISO controls other than internal
 tabs, more than 4,096 UTF-16 code units, or more than 8,192 UTF-8 bytes. It then
 applies leading-whitespace privacy and a small credential classifier. Those
 well-formed commands may still update ranking through a stable, case-sensitive
-SHA-256 identity, but only successful or accepted commands approved by the
+SHA-256 identity, but only successful commands approved by the
 filter can enter retained replay history or the observed-token compiler. Persistence
 rechecks the same eligibility at its storage boundary. The digest is not
 directly decodable, but common command strings can still be guessed and hashed
@@ -428,10 +428,10 @@ so one learned command cannot gain a second provider vote from its ranking row.
 Duplicate candidates from the same source do not multiply support.
 
 The global ranker applies the strongest semantic adjustment among contributors.
-Exact outcome statistics then add bounded usage,
-success/failure, accepted/dismissed, recency, profile, and working-directory
-evidence. Only explicit dismissal is negative; passive popup
-closure is neutral.
+Exact outcome statistics then add bounded execution usage, accepted/dismissed
+feedback, recency, profile, and working-directory evidence. Nonzero command
+exits never penalize ordering. Only explicit dismissal is negative; passive
+popup closure is neutral. Popup feedback never creates replay history.
 
 The edit representative favors semantic fit, a narrow replacement range, the
 bounded prior, local rank, and stable declaration order. Presentation selection

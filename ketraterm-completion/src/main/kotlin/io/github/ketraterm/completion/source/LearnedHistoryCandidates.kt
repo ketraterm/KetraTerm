@@ -52,8 +52,6 @@ private fun TerminalCompletionRankingStats.localScore(nowEpochMillis: Long): Int
     val score =
         BASE_SCORE.toLong() +
             counterScore(useCount, USE_COUNT_SCORE) +
-            counterScore(successCount, SUCCESS_COUNT_SCORE) +
-            counterScore(failureCount, -FAILURE_COUNT_PENALTY) +
             counterScore(acceptedCount, ACCEPTED_COUNT_SCORE) +
             counterScore(dismissedCount, -DISMISSED_COUNT_PENALTY) +
             LearnedEvidenceScoring.recencyBoost(nowEpochMillis, lastUsedEpochMillis)
@@ -68,8 +66,6 @@ private fun counterScore(
 private const val SOURCE_LEARNED = "learned"
 private const val BASE_SCORE = 620
 private const val USE_COUNT_SCORE = 18
-private const val SUCCESS_COUNT_SCORE = 10
-private const val FAILURE_COUNT_PENALTY = 16
 private const val ACCEPTED_COUNT_SCORE = 24
 private const val DISMISSED_COUNT_PENALTY = 30
 private const val MAX_COUNTER_SCORE_UNITS = 50
