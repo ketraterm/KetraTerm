@@ -109,21 +109,25 @@ class GradleTaskCompletionSourceTest {
     fun `passes the immutable request to the task provider`() =
         runBlocking {
             var requestedDirectory: String? = null
-            var requestedLimit = 0
+            var requestedPrefix: String? = null
             val requestAwareSource =
                 TerminalCompletionSources.gradleTask(
                     sourceId = "request-aware-gradle-task",
-                    tasksProvider = { request, limit ->
+                    tasksProvider = { request, context ->
                         requestedDirectory = request.workingDirectoryUri
-                        requestedLimit = limit
-                        listOf(TerminalGradleTask(":test", projectDirectory = "."))
+                        requestedPrefix = context.activePrefix
+                        buildList {
+                            repeat(300) { index -> add(TerminalGradleTask(":otherTask$index", projectDirectory = ".")) }
+                            add(TerminalGradleTask(":needleTask", projectDirectory = "."))
+                        }
                     },
                 )
 
-            requestAwareSource.complete(request("gradle te"))
+            val candidates = requestAwareSource.complete(request("gradle needle"))
 
             assertEquals("file:///project", requestedDirectory)
-            assertEquals(256, requestedLimit)
+            assertEquals("needle", requestedPrefix)
+            assertEquals(listOf("needleTask"), candidates.map { it.replacementText })
         }
 
     private fun request(commandLine: String): TerminalCompletionRequest =

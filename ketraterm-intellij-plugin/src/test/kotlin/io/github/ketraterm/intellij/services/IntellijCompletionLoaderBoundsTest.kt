@@ -28,7 +28,7 @@ class IntellijCompletionLoaderBoundsTest {
     val temporaryFolder = TemporaryFolder()
 
     @Test
-    fun `Git reference loader stops when the requested count is materialized`() =
+    fun `Git reference loader owns an input budget independent of popup results`() =
         runBlocking {
             val localBranches = CountingStringIterable(valueAt = { index -> "local-$index" })
             val loader =
@@ -45,10 +45,10 @@ class IntellijCompletionLoaderBoundsTest {
                     },
                 )
 
-            val snapshot = loader.load("file:///repo", 37)
+            val snapshot = loader.load("file:///repo")
 
-            assertEquals(37, snapshot.localBranches.size)
-            assertEquals(37, localBranches.nextCalls)
+            assertEquals(8_192, snapshot.localBranches.size)
+            assertEquals(8_192, localBranches.nextCalls)
         }
 
     @Test
@@ -68,7 +68,7 @@ class IntellijCompletionLoaderBoundsTest {
                         collector(GitReferenceReadModel(null, localBranches, emptyList(), emptyList()))
                     },
                 )
-            loading = async(start = CoroutineStart.LAZY) { loader.load("file:///repo", 256) }
+            loading = async(start = CoroutineStart.LAZY) { loader.load("file:///repo") }
 
             loading.start()
             val failure = runCatching { loading.await() }.exceptionOrNull()
@@ -78,23 +78,23 @@ class IntellijCompletionLoaderBoundsTest {
         }
 
     @Test
-    fun `Git commit loader passes through a smaller requested count`() =
+    fun `Git commit loader owns its recent-history budget`() =
         runBlocking {
             val commits = CountingGitCommitIterable()
             val loader =
                 IntellijGitCommitCompletionLoader(
                     GitCommitReadPort { _, limit ->
-                        assertEquals(17, limit)
+                        assertEquals(50, limit)
                         commits
                     },
                 )
 
-            val values = loader.load("file:///repo", 17)
+            val values = loader.load("file:///repo")
 
-            assertEquals(17, values.size)
-            assertEquals(17, commits.nextCalls)
+            assertEquals(50, values.size)
+            assertEquals(50, commits.nextCalls)
             assertEquals(commitHash(0), values.first().value)
-            assertEquals(commitHash(16), values.last().value)
+            assertEquals(commitHash(49), values.last().value)
         }
 
     @Test
@@ -106,7 +106,7 @@ class IntellijCompletionLoaderBoundsTest {
                     if (count == 4) loading.cancel(CancellationException("obsolete Git commit completion"))
                 }
             val loader = IntellijGitCommitCompletionLoader(GitCommitReadPort { _, _ -> commits })
-            loading = async(start = CoroutineStart.LAZY) { loader.load("file:///repo", 256) }
+            loading = async(start = CoroutineStart.LAZY) { loader.load("file:///repo") }
 
             loading.start()
             val failure = runCatching { loading.await() }.exceptionOrNull()
@@ -116,7 +116,7 @@ class IntellijCompletionLoaderBoundsTest {
         }
 
     @Test
-    fun `Git status loader stops across both groups at the requested count`() =
+    fun `Git status loader owns one visit budget across both groups`() =
         runBlocking {
             val repositoryRoot = temporaryFolder.newFolder("git-status-loader").toPath()
             val changed =
@@ -142,11 +142,11 @@ class IntellijCompletionLoaderBoundsTest {
                     },
                 )
 
-            val entries = loader.load(repositoryRoot.toUri().toString(), 31)
+            val entries = loader.load(repositoryRoot.toUri().toString())
 
-            assertEquals(31, entries.size)
+            assertEquals(8_192, entries.size)
             assertEquals(3, changed.nextCalls)
-            assertEquals(28, unversioned.nextCalls)
+            assertEquals(8_189, unversioned.nextCalls)
         }
 
     @Test
@@ -167,7 +167,7 @@ class IntellijCompletionLoaderBoundsTest {
                         collector(GitStatusReadModel(repositoryRoot, repositoryRoot, changed, emptyList()))
                     },
                 )
-            loading = async(start = CoroutineStart.LAZY) { loader.load(repositoryRoot.toUri().toString(), 256) }
+            loading = async(start = CoroutineStart.LAZY) { loader.load(repositoryRoot.toUri().toString()) }
 
             loading.start()
             val failure = runCatching { loading.await() }.exceptionOrNull()
@@ -177,17 +177,17 @@ class IntellijCompletionLoaderBoundsTest {
         }
 
     @Test
-    fun `Gradle task loader stops when the requested count is materialized`() =
+    fun `Gradle task loader owns an imported-model task budget`() =
         runBlocking {
             val projectDirectory = temporaryFolder.newFolder("gradle-loader").toPath()
             val tasks = CountingGradleTaskNodes(projectDirectory.toString())
             val root = TestGradleModelNode(moduleId = "root", children = tasks)
             val loader = IntellijGradleTaskLoader(GradleModelReadPort { collector -> collector(listOf(root)) })
 
-            val entries = loader.load(projectDirectory.toUri().toString(), 29)
+            val entries = loader.load(projectDirectory.toUri().toString())
 
-            assertEquals(29, entries.size)
-            assertEquals(29, tasks.nextCalls)
+            assertEquals(8_192, entries.size)
+            assertEquals(8_192, tasks.nextCalls)
         }
 
     @Test
@@ -204,7 +204,7 @@ class IntellijCompletionLoaderBoundsTest {
                 )
             val root = TestGradleModelNode(moduleId = "root", children = tasks)
             val loader = IntellijGradleTaskLoader(GradleModelReadPort { collector -> collector(listOf(root)) })
-            loading = async(start = CoroutineStart.LAZY) { loader.load(projectDirectory.toUri().toString(), 256) }
+            loading = async(start = CoroutineStart.LAZY) { loader.load(projectDirectory.toUri().toString()) }
 
             loading.start()
             val failure = runCatching { loading.await() }.exceptionOrNull()

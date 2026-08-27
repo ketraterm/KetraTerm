@@ -73,22 +73,27 @@ in implementation packages and must stay `internal`.
 `TerminalCompletionSources.valueDomain(...)` adapts a suspending host loader for one declared
 `TerminalCompletionValueDomain`. It resolves the active spec context through the shared tokenizer, applies the request's
 shell quoting policy, and emits domain-tagged argument candidates. A provider may perform bounded host I/O and must
-cooperate with cancellation. The source passes its count limit into the loader so host enumeration stops before building
-an oversized value snapshot. A provider may additionally restrict itself to canonical command/subcommand names when a
-value domain has command-specific validity.
+cooperate with cancellation. The loader receives the immutable request and resolved context, and owns an independent
+input, visit, or time budget. It returns that complete host-bounded snapshot; matching and the final candidate limit remain
+inside the shared source. A provider may additionally restrict itself to canonical command/subcommand names when a value
+domain has command-specific validity.
 Aggregate host sources that load several provider groups in one operation use
 `TerminalCompletionSources.valueDomainCandidates(...)` to project each already-loaded group through the identical
 matching, quoting, replacement, and scoring policy without constructing nested source adapters per request.
 
-`TerminalCompletionSources.fuzzyPath(...)` adapts either a suspending bounded host path loader or a query-aware
-`TerminalFuzzyPathProvider` for context-aware fuzzy path completion. Bounded list loaders use the shared dependency-free
-matcher once. Both loader forms receive the same immutable completion request used by the engine, so host-relative
-results use its captured working-directory URI instead of resampling mutable session state. Query-aware providers also
-receive the decoded active prefix. Both forms receive the source count limit and return no more entries than requested;
-query-aware providers return already matched, relevance-ordered entries, so the source never repeats that
-match. The shared source retains path-kind filtering, explicit replacement ranges, and shell-safe quoting. It
-requires typed path text by default; a small, context-specific provider such as Git status paths may opt in to
-empty-prefix suggestions.
+Fuzzy paths have two explicit provider shapes. `TerminalCompletionSources.fuzzyPath(...)` accepts a query-aware
+`TerminalFuzzyPathProvider`; the host index receives the immutable request and resolved context and returns already
+matched, relevance-ordered entries within its own query budget. `TerminalCompletionSources.fuzzyPathSnapshot(...)`
+accepts a bounded host snapshot and runs the shared dependency-free matcher once over the entire snapshot. Neither host
+contract receives the engine's final candidate limit. The shared source applies path-kind, hidden-path, replacement, and
+shell-quoting rules before enforcing that limit, so ineligible early matches cannot hide eligible later matches. Both
+forms use the request's captured working-directory URI instead of resampling mutable session state. Fuzzy path completion
+requires typed path text by default; a small, context-specific provider such as Git status paths may opt in to empty-prefix
+suggestions.
+
+`TerminalCompletionSources.gradleTask(...)` follows the snapshot contract as well. The host loader receives the request
+and resolved Gradle context, traverses an imported model under its own visit budget, and returns the complete bounded task
+snapshot. Canonical Gradle matching and the final candidate limit are shared-engine responsibilities.
 
 `TerminalCompletionContextResolver` is the shared internal command-line context
 resolver. The merged engine parses and resolves once from its one command-spec set, then passes

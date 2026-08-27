@@ -87,19 +87,14 @@ internal class IntellijGitStatusPathLoader(
      * Renamed paths use their post-rename path when available; deleted paths use their prior path.
      *
      * @param workingDirectoryUri local `file` URI used to select and relativize a repository.
-     * @param limit positive maximum number of changed paths to load.
-     * @return at most [limit] changed paths, or an empty list for unusable project, URI, or repository state.
+     * @return a visit-bounded changed-path snapshot, or an empty list for unusable project, URI, or repository state.
      */
-    suspend fun load(
-        workingDirectoryUri: String?,
-        limit: Int,
-    ): List<TerminalFuzzyPathEntry> {
-        require(limit > 0) { "limit must be > 0, was $limit" }
+    suspend fun load(workingDirectoryUri: String?): List<TerminalFuzzyPathEntry> {
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
         return readPort.read(workingDirectoryUri) { model ->
-            val retained = ArrayList<TerminalFuzzyPathEntry>(limit)
-            val retainedPaths = HashSet<String>(limit)
+            val retained = ArrayList<TerminalFuzzyPathEntry>(INITIAL_RESULT_CAPACITY)
+            val retainedPaths = HashSet<String>(INITIAL_RESULT_CAPACITY)
             val visitBudget =
                 BoundedVisitBudget(MAX_VISITED_CHANGES) {
                     cancellationContext.ensureActive()
@@ -121,13 +116,13 @@ internal class IntellijGitStatusPathLoader(
                 pathValue?.let { runCatching { Path.of(it) }.getOrNull() }?.let { path ->
                     retain(path, isDirectory = false, detail = "changed file")
                 }
-                retained.size < limit
+                true
             }
             visitBudget.visit(model.unversionedPathValues) { pathValue ->
                 pathValue?.let { runCatching { Path.of(it) }.getOrNull() }?.let { path ->
                     retain(path, isDirectory = false, detail = "untracked file")
                 }
-                retained.size < limit
+                true
             }
             retained.sortWith(ENTRY_ORDER)
             retained
@@ -141,6 +136,7 @@ internal class IntellijGitStatusPathLoader(
 
     private companion object {
         private const val MAX_VISITED_CHANGES = 8_192
+        private const val INITIAL_RESULT_CAPACITY = 64
         private val ENTRY_ORDER =
             compareBy<TerminalFuzzyPathEntry, String>(String.CASE_INSENSITIVE_ORDER) { it.path }
                 .thenBy { it.path }
@@ -148,10 +144,10 @@ internal class IntellijGitStatusPathLoader(
 }
 
 /** Creates changed-Git-path completion without exposing IntelliJ VCS APIs to the shared engine. */
-internal fun intellijGitStatusPathCompletionSource(loader: suspend (String?, Int) -> List<TerminalFuzzyPathEntry>) =
-    TerminalCompletionSources.fuzzyPath(
+internal fun intellijGitStatusPathCompletionSource(loader: suspend (String?) -> List<TerminalFuzzyPathEntry>) =
+    TerminalCompletionSources.fuzzyPathSnapshot(
         sourceId = "intellij-git-status-path",
-        entriesProvider = { request, limit -> loader(request.workingDirectoryUri, limit) },
+        entriesProvider = { request, _ -> loader(request.workingDirectoryUri) },
         requiresNonEmptyPrefix = false,
         allowedCommandNames = setOf("add", "restore", "rm", "diff"),
     )

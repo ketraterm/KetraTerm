@@ -71,7 +71,7 @@ class IntellijCompletionRegistryTest {
                 TerminalCompletionSources.valueDomain(
                     sourceId = "test-branch",
                     domain = TerminalCompletionValueDomain.GIT_BRANCH,
-                    valuesProvider = { _ ->
+                    valuesProvider = { _, _ ->
                         loads++
                         listOf(TerminalCompletionDomainValue("main"))
                     },

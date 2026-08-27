@@ -234,21 +234,15 @@ internal class IntellijGitCommitCompletionLoader(
      * Loads recent commits reachable from HEAD, branches, remotes, or tags.
      *
      * @param workingDirectoryUri local `file` URI used to select the containing repository.
-     * @param limit positive maximum number of commit values requested by the source.
-     * @return at most the smaller of [limit] and 50 newest commit values, preserving Git history order.
+     * @return at most 50 newest commit values, preserving Git history order.
      */
-    suspend fun load(
-        workingDirectoryUri: String?,
-        limit: Int,
-    ): List<TerminalCompletionDomainValue> {
-        require(limit > 0) { "limit must be > 0, was $limit" }
+    suspend fun load(workingDirectoryUri: String?): List<TerminalCompletionDomainValue> {
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
-        val loadLimit = minOf(limit, MAX_RECENT_COMMITS)
-        val commits = readPort.read(workingDirectoryUri, loadLimit) ?: return emptyList()
-        val values = ArrayList<TerminalCompletionDomainValue>(loadLimit)
+        val commits = readPort.read(workingDirectoryUri, MAX_RECENT_COMMITS) ?: return emptyList()
+        val values = ArrayList<TerminalCompletionDomainValue>(MAX_RECENT_COMMITS)
         val visitBudget =
-            BoundedVisitBudget(loadLimit) {
+            BoundedVisitBudget(MAX_RECENT_COMMITS) {
                 cancellationContext.ensureActive()
                 ProgressManager.checkCanceled()
             }
@@ -263,7 +257,7 @@ internal class IntellijGitCommitCompletionLoader(
                         detail = sanitizeCommitSubject(commit.subject),
                     )
             }
-            values.size < loadLimit
+            true
         }
         return values
     }
@@ -271,7 +265,7 @@ internal class IntellijGitCommitCompletionLoader(
 
 /** Creates recent-commit completion without exposing Git4Idea objects to the shared engine. */
 internal fun intellijGitCommitCompletionSource(
-    loader: suspend (String?, Int) -> List<TerminalCompletionDomainValue>,
+    loader: suspend (String?) -> List<TerminalCompletionDomainValue>,
 ): TerminalCompletionSource =
     TerminalCompletionSource { request, context, limit ->
         val commandName = context.currentCommand?.name
@@ -290,7 +284,7 @@ internal fun intellijGitCommitCompletionSource(
             context = context,
             domain = TerminalCompletionValueDomain.GIT_COMMIT,
             sourceId = GIT_COMMIT_SOURCE_ID,
-            values = loader(request.workingDirectoryUri, limit),
+            values = loader(request.workingDirectoryUri),
             limit = limit,
         )
     }

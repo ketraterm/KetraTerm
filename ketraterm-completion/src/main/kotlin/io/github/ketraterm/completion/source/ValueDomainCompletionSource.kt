@@ -38,7 +38,8 @@ import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 internal class ValueDomainCompletionSource(
     private val domain: TerminalCompletionValueDomain,
     private val sourceId: String,
-    private val valuesProvider: suspend (Int) -> List<TerminalCompletionDomainValue>,
+    private val valuesProvider:
+        suspend (TerminalCompletionRequest, TerminalCompletionContext) -> List<TerminalCompletionDomainValue>,
     private val allowedCommandNames: Set<String>,
 ) : TerminalCompletionSource {
     init {
@@ -68,7 +69,7 @@ internal class ValueDomainCompletionSource(
             return emptyList()
         }
 
-        val values = valuesProvider(limit)
+        val values = valuesProvider(request, context)
         return projectValueDomainCandidates(request, context, domain, sourceId, values, limit)
     }
 }

@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 /** Tests context-aware completion from a host-owned ready fuzzy path snapshot. */
 class FuzzyPathCompletionSourceTest {
     private val source =
-        TerminalCompletionSources.fuzzyPath(
+        TerminalCompletionSources.fuzzyPathSnapshot(
             sourceId = "project-file",
             entriesProvider = { _, _ ->
                 listOf(
@@ -56,15 +56,13 @@ class FuzzyPathCompletionSourceTest {
         runBlocking {
             var requestedDirectory: String? = null
             var requestedPrefix: String? = null
-            var requestedLimit = 0
             val queryAwareSource =
                 TerminalCompletionSources.fuzzyPath(
                     sourceId = "query-aware-project-file",
                     entriesProvider =
-                        TerminalFuzzyPathProvider { request, prefix, limit ->
+                        TerminalFuzzyPathProvider { request, context ->
                             requestedDirectory = request.workingDirectoryUri
-                            requestedPrefix = prefix
-                            requestedLimit = limit
+                            requestedPrefix = context.activePrefix
                             listOf(TerminalFuzzyPathEntry("settings.gradle.kts", isDirectory = false))
                         },
                 )
@@ -73,8 +71,28 @@ class FuzzyPathCompletionSourceTest {
 
             assertEquals("file:///project", requestedDirectory)
             assertEquals("sgk", requestedPrefix)
-            assertEquals(256, requestedLimit)
             assertEquals(listOf("settings.gradle.kts"), candidates.map(TerminalCompletionCandidate::replacementText))
+        }
+
+    @Test
+    fun `applies directory filtering before the final candidate limit`() =
+        runBlocking {
+            val queryAwareSource =
+                TerminalCompletionSources.fuzzyPath(
+                    sourceId = "query-aware-project-file",
+                    entriesProvider =
+                        TerminalFuzzyPathProvider { _, _ ->
+                            buildList {
+                                repeat(300) { index -> add(TerminalFuzzyPathEntry("files/match-$index.kt", false)) }
+                                add(TerminalFuzzyPathEntry("matching-directory", true))
+                            }
+                        },
+                )
+
+            assertEquals(
+                listOf("matching-directory/"),
+                queryAwareSource.complete(request("cd match")).map(TerminalCompletionCandidate::replacementText),
+            )
         }
 
     @Test
@@ -96,7 +114,7 @@ class FuzzyPathCompletionSourceTest {
     fun `can opt into an empty prefix for a small context-specific path snapshot`() =
         runBlocking {
             val statusSource =
-                TerminalCompletionSources.fuzzyPath(
+                TerminalCompletionSources.fuzzyPathSnapshot(
                     sourceId = "git-status-path",
                     entriesProvider = { _, _ -> listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false)) },
                     requiresNonEmptyPrefix = false,
@@ -116,6 +134,26 @@ class FuzzyPathCompletionSourceTest {
                 statusSource.complete(request("git rm ")).map(TerminalCompletionCandidate::replacementText),
             )
             assertTrue(statusSource.complete(request("cd ")).isEmpty())
+        }
+
+    @Test
+    fun `matches the complete snapshot before applying the candidate limit`() =
+        runBlocking {
+            val completeSnapshotSource =
+                TerminalCompletionSources.fuzzyPathSnapshot(
+                    sourceId = "large-status-snapshot",
+                    entriesProvider = { _, _ ->
+                        buildList {
+                            repeat(300) { index -> add(TerminalFuzzyPathEntry("other/file-$index.kt", false)) }
+                            add(TerminalFuzzyPathEntry("src/NeedleTarget.kt", false))
+                        }
+                    },
+                )
+
+            assertEquals(
+                listOf("src/NeedleTarget.kt"),
+                completeSnapshotSource.complete(request("cat Needle")).map(TerminalCompletionCandidate::replacementText),
+            )
         }
 
     @Test

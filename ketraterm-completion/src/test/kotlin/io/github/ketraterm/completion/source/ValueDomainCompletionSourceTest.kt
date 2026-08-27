@@ -33,7 +33,7 @@ class ValueDomainCompletionSourceTest {
         TerminalCompletionSources.valueDomain(
             domain = TerminalCompletionValueDomain.GIT_BRANCH,
             sourceId = "intellij-git",
-            valuesProvider = { _ ->
+            valuesProvider = { _, _ ->
                 listOf(
                     TerminalCompletionDomainValue("feature/terminal", detail = "local branch"),
                     TerminalCompletionDomainValue("fix/render"),
@@ -72,7 +72,7 @@ class ValueDomainCompletionSourceTest {
                 TerminalCompletionSources.valueDomain(
                     domain = TerminalCompletionValueDomain.GIT_BRANCH,
                     sourceId = "intellij-git-remote-branch",
-                    valuesProvider = { _ -> listOf(TerminalCompletionDomainValue("origin/feature/terminal")) },
+                    valuesProvider = { _, _ -> listOf(TerminalCompletionDomainValue("origin/feature/terminal")) },
                     allowedCommandNames = setOf("checkout", "merge", "rebase"),
                 )
 
@@ -91,7 +91,7 @@ class ValueDomainCompletionSourceTest {
                 TerminalCompletionSources.valueDomain(
                     domain = TerminalCompletionValueDomain.GIT_BRANCH,
                     sourceId = "git",
-                    valuesProvider = { _ -> listOf(TerminalCompletionDomainValue("release\$next")) },
+                    valuesProvider = { _, _ -> listOf(TerminalCompletionDomainValue("release\$next")) },
                 )
 
             assertEquals("release\\\$next", specialSource.complete(request("git switch rel")).single().replacementText)
@@ -116,7 +116,7 @@ class ValueDomainCompletionSourceTest {
                 TerminalCompletionSources.valueDomain(
                     domain = TerminalCompletionValueDomain.GIT_BRANCH,
                     sourceId = "git",
-                    valuesProvider = { _ ->
+                    valuesProvider = { _, _ ->
                         listOf(TerminalCompletionDomainValue(value = "f-branch", displayText = "Feature Branch"))
                     },
                 )
@@ -134,7 +134,7 @@ class ValueDomainCompletionSourceTest {
                 TerminalCompletionSources.valueDomain(
                     domain = TerminalCompletionValueDomain.GIT_BRANCH,
                     sourceId = "git",
-                    valuesProvider = { _ ->
+                    valuesProvider = { _, _ ->
                         listOf(TerminalCompletionDomainValue(value = "feature-branch", displayText = "Release candidate"))
                     },
                 )
@@ -146,22 +146,26 @@ class ValueDomainCompletionSourceTest {
         }
 
     @Test
-    fun `passes the source count limit to the value loader`() =
+    fun `passes semantic context without truncating the provider snapshot`() =
         runBlocking {
-            var requestedLimit = 0
+            var requestedPrefix: String? = null
             val boundedSource =
                 TerminalCompletionSources.valueDomain(
                     domain = TerminalCompletionValueDomain.GIT_BRANCH,
                     sourceId = "git",
-                    valuesProvider = { limit ->
-                        requestedLimit = limit
-                        emptyList()
+                    valuesProvider = { _, context ->
+                        requestedPrefix = context.activePrefix
+                        buildList {
+                            repeat(300) { index -> add(TerminalCompletionDomainValue("other-$index")) }
+                            add(TerminalCompletionDomainValue("feature/needle"))
+                        }
                     },
                 )
 
-            boundedSource.complete(request("git switch f"))
+            val candidates = boundedSource.complete(request("git switch feature/n"))
 
-            assertEquals(256, requestedLimit)
+            assertEquals("feature/n", requestedPrefix)
+            assertEquals(listOf("feature/needle"), candidates.map { it.replacementText })
         }
 
     private fun request(
