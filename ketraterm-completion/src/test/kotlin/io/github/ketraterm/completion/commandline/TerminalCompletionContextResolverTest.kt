@@ -223,6 +223,24 @@ class TerminalCompletionContextResolverTest {
     }
 
     @Test
+    fun `only positional tokens advance the positional argument counter`() {
+        val spec =
+            TerminalCommandSpec(
+                name = "tool",
+                options = listOf(TerminalOptionSpec(listOf("--config"), requiresValue = true)),
+                positionalArguments =
+                    listOf(
+                        TerminalArgumentSpec(name = "first"),
+                        TerminalArgumentSpec(name = "second"),
+                    ),
+            )
+
+        assertEquals("second", resolve("tool --config config.toml first ", listOf(spec)).activePositionalArgument?.name)
+        assertEquals("second", resolve("tool --config=config.toml first ", listOf(spec)).activePositionalArgument?.name)
+        assertEquals("second", resolve("tool -- --config ", listOf(spec)).activePositionalArgument?.name)
+    }
+
+    @Test
     fun `repeatable subcommands keep suggesting siblings after an existing sibling`() {
         val context = resolve("./gradlew clean bu")
 
