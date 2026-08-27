@@ -81,15 +81,13 @@ Aggregate host sources that load several provider groups in one operation use
 `TerminalCompletionSources.valueDomainCandidates(...)` to project each already-loaded group through the identical
 matching, quoting, replacement, and scoring policy without constructing nested source adapters per request.
 
-Fuzzy paths have two explicit provider shapes. `TerminalCompletionSources.fuzzyPath(...)` accepts a query-aware
-`TerminalFuzzyPathProvider`; the host index receives the immutable request and resolved context and returns already
-matched, relevance-ordered entries within its own query budget. `TerminalCompletionSources.fuzzyPathSnapshot(...)`
-accepts a bounded host snapshot and runs the shared dependency-free matcher once over the entire snapshot. Neither host
-contract receives the engine's final candidate limit. The shared source applies path-kind, hidden-path, replacement, and
-shell-quoting rules before enforcing that limit, so ineligible early matches cannot hide eligible later matches. Both
-forms use the request's captured working-directory URI instead of resampling mutable session state. Fuzzy path completion
-requires typed path text by default; a small, context-specific provider such as Git status paths may opt in to empty-prefix
-suggestions.
+`TerminalCompletionSources.fuzzyPath(...)` accepts one query-aware `TerminalFuzzyPathProvider`. The host receives the
+immutable request and resolved context and returns already matched, relevance-ordered entries within its own query,
+input, visit, or time budget. It never receives the engine's final candidate limit. The shared source applies path-kind,
+hidden-path, replacement, and shell-quoting rules before enforcing that limit, so ineligible early matches cannot hide
+eligible later matches. Providers use the request's captured working-directory URI instead of resampling mutable session
+state. Fuzzy path completion requires typed path text by default; a small, context-specific provider such as Git status
+paths may opt in to empty-prefix suggestions.
 
 `TerminalCompletionSources.gradleTask(...)` follows the snapshot contract as well. The host loader receives the request
 and resolved Gradle context, traverses an imported model under its own visit budget, and returns the complete bounded task
@@ -455,8 +453,9 @@ Ordering and all tie-breakers are deterministic.
 Source safety and presentation are independent. Every source receives a fixed
 256-candidate output budget. Sources apply it only after their owned matching, eligibility, and encoding rules.
 Fuzzy-path, Gradle-task, and value-domain host loaders do not receive that count; they use explicit independent query,
-input, visit, history, or time budgets and return complete host-bounded snapshots for shared matching. There is no
-universal deadline or provider-budget protocol. The engine globally fuses the complete bounded
+input, visit, history, or time budgets. Fuzzy-path providers return ready ordered matches, while Gradle-task and
+value-domain providers return complete host-bounded snapshots for shared matching. There is no universal deadline or
+provider-budget protocol. The engine globally fuses the complete bounded
 union and has no popup-size parameter; the Swing controller alone presents an
 eight-row sliding viewport across the ranked snapshot. The snapshot also carries
 absolute overflow metadata so each physical renderer can expose range and scroll

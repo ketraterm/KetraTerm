@@ -142,11 +142,39 @@ class IntellijCompletionLoaderBoundsTest {
                     },
                 )
 
-            val entries = loader.load(repositoryRoot.toUri().toString())
+            val entries = loader.load(repositoryRoot.toUri().toString(), prefix = "")
 
             assertEquals(8_192, entries.size)
             assertEquals(3, changed.nextCalls)
             assertEquals(8_189, unversioned.nextCalls)
+        }
+
+    @Test
+    fun `Git status loader matches during discovery without a candidate cap`() =
+        runBlocking {
+            val repositoryRoot = temporaryFolder.newFolder("git-status-query").toPath()
+            val changedPaths =
+                buildList {
+                    repeat(300) { index -> add(repositoryRoot.resolve("other-$index.kt").toString()) }
+                    add(repositoryRoot.resolve("src/NeedleTarget.kt").toString())
+                }
+            val loader =
+                IntellijGitStatusPathLoader(
+                    GitStatusReadPort { _, collector ->
+                        collector(
+                            GitStatusReadModel(
+                                repositoryRoot = repositoryRoot,
+                                workingDirectory = repositoryRoot,
+                                changedPathValues = changedPaths,
+                                unversionedPathValues = emptyList(),
+                            ),
+                        )
+                    },
+                )
+
+            val entries = loader.load(repositoryRoot.toUri().toString(), prefix = "Needle")
+
+            assertEquals(listOf("src/NeedleTarget.kt"), entries.map { it.path })
         }
 
     @Test
@@ -167,7 +195,7 @@ class IntellijCompletionLoaderBoundsTest {
                         collector(GitStatusReadModel(repositoryRoot, repositoryRoot, changed, emptyList()))
                     },
                 )
-            loading = async(start = CoroutineStart.LAZY) { loader.load(repositoryRoot.toUri().toString()) }
+            loading = async(start = CoroutineStart.LAZY) { loader.load(repositoryRoot.toUri().toString(), prefix = "") }
 
             loading.start()
             val failure = runCatching { loading.await() }.exceptionOrNull()

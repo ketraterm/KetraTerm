@@ -67,47 +67,6 @@ object TerminalCompletionSources {
     }
 
     /**
-     * Creates a source that fuzzy-matches one bounded host path snapshot.
-     *
-     * [entriesProvider] receives the immutable request and its resolved semantic
-     * context after eligibility has been established. It owns an independent
-     * input, visit, or time budget and must not truncate its raw snapshot to a
-     * final candidate limit. The shared source matches the complete returned
-     * snapshot and ranks it. The source applies path eligibility, hidden-path
-     * and quoting rules before the engine's final result limit.
-     *
-     * Use [fuzzyPath] when the host has a query index that returns already-matched,
-     * relevance-ordered paths directly.
-     *
-     * @param sourceId stable candidate-source id used by ranking feedback.
-     * @param entriesProvider suspending bounded snapshot loader. Returned paths
-     * must be relative to the request's current directory.
-     * @param requiresNonEmptyPrefix whether this source waits for explicit path text.
-     * @param allowedCommandNames optional canonical command/subcommand restriction.
-     * @return context-aware fuzzy path completion source.
-     * @throws IllegalArgumentException if [sourceId] is blank.
-     */
-    @JvmStatic
-    @JvmOverloads
-    fun fuzzyPathSnapshot(
-        sourceId: String,
-        entriesProvider: suspend (TerminalCompletionRequest, TerminalCompletionContext) -> List<TerminalFuzzyPathEntry>,
-        requiresNonEmptyPrefix: Boolean = true,
-        allowedCommandNames: Set<String> = emptySet(),
-    ): TerminalCompletionSource {
-        require(sourceId.isNotBlank()) { "sourceId must not be blank" }
-        require(allowedCommandNames.none(String::isBlank)) { "allowedCommandNames must not contain blank values" }
-        return FuzzyPathCompletionSource(
-            sourceId = sourceId,
-            entriesProvider = { request, context ->
-                matchFuzzyPathSnapshot(entriesProvider(request, context), context.activePrefix)
-            },
-            requiresNonEmptyPrefix = requiresNonEmptyPrefix,
-            allowedCommandNames = allowedCommandNames.toSet(),
-        )
-    }
-
-    /**
      * Creates a source for host-indexed Gradle tasks.
      *
      * The source understands Gradle's canonical `:project:task` notation and

@@ -21,26 +21,35 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Tests context-aware completion from a host-owned ready fuzzy path snapshot. */
+/** Tests context-aware completion from host-owned ready fuzzy path matches. */
 class FuzzyPathCompletionSourceTest {
-    private val source =
-        TerminalCompletionSources.fuzzyPathSnapshot(
-            sourceId = "project-file",
-            entriesProvider = { _, _ ->
+    private val entriesByPrefix =
+        mapOf(
+            "FzT" to
                 listOf(
                     TerminalFuzzyPathEntry("src/main/kotlin/FuzzyTarget.kt", isDirectory = false),
-                    TerminalFuzzyPathEntry("src/main/resources", isDirectory = true),
-                    TerminalFuzzyPathEntry("src/main/.generated/Hidden.kt", isDirectory = false),
                     TerminalFuzzyPathEntry("src/test/kotlin/FuzzyTargetTest.kt", isDirectory = false),
-                    TerminalFuzzyPathEntry("notes/My File.txt", isDirectory = false),
-                    TerminalFuzzyPathEntry("../shared/NearbySibling.kt", isDirectory = false),
-                    TerminalFuzzyPathEntry("../.private/NearbySecret.kt", isDirectory = false),
-                )
-            },
+                ),
+            "rs" to
+                listOf(
+                    TerminalFuzzyPathEntry("src/main/result.txt", isDirectory = false),
+                    TerminalFuzzyPathEntry("src/main/resources", isDirectory = true),
+                ),
+            "Hidden" to listOf(TerminalFuzzyPathEntry("src/main/.generated/Hidden.kt", isDirectory = false)),
+            "src/main/.g" to listOf(TerminalFuzzyPathEntry("src/main/.generated/Hidden.kt", isDirectory = false)),
+            "NbySib" to listOf(TerminalFuzzyPathEntry("../shared/NearbySibling.kt", isDirectory = false)),
+            "NbySec" to listOf(TerminalFuzzyPathEntry("../.private/NearbySecret.kt", isDirectory = false)),
+            "../.p" to listOf(TerminalFuzzyPathEntry("../.private/NearbySecret.kt", isDirectory = false)),
+            "MyF" to listOf(TerminalFuzzyPathEntry("notes/My File.txt", isDirectory = false)),
+        )
+    private val source =
+        TerminalCompletionSources.fuzzyPath(
+            sourceId = "project-file",
+            entriesProvider = TerminalFuzzyPathProvider { _, context -> entriesByPrefix[context.activePrefix].orEmpty() },
         )
 
     @Test
-    fun `finds a project file from a basename subsequence in a declared path argument`() =
+    fun `materializes ready project file matches in provider order`() =
         runBlocking {
             val candidates = source.complete(request("cat FzT"))
 
@@ -111,12 +120,15 @@ class FuzzyPathCompletionSourceTest {
         }
 
     @Test
-    fun `can opt into an empty prefix for a small context-specific path snapshot`() =
+    fun `can opt into an empty prefix for a small context-specific provider`() =
         runBlocking {
             val statusSource =
-                TerminalCompletionSources.fuzzyPathSnapshot(
+                TerminalCompletionSources.fuzzyPath(
                     sourceId = "git-status-path",
-                    entriesProvider = { _, _ -> listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false)) },
+                    entriesProvider =
+                        TerminalFuzzyPathProvider { _, _ ->
+                            listOf(TerminalFuzzyPathEntry("src/Changed.kt", isDirectory = false))
+                        },
                     requiresNonEmptyPrefix = false,
                     allowedCommandNames = setOf("add", "restore", "rm", "diff"),
                 )
@@ -134,26 +146,6 @@ class FuzzyPathCompletionSourceTest {
                 statusSource.complete(request("git rm ")).map(TerminalCompletionCandidate::replacementText),
             )
             assertTrue(statusSource.complete(request("cd ")).isEmpty())
-        }
-
-    @Test
-    fun `matches the complete snapshot before applying the candidate limit`() =
-        runBlocking {
-            val completeSnapshotSource =
-                TerminalCompletionSources.fuzzyPathSnapshot(
-                    sourceId = "large-status-snapshot",
-                    entriesProvider = { _, _ ->
-                        buildList {
-                            repeat(300) { index -> add(TerminalFuzzyPathEntry("other/file-$index.kt", false)) }
-                            add(TerminalFuzzyPathEntry("src/NeedleTarget.kt", false))
-                        }
-                    },
-                )
-
-            assertEquals(
-                listOf("src/NeedleTarget.kt"),
-                completeSnapshotSource.complete(request("cat Needle")).map(TerminalCompletionCandidate::replacementText),
-            )
         }
 
     @Test
