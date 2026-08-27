@@ -24,10 +24,9 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.TimeUnit
 
 /**
- * Time-, visit-, and result-bounded local directory scanner.
+ * Time- and visit-bounded local directory scanner.
  *
  * @param maxVisitedEntries positive cap on inspected direct children.
- * @param maxMatchingEntries positive cap on retained matches.
  * @param scanBudgetNanos positive best-effort monotonic scan budget.
  * @param nanoTime monotonic clock used to enforce the budget.
  * @param ioDispatcher dispatcher used only for blocking filesystem access.
@@ -37,14 +36,12 @@ class TerminalBoundedDirectoryScanner
     @JvmOverloads
     constructor(
         private val maxVisitedEntries: Int = DEFAULT_MAX_VISITED_ENTRIES,
-        private val maxMatchingEntries: Int = DEFAULT_MAX_MATCHING_ENTRIES,
         private val scanBudgetNanos: Long = TimeUnit.MILLISECONDS.toNanos(DEFAULT_SCAN_BUDGET_MILLIS),
         private val nanoTime: () -> Long = System::nanoTime,
         private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) : TerminalDirectoryScanner {
         init {
             require(maxVisitedEntries > 0) { "maxVisitedEntries must be > 0, was $maxVisitedEntries" }
-            require(maxMatchingEntries > 0) { "maxMatchingEntries must be > 0, was $maxMatchingEntries" }
             require(scanBudgetNanos > 0L) { "scanBudgetNanos must be > 0, was $scanBudgetNanos" }
         }
 
@@ -105,13 +102,12 @@ class TerminalBoundedDirectoryScanner
                     else -> throw failure
                 }
             }
-            return TerminalDirectoryEntrySnapshot(entries).matching(entryNamePrefix, maxMatchingEntries)
+            return TerminalDirectoryEntrySnapshot(entries).matching(entryNamePrefix)
         }
 
         private companion object {
             private const val INITIAL_SCAN_CAPACITY = 128
             private const val DEFAULT_MAX_VISITED_ENTRIES = 8_192
-            private const val DEFAULT_MAX_MATCHING_ENTRIES = 256
             private const val DEFAULT_SCAN_BUDGET_MILLIS = 50L
         }
     }

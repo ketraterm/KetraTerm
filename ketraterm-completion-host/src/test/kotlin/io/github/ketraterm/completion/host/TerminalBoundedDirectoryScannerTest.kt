@@ -46,7 +46,7 @@ class TerminalBoundedDirectoryScannerTest {
             Files.setLastModifiedTime(directory, originalVersion)
             val narrow = scanner.scan(directory, "zebra")
 
-            assertEquals(256, broad.size)
+            assertEquals(300, broad.size)
             assertEquals(emptyList(), narrow)
         }
 
@@ -114,7 +114,6 @@ class TerminalBoundedDirectoryScannerTest {
     ): TerminalBoundedDirectoryScanner =
         TerminalBoundedDirectoryScanner(
             maxVisitedEntries = maxVisitedEntries,
-            maxMatchingEntries = 256,
             scanBudgetNanos = Long.MAX_VALUE,
             nanoTime = { 0L },
             ioDispatcher = ioDispatcher,

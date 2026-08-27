@@ -16,8 +16,7 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
-import io.github.ketraterm.completion.internal.boundedTo
+import io.github.ketraterm.completion.internal.BoundedCompletionCandidateCollector
 import io.github.ketraterm.completion.matching.CompletionMatcher
 
 /**
@@ -38,6 +37,7 @@ internal class PathCompletionSource(
         context: TerminalCompletionContext,
         limit: Int,
     ): List<TerminalCompletionCandidate> {
+        require(limit > 0) { "limit must be > 0, was $limit" }
         val workingDir = request.workingDirectoryUri ?: return emptyList()
         val prefix = context.activePrefix
         if (!allowsPathCompletion(context.activePosition, context.expectedPathKind, prefix)) {
@@ -58,7 +58,7 @@ internal class PathCompletionSource(
             )
 
         val pathSeparator = if (prefix.contains('\\')) '\\' else '/'
-        val candidates = ArrayList<TerminalCompletionCandidate>()
+        val candidates = BoundedCompletionCandidateCollector(limit)
         var orderIndex = 0
 
         for ((name, isDirectory) in entries) {
@@ -68,14 +68,25 @@ internal class PathCompletionSource(
             if (!match.matchedRanges.isEmpty() && match.matchedRanges.startOffset(0) != 0) continue
             val rawSuffix = if (isDirectory) "$pathSeparator" else ""
             val rawReplacement = directoryPortion + name + rawSuffix
+            val normalizedReplacement = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement
+            if (!ShellReplacementText.canEncode(
+                    normalizedReplacement,
+                    context.activeTokenQuote,
+                    request.shellCapabilities.quoting,
+                )
+            ) {
+                continue
+            }
+            val candidateScore = match.sourceScore(PATH_BASE_SCORE, filePrefix, orderIndex++)
+            if (!candidates.shouldMaterialize(candidateScore)) continue
             val replacementText =
                 ShellReplacementText.encode(
-                    value = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement,
+                    value = normalizedReplacement,
                     activeTokenQuote = context.activeTokenQuote,
                     policy = request.shellCapabilities.quoting,
                 ) ?: continue
 
-            candidates +=
+            candidates.offer(
                 TerminalCompletionCandidate(
                     replacementText = replacementText,
                     replacementStartOffset = context.replacementStartOffset,
@@ -84,13 +95,13 @@ internal class PathCompletionSource(
                     detail = if (isDirectory) "directory" else "file",
                     source = SOURCE_PATH,
                     kind = TerminalCompletionCandidateKind.PATH,
-                    score = match.sourceScore(PATH_BASE_SCORE, filePrefix, orderIndex++),
+                    score = candidateScore,
                     matchedRanges = match.matchedRanges,
-                )
+                ),
+            )
         }
 
-        candidates.sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
-        return candidates.boundedTo(limit)
+        return candidates.finish()
     }
 
     private fun splitPathPrefix(prefix: String): PathParts? {

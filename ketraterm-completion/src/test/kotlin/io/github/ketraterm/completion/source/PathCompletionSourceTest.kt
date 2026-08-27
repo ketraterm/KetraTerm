@@ -100,6 +100,23 @@ class PathCompletionSourceTest {
         }
 
     @Test
+    fun `directory eligibility is applied before the final candidate limit`() =
+        runBlocking {
+            val entries =
+                buildList {
+                    repeat(300) { index ->
+                        add(TerminalFileEntry("a-file-${index.toString().padStart(3, '0')}", isDirectory = false))
+                    }
+                    add(TerminalFileEntry("a-target-directory", isDirectory = true))
+                }
+            val source = PathCompletionSource(TerminalFileSystemProvider { entries })
+
+            val candidates = source.complete(request("cd a", "file:///project"))
+
+            assertEquals(listOf("a-target-directory/"), candidates.map { it.replacementText })
+        }
+
+    @Test
     fun `empty path argument prefix hides dot entries until dot is typed`() =
         runBlocking {
             val emptyPrefixCandidates = source.complete(request("cat ", "file:///project"))
