@@ -21,6 +21,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.toList
+import java.io.IOException
 import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -128,6 +129,35 @@ class MergedCompletionEngineTest {
             assertEquals(0, failureEvents.single().sourceIndex)
             assertSame(failedSource, failureEvents.single().source.source)
             assertEquals("failed source", failureEvents.single().failure.message)
+        }
+
+    @Test
+    fun `path provider failure reaches the centralized source diagnostic`() =
+        runBlocking {
+            val failure = IOException("directory access failed")
+            val pathSource = TerminalCompletionSources.path(TerminalFileSystemProvider { throw failure })
+            val failureEvents = mutableListOf<RecordedSourceFailure>()
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources = listOf(entry(pathSource, 0)),
+                    commandSpecs = emptyList(),
+                    sourceFailureHandler =
+                        TerminalCompletionSourceFailureHandler { index, source, reportedFailure ->
+                            failureEvents += RecordedSourceFailure(index, source, reportedFailure)
+                        },
+                )
+            val request =
+                TerminalCompletionRequest(
+                    commandLine = "./r",
+                    cursorOffset = 3,
+                    workingDirectoryUri = "file:///project",
+                )
+
+            assertEquals(emptyList(), engine.complete(request))
+            assertEquals(1, failureEvents.size)
+            assertEquals(0, failureEvents.single().sourceIndex)
+            assertSame(pathSource, failureEvents.single().source.source)
+            assertSame(failure, failureEvents.single().failure)
         }
 
     @Test

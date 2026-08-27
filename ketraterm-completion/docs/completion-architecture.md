@@ -453,9 +453,10 @@ use the edit representative, so presentation ownership cannot change ranking.
 Ordering and all tie-breakers are deterministic.
 
 Source safety and presentation are independent. Every source receives a fixed
-256-candidate safety budget. Fuzzy-path, Gradle-task, and value-domain sources pass that same count into their loaders;
-hosts stop enumerating once they have enough usable rows instead of materializing a larger snapshot for later truncation.
-There is no universal deadline or provider-budget protocol. The engine globally fuses the complete bounded
+256-candidate output budget. Sources apply it only after their owned matching, eligibility, and encoding rules.
+Fuzzy-path, Gradle-task, and value-domain host loaders do not receive that count; they use explicit independent query,
+input, visit, history, or time budgets and return complete host-bounded snapshots for shared matching. There is no
+universal deadline or provider-budget protocol. The engine globally fuses the complete bounded
 union and has no popup-size parameter; the Swing controller alone presents an
 eight-row sliding viewport across the ranked snapshot. The snapshot also carries
 absolute overflow metadata so each physical renderer can expose range and scroll
@@ -470,6 +471,9 @@ block a fast spec, learned, or direct-path result. Individual sources remain
 ordinary suspending functions and never own scopes or child jobs. A non-cancellation source failure is reported through
 `TerminalCompletionSourceFailureHandler` and contributes an empty result; request cancellation reaches every child,
 and source declaration order remains the deterministic final-fusion tie-breaker.
+Host adapters therefore propagate operational failures, including abnormal filesystem access, through their source.
+Only normal absence or unsupported host context becomes an empty provider result; adapters do not duplicate diagnostic
+callbacks or silently convert failures into "no matches."
 
 ## Ranking Calibration
 

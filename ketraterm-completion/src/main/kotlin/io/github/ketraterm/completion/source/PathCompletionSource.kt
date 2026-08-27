@@ -19,7 +19,6 @@ import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.boundedTo
 import io.github.ketraterm.completion.matching.CompletionMatcher
-import kotlinx.coroutines.CancellationException
 
 /**
  * Autocomplete source for directory contents and file paths.
@@ -50,19 +49,13 @@ internal class PathCompletionSource(
         val directoryPortion = pathParts.directoryPrefix
         val filePrefix = pathParts.entryNamePrefix
         val entries =
-            try {
-                fileSystemProvider.listDirectory(
-                    TerminalDirectoryListingRequest(
-                        workingDirectoryUri = workingDir,
-                        directoryPrefix = directoryPortion,
-                        entryNamePrefix = filePrefix,
-                    ),
-                )
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                return emptyList()
-            }
+            fileSystemProvider.listDirectory(
+                TerminalDirectoryListingRequest(
+                    workingDirectoryUri = workingDir,
+                    directoryPrefix = directoryPortion,
+                    entryNamePrefix = filePrefix,
+                ),
+            )
 
         val pathSeparator = if (prefix.contains('\\')) '\\' else '/'
         val candidates = ArrayList<TerminalCompletionCandidate>()

@@ -18,6 +18,7 @@ package io.github.ketraterm.completion.source
 import io.github.ketraterm.completion.api.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import java.io.IOException
 import kotlin.test.*
 
 class PathCompletionSourceTest {
@@ -432,6 +433,20 @@ class PathCompletionSourceTest {
                 }
 
             assertSame(cancellation, thrown)
+        }
+
+    @Test
+    fun `propagates operational file-system provider failure`() =
+        runBlocking {
+            val failure = IOException("directory access failed")
+            val failingSource = PathCompletionSource(TerminalFileSystemProvider { throw failure })
+
+            val thrown =
+                assertFailsWith<IOException> {
+                    failingSource.complete(request("cat R", "file:///project"))
+                }
+
+            assertSame(failure, thrown)
         }
 
     @Test

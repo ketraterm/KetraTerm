@@ -27,7 +27,8 @@ fun interface TerminalDirectoryScanner {
      *
      * @param directory normalized absolute local directory.
      * @param entryNamePrefix case-insensitive child-name prefix.
-     * @return bounded deterministically ordered entries.
+     * @return bounded deterministically ordered entries, or an empty list when
+     * [directory] is absent or not a directory.
      */
     suspend fun scan(
         directory: Path,
