@@ -18,13 +18,16 @@ package io.github.ketraterm.intellij.settings
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.SearchableConfigurable
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import io.github.ketraterm.intellij.KetraTermBundle
+import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfile
@@ -206,6 +209,11 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
                         cell(completionLearningPersistenceCheckBox)
                             .comment(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence.comment"))
                     }
+                    row(KetraTermBundle.message("settings.ketraterm.completionLearningData")) {
+                        button(KetraTermBundle.message("settings.ketraterm.resetCompletionLearning")) {
+                            confirmAndResetCompletionLearning()
+                        }
+                    }
                     row {
                         cell(scrollOnOutputCheckBox)
                     }
@@ -254,6 +262,26 @@ class KetraTermSettingsConfigurable : SearchableConfigurable {
 
     override fun disposeUIResources() {
         panel = null
+    }
+
+    private fun confirmAndResetCompletionLearning() {
+        val answer =
+            Messages.showYesNoDialog(
+                null as Project?,
+                KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.confirmation"),
+                KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.confirmationTitle"),
+                KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.confirm"),
+                Messages.getCancelButton(),
+                Messages.getWarningIcon(),
+            )
+        if (answer != Messages.YES) return
+
+        KetraTermCompletionService.getInstance().resetLearning()
+        Messages.showInfoMessage(
+            null as Project?,
+            KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.complete"),
+            KetraTermBundle.message("settings.ketraterm.resetCompletionLearning.completeTitle"),
+        )
     }
 
     private fun applyState(state: KetraTermIntellijSettings.State) {

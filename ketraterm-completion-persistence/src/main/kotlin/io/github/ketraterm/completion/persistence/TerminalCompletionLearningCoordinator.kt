@@ -17,6 +17,7 @@ package io.github.ketraterm.completion.persistence
 
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
+import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import java.nio.file.Path
@@ -27,8 +28,9 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * One caller-owned worker hydrates the file once, observes last-value
  * enablement, and checkpoints the latest dirty snapshot at a fixed interval.
- * Recording never waits for hydration or disk. Shutdown bypasses the interval
- * and awaits the final dirty write.
+ * Recording and reset mutate memory synchronously and never wait for disk.
+ * Reset bypasses enablement and the checkpoint interval so persisted learning
+ * is replaced promptly. Shutdown awaits the final required write.
  */
 class TerminalCompletionLearningCoordinator
     internal constructor(
@@ -86,6 +88,7 @@ class TerminalCompletionLearningCoordinator
         private var mutationRevision = 0L
         private var persistedRevision = 0L
         private var attemptedRevision = 0L
+        private var resetRevision = 0L
         private var persistenceFailure: Throwable? = null
         private val worker: Deferred<Unit> =
             coroutineScope.async(start = CoroutineStart.UNDISPATCHED) {
@@ -155,6 +158,26 @@ class TerminalCompletionLearningCoordinator
         }
 
         /**
+         * Removes all completion learning and schedules immediate replacement of the persisted snapshot.
+         *
+         * The in-memory reset is visible before this method returns. A reset
+         * supersedes an in-flight hydration and is written even when ordinary
+         * persistence is disabled.
+         */
+        fun resetLearning() {
+            synchronized(stateLock) {
+                check(acceptingEvents) { "completion-learning owner is closed" }
+                learningStore.clear()
+                hydrated = true
+                loadBlocked = false
+                persistenceFailure = null
+                markDirty()
+                resetRevision = mutationRevision
+                wakeups.trySend(Unit)
+            }
+        }
+
+        /**
          * Enables or disables persistence for the fixed configured path.
          *
          * The first enable hydrates the file once. Disabling cancels a pending
@@ -187,7 +210,9 @@ class TerminalCompletionLearningCoordinator
                 }
             }
             worker.await()
-            synchronized(stateLock) { persistenceFailure.takeIf { persistenceEnabled } }?.let { throw it }
+            synchronized(stateLock) {
+                persistenceFailure.takeIf { persistenceEnabled || resetRevision > persistedRevision }
+            }?.let { throw it }
         }
 
         private suspend fun runWorker() {
@@ -198,6 +223,7 @@ class TerminalCompletionLearningCoordinator
                         WorkerAction.WAIT -> wakeups.receive()
                         WorkerAction.WAIT_FOR_CHECKPOINT -> waitForCheckpoint()
                         WorkerAction.WRITE_NOW -> persistLatest()
+                        WorkerAction.WRITE_RESET -> persistReset()
                         WorkerAction.STOP -> return
                     }
                 }
@@ -214,6 +240,7 @@ class TerminalCompletionLearningCoordinator
             synchronized(stateLock) {
                 when {
                     persistenceEnabled && !hydrated -> WorkerAction.HYDRATE
+                    resetRevision > attemptedRevision -> WorkerAction.WRITE_RESET
                     closeRequested && canPersist() && !finalWriteAttempted -> {
                         finalWriteAttempted = true
                         WorkerAction.WRITE_NOW
@@ -235,15 +262,19 @@ class TerminalCompletionLearningCoordinator
                     is CompletionLearningFileLoadOutcome.Failed -> outcome.cause
                     else -> null
                 }
-            synchronized(stateLock) {
-                if (outcome is CompletionLearningFileLoadOutcome.Loaded) {
-                    learningStore.mergeSnapshot(outcome.snapshot)
+            val reportedFailure =
+                synchronized(stateLock) {
+                    hydrated = true
+                    if (resetRevision != 0L) {
+                        null
+                    } else {
+                        if (outcome is CompletionLearningFileLoadOutcome.Loaded) learningStore.mergeSnapshot(outcome.snapshot)
+                        loadBlocked = loadFailure != null
+                        loadFailure
+                    }
                 }
-                loadBlocked = loadFailure != null
-                hydrated = true
-            }
-            if (loadFailure != null) {
-                runCatching { onPersistenceLoadFailure(loadFailure) }
+            if (reportedFailure != null) {
+                runCatching { onPersistenceLoadFailure(reportedFailure) }
             }
         }
 
@@ -297,6 +328,32 @@ class TerminalCompletionLearningCoordinator
             }
         }
 
+        private suspend fun persistReset() {
+            val revision =
+                synchronized(stateLock) {
+                    if (resetRevision <= attemptedRevision) return
+                    resetRevision.also { attemptedRevision = maxOf(attemptedRevision, it) }
+                }
+            val failure =
+                try {
+                    withContext(ioDispatcher) { fileStore.persist(TerminalCompletionLearningSnapshot.EMPTY) }
+                    null
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (writeFailure: Throwable) {
+                    writeFailure
+                }
+
+            synchronized(stateLock) {
+                if (failure == null) {
+                    persistedRevision = maxOf(persistedRevision, revision)
+                    persistenceFailure = null
+                } else {
+                    persistenceFailure = failure
+                }
+            }
+        }
+
         private fun markDirty() {
             check(mutationRevision != Long.MAX_VALUE) { "completion-learning mutation revision overflow" }
             val shouldSignal = mutationRevision == persistedRevision || mutationRevision == attemptedRevision
@@ -313,6 +370,7 @@ class TerminalCompletionLearningCoordinator
             WAIT,
             WAIT_FOR_CHECKPOINT,
             WRITE_NOW,
+            WRITE_RESET,
             STOP,
         }
 

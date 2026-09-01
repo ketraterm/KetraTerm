@@ -163,7 +163,9 @@ Optional disk I/O belongs to the separately published
 store synchronously; one conflated worker hydrates once, observes last-value enablement, and checkpoints the latest dirty
 snapshot every 30 seconds. The file store persists opaque evidence and only
 positive, policy-approved replay rows, rechecking replay eligibility before encoding. It
-talks directly to one bounded file store and forces the final dirty write during shutdown.
+talks directly to one bounded file store and forces the final dirty write during shutdown. A user-requested reset clears
+the shared in-memory store synchronously, supersedes any in-flight hydration, and sends an immediate empty replacement
+through that same worker even when routine persistence is disabled.
 There is no runtime path switching, repository lifecycle, separate writer, control actor, or arbitrary flush barrier.
 Product hosts own the fixed destination, enablement policy, one load-failure diagnostic callback, and a bounded
 shutdown durability budget. If final Java NIO does not finish within that budget, the host cancels its persistence

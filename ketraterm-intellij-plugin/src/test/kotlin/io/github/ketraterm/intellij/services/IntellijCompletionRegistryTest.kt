@@ -36,6 +36,26 @@ import java.nio.file.Path
 
 class IntellijCompletionRegistryTest {
     @Test
+    fun `reset removes shared completion learning`() =
+        runBlocking {
+            val learningStore = TerminalCompletionLearningStore()
+            learningStore.recordCommandResult("git status", true, "bash", "file:///repo", 1L)
+            val registry =
+                IntellijCompletionRegistry(
+                    learningStore = learningStore,
+                    persistencePath = memoryOnlyPath(),
+                    persistenceEnabled = false,
+                    coroutineScope = this,
+                )
+
+            registry.resetLearning()
+
+            assertTrue(learningStore.snapshot().rankingStats.isEmpty())
+            assertTrue(learningStore.snapshot().replayCommands.isEmpty())
+            registry.closeAndFlush()
+        }
+
+    @Test
     fun `directory completion suspends until the scanner returns real values`() =
         runBlocking {
             var scans = 0

@@ -94,6 +94,15 @@ class TerminalCompletionLearningStore
             }
         }
 
+        /** Removes all retained ranking evidence and replay commands. */
+        fun clear() {
+            synchronized(lock) {
+                learningStats.clear()
+                publishedSnapshot = TerminalCompletionLearningSnapshot.EMPTY
+                snapshotDirty = false
+            }
+        }
+
         /** Returns identity-cached ranking, history, and observed-token indexes. */
         internal fun indexesFor(shellSyntax: TerminalShellSyntax): CompletionLearningIndexes =
             learningIndexCache.indexesFor(snapshot(), shellSyntax)

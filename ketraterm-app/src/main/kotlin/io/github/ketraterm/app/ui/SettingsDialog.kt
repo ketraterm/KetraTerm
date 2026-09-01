@@ -39,6 +39,7 @@ internal class SettingsDialog(
     parent: JFrame,
     private val settings: KetraTermSettings,
     private val profileRegistry: TerminalProfileRegistry,
+    private val onResetCompletionLearning: () -> Unit,
     private val onApply: () -> Unit,
 ) : JDialog(parent, "Terminal Settings", true) {
     private val cardLayout = CardLayout()
@@ -195,6 +196,10 @@ internal class SettingsDialog(
         JCheckBox("Accept selected suggestion with Enter", settings.acceptSelectedSuggestionWithEnter)
     private val persistentSuggestionLearningCheckbox =
         JCheckBox("Persist suggestion learning", settings.persistentSuggestionLearningEnabled)
+    private val resetCompletionLearningButton =
+        JButton("Reset completion learning...").apply {
+            addActionListener { confirmAndResetCompletionLearning() }
+        }
     private val scrollOnOutputCheckbox = JCheckBox("Scroll on output", settings.scrollOnOutput)
     private val cursorBlinkSpinner =
         createSpinner(settings.cursorBlinkMillis, TerminalConfig.CURSOR_BLINK_MIN, TerminalConfig.CURSOR_BLINK_MAX, 50, 70)
@@ -426,8 +431,9 @@ internal class SettingsDialog(
             historySection,
             0,
             persistentSuggestionLearningCheckbox,
-            "Persist compact suggestion ranking metadata across app restarts. Terminal output is never stored.",
+            "Persist a bounded, sanitized completion-learning snapshot across app restarts. Terminal output is never stored.",
         )
+        addFormRow(historySection, 2, "Learning data:", resetCompletionLearningButton)
         panel.add(historySection)
 
         return panel
@@ -732,6 +738,26 @@ internal class SettingsDialog(
             add(rightPanel, BorderLayout.EAST)
             this@SettingsDialog.rootPane.defaultButton = okButton
         }
+
+    private fun confirmAndResetCompletionLearning() {
+        val answer =
+            JOptionPane.showConfirmDialog(
+                this,
+                "This deletes learned commands and suggestion ranking signals. This action cannot be undone.",
+                "Reset Completion Learning?",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE,
+            )
+        if (answer != JOptionPane.YES_OPTION) return
+
+        onResetCompletionLearning()
+        JOptionPane.showMessageDialog(
+            this,
+            "Completion learning has been reset.",
+            "Completion Learning Reset",
+            JOptionPane.INFORMATION_MESSAGE,
+        )
+    }
 
     private fun resetToDefaults() {
         val defaultProfile =

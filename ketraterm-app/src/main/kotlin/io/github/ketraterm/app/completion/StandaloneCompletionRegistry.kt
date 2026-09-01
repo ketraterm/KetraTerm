@@ -159,6 +159,13 @@ internal class StandaloneCompletionRegistry private constructor(
         }
     }
 
+    /** Removes all session and persisted completion learning. */
+    fun resetLearning() {
+        synchronized(lifecycleLock) {
+            if (!closed) learning.resetLearning()
+        }
+    }
+
     /** Stops accepting learning events and waits for the final dirty persistence write. */
     suspend fun closeAndFlush() {
         synchronized(lifecycleLock) {

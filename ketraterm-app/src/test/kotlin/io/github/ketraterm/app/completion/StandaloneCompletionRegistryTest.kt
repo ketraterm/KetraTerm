@@ -32,6 +32,19 @@ class StandaloneCompletionRegistryTest {
     private val persistenceDirectory = Files.createTempDirectory("ketraterm-registry-test")
     private var eventTime = 0L
 
+    @Test
+    fun `reset removes shared completion learning`() =
+        runBlocking {
+            val learningStore = TerminalCompletionLearningStore()
+            val registry = registry(learningStore = learningStore)
+            registry.recordSuccess("git switch main", profileId = "bash", workingDirectoryUri = "file:///repo")
+
+            registry.resetLearning()
+
+            assertTrue(learningStore.snapshot().rankingStats.isEmpty())
+            assertTrue(learningStore.snapshot().replayCommands.isEmpty())
+        }
+
     @AfterTest
     fun closeRegistries() {
         runBlocking {

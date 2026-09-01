@@ -33,6 +33,74 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalCompletionLearningCoordinatorTest {
     @Test
+    fun `reset clears memory and persists empty state immediately when persistence is disabled`() =
+        runTest {
+            val files = RecordingSnapshotFiles()
+            val learning = TerminalCompletionLearningStore()
+            val coordinator = coordinator(learning, files, enabled = false)
+            coordinator.recordCommandResult("old command", true, null, null, 1L)
+
+            coordinator.resetLearning()
+            coordinator.recordCommandResult("new command", true, null, null, 2L)
+
+            assertEquals(listOf("new command"), learning.snapshot().replayCommands.map { it.commandLine })
+            runCurrent()
+            assertEquals(listOf(TerminalCompletionLearningSnapshot.EMPTY), files.writes)
+            coordinator.closeAndFlush()
+            assertEquals(1, files.writeAttempts.get())
+        }
+
+    @Test
+    fun `reset during hydration discards the loaded snapshot`() =
+        runTest {
+            val loadStarted = CountDownLatch(1)
+            val releaseLoad = CountDownLatch(1)
+            val files =
+                RecordingSnapshotFiles(
+                    initialLoadOutcome = CompletionLearningFileLoadOutcome.Loaded(snapshot("old command", 1L)),
+                    beforeLoad = {
+                        loadStarted.countDown()
+                        check(releaseLoad.await(5L, TimeUnit.SECONDS)) { "test load was not released" }
+                    },
+                )
+            val learning = TerminalCompletionLearningStore()
+            val coordinator = coordinator(learning, files, ioDispatcher = Dispatchers.IO)
+
+            try {
+                assertTrue(loadStarted.await(5L, TimeUnit.SECONDS))
+                coordinator.resetLearning()
+                releaseLoad.countDown()
+                coordinator.closeAndFlush()
+
+                assertSame(TerminalCompletionLearningSnapshot.EMPTY, learning.snapshot())
+                assertEquals(listOf(TerminalCompletionLearningSnapshot.EMPTY), files.writes)
+            } finally {
+                releaseLoad.countDown()
+            }
+        }
+
+    @Test
+    fun `reset replaces a rejected snapshot after hydration blocked ordinary persistence`() =
+        runTest {
+            val diagnostics = CopyOnWriteArrayList<Throwable>()
+            val files = RecordingSnapshotFiles(initialLoadOutcome = CompletionLearningFileLoadOutcome.Rejected)
+            val coordinator =
+                coordinator(
+                    learning = TerminalCompletionLearningStore(),
+                    files = files,
+                    onPersistenceLoadFailure = diagnostics::add,
+                )
+            runCurrent()
+
+            coordinator.resetLearning()
+            runCurrent()
+            coordinator.closeAndFlush()
+
+            assertEquals(1, diagnostics.size)
+            assertEquals(listOf(TerminalCompletionLearningSnapshot.EMPTY), files.writes)
+        }
+
+    @Test
     fun `large mutation burst is synchronous and checkpoints one latest snapshot`() =
         runTest {
             val files = RecordingSnapshotFiles()

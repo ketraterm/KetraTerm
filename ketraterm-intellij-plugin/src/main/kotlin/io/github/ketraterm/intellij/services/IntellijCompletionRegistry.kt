@@ -143,6 +143,13 @@ internal class IntellijCompletionRegistry(
         }
     }
 
+    /** Removes all session and persisted completion learning. */
+    fun resetLearning() {
+        synchronized(lock) {
+            if (!closed) learning.resetLearning()
+        }
+    }
+
     /** Stops accepting learning events and waits for the final dirty persistence write. */
     suspend fun closeAndFlush() {
         synchronized(lock) {

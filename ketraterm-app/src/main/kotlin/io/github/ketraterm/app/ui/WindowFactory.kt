@@ -185,9 +185,13 @@ internal class WindowFactory(
                 background = Chrome.popupBackground
                 foreground = Chrome.textPrimary
                 addActionListener {
-                    SettingsDialog(frame, settings, profileRegistry) {
-                        tabManager.reloadAllPanes()
-                    }.isVisible = true
+                    SettingsDialog(
+                        parent = frame,
+                        settings = settings,
+                        profileRegistry = profileRegistry,
+                        onResetCompletionLearning = tabManager::resetCompletionLearning,
+                        onApply = tabManager::reloadAllPanes,
+                    ).isVisible = true
                 }
             }
         popup.add(settingsItem)

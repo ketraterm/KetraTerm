@@ -1030,6 +1030,10 @@ internal class TabManager(
         completionRegistry.setPersistenceEnabled(settings.persistentSuggestionLearningEnabled)
     }
 
+    fun resetCompletionLearning() {
+        completionRegistry.resetLearning()
+    }
+
     private companion object {
         private val LOGGER: Logger = Logger.getLogger(TabManager::class.java.name)
         private const val INITIAL_TAB_CAPACITY = 4

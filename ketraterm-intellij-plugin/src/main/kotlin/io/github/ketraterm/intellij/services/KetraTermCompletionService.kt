@@ -149,6 +149,13 @@ internal class KetraTermCompletionService : Disposable {
         }
     }
 
+    /** Removes all session and persisted completion learning. */
+    fun resetLearning() {
+        lifecycle.ifOpen {
+            completionRuntime.registry.resetLearning()
+        }
+    }
+
     /** Durably flushes learned completion state before cancelling its owned scope. */
     override fun dispose() {
         if (!lifecycle.beginClose()) return

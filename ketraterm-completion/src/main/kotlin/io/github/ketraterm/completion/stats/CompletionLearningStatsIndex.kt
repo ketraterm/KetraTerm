@@ -49,6 +49,11 @@ internal class CompletionLearningStatsIndex(
         return TerminalCompletionLearningSnapshot(rankingStats, replayCommands)
     }
 
+    fun clear() {
+        rowsByKey.clear()
+        orderedRows.clear()
+    }
+
     fun recordCommandResult(
         identityDigest: String,
         replayCommandLine: String?,
