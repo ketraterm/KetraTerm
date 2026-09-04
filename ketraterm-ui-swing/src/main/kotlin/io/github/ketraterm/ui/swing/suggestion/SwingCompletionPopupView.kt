@@ -15,533 +15,222 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
-import java.awt.*
+import java.awt.BorderLayout
+import java.awt.Component
+import java.awt.Dimension
 import java.awt.event.*
-import java.beans.PropertyChangeListener
-import java.util.*
-import javax.accessibility.*
-import javax.swing.JComponent
-import javax.swing.SwingUtilities
-import javax.swing.ToolTipManager
-import kotlin.math.ceil
-import kotlin.math.max
-import kotlin.math.min
+import java.util.regex.Pattern
+import javax.swing.*
 
-/** Adaptive custom-painted completion list used by the standalone Swing host. */
+/** Standard Swing list presentation; the controller retains selection and acceptance ownership. */
 internal class SwingCompletionPopupView(
     private val listener: SwingShellSuggestionViewListener,
-) : JComponent(),
-    SwingShellSuggestionView,
-    Accessible {
-    override val component: JComponent
-        get() = this
-
-    private var snapshot: SwingShellSuggestionViewSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
-    private val popupLayout = SwingCompletionPopupLayout()
-    private var appearance: SwingCompletionPopupAppearance? = null
-    private var appearanceFont: Font? = null
-    private var appearanceBackground: Color? = null
-    private var appearanceForeground: Color? = null
-    private var appearanceParent: Component? = null
-    private var preparedComponentWidth = -1
+) : JPanel(BorderLayout()),
+    SwingShellSuggestionView {
+    override val component: JComponent get() = this
+    private var snapshot = SwingShellSuggestionViewSnapshot.EMPTY
+    private var updating = false
     private var closed = false
-
-    internal var layoutPreparationCount: Int = 0
-        private set
-
+    internal val list = JList<SwingShellSuggestion>()
+    private val scrollPane = JScrollPane(list)
+    private val position = JLabel()
+    private val selectionListener =
+        javax.swing.event.ListSelectionListener {
+            if (!updating && !closed && !it.valueIsAdjusting && list.selectedIndex >= 0) {
+                listener.onSuggestionHovered(list.selectedIndex)
+            }
+        }
     private val pointerHandler =
         object : MouseAdapter() {
             override fun mousePressed(event: MouseEvent) {
-                if (!SwingUtilities.isLeftMouseButton(event)) return
-                val row = rowAt(event.y)
-                if (row >= 0) listener.onSuggestionClicked(row)
+                if (!closed && SwingUtilities.isLeftMouseButton(event)) {
+                    rowAt(event)?.let(listener::onSuggestionClicked)
+                }
             }
 
             override fun mouseMoved(event: MouseEvent) {
-                val row = rowAt(event.y)
-                if (row >= 0) listener.onSuggestionHovered(row)
+                if (!closed) rowAt(event)?.let(listener::onSuggestionHovered)
             }
 
             override fun mouseWheelMoved(event: MouseWheelEvent) {
-                val rotation = event.wheelRotation.coerceIn(-MAX_WHEEL_STEP, MAX_WHEEL_STEP)
-                if (rotation == 0) return
-                listener.onSuggestionScrollRequested(rotation)
-                event.consume()
+                if (!closed && event.wheelRotation != 0) {
+                    listener.onSuggestionScrollRequested(event.wheelRotation.coerceIn(-3, 3))
+                    event.consume()
+                }
             }
-        }
-    private val resizeHandler =
-        object : ComponentAdapter() {
-            override fun componentResized(event: ComponentEvent) {
-                if (width != preparedComponentWidth) prepareLayout(revalidateComponent = false)
-            }
-        }
-    private val appearanceChangeHandler =
-        PropertyChangeListener { event ->
-            if (event.propertyName in APPEARANCE_PROPERTIES) {
-                invalidateAppearance()
-                prepareLayout(revalidateComponent = true)
-            }
-        }
-    private val parentAppearanceChangeHandler =
-        PropertyChangeListener { event ->
-            if (event.propertyName in APPEARANCE_PROPERTIES) {
-                invalidateAppearance()
-                prepareLayout(revalidateComponent = true)
-                repaint()
-            }
-        }
-    private val hierarchyHandler =
-        HierarchyListener { event ->
-            if (event.changeFlags and HierarchyEvent.PARENT_CHANGED.toLong() != 0L) synchronizeAppearanceParent()
         }
 
     init {
-        isOpaque = false
         isFocusable = false
-        name = "commandCompletionList"
-        toolTipText = ""
-        addMouseListener(pointerHandler)
-        addMouseMotionListener(pointerHandler)
-        addMouseWheelListener(pointerHandler)
-        addComponentListener(resizeHandler)
-        addPropertyChangeListener(appearanceChangeHandler)
-        addHierarchyListener(hierarchyHandler)
-        ToolTipManager.sharedInstance().registerComponent(this)
+        list.isFocusable = false
+        list.selectionMode = ListSelectionModel.SINGLE_SELECTION
+        list.cellRenderer = CompletionRenderer()
+        list.visibleRowCount = SwingShellSuggestionViewSnapshot.MAX_VISIBLE_SUGGESTIONS
+        list.accessibleContext.accessibleName = "Command completions"
+        list.addListSelectionListener(selectionListener)
+        list.addMouseListener(pointerHandler)
+        list.addMouseMotionListener(pointerHandler)
+        list.addMouseWheelListener(pointerHandler)
+        ToolTipManager.sharedInstance().registerComponent(list)
+        scrollPane.isWheelScrollingEnabled = false
+        scrollPane.horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
+        scrollPane.verticalScrollBarPolicy = ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER
+        scrollPane.addMouseWheelListener(pointerHandler)
+        scrollPane.viewport.addComponentListener(
+            object : ComponentAdapter() {
+                override fun componentResized(event: ComponentEvent) = revealSelection()
+            },
+        )
+        position.border = BorderFactory.createEmptyBorder(2, 6, 2, 6)
+        add(scrollPane, BorderLayout.CENTER)
+        add(position, BorderLayout.SOUTH)
     }
 
     override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+        check(SwingUtilities.isEventDispatchThread()) { "completion view must update on the EDT" }
         check(!closed) { "completion view is closed" }
-        val oldSnapshot = this.snapshot
-        this.snapshot = snapshot
-        if (oldSnapshot.visibleSuggestions != snapshot.visibleSuggestions) {
-            prepareLayout(revalidateComponent = true)
-        }
-        accessibleContextOrNull()?.let { context ->
-            context.firePropertyChange(AccessibleContext.ACCESSIBLE_VISIBLE_DATA_PROPERTY, oldSnapshot, snapshot)
-            if (oldSnapshot.selectedIndex != snapshot.selectedIndex) {
-                context.firePropertyChange(
-                    AccessibleContext.ACCESSIBLE_SELECTION_PROPERTY,
-                    oldSnapshot.selectedSuggestion,
-                    snapshot.selectedSuggestion,
-                )
+        updating = true
+        try {
+            if (this.snapshot.visibleSuggestions != snapshot.visibleSuggestions) {
+                list.setListData(snapshot.visibleSuggestions.toTypedArray())
             }
+            this.snapshot = snapshot
+            list.selectedIndex = snapshot.selectedIndex
+            list.visibleRowCount = snapshot.visibleSuggestions.size
+            position.isVisible = snapshot.hasSuggestionsBefore || snapshot.hasSuggestionsAfter
+            position.text =
+                "${snapshot.viewportStartIndex + 1}–${snapshot.viewportStartIndex + snapshot.visibleSuggestions.size} of ${snapshot.totalSuggestionCount}"
+            list.accessibleContext.accessibleDescription = "${snapshot.totalSuggestionCount} suggestions, ${position.text}"
+            revealSelection()
+        } finally {
+            updating = false
         }
+        revalidate()
         repaint()
-    }
-
-    override fun close() {
-        if (closed) return
-        closed = true
-        snapshot = SwingShellSuggestionViewSnapshot.EMPTY
-        popupLayout.clear()
-        preparedComponentWidth = -1
-        ToolTipManager.sharedInstance().unregisterComponent(this)
-        removeMouseListener(pointerHandler)
-        removeMouseMotionListener(pointerHandler)
-        removeMouseWheelListener(pointerHandler)
-        removeComponentListener(resizeHandler)
-        removePropertyChangeListener(appearanceChangeHandler)
-        removeHierarchyListener(hierarchyHandler)
-        appearanceParent?.removePropertyChangeListener(parentAppearanceChangeHandler)
-        appearanceParent = null
-    }
-
-    override fun addNotify() {
-        super.addNotify()
-        synchronizeAppearanceParent()
-        invalidateAppearance()
-        prepareLayout(revalidateComponent = true)
     }
 
     override fun getPreferredSize(): Dimension =
         if (snapshot.visibleSuggestions.isEmpty()) {
             Dimension(0, 0)
         } else {
-            Dimension(popupLayout.preferredWidth, popupLayout.preferredHeight)
+            super.getPreferredSize().apply { width = width.coerceIn(320, 640) }
         }
 
-    override fun getToolTipText(event: MouseEvent): String? {
-        val row = rowAt(event.y)
-        return if (row >= 0) popupLayout.row(row).tooltipText.takeIf { it.isNotEmpty() } else null
+    override fun doLayout() {
+        super.doLayout()
+        scrollPane.doLayout()
+        scrollPane.viewport.doLayout()
+        revealSelection()
     }
 
-    override fun getToolTipLocation(event: MouseEvent): Point? {
-        val row = rowAt(event.y)
-        if (row < 0) return null
-        val physicalRow = row - firstPaintedRow()
-        return Point(
-            SwingCompletionPopupLayout.PRIMARY_X,
-            SwingCompletionPopupLayout.SURFACE_PADDING + (physicalRow + 1) * popupLayout.rowHeight,
-        )
+    private fun revealSelection() {
+        if (list.selectedIndex >= 0) list.ensureIndexIsVisible(list.selectedIndex)
     }
 
-    override fun paintComponent(graphics: Graphics) {
-        if (snapshot.visibleSuggestions.isEmpty() || width <= 0 || height <= 0) return
-        val graphicsCopy = graphics.create()
-        if (graphicsCopy !is Graphics2D) {
-            graphicsCopy.dispose()
-            return
-        }
-        val graphics2D = graphicsCopy
-        try {
-            configureRendering(graphics2D)
-            val previousAppearance = appearance
-            val resolvedAppearance = ensureAppearance()
-            val appearanceChanged = previousAppearance !== resolvedAppearance
-            if (appearanceChanged || popupLayout.fontRenderContext != graphics2D.fontRenderContext) {
-                prepareLayout(graphics2D.fontRenderContext, revalidateComponent = appearanceChanged)
-            }
-            paintSurface(graphics2D, resolvedAppearance)
-            paintRows(graphics2D, resolvedAppearance)
-            paintScrollPosition(graphics2D, resolvedAppearance)
-        } finally {
-            graphics2D.dispose()
-        }
-    }
-
-    override fun getAccessibleContext(): AccessibleContext {
-        if (accessibleContext == null) {
-            accessibleContext = AccessibleCompletionList()
-        }
-        return accessibleContext
-    }
-
-    private fun paintSurface(
-        graphics: Graphics2D,
-        appearance: SwingCompletionPopupAppearance,
-    ) {
-        val palette = appearance.palette
-        val surfaceWidth = max(1, width - SHADOW_INSET)
-        val surfaceHeight = max(1, height - SHADOW_INSET)
-        graphics.color = palette.shadow
-        graphics.fillRoundRect(
-            SHADOW_INSET,
-            SHADOW_INSET + 1,
-            max(1, width - SHADOW_INSET * 2),
-            max(1, height - SHADOW_INSET * 2),
-            SURFACE_ARC,
-            SURFACE_ARC,
-        )
-        graphics.color = palette.background
-        graphics.fillRoundRect(0, 0, surfaceWidth, surfaceHeight, SURFACE_ARC, SURFACE_ARC)
-        graphics.color = palette.border
-        graphics.drawRoundRect(0, 0, max(0, surfaceWidth - 1), max(0, surfaceHeight - 1), SURFACE_ARC, SURFACE_ARC)
-    }
-
-    private fun paintRows(
-        graphics: Graphics2D,
-        appearance: SwingCompletionPopupAppearance,
-    ) {
-        val capacity = popupLayout.visibleRowCapacity(height)
-        if (capacity == 0) return
-        val firstRow = firstPaintedRow()
-        val endRow = min(popupLayout.rowCount, firstRow + capacity)
-        var rowIndex = firstRow
-        while (rowIndex < endRow) {
-            val row = popupLayout.row(rowIndex)
-            val physicalIndex = rowIndex - firstRow
-            val top = SwingCompletionPopupLayout.SURFACE_PADDING + physicalIndex * popupLayout.rowHeight
-            val selected = rowIndex == snapshot.selectedIndex
-            if (selected) {
-                graphics.color = appearance.palette.selectionBackground
-                graphics.fillRoundRect(
-                    ROW_HORIZONTAL_INSET,
-                    top + ROW_VERTICAL_INSET,
-                    width - ROW_HORIZONTAL_INSET * 2 - SHADOW_INSET,
-                    popupLayout.rowHeight - ROW_VERTICAL_INSET * 2,
-                    SELECTION_ARC,
-                    SELECTION_ARC,
-                )
-            }
-
-            paintRoleIcon(
-                graphics,
-                x = ICON_X,
-                centerY = top + popupLayout.rowHeight / 2,
-                size = popupLayout.iconSize,
-                role = row.accentRole,
-                color = appearance.palette.accent(row.accentRole),
-            )
-            val primary = if (selected) row.selectedPrimaryLayout else row.primaryLayout
-            primary.draw(
-                graphics,
-                SwingCompletionPopupLayout.PRIMARY_X.toFloat(),
-                (top + popupLayout.primaryBaseline).toFloat(),
-            )
-            val detailX =
-                SwingCompletionPopupLayout.PRIMARY_X + ceil(primary.advance.toDouble()).toInt() + SwingCompletionPopupLayout.DETAIL_GAP
-            row.detailLayout?.let { detail ->
-                graphics.color = if (selected) appearance.palette.selectedForeground else appearance.palette.mutedForeground
-                detail.draw(graphics, detailX.toFloat(), (top + popupLayout.detailBaseline).toFloat())
-            }
-            row.sourceLayout?.let { source ->
-                val sourceX =
-                    width -
-                        SHADOW_INSET -
-                        SwingCompletionPopupLayout.RIGHT_CONTENT_INSET -
-                        SwingCompletionPopupLayout.SCROLLBAR_RESERVE -
-                        row.sourceBadgeWidth
-                val badgeHeight = ceil(source.ascent + source.descent).toInt() + SwingCompletionPopupLayout.SOURCE_VERTICAL_PADDING * 2
-                val badgeY = top + (popupLayout.rowHeight - badgeHeight) / 2
-                graphics.color = appearance.palette.sourceBackground
-                graphics.fillRoundRect(sourceX, badgeY, row.sourceBadgeWidth, badgeHeight, SOURCE_ARC, SOURCE_ARC)
-                graphics.color = appearance.palette.sourceForeground
-                source.draw(
-                    graphics,
-                    (sourceX + SwingCompletionPopupLayout.SOURCE_HORIZONTAL_PADDING).toFloat(),
-                    (top + popupLayout.sourceBaseline).toFloat(),
-                )
-            }
-            rowIndex++
-        }
-    }
-
-    private fun paintRoleIcon(
-        graphics: Graphics2D,
-        x: Int,
-        centerY: Int,
-        size: Int,
-        role: SwingShellSuggestionAccentRole,
-        color: Color,
-    ) {
-        val top = centerY - size / 2
-        val right = x + size - 1
-        graphics.color = color
-        val previousStroke = graphics.stroke
-        graphics.stroke = ICON_STROKE
-        when (role) {
-            SwingShellSuggestionAccentRole.COMMAND -> {
-                graphics.drawLine(x + 1, top + 2, x + size / 2, centerY)
-                graphics.drawLine(x + size / 2, centerY, x + 1, top + size - 2)
-                graphics.drawLine(x + size / 2 + 2, top + size - 2, right, top + size - 2)
-            }
-
-            SwingShellSuggestionAccentRole.PATH -> {
-                graphics.drawLine(x + 1, top + 3, x + size / 2 - 1, top + 3)
-                graphics.drawLine(x + size / 2 - 1, top + 3, x + size / 2 + 1, top + 5)
-                graphics.drawRoundRect(x + 1, top + 5, size - 2, size - 7, 2, 2)
-            }
-
-            SwingShellSuggestionAccentRole.OPTION -> {
-                graphics.drawLine(x + 1, centerY - 3, right, centerY - 3)
-                graphics.drawLine(x + 1, centerY + 3, right, centerY + 3)
-                graphics.fillOval(x + size / 3, centerY - 5, 4, 4)
-                graphics.fillOval(x + size * 2 / 3, centerY + 1, 4, 4)
-            }
-
-            SwingShellSuggestionAccentRole.HISTORY -> {
-                graphics.drawOval(x + 1, top + 1, size - 2, size - 2)
-                graphics.drawLine(x + size / 2, centerY, x + size / 2, top + 3)
-                graphics.drawLine(x + size / 2, centerY, right - 2, centerY + 2)
-            }
-
-            SwingShellSuggestionAccentRole.OTHER -> graphics.fillOval(x + size / 2 - 2, centerY - 2, 5, 5)
-        }
-        graphics.stroke = previousStroke
-    }
-
-    private fun paintScrollPosition(
-        graphics: Graphics2D,
-        appearance: SwingCompletionPopupAppearance,
-    ) {
-        if (snapshot.totalSuggestionCount <= popupLayout.visibleRowCapacity(height)) return
-        val trackHeight = max(1, height - SCROLL_INSET * 2 - SHADOW_INSET)
-        val trackX = width - SCROLL_INSET - SCROLL_WIDTH - SHADOW_INSET
-        graphics.color = appearance.palette.scrollTrack
-        graphics.fillRoundRect(trackX, SCROLL_INSET, SCROLL_WIDTH, trackHeight, SCROLL_WIDTH, SCROLL_WIDTH)
-
-        val capacity = popupLayout.visibleRowCapacity(height).coerceAtLeast(1)
-        val firstAbsolute = snapshot.viewportStartIndex + firstPaintedRow()
-        val thumbHeight = max(MIN_SCROLL_THUMB_HEIGHT, trackHeight * capacity / snapshot.totalSuggestionCount).coerceAtMost(trackHeight)
-        val availableTravel = trackHeight - thumbHeight
-        val maximumStart = max(1, snapshot.totalSuggestionCount - capacity)
-        val thumbY = SCROLL_INSET + availableTravel * firstAbsolute.coerceAtMost(maximumStart) / maximumStart
-        graphics.color = appearance.palette.scrollThumb
-        graphics.fillRoundRect(trackX, thumbY, SCROLL_WIDTH, thumbHeight, SCROLL_WIDTH, SCROLL_WIDTH)
-    }
-
-    private fun prepareLayout(revalidateComponent: Boolean) {
-        prepareLayout(renderContext = null, revalidateComponent = revalidateComponent)
-    }
-
-    private fun prepareLayout(
-        renderContext: java.awt.font.FontRenderContext?,
-        revalidateComponent: Boolean,
-    ) {
-        if (closed || snapshot.visibleSuggestions.isEmpty()) {
-            popupLayout.clear()
-            preparedComponentWidth = -1
-            if (revalidateComponent) revalidate()
-            return
-        }
-        val resolvedAppearance = ensureAppearance()
-        val availableWidth = if (width > 0) width else SWING_COMPLETION_POPUP_MAX_WIDTH
-        if (renderContext == null) {
-            popupLayout.prepare(this, snapshot.visibleSuggestions, resolvedAppearance, availableWidth)
-        } else {
-            popupLayout.prepare(this, snapshot.visibleSuggestions, resolvedAppearance, availableWidth, renderContext)
-        }
-        preparedComponentWidth = width
-        layoutPreparationCount++
-        if (revalidateComponent) revalidate()
-    }
-
-    private fun ensureAppearance(): SwingCompletionPopupAppearance {
-        val currentFont = parent?.font ?: font
-        val currentBackground = parent?.background ?: background
-        val currentForeground = parent?.foreground ?: foreground
-        val cached = appearance
-        if (
-            cached != null &&
-            appearanceFont == currentFont &&
-            appearanceBackground == currentBackground &&
-            appearanceForeground == currentForeground
-        ) {
-            return cached
-        }
-        return SwingCompletionPopupAppearanceResolver.resolve(currentFont, currentBackground, currentForeground).also {
-            appearance = it
-            appearanceFont = currentFont
-            appearanceBackground = currentBackground
-            appearanceForeground = currentForeground
-        }
-    }
-
-    private fun invalidateAppearance() {
-        appearance = null
-        appearanceFont = null
-        appearanceBackground = null
-        appearanceForeground = null
-    }
-
-    private fun synchronizeAppearanceParent() {
-        val currentParent = parent
-        if (appearanceParent === currentParent) return
-        appearanceParent?.removePropertyChangeListener(parentAppearanceChangeHandler)
-        appearanceParent = currentParent
-        currentParent?.addPropertyChangeListener(parentAppearanceChangeHandler)
-        invalidateAppearance()
-    }
-
-    private fun configureRendering(graphics: Graphics2D) {
-        graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-        graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
-        graphics.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON)
-    }
-
-    private fun firstPaintedRow(): Int = popupLayout.firstVisibleRow(height, snapshot.selectedIndex)
-
-    private fun rowAt(y: Int): Int {
-        if (y < SwingCompletionPopupLayout.SURFACE_PADDING) return -1
-        val physicalRow = (y - SwingCompletionPopupLayout.SURFACE_PADDING) / popupLayout.rowHeight
-        val capacity = popupLayout.visibleRowCapacity(height)
-        if (physicalRow !in 0 until capacity) return -1
-        val row = firstPaintedRow() + physicalRow
-        return row.takeIf { it in 0 until popupLayout.rowCount } ?: -1
-    }
-
-    private fun accessibleContextOrNull(): AccessibleContext? = accessibleContext
-
-    private inner class AccessibleCompletionList :
-        AccessibleJComponent(),
-        AccessibleSelection {
-        override fun getAccessibleName(): String = super.getAccessibleName() ?: "Command completions"
-
-        override fun getAccessibleDescription(): String {
-            val count = snapshot.totalSuggestionCount
-            val selectedIndex = snapshot.selectedIndex
-            return if (selectedIndex !in 0 until popupLayout.rowCount) {
-                "$count suggestions"
-            } else {
-                "$count suggestions, selected ${snapshot.absoluteSelectedIndex + 1}: ${popupLayout.row(selectedIndex).accessibleName}"
-            }
+    private fun rowAt(event: MouseEvent): Int? =
+        list.locationToIndex(event.point).takeIf {
+            it >= 0 && list.getCellBounds(it, it)?.contains(event.point) == true
         }
 
-        override fun getAccessibleRole(): AccessibleRole = AccessibleRole.LIST
-
-        override fun getAccessibleChildrenCount(): Int = snapshot.visibleSuggestions.size
-
-        override fun getAccessibleChild(index: Int): Accessible? =
-            index.takeIf { it in snapshot.visibleSuggestions.indices }?.let(::AccessibleCompletionRow)
-
-        override fun getAccessibleSelection(): AccessibleSelection = this
-
-        override fun getAccessibleSelectionCount(): Int = if (snapshot.selectedIndex >= 0) 1 else 0
-
-        override fun getAccessibleSelection(index: Int): Accessible? =
-            if (index == 0 && snapshot.selectedIndex >= 0) AccessibleCompletionRow(snapshot.selectedIndex) else null
-
-        override fun isAccessibleChildSelected(index: Int): Boolean = index == snapshot.selectedIndex
-
-        override fun addAccessibleSelection(index: Int) {
-            if (index !in snapshot.visibleSuggestions.indices) return
-            if (SwingUtilities.isEventDispatchThread()) {
-                listener.onSuggestionHovered(index)
-            } else {
-                SwingUtilities.invokeLater { listener.onSuggestionHovered(index) }
-            }
-        }
-
-        override fun removeAccessibleSelection(index: Int) = Unit
-
-        override fun clearAccessibleSelection() = Unit
-
-        override fun selectAllAccessibleSelection() = Unit
-    }
-
-    private inner class AccessibleCompletionRow(
-        private val rowIndex: Int,
-    ) : Accessible {
-        private val row = popupLayout.row(rowIndex)
-        private val selected = rowIndex == snapshot.selectedIndex
-        private val showing =
-            rowIndex in firstPaintedRow() until firstPaintedRow() + popupLayout.visibleRowCapacity(height)
-        private val context =
-            object : AccessibleContext() {
-                override fun getAccessibleName(): String = row.accessibleName
-
-                override fun getAccessibleDescription(): String = row.accessibleDescription
-
-                override fun getAccessibleRole(): AccessibleRole = AccessibleRole.LIST_ITEM
-
-                override fun getAccessibleStateSet(): AccessibleStateSet =
-                    AccessibleStateSet().apply {
-                        add(AccessibleState.ENABLED)
-                        add(AccessibleState.VISIBLE)
-                        add(AccessibleState.SELECTABLE)
-                        if (selected) add(AccessibleState.SELECTED)
-                        if (showing) add(AccessibleState.SHOWING)
-                    }
-
-                override fun getAccessibleIndexInParent(): Int = rowIndex
-
-                override fun getAccessibleChildrenCount(): Int = 0
-
-                override fun getAccessibleChild(index: Int): Accessible? = null
-
-                override fun getLocale(): Locale = this@SwingCompletionPopupView.locale ?: Locale.getDefault()
-            }
-
-        init {
-            context.accessibleParent = this@SwingCompletionPopupView
-        }
-
-        override fun getAccessibleContext(): AccessibleContext = context
-    }
-
-    private companion object {
-        private const val MAX_WHEEL_STEP = 3
-        private const val SHADOW_INSET = 2
-        private const val SURFACE_ARC = 10
-        private const val SELECTION_ARC = 7
-        private const val SOURCE_ARC = 6
-        private const val ROW_HORIZONTAL_INSET = 4
-        private const val ROW_VERTICAL_INSET = 1
-        private const val ICON_X = 10
-        private const val SCROLL_INSET = 7
-        private const val SCROLL_WIDTH = 3
-        private const val MIN_SCROLL_THUMB_HEIGHT = 12
-        private val ICON_STROKE = BasicStroke(1.35f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-        private val APPEARANCE_PROPERTIES = setOf("font", "background", "foreground")
+    override fun close() {
+        check(SwingUtilities.isEventDispatchThread()) { "completion view must close on the EDT" }
+        if (closed) return
+        closed = true
+        list.removeListSelectionListener(selectionListener)
+        list.removeMouseListener(pointerHandler)
+        list.removeMouseMotionListener(pointerHandler)
+        list.removeMouseWheelListener(pointerHandler)
+        scrollPane.removeMouseWheelListener(pointerHandler)
+        ToolTipManager.sharedInstance().unregisterComponent(list)
+        list.setListData(emptyArray<SwingShellSuggestion>())
+        snapshot = SwingShellSuggestionViewSnapshot.EMPTY
     }
 }
+
+private class CompletionRenderer : DefaultListCellRenderer() {
+    override fun getListCellRendererComponent(
+        list: JList<*>?,
+        value: Any?,
+        index: Int,
+        isSelected: Boolean,
+        cellHasFocus: Boolean,
+    ): Component {
+        super.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus)
+        val suggestion = value as? SwingShellSuggestion ?: return this
+        val primary = displayText(suggestion.displayText, 4096)
+        val detail = displayText(suggestion.detail, 1024)
+        val source = displayText(suggestion.sourceDisplayText, 128)
+        text =
+            buildString {
+                append("<html>")
+                var offset = 0
+                for (range in 0 until suggestion.matchedRanges.rangeCount) {
+                    val start = suggestion.matchedRanges.startOffset(range)
+                    if (start >= primary.length) break
+                    val end = suggestion.matchedRanges.endOffset(range).coerceAtMost(primary.length)
+                    append(escapeHtml(primary.substring(offset, start)))
+                    append("<b>").append(escapeHtml(primary.substring(start, end))).append("</b>")
+                    offset = end
+                }
+                append(escapeHtml(primary.substring(offset)))
+                if (detail.isNotEmpty()) append(" &nbsp; ").append(escapeHtml(detail))
+                append(" &nbsp; <small>").append(escapeHtml(source)).append("</small></html>")
+            }
+        icon =
+            UIManager.getIcon(
+                when (suggestion.accentRole) {
+                    SwingShellSuggestionAccentRole.PATH -> "FileView.directoryIcon"
+                    SwingShellSuggestionAccentRole.COMMAND -> "FileView.computerIcon"
+                    else -> "Tree.leafIcon"
+                },
+            )
+        border = BorderFactory.createEmptyBorder(4, 6, 4, 6)
+        toolTipText = "<html>" +
+            listOf(displayText(primary, 1024), detail, source)
+                .filter { it.isNotEmpty() }
+                .joinToString(" — ", transform = ::escapeHtml) + "</html>"
+        getAccessibleContext().accessibleName = primary.ifEmpty { "Completion suggestion" }
+        getAccessibleContext().accessibleDescription = listOf(detail, source, suggestion.accentRole.name).joinToString(", ")
+        return this
+    }
+}
+
+/** Bound hostile provider text without splitting an extended grapheme or exposing display controls. */
+private fun displayText(
+    text: String,
+    limit: Int,
+): String {
+    var end = text.length
+    if (end > limit) {
+        val matcher = GRAPHEME.matcher(text).region(0, minOf(text.length, limit + 1))
+        end = 0
+        while (matcher.find() && matcher.end() <= limit) end = matcher.end()
+    }
+    return buildString {
+        for (index in 0 until end) {
+            val char = text[index]
+            append(
+                if (Character.isISOControl(char) ||
+                    char == '\u061c' ||
+                    char in '\u200e'..'\u200f' ||
+                    char in '\u202a'..'\u202e' ||
+                    char in '\u2066'..'\u2069'
+                ) {
+                    ' '
+                } else {
+                    char
+                },
+            )
+        }
+        if (end < text.length) append('…')
+    }
+}
+
+private fun escapeHtml(text: String): String =
+    text
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+
+private val GRAPHEME = Pattern.compile("\\X")

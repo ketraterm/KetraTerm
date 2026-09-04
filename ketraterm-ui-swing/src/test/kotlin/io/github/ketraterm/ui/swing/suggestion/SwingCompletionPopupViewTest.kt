@@ -36,7 +36,7 @@ class SwingCompletionPopupViewTest {
             val suggestions = List(3) { index -> suggestion("candidate-$index", detail = "detail-$index") }
             view.update(snapshot(suggestions, selectedIndex = 1, total = 12, start = 4))
 
-            val context = view.accessibleContext
+            val context = view.list.accessibleContext
             assertEquals(AccessibleRole.LIST, context.accessibleRole)
             assertEquals("Command completions", context.accessibleName)
             assertEquals(3, context.accessibleChildrenCount)
@@ -44,7 +44,7 @@ class SwingCompletionPopupViewTest {
             val selection = context.accessibleSelection as AccessibleSelection
             assertEquals(1, selection.accessibleSelectionCount)
             assertEquals("candidate-1", selection.getAccessibleSelection(0).accessibleContext.accessibleName)
-            assertEquals(AccessibleRole.LIST_ITEM, context.getAccessibleChild(1).accessibleContext.accessibleRole)
+            assertEquals("candidate-1", context.getAccessibleChild(1).accessibleContext.accessibleName)
         }
 
     @Test
@@ -54,26 +54,27 @@ class SwingCompletionPopupViewTest {
             val view = createView(listener)
             val suggestions = List(8) { index -> suggestion("candidate-$index") }
             view.update(snapshot(suggestions, selectedIndex = 7, total = 20, start = 8))
-            val fullHeight = view.preferredSize.height
-            val rowHeight = (fullHeight - SwingCompletionPopupLayout.SURFACE_PADDING * 2) / suggestions.size
-            view.setSize(440, SwingCompletionPopupLayout.SURFACE_PADDING * 2 + rowHeight * 2)
+            val rowHeight = view.list.getCellBounds(0, 0).height
+            view.setSize(440, rowHeight * 2 + 25)
+            view.doLayout()
 
             val image = BufferedImage(view.width, view.height, BufferedImage.TYPE_INT_ARGB)
             view.paint(image.createGraphics())
             val event =
                 MouseEvent(
-                    view,
+                    view.list,
                     MouseEvent.MOUSE_MOVED,
                     0L,
                     0,
                     40,
-                    SwingCompletionPopupLayout.SURFACE_PADDING + 2,
+                    view.list.getCellBounds(7, 7).let { it.y + it.height / 2 },
                     0,
                     false,
                 )
-            view.dispatchEvent(event)
+            view.list.dispatchEvent(event)
 
-            assertEquals(6, listener.hoveredIndex)
+            assertEquals(7, listener.hoveredIndex)
+            assertTrue(view.list.visibleRect.intersects(view.list.getCellBounds(7, 7)))
             assertTrue(imageContainsNonTransparentPixel(image))
         }
 
@@ -84,15 +85,16 @@ class SwingCompletionPopupViewTest {
             val view = createView(listener)
             view.update(snapshot(List(2) { suggestion("candidate-$it") }, selectedIndex = 0, total = 2, start = 0))
             view.size = view.preferredSize
+            view.doLayout()
 
-            view.dispatchEvent(
+            view.list.dispatchEvent(
                 MouseEvent(
-                    view,
+                    view.list,
                     MouseEvent.MOUSE_PRESSED,
                     0L,
                     0,
                     40,
-                    SwingCompletionPopupLayout.SURFACE_PADDING + 2,
+                    view.list.visibleRect.y + 2,
                     1,
                     false,
                     MouseEvent.BUTTON1,
@@ -100,7 +102,7 @@ class SwingCompletionPopupViewTest {
             )
             val wheel =
                 MouseWheelEvent(
-                    view,
+                    view.list,
                     MouseEvent.MOUSE_WHEEL,
                     0L,
                     0,
@@ -112,7 +114,7 @@ class SwingCompletionPopupViewTest {
                     1,
                     2,
                 )
-            view.dispatchEvent(wheel)
+            view.list.dispatchEvent(wheel)
 
             assertEquals(0, listener.clickedIndex)
             assertEquals(2, listener.scrollDelta)
@@ -132,19 +134,20 @@ class SwingCompletionPopupViewTest {
                 ),
             )
             view.size = view.preferredSize
+            view.doLayout()
             val event =
                 MouseEvent(
-                    view,
+                    view.list,
                     MouseEvent.MOUSE_MOVED,
                     0L,
                     0,
                     40,
-                    SwingCompletionPopupLayout.SURFACE_PADDING + 2,
+                    view.list.visibleRect.y + 2,
                     0,
                     false,
                 )
 
-            val tooltip = view.getToolTipText(event)
+            val tooltip = view.list.getToolTipText(event)
             assertNotNull(tooltip)
             assertTrue(tooltip!!.contains("git checkout feature/terminal"))
             assertTrue(tooltip.contains("Switch branch"))
@@ -152,33 +155,92 @@ class SwingCompletionPopupViewTest {
         }
 
     @Test
-    fun `selection-only updates reuse measured text layouts`() =
+    fun `selection-only updates retain the list model`() =
         onEdt {
             val view = createView(RecordingListener())
             val suggestions = List(3) { suggestion("candidate-$it") }
             view.update(snapshot(suggestions, selectedIndex = 0, total = 3, start = 0))
-            val preparationsAfterContent = view.layoutPreparationCount
+            val model = view.list.model
 
             view.update(snapshot(suggestions, selectedIndex = 1, total = 3, start = 0))
 
-            assertEquals(preparationsAfterContent, view.layoutPreparationCount)
+            assertSame(model, view.list.model)
         }
 
     @Test
-    fun `parent terminal font changes recompute adaptive row metrics`() =
+    fun `list font changes recompute row metrics`() =
         onEdt {
             val view = createView(RecordingListener())
             view.update(snapshot(listOf(suggestion("candidate")), selectedIndex = 0, total = 1, start = 0))
             val initialHeight = view.preferredSize.height
 
-            (view.parent as JPanel).font = Font(Font.MONOSPACED, Font.PLAIN, 32)
+            view.list.font = Font(Font.MONOSPACED, Font.PLAIN, 32)
 
             assertTrue(view.preferredSize.height > initialHeight)
+        }
+
+    @Test
+    fun `renderer escapes markup neutralizes controls and bounds hostile graphemes`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            val candidate = suggestion("<html><img src='file:/secret'>\u202e\n" + "x".repeat(8000), detail = "<script>&")
+            view.update(snapshot(listOf(candidate), 0, 1, 0))
+            val renderer = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, false, false) as javax.swing.JLabel
+            assertTrue(renderer.text.contains("&lt;html&gt;"))
+            assertFalse(renderer.text.contains("<img"))
+            assertFalse(renderer.text.contains('\u202e'))
+            assertFalse(renderer.text.contains('\n'))
+            assertTrue(renderer.text.length < 5000)
+            val cluster = suggestion("a" + "\u0301".repeat(8000))
+            val clusterRenderer =
+                view.list.cellRenderer.getListCellRendererComponent(view.list, cluster, 0, false, false) as javax.swing.JLabel
+            assertEquals("\u2026", clusterRenderer.accessibleContext.accessibleName)
+            view.close()
+        }
+
+    @Test
+    fun `look and feel colors and accessible selection use the standard list`() =
+        onEdt {
+            val listener = RecordingListener()
+            val view = createView(listener)
+            val candidates = List(2) { suggestion("candidate-$it") }
+            view.update(snapshot(candidates, -1, 2, 0))
+            assertEquals(-1, view.list.selectedIndex)
+            view.list.selectionBackground = Color.MAGENTA
+            view.list.selectionForeground = Color.YELLOW
+            val renderer = view.list.cellRenderer.getListCellRendererComponent(view.list, candidates[1], 1, true, false)
+            assertEquals(Color.MAGENTA, renderer.background)
+            assertEquals(Color.YELLOW, renderer.foreground)
+            view.list.accessibleContext.accessibleSelection
+                .addAccessibleSelection(1)
+            assertEquals(1, listener.hoveredIndex)
+            view.close()
+            assertEquals(0, view.list.model.size)
+        }
+
+    @Test
+    fun `renderer retains matched fragments and bounded preferred width`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            val text = "git status"
+            val candidate =
+                suggestion(text).copy(
+                    matchedRanges = SwingShellSuggestionMatchRanges.fromPackedOffsets(text, intArrayOf(0, 3, 4, 6)),
+                )
+            view.update(snapshot(listOf(candidate), 0, 1, 0))
+            val renderer = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, false, false) as javax.swing.JLabel
+            assertTrue(renderer.text.contains("<b>git</b> <b>st</b>atus"))
+            view.update(snapshot(listOf(suggestion("x".repeat(10000))), 0, 1, 0))
+            assertTrue(view.preferredSize.width in 320..640)
+            view.update(SwingShellSuggestionViewSnapshot.EMPTY)
+            assertEquals(java.awt.Dimension(0, 0), view.preferredSize)
+            view.close()
         }
 
     private fun createView(listener: RecordingListener): SwingCompletionPopupView {
         val parent =
             JPanel(null).apply {
+                setSize(800, 600)
                 font = Font(Font.MONOSPACED, Font.PLAIN, 13)
                 background = Color(0x10, 0x14, 0x18)
                 foreground = Color(0xE5, 0xE7, 0xEB)
