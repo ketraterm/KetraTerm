@@ -29,7 +29,7 @@ import kotlinx.coroutines.swing.Swing
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
 import java.awt.event.FocusListener
-import kotlin.coroutines.EmptyCoroutineContext
+import javax.swing.SwingUtilities
 
 /**
  * Binds host-neutral live-completion behavior to one Swing terminal.
@@ -80,7 +80,7 @@ class SwingLiveCompletionBinding
 
         private val invalidationListener =
             SwingShellSuggestionInvalidationListener {
-                check(!edtDispatcher.isDispatchNeeded(EmptyCoroutineContext)) { "shell suggestion invalidation must run on the EDT" }
+                check(SwingUtilities.isEventDispatchThread()) { "shell suggestion invalidation must run on the EDT" }
                 if (closed) return@SwingShellSuggestionInvalidationListener
                 invalidatedRevision = shellCommandLineRevisions.value
                 cancelAndHideInternal()
@@ -88,7 +88,7 @@ class SwingLiveCompletionBinding
 
         private val eligibilityListener =
             SwingShellSuggestionEligibilityListener { eligible ->
-                check(!edtDispatcher.isDispatchNeeded(EmptyCoroutineContext)) { "shell suggestion eligibility must run on the EDT" }
+                check(SwingUtilities.isEventDispatchThread()) { "shell suggestion eligibility must run on the EDT" }
                 if (closed) return@SwingShellSuggestionEligibilityListener
                 if (eligible && isEligibleOnEdt() && invalidatedRevision == null) {
                     lastRequest = null
@@ -107,7 +107,7 @@ class SwingLiveCompletionBinding
          */
         val suggestionFeedbackHandler =
             SwingShellSuggestionFeedbackHandler { feedback ->
-                check(!edtDispatcher.isDispatchNeeded(EmptyCoroutineContext)) { "shell suggestion feedback must run on the EDT" }
+                check(SwingUtilities.isEventDispatchThread()) { "shell suggestion feedback must run on the EDT" }
                 lastRequest = null
                 feedbackHandler.onSuggestionFeedback(feedback)
             }
@@ -149,7 +149,7 @@ class SwingLiveCompletionBinding
         }
 
         internal fun attach(target: SwingLiveCompletionTarget) {
-            check(!edtDispatcher.isDispatchNeeded(EmptyCoroutineContext)) { "live completion must be attached on the EDT" }
+            check(SwingUtilities.isEventDispatchThread()) { "live completion must be attached on the EDT" }
             check(!closed) { "live completion binding is closed" }
             check(this.target == null) { "live completion binding is already attached" }
             this.target = target
@@ -198,7 +198,7 @@ class SwingLiveCompletionBinding
             }
 
         internal fun refreshNow() {
-            check(!edtDispatcher.isDispatchNeeded(EmptyCoroutineContext)) { "live completion must refresh on the EDT" }
+            check(SwingUtilities.isEventDispatchThread()) { "live completion must refresh on the EDT" }
             if (closed || invalidatedRevision != null || !isEligibleOnEdt()) {
                 cancelAndHideInternal()
                 return
@@ -217,7 +217,7 @@ class SwingLiveCompletionBinding
 
         /** Stops observation, removes focus wiring, and hides suggestions. */
         override fun close() {
-            check(!edtDispatcher.isDispatchNeeded(EmptyCoroutineContext)) { "live completion must be closed on the EDT" }
+            check(SwingUtilities.isEventDispatchThread()) { "live completion must be closed on the EDT" }
             if (closed) return
             closed = true
             observationJob?.cancel()
@@ -230,7 +230,7 @@ class SwingLiveCompletionBinding
         }
 
         private fun onEdt(action: () -> Unit) {
-            if (!edtDispatcher.isDispatchNeeded(EmptyCoroutineContext)) {
+            if (SwingUtilities.isEventDispatchThread()) {
                 action()
             } else {
                 observationScope.launch(edtDispatcher) { action() }

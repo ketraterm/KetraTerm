@@ -17,27 +17,22 @@ package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.suggestion.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.swing.Swing
+import kotlinx.coroutines.test.*
 import java.awt.event.FocusEvent
 import java.awt.event.FocusListener
 import javax.swing.JPanel
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertSame
+import javax.swing.SwingUtilities
+import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingLiveCompletionBindingTest {
     @Test
     fun `shell edit revisions debounce the latest shell snapshot`() =
-        runTest {
+        onEdtTest {
             val revisions = MutableStateFlow(-1L)
             val target = RecordingTarget()
             var active = snapshot("git s")
@@ -58,7 +53,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `feedback invalidates request deduplication before reaching the host`() =
-        runTest {
+        onEdtTest {
             val forwarded = ArrayList<SwingShellSuggestionFeedback>()
             val target = RecordingTarget()
             val binding =
@@ -82,7 +77,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `focus loss hides suggestions and close removes all lifecycle wiring`() =
-        runTest {
+        onEdtTest {
             val revisions = MutableStateFlow(-1L)
             val target = RecordingTarget()
             val binding = binding(backgroundScope, revisions)
@@ -102,7 +97,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `shell edit revisions cannot reopen suggestions until focus returns`() =
-        runTest {
+        onEdtTest {
             val revisions = MutableStateFlow(-1L)
             val target = RecordingTarget()
             val binding = binding(backgroundScope, revisions)
@@ -132,7 +127,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `input invalidation rejects unchanged command snapshots until command changes`() =
-        runTest {
+        onEdtTest {
             val revisions = MutableStateFlow(-1L)
             val target = RecordingTarget()
             var active = snapshot("git s")
@@ -175,7 +170,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `changed shell snapshot hides old popup before debounce fires`() =
-        runTest {
+        onEdtTest {
             val revisions = MutableStateFlow(-1L)
             val target = RecordingTarget()
             var active = snapshot("git s")
@@ -203,7 +198,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `binding rejects duplicate attachment and attachment after close`() =
-        runTest {
+        onEdtTest {
             val binding = binding(backgroundScope)
             binding.attach(RecordingTarget())
 
@@ -214,7 +209,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `failed attachment rolls back target ownership`() =
-        runTest {
+        onEdtTest {
             val binding = binding(backgroundScope)
 
             assertFailsWith<IllegalStateException> { binding.attach(RecordingTarget(failOnAttach = true)) }
@@ -225,7 +220,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `ineligible viewport cancels automatic trigger and live viewport reschedules`() =
-        runTest {
+        onEdtTest {
             val revisions = MutableStateFlow(-1L)
             val target = RecordingTarget()
             val binding = binding(backgroundScope, revisions)
@@ -249,7 +244,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `cheap trigger characters bypass the normal length threshold`() =
-        runTest {
+        onEdtTest {
             val target = RecordingTarget()
             var active = snapshot("-")
             val binding =
@@ -271,7 +266,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `short ordinary text is hidden`() =
-        runTest {
+        onEdtTest {
             val target = RecordingTarget()
             val binding = binding(scope = backgroundScope, activeCommandLine = { snapshot("g") })
             binding.attach(target)
@@ -285,7 +280,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `ranking context change invalidates request deduplication`() =
-        runTest {
+        onEdtTest {
             val target = RecordingTarget()
             val active = snapshot("git s")
             var directory = "file:///one"
@@ -312,7 +307,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `burst edits wait a full debounce interval after the last edit`() =
-        runTest {
+        onEdtTest {
             val revisions = MutableStateFlow(-1L)
             var active = snapshot("gi")
             val target = RecordingTarget()
@@ -335,7 +330,7 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `cancel and close suppress pending debounce without cancelling caller scope`() =
-        runTest {
+        onEdtTest {
             val target = RecordingTarget()
             val binding = binding(backgroundScope)
             binding.attach(target)
@@ -352,13 +347,13 @@ class SwingLiveCompletionBindingTest {
             advanceTimeBy(100.milliseconds)
             runCurrent()
             assertEquals(emptyList(), target.requests)
-            kotlin.test.assertTrue(backgroundScope.coroutineContext[kotlinx.coroutines.Job]!!.isActive)
+            assertTrue(backgroundScope.coroutineContext[Job]!!.isActive)
         }
 
     @Test
     fun `caller scope cancellation stops delayed requests`() =
-        runTest {
-            val owner = kotlinx.coroutines.Job(backgroundScope.coroutineContext[kotlinx.coroutines.Job])
+        onEdtTest {
+            val owner = Job(backgroundScope.coroutineContext[Job])
             val scope = CoroutineScope(backgroundScope.coroutineContext + owner)
             val target = RecordingTarget()
             val binding = binding(scope)
@@ -371,6 +366,75 @@ class SwingLiveCompletionBindingTest {
             assertEquals(emptyList(), target.requests)
             binding.close()
         }
+
+    @Test
+    fun `real Swing dispatcher supports attachment refresh callbacks and disposal`() =
+        runBlocking<Unit> {
+            val owner = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val requested = CompletableDeferred<Unit>()
+            val target = RecordingTarget(onRequest = { requested.complete(Unit) })
+            val revisions = MutableStateFlow(-1L)
+            val binding =
+                SwingLiveCompletionBinding(
+                    activeCommandLine = { snapshot("git s") },
+                    shellCommandLineRevisions = revisions,
+                    suggestionsEnabled = { true },
+                    rankingContextKey = { null },
+                    feedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+                    observationScope = owner,
+                )
+            try {
+                withContext(Dispatchers.Swing) {
+                    binding.attach(target)
+                    target.gainFocus()
+                }
+                revisions.value = 0
+                withTimeout(5000) { requested.await() }
+                withContext(Dispatchers.Swing) {
+                    assertEquals(listOf(snapshot("git s")), target.requests)
+                    val hides = target.hideCount
+                    binding.cancelAndHide()
+                    assertEquals(hides + 1, target.hideCount)
+                    target.invalidateSuggestions()
+                    target.setAutomaticSuggestionEligible(false)
+                    target.setAutomaticSuggestionEligible(true)
+                    binding.suggestionFeedbackHandler.onSuggestionFeedback(feedback())
+                    target.loseFocus()
+                }
+            } finally {
+                withContext(Dispatchers.Swing) { binding.close() }
+                owner.cancel()
+            }
+            assertEquals(1, target.removeFocusListenerCount)
+        }
+
+    @Test
+    fun `production binding rejects attachment and disposal off the EDT`() =
+        runBlocking<Unit> {
+            assertTrue(!SwingUtilities.isEventDispatchThread())
+            val owner = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val binding =
+                SwingLiveCompletionBinding(
+                    activeCommandLine = { snapshot("git s") },
+                    shellCommandLineRevisions = MutableStateFlow(-1L),
+                    suggestionsEnabled = { true },
+                    rankingContextKey = { null },
+                    feedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+                    observationScope = owner,
+                )
+            try {
+                assertFailsWith<IllegalStateException> { binding.attach(RecordingTarget()) }
+                withContext(Dispatchers.Swing) { binding.attach(RecordingTarget()) }
+                assertFailsWith<IllegalStateException> { binding.close() }
+            } finally {
+                withContext(Dispatchers.Swing) { binding.close() }
+                owner.cancel()
+            }
+        }
+
+    private fun onEdtTest(block: suspend TestScope.() -> Unit) {
+        SwingUtilities.invokeAndWait { runTest { block() } }
+    }
 
     private fun binding(
         scope: CoroutineScope,
@@ -386,7 +450,7 @@ class SwingLiveCompletionBindingTest {
             rankingContextKey = { "file:///workspace" },
             feedbackHandler = feedbackHandler,
             observationScope = scope,
-            edtDispatcher = UnconfinedTestDispatcher(scope.coroutineContext[kotlinx.coroutines.test.TestCoroutineScheduler]),
+            edtDispatcher = UnconfinedTestDispatcher(scope.coroutineContext[TestCoroutineScheduler]),
             minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
         )
 
@@ -412,6 +476,7 @@ class SwingLiveCompletionBindingTest {
 
     private class RecordingTarget(
         private val failOnAttach: Boolean = false,
+        private val onRequest: () -> Unit = {},
     ) : SwingLiveCompletionTarget {
         val requests = ArrayList<TerminalShellCommandLineSnapshot>()
         var hideCount = 0
@@ -423,10 +488,13 @@ class SwingLiveCompletionBindingTest {
         private var automaticSuggestionEligible = true
 
         override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) {
+            assertTrue(SwingUtilities.isEventDispatchThread())
             requests += snapshot
+            onRequest()
         }
 
         override fun hideSuggestions() {
+            assertTrue(SwingUtilities.isEventDispatchThread())
             hideCount++
         }
 
