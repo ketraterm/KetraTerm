@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Insets
 import java.awt.event.KeyEvent
+import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -285,8 +286,17 @@ class SwingTerminalShellSuggestionTest {
             assertEquals(5, state.anchorColumn)
             assertEquals(2, state.anchorRow)
 
-            assertEquals(0, state.selectedIndex)
-            assertEquals("git status", state.selectedSuggestion?.replacementText)
+            assertEquals(-1, state.selectedIndex)
+            assertNull(state.selectedSuggestion)
+
+            // First TAB highlights first suggestion
+            component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_TAB)) }
+            component.keyListeners.forEach { listener -> listener.keyReleased(keyReleased(component, KeyEvent.VK_TAB)) }
+            val highlightedState = component.currentShellSuggestionState()
+            assertEquals(0, highlightedState.selectedIndex)
+            assertEquals("git status", highlightedState.selectedSuggestion?.replacementText)
+
+            // Second TAB accepts the highlighted suggestion
             component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_TAB)) }
             component.keyListeners.forEach { listener -> listener.keyReleased(keyReleased(component, KeyEvent.VK_TAB)) }
         }
@@ -303,7 +313,49 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `progressive provider rankings preserve the selected outcome after automatic preselection`() {
+    fun `enter on passive suggestions is not consumed and does not accept`() {
+        val view = RecordingSuggestionView()
+        val accepted = mutableListOf<SwingShellSuggestionAcceptance>()
+        val connector = RecordingConnector()
+        val session = activeSuggestionSession(connector)
+        val component =
+            SwingTerminal(
+                settingsProvider = { SwingSettings(padding = Insets(0, 0, 0, 0)) },
+                hostServices =
+                    SwingHostServices(
+                        shellSuggestionProvider = SwingShellSuggestionProvider { flowOf(suggestions("git s")) },
+                        shellSuggestionHandler = { accepted += it },
+                        shellSuggestionViewFactory = view.factory(),
+                    ),
+            )
+
+        SwingUtilities.invokeAndWait {
+            component.size = component.preferredGridSize(12, 4)
+            component.bind(session)
+            component.requestShellSuggestions(commandText = "git s", cursorOffset = 5, anchorColumn = 5, anchorRow = 0)
+        }
+        view.awaitUpdate()
+
+        val enterEvent = keyPressed(component, KeyEvent.VK_ENTER)
+        SwingUtilities.invokeAndWait {
+            val state = component.currentShellSuggestionState()
+            assertTrue(state.visible)
+            assertEquals(-1, state.selectedIndex)
+            component.keyListeners.forEach { listener -> listener.keyPressed(enterEvent) }
+        }
+
+        assertTrue(enterEvent.isConsumed)
+        assertTrue(accepted.isEmpty())
+        assertTrue(connector.writtenBytes.size() > 0)
+        SwingUtilities.invokeAndWait {
+            assertFalse(component.currentShellSuggestionState().visible)
+            component.dispose()
+        }
+        session.close()
+    }
+
+    @Test
+    fun `progressive provider rankings preserve the selected outcome across reranking updates`() {
         val emissions = Channel<List<SwingShellSuggestion>>(Channel.UNLIMITED)
         val view = RecordingSuggestionView()
         val component =
@@ -332,6 +384,9 @@ class SwingTerminalShellSuggestionTest {
         view.awaitUpdate()
 
         SwingUtilities.invokeAndWait {
+            // First DOWN highlights index 0; second DOWN navigates to index 1
+            component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_DOWN)) }
+            component.keyListeners.forEach { listener -> listener.keyReleased(keyReleased(component, KeyEvent.VK_DOWN)) }
             component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_DOWN)) }
             component.keyListeners.forEach { listener -> listener.keyReleased(keyReleased(component, KeyEvent.VK_DOWN)) }
             assertEquals(initial[1], component.currentShellSuggestionState().selectedSuggestion)
@@ -352,7 +407,7 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `provider empty result hides popup and later results reopen with first selection`() {
+    fun `provider empty result hides popup and later results reopen in passive state`() {
         val emissions = Channel<List<SwingShellSuggestion>>(Channel.UNLIMITED)
         val view = RecordingSuggestionView()
         val component =
@@ -376,7 +431,8 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             val state = component.currentShellSuggestionState()
             assertTrue(state.visible)
-            assertEquals(0, state.selectedIndex)
+            assertEquals(-1, state.selectedIndex)
+            assertNull(state.selectedSuggestion)
         }
 
         assertTrue(emissions.trySend(emptyList()).isSuccess)
@@ -393,8 +449,8 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             val state = component.currentShellSuggestionState()
             assertTrue(state.visible)
-            assertEquals(0, state.selectedIndex)
-            assertEquals(laterSuggestions.first(), state.selectedSuggestion)
+            assertEquals(-1, state.selectedIndex)
+            assertNull(state.selectedSuggestion)
             component.dispose()
         }
         emissions.close()
@@ -431,8 +487,8 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             val state = component.currentShellSuggestionState()
             assertTrue(state.visible)
-            assertEquals(0, state.selectedIndex)
-            assertEquals(suggestions("git s").first(), state.selectedSuggestion)
+            assertEquals(-1, state.selectedIndex)
+            assertNull(state.selectedSuggestion)
         }
 
         assertEquals(
@@ -833,6 +889,7 @@ class SwingTerminalShellSuggestionTest {
 
     private class RecordingConnector : TerminalConnector {
         private var listener: TerminalConnectorListener? = null
+        val writtenBytes = ByteArrayOutputStream()
 
         override fun start(listener: TerminalConnectorListener) {
             this.listener = listener
@@ -842,7 +899,9 @@ class SwingTerminalShellSuggestionTest {
             bytes: ByteArray,
             offset: Int,
             length: Int,
-        ) = Unit
+        ) {
+            writtenBytes.write(bytes, offset, length)
+        }
 
         override fun resize(
             columns: Int,

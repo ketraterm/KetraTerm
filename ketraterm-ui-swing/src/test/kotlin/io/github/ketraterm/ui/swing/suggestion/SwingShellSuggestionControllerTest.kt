@@ -350,6 +350,25 @@ class SwingShellSuggestionControllerTest {
     }
 
     @Test
+    fun `tab on unique suggestion accepts immediately when passive`() {
+        val host = RecordingSuggestionHost()
+        val controller = SwingShellSuggestionController(host)
+        val request = request(commandText = "cd ", cursorOffset = 3)
+        val items = suggestions(1, endOffset = request.commandText.length)
+        controller.show(request, items, selectedIndex = -1)
+
+        val tab = keyPressed(KeyEvent.VK_TAB)
+        assertTrue(controller.handleKeyPressed(tab))
+
+        assertFalse(controller.state().visible)
+        assertEquals(listOf(0), host.acceptedIndexes)
+        assertEquals(listOf(items[0]), host.acceptedSuggestions)
+        assertEquals(listOf(request), host.acceptedRequests)
+        assertEquals(listOf(SwingShellSuggestionFeedbackKind.ACCEPTED), host.feedbackKinds)
+        assertTrue(tab.isConsumed)
+    }
+
+    @Test
     fun `escape hides popup records dismissal without accepting`() {
         val host = RecordingSuggestionHost()
         val controller = SwingShellSuggestionController(host)

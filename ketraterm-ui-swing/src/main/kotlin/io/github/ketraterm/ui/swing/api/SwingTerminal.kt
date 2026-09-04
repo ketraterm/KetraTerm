@@ -1536,11 +1536,10 @@ class SwingTerminal
                         }.flowOn(Dispatchers.Default)
                             .conflate()
                             .collect { suggestions ->
-                                ensureActive()
+                                this@launch.ensureActive()
                                 shellSuggestionController.showPreservingSelectedOutcome(
                                     request,
                                     suggestions,
-                                    fallbackSelectedIndex = 0,
                                 )
                             }
                     } catch (cancellation: CancellationException) {

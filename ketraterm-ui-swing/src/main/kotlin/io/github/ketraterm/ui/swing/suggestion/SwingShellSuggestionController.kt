@@ -56,7 +56,7 @@ internal class SwingShellSuggestionController(
     fun showPreservingSelectedOutcome(
         request: SwingShellSuggestionRequest,
         suggestions: List<SwingShellSuggestion>,
-        fallbackSelectedIndex: Int,
+        fallbackSelectedIndex: Int = NO_SELECTION,
     ): Boolean = showInternal(request, suggestions, fallbackSelectedIndex, preserveSelectedOutcome = true)
 
     private fun showInternal(
@@ -187,6 +187,9 @@ internal class SwingShellSuggestionController(
 
     private fun selectFirstOrAccept(): Boolean =
         if (selectedIndex in suggestions.indices) {
+            acceptSelected()
+        } else if (suggestions.size == 1) {
+            select(0)
             acceptSelected()
         } else {
             select(0)
