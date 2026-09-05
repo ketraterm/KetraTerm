@@ -959,25 +959,30 @@ class SwingTerminal
             val availableWidth = width - paddingLeft - paddingRight
             val popupWidth = minOf(availableWidth, preferred.width).coerceAtLeast(0)
             val paddingBottom = SwingTerminalChrome.bottom(settings, activeBuffer)
-            val popupHeight = minOf(height - paddingTop - paddingBottom, preferred.height).coerceAtLeast(0)
-            if (popupWidth == 0 || popupHeight == 0) {
+            val availableHeight = (height - paddingTop - paddingBottom).coerceAtLeast(0)
+            if (popupWidth == 0 || availableHeight == 0 || preferred.height <= 0) {
                 popup.setBounds(0, 0, 0, 0)
                 return
             }
 
             val contentOriginY = if (visualGeometry.rowCount == renderCache.rows) visualGeometry.contentOriginY else 0.0
             val anchorX = paddingLeft + state.anchorColumn * metrics.cellWidth
-            val belowY = paddingTop + contentOriginY + (state.anchorRow + 1) * metrics.cellHeight
-            val aboveY = paddingTop + contentOriginY + state.anchorRow * metrics.cellHeight - popupHeight
             val bottomLimit = height - paddingBottom
-            val popupY =
-                if (belowY + popupHeight <= bottomLimit || aboveY < paddingTop) {
-                    floor(belowY).toInt()
-                } else {
-                    floor(aboveY).toInt()
-                }
+            val anchorTop =
+                floor(paddingTop + contentOriginY + state.anchorRow * metrics.cellHeight)
+                    .toInt()
+                    .coerceIn(paddingTop, bottomLimit)
+            val anchorBottom =
+                ceil(paddingTop + contentOriginY + (state.anchorRow + 1) * metrics.cellHeight)
+                    .toInt()
+                    .coerceIn(paddingTop, bottomLimit)
+            val spaceAbove = anchorTop - paddingTop
+            val spaceBelow = bottomLimit - anchorBottom
+            val placeBelow = preferred.height <= spaceBelow || spaceBelow >= spaceAbove
+            val popupHeight = minOf(preferred.height, if (placeBelow) spaceBelow else spaceAbove)
+            val popupY = if (placeBelow) anchorBottom else anchorTop - popupHeight
             val popupX = anchorX.coerceIn(paddingLeft, maxOf(paddingLeft, width - paddingRight - popupWidth))
-            popup.setBounds(popupX, popupY.coerceAtLeast(paddingTop), popupWidth, popupHeight)
+            popup.setBounds(popupX, popupY, popupWidth, popupHeight)
         }
 
         override fun paintComponent(graphics: Graphics) {

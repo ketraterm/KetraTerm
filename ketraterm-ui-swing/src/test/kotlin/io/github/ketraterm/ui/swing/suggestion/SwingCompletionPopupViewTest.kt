@@ -149,8 +149,8 @@ class SwingCompletionPopupViewTest {
 
             val tooltip = view.list.getToolTipText(event)
             assertNotNull(tooltip)
-            assertTrue(tooltip!!.contains("git checkout feature/terminal"))
-            assertTrue(tooltip.contains("Switch branch"))
+            assertTrue(tooltip!!.contains("git&nbsp;checkout&nbsp;feature/terminal"))
+            assertTrue(tooltip.contains("Switch&nbsp;branch"))
             assertTrue(tooltip.contains("Git"))
         }
 
@@ -229,12 +229,36 @@ class SwingCompletionPopupViewTest {
                 )
             view.update(snapshot(listOf(candidate), 0, 1, 0))
             val renderer = view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, false, false) as javax.swing.JLabel
-            assertTrue(renderer.text.contains("<b>git</b> <b>st</b>atus"))
+            assertTrue(renderer.text.contains("<b>git</b>&nbsp;<b>st</b>atus"))
             view.update(snapshot(listOf(suggestion("x".repeat(10000))), 0, 1, 0))
             assertTrue(view.preferredSize.width in 320..640)
             view.update(SwingShellSuggestionViewSnapshot.EMPTY)
             assertEquals(java.awt.Dimension(0, 0), view.preferredSize)
             view.close()
+        }
+
+    @Test
+    fun `renderer and tooltip preserve leading repeated and trailing spaces`() =
+        onEdt {
+            val view = createView(RecordingListener())
+            try {
+                fun label(text: String): javax.swing.JLabel =
+                    view.list.cellRenderer.getListCellRendererComponent(
+                        view.list,
+                        suggestion(text),
+                        0,
+                        false,
+                        false,
+                    ) as javax.swing.JLabel
+                val singleSpaceWidth = label("folder name").preferredSize.width
+                assertTrue(label("folder  name").preferredSize.width > singleSpaceWidth)
+                val renderer = label(" folder  name ")
+                assertTrue(renderer.text.contains("&nbsp;folder&nbsp;&nbsp;name&nbsp;"))
+                assertTrue(renderer.toolTipText.contains("&nbsp;folder&nbsp;&nbsp;name&nbsp;"))
+                assertEquals(" folder  name ", renderer.accessibleContext.accessibleName)
+            } finally {
+                view.close()
+            }
         }
 
     private fun createView(listener: RecordingListener): SwingCompletionPopupView {

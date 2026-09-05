@@ -44,6 +44,41 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class SwingTerminalShellSuggestionTest {
     @Test
+    fun `suggestion popup fits around the prompt in short terminals`() {
+        SwingUtilities.invokeAndWait {
+            val view =
+                object : SwingShellSuggestionView {
+                    override val component = JPanel().apply { preferredSize = java.awt.Dimension(320, 200) }
+
+                    override fun update(snapshot: SwingShellSuggestionViewSnapshot) = Unit
+                }
+            val terminal =
+                SwingTerminal(
+                    settingsProvider = { SwingSettings(padding = Insets(5, 4, 7, 6)) },
+                    hostServices = SwingHostServices(shellSuggestionViewFactory = SwingShellSuggestionViewFactory { view }),
+                )
+            try {
+                for (height in listOf(12, 100, 200, 500)) {
+                    terminal.setSize(250, height)
+                    for (row in listOf(0, 2, 4, 8)) {
+                        terminal.showShellSuggestions(request(anchorColumn = 0, anchorRow = row), suggestions(), 0)
+                        terminal.doLayout()
+                        val bounds = view.component.bounds
+                        assertTrue(bounds.x >= 0 && bounds.y >= 0, "Popup starts outside terminal: $bounds")
+                        assertTrue(bounds.x + bounds.width <= terminal.width, "Popup exceeds terminal width: $bounds")
+                        assertTrue(bounds.y + bounds.height <= height, "Popup exceeds terminal height: $bounds")
+                        if (bounds.height > 0) {
+                            assertTrue(bounds.y >= 5 && bounds.y + bounds.height <= height - 7)
+                        }
+                    }
+                }
+            } finally {
+                terminal.dispose()
+            }
+        }
+    }
+
+    @Test
     fun `new suggestion request cancels the previous provider call`() {
         val firstStarted = CompletableDeferred<Unit>()
         val firstCancelled = CompletableDeferred<Unit>()
