@@ -36,7 +36,7 @@ dependencies {
     implementation(project(":ketraterm-workspace"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
 
-    runtimeOnly("org.slf4j:slf4j-nop:2.0.18")
+    runtimeOnly("org.slf4j:slf4j-nop:2.0.19")
 
     testImplementation(kotlin("test"))
 }
