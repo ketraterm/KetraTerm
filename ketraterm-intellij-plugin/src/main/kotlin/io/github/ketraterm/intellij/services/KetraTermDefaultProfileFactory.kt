@@ -30,31 +30,36 @@ internal object KetraTermDefaultProfileFactory {
     /**
      * Creates the default profile for [project].
      *
-     * The shell command comes from the host-neutral profile registry. The
-     * IntelliJ-specific contribution is only the initial working directory.
+     * The host-neutral profile registry resolves the shell command. IntelliJ
+     * supplies the launch directory, tab name, and configured environment.
      *
      * @param project current IntelliJ project.
+     * @param settings normalized IntelliJ terminal settings.
+     * @param workingDirectory explicit launch directory, overriding the configured start directory when supplied.
      * @return local terminal launch profile.
      */
     fun defaultProfile(
         project: Project,
         settings: KetraTermIntellijSettings.State = KetraTermIntellijSettings.getInstance().state,
-    ): TerminalProfile = defaultProfile(project.guessProjectDir()?.path ?: project.basePath, settings)
+        workingDirectory: Path? = null,
+    ): TerminalProfile = defaultProfile(project.guessProjectDir()?.path ?: project.basePath, settings, workingDirectory)
 
     /**
      * Creates a default profile for a nullable project path.
      *
      * @param basePath project base path, or `null` when the IDE has no local project path.
      * @param settings normalized IntelliJ terminal settings.
+     * @param workingDirectory explicit launch directory, overriding the configured start directory when supplied.
      * @return local terminal launch profile.
      */
     fun defaultProfile(
         basePath: String?,
         settings: KetraTermIntellijSettings.State = KetraTermIntellijSettings.State(),
+        workingDirectory: Path? = null,
     ): TerminalProfile {
-        val workingDirectory = workingDirectory(basePath, settings.startDirectory)
+        val launchDirectory = workingDirectory ?: workingDirectory(basePath, settings.startDirectory)
         return TerminalProfileRegistry()
-            .configuredProfile(settings.shellPath, workingDirectory)
+            .configuredProfile(settings.shellPath, launchDirectory)
             .copy(
                 displayName = settings.defaultTabName,
                 environment = KetraTermIntellijSettingsNormalizer.parseEnvironmentVariables(settings.environmentVariables),

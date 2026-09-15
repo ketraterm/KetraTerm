@@ -106,6 +106,18 @@ dependencies {
         bundledModule("intellij.gradle")
         bundledModule("intellij.gradle.settings")
         testFramework(TestFrameworkType.Platform)
+        // IntelliJ 2026.2 splits Gradle/Java's required modules across these owning plugins.
+        // Load them in fixtures so the platform does not silently exclude KetraTerm's registrations.
+        testBundledPlugins(
+            "com.intellij.java",
+            "com.intellij.properties",
+            "intellij.java.aetherDependencyResolver.plugin",
+            "intellij.libraries.misc.plugin",
+            "intellij.structuralSearch.plugin",
+            "intellij.structureView.plugin",
+            "intellij.testRunner.plugin",
+            "intellij.todo.plugin",
+        )
 
         // Add plugin dependencies for compilation here, for example:
         // bundledPlugin("com.intellij.java")

@@ -17,8 +17,11 @@ package io.github.ketraterm.intellij.ui
 
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.ProjectManager
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.wm.ToolWindowManager
 import io.github.ketraterm.intellij.services.KetraTermProjectTerminalService
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import java.awt.KeyboardFocusManager
@@ -150,17 +153,59 @@ internal class KetraTermCloseTabAction : KetraTermPaneLifecycleAction() {
 }
 
 /**
- * Opens a new KetraTerm tab in the focused terminal's local directory.
+ * Opens a tab in the selected local directory, a selected file's parent, or the focused terminal's directory.
  */
-internal class KetraTermOpenTerminalHereAction : KetraTermPaneLifecycleAction() {
-    override fun isEnabled(pane: KetraTermTerminalPane): Boolean = pane.canOpenTerminalHere()
+internal class KetraTermOpenTerminalHereAction : DumbAwareAction() {
+    override fun actionPerformed(event: AnActionEvent) {
+        val file = event.getData(CommonDataKeys.VIRTUAL_FILE)
+        if (usesTerminalPane(event, file)) {
+            val pane = terminalPane(event) ?: return
+            if (pane.canOpenTerminalHere()) pane.openTerminalHere()
+            return
+        }
 
-    override fun actionPerformed(
-        pane: KetraTermTerminalPane,
-        event: AnActionEvent,
-    ) {
-        pane.openTerminalHere()
+        val project = event.project ?: return
+        if (project.isDisposed || project.isDefault) return
+        val directory = terminalContextDirectory(file) ?: return
+        val workingDirectory = directory.fileSystem.getNioPath(directory) ?: return
+        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("KetraTerm") ?: return
+        KetraTermProjectTerminalService.getInstance(project).openDefaultTab(toolWindow, workingDirectory)
+        toolWindow.activate(null)
     }
+
+    override fun update(event: AnActionEvent) {
+        val file = event.getData(CommonDataKeys.VIRTUAL_FILE)
+        if (usesTerminalPane(event, file)) {
+            val enabled =
+                event.updateSession.compute(this, "terminalDirectory", ActionUpdateThread.EDT) {
+                    terminalPane(event)?.canOpenTerminalHere() == true
+                }
+            event.presentation.isEnabled = enabled
+            event.presentation.isVisible = event.isTerminalContextMenu() || enabled
+            return
+        }
+
+        val project = event.project
+        event.presentation.isEnabledAndVisible =
+            project != null &&
+            !project.isDisposed &&
+            !project.isDefault &&
+            terminalContextDirectory(file) != null
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+
+    private fun usesTerminalPane(
+        event: AnActionEvent,
+        file: VirtualFile?,
+    ): Boolean = event.isTerminalContextMenu() || (file == null && !event.isFromContextMenu)
+}
+
+/** Resolves a local launch directory without filesystem I/O or constructing a path during action updates. */
+internal fun terminalContextDirectory(file: VirtualFile?): VirtualFile? {
+    if (file == null || !file.isValid || !file.isInLocalFileSystem) return null
+    val directory = if (file.isDirectory) file else file.parent ?: return null
+    return directory.takeIf { it.isValid && it.isDirectory && it.isInLocalFileSystem }
 }
 
 internal abstract class KetraTermPaneLifecycleAction : DumbAwareAction() {
@@ -189,12 +234,13 @@ private fun terminalPane(event: AnActionEvent): KetraTermTerminalPane? {
     if (event.isTerminalContextMenu()) {
         KetraTermTerminalPopupContext.currentPane()?.let { return it }
     }
-    val focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner
+    val focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner ?: return null
     event.project
-        ?.let { KetraTermProjectTerminalService.getInstance(it).paneForComponent(focusOwner) }
+        ?.getServiceIfCreated(KetraTermProjectTerminalService::class.java)
+        ?.paneForComponent(focusOwner)
         ?.let { return it }
     for (project in ProjectManager.getInstance().openProjects) {
-        KetraTermProjectTerminalService.getInstance(project).paneForComponent(focusOwner)?.let { return it }
+        project.getServiceIfCreated(KetraTermProjectTerminalService::class.java)?.paneForComponent(focusOwner)?.let { return it }
     }
     return null
 }

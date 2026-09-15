@@ -115,9 +115,11 @@
 
         <action id="KetraTerm.Terminal.OpenTerminalHere"
                 class="io.github.ketraterm.intellij.ui.KetraTermOpenTerminalHereAction"
-                text="Open Terminal Here"
-                description="Open a KetraTerm terminal tab in the focused terminal directory"
-        />
+                text="Open in KetraTerm"
+                description="Open a KetraTerm terminal tab in this directory">
+            <override-text place="KetraTerm.TerminalContextMenu" text="Open Terminal Here"/>
+            <add-to-group group-id="RevealGroup"/>
+        </action>
 
         <action id="KetraTerm.Terminal.ScrollPageUp"
                 class="io.github.ketraterm.intellij.ui.KetraTermScrollPageUpAction"
