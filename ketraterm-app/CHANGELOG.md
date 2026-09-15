@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Fixed cursor and scroll-position jumps when resizing terminals with a full history.
+- Fixed terminal links opening the wrong destination after a reset.
 - Fixed missing spaces and line breaks when copying or exporting terminal text, including after resizing.
 - Improved compatibility with custom shell startup files and commands.
 - Improved link underlines and kept hover highlights consistent across wrapped lines and output updates.

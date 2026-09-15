@@ -240,6 +240,10 @@ Not guaranteed:
 
 - primary logical-line reconstruction and rewrap
 - cursor relocation into the reflowed primary content
+- newest-row retention within the configured history capacity, with cursor and
+  viewport positions adjusted for rows evicted during reflow
+- scrolled viewport anchors preserved while retained, or clamped to the oldest
+  surviving row when evicted
 - deep-copy of surviving clusters into a fresh primary store
 - alternate-screen wipe and recreation at the new dimensions
 - scroll margins reset/clamped to the new viewport

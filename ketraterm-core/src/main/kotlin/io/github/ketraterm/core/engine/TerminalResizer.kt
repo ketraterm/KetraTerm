@@ -117,12 +117,14 @@ internal object TerminalResizer {
         val absoluteOldViewportTopRow =
             oldLiveScreenTop - oldScrollbackOffset
 
-        var newAbsoluteCursorRow = 0
+        // Record emitted-row positions, including the discarded prefix. Ring indices
+        // would become stale when later output evicts earlier rows during reflow.
+        var newAbsoluteCursorRow = 0L
         var newCursorCol = 0
         var cursorPlaced = false
 
         /*
-         * Target live-screen top in the newly reflowed ring.
+         * Target live-screen top in emitted-row coordinates.
          *
          * For a hard boundary, this is the first row emitted after the old
          * history section.
@@ -130,7 +132,7 @@ internal object TerminalResizer {
          * For a boundary inside a wrapped line, this becomes the first row
          * emitted for that entire reconstructed logical line.
          */
-        var targetNewLiveScreenTop = -1
+        var targetNewLiveScreenTop = -1L
 
         /*
          * True while the current builder contains the old history/live-screen
@@ -141,13 +143,13 @@ internal object TerminalResizer {
          */
         var builderContainsOldLiveScreenTop = false
 
-        var newViewportTopRow = -1
+        var newViewportTopRow = -1L
         var viewportTopPlaced = false
 
         fun placeCursorAtEmptyLogicalLine() {
             if (builder.cursorAbsoluteIndex == -1) return
 
-            newAbsoluteCursorRow = newRing.size - 1
+            newAbsoluteCursorRow = newRing.discardedCount + newRing.size - 1
             newCursorCol = 0
             cursorPlaced = true
         }
@@ -155,7 +157,7 @@ internal object TerminalResizer {
         fun placeViewportAtEmptyLogicalLine() {
             if (builder.viewportTopAbsoluteIndex == -1) return
 
-            newViewportTopRow = newRing.size - 1
+            newViewportTopRow = newRing.discardedCount + newRing.size - 1
             viewportTopPlaced = true
         }
 
@@ -167,7 +169,7 @@ internal object TerminalResizer {
              * This is the beginning of the fully reconstructed logical line,
              * including any wrapped fragments that previously lived in history.
              */
-            targetNewLiveScreenTop = newRing.size
+            targetNewLiveScreenTop = newRing.discardedCount + newRing.size
         }
 
         fun flushBuilder() {
@@ -250,13 +252,13 @@ internal object TerminalResizer {
                     }
 
                     if (srcIndex == builder.cursorAbsoluteIndex) {
-                        newAbsoluteCursorRow = newRing.size - 1
+                        newAbsoluteCursorRow = newRing.discardedCount + newRing.size - 1
                         newCursorCol = i
                         cursorPlaced = true
                     }
 
                     if (srcIndex == builder.viewportTopAbsoluteIndex) {
-                        newViewportTopRow = newRing.size - 1
+                        newViewportTopRow = newRing.discardedCount + newRing.size - 1
                         viewportTopPlaced = true
                     }
                 }
@@ -314,7 +316,7 @@ internal object TerminalResizer {
                     }
 
                     if (targetNewLiveScreenTop < 0) {
-                        targetNewLiveScreenTop = newRing.size
+                        targetNewLiveScreenTop = newRing.discardedCount + newRing.size
                     }
                 }
             }
@@ -425,7 +427,7 @@ internal object TerminalResizer {
          */
         if (targetNewLiveScreenTop < 0) {
             targetNewLiveScreenTop =
-                (newRing.size - newHeight).coerceAtLeast(0)
+                newRing.discardedCount + (newRing.size - newHeight).coerceAtLeast(0)
         }
 
         /*
@@ -445,10 +447,11 @@ internal object TerminalResizer {
          */
         val minimumRingSize =
             if (shouldPreserveLiveScreenTop) {
-                minOf(
-                    targetNewLiveScreenTop,
-                    buffer.maxHistory,
-                ) + newHeight
+                (targetNewLiveScreenTop - newRing.discardedCount)
+                    .coerceIn(
+                        0L,
+                        buffer.maxHistory.toLong(),
+                    ).toInt() + newHeight
             } else {
                 newHeight
             }
@@ -462,8 +465,8 @@ internal object TerminalResizer {
         /*
          * The actual live screen is always the final newHeight rows.
          *
-         * Padding above makes this equal targetNewLiveScreenTop when top
-         * preservation is requested.
+         * Padding above preserves the target top when it is still retained
+         * and the following content fits in the new viewport.
          */
         val liveScreenTop =
             (newRing.size - newHeight).coerceAtLeast(0)
@@ -476,6 +479,7 @@ internal object TerminalResizer {
                 )
 
             newAbsoluteCursorRow =
+                newRing.discardedCount +
                 (liveScreenTop + buffer.cursor.row).coerceIn(
                     liveScreenTop,
                     newRing.size - 1,
@@ -483,10 +487,11 @@ internal object TerminalResizer {
         }
 
         val newRelativeCursorRow =
-            (newAbsoluteCursorRow - liveScreenTop).coerceIn(
-                0,
-                newHeight - 1,
-            )
+            (newAbsoluteCursorRow - newRing.discardedCount - liveScreenTop)
+                .coerceIn(
+                    0L,
+                    (newHeight - 1).toLong(),
+                ).toInt()
 
         buffer.store = newStore
         buffer.ring = newRing
@@ -495,10 +500,11 @@ internal object TerminalResizer {
 
         return when {
             oldScrollbackOffset > 0 && viewportTopPlaced -> {
-                (liveScreenTop - newViewportTopRow).coerceIn(
-                    0,
-                    liveScreenTop,
-                )
+                (newRing.discardedCount + liveScreenTop - newViewportTopRow)
+                    .coerceIn(
+                        0L,
+                        liveScreenTop.toLong(),
+                    ).toInt()
             }
 
             oldScrollbackOffset > 0 -> {
