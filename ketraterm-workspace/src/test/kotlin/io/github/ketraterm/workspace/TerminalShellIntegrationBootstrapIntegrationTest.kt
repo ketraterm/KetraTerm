@@ -32,6 +32,224 @@ import kotlin.test.assertTrue
 
 class TerminalShellIntegrationBootstrapIntegrationTest {
     @Test
+    fun `Bash startup applies project toolchain after bashrc replaces environment and prompt hook`(
+        @TempDir tempDir: Path,
+    ) {
+        val bash = installedExecutable("bash", "bash.exe")
+        assumeTrue(bash != null, "bash is not installed")
+        val home = Files.createDirectory(tempDir.resolve("user home"))
+        val jdk = Files.createDirectory(tempDir.resolve("project JDK ${'$'}literal 'quote"))
+        val bin = Files.createDirectory(jdk.resolve("bin"))
+        Files.writeString(
+            home.resolve(".bashrc"),
+            """
+            export JAVA_HOME=rc-jdk
+            export PATH=/usr/bin:/bin
+            PROMPT_COMMAND=': user-prompt-hook'
+            export USER_RC_RAN=yes
+            """.trimIndent(),
+        )
+        Files.writeString(bin.resolve("java"), "#!/bin/sh\nprintf 'PROJECT_JAVA\\n'\n")
+        assertTrue(bin.resolve("java").toFile().setExecutable(true))
+        val profile =
+            TerminalProfile(
+                id = "bash",
+                displayName = "Bash",
+                command = listOf(bash!!, "-i"),
+                environment = mapOf("HOME" to home.toString(), "JAVA_HOME" to "explicit-jdk", "TERM" to "xterm-256color"),
+                shellEnvironment = TerminalShellEnvironment(mapOf("JAVA_HOME" to jdk.toString()), bin.toString()),
+            )
+        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir.resolve("bootstrap"))
+        val result =
+            runProcess(
+                launch.command,
+                environment = launch.environment,
+                standardInput =
+                    """
+                    printf 'HOME_RESULT=%s\nRC_RESULT=%s\n' "${'$'}JAVA_HOME" "${'$'}USER_RC_RAN"
+                    [[ "${'$'}{PATH%%:*}/java" -ef "${'$'}JAVA_HOME/bin/java" ]] && printf 'PROJECT_BIN_FIRST=yes\n'
+                    java
+                    export -p | command grep _KetraTerm_FORCE_ || :
+                    exit
+                    """.trimIndent() + "\n",
+            )
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("HOME_RESULT=$jdk"), visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("RC_RESULT=yes"), visibleEscapes(result.stdout))
+        assertTrue(result.stdout.lineSequence().any { it.trimEnd('\r') == "PROJECT_BIN_FIRST=yes" }, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("PROJECT_JAVA"), visibleEscapes(result.stdout))
+        assertTrue(!result.stdout.contains("declare -x _KetraTerm_FORCE_"), visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("\u001B]133;A\u0007"), visibleEscapes(result.stdout))
+    }
+
+    @Test
+    fun `Bash login startup sources first login file and reapplies environment once`(
+        @TempDir tempDir: Path,
+    ) {
+        val bash = installedExecutable("bash", "bash.exe")
+        assumeTrue(bash != null, "bash is not installed")
+        val home = Files.createDirectory(tempDir.resolve("login home"))
+        Files.writeString(
+            home.resolve(".bash_profile"),
+            """
+            export JAVA_HOME=login-jdk
+            export PATH=/usr/bin:/bin
+            export LOGIN_FILE=profile
+            """.trimIndent(),
+        )
+        Files.writeString(home.resolve(".bash_login"), "export LOGIN_FILE=wrong\n")
+        val profile =
+            TerminalProfile(
+                id = "bash",
+                displayName = "Bash",
+                command = listOf(bash!!, "--login", "-i"),
+                environment = mapOf("HOME" to home.toString(), "TERM" to "xterm-256color"),
+                shellEnvironment = TerminalShellEnvironment(mapOf("JAVA_HOME" to "project-jdk"), "/project/bin"),
+            )
+        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir.resolve("bootstrap"))
+        val result =
+            runProcess(
+                launch.command,
+                environment = launch.environment,
+                standardInput =
+                    """
+                    printf 'LOGIN_RESULT=%s:%s:%s\n' "${'$'}JAVA_HOME" "${'$'}LOGIN_FILE" "${'$'}PATH"
+                    export JAVA_HOME=user-change
+                    printf 'USER_RESULT=%s\n' "${'$'}JAVA_HOME"
+                    exit
+                    """.trimIndent() + "\n",
+            )
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("LOGIN_RESULT=project-jdk:profile:/project/bin:/usr/bin:/bin"), visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("USER_RESULT=user-change"), visibleEscapes(result.stdout))
+    }
+
+    @Test
+    fun `PowerShell startup reapplies toolchain after profile code and clears launch markers`(
+        @TempDir tempDir: Path,
+    ) {
+        val powerShell = installedExecutable("pwsh", "pwsh.exe", "powershell.exe")
+        assumeTrue(powerShell != null, "PowerShell is not installed")
+        val javaHome = "project JDK ${'$'}literal 'quoted'"
+        val bin = tempDir.resolve("project JDK ${'$'}literal 'quoted'/bin").toString()
+        val profile =
+            TerminalProfile(
+                id = "powershell",
+                displayName = "PowerShell",
+                command = listOf(powerShell!!),
+                shellEnvironment = TerminalShellEnvironment(mapOf("JAVA_HOME" to javaHome), bin),
+            )
+        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir.resolve("bootstrap"))
+        val bootstrap = String(Base64.getDecoder().decode(launch.command.last()), Charsets.UTF_16LE)
+        val startupFile = tempDir.resolve("profile.ps1")
+        Files.writeString(startupFile, "${'$'}env:JAVA_HOME = 'profile-jdk'\n${'$'}env:PATH = 'profile-bin'\n")
+        val startup =
+            """
+            . '${startupFile.toString().replace("'", "''")}'
+            $bootstrap
+            [Console]::WriteLine('HOME_RESULT=' + ${'$'}env:JAVA_HOME)
+            [Console]::WriteLine('PATH_RESULT=' + ${'$'}env:PATH)
+            [Console]::WriteLine('MARKERS=' + @(Get-ChildItem Env: | Where-Object Name -Like '_KetraTerm_FORCE_*').Count)
+            ${'$'}env:JAVA_HOME = 'user-change'
+            prompt | Out-Null
+            [Console]::WriteLine('USER_RESULT=' + ${'$'}env:JAVA_HOME)
+            """.trimIndent()
+        val encoded = Base64.getEncoder().encodeToString(startup.toByteArray(Charsets.UTF_16LE))
+        val result = runProcess(listOf(powerShell, "-NoProfile", "-EncodedCommand", encoded), environment = launch.environment)
+
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("HOME_RESULT=$javaHome"), visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("PATH_RESULT=$bin${java.io.File.pathSeparator}profile-bin"), visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("MARKERS=0"), visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("USER_RESULT=user-change"), visibleEscapes(result.stdout))
+    }
+
+    @Test
+    fun `zsh startup reapplies toolchain after login file and follows user ZDOTDIR changes`(
+        @TempDir tempDir: Path,
+    ) {
+        val zsh = installedExecutable("zsh", "zsh.exe")
+        assumeTrue(zsh != null, "zsh is not installed")
+        val original = Files.createDirectory(tempDir.resolve("original"))
+        val relocated = Files.createDirectory(tempDir.resolve("relocated"))
+        Files.writeString(original.resolve(".zshenv"), "export ZDOTDIR=${shellSingleQuote(relocated.toString())}\n")
+        Files.writeString(relocated.resolve(".zshrc"), "export JAVA_HOME=rc-jdk\n")
+        Files.writeString(
+            relocated.resolve(".zlogin"),
+            """
+            export JAVA_HOME=login-jdk
+            export PATH=/usr/bin:/bin
+            export LOGIN_FILE=relocated
+            """.trimIndent(),
+        )
+        val profile =
+            TerminalProfile(
+                id = "zsh",
+                displayName = "Zsh",
+                command = listOf(zsh!!, "-l", "-i"),
+                environment = mapOf("ZDOTDIR" to original.toString(), "TERM" to "xterm-256color"),
+                shellEnvironment = TerminalShellEnvironment(mapOf("JAVA_HOME" to "project-jdk"), "/project/bin"),
+            )
+        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir.resolve("bootstrap"))
+        val assertions =
+            """
+            printf 'LOGIN_RESULT=%s:%s:%s\n' "${'$'}JAVA_HOME" "${'$'}LOGIN_FILE" "${'$'}PATH"
+            print -l -- ${'$'}{parameters[(I)_KetraTerm_FORCE_*]}
+            exit 0
+            """.trimIndent()
+        val result =
+            runProcess(
+                launch.command + listOf("-c", assertions),
+                environment = launch.environment,
+            )
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("LOGIN_RESULT=project-jdk:relocated:/project/bin:/usr/bin:/bin"), visibleEscapes(result.stdout))
+        assertTrue(!result.stdout.lineSequence().any { it.startsWith("_KetraTerm_FORCE_SET_") }, visibleEscapes(result.stdout))
+    }
+
+    @Test
+    fun `fish startup reapplies toolchain after user config and consumes markers`(
+        @TempDir tempDir: Path,
+    ) {
+        val fish = installedExecutable("fish", "fish.exe")
+        assumeTrue(fish != null, "fish is not installed")
+        val config = Files.createDirectories(tempDir.resolve("config/fish"))
+        Files.writeString(
+            config.resolve("config.fish"),
+            """
+            set -gx JAVA_HOME config-jdk
+            set -gx PATH /usr/bin /bin
+            set -gx USER_CONFIG_RAN yes
+            """.trimIndent(),
+        )
+        val profile =
+            TerminalProfile(
+                id = "fish",
+                displayName = "Fish",
+                command = listOf(fish!!, "-i"),
+                environment = mapOf("XDG_CONFIG_HOME" to config.parent.toString(), "TERM" to "xterm-256color"),
+                shellEnvironment = TerminalShellEnvironment(mapOf("JAVA_HOME" to "project-jdk"), "/project/bin"),
+            )
+        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir.resolve("bootstrap"))
+        val assertions =
+            """
+            printf 'RESULT=%s:%s:%s\n' "${'$'}JAVA_HOME" "${'$'}USER_CONFIG_RAN" "${'$'}PATH[1]"
+            set --names | string match '_KetraTerm_FORCE_*'
+            exit 0
+            """.trimIndent()
+        val result =
+            runProcess(
+                launch.command + listOf("-c", assertions),
+                environment = launch.environment,
+            )
+        assertEquals(0, result.exitCode, visibleEscapes(result.stdout))
+        assertTrue(result.stdout.contains("RESULT=project-jdk:yes:/project/bin"), visibleEscapes(result.stdout))
+        assertTrue(!result.stdout.lineSequence().any { it.startsWith("_KetraTerm_FORCE_SET_") }, visibleEscapes(result.stdout))
+    }
+
+    @Test
     fun `generated PowerShell bootstrap emits encoded current directory before prompt when PowerShell is installed`(
         @TempDir tempDir: Path,
     ) {
@@ -293,6 +511,10 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
             val output = locate(command) ?: continue
             val firstLine = output.lineSequence().firstOrNull { isUsableShellPath(it) } ?: continue
             return firstLine.trim()
+        }
+        if (isWindows() && names.any { it == "bash" || it == "bash.exe" }) {
+            val gitBash = Path.of(System.getenv("ProgramFiles") ?: "C:\\Program Files", "Git", "bin", "bash.exe")
+            if (Files.isRegularFile(gitBash)) return gitBash.toString()
         }
         return null
     }

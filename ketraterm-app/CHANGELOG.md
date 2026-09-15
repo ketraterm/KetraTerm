@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Improved compatibility with custom shell startup files and commands.
 - Improved link underlines and kept hover highlights consistent across wrapped lines and output updates.
 
 ## [0.2.2] - 2026-09-11

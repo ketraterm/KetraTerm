@@ -162,6 +162,7 @@ class KetraTermProjectTerminalService(
         profile: TerminalProfile,
         settings: SwingSettings,
     ): Content {
+        val addProjectJdkToPath = KetraTermIntellijSettings.getInstance().state.addProjectJdkToPath
         val pendingId = "pending-terminal-${nextPendingTabNumber.getAndIncrement()}"
         val container =
             JPanel(BorderLayout()).apply {
@@ -180,7 +181,7 @@ class KetraTermProjectTerminalService(
         @Suppress("UsePropertyAccessSyntax")
         content.setDisposer(PendingTerminalTabDisposable(pendingId))
 
-        pendingTabsById[pendingId] = PendingTerminalTab(content, container)
+        pendingTabsById[pendingId] = PendingTerminalTab(content, container, profile)
 
         contentManager.addContent(content)
         contentManager.setSelectedContent(content, true)
@@ -189,10 +190,11 @@ class KetraTermProjectTerminalService(
             pendingId = pendingId,
             profileName = profile.displayName,
             start = {
+                val launchProfile = profile.withProjectSdkEnvironment(project, enabled = addProjectJdkToPath)
                 synchronized(workspaceLock) {
                     ptyRuntime.openWorkspaceTab(
                         workspace = workspace,
-                        profile = profile,
+                        profile = launchProfile,
                         options = openOptions(settings, profile),
                     )
                 }
@@ -310,6 +312,7 @@ class KetraTermProjectTerminalService(
         pendingTab: PendingTerminalTab,
         workspaceTab: TerminalWorkspaceTab,
     ) {
+        val sourceProfile = pendingTab.sourceProfile
         val pane =
             KetraTermTerminalPane.create(
                 project = project,
@@ -318,7 +321,7 @@ class KetraTermProjectTerminalService(
                     KetraTermTerminalPaneHostActions(
                         openNewTabAction = ::openDefaultTabFromContextMenu,
                         canOpenTerminalHereAction = ::canOpenTerminalHere,
-                        openTerminalHereAction = ::openTerminalHere,
+                        openTerminalHereAction = { tab -> openTerminalHere(tab, sourceProfile) },
                         closePaneAction = ::closePaneFromContextMenu,
                     ),
             )
@@ -364,12 +367,15 @@ class KetraTermProjectTerminalService(
     private fun canOpenTerminalHere(tab: TerminalWorkspaceTab): Boolean =
         lastToolWindow != null && IntellijWorkingDirectoryResolver.resolve(tab.currentWorkingDirectoryUri) != null
 
-    private fun openTerminalHere(tab: TerminalWorkspaceTab): Boolean {
+    private fun openTerminalHere(
+        tab: TerminalWorkspaceTab,
+        sourceProfile: TerminalProfile,
+    ): Boolean {
         val toolWindow = lastToolWindow ?: return false
         val workingDirectory = IntellijWorkingDirectoryResolver.resolve(tab.currentWorkingDirectoryUri) ?: return false
         openTab(
             toolWindow = toolWindow,
-            profile = tab.profile.copy(workingDirectory = workingDirectory),
+            profile = sourceProfile.copy(workingDirectory = workingDirectory),
             settings = KetraTermIntellijSettings.getInstance().current(),
         )
         return true
@@ -570,6 +576,7 @@ class KetraTermProjectTerminalService(
     private data class PendingTerminalTab(
         val content: Content,
         val container: JPanel,
+        val sourceProfile: TerminalProfile,
     )
 
     private data class ContentCloseQueryRegistration(

@@ -33,6 +33,18 @@ import java.util.concurrent.CancellationException
  */
 class KetraTermIntellijSettingsTest {
     @Test
+    fun `project JDK injection defaults on and survives platform state reload`() {
+        val service = KetraTermIntellijSettings()
+        assertTrue(service.state.addProjectJdkToPath)
+
+        service.loadState(service.state.copy(addProjectJdkToPath = false))
+        service.replaceState(service.state.copy(environmentVariables = "JAVA_HOME=/custom/jdk"))
+
+        assertFalse(service.state.addProjectJdkToPath)
+        assertEquals("JAVA_HOME=/custom/jdk", service.state.environmentVariables)
+    }
+
+    @Test
     fun `platform load and UI updates publish normalized state before notifying listeners`() {
         val service = KetraTermIntellijSettings()
         val observed = mutableListOf<KetraTermIntellijSettings.State>()

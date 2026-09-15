@@ -32,6 +32,8 @@ import java.nio.file.Path
  * @property workingDirectory initial process working directory, or `null` for
  * the platform/user default.
  * @property kind stable presentation category for host UI icons and menus.
+ * @property shellEnvironment host-selected variables applied at launch and after
+ * supported shell startup files, taking precedence over [environment].
  */
 data class TerminalProfile(
     val id: String,
@@ -40,6 +42,7 @@ data class TerminalProfile(
     val environment: Map<String, String> = emptyMap(),
     val workingDirectory: Path? = null,
     val kind: TerminalProfileKind = TerminalProfileKind.classify(id, displayName, command),
+    val shellEnvironment: TerminalShellEnvironment = TerminalShellEnvironment.Empty,
 ) {
     init {
         require(id.isNotBlank()) { "profile id must not be blank" }

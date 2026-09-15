@@ -18,8 +18,10 @@ package io.github.ketraterm.workspace
 import io.github.ketraterm.workspace.config.TerminalWorkspaceConfigManager
 import java.io.IOException
 import java.io.InputStream
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFilePermission
 import java.util.*
 
@@ -42,14 +44,14 @@ internal object TerminalShellIntegrationBootstrap {
         enabled: Boolean,
         scriptDirectory: Path = defaultScriptDirectory(),
     ): TerminalProfile {
-        if (!enabled) return profile
+        if (!enabled) return TerminalShellEnvironmentBootstrap.applyInitial(profile)
 
         val integrated =
             when (profile.kind) {
                 TerminalProfileKind.POWERSHELL -> withPowerShellIntegration(profile)
                 TerminalProfileKind.BASH,
                 TerminalProfileKind.GIT_BASH,
-                -> withBashIntegration(profile)
+                -> withBashIntegration(profile, scriptDirectory)
                 TerminalProfileKind.ZSH -> withZshIntegration(profile, scriptDirectory)
                 TerminalProfileKind.FISH -> withFishIntegration(profile)
                 TerminalProfileKind.WSL,
@@ -58,7 +60,7 @@ internal object TerminalShellIntegrationBootstrap {
                 else -> profile
             }
 
-        if (integrated === profile) return profile
+        if (integrated === profile) return TerminalShellEnvironmentBootstrap.applyInitial(profile)
 
         val configPath = TerminalWorkspaceConfigManager.getDefaultPath()
         val binDir = scriptDirectory.resolve("bin")
@@ -86,7 +88,9 @@ internal object TerminalShellIntegrationBootstrap {
         }
         baseEnv[pathKey] = newPath
 
-        return integrated.copy(environment = baseEnv)
+        return TerminalShellEnvironmentBootstrap.withMarkers(
+            TerminalShellEnvironmentBootstrap.applyInitial(integrated.copy(environment = baseEnv)),
+        )
     }
 
     private fun withExplicitWslShellIntegration(
@@ -100,7 +104,7 @@ internal object TerminalShellIntegrationBootstrap {
         val shellProfile = profile.copy(command = shellCommand)
         val integrated =
             when (shellName) {
-                "bash", "bash.exe" -> withBashIntegration(shellProfile)
+                "bash", "bash.exe" -> withBashIntegration(shellProfile, scriptDirectory)
                 "zsh", "zsh.exe" -> withZshIntegration(shellProfile, scriptDirectory)
                 "fish", "fish.exe" -> withFishIntegration(shellProfile)
                 else -> return profile
@@ -163,9 +167,15 @@ internal object TerminalShellIntegrationBootstrap {
         return profile.copy(command = next)
     }
 
-    private fun withBashIntegration(profile: TerminalProfile): TerminalProfile {
+    private fun withBashIntegration(
+        profile: TerminalProfile,
+        scriptDirectory: Path,
+    ): TerminalProfile {
         val command = profile.command
         if (hasExplicitBashEntryPoint(command)) return profile
+        if (profile.shellEnvironment != TerminalShellEnvironment.Empty) {
+            return withBashStartupWrapper(profile, scriptDirectory)
+        }
 
         val promptCommand = profile.environment["PROMPT_COMMAND"]
         val environment =
@@ -176,6 +186,73 @@ internal object TerminalShellIntegrationBootstrap {
                 )
         return profile.copy(environment = environment)
     }
+
+    private fun withBashStartupWrapper(
+        profile: TerminalProfile,
+        scriptDirectory: Path,
+    ): TerminalProfile {
+        // An explicitly disabled rc file remains authoritative for shell startup.
+        if ("--norc" in profile.command ||
+            "--posix" in profile.command ||
+            executableName(profile.command[0]) in setOf("sh", "sh.exe")
+        ) {
+            return profile
+        }
+        val startupFile = scriptDirectory.resolve("bash/rcfile.bash")
+        try {
+            Files.createDirectories(startupFile.parent)
+            writeIfChanged(startupFile, bashStartupScript())
+        } catch (_: IOException) {
+            return profile
+        }
+        var login = false
+        val arguments = ArrayList<String>(profile.command.size + 2)
+        arguments += profile.command[0]
+        arguments += "--rcfile"
+        arguments += startupFile.toString()
+        for (argument in profile.command.drop(1)) {
+            when {
+                argument == "--login" || argument == "-l" -> login = true
+                isShortOptionCluster(argument, 'l') -> {
+                    login = true
+                    arguments += argument.filterIndexed { index, character -> index == 0 || character != 'l' }
+                }
+                else -> arguments += argument
+            }
+        }
+        val environment = profile.environment.toMutableMap()
+        environment[OSC7_AUTHORITY_ENVIRONMENT_VARIABLE] = LOCAL_OSC7_AUTHORITY
+        environment["_KetraTerm_BASH_LOGIN_SHELL"] = if (login) "1" else "0"
+        environment["_KetraTerm_BASH_NO_PROFILE"] = if ("--noprofile" in profile.command) "1" else "0"
+        return profile.copy(command = arguments, environment = environment)
+    }
+
+    private fun bashStartupScript(): String =
+        """
+        if [[ ${'$'}{_KetraTerm_BASH_LOGIN_SHELL:-0} == 1 ]]; then
+            if [[ ${'$'}{_KetraTerm_BASH_NO_PROFILE:-0} != 1 ]]; then
+                [[ ! -r /etc/profile ]] || source /etc/profile
+                for __ketraterm_login_file in .bash_profile .bash_login .profile; do
+                    if [[ -r "${'$'}HOME/${'$'}__ketraterm_login_file" ]]; then
+                        source "${'$'}HOME/${'$'}__ketraterm_login_file"
+                        break
+                    fi
+                done
+                unset __ketraterm_login_file
+            fi
+        elif [[ -r "${'$'}HOME/.bashrc" ]]; then
+            source "${'$'}HOME/.bashrc"
+        fi
+        unset _KetraTerm_BASH_LOGIN_SHELL _KetraTerm_BASH_NO_PROFILE
+        ${TerminalShellEnvironmentBootstrap.bash}
+        if [[ ${'$'}(declare -p PROMPT_COMMAND 2>/dev/null) == 'declare -a '* ]]; then
+            PROMPT_COMMAND=(${shellSingleQuote(BASH_PROMPT_COMMAND)} "${'$'}{PROMPT_COMMAND[@]}")
+        else
+            PROMPT_COMMAND=${shellSingleQuote(BASH_PROMPT_COMMAND)}"${'$'}{PROMPT_COMMAND:+; ${'$'}PROMPT_COMMAND}"
+        fi
+        """.trimIndent()
+
+    private fun shellSingleQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
 
     private fun withZshIntegration(
         profile: TerminalProfile,
@@ -191,7 +268,7 @@ internal object TerminalShellIntegrationBootstrap {
             return profile
         }
 
-        val originalZdotdir = profile.environment["ZDOTDIR"].orEmpty()
+        val originalZdotdir = profile.environment["ZDOTDIR"] ?: System.getenv("ZDOTDIR").orEmpty()
         val environment =
             profile.environment +
                 mapOf(
@@ -216,7 +293,10 @@ internal object TerminalShellIntegrationBootstrap {
         )
     }
 
-    private fun encodedPowerShellScript(): String = Base64.getEncoder().encodeToString(POWERSHELL_SCRIPT.toByteArray(Charsets.UTF_16LE))
+    private fun encodedPowerShellScript(): String =
+        Base64.getEncoder().encodeToString(
+            (TerminalShellEnvironmentBootstrap.powerShell + "\n" + POWERSHELL_SCRIPT).toByteArray(Charsets.UTF_16LE),
+        )
 
     private fun hasExplicitPowerShellEntryPoint(command: List<String>): Boolean {
         var index = 1
@@ -263,6 +343,7 @@ internal object TerminalShellIntegrationBootstrap {
         var index = 1
         while (index < command.size) {
             val argument = command[index]
+            if (argument == "--") return index < command.lastIndex
             if (argument == "-c" || argument == "--command" || isShortOptionCluster(argument, 'c')) return true
             if (!argument.startsWith("-")) return true
             index++
@@ -274,6 +355,7 @@ internal object TerminalShellIntegrationBootstrap {
         var index = 1
         while (index < command.size) {
             val argument = command[index]
+            if (argument == "--") return index < command.lastIndex
             if (argument == "-c" || argument == "-s" || isShortOptionCluster(argument, 'c') || isShortOptionCluster(argument, 's')) {
                 return true
             }
@@ -288,6 +370,7 @@ internal object TerminalShellIntegrationBootstrap {
         var index = 1
         while (index < command.size) {
             val argument = command[index]
+            if (argument == "--") return true
             if (argument == "-c" || argument.startsWith("--command") || isShortOptionCluster(argument, 'c')) return true
             if (!argument.startsWith("-")) return true
             index += if (argument == "-C" || argument == "--init-command") 2 else 1
@@ -322,20 +405,27 @@ internal object TerminalShellIntegrationBootstrap {
             directory.resolve(".zshrc"),
             joinedShellCommands(
                 zshSourceOriginalStartupFile(".zshrc"),
-                ZSH_INTEGRATION_SCRIPT,
+                "if [[ ! -o login ]]; then\n${TerminalShellEnvironmentBootstrap.zsh}\nfi\n$ZSH_INTEGRATION_SCRIPT",
             ),
         )
-        writeIfChanged(directory.resolve(".zlogin"), zshSourceOriginalStartupFile(".zlogin"))
+        writeIfChanged(
+            directory.resolve(".zlogin"),
+            zshSourceOriginalStartupFile(".zlogin") + "\n" + TerminalShellEnvironmentBootstrap.zsh,
+        )
         writeIfChanged(directory.resolve(".zlogout"), zshSourceOriginalStartupFile(".zlogout"))
     }
 
     private fun zshSourceOriginalStartupFile(fileName: String): String =
         """
+        __ketraterm_bootstrap_zdotdir=${'$'}ZDOTDIR
         __ketraterm_original_zdotdir=${'$'}{KetraTerm_ORIGINAL_ZDOTDIR:-${'$'}HOME}
         if [[ -n "${'$'}__ketraterm_original_zdotdir" && "${'$'}__ketraterm_original_zdotdir" != "${'$'}ZDOTDIR" && -r "${'$'}__ketraterm_original_zdotdir/$fileName" ]]; then
+            ZDOTDIR=${'$'}__ketraterm_original_zdotdir
             source "${'$'}__ketraterm_original_zdotdir/$fileName"
+            export KetraTerm_ORIGINAL_ZDOTDIR=${'$'}{ZDOTDIR:-${'$'}HOME}
         fi
-        unset __ketraterm_original_zdotdir
+        export ZDOTDIR=${'$'}__ketraterm_bootstrap_zdotdir
+        unset __ketraterm_original_zdotdir __ketraterm_bootstrap_zdotdir
         """.trimIndent()
 
     private fun writeIfChanged(
@@ -343,7 +433,17 @@ internal object TerminalShellIntegrationBootstrap {
         content: String,
     ) {
         if (Files.exists(path) && Files.readString(path) == content) return
-        Files.writeString(path, content)
+        val temporary = Files.createTempFile(path.parent, ".${path.fileName}.", ".tmp")
+        try {
+            Files.writeString(temporary, content)
+            try {
+                Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
     }
 
     private fun defaultScriptDirectory(): Path =
@@ -423,6 +523,7 @@ internal object TerminalShellIntegrationBootstrap {
 
     internal val FISH_INIT_COMMAND =
         """
+        ${TerminalShellEnvironmentBootstrap.fish}
         if not set -q __KetraTerm_FISH_SHELL_INTEGRATION_INSTALLED
             set -g __KetraTerm_FISH_SHELL_INTEGRATION_INSTALLED 1
             set -g __ketraterm_fish_command_started 0

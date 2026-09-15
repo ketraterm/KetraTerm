@@ -33,6 +33,37 @@ import javax.swing.JComboBox
 import javax.swing.JLabel
 
 class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
+    fun testProjectJdkCheckboxAppliesResetsAndPreservesEnvironmentSettings() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        val original = settings.state
+        val configurable = KetraTermSettingsConfigurable(emptyList())
+        try {
+            val configured = original.copy(addProjectJdkToPath = true, environmentVariables = "JAVA_HOME=/custom/jdk")
+            settings.loadState(configured)
+            val component = configurable.createComponent()
+            val checkbox =
+                descendants(component)
+                    .filterIsInstance<AbstractButton>()
+                    .single { it.text == KetraTermBundle.message("settings.ketraterm.addProjectJdkToPath") }
+            assertTrue(checkbox.isSelected)
+            assertFalse(configurable.isModified())
+
+            checkbox.isSelected = false
+            assertTrue(configurable.isModified())
+            configurable.apply()
+            assertEquals(configured.copy(addProjectJdkToPath = false), settings.state)
+            assertFalse(configurable.isModified())
+
+            checkbox.isSelected = true
+            configurable.reset()
+            assertFalse(checkbox.isSelected)
+            assertFalse(configurable.isModified())
+        } finally {
+            configurable.disposeUIResources()
+            settings.replaceState(original)
+        }
+    }
+
     fun testHiddenSuggestionPreferencesSurviveApply() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state
