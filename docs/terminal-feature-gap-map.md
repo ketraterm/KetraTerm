@@ -98,8 +98,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ### Grid Operations
 - DONE(core): deterministic randomized left/right-margin properties cover ICH/DCH, selective erase, IL/DL, and partial-region scroll up/down. They model guard-column movement, preserve rows outside the scroll region, and verify protected wide spans plus wide/cluster storage invariants.
-- `DONE(core/host)`: mixed and repeated alternate-screen mode coverage verifies exact primary history retention and zero alternate history through real byte streams. Cases include every `47`/`1047`/`1049` entry/exit pairing, repeated commands and re-entry, screen-local `1048` saves, and ordered private-mode lists.
-- `TODO(core)`: remaining scrollback policy combinations involving erase/reset commands while alternate is active and resize/capacity boundaries beyond existing coverage.
+- `DONE(core/host)`: alternate-screen byte-stream coverage verifies exact primary history retention and zero alternate history across every `47`/`1047`/`1049` entry/exit pairing, repeated commands and re-entry, screen-local `1048` saves, and ordered private-mode lists. `ED2`, repeated `ED3`, and repeated `DECSTR` tests verify active-buffer clearing or text preservation, including combining/wide text and saved-cursor behavior. `DECCOLM` tests cover both 80/132-column directions and current-width requests, preserving primary history while alternate is active and clearing primary history when primary is active.
+- `TODO(core)`: remaining scrollback policy coverage for resize/capacity boundaries beyond existing tests.
 - `DONE(core/session/ui)`: soft-wrap text reconstruction preserves written and erased spaces for linear selection, command capture, clipboard copy/paste, and retained-output export. Core distinguishes artificial wide-character wrap padding from meaningful empty cells and preserves that distinction through resize/reflow. Selected hard line breaks survive empty selection endpoints; block selections retain physical row breaks.
 
 ### Unicode Width

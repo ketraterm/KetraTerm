@@ -1018,6 +1018,108 @@ class HostCommandAdapterTest {
     @Nested
     @DisplayName("alternate screen history")
     inner class AlternateScreenHistory {
+        @ParameterizedTest(name = "alternate entry {0}")
+        @ValueSource(ints = [47, 1047, 1049])
+        fun `ED3 on alternate preserves its viewport and primary history until primary is explicitly cleared`(entryMode: Int) {
+            val f = populatedPrimary()
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[?${entryMode}hA0\r\nA1\r\nA2\r\nA3\r\nAe\u0301\r\n界")
+            f.acceptAscii("\u001B[2;5H\u001B[?1048h")
+            assertAlternateScreen(f, "A3\nAe\u0301\n界")
+
+            repeat(2) {
+                f.acceptAscii("\u001B[3J")
+                assertAlternateScreen(f, "A3\nAe\u0301\n界")
+                assertAll(
+                    { assertEquals(4, f.terminal.cursorCol) },
+                    { assertEquals(1, f.terminal.cursorRow) },
+                )
+            }
+            f.acceptAscii("\u001B[H\u001B[?1048l")
+            assertAll(
+                { assertEquals(4, f.terminal.cursorCol) },
+                { assertEquals(1, f.terminal.cursorRow) },
+            )
+
+            f.acceptAscii("\u001B[?${entryMode}l")
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[3J")
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("P0\nP1\nP2", f.terminal.getAllAsString()) },
+                { assertEquals("P0\nP1\nP2", f.terminal.getScreenAsString()) },
+            )
+
+            f.acceptAscii("\u001B[?47h")
+            assertAlternateScreen(f, "A3\nAe\u0301\n界")
+        }
+
+        @ParameterizedTest(name = "alternate entry {0}")
+        @ValueSource(ints = [47, 1047, 1049])
+        fun `ED2 clears only the active alternate viewport and preserves primary history`(entryMode: Int) {
+            val f = populatedPrimary()
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[?${entryMode}hA0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5\u001B[2;5H")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+
+            f.acceptAscii("\u001B[2J")
+
+            assertAlternateScreen(f, "\n\n")
+            assertAll(
+                { assertEquals(4, f.terminal.cursorCol) },
+                { assertEquals(1, f.terminal.cursorRow) },
+            )
+            f.acceptAscii("\u001B[?${entryMode}l")
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[?47h")
+            assertAlternateScreen(f, "\n\n")
+        }
+
+        @ParameterizedTest(name = "alternate entry {0}")
+        @ValueSource(ints = [47, 1047, 1049])
+        fun `DECSTR on alternate preserves both buffers and history while resetting saved cursors`(entryMode: Int) {
+            val f = populatedPrimary()
+            f.acceptAscii("\u001B[2;2H\u001B[?1048h\u001B[?${entryMode}h")
+            f.acceptAscii("A0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            f.acceptAscii("\u001B[2;3r\u001B[?69h\u001B[2;9s\u001B[?6h\u001B[1;2H\u001B[?1048h")
+            f.acceptAscii("\u001B[2;3H\u001B[4h")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+            assertAll(
+                { assertEquals(3, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+                { assertTrue(f.terminal.getModeSnapshot().isOriginMode) },
+                { assertTrue(f.terminal.getModeSnapshot().isLeftRightMarginMode) },
+                { assertTrue(f.terminal.getModeSnapshot().isInsertMode) },
+            )
+
+            repeat(2) {
+                f.acceptAscii("\u001B[!p")
+                assertAlternateScreen(f, "A3\nA4\nA5")
+                assertAll(
+                    { assertEquals(12, f.terminal.width) },
+                    { assertEquals(3, f.terminal.height) },
+                    { assertEquals(3, f.terminal.cursorCol) },
+                    { assertEquals(2, f.terminal.cursorRow) },
+                    { assertFalse(f.terminal.getModeSnapshot().isOriginMode) },
+                    { assertFalse(f.terminal.getModeSnapshot().isLeftRightMarginMode) },
+                    { assertFalse(f.terminal.getModeSnapshot().isInsertMode) },
+                )
+            }
+            f.acceptAscii("\u001B[?1048l")
+            assertAll(
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(0, f.terminal.cursorRow) },
+            )
+            f.acceptAscii("\u001B[?${entryMode}l\u001B[?1048l")
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(0, f.terminal.cursorRow) },
+            )
+            f.acceptAscii("\u001B[?47h")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+        }
+
         @ParameterizedTest(name = "enter {0}, exit {1}")
         @CsvSource(
             "47, 47",
@@ -1169,6 +1271,81 @@ class HostCommandAdapterTest {
                 { assertEquals(expectedCoordinate, f.terminal.cursorCol) },
                 { assertEquals(expectedCoordinate, f.terminal.cursorRow) },
             )
+        }
+
+        @ParameterizedTest(name = "alternate mode {0}, width {1}, DECCOLM {2}, expected width {3}")
+        @CsvSource(
+            "47, 80, h, 132",
+            "47, 132, l, 80",
+            "47, 80, l, 80",
+            "47, 132, h, 132",
+            "1047, 80, h, 132",
+            "1047, 132, l, 80",
+            "1047, 80, l, 80",
+            "1047, 132, h, 132",
+            "1049, 80, h, 132",
+            "1049, 132, l, 80",
+            "1049, 80, l, 80",
+            "1049, 132, h, 132",
+        )
+        fun `DECCOLM on alternate clears its display and preserves primary history even at the current width`(
+            entryMode: Int,
+            initialWidth: Int,
+            commandSuffix: String,
+            expectedWidth: Int,
+        ) {
+            val f = Fixture(terminal = TerminalBuffers.create(width = initialWidth, height = 3, maxHistory = 8))
+            f.acceptAscii("H0\r\nH1\r\nH2\r\nP0\r\nP1\r\nP2")
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[?${entryMode}hA0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+
+            f.acceptAscii("\u001B[?3$commandSuffix")
+
+            assertAlternateScreen(f, "\n\n")
+            assertAll(
+                { assertEquals(expectedWidth, f.terminal.width) },
+                { assertEquals(3, f.terminal.height) },
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(0, f.terminal.cursorRow) },
+            )
+            f.acceptAscii("\u001B[?${entryMode}l")
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(expectedWidth, f.terminal.width) },
+                { assertEquals(3, f.terminal.height) },
+            )
+        }
+
+        @ParameterizedTest(name = "primary width {0}, DECCOLM {1}, expected width {2}")
+        @CsvSource("80, h, 132", "132, l, 80", "80, l, 80", "132, h, 132")
+        fun `DECCOLM on primary clears its display and history even at the current width`(
+            initialWidth: Int,
+            commandSuffix: String,
+            expectedWidth: Int,
+        ) {
+            val f = Fixture(terminal = TerminalBuffers.create(width = initialWidth, height = 3, maxHistory = 8))
+            f.acceptAscii("H0\r\nH1\r\nH2\r\nP0\r\nP1\r\nP2")
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[?47hA0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+            f.acceptAscii("\u001B[?47l")
+            assertPrimaryHistory(f)
+
+            f.acceptAscii("\u001B[?3$commandSuffix")
+
+            assertAll(
+                { assertEquals(expectedWidth, f.terminal.width) },
+                { assertEquals(3, f.terminal.height) },
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("\n\n", f.terminal.getAllAsString()) },
+                { assertEquals("\n\n", f.terminal.getScreenAsString()) },
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(0, f.terminal.cursorRow) },
+            )
+            (f.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                assertEquals(TerminalRenderBufferKind.PRIMARY, frame.activeBuffer)
+            }
         }
 
         private fun populatedPrimary(): Fixture {
