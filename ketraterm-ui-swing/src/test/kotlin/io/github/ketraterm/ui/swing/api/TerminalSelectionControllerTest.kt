@@ -145,11 +145,10 @@ class TerminalSelectionControllerTest {
             clusterSink: TerminalRenderClusterSink?,
             clusterDataSink: TerminalRenderClusterDataSink?,
         ) {
-            for (col in 0 until minOf(columns, content.length)) {
-                val idx = codeOffset + col
-                codeWords[idx] = content[col].code
-                attrWords[idx] = TerminalRenderAttrs.DEFAULT
-                flags[idx] = TerminalRenderCellFlags.CODEPOINT
+            for (col in 0 until columns) {
+                codeWords[codeOffset + col] = if (col < content.length) content[col].code else 0
+                attrWords[attrOffset + col] = TerminalRenderAttrs.DEFAULT
+                flags[flagOffset + col] = if (col < content.length) TerminalRenderCellFlags.CODEPOINT else TerminalRenderCellFlags.EMPTY
             }
         }
     }
@@ -339,11 +338,11 @@ class TerminalSelectionControllerTest {
                 clusterDataSink: TerminalRenderClusterDataSink?,
             ) {
                 val lineContent = frameLines[row]
-                for (col in 0 until minOf(columns, lineContent.length)) {
-                    val idx = codeOffset + col
-                    codeWords[idx] = lineContent[col].code
-                    attrWords[idx] = TerminalRenderAttrs.DEFAULT
-                    flags[idx] = TerminalRenderCellFlags.CODEPOINT
+                for (col in 0 until columns) {
+                    codeWords[codeOffset + col] = if (col < lineContent.length) lineContent[col].code else 0
+                    attrWords[attrOffset + col] = TerminalRenderAttrs.DEFAULT
+                    flags[flagOffset + col] =
+                        if (col < lineContent.length) TerminalRenderCellFlags.CODEPOINT else TerminalRenderCellFlags.EMPTY
                 }
             }
         }
@@ -676,10 +675,10 @@ class TerminalSelectionControllerTest {
         ) {
             val text = lines[row]
             var column = 0
-            while (column < minOf(columns, text.length)) {
-                codeWords[codeOffset + column] = text[column].code
+            while (column < columns) {
+                codeWords[codeOffset + column] = if (column < text.length) text[column].code else 0
                 attrWords[attrOffset + column] = TerminalRenderAttrs.DEFAULT
-                flags[flagOffset + column] = TerminalRenderCellFlags.CODEPOINT
+                flags[flagOffset + column] = if (column < text.length) TerminalRenderCellFlags.CODEPOINT else TerminalRenderCellFlags.EMPTY
                 column++
             }
         }

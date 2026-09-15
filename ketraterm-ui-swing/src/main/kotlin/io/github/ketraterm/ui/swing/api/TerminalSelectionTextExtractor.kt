@@ -21,11 +21,11 @@ import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
 
 /**
  * Extracts selected visible text from primitive render-cache rows in logical text order.
+ * Linear selections preserve spaces inside logical lines and selected hard line breaks.
+ * Empty row padding and spaces at hard line ends are omitted.
  * Rectangular selections project their visual interval independently on each row.
  */
 internal class TerminalSelectionTextExtractor {
-    private val rowScratch = StringBuilder(INITIAL_ROW_CAPACITY)
-
     fun selectedText(
         cache: TerminalRenderCache,
         selection: CellSelection,
@@ -42,21 +42,26 @@ internal class TerminalSelectionTextExtractor {
         while (row <= lastRow) {
             val bidi = bidiLayout?.row(cache, row)
             val range = selection.packedColumnRange(row, cache, bidi)
-            if (range != CellSelection.NO_RANGE) {
+            // Linear selections can include a row boundary without selecting a cell on one side.
+            if (!selection.isBlock || range != CellSelection.NO_RANGE) {
                 if (
                     hasPreviousSelectedRow &&
                     (!joinSoftWrappedRows || selection.isBlock || row == 0 || !cache.lineWrapped[row - 1])
                 ) {
                     result.append('\n')
                 }
-                appendTrimmedRow(
-                    destination = result,
-                    cache = cache,
-                    row = row,
-                    startColumn = CellSelection.rangeStart(range),
-                    endColumn = CellSelection.rangeEnd(range),
-                    bidi = bidi,
-                )
+                if (range != CellSelection.NO_RANGE) {
+                    val endColumn = CellSelection.rangeEnd(range)
+                    appendRow(
+                        destination = result,
+                        cache = cache,
+                        row = row,
+                        startColumn = CellSelection.rangeStart(range),
+                        endColumn = if (selection.isBlock) endColumn else minOf(endColumn, linearTextEndColumn(cache, row)),
+                        bidi = bidi,
+                        trimTrailingSpaces = selection.isBlock,
+                    )
+                }
                 hasPreviousSelectedRow = true
             }
             row++
@@ -127,15 +132,39 @@ internal class TerminalSelectionTextExtractor {
         return CellSelection(start, row, end, row)
     }
 
-    private fun appendTrimmedRow(
+    /** Bounds trimming by the whole row, so a partial selection retains interior spaces. */
+    private fun linearTextEndColumn(
+        cache: TerminalRenderCache,
+        row: Int,
+    ): Int {
+        val rowOffset = cache.rowOffset(row)
+        var end = cache.columns
+        if (cache.lineWrapped[row]) {
+            if (end > 0 && cache.flags[rowOffset + end - 1] and TerminalRenderCellFlags.WRAP_PADDING != 0) end--
+            return end
+        }
+        while (end > 0) {
+            val index = rowOffset + end - 1
+            val flags = cache.flags[index]
+            val empty = flags and TerminalRenderCellFlags.EMPTY != 0
+            val trailingSpace =
+                flags and TerminalRenderCellFlags.CODEPOINT != 0 && cache.codeWords[index] == ' '.code
+            if (!empty && !trailingSpace) break
+            end--
+        }
+        return end
+    }
+
+    private fun appendRow(
         destination: StringBuilder,
         cache: TerminalRenderCache,
         row: Int,
         startColumn: Int,
         endColumn: Int,
         bidi: TerminalBidiLayout.Row?,
+        trimTrailingSpaces: Boolean,
     ) {
-        rowScratch.setLength(0)
+        val rowStart = destination.length
         // A visual interval may select disjoint logical spans in mixed-direction text.
         // Visit logical cells in order so copying preserves text and cluster ordering.
         var column = if (bidi == null) startColumn else 0
@@ -144,17 +173,19 @@ internal class TerminalSelectionTextExtractor {
             val visualColumn = bidi?.visualColumn(column) ?: column
             column =
                 if (visualColumn >= startColumn && visualColumn < endColumn) {
-                    appendCell(rowScratch, cache, row, column)
+                    appendCell(destination, cache, row, column)
                 } else {
                     column + 1
                 }
         }
 
-        var trimmedEnd = rowScratch.length
-        while (trimmedEnd > 0 && rowScratch[trimmedEnd - 1] == ' ') {
-            trimmedEnd--
+        if (trimTrailingSpaces) {
+            var trimmedEnd = destination.length
+            while (trimmedEnd > rowStart && destination[trimmedEnd - 1] == ' ') {
+                trimmedEnd--
+            }
+            destination.setLength(trimmedEnd)
         }
-        destination.append(rowScratch, 0, trimmedEnd)
     }
 
     private fun appendCell(
@@ -229,7 +260,6 @@ internal class TerminalSelectionTextExtractor {
     }
 
     private companion object {
-        private const val INITIAL_ROW_CAPACITY = 256
         private const val WORD_KIND_SPACE = 0
         private const val WORD_KIND_WORD = 1
         private const val WORD_KIND_PUNCTUATION_BASE = 2

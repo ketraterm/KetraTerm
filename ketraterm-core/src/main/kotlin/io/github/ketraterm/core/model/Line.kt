@@ -68,15 +68,20 @@ internal class Line(
      * Set by [io.github.ketraterm.core.engine.MutationEngine] during soft-wrap events.
      */
     var wrapped: Boolean = false
+        set(value) {
+            field = value
+            if (!value) endsWithWrapPadding = false
+        }
 
     /**
-     * True when resize reflow inserted an artificial trailing blank cell to keep
+     * True when writing or reflow inserted an artificial trailing blank cell to keep
      * a wide character from being split across physical rows.
      *
-     * The marker is line-scoped because resize padding can only occupy the last
-     * cell of a wrapped physical row. Normal line mutation clears it.
+     * Padding can only occupy the last cell of a wrapped physical row. Mutations
+     * that replace that cell or remove the soft wrap clear this provenance;
+     * changes to earlier columns or visual attributes preserve it.
      */
-    var endsWithResizePadding: Boolean = false
+    var endsWithWrapPadding: Boolean = false
 
     /**
      * Visual generation for this physical line.
@@ -137,6 +142,7 @@ internal class Line(
         attr: Long,
         extendedAttr: Long = 0L,
     ) {
+        if (col == width - 1) endsWithWrapPadding = false
         codepoints[col] = raw
         attrs[col] = attr
         extendedAttrs[col] = extendedAttr
@@ -218,7 +224,7 @@ internal class Line(
         attr: Long,
         extendedAttr: Long = 0L,
     ) {
-        endsWithResizePadding = false
+        if (col == width - 1) endsWithWrapPadding = false
         freeHandleAt(col)
         codepoints[col] = codepoint
         attrs[col] = attr
@@ -242,7 +248,7 @@ internal class Line(
         attr: Long,
         extendedAttr: Long = 0L,
     ) {
-        endsWithResizePadding = false
+        if (col == width - 1) endsWithWrapPadding = false
         freeHandleAt(col)
         codepoints[col] = store.alloc(cps, 0, cpLen)
         attrs[col] = attr
@@ -262,7 +268,6 @@ internal class Line(
         attrs.fill(defaultAttr)
         extendedAttrs.fill(defaultExtendedAttr)
         wrapped = false
-        endsWithResizePadding = false
     }
 
     /**
@@ -276,7 +281,7 @@ internal class Line(
     ) {
         val from = startCol.coerceAtLeast(0)
         if (from >= width) return
-        endsWithResizePadding = false
+        endsWithWrapPadding = false
         store.freeRange(codepoints, from, width)
         codepoints.fill(TerminalConstants.EMPTY, from, width)
         attrs.fill(attr, from, width)
@@ -294,7 +299,7 @@ internal class Line(
     ) {
         val to = (endCol + 1).coerceAtMost(width)
         if (to <= 0) return
-        endsWithResizePadding = false
+        if (to == width) endsWithWrapPadding = false
         store.freeRange(codepoints, 0, to)
         codepoints.fill(TerminalConstants.EMPTY, 0, to)
         attrs.fill(attr, 0, to)
@@ -314,7 +319,7 @@ internal class Line(
         val from = startCol.coerceIn(0, width)
         val to = endExclusive.coerceIn(0, width)
         if (from >= to) return
-        endsWithResizePadding = false
+        if (to == width) endsWithWrapPadding = false
         store.freeRange(codepoints, from, to)
         codepoints.fill(TerminalConstants.EMPTY, from, to)
         attrs.fill(attr, from, to)
@@ -348,7 +353,7 @@ internal class Line(
         defaultExtendedAttr: Long = 0L,
     ) {
         if (isInvalidRange(col, count, rightInclusive)) return
-        endsWithResizePadding = false
+        if (rightInclusive == width - 1) endsWithWrapPadding = false
 
         val safeCount = count.coerceAtMost(rightInclusive - col + 1)
         val shiftCount = rightInclusive - col + 1 - safeCount
@@ -400,7 +405,7 @@ internal class Line(
         defaultExtendedAttr: Long = 0L,
     ) {
         if (isInvalidRange(col, count, rightInclusive)) return
-        endsWithResizePadding = false
+        if (rightInclusive == width - 1) endsWithWrapPadding = false
 
         val safeCount = count.coerceAtMost(rightInclusive - col + 1)
         val shiftCount = rightInclusive - col + 1 - safeCount
@@ -433,7 +438,7 @@ internal class Line(
         attr: Long,
         extendedAttr: Long = 0L,
     ) {
-        endsWithResizePadding = false
+        endsWithWrapPadding = false
         store.freeRange(codepoints, 0, width)
         codepoints.fill(codepoint)
         attrs.fill(attr)

@@ -219,6 +219,110 @@ class CoreTerminalRenderFrameTest {
     }
 
     @Test
+    fun `wide prewrap exposes only its artificial final cell as padding`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 2)
+        buffer.writeText("abc中x")
+
+        buffer.readRenderFrame { frame ->
+            val first = copyRow(frame, 0)
+            val second = copyRow(frame, 1)
+            assertTrue(frame.lineWrapped(0))
+            assertEquals(TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING, first.flags[3])
+            assertEquals(0, first.codeWords[3])
+            assertEquals(TerminalRenderCellFlags.EMPTY, second.flags[3])
+        }
+    }
+
+    @Test
+    fun `wide cluster prewrap preserves padding through retained history`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 1, maxHistory = 4)
+        buffer.writeText("abc")
+        buffer.writeCluster(intArrayOf(0x1F469, 0x200D, 0x1F4BB), length = 3)
+
+        buffer.readRenderFrame(scrollbackOffset = 1) { frame ->
+            assertTrue(frame.lineWrapped(0))
+            assertEquals(
+                TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING,
+                copyRow(frame).flags[3],
+            )
+        }
+    }
+
+    @Test
+    fun `erasing adjacent content preserves padding and invalidates render generation`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 2)
+        buffer.writeText("abc中x")
+        var previousGeneration = 0L
+        buffer.readRenderFrame { previousGeneration = it.lineGeneration(0) }
+
+        buffer.positionCursor(col = 2, row = 0)
+        buffer.eraseCharacters(1)
+
+        buffer.readRenderFrame { frame ->
+            val first = copyRow(frame)
+            assertNotEquals(previousGeneration, frame.lineGeneration(0))
+            assertTrue(frame.lineWrapped(0))
+            assertEquals(TerminalRenderCellFlags.EMPTY, first.flags[2])
+            assertEquals(TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING, first.flags[3])
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["write", "erase", "insert", "delete", "line feed"])
+    fun `replacing padding or breaking continuation clears its flag`(operation: String) {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 2)
+        buffer.writeText("abc中x")
+        buffer.positionCursor(col = 3, row = 0)
+
+        when (operation) {
+            "write" -> buffer.writeText(" ")
+            "erase" -> buffer.eraseCharacters(1)
+            "insert" -> buffer.insertBlankCharacters(1)
+            "delete" -> buffer.deleteCharacters(1)
+            "line feed" -> buffer.newLine()
+        }
+
+        buffer.readRenderFrame { frame ->
+            assertEquals(0, copyRow(frame).flags[3] and TerminalRenderCellFlags.WRAP_PADDING)
+        }
+    }
+
+    @Test
+    fun `erasing history preserves visible padding provenance`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 2, maxHistory = 4)
+        buffer.writeLogicalLine("old")
+        buffer.writeText("abc中x")
+        assertEquals(1, buffer.historySize)
+
+        buffer.eraseScreenAndHistory()
+
+        buffer.readRenderFrame { frame ->
+            assertEquals(0, frame.historySize)
+            assertTrue(frame.lineWrapped(0))
+            assertEquals(
+                TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING,
+                copyRow(frame).flags[3],
+            )
+        }
+    }
+
+    @Test
+    fun `resize padding uses the same render provenance as immediate prewrap`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 8, initialHeight = 2)
+        buffer.writeText("abc中x")
+
+        buffer.resize(newWidth = 4, newHeight = 2)
+
+        buffer.readRenderFrame { frame ->
+            assertTrue(frame.lineWrapped(0))
+            assertEquals(
+                TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING,
+                copyRow(frame).flags[3],
+            )
+        }
+    }
+
+    @Test
     fun `empty line copies empty flags and default attrs`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 3, initialHeight = 1)
         val reader = buffer as TerminalRenderFrameReader

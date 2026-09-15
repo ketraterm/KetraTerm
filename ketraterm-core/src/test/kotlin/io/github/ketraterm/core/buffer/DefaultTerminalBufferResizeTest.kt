@@ -20,8 +20,49 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 
 class DefaultTerminalBufferResizeTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["abc中x", "ab 中x"])
+    fun `widening after immediate wide prewrap removes only artificial padding`(text: String) {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 3)
+        buffer.writeText(text)
+
+        buffer.resize(newWidth = 8, newHeight = 3)
+
+        assertEquals(text, buffer.getAllAsString().trimEnd())
+        buffer.resize(newWidth = 4, newHeight = 3)
+        buffer.resize(newWidth = 8, newHeight = 3)
+        assertEquals(text, buffer.getAllAsString().trimEnd())
+    }
+
+    @Test
+    fun `widening preserves a fully erased wrapped continuation row`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 3)
+        buffer.writeText("abcdefghij")
+        buffer.positionCursor(col = 0, row = 1)
+        buffer.eraseCharacters(4)
+        buffer.positionCursor(col = 2, row = 2)
+
+        buffer.resize(newWidth = 12, newHeight = 3)
+
+        assertEquals("abcd    ij", buffer.getAllAsString().trimEnd())
+    }
+
+    @Test
+    fun `widening preserves erased space adjacent to wide prewrap padding`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 3)
+        buffer.writeText("abc中x")
+        buffer.positionCursor(col = 2, row = 0)
+        buffer.eraseCharacters(1)
+        buffer.positionCursor(col = 3, row = 1)
+
+        buffer.resize(newWidth = 8, newHeight = 3)
+
+        assertEquals("ab 中x", buffer.getAllAsString().trimEnd())
+    }
+
     private fun stateOf(buffer: DefaultTerminalBuffer): TerminalState {
         val componentsField = DefaultTerminalBuffer::class.java.getDeclaredField("components")
         componentsField.isAccessible = true

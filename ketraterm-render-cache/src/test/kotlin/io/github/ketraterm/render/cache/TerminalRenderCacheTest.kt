@@ -332,6 +332,31 @@ class TerminalRenderCacheTest {
     }
 
     @Test
+    fun `wrap padding survives frame and cache copies without producing blinking text`() {
+        val frame = MutableFrame(columns = 3, rows = 1)
+        frame.setRow(0, "ab")
+        frame.setWrapPadding(row = 0)
+        frame.setBlink(row = 0, column = 2, blink = true)
+        val source = TerminalRenderCache(columns = 3, rows = 1)
+        val destination = TerminalRenderCache(columns = 3, rows = 1)
+
+        source.updateFrom(frame.reader)
+        destination.updateFrom(source)
+
+        for (cache in listOf(source, destination)) {
+            assertEquals(TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING, cache.flags[2])
+            assertTrue(cache.lineWrapped[0])
+            assertFalse(cache.hasBlinkingText)
+            assertFalse(cache.lineHasBlinkingText[0])
+        }
+
+        frame.setRow(0, "abc")
+        source.updateFrom(frame.reader)
+        destination.updateFrom(source)
+        assertEquals(TerminalRenderCellFlags.CODEPOINT, destination.flags[2])
+    }
+
+    @Test
     fun `blink text metadata is copied per row`() {
         val frame = MutableFrame(columns = 3, rows = 2)
         frame.setRow(0, "abc")
@@ -845,6 +870,13 @@ class TerminalRenderCacheTest {
             blink: Boolean,
         ) {
             attrs[row][column] = TerminalRenderAttrs.pack(blink = blink)
+            lineGenerations[row]++
+            frameGeneration++
+        }
+
+        fun setWrapPadding(row: Int) {
+            flags[row][columns - 1] = TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING
+            wrapped[row] = true
             lineGenerations[row]++
             frameGeneration++
         }

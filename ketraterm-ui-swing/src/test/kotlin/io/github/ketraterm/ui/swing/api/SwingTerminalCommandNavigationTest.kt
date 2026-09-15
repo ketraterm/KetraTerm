@@ -31,8 +31,9 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import kotlinx.coroutines.Dispatchers
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Cursor
 import java.awt.event.MouseEvent
@@ -290,10 +291,52 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
             component.bind(session)
-            assertEquals("row6row7", component.commandOutputText(secondCommandId))
+            assertEquals("row6        row7", component.commandOutputText(secondCommandId))
         }
 
         session.close()
+    }
+
+    @Test
+    fun `command output copy and export preserve spaces at soft wraps while scrolled away`() {
+        val reader = CommandFrameReader(textByAbsoluteRow = mapOf(6 to "working dir ", 7 to "is project"))
+        val session = commandSession(reader)
+        var clipboardText: String? = null
+        val component =
+            SwingTerminal(
+                settingsProvider = { SwingSettings(padding = SwingPadding()) },
+                hostServices =
+                    SwingHostServices(
+                        clipboardHandler =
+                            object : TerminalClipboardHandler {
+                                override fun copyText(text: String) {
+                                    clipboardText = text
+                                }
+
+                                override fun readText(): String? = clipboardText
+                            },
+                    ),
+            )
+        val secondCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(6))
+        try {
+            SwingUtilities.invokeAndWait {
+                component.size = component.preferredGridSize(12, 2)
+                component.bind(session)
+                component.scrollToScrollbackOffset(HISTORY_SIZE)
+                assertEquals(HISTORY_SIZE, component.viewportState().renderOffset)
+
+                val exported = component.commandOutputText(secondCommandId)
+                assertTrue(component.copyCommandOutputToClipboard(secondCommandId))
+                assertAll(
+                    { assertEquals("working dir is project", exported) },
+                    { assertEquals("working dir is project", clipboardText) },
+                    { assertEquals(HISTORY_SIZE, component.viewportState().renderOffset) },
+                )
+            }
+        } finally {
+            SwingUtilities.invokeAndWait { component.dispose() }
+            session.close()
+        }
     }
 
     @Test
@@ -425,7 +468,9 @@ class SwingTerminalCommandNavigationTest {
         return session
     }
 
-    private class CommandFrameReader : TerminalRenderFrameReader {
+    private class CommandFrameReader(
+        private val textByAbsoluteRow: Map<Int, String> = emptyMap(),
+    ) : TerminalRenderFrameReader {
         override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
             readRenderFrame(scrollbackOffset = 0, viewportRows = 2, consumer = consumer)
         }
@@ -442,13 +487,14 @@ class SwingTerminalCommandNavigationTest {
             viewportRows: Int,
             consumer: TerminalRenderFrameConsumer,
         ) {
-            consumer.accept(CommandFrame(scrollbackOffset.coerceIn(0, HISTORY_SIZE), viewportRows.coerceAtLeast(1)))
+            consumer.accept(CommandFrame(scrollbackOffset.coerceIn(0, HISTORY_SIZE), viewportRows.coerceAtLeast(1), textByAbsoluteRow))
         }
     }
 
     private class CommandFrame(
         override val scrollbackOffset: Int,
         override val rows: Int,
+        private val textByAbsoluteRow: Map<Int, String>,
     ) : TerminalRenderFrame {
         override val columns: Int = 12
         override val historySize: Int = HISTORY_SIZE
@@ -487,7 +533,8 @@ class SwingTerminalCommandNavigationTest {
             clusterDataSink: TerminalRenderClusterDataSink?,
         ) {
             var column = 0
-            val text = "row${HISTORY_SIZE - scrollbackOffset + row}"
+            val absoluteRow = HISTORY_SIZE - scrollbackOffset + row
+            val text = textByAbsoluteRow[absoluteRow] ?: "row$absoluteRow"
             while (column < columns) {
                 codeWords[codeOffset + column] = if (column < text.length) text[column].code else 0
                 attrWords[attrOffset + column] = TerminalRenderAttrs.DEFAULT

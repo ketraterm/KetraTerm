@@ -455,6 +455,7 @@ internal class MutationEngine(
         if (widthInCells == 2 && cCol >= rightMargin) {
             annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
             line.wrapped = true
+            line.endsWithWrapPadding = cCol == width - 1
             state.markLineChanged(line)
             cCol = leftMargin
             cRow = advanceRow(cRow)
@@ -1600,6 +1601,7 @@ internal class MutationEngine(
                     }
                 }
                 destLine.wrapped = srcLine.wrapped
+                destLine.endsWithWrapPadding = srcLine.endsWithWrapPadding
                 state.markLineChanged(destLine)
             }
 
