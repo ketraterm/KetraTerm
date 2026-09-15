@@ -32,7 +32,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y xvfb zsh fish
 
       - name: Run Tests (Linux with Xvfb)
         if: runner.os == 'Linux'

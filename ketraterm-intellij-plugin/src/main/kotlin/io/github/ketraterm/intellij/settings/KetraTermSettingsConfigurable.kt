@@ -80,6 +80,7 @@ class KetraTermSettingsConfigurable internal constructor(
         }
     private val startDirectoryField = TextFieldWithBrowseButton()
     private val environmentVariablesField = JBTextField()
+    private val addProjectJdkToPathCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.addProjectJdkToPath"))
     private val defaultTabNameField = JBTextField()
     private val cursorShapeCombo = ComboBox(cursorShapeOptions())
     private val ambiguousWidthCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.ambiguousWidth"))
@@ -143,6 +144,10 @@ class KetraTermSettingsConfigurable internal constructor(
                         cell(environmentVariablesField)
                             .align(AlignX.FILL)
                             .comment(KetraTermBundle.message("settings.ketraterm.environmentVariables.comment"))
+                    }
+                    row {
+                        cell(addProjectJdkToPathCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.addProjectJdkToPath.comment"))
                     }
                     row(KetraTermBundle.message("settings.ketraterm.defaultTabName")) {
                         cell(defaultTabNameField)
@@ -285,6 +290,7 @@ class KetraTermSettingsConfigurable internal constructor(
         shellPathCombo.selectedItem = shellPathOptionFor(state.shellPath) ?: state.shellPath
         startDirectoryField.text = state.startDirectory
         environmentVariablesField.text = state.environmentVariables
+        addProjectJdkToPathCheckBox.isSelected = state.addProjectJdkToPath
         defaultTabNameField.text = state.defaultTabName
         cursorShapeCombo.selectedItem = cursorShapeOptions().first { it.id == state.cursorShape }
         ambiguousWidthCheckBox.isSelected = state.treatAmbiguousAsWide
@@ -332,6 +338,7 @@ class KetraTermSettingsConfigurable internal constructor(
             shellPath = selectedShellPath(),
             startDirectory = startDirectoryField.text.trim(),
             environmentVariables = environmentVariablesField.text.trim(),
+            addProjectJdkToPath = addProjectJdkToPathCheckBox.isSelected,
             defaultTabName = defaultTabNameField.text.trim(),
             pasteSanitization = (pasteSanitizationCombo.selectedItem as? PasteSanitizationOption)?.id ?: "raw",
             clipboardLocalWrite = (clipboardLocalWriteCombo.selectedItem as? PermissionOption)?.id ?: "prompt",

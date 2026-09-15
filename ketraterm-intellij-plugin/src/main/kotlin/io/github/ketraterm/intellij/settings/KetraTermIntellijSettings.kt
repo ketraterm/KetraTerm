@@ -210,6 +210,7 @@ class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTerm
      * @property shellPath command or executable path used for new local shells.
      * @property startDirectory initial working directory; blank means project root.
      * @property environmentVariables newline-separated `NAME=VALUE` environment entries.
+     * @property addProjectJdkToPath whether new terminals use the project JDK for `JAVA_HOME` and prepend its `bin` to `PATH`.
      * @property defaultTabName user-visible name for newly opened tabs.
      * @property smartSuggestionsEnabled master switch for completion resources and requests.
      * @property shellSuggestionsEnabled whether host-provided shell suggestions
@@ -238,6 +239,7 @@ class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTerm
         @JvmField val shellPath: String = TerminalConfig.DEFAULT_SHELL_PATH,
         @JvmField val startDirectory: String = "",
         @JvmField val environmentVariables: String = "",
+        @JvmField val addProjectJdkToPath: Boolean = true,
         @JvmField val defaultTabName: String = "Local",
         @JvmField val smartSuggestionsEnabled: Boolean = TerminalConfig.DEFAULT_SMART_SUGGESTIONS_ENABLED,
         @JvmField val shellSuggestionsEnabled: Boolean = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED,
