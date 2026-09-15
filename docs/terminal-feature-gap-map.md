@@ -25,7 +25,7 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 - *No outstanding CSI cursor, SGR color, alternate screen, or basic input gaps.*
 
 ### Tier 2: Useful (Under consideration / partial gaps)
-- *No outstanding SAFE query-response, DECRQSS/XTGETTCAP, push/pop title stack, or host-adapter allow/deny policy-surface gaps (all implemented and verified).*
+- *The existing safe query-response baseline, DECRQSS/XTGETTCAP, push/pop title stack, and host-adapter allow/deny policy surface are implemented and verified. Additional query protocols are tracked below.*
 - `FIXED(alpha-blocker)`: Kitty keyboard capability advertising is per-session and admits only progressive flags backed by complete active-host metadata. The portable Swing profile, including IntelliJ-hosted Swing, exposes `1` (disambiguate escape codes) and `8` (report all keys as escape codes); richer flags stay unadvertised.
 
 ### Tier 3: Optional (Graphics & advanced features)
@@ -106,6 +106,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ### Query and Response Channel
 - `DONE(core/host/policy)`: terminal-to-host response channel exists for DA, DSR/CPR, safe window reports, palette queries, `DECRQSS`, and allowlisted `XTGETTCAP`; host policy can deny terminal responses before they enqueue bytes.
+- `TODO(core)`: light/dark color-scheme query (`CSI ?996n`). Private DSR dispatch already reaches core, but there is no `CSI ?997;Ps n` reply or host-supplied scheme state for applications that use this protocol to select their theme. Add the response and active-host scheme integration under the terminal-response policy; existing OSC background-color queries do not cover this protocol.
 - `TODO(core/parser/host/policy)`: OSC query responses and future query/response protocols need explicit response shape, allowlist, and host policy before implementation.
 - `TODO(core/host)`: event API for hyperlinks, palette updates, and terminal notifications if these move out of host or render-frame metadata.
 
@@ -114,6 +115,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 ## Integration Gaps
 
 - `DONE(host/policy)`: host-adapter allow/deny policy surface for title updates, OSC 8 hyperlinks, OSC 7 current-working-directory reports, desktop notifications, window manipulation requests, palette controls, terminal response channels, and OSC 52 clipboard request auditing.
+- `TODO(host)`: complete DECCOLM integration. `CSI ?3h` / `CSI ?3l` resize and reset the core grid to 132 / 80 columns, but do not notify the connector, leaving the PTY dimensions unchanged. Synchronize accepted column changes across core, session, PTY, and the displayed grid. Never resize the IDE window; standalone-window resizing may occur only when the product's resize policy allows it. Define host behavior when the requested columns cannot fit without a window resize, keeping accepted grid and PTY dimensions consistent. Verify both switch directions and host policy outcomes.
 - `TODO(host)`: richer host callbacks for palette updates, terminal notifications, mouse-report policy, and future clipboard decisions when those product surfaces need UI or embedding feedback.
 
 ---
@@ -148,6 +150,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ## Session, Transport, Rendering, and Host Integration Gaps
 
+- `TODO(session)`: startup command inside an interactive shell. Profiles currently specify the launched process and arguments, but cannot separately request a command to execute once that shell is ready. Add host/profile configuration and shell-readiness-aware, once-per-session execution so a tab can start a requested command without replacing its interactive shell or relying on a fixed delay.
+- `TODO(session)`: automatic foreground-process tab titles. Existing titles come from application-reported titles, user overrides, and directory/profile fallbacks; there is no independent foreground-process detection for applications that do not report a title. Add lifecycle-bound process tracking and a product setting for displaying the detected name, preserving custom-title precedence and existing fallbacks when detection is unavailable.
 - `DONE(host/profile)`: IntelliJ **Open in KetraTerm** opens a new tab from local Project View, editor, and editor-tab file contexts. The [feature map](terminal-feature-map.md#7-embedding--swing-ui) defines directory selection and launch behavior.
 - `DONE(host/profile)`: IntelliJ project workspace persistence restores open tabs, custom names, local working directories, profile choice, order, and selection. The [feature map](terminal-feature-map.md#7-embedding--swing-ui) defines lazy startup, directory fallback, and the local-host boundary.
 - `DONE(host/profile)`: IntelliJ project JDK environment injection and its default-on setting follow the reworked IntelliJ terminal's launch precedence. The [feature map](terminal-feature-map.md#7-embedding--swing-ui) defines the supported local SDK and shell boundaries.
