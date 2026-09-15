@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.core.buffer
 
+import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.state.TerminalState
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -23,6 +24,131 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class DefaultTerminalBufferResizeTest {
+    @Test
+    fun `narrowing keeps a retained scrollback anchor after earlier rows are evicted`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 8, initialHeight = 3, maxHistory = 2)
+        writeRows(buffer, "A", "BBBBBB", "C", "D", "E")
+        buffer.positionCursor(col = 0, row = 2)
+        assertEquals(2, buffer.historySize)
+
+        val result = buffer.resize(newWidth = 3, newHeight = 3, oldScrollbackOffset = 1)
+
+        assertAll(
+            { assertEquals(2 to 2, result) },
+            { assertEquals("BBB\nBBB\nC\nD\nE", buffer.getAllAsString()) },
+            { assertEquals("C\nD\nE", buffer.getScreenAsString()) },
+        )
+        val state = stateOf(buffer)
+        assertEquals("BBB", state.ring[state.resolveScrollbackRingIndex(0, result.first)].toTextTrimmed())
+    }
+
+    @Test
+    fun `narrowing clamps an evicted scrollback anchor to the oldest surviving row`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 8, initialHeight = 3, maxHistory = 2)
+        writeRows(buffer, "AAAAAA", "BBBBBB", "CCCCCC", "DDDDDD", "EEEEEE")
+        buffer.positionCursor(col = 0, row = 2)
+        assertEquals(2, buffer.historySize)
+
+        val result = buffer.resize(newWidth = 3, newHeight = 3, oldScrollbackOffset = 1)
+
+        assertAll(
+            { assertEquals(2 to 2, result) },
+            { assertEquals("CCC\nDDD\nDDD\nEEE\nEEE", buffer.getAllAsString()) },
+        )
+        val state = stateOf(buffer)
+        assertEquals("CCC", state.ring[state.resolveScrollbackRingIndex(0, result.first)].toTextTrimmed())
+    }
+
+    @Test
+    fun `narrowing keeps the cursor on retained text when later rows evict earlier output`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 8, initialHeight = 3, maxHistory = 2)
+        writeRows(buffer, "A", "B", "C", "DDDDDD", "EEEEEE")
+        buffer.positionCursor(col = 4, row = 1)
+
+        assertEquals(0 to 2, buffer.resize(newWidth = 3, newHeight = 3))
+
+        assertAll(
+            { assertEquals("C\nDDD\nDDD\nEEE\nEEE", buffer.getAllAsString()) },
+            { assertEquals(1, buffer.cursorCol) },
+            { assertEquals(0, buffer.cursorRow) },
+        )
+        buffer.writeCodepoint('X'.code)
+        assertEquals("C\nDDD\nDXD\nEEE\nEEE", buffer.getAllAsString())
+    }
+
+    @Test
+    fun `narrowing keeps an empty scrollback anchor after earlier rows are evicted`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 8, initialHeight = 3, maxHistory = 2)
+        writeRows(buffer, "AAAAAA", "", "C", "D", "E")
+        buffer.positionCursor(col = 0, row = 2)
+
+        assertEquals(1 to 2, buffer.resize(newWidth = 3, newHeight = 3, oldScrollbackOffset = 1))
+        assertEquals("AAA\n\nC\nD\nE", buffer.getAllAsString())
+    }
+
+    @Test
+    fun `narrowing keeps the cursor on an empty row after later output evicts earlier rows`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 8, initialHeight = 3, maxHistory = 2)
+        writeRows(buffer, "AAAAAA", "B", "", "D", "EEEEEE")
+        buffer.positionCursor(col = 0, row = 0)
+
+        assertEquals(0 to 2, buffer.resize(newWidth = 3, newHeight = 4))
+        assertAll(
+            { assertEquals("AAA\nB\n\nD\nEEE\nEEE", buffer.getAllAsString()) },
+            { assertEquals(0, buffer.cursorRow) },
+            { assertEquals(0, buffer.cursorCol) },
+        )
+        buffer.writeCodepoint('X'.code)
+        assertEquals("AAA\nB\nX\nD\nEEE\nEEE", buffer.getAllAsString())
+    }
+
+    @ParameterizedTest
+    @CsvSource("中, 2, Z", "e\u0301, 1, YZ", "👩‍💻, 2, Z")
+    fun `narrowing keeps cursor and Unicode content together across history eviction`(
+        glyph: String,
+        glyphWidth: Int,
+        tail: String,
+    ) {
+        val buffer = DefaultTerminalBuffer(initialWidth = 8, initialHeight = 3, maxHistory = 2)
+        writeRows(buffer, "A", "B", "C", "abc", "EEEEEE")
+        buffer.positionCursor(col = 3, row = 1)
+        val codepoints = glyph.codePoints().toArray()
+        buffer.writeCluster(codepoints)
+        buffer.writeText(tail)
+        buffer.positionCursor(col = 3, row = 1)
+
+        assertEquals(0 to 2, buffer.resize(newWidth = 3, newHeight = 3))
+
+        assertAll(
+            { assertEquals("C\nabc\n$glyph$tail\nEEE\nEEE", buffer.getAllAsString()) },
+            { assertEquals(0, buffer.cursorRow) },
+            { assertEquals(0, buffer.cursorCol) },
+        )
+        val state = stateOf(buffer)
+        val line = state.ring[state.resolveRingIndex(buffer.cursorRow)]
+        if (codepoints.size > 1) {
+            val actual = IntArray(codepoints.size)
+            assertEquals(codepoints.size, line.readCluster(buffer.cursorCol, actual))
+            assertArrayEquals(codepoints, actual)
+        }
+        if (glyphWidth == 2) {
+            assertEquals(TerminalConstants.WIDE_CHAR_SPACER, line.getCodepoint(1))
+        }
+    }
+
+    private fun writeRows(
+        buffer: DefaultTerminalBuffer,
+        vararg rows: String,
+    ) {
+        for ((index, text) in rows.withIndex()) {
+            if (index > 0) {
+                buffer.carriageReturn()
+                buffer.newLine()
+            }
+            buffer.writeText(text)
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["abc中x", "ab 中x"])
     fun `widening after immediate wide prewrap removes only artificial padding`(text: String) {
