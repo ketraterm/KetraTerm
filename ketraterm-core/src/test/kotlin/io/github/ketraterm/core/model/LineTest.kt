@@ -27,6 +27,45 @@ import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("Line Test Suite")
 class LineTest {
+    @Test
+    fun `edits before trailing wrap padding preserve its provenance`() {
+        val line = line(4)
+        line.wrapped = true
+        line.endsWithWrapPadding = true
+
+        line.setCell(0, 'a'.code, 0)
+        line.setCluster(1, intArrayOf('e'.code, 0x0301), 2, 0)
+        line.setRawCell(2, 'c'.code, 0)
+        line.clearToColumn(1, 0)
+        line.clearRange(1, 3, 0)
+        line.insertCellsInRange(0, 1, 2, 0)
+        line.deleteCellsInRange(0, 1, 2, 0)
+        line.setCellAttributes(3, 1, 2)
+
+        assertTrue(line.endsWithWrapPadding)
+        assertEquals(TerminalConstants.EMPTY, line.rawCodepoint(3))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["raw write", "clear prefix", "clear suffix", "clear range", "fill", "clear", "unwrap"])
+    fun `replacing the final cell or removing its wrap clears padding provenance`(operation: String) {
+        val line = line(4)
+        line.wrapped = true
+        line.endsWithWrapPadding = true
+
+        when (operation) {
+            "raw write" -> line.setRawCell(3, 'x'.code, 0)
+            "clear prefix" -> line.clearToColumn(3, 0)
+            "clear suffix" -> line.clearFromColumn(3, 0)
+            "clear range" -> line.clearRange(2, 4, 0)
+            "fill" -> line.fill(TerminalConstants.EMPTY, 0)
+            "clear" -> line.clear(0)
+            "unwrap" -> line.wrapped = false
+        }
+
+        assertFalse(line.endsWithWrapPadding)
+    }
+
     // Every test gets a fresh store. Lines within the same test share one store
     // to reflect the real ownership model (all lines in a ring share one store).
     private fun store() = ClusterStore()

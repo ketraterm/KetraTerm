@@ -29,6 +29,8 @@ import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
  * Linear selections use logical columns in stored text order. Block selections
  * use visual columns and the same horizontal interval on every selected row;
  * copying a block maps its cells back to logical order independently per row.
+ * A linear selection crossing a hard row boundary includes its newline even
+ * when an endpoint selects no cells on that row. Soft wraps contribute no newline.
  *
  * @property anchorColumn zero-based anchor caret column.
  * @property anchorRow zero-based anchor row.

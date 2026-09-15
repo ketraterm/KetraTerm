@@ -107,16 +107,16 @@ internal class ShellIntegrationCommandTextExtractor(
             copyLine(frame, row)
             if (!validClusterData) return null
 
+            val wrapped = frame.lineWrapped(row)
             val fromColumn = if (row == startRow) startColumn else 0
             val toColumn =
                 when {
-                    row < endRow -> lastTextColumnExclusive(frame.columns)
-                    cursorAtNextLineStart -> lastTextColumnExclusive(frame.columns)
+                    row < endRow || cursorAtNextLineStart -> lastTextColumnExclusive(frame.columns, preserveWrapColumns = wrapped)
                     else -> cursorColumn.coerceIn(0, frame.columns)
                 }
             if (toColumn < fromColumn || !appendCopiedRange(fromColumn, toColumn)) return null
 
-            if (row < endRow && !frame.lineWrapped(row) && !appendCodePoint('\n'.code)) return null
+            if (row < endRow && !wrapped && !appendCodePoint('\n'.code)) return null
             row++
         }
         return builder.toString()
@@ -226,11 +226,11 @@ internal class ShellIntegrationCommandTextExtractor(
                 }
             }
 
+            val wrapped = frame?.lineWrapped(row) ?: cache!!.lineWrapped[row]
             val fromColumn = if (row == startRow) startColumn else 0
             val toColumn =
                 when {
-                    row < endRow -> lastTextColumnExclusive(columns)
-                    cursorAtNextLineStart -> lastTextColumnExclusive(columns)
+                    row < endRow || cursorAtNextLineStart -> lastTextColumnExclusive(columns, preserveWrapColumns = wrapped)
                     else -> cursorColumn.coerceIn(0, columns)
                 }
             if (toColumn < fromColumn) return TerminalShellCommandFingerprintStatus.INVALID
@@ -238,7 +238,12 @@ internal class ShellIntegrationCommandTextExtractor(
             var column = fromColumn
             while (column < toColumn) {
                 val cellFlags = flags[column]
+                if (!TerminalRenderCellFlags.isValidCombination(cellFlags)) return TerminalShellCommandFingerprintStatus.INVALID
                 when {
+                    cellFlags == TerminalRenderCellFlags.EMPTY -> {
+                        if (!hashCodePoint(' '.code, destination)) return TerminalShellCommandFingerprintStatus.INVALID
+                    }
+                    cellFlags and TerminalRenderCellFlags.WRAP_PADDING != 0 -> Unit
                     cellFlags and TerminalRenderCellFlags.WIDE_TRAILING != 0 -> Unit
                     cellFlags and TerminalRenderCellFlags.CODEPOINT != 0 -> {
                         if (!hashCodePoint(codeWords[column], destination)) {
@@ -265,7 +270,7 @@ internal class ShellIntegrationCommandTextExtractor(
                 column++
             }
 
-            if (row < endRow && !(frame?.lineWrapped(row) ?: cache!!.lineWrapped[row])) {
+            if (row < endRow && !wrapped) {
                 if (!hashCodePoint('\n'.code, destination)) {
                     return TerminalShellCommandFingerprintStatus.INVALID
                 }
@@ -405,11 +410,21 @@ internal class ShellIntegrationCommandTextExtractor(
         clusterCodePoints = clusterCodePoints.copyOf(capacity)
     }
 
-    private fun lastTextColumnExclusive(columns: Int): Int {
+    private fun lastTextColumnExclusive(
+        columns: Int,
+        preserveWrapColumns: Boolean = false,
+    ): Int {
         var column = columns - 1
+        if (preserveWrapColumns) {
+            while (column >= 0 && flags[column] == (TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING)) column--
+            return column + 1
+        }
         while (column >= 0) {
             val cellFlags = flags[column]
-            if (cellFlags != TerminalRenderCellFlags.EMPTY) {
+            if (
+                cellFlags != TerminalRenderCellFlags.EMPTY &&
+                cellFlags != (TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING)
+            ) {
                 if (cellFlags and TerminalRenderCellFlags.CODEPOINT != 0) {
                     val code = codeWords[column]
                     if (code != 0 && code != 0x20) {
@@ -431,7 +446,12 @@ internal class ShellIntegrationCommandTextExtractor(
         var column = startColumn
         while (column < endColumn) {
             val cellFlags = flags[column]
+            if (!TerminalRenderCellFlags.isValidCombination(cellFlags)) return false
             when {
+                cellFlags == TerminalRenderCellFlags.EMPTY -> {
+                    if (!appendCodePoint(' '.code)) return false
+                }
+                cellFlags and TerminalRenderCellFlags.WRAP_PADDING != 0 -> Unit
                 cellFlags and TerminalRenderCellFlags.WIDE_TRAILING != 0 -> Unit
                 cellFlags and TerminalRenderCellFlags.CODEPOINT != 0 -> {
                     if (!appendCodePoint(codeWords[column])) return false

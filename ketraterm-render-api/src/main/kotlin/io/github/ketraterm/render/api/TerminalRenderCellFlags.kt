@@ -15,18 +15,13 @@
  */
 package io.github.ketraterm.render.api
 
-import io.github.ketraterm.render.api.TerminalRenderCellFlags.CLUSTER
-import io.github.ketraterm.render.api.TerminalRenderCellFlags.CODEPOINT
-import io.github.ketraterm.render.api.TerminalRenderCellFlags.EMPTY
-import io.github.ketraterm.render.api.TerminalRenderCellFlags.WIDE_LEADING
-import io.github.ketraterm.render.api.TerminalRenderCellFlags.WIDE_TRAILING
-
 /**
  * Public render cell flag bit set.
  *
  * Valid combinations are:
  *
  * - [EMPTY]
+ * - [EMPTY] or [WRAP_PADDING]
  * - [CODEPOINT]
  * - [CODEPOINT] or [WIDE_LEADING]
  * - [CLUSTER]
@@ -62,6 +57,17 @@ object TerminalRenderCellFlags {
     const val WIDE_TRAILING: Int = 1 shl 4
 
     /**
+     * Artificial final-column blank inserted when a width-2 glyph moves to the
+     * next physical row. Valid only with [EMPTY], at the last column of a row
+     * whose [TerminalRenderFrame.lineWrapped] is `true`.
+     *
+     * Logical text extraction omits this cell when joining soft-wrapped rows;
+     * ordinary empty cells still represent spaces within a logical line.
+     * Rendering and rectangular selection retain its physical cell geometry.
+     */
+    const val WRAP_PADDING: Int = 1 shl 5
+
+    /**
      * Returns whether [flags] is one of the valid public render cell flag
      * combinations.
      *
@@ -71,6 +77,7 @@ object TerminalRenderCellFlags {
     fun isValidCombination(flags: Int): Boolean =
         when (flags) {
             EMPTY,
+            EMPTY or WRAP_PADDING,
             CODEPOINT,
             CODEPOINT or WIDE_LEADING,
             CLUSTER,

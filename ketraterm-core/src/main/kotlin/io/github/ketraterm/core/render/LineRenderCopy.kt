@@ -18,6 +18,7 @@ package io.github.ketraterm.core.render
 import io.github.ketraterm.core.codec.AttributeCodec
 import io.github.ketraterm.core.model.Line
 import io.github.ketraterm.core.model.TerminalConstants
+import io.github.ketraterm.render.api.TerminalRenderCellFlags
 
 internal fun Line.copyToRenderAbi(
     width: Int,
@@ -77,6 +78,9 @@ internal fun Line.copyToRenderAbi(
         }
         col++
     }
+    if (endsWithWrapPadding && wrapped && width == this.width) {
+        flags[flagOffset + width - 1] = TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING
+    }
 }
 
 private fun Line.cellFlags(
@@ -84,19 +88,19 @@ private fun Line.cellFlags(
     raw: Int,
 ): Int =
     when {
-        raw == TerminalConstants.EMPTY -> io.github.ketraterm.render.api.TerminalRenderCellFlags.EMPTY
-        raw == TerminalConstants.WIDE_CHAR_SPACER -> io.github.ketraterm.render.api.TerminalRenderCellFlags.WIDE_TRAILING
+        raw == TerminalConstants.EMPTY -> TerminalRenderCellFlags.EMPTY
+        raw == TerminalConstants.WIDE_CHAR_SPACER -> TerminalRenderCellFlags.WIDE_TRAILING
         raw <= TerminalConstants.CLUSTER_HANDLE_MAX -> {
-            var flags = io.github.ketraterm.render.api.TerminalRenderCellFlags.CLUSTER
+            var flags = TerminalRenderCellFlags.CLUSTER
             if (isWideLeading(col)) {
-                flags = flags or io.github.ketraterm.render.api.TerminalRenderCellFlags.WIDE_LEADING
+                flags = flags or TerminalRenderCellFlags.WIDE_LEADING
             }
             flags
         }
         else -> {
-            var flags = io.github.ketraterm.render.api.TerminalRenderCellFlags.CODEPOINT
+            var flags = TerminalRenderCellFlags.CODEPOINT
             if (isWideLeading(col)) {
-                flags = flags or io.github.ketraterm.render.api.TerminalRenderCellFlags.WIDE_LEADING
+                flags = flags or TerminalRenderCellFlags.WIDE_LEADING
             }
             flags
         }

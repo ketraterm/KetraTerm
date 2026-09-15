@@ -269,7 +269,7 @@ internal object TerminalResizer {
                     chunkLength < newWidth &&
                     offset + chunkLength < builder.size
                 ) {
-                    newLine.endsWithResizePadding = true
+                    newLine.endsWithWrapPadding = true
                 }
 
                 offset += chunkLength
@@ -342,7 +342,7 @@ internal object TerminalResizer {
              * the continuation geometry.
              */
             val dataLength =
-                if (oldLine.wrapped && logicalLen > 0) {
+                if (oldLine.wrapped) {
                     oldWidth
                 } else {
                     logicalLen
@@ -367,10 +367,10 @@ internal object TerminalResizer {
 
             for (col in 0 until readLength) {
                 /*
-                 * Resize padding is not logical terminal content.
+                 * Padding before a wrapped wide glyph is not logical terminal content.
                  */
                 if (
-                    oldLine.endsWithResizePadding &&
+                    oldLine.endsWithWrapPadding &&
                     col == oldLine.width - 1
                 ) {
                     continue
@@ -518,7 +518,7 @@ internal object TerminalResizer {
      * Returns the index one past the last durable cell.
      *
      * Raw values are used so cluster handles count as content. Temporary
-     * resize-only wide padding is excluded.
+     * wide-wrap padding is excluded.
      */
     private fun getLogicalLength(line: Line): Int {
         var len = line.width
@@ -526,13 +526,6 @@ internal object TerminalResizer {
         while (
             len > 0 &&
             line.rawCodepoint(len - 1) == TerminalConstants.EMPTY
-        ) {
-            len--
-        }
-
-        if (
-            line.endsWithResizePadding &&
-            len == line.width
         ) {
             len--
         }

@@ -705,7 +705,7 @@ class TerminalRenderCache(
         var index = offset
         while (index < end) {
             if (
-                flags[index] != TerminalRenderCellFlags.EMPTY &&
+                flags[index] and TerminalRenderCellFlags.EMPTY == 0 &&
                 TerminalRenderAttrs.isBlink(attrWords[index])
             ) {
                 return true

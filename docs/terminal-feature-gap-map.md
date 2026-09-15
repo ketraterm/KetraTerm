@@ -99,7 +99,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 ### Grid Operations
 - DONE(core): deterministic randomized left/right-margin properties cover ICH/DCH, selective erase, IL/DL, and partial-region scroll up/down. They model guard-column movement, preserve rows outside the scroll region, and verify protected wide spans plus wide/cluster storage invariants.
 - `TODO(core)`: scrollback policy under alternate-screen and private-mode combinations beyond tested full-viewport and top-anchored primary-screen regions.
-- `TODO(core)`: soft-wrap metadata compatibility with copy/paste/export.
+- `DONE(core/session/ui)`: soft-wrap text reconstruction preserves written and erased spaces for linear selection, command capture, clipboard copy/paste, and retained-output export. Core distinguishes artificial wide-character wrap padding from meaningful empty cells and preserves that distinction through resize/reflow. Selected hard line breaks survive empty selection endpoints; block selections retain physical row breaks.
 
 ### Unicode Width
 - `TODO(core)`: invalid/unassigned codepoint width policy.

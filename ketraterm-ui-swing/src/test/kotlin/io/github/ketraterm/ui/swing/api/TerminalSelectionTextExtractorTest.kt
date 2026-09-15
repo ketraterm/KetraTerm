@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalSelectionTextExtractorTest {
     private val extractor = TerminalSelectionTextExtractor()
@@ -106,6 +107,175 @@ class TerminalSelectionTextExtractorTest {
         val selection = CellSelection(anchorColumn = 0, anchorRow = 0, caretColumn = 2, caretRow = 1)
 
         assertEquals("abcd", extractor.selectedText(cache, selection, joinSoftWrappedRows = true))
+    }
+
+    @Test
+    fun `linear copy preserves a separator space at a soft wrap boundary`() {
+        val frame =
+            object : TestRenderFrame(arrayOf(textCells("echo "), textCells("test "))) {
+                override fun lineWrapped(row: Int): Boolean = row == 0
+            }
+        val selection = CellSelection(0, 0, 4, 1)
+
+        assertEquals("echo test", extractor.selectedText(renderCache(frame), selection, joinSoftWrappedRows = true))
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [1, 2, 5, 8, 13, 80])
+    fun `copying a quoted path preserves text at different wrap widths`(columns: Int) {
+        val text = "cat '/work/my project/file.txt'"
+        val chunks = text.chunked(columns)
+        val cells =
+            chunks
+                .map { chunk ->
+                    Array(columns) { column ->
+                        if (column < chunk.length) {
+                            TestCell(codeWord = chunk[column].code, flags = TerminalRenderCellFlags.CODEPOINT)
+                        } else {
+                            TestCell()
+                        }
+                    }
+                }.toTypedArray()
+        val frame =
+            object : TestRenderFrame(cells) {
+                override fun lineWrapped(row: Int): Boolean = row < chunks.lastIndex
+            }
+        val selection = CellSelection(0, 0, chunks.last().length, chunks.lastIndex)
+
+        assertEquals(text, extractor.selectedText(renderCache(frame), selection, joinSoftWrappedRows = true))
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `partial wrapped copy preserves spaces in both selection directions`(backward: Boolean) {
+        val frame =
+            object : TestRenderFrame(arrayOf(textCells(">abc "), textCells("def!?"))) {
+                override fun lineWrapped(row: Int): Boolean = row == 0
+            }
+        val selection = if (backward) CellSelection(3, 1, 1, 0) else CellSelection(1, 0, 3, 1)
+
+        assertEquals("abc def", extractor.selectedText(renderCache(frame), selection, joinSoftWrappedRows = true))
+    }
+
+    @Test
+    fun `linear copy preserves a fully blank physical row inside a logical line`() {
+        val frame =
+            object : TestRenderFrame(arrayOf(textCells("ab  "), textCells("    "), textCells("  cd"))) {
+                override fun lineWrapped(row: Int): Boolean = row < 2
+            }
+        val selection = CellSelection(0, 0, 4, 2)
+
+        assertEquals("ab        cd", extractor.selectedText(renderCache(frame), selection, joinSoftWrappedRows = true))
+    }
+
+    @Test
+    fun `linear copy preserves erased cells across wrapped rows`() {
+        val frame =
+            object : TestRenderFrame(
+                arrayOf(textCells("ab") + arrayOf(TestCell(), TestCell()), Array(4) { TestCell() }, textCells("  cd")),
+            ) {
+                override fun lineWrapped(row: Int): Boolean = row < 2
+            }
+        val selection = CellSelection(0, 0, 4, 2)
+
+        assertEquals("ab        cd", extractor.selectedText(renderCache(frame), selection, joinSoftWrappedRows = true))
+    }
+
+    @Test
+    fun `partial row copy preserves selected spaces before unselected text`() {
+        val cache = renderCache(TestRenderFrame.text("echo test"))
+        val selection = CellSelection(0, 0, 5, 0)
+
+        assertEquals("echo ", extractor.selectedText(cache, selection, joinSoftWrappedRows = true))
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `selection ending at the next row start includes only a hard line break`(softWrapped: Boolean) {
+        val frame =
+            object : TestRenderFrame(arrayOf(textCells("left"), textCells("next"))) {
+                override fun lineWrapped(row: Int): Boolean = row == 0 && softWrapped
+            }
+        val selection = CellSelection(0, 0, 0, 1)
+
+        assertEquals(
+            if (softWrapped) "left" else "left\n",
+            extractor.selectedText(renderCache(frame), selection, joinSoftWrappedRows = true),
+        )
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `selection starting at the preceding row end includes only a hard line break`(softWrapped: Boolean) {
+        val frame =
+            object : TestRenderFrame(arrayOf(textCells("left"), textCells("next"))) {
+                override fun lineWrapped(row: Int): Boolean = row == 0 && softWrapped
+            }
+        val selection = CellSelection(4, 0, 4, 1)
+
+        assertEquals(
+            if (softWrapped) "next" else "\nnext",
+            extractor.selectedText(renderCache(frame), selection, joinSoftWrappedRows = true),
+        )
+    }
+
+    @Test
+    fun `linear copy keeps hard breaks and indentation around wrapped lines`() {
+        val frame =
+            object : TestRenderFrame(arrayOf(textCells("one "), textCells("  tw"), textCells("o   "), textCells("done"))) {
+                override fun lineWrapped(row: Int): Boolean = row == 1
+            }
+        val selection = CellSelection(0, 0, 4, 3)
+
+        assertEquals("one\n  two\ndone", extractor.selectedText(renderCache(frame), selection, joinSoftWrappedRows = true))
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `wide character wrap omits empty padding but preserves a preceding real space`(hasSeparator: Boolean) {
+        val firstRow =
+            textCells(if (hasSeparator) "ab " else "abc") +
+                TestCell(flags = TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING)
+        val secondRow =
+            arrayOf(
+                TestCell(codeWord = '中'.code, flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING),
+                TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING),
+                TestCell(codeWord = 'x'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+                TestCell(),
+            )
+        val frame =
+            object : TestRenderFrame(arrayOf(firstRow, secondRow)) {
+                override fun lineWrapped(row: Int): Boolean = row == 0
+            }
+        val selection = CellSelection(0, 0, 3, 1)
+
+        assertEquals(
+            if (hasSeparator) "ab 中x" else "abc中x",
+            extractor.selectedText(renderCache(frame), selection, joinSoftWrappedRows = true),
+        )
+    }
+
+    @Test
+    fun `wrapped copy keeps combining and emoji clusters intact`() {
+        val firstRow =
+            arrayOf(
+                TestCell(codeWord = 'A'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+                TestCell(flags = TerminalRenderCellFlags.CLUSTER, cluster = "e\u0301"),
+                TestCell(codeWord = 'B'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+            )
+        val secondRow =
+            arrayOf(
+                TestCell(flags = TerminalRenderCellFlags.CLUSTER or TerminalRenderCellFlags.WIDE_LEADING, cluster = "👩‍💻"),
+                TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING),
+                TestCell(codeWord = 'C'.code, flags = TerminalRenderCellFlags.CODEPOINT),
+            )
+        val frame =
+            object : TestRenderFrame(arrayOf(firstRow, secondRow)) {
+                override fun lineWrapped(row: Int): Boolean = row == 0
+            }
+        val selection = CellSelection(0, 0, 3, 1)
+
+        assertEquals("Ae\u0301B👩‍💻C", extractor.selectedText(renderCache(frame), selection, joinSoftWrappedRows = true))
     }
 
     @Test

@@ -173,6 +173,36 @@ class TerminalShellCommandLineObservationTest {
         }
 
     @Test
+    fun `erasing a wrapped character preserves its space and invalidates the command revision`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
+                runCurrent()
+                fixture.feed("\u001B]133;A\u0007P> \u001B]133;B\u0007echo" + " ".repeat(21) + "X\u754C\u001B[0m")
+                runCurrent()
+                val before = fixture.session.activeShellCommandLine()
+                val previousRevision = fixture.session.activeShellCommandLineRevision.value
+                assertEquals("echo" + " ".repeat(21) + "X\u754C", before?.commandText)
+                assertTrue(previousRevision >= 0L)
+
+                fixture.feed("\u001B[1;29H\u001B[X\u001B[2;3H")
+                runCurrent()
+
+                val after = fixture.session.activeShellCommandLine()
+                assertEquals("echo" + " ".repeat(22) + "\u754C", after?.commandText)
+                assertEquals(before?.cursorRow, after?.cursorRow)
+                assertEquals(before?.cursorColumn, after?.cursorColumn)
+                assertTrue(fixture.session.activeShellCommandLineRevision.value > previousRevision)
+
+                val erasedRevision = fixture.session.activeShellCommandLineRevision.value
+                fixture.feed("\u001B[1;29H \u001B[2;3H")
+                runCurrent()
+                assertEquals(after, fixture.session.activeShellCommandLine())
+                assertEquals(erasedRevision, fixture.session.activeShellCommandLineRevision.value)
+            }
+        }
+
+    @Test
     fun `observation skips scrolled viewports and resumes when the live viewport returns`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->

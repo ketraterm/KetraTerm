@@ -20,6 +20,17 @@ import org.junit.jupiter.api.Test
 
 class TerminalRenderCellFlagsTest {
     @Test
+    fun `wrap padding is valid only on an empty cell`() {
+        for (baseFlags in 0 until TerminalRenderCellFlags.WRAP_PADDING) {
+            assertEquals(
+                baseFlags == TerminalRenderCellFlags.EMPTY,
+                TerminalRenderCellFlags.isValidCombination(baseFlags or TerminalRenderCellFlags.WRAP_PADDING),
+                "padding with base flags $baseFlags",
+            )
+        }
+    }
+
+    @Test
     fun `valid flag combinations match public cell encoding contract`() {
         assertAll(
             { assertTrue(TerminalRenderCellFlags.isValidCombination(TerminalRenderCellFlags.EMPTY)) },

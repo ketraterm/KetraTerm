@@ -682,6 +682,106 @@ class SwingTerminalSelectionTest {
     }
 
     @Test
+    fun `copy and paste preserve wrapped word separators and hard line breaks`() {
+        val frame =
+            object : TestRenderFrame(
+                arrayOf("echo ", "test", "done")
+                    .map { text ->
+                        Array(5) { column ->
+                            if (column < text.length) {
+                                TestCell(codeWord = text[column].code, flags = TerminalRenderCellFlags.CODEPOINT)
+                            } else {
+                                TestCell()
+                            }
+                        }
+                    }.toTypedArray(),
+            ) {
+                override fun lineWrapped(row: Int): Boolean = row == 0
+            }
+        var clipboardText: String? = null
+        val clipboard =
+            object : TerminalClipboardHandler {
+                override fun copyText(text: String) {
+                    clipboardText = text
+                }
+
+                override fun readText(): String? = clipboardText
+            }
+        val input = RecordingInputEncoder()
+        val session = testSession(frame, inputEncoder = input)
+        val component =
+            createComponent(
+                settingsProvider = { SwingSettings(padding = SwingPadding(), shellIntegrationDecorationGutterWidth = 0) },
+                hostServices = SwingHostServices(clipboardHandler = clipboard),
+            )
+        try {
+            session.start(columns = 5, rows = 3)
+            SwingUtilities.invokeAndWait {
+                component.size = component.preferredGridSize(5, 3)
+                component.bind(session)
+                assertTrue(component.selectAll())
+                assertTrue(component.copySelectionToClipboard())
+                assertTrue(component.pasteClipboardText())
+                assertAll(
+                    { assertEquals("echo test\ndone", clipboardText) },
+                    { assertEquals("echo test\ndone", input.pasteText.get()) },
+                )
+            }
+        } finally {
+            SwingUtilities.invokeAndWait { component.dispose() }
+            session.close()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `partial multiline copy joins soft wraps only for normal selection`(block: Boolean) {
+        val frame =
+            object : TestRenderFrame(
+                arrayOf("abcde", "fghij")
+                    .map { text ->
+                        Array(text.length) { column ->
+                            TestCell(codeWord = text[column].code, flags = TerminalRenderCellFlags.CODEPOINT)
+                        }
+                    }.toTypedArray(),
+            ) {
+                override fun lineWrapped(row: Int): Boolean = row == 0
+            }
+        val clipboard = RecordingClipboard()
+        val session = testSession(frame)
+        val settings = SwingSettings(padding = SwingPadding(), shellIntegrationDecorationGutterWidth = 0)
+        val component =
+            createComponent(
+                settingsProvider = { settings },
+                hostServices = SwingHostServices(clipboardHandler = clipboard),
+            )
+        try {
+            SwingUtilities.invokeAndWait {
+                component.size = component.preferredGridSize(5, 2)
+                component.bind(session)
+                val metrics = SwingMetrics.from(component.getFontMetrics(settings.font))
+                val startX = metrics.cellWidth + 1
+                val endX = 3 * metrics.cellWidth + 1
+                val endY = metrics.cellHeight + 1
+                val press =
+                    if (block) mousePressedWithAlt(component, startX, 1) else mousePressed(component, startX, 1, 1)
+                val drag =
+                    if (block) mouseDraggedWithAlt(component, endX, endY) else mouseDragged(component, endX, endY)
+                component.mouseListeners.forEach { it.mousePressed(press) }
+                component.mouseMotionListeners.forEach { it.mouseDragged(drag) }
+                component.mouseListeners.forEach { it.mouseReleased(mouseReleased(component, endX, endY)) }
+
+                assertEquals(CellSelection(1, 0, 4, 1, isBlock = block), component.currentSelection())
+                assertTrue(component.copySelectionToClipboard())
+                assertEquals(if (block) "bcd\nghi" else "bcdefghi", clipboard.copied.get())
+            }
+        } finally {
+            SwingUtilities.invokeAndWait { component.dispose() }
+            session.close()
+        }
+    }
+
+    @Test
     fun `copySelectionToClipboard ignores selected empty cells after row content`() {
         val clipboard = RecordingClipboard()
         val frame =

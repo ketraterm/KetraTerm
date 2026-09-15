@@ -23,6 +23,7 @@ import io.github.ketraterm.input.event.*
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
+import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -781,6 +783,173 @@ class TerminalSessionTest {
         val recordId = session.shellDecorations().commandRecordIds[0]
         assertEquals("abcdefghijk", session.shellIntegrationState.commandText(recordId))
         session.close()
+    }
+
+    @Test
+    fun `OSC 133 command start preserves argument separator at soft wrap`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 8, rows = 4).use { session ->
+            connector.feedFromHost(
+                "\u001B]133;A\u0007P> \u001B]133;B\u0007echo hello\u001B]133;C\u0007".ascii(),
+            )
+
+            val recordId = session.shellDecorations().commandRecordIds[0]
+            assertEquals("echo hello", session.shellIntegrationState.commandText(recordId))
+        }
+    }
+
+    @Test
+    fun `OSC 133 command start preserves a soft wrapped row containing only spaces`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 8, rows = 4).use { session ->
+            val command = "echo" + " ".repeat(9) + "hello"
+            connector.feedFromHost(
+                ("\u001B]133;A\u0007P> \u001B]133;B\u0007" + command + "\u001B]133;C\u0007").ascii(),
+            )
+
+            val recordId = session.shellDecorations().commandRecordIds[0]
+            assertEquals("echo" + " ".repeat(9) + "hello", session.shellIntegrationState.commandText(recordId))
+        }
+    }
+
+    @Test
+    fun `OSC 133 command start preserves wrapped argument separators after prompt enters scrollback`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 8, rows = 2).use { session ->
+            connector.feedFromHost(
+                "\u001B]133;A\u0007P> \u001B]133;B\u0007echo first second third\u001B]133;C\u0007".ascii(),
+            )
+
+            val recordId = session.shellDecorations().commandRecordIds[1]
+            assertEquals("echo first second third", session.shellIntegrationState.commandText(recordId))
+        }
+    }
+
+    @Test
+    fun `OSC 133 command start preserves spaces before wide glyph wrap padding`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 10, rows = 4).use { session ->
+            connector.feedFromHost(
+                "\u001B]133;A\u0007P> \u001B]133;B\u0007echo  \u754C\u001B]133;C\u0007"
+                    .toByteArray(StandardCharsets.UTF_8),
+            )
+
+            val recordId = session.shellDecorations().commandRecordIds[0]
+            assertEquals("echo  \u754C", session.shellIntegrationState.commandText(recordId))
+        }
+    }
+
+    @Test
+    fun `OSC 133 command start preserves spaces before grapheme cluster wrap padding`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 10, rows = 4).use { session ->
+            connector.feedFromHost(
+                "\u001B]133;A\u0007P> \u001B]133;B\u0007echo  \uD83D\uDC69\u200D\uD83D\uDCBB\u001B]133;C\u0007"
+                    .toByteArray(StandardCharsets.UTF_8),
+            )
+
+            val recordId = session.shellDecorations().commandRecordIds[0]
+            assertEquals("echo  \uD83D\uDC69\u200D\uD83D\uDCBB", session.shellIntegrationState.commandText(recordId))
+        }
+    }
+
+    @Test
+    fun `OSC 133 command start preserves erased cells at a soft wrap boundary`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 8, rows = 4).use { session ->
+            connector.feedFromHost(
+                "\u001B]133;A\u0007P> \u001B]133;B\u0007echoXhello\u001B[1;8H\u001B[X\u001B[2;6H\u001B]133;C\u0007".ascii(),
+            )
+
+            val recordId = session.shellDecorations().commandRecordIds[0]
+            assertEquals("echo hello", session.shellIntegrationState.commandText(recordId))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["echo hello", "echo         hello", "echo  \u754C", "echo  \uD83D\uDC69\u200D\uD83D\uDCBB"])
+    fun `command text and frame and cache fingerprints agree across soft wrap widths`(command: String) {
+        val extractor = ShellIntegrationCommandTextExtractor()
+        val boundedExtractor = ShellIntegrationCommandTextExtractor(maxTextLength = command.length - 1)
+        var unwrappedFingerprint: LongArray? = null
+        for (columns in listOf(80, 8, 10)) {
+            val connector = MockConnector()
+            createStartedSession(connector, columns = columns, rows = 4).use { session ->
+                connector.feedFromHost(
+                    ("\u001B]133;A\u0007P> \u001B]133;B\u0007" + command + "\u001B[0m")
+                        .toByteArray(StandardCharsets.UTF_8),
+                )
+                val frameFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+                session.readRenderFrame { frame ->
+                    val lineId = frame.lineId(0)
+                    val cursor = frame.cursor
+                    assertEquals(command, extractor.extract(frame, lineId, 3, cursor.row, cursor.column))
+                    assertEquals(
+                        TerminalShellCommandFingerprintStatus.COMPLETE,
+                        extractor.fingerprint(frame, lineId, 3, cursor.row, cursor.column, frameFingerprint),
+                    )
+                    assertNull(boundedExtractor.extract(frame, lineId, 3, cursor.row, cursor.column))
+                    assertEquals(
+                        TerminalShellCommandFingerprintStatus.INVALID,
+                        boundedExtractor.fingerprint(
+                            frame,
+                            lineId,
+                            3,
+                            cursor.row,
+                            cursor.column,
+                            LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS),
+                        ),
+                    )
+                }
+                val cache = TerminalRenderCache(columns, 4).also { it.updateFrom(session) }
+                val cacheFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
+                assertEquals(
+                    TerminalShellCommandFingerprintStatus.COMPLETE,
+                    extractor.fingerprint(cache, cache.lineIds[0], 3, cache.cursorRow, cache.cursorColumn, cacheFingerprint),
+                )
+                assertArrayEquals(frameFingerprint, cacheFingerprint)
+                assertEquals(command.length.toLong(), frameFingerprint[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX])
+                assertEquals(
+                    TerminalShellCommandFingerprintStatus.INVALID,
+                    boundedExtractor.fingerprint(
+                        cache,
+                        cache.lineIds[0],
+                        3,
+                        cache.cursorRow,
+                        cache.cursorColumn,
+                        LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS),
+                    ),
+                )
+                if (columns == 80) {
+                    unwrappedFingerprint = frameFingerprint
+                } else {
+                    assertArrayEquals(unwrappedFingerprint, frameFingerprint, "fingerprint at width $columns")
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0, TerminalRenderCellFlags.CLUSTER])
+    fun `wrapped command fingerprint rejects invalid cell flags or missing cluster data`(invalidFlags: Int) {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 8, rows = 4).use { session ->
+            connector.feedFromHost("\u001B]133;A\u0007P> \u001B]133;B\u0007echo hello\u001B[0m".ascii())
+            val cache = TerminalRenderCache(8, 4).also { it.updateFrom(session) }
+            cache.flags[4] = invalidFlags
+
+            assertEquals(
+                TerminalShellCommandFingerprintStatus.INVALID,
+                ShellIntegrationCommandTextExtractor().fingerprint(
+                    cache,
+                    cache.lineIds[0],
+                    3,
+                    cache.cursorRow,
+                    cache.cursorColumn,
+                    LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS),
+                ),
+            )
+        }
     }
 
     @Test
