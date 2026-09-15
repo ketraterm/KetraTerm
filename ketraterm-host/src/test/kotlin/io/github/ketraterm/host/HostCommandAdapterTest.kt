@@ -25,6 +25,7 @@ import io.github.ketraterm.protocol.*
 import io.github.ketraterm.protocol.keyboard.FormatOtherKeysMode
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.protocol.keyboard.ModifyOtherKeysMode
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import org.junit.jupiter.api.Assertions.*
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("HostCommandAdapter")
@@ -1009,6 +1011,193 @@ class HostCommandAdapterTest {
                     { assertFalse(frame.cursor.blinking) },
                     { assertEquals(TerminalRenderCursorShape.BAR, frame.cursor.shape) },
                 )
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("alternate screen history")
+    inner class AlternateScreenHistory {
+        @ParameterizedTest(name = "enter {0}, exit {1}")
+        @CsvSource(
+            "47, 47",
+            "47, 1047",
+            "47, 1049",
+            "1047, 47",
+            "1047, 1047",
+            "1047, 1049",
+            "1049, 47",
+            "1049, 1047",
+            "1049, 1049",
+        )
+        fun `every alternate entry and exit pairing preserves populated primary history`(
+            entryMode: Int,
+            exitMode: Int,
+        ) {
+            val f = populatedPrimary()
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[3;3H\u001B[?1048h\u001B[?${entryMode}h")
+            assertAlternateScreen(f, "\n\n")
+
+            f.acceptAscii("A0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+            f.acceptAscii("\u001B[?${exitMode}l")
+
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(2, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+        }
+
+        @ParameterizedTest(name = "enter {0}, repeat {1}")
+        @CsvSource(
+            "47, 47",
+            "47, 1047",
+            "47, 1049",
+            "1047, 47",
+            "1047, 1047",
+            "1047, 1049",
+            "1049, 47",
+            "1049, 1047",
+            "1049, 1049",
+        )
+        fun `repeated alternate mode commands preserve content and do not restore twice`(
+            entryMode: Int,
+            repeatedMode: Int,
+        ) {
+            val f = populatedPrimary()
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[3;3H\u001B[?${entryMode}hALT")
+            repeat(2) {
+                f.acceptAscii("\u001B[?${repeatedMode}h")
+                assertAlternateScreen(f, "ALT\n\n")
+                assertAll(
+                    { assertEquals(3, f.terminal.cursorCol) },
+                    { assertEquals(0, f.terminal.cursorRow) },
+                )
+            }
+
+            f.acceptAscii("\u001B[?${entryMode}l")
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(2, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+
+            f.acceptAscii("\u001B[1;5H")
+            repeat(2) {
+                f.acceptAscii("\u001B[?${repeatedMode}l")
+                assertPrimaryHistory(f)
+                assertAll(
+                    { assertEquals(4, f.terminal.cursorCol) },
+                    { assertEquals(0, f.terminal.cursorRow) },
+                )
+            }
+        }
+
+        @ParameterizedTest(name = "mode {0}")
+        @ValueSource(ints = [47, 1047, 1049])
+        fun `alternate reentry preserves or clears only alternate text across repeated sessions`(mode: Int) {
+            val f = populatedPrimary()
+            assertPrimaryHistory(f)
+
+            repeat(3) { cycle ->
+                f.acceptAscii("\u001B[?${mode}h")
+                val previous = cycle - 1
+                val expected = if (mode == 47 && cycle > 0) "$previous-3\n$previous-4\n$previous-5" else "\n\n"
+                assertAlternateScreen(f, expected)
+
+                f.acceptAscii("\u001B[H$cycle-0\r\n$cycle-1\r\n$cycle-2\r\n$cycle-3\r\n$cycle-4\r\n$cycle-5")
+                assertAlternateScreen(f, "$cycle-3\n$cycle-4\n$cycle-5")
+                f.acceptAscii("\u001B[?${mode}l")
+                assertPrimaryHistory(f)
+            }
+        }
+
+        @ParameterizedTest(name = "alternate entry {0}")
+        @ValueSource(ints = [47, 1047, 1049])
+        fun `1048 uses separate latest saved cursor slots without changing retained history`(entryMode: Int) {
+            val f = populatedPrimary()
+            f.acceptAscii("\u001B[2;2H\u001B[?1048h\u001B[3;3H\u001B[?1048h\u001B[H\u001B[?1048l")
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(2, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+
+            f.acceptAscii("\u001B[?${entryMode}hA0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            f.acceptAscii("\u001B[2;2H\u001B[?1048h\u001B[3;1H\u001B[?1048h\u001B[H\u001B[?1048l")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+            assertAll(
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+
+            f.acceptAscii("\u001B[?${entryMode}l\u001B[H\u001B[?1048l")
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(2, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+
+            f.acceptAscii("\u001B[?47h\u001B[H\u001B[?1048l")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+            assertAll(
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+            f.acceptAscii("\u001B[?47l")
+            assertPrimaryHistory(f)
+        }
+
+        @ParameterizedTest(name = "exit list {0}")
+        @CsvSource("1048;47;1049, 2", "47;1048;1049, 1")
+        fun `combined private mode lists apply cursor restore to the screen active at that position`(
+            exitModes: String,
+            expectedCoordinate: Int,
+        ) {
+            val f = populatedPrimary()
+            f.acceptAscii("\u001B[2;2H\u001B[?1048h\u001B[3;3H\u001B[?47;1048;1049h")
+            f.acceptAscii("A0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+
+            f.acceptAscii("\u001B[?${exitModes}l")
+
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(expectedCoordinate, f.terminal.cursorCol) },
+                { assertEquals(expectedCoordinate, f.terminal.cursorRow) },
+            )
+        }
+
+        private fun populatedPrimary(): Fixture {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 12, height = 3, maxHistory = 8))
+            f.acceptAscii("H0\r\nH1\r\nH2\r\nP0\r\nP1\r\nP2")
+            return f
+        }
+
+        private fun assertPrimaryHistory(f: Fixture) {
+            assertAll(
+                { assertEquals(3, f.terminal.historySize) },
+                { assertEquals("H0\nH1\nH2\nP0\nP1\nP2", f.terminal.getAllAsString()) },
+                { assertEquals("P0\nP1\nP2", f.terminal.getScreenAsString()) },
+            )
+            (f.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                assertEquals(TerminalRenderBufferKind.PRIMARY, frame.activeBuffer)
+            }
+        }
+
+        private fun assertAlternateScreen(
+            f: Fixture,
+            expectedText: String,
+        ) {
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals(expectedText, f.terminal.getAllAsString()) },
+            )
+            (f.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                assertEquals(TerminalRenderBufferKind.ALTERNATE, frame.activeBuffer)
             }
         }
     }
