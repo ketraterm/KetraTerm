@@ -54,6 +54,44 @@ class KetraTermDefaultProfileFactoryTest {
     }
 
     @Test
+    fun `explicit context directory overrides settings while preserving shell and environment`() {
+        val settings =
+            KetraTermIntellijSettings.State(
+                shellPath = "custom-shell.exe",
+                startDirectory = "C:\\configured\\start",
+                environmentVariables = "CUSTOM=value\nEMPTY=",
+                defaultTabName = "Project Shell",
+            )
+        val requestedDirectory = Path.of("C:\\work\\project\\selected folder")
+
+        val profile =
+            KetraTermDefaultProfileFactory.defaultProfile(
+                "C:\\work\\project",
+                settings,
+                workingDirectory = requestedDirectory,
+            )
+
+        assertEquals(requestedDirectory, profile.workingDirectory)
+        assertEquals(listOf("custom-shell.exe"), profile.command)
+        assertEquals(mapOf("CUSTOM" to "value", "EMPTY" to ""), profile.environment)
+        assertEquals("Project Shell", profile.displayName)
+        assertEquals("C:\\configured\\start", settings.startDirectory)
+    }
+
+    @Test
+    fun `explicit context directory is retained without a project path`() {
+        val requestedDirectory = Path.of("C:\\selected")
+
+        val profile =
+            KetraTermDefaultProfileFactory.defaultProfile(
+                basePath = null,
+                workingDirectory = requestedDirectory,
+            )
+
+        assertEquals(requestedDirectory, profile.workingDirectory)
+    }
+
+    @Test
     fun `maps plugin launch settings into terminal profile`() {
         val profile =
             KetraTermDefaultProfileFactory.defaultProfile(

@@ -24,10 +24,7 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
-import com.intellij.ui.content.Content
-import com.intellij.ui.content.ContentManager
-import com.intellij.ui.content.ContentManagerEvent
-import com.intellij.ui.content.ContentManagerListener
+import com.intellij.ui.content.*
 import io.github.ketraterm.host.TerminalClipboardOrigin
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
@@ -42,6 +39,7 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.workspace.*
 import java.awt.BorderLayout
 import java.awt.Component
+import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
@@ -123,15 +121,19 @@ class KetraTermProjectTerminalService(
      * Opens one local terminal tab in [toolWindow].
      *
      * @param toolWindow target IntelliJ tool window.
+     * @param workingDirectory explicit local directory, overriding the configured start directory when supplied.
      * @return created content tab containing either a pending, running, or failure state.
      */
-    fun openDefaultTab(toolWindow: ToolWindow): Content {
+    fun openDefaultTab(
+        toolWindow: ToolWindow,
+        workingDirectory: Path? = null,
+    ): Content {
         check(!disposed) { "KetraTerm project terminal service is disposed" }
 
         lastToolWindow = toolWindow
         val settingsService = KetraTermIntellijSettings.getInstance()
         val settingsState = settingsService.state
-        val profile = KetraTermDefaultProfileFactory.defaultProfile(project, settingsState)
+        val profile = KetraTermDefaultProfileFactory.defaultProfile(project, settingsState, workingDirectory)
         val settings = settingsService.current()
         return openTab(toolWindow, profile, settings)
     }
@@ -169,9 +171,8 @@ class KetraTermProjectTerminalService(
                 border = null
                 add(KetraTermTerminalStartupView.starting(profile.displayName), BorderLayout.CENTER)
             }
-        val contentManager = toolWindow.contentManager
         val content =
-            contentManager.factory.createContent(
+            ContentFactory.getInstance().createContent(
                 container,
                 profile.displayName,
                 false,
@@ -183,6 +184,8 @@ class KetraTermProjectTerminalService(
 
         pendingTabsById[pendingId] = PendingTerminalTab(content, container, profile)
 
+        // Access initializes the tool-window factory, which must see this pending tab before ensuring a default tab.
+        val contentManager = toolWindow.contentManager
         contentManager.addContent(content)
         contentManager.setSelectedContent(content, true)
 

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Added "Open in KetraTerm" to project and editor context menus.
 - New terminals now use your project's JDK automatically, with an option to turn this off.
 - Improved link underlines and highlighting across wrapped lines.
 - Fixed delayed or flickering links while scrolling and during build output.
