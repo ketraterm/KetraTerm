@@ -31,6 +31,8 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("HostCommandAdapter")
 class HostCommandAdapterTest {
@@ -60,6 +62,13 @@ class HostCommandAdapterTest {
             val destination = ByteArray(128)
             val count = terminal.readResponseBytes(destination)
             return destination.decodeToString(0, count)
+        }
+
+        fun advanceToLastHyperlinkId() {
+            HostCommandAdapter::class.java
+                .getDeclaredField("nextHyperlinkNumericId")
+                .apply { isAccessible = true }
+                .setInt(sink, Int.MAX_VALUE)
         }
     }
 
@@ -1580,6 +1589,160 @@ class HostCommandAdapterTest {
                 { assertEquals(18, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
                 { assertEquals(0, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
             )
+        }
+
+        @ParameterizedTest(name = "reset from alternate screen = {0}")
+        @ValueSource(booleans = [false, true])
+        fun `RIS never rebinds hyperlinks retained by mode 47`(resetFromAlternate: Boolean) {
+            val f = Fixture()
+            f.acceptAscii("\u001B[?47h\u001B]8;id=old;https://example.com/old\u0007ALT\u001B]8;;\u0007")
+            val retainedId = requireNotNull(f.terminal.getAttrAt(0, 0)).hyperlinkId
+            assertEquals("https://example.com/old", f.sink.hyperlinkUri(retainedId))
+
+            if (!resetFromAlternate) f.acceptAscii("\u001B[?47l")
+            f.acceptAscii("\u001Bc")
+            assertNull(f.sink.hyperlinkUri(retainedId))
+
+            f.acceptAscii("\u001B]8;id=new;https://example.com/new\u0007NEW\u001B]8;;\u0007")
+            val newId = requireNotNull(f.terminal.getAttrAt(0, 0)).hyperlinkId
+            f.acceptAscii("\u001B[?47h")
+
+            assertAll(
+                { assertEquals("ALT", f.terminal.getLineAsString(0)) },
+                { assertEquals(retainedId, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                { assertTrue(newId > 0) },
+                { assertNotEquals(retainedId, newId) },
+                { assertNull(f.sink.hyperlinkUri(retainedId)) },
+                { assertEquals("https://example.com/new", f.sink.hyperlinkUri(newId)) },
+            )
+        }
+
+        @Test
+        fun `captured hyperlink ids stay invalid across repeated RIS and new links`() {
+            val f = Fixture()
+            val capturedIds = mutableListOf<Int>()
+
+            repeat(3) { cycle ->
+                f.acceptAscii("\u001B[H\u001B]8;id=stable;https://example.com/$cycle\u0007X")
+                val currentId = requireNotNull(f.terminal.getAttrAt(0, 0)).hyperlinkId
+                assertTrue(currentId > 0)
+                assertFalse(currentId in capturedIds)
+                assertEquals("https://example.com/$cycle", f.sink.hyperlinkUri(currentId))
+                capturedIds.forEach { assertNull(f.sink.hyperlinkUri(it)) }
+                capturedIds += currentId
+
+                f.acceptAscii("\u001BcN")
+                assertAll(
+                    { assertNull(f.sink.activeHyperlinkUri) },
+                    { assertNull(f.sink.activeHyperlinkId) },
+                    { assertEquals(0, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                )
+                capturedIds.forEach { assertNull(f.sink.hyperlinkUri(it)) }
+            }
+        }
+
+        @Test
+        fun `reopening an evicted explicit hyperlink never rebinds its old numeric id`() {
+            val f = Fixture(hostPolicy = HostPolicy(maxHyperlinkEntries = 1))
+
+            f.acceptAscii("\u001B]8;id=same;https://example.com/a\u0007A")
+            val originalId = requireNotNull(f.terminal.getAttrAt(0, 0)).hyperlinkId
+            f.acceptAscii("\u001B]8;id=other;https://example.com/b\u0007B")
+            val otherId = requireNotNull(f.terminal.getAttrAt(1, 0)).hyperlinkId
+            assertNull(f.sink.hyperlinkUri(originalId))
+            f.acceptAscii("\u001B]8;id=same;https://example.com/a\u0007C")
+            val reopenedId = requireNotNull(f.terminal.getAttrAt(2, 0)).hyperlinkId
+
+            assertAll(
+                { assertEquals("ABC", f.terminal.getLineAsString(0)) },
+                { assertEquals(originalId, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                { assertTrue(reopenedId > 0) },
+                { assertNotEquals(originalId, reopenedId) },
+                { assertNotEquals(otherId, reopenedId) },
+                { assertNull(f.sink.hyperlinkUri(originalId)) },
+                { assertNull(f.sink.hyperlinkUri(otherId)) },
+                { assertEquals("https://example.com/a", f.sink.hyperlinkUri(reopenedId)) },
+            )
+        }
+
+        @Test
+        fun `exhausted hyperlink ids do not wrap or evict mappings and clear the active link`() {
+            val f = Fixture(hostPolicy = HostPolicy(maxHyperlinkEntries = 2))
+            f.acceptAscii("\u001B]8;id=first;https://example.com/first\u0007A")
+            assertEquals(1, f.terminal.getAttrAt(0, 0)?.hyperlinkId)
+            f.advanceToLastHyperlinkId()
+
+            f.acceptAscii("\u001B]8;id=last;https://example.com/last\u0007B")
+            assertEquals(Int.MAX_VALUE, f.terminal.getAttrAt(1, 0)?.hyperlinkId)
+            f.acceptAscii("\u001B]8;id=overflow;https://example.com/overflow\u0007C")
+
+            assertAll(
+                { assertEquals(0, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
+                { assertNull(f.sink.activeHyperlinkUri) },
+                { assertNull(f.sink.activeHyperlinkId) },
+                { assertEquals("https://example.com/first", f.sink.hyperlinkUri(1)) },
+                { assertEquals("https://example.com/last", f.sink.hyperlinkUri(Int.MAX_VALUE)) },
+                { assertNull(f.sink.hyperlinkUri(0)) },
+            )
+
+            f.acceptAscii("\u001B]8;;https://example.com/anonymous\u0007D")
+            assertAll(
+                { assertEquals("ABCD", f.terminal.getLineAsString(0)) },
+                { assertEquals(0, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
+                { assertNull(f.sink.activeHyperlinkUri) },
+                { assertNull(f.sink.activeHyperlinkId) },
+                { assertEquals("https://example.com/first", f.sink.hyperlinkUri(1)) },
+                { assertEquals("https://example.com/last", f.sink.hyperlinkUri(Int.MAX_VALUE)) },
+            )
+        }
+
+        @Test
+        fun `exhausted hyperlink allocation still reuses a registered explicit id and uri`() {
+            val f = Fixture()
+            f.advanceToLastHyperlinkId()
+            f.acceptAscii("\u001B]8;id=same;https://example.com/a\u0007A\u001B]8;;\u0007")
+            f.acceptAscii("\u001B]8;id=same;https://example.com/a\u0007B")
+
+            assertAll(
+                { assertEquals(Int.MAX_VALUE, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                { assertEquals(Int.MAX_VALUE, f.terminal.getAttrAt(1, 0)?.hyperlinkId) },
+                { assertEquals("https://example.com/a", f.sink.activeHyperlinkUri) },
+                { assertEquals("same", f.sink.activeHyperlinkId) },
+            )
+
+            f.acceptAscii("\u001B]8;;https://example.com/a\u0007C")
+            f.acceptAscii("\u001B]8;id=same;https://example.com/b\u0007D")
+            f.acceptAscii("\u001B]8;id=other;https://example.com/a\u0007E")
+
+            assertAll(
+                { assertEquals("ABCDE", f.terminal.getLineAsString(0)) },
+                { assertEquals(0, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
+                { assertEquals(0, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
+                { assertEquals(0, f.terminal.getAttrAt(4, 0)?.hyperlinkId) },
+                { assertNull(f.sink.activeHyperlinkUri) },
+                { assertNull(f.sink.activeHyperlinkId) },
+                { assertEquals("https://example.com/a", f.sink.hyperlinkUri(Int.MAX_VALUE)) },
+            )
+        }
+
+        @Test
+        fun `RIS does not restart exhausted hyperlink allocation`() {
+            val f = Fixture()
+            f.advanceToLastHyperlinkId()
+            f.acceptAscii("\u001B]8;id=last;https://example.com/last\u0007A")
+            assertEquals(Int.MAX_VALUE, f.terminal.getAttrAt(0, 0)?.hyperlinkId)
+
+            repeat(2) {
+                f.acceptAscii("\u001Bc\u001B]8;id=last;https://example.com/last\u0007B")
+                assertAll(
+                    { assertEquals("B", f.terminal.getLineAsString(0)) },
+                    { assertEquals(0, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                    { assertNull(f.sink.activeHyperlinkUri) },
+                    { assertNull(f.sink.activeHyperlinkId) },
+                    { assertNull(f.sink.hyperlinkUri(Int.MAX_VALUE)) },
+                    { assertNull(f.sink.hyperlinkUri(1)) },
+                )
+            }
         }
 
         @Test
