@@ -39,6 +39,7 @@ internal object KetraTermTerminalActionIds {
     const val SELECT_ALL = "KetraTerm.Terminal.SelectAll"
     const val CLEAR_SCREEN = "KetraTerm.Terminal.ClearScreen"
     const val NEW_TAB = "KetraTerm.Terminal.NewTab"
+    const val RENAME_TAB = "KetraTerm.Terminal.RenameTab"
     const val CLOSE_TAB = "KetraTerm.Terminal.CloseTab"
     const val OPEN_TERMINAL_HERE = "KetraTerm.Terminal.OpenTerminalHere"
     const val SCROLL_PAGE_UP = "KetraTerm.Terminal.ScrollPageUp"
@@ -137,6 +138,18 @@ internal class KetraTermNewTabAction : KetraTermPaneLifecycleAction() {
         event: AnActionEvent,
     ) {
         pane.openNewTab()
+    }
+}
+
+/**
+ * Edits the focused terminal tab's custom title, with an empty name restoring its automatic title.
+ */
+internal class KetraTermRenameTabAction : KetraTermPaneLifecycleAction() {
+    override fun actionPerformed(
+        pane: KetraTermTerminalPane,
+        event: AnActionEvent,
+    ) {
+        pane.renameTab()
     }
 }
 

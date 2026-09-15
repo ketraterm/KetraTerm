@@ -113,6 +113,12 @@
                 description="Close the focused KetraTerm terminal tab"
         />
 
+        <action id="KetraTerm.Terminal.RenameTab"
+                class="io.github.ketraterm.intellij.ui.KetraTermRenameTabAction"
+                text="Rename Tab..."
+                description="Set a custom KetraTerm tab title or restore its automatic title"
+        />
+
         <action id="KetraTerm.Terminal.OpenTerminalHere"
                 class="io.github.ketraterm.intellij.ui.KetraTermOpenTerminalHereAction"
                 text="Open in KetraTerm"

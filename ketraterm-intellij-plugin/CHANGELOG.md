@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Terminal tabs now reopen with their names and working directories after an IDE restart.
+- Added "Rename Tab" to the terminal context menu.
 - Added "Open in KetraTerm" to project and editor context menus.
 - New terminals now use your project's JDK automatically, with an option to turn this off.
 - Improved link underlines and highlighting across wrapped lines.

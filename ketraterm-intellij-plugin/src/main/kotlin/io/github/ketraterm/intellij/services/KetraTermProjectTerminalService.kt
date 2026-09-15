@@ -15,16 +15,22 @@
  */
 package io.github.ketraterm.intellij.services
 
+import com.intellij.ide.trustedProjects.TrustedProjects
+import com.intellij.ide.trustedProjects.TrustedProjectsListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.colors.EditorColorsListener
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectCloseListener
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.util.Key
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.ui.content.*
+import com.intellij.util.ui.update.UiNotifyConnector
 import io.github.ketraterm.host.TerminalClipboardOrigin
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
@@ -35,11 +41,13 @@ import io.github.ketraterm.intellij.ui.KetraTermTerminalStartupView
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
+import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.workspace.*
 import java.awt.BorderLayout
 import java.awt.Component
 import java.nio.file.Path
+import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
@@ -49,14 +57,20 @@ import javax.swing.SwingUtilities
  *
  * The service adapts IntelliJ `Content` tabs to the host-neutral
  * [TerminalWorkspace]. Closing an IDE tab disposes the corresponding pane and
- * terminal session; closing the project disposes all remaining sessions.
+ * terminal session. Project closing freezes restart metadata before disposing
+ * sessions; [KetraTermTerminalTabsStorage] owns XML serialization independently
+ * of the UI lifecycle.
  *
  * @property project IntelliJ project that owns this terminal workspace.
  */
 @Service(Service.Level.PROJECT)
-class KetraTermProjectTerminalService(
+class KetraTermProjectTerminalService internal constructor(
     private val project: Project,
+    private val startWorkspaceTab: (TerminalWorkspace, TerminalProfile, TerminalWorkspaceOpenOptions) -> TerminalWorkspaceTab,
 ) : Disposable {
+    /** Creates the project owner using IntelliJ's bundled PTY runtime. */
+    constructor(project: Project) : this(project, IntelliJPtyRuntime()::openWorkspaceTab)
+
     private val contentsByTabId = LinkedHashMap<String, Content>()
     private val pendingTabsById = LinkedHashMap<String, PendingTerminalTab>()
     private val panesByTabId = LinkedHashMap<String, KetraTermTerminalPane>()
@@ -64,10 +78,17 @@ class KetraTermProjectTerminalService(
     private val workspace = TerminalWorkspace(IntellijWorkspaceListener())
     private val workspaceLock = Any()
     private val nextPendingTabNumber = AtomicInteger(1)
-    private val ptyRuntime = IntelliJPtyRuntime()
     private val settingsChangedListener = { reloadOpenTerminalSettings() }
     private var lastToolWindow: ToolWindow? = null
+    private var tabsInitialized = false
+    private var initializingTabs = false
+    private var persistence: TerminalTabsPersistence? = null
+
+    @Volatile
     private var disposed = false
+
+    @Volatile
+    private var closing = false
 
     init {
         KetraTermIntellijSettings.getInstance().addChangeListener(settingsChangedListener)
@@ -76,6 +97,29 @@ class KetraTermProjectTerminalService(
             EditorColorsListener {
                 if (KetraTermIntellijSettings.getInstance().state.themeId == KetraTermIntellijSettings.DEFAULT_THEME_ID) {
                     reloadOpenTerminalSettings()
+                }
+            },
+        )
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            ProjectCloseListener.TOPIC,
+            object : ProjectCloseListener {
+                override fun projectClosingBeforeSave(project: Project) {
+                    if (project === this@KetraTermProjectTerminalService.project) persistence?.capture()
+                }
+
+                override fun projectClosing(project: Project) {
+                    if (project !== this@KetraTermProjectTerminalService.project) return
+                    closing = true
+                    persistence?.dispose()
+                }
+            },
+        )
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            TrustedProjectsListener.TOPIC,
+            object : TrustedProjectsListener {
+                override fun onProjectTrusted(project: Project) {
+                    if (project !== this@KetraTermProjectTerminalService.project) return
+                    invokeLaterIfAlive { lastToolWindow?.let(::ensureInitialTab) }
                 }
             },
         )
@@ -107,14 +151,46 @@ class KetraTermProjectTerminalService(
     }
 
     /**
-     * Opens the initial terminal tab if no terminal content exists yet.
+     * Restores saved tabs once, or opens a default tab when the tool window is empty.
+     *
+     * Automatic restoration waits for project trust. Restored tabs retain their
+     * selection without requesting focus and start sessions only when shown.
      *
      * @param toolWindow target IntelliJ tool window.
      */
     fun ensureInitialTab(toolWindow: ToolWindow) {
         lastToolWindow = toolWindow
+        if (disposed || closing || initializingTabs || !TrustedProjects.isProjectTrusted(project)) return
+        initializeTabs(toolWindow)
         if (hasOpenTabs()) return
         openDefaultTab(toolWindow)
+    }
+
+    private fun initializeTabs(toolWindow: ToolWindow) {
+        if (tabsInitialized || initializingTabs || !TrustedProjects.isProjectTrusted(project)) return
+        initializingTabs = true
+        try {
+            val storage = project.service<KetraTermTerminalTabsStorage>()
+            val saved = storage.state
+            // Content-manager access can initialize the factory reentrantly.
+            val manager = toolWindow.contentManager
+            val restored = saved.tabs.map { state -> openTab(toolWindow, null, state) }
+            restored.getOrNull(saved.selectedTabIndex)?.let { manager.setSelectedContent(it, false) }
+            persistence =
+                TerminalTabsPersistence(storage, manager, this) { content ->
+                    content.getUserData(TAB_STATE)?.invoke()
+                }
+            tabsInitialized = true
+            persistence?.capture()
+            // Arm lazy startup only after restoring selection; adding the first content can temporarily select it.
+            for ((id, pending) in pendingTabsById) {
+                if (pending.restoredState != null) {
+                    UiNotifyConnector.doWhenFirstShown(pending.container) { startPendingTab(id) }
+                }
+            }
+        } finally {
+            initializingTabs = false
+        }
     }
 
     /**
@@ -128,14 +204,14 @@ class KetraTermProjectTerminalService(
         toolWindow: ToolWindow,
         workingDirectory: Path? = null,
     ): Content {
-        check(!disposed) { "KetraTerm project terminal service is disposed" }
+        check(!disposed && !closing) { "KetraTerm project terminal service is closing or disposed" }
 
         lastToolWindow = toolWindow
+        initializeTabs(toolWindow)
         val settingsService = KetraTermIntellijSettings.getInstance()
         val settingsState = settingsService.state
         val profile = KetraTermDefaultProfileFactory.defaultProfile(project, settingsState, workingDirectory)
-        val settings = settingsService.current()
-        return openTab(toolWindow, profile, settings)
+        return openTab(toolWindow, profile)
     }
 
     /**
@@ -149,32 +225,34 @@ class KetraTermProjectTerminalService(
         toolWindow: ToolWindow,
         profile: TerminalProfile,
     ): Content {
-        check(!disposed) { "KetraTerm project terminal service is disposed" }
+        check(!disposed && !closing) { "KetraTerm project terminal service is closing or disposed" }
 
         lastToolWindow = toolWindow
+        initializeTabs(toolWindow)
         val settingsState = KetraTermIntellijSettings.getInstance().state
         val configuredProfile =
             KetraTermDefaultProfileFactory.profileForSelectedShell(project, profile, settingsState)
-        val settings = KetraTermIntellijSettings.getInstance().current()
-        return openTab(toolWindow, configuredProfile, settings)
+        return openTab(toolWindow, configuredProfile)
     }
 
     private fun openTab(
         toolWindow: ToolWindow,
-        profile: TerminalProfile,
-        settings: SwingSettings,
+        profile: TerminalProfile?,
+        restoredState: TerminalTabState? = null,
     ): Content {
-        val addProjectJdkToPath = KetraTermIntellijSettings.getInstance().state.addProjectJdkToPath
+        val displayName =
+            restoredState?.customTitle ?: profile?.displayName
+                ?: KetraTermIntellijSettings.getInstance().state.defaultTabName
         val pendingId = "pending-terminal-${nextPendingTabNumber.getAndIncrement()}"
         val container =
             JPanel(BorderLayout()).apply {
                 border = null
-                add(KetraTermTerminalStartupView.starting(profile.displayName), BorderLayout.CENTER)
+                add(KetraTermTerminalStartupView.starting(displayName), BorderLayout.CENTER)
             }
         val content =
             ContentFactory.getInstance().createContent(
                 container,
-                profile.displayName,
+                displayName,
                 false,
             )
 
@@ -182,32 +260,61 @@ class KetraTermProjectTerminalService(
         @Suppress("UsePropertyAccessSyntax")
         content.setDisposer(PendingTerminalTabDisposable(pendingId))
 
-        pendingTabsById[pendingId] = PendingTerminalTab(content, container, profile)
+        val pending = PendingTerminalTab(content, container, profile, restoredState)
+        pendingTabsById[pendingId] = pending
+        content.putUserData(TAB_STATE) {
+            restoredState ?: TerminalTabRestore.snapshot(requireNotNull(profile), null, null)
+        }
 
-        // Access initializes the tool-window factory, which must see this pending tab before ensuring a default tab.
         val contentManager = toolWindow.contentManager
         contentManager.addContent(content)
-        contentManager.setSelectedContent(content, true)
-
-        startTerminalTabInBackground(
-            pendingId = pendingId,
-            profileName = profile.displayName,
-            start = {
-                val launchProfile = profile.withProjectSdkEnvironment(project, enabled = addProjectJdkToPath)
-                synchronized(workspaceLock) {
-                    ptyRuntime.openWorkspaceTab(
-                        workspace = workspace,
-                        profile = launchProfile,
-                        options = openOptions(settings, profile),
-                    )
-                }
-            },
-        )
+        if (restoredState == null) {
+            contentManager.setSelectedContent(content, true)
+            startPendingTab(pendingId)
+        }
         return content
+    }
+
+    private fun startPendingTab(pendingId: String) {
+        val pending = pendingTabsById[pendingId] ?: return
+        if (disposed || closing || pending.startRequested) return
+        pending.startRequested = true
+        val settingsService = KetraTermIntellijSettings.getInstance()
+        val settingsState = settingsService.state
+        val settings = settingsService.current()
+        val basePath = project.basePath
+        ApplicationManager.getApplication().executeOnPooledThread {
+            if (disposed || closing || pending.closed) return@executeOnPooledThread
+            val result =
+                try {
+                    val profile =
+                        pending.sourceProfile
+                            ?: TerminalTabRestore.profile(basePath, requireNotNull(pending.restoredState), settingsState)
+                    val launchProfile = profile.withProjectSdkEnvironment(project, enabled = settingsState.addProjectJdkToPath)
+                    val tab =
+                        synchronized(workspaceLock) {
+                            if (disposed || closing || pending.closed) return@executeOnPooledThread
+                            startWorkspaceTab(workspace, launchProfile, openOptions(settings, profile))
+                        }
+                    TerminalStartupResult.Started(tab, profile)
+                } catch (cancelled: ProcessCanceledException) {
+                    throw cancelled
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (exception: Exception) {
+                    TerminalStartupResult.Failed(exception)
+                } catch (error: LinkageError) {
+                    TerminalStartupResult.Failed(error)
+                }
+            invokeLaterIfAlive {
+                publishTerminalStartupResult(pendingId, result)
+            }
+        }
     }
 
     override fun dispose() {
         if (disposed) return
+        persistence?.dispose()
         disposed = true
 
         val panes = panesByTabId.values.toList()
@@ -258,38 +365,17 @@ class KetraTermProjectTerminalService(
 
         content?.manager?.removeContent(content, true)
 
-        if (!hasOpenTabs()) {
+        if (!closing && !hasOpenTabs()) {
             lastToolWindow?.let(::openDefaultTab)
         }
     }
 
     private fun closePendingTab(pendingId: String) {
-        pendingTabsById.remove(pendingId)
-    }
-
-    private fun startTerminalTabInBackground(
-        pendingId: String,
-        profileName: String,
-        start: () -> TerminalWorkspaceTab,
-    ) {
-        ApplicationManager.getApplication().executeOnPooledThread {
-            val result =
-                try {
-                    TerminalStartupResult.Started(start())
-                } catch (exception: Exception) {
-                    TerminalStartupResult.Failed(exception)
-                } catch (error: LinkageError) {
-                    TerminalStartupResult.Failed(error)
-                }
-            invokeLaterIfAlive {
-                publishTerminalStartupResult(pendingId, profileName, result)
-            }
-        }
+        pendingTabsById.remove(pendingId)?.closed = true
     }
 
     private fun publishTerminalStartupResult(
         pendingId: String,
-        profileName: String,
         result: TerminalStartupResult,
     ) {
         val pendingTab = pendingTabsById[pendingId]
@@ -305,17 +391,18 @@ class KetraTermProjectTerminalService(
         when (result) {
             is TerminalStartupResult.Started -> {
                 pendingTabsById.remove(pendingId)
-                bindStartedTab(pendingTab, result.tab)
+                bindStartedTab(pendingTab, result.tab, result.sourceProfile)
             }
-            is TerminalStartupResult.Failed -> showStartupFailure(pendingTab, profileName, result.error)
+            is TerminalStartupResult.Failed -> showStartupFailure(pendingTab, result.error)
         }
     }
 
     private fun bindStartedTab(
         pendingTab: PendingTerminalTab,
         workspaceTab: TerminalWorkspaceTab,
+        sourceProfile: TerminalProfile,
     ) {
-        val sourceProfile = pendingTab.sourceProfile
+        workspaceTab.customTitle = pendingTab.restoredState?.customTitle
         val pane =
             KetraTermTerminalPane.create(
                 project = project,
@@ -336,15 +423,23 @@ class KetraTermProjectTerminalService(
         installCloseQueryListener(pendingTab.content, workspaceTab)
         contentsByTabId[workspaceTab.id] = pendingTab.content
         panesByTabId[workspaceTab.id] = pane
-        pane.requestFocus()
+        pendingTab.content.putUserData(TAB_STATE) {
+            TerminalTabRestore.snapshot(sourceProfile, workspaceTab.customTitle, workspaceTab.currentWorkingDirectoryUri)
+        }
+        persistence?.capture()
+        if (pendingTab.content.isSelected && lastToolWindow?.isActive == true) pane.requestFocus()
+        val sessionState = workspaceTab.session.state.value
+        if (sessionState is TerminalSessionState.Closed && !sessionState.event.locallyRequested) {
+            closeTabAfterRemoteSessionExit(workspaceTab)
+        }
     }
 
     private fun showStartupFailure(
         pendingTab: PendingTerminalTab,
-        profileName: String,
         error: Throwable,
     ) {
-        pendingTab.content.displayName = "Failed: $profileName"
+        val profileName = pendingTab.sourceProfile?.displayName ?: KetraTermIntellijSettings.getInstance().state.defaultTabName
+        pendingTab.content.displayName = pendingTab.restoredState?.customTitle ?: "Failed: $profileName"
         replaceContent(
             pendingTab.container,
             KetraTermTerminalStartupView.failure(profileName, error),
@@ -379,7 +474,6 @@ class KetraTermProjectTerminalService(
         openTab(
             toolWindow = toolWindow,
             profile = sourceProfile.copy(workingDirectory = workingDirectory),
-            settings = KetraTermIntellijSettings.getInstance().current(),
         )
         return true
     }
@@ -494,8 +588,16 @@ class KetraTermProjectTerminalService(
             title: String,
         ) {
             invokeLaterIfAlive {
-                contentsByTabId[tab.id]?.displayName = title
+                contentsByTabId[tab.id]?.displayName = tab.title
+                persistence?.capture()
             }
+        }
+
+        override fun currentWorkingDirectoryChanged(
+            tab: TerminalWorkspaceTab,
+            uri: String,
+        ) {
+            invokeLaterIfAlive { persistence?.capture() }
         }
 
         override fun showNotification(
@@ -560,13 +662,15 @@ class KetraTermProjectTerminalService(
 
     private fun invokeLaterIfAlive(action: () -> Unit) {
         ApplicationManager.getApplication().invokeLater {
-            if (!disposed) {
+            if (!disposed && !closing) {
                 action()
             }
         }
     }
 
     companion object {
+        private val TAB_STATE = Key.create<() -> TerminalTabState>("KetraTerm.tabState")
+
         /**
          * Returns the terminal service for [project].
          *
@@ -576,11 +680,17 @@ class KetraTermProjectTerminalService(
         fun getInstance(project: Project): KetraTermProjectTerminalService = project.service()
     }
 
-    private data class PendingTerminalTab(
+    private class PendingTerminalTab(
         val content: Content,
         val container: JPanel,
-        val sourceProfile: TerminalProfile,
-    )
+        val sourceProfile: TerminalProfile?,
+        val restoredState: TerminalTabState?,
+    ) {
+        var startRequested = false
+
+        @Volatile
+        var closed = false
+    }
 
     private data class ContentCloseQueryRegistration(
         val manager: ContentManager,
@@ -590,6 +700,7 @@ class KetraTermProjectTerminalService(
     private sealed interface TerminalStartupResult {
         data class Started(
             val tab: TerminalWorkspaceTab,
+            val sourceProfile: TerminalProfile,
         ) : TerminalStartupResult
 
         data class Failed(

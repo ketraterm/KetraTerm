@@ -22,6 +22,7 @@ import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.ui.components.JBScrollBar
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
@@ -176,6 +177,24 @@ internal class KetraTermTerminalPane private constructor(
     fun openNewTab(): Boolean = hostActions.openNewTab()
 
     /**
+     * Prompts for a custom tab title; a blank name restores the shell's automatic title.
+     */
+    fun renameTab() {
+        val title =
+            Messages.showInputDialog(
+                project,
+                "Tab name (leave empty for automatic):",
+                "Rename Terminal Tab",
+                null,
+                tab.customTitle ?: tab.title,
+                null,
+            ) ?: return
+        if (!closed) {
+            tab.customTitle = title.trim().takeIf(String::isNotEmpty)
+        }
+    }
+
+    /**
      * Returns whether "Open Terminal Here" can run for this pane.
      */
     fun canOpenTerminalHere(): Boolean = hostActions.canOpenTerminalHere(tab)
@@ -225,6 +244,7 @@ internal class KetraTermTerminalPane private constructor(
 
         group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.OPEN_SEARCH)
         group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.NEW_TAB)
+        group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.RENAME_TAB)
         group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.CLOSE_TAB)
         group.add(Separator.getInstance())
         group.addRegisteredAction(actionManager, KetraTermTerminalActionIds.COPY_SELECTION)
