@@ -66,6 +66,7 @@ internal class TabManager(
 
     @Volatile private var completionShutdown: Job? = null
     private val shutdownStarted = AtomicBoolean()
+    private val windowResizeController = TerminalWindowResizeController(frame)
     private var appliedTheme = settings.theme
     private val settingsListener: () -> Unit = {
         if (!shutdownStarted.get()) reloadAllPanes()
@@ -164,6 +165,7 @@ internal class TabManager(
             settings.addChangeListener(settingsListener)
         } catch (failure: Throwable) {
             var cleanupFailure: Throwable? = failure
+            cleanupFailure = captureCleanupFailure(cleanupFailure, windowResizeController::close)
             cleanupFailure = captureCleanupFailure(cleanupFailure) { settings.removeChangeListener(settingsListener) }
             cleanupFailure = captureCleanupFailure(cleanupFailure) { focusManager.removeKeyEventDispatcher(keyEventDispatcher) }
             cleanupFailure = captureCleanupFailure(cleanupFailure, ::closeCompletionLearningWithinBudget)
@@ -275,6 +277,7 @@ internal class TabManager(
         id: String,
         root: SplitNode,
     ) {
+        windowResizeController.clearTarget()
         val tabPanes = root.allPanes()
         var failure: Throwable? = null
         for (pane in tabPanes) {
@@ -290,6 +293,7 @@ internal class TabManager(
         failure = captureCleanupFailure(failure) { tabBar.removeTab(id) }
         failure = captureCleanupFailure(failure, ::updateFrameTitle)
         failure = captureCleanupFailure(failure) { selectedPane?.let { onTabSelected(it.tab.id) } }
+        refreshWindowResizeTarget()
         failure?.let { throw it }
     }
 
@@ -308,6 +312,7 @@ internal class TabManager(
     /** Closes every open tab and starts bounded completion persistence without blocking the Swing EDT. */
     fun closeAllTabsWithoutConfirmation() {
         if (!shutdownStarted.compareAndSet(false, true)) return
+        windowResizeController.close()
         settings.removeChangeListener(settingsListener)
         var failure: Throwable? = null
         failure =
@@ -377,6 +382,7 @@ internal class TabManager(
             tabBar.repaint()
         }
         panes.forEach { it.reloadSettings() }
+        refreshWindowResizeTarget()
         reconcileCompletion()
     }
 
@@ -450,6 +456,7 @@ internal class TabManager(
             }
         val createdPane = createTerminalPane(workspaceTab)
 
+        windowResizeController.clearTarget()
         panes += createdPane
 
         val newRoot = splitNodeInTree(root, pane, createdPane, isVertical)
@@ -460,6 +467,8 @@ internal class TabManager(
         container.add(newRoot.component, BorderLayout.CENTER)
         container.revalidate()
         container.repaint()
+
+        refreshWindowResizeTarget()
 
         createdPane.requestFocus()
         updateFrameTitle()
@@ -559,6 +568,7 @@ internal class TabManager(
         failure = captureCleanupFailure(failure) { workspace.closeTab(pane.tab.id) }
 
         val newActive = getActivePane(tabId)
+        refreshWindowResizeTarget()
         failure = captureCleanupFailure(failure) { newActive?.requestFocus() }
         failure = captureCleanupFailure(failure, ::updateFrameTitle)
         failure?.let { throw it }
@@ -744,6 +754,16 @@ internal class TabManager(
 
     private fun showPane(tabId: String) {
         (tabContentPanel.layout as CardLayout).show(tabContentPanel, tabId)
+        refreshWindowResizeTarget()
+    }
+
+    private fun refreshWindowResizeTarget() {
+        val pane = (tabRoots[tabBar.selectedId()] as? LeafNode)?.pane
+        if (shutdownStarted.get() || !settings.config.shellRequestResizeWindow || pane == null) {
+            windowResizeController.clearTarget()
+        } else {
+            windowResizeController.setTarget(pane.tab.session, pane.terminal)
+        }
     }
 
     private fun closeTabWithoutUserPrompt(id: String) {
@@ -975,25 +995,16 @@ internal class TabManager(
             rows: Int,
             columns: Int,
         ) {
-            if (settings.config.shellRequestResizeWindow) {
-                // Resize the session synchronously so that subsequent query reports (e.g. vttest CSI 18 t)
-                // return the updated size immediately.
+            if (windowResizeController.request(tab.session, rows, columns)) {
                 tab.session.resize(columns, rows)
-
-                SwingUtilities.invokeLater {
-                    val pane = panes.firstOrNull { it.tab == tab } ?: return@invokeLater
-                    val terminal = pane.terminal
-                    val targetSize = terminal.preferredGridSize(columns, rows)
-                    val currentSize = terminal.size
-                    val deltaWidth = targetSize.width - currentSize.width
-                    val deltaHeight = targetSize.height - currentSize.height
-
-                    terminal.preferredSize = targetSize
-                    frame.setSize(frame.width + deltaWidth, frame.height + deltaHeight)
-                    frame.revalidate()
-                }
             }
         }
+
+        override fun requestColumnMode(
+            tab: TerminalWorkspaceTab,
+            rows: Int,
+            columns: Int,
+        ): Boolean = windowResizeController.request(tab.session, rows, columns)
 
         override fun moveWindow(
             tab: TerminalWorkspaceTab,

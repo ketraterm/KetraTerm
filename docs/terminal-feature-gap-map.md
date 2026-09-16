@@ -116,7 +116,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 ## Integration Gaps
 
 - `DONE(host/policy)`: host-adapter allow/deny policy surface for title updates, OSC 8 hyperlinks, OSC 7 current-working-directory reports, desktop notifications, window manipulation requests, palette controls, terminal response channels, and OSC 52 clipboard request auditing.
-- `TODO(host)`: complete DECCOLM integration. `CSI ?3h` / `CSI ?3l` resize and reset the core grid to 132 / 80 columns, but do not notify the connector, leaving the PTY dimensions unchanged. Synchronize accepted column changes across core, session, PTY, and the displayed grid. Never resize the IDE window; standalone-window resizing may occur only when the product's resize policy allows it. Define host behavior when the requested columns cannot fit without a window resize, keeping accepted grid and PTY dimensions consistent. Verify both switch directions and host policy outcomes.
+- `DONE(host)`: DECCOLM requires policy permission and explicit host acceptance before changing core state. Session synchronizes accepted 80/132-column changes with the connector before following output. IntelliJ ignores requests; standalone uses its existing resize permission and rejects disruptive or unrepresentable layouts. Embedders default to rejection. Product behavior is described under [Column Toggles](terminal-feature-map.md#1-terminal-protocols--control-sequences).
 - `TODO(host)`: richer host callbacks for palette updates, terminal notifications, mouse-report policy, and future clipboard decisions when those product surfaces need UI or embedding feedback.
 
 ---

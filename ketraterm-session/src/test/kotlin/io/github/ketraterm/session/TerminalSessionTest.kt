@@ -49,6 +49,88 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @Test
+    fun `accepted DECCOLM synchronizes connector and core before following output and queries`() {
+        val stream = "old\u001B[?3hwide\u001B[18t\u001B[?3lnarrow\u001B[18t"
+        for (split in 0..stream.length) {
+            val connector = MockConnector()
+            val requests = mutableListOf<Pair<Int, Int>>()
+            val events =
+                object : HostEventSink by HostEventSink.NONE {
+                    override fun requestColumnMode(
+                        rows: Int,
+                        columns: Int,
+                    ): Boolean {
+                        requests += columns to rows
+                        return true
+                    }
+                }
+            val session = createStartedSession(connector, columns = 80, rows = 3, hostEvents = events)
+            try {
+                connector.feedFromHost(stream.take(split).ascii())
+                connector.feedFromHost(stream.drop(split).ascii())
+                assertEquals(listOf(132 to 3, 80 to 3), requests)
+                assertEquals(listOf(80 to 3, 132 to 3, 80 to 3), connector.resizeCalls)
+                assertEquals("\u001B[8;3;132t\u001B[8;3;80t", connector.writtenBytes.asciiText())
+                assertEquals(80, session.terminal.width)
+                assertEquals("narrow", session.terminal.getLineAsString(0))
+            } finally {
+                session.close()
+            }
+        }
+    }
+
+    @Test
+    fun `denied and unhandled DECCOLM never resize the connector`() {
+        for (policy in HostControlPolicy.entries) {
+            val connector = MockConnector()
+            val session =
+                createStartedSession(connector, columns = 90, rows = 3, hostPolicy = HostPolicy(windowManipulationPolicy = policy))
+            try {
+                connector.feedFromHost("keep\u001B[?3h\u001B[?3l".ascii())
+                assertEquals(listOf(90 to 3), connector.resizeCalls)
+                assertEquals(90, session.terminal.width)
+                assertEquals("keep", session.terminal.getLineAsString(0))
+            } finally {
+                session.close()
+            }
+        }
+    }
+
+    @Test
+    fun `connector resize failure does not apply destructive DECCOLM reset`() {
+        val delegate = MockConnector()
+        val failure = IllegalStateException("resize failed")
+        val connector =
+            object : TerminalConnector by delegate {
+                override fun resize(
+                    columns: Int,
+                    rows: Int,
+                ) {
+                    if (columns == 132) throw failure
+                    delegate.resize(columns, rows)
+                }
+            }
+        val terminal = TerminalBuffers.create(width = 80, height = 3)
+        val events =
+            object : HostEventSink by HostEventSink.NONE {
+                override fun requestColumnMode(
+                    rows: Int,
+                    columns: Int,
+                ): Boolean = true
+            }
+        val session = TerminalSession.create(terminal, connector, hostEvents = events)
+        try {
+            session.start(80, 3)
+            delegate.feedFromHost("keep".ascii())
+            assertSame(failure, assertThrows(IllegalStateException::class.java) { delegate.feedFromHost("\u001B[?3h".ascii()) })
+            assertEquals(80, terminal.width)
+            assertEquals("keep", terminal.getLineAsString(0))
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
     fun `color scheme replies track live host theme and policy updates through transport`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)

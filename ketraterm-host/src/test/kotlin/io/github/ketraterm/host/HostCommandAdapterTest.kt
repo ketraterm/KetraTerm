@@ -722,13 +722,46 @@ class HostCommandAdapterTest {
 
         @Test
         fun `DECCOLM set and reset resize the core width`() {
-            val f = Fixture(terminal = TerminalBuffers.create(width = 80, height = 3))
+            val f =
+                Fixture(terminal = TerminalBuffers.create(width = 80, height = 3), events = RecordingHostEventSink(acceptColumnMode = true))
 
             f.acceptAscii("\u001B[?3h")
             assertEquals(132, f.terminal.width)
 
             f.acceptAscii("\u001B[?3l")
             assertEquals(80, f.terminal.width)
+        }
+
+        @Test
+        fun `DECCOLM without host acceptance or with denied policy preserves display and cursor`() {
+            for (policy in HostControlPolicy.entries) {
+                val f = Fixture(hostPolicy = HostPolicy(windowManipulationPolicy = policy))
+                f.acceptAscii("abc\u001B[?3h\u001B[?3l\u001B[6n")
+                assertEquals(10, f.terminal.width)
+                assertEquals("abc", f.terminal.getLineAsString(0))
+                assertEquals("\u001B[1;4R", f.drainResponses())
+            }
+            val f =
+                Fixture(hostPolicy = HostPolicy(windowManipulationPolicy = HostControlPolicy.DENY), events = RecordingHostEventSink(true))
+            f.acceptAscii("abc\u001B[?3h")
+            assertEquals(10, f.terminal.width)
+            assertEquals("abc", f.terminal.getLineAsString(0))
+        }
+
+        @Test
+        fun `rejected DECCOLM preserves custom margins and tab stops`() {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 10, height = 5))
+            f.acceptAscii("keep\u001B[3g\u001B[1;5H\u001BH\u001B[2;4r\u001B[?69h\u001B[3;9s\u001B[?6h")
+            f.acceptAscii("\u001B[?3h\u001B[?3l")
+            assertEquals("keep", f.terminal.getLineAsString(0))
+            f.acceptAscii("\u001B[H")
+            assertEquals(2, f.terminal.cursorCol)
+            assertEquals(1, f.terminal.cursorRow)
+            f.acceptAscii("\t")
+            assertEquals(4, f.terminal.cursorCol)
+            f.acceptAscii("\u001B[99;99H")
+            assertEquals(8, f.terminal.cursorCol)
+            assertEquals(3, f.terminal.cursorRow)
         }
 
         @Test
@@ -1319,7 +1352,11 @@ class HostCommandAdapterTest {
             commandSuffix: String,
             expectedWidth: Int,
         ) {
-            val f = Fixture(terminal = TerminalBuffers.create(width = initialWidth, height = 3, maxHistory = 8))
+            val f =
+                Fixture(
+                    terminal = TerminalBuffers.create(width = initialWidth, height = 3, maxHistory = 8),
+                    events = RecordingHostEventSink(acceptColumnMode = true),
+                )
             f.acceptAscii("H0\r\nH1\r\nH2\r\nP0\r\nP1\r\nP2")
             assertPrimaryHistory(f)
             f.acceptAscii("\u001B[?${entryMode}hA0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
@@ -1349,7 +1386,11 @@ class HostCommandAdapterTest {
             commandSuffix: String,
             expectedWidth: Int,
         ) {
-            val f = Fixture(terminal = TerminalBuffers.create(width = initialWidth, height = 3, maxHistory = 8))
+            val f =
+                Fixture(
+                    terminal = TerminalBuffers.create(width = initialWidth, height = 3, maxHistory = 8),
+                    events = RecordingHostEventSink(acceptColumnMode = true),
+                )
             f.acceptAscii("H0\r\nH1\r\nH2\r\nP0\r\nP1\r\nP2")
             assertPrimaryHistory(f)
             f.acceptAscii("\u001B[?47hA0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
@@ -2862,7 +2903,14 @@ class HostCommandAdapterTest {
         }
     }
 
-    private class RecordingHostEventSink : HostEventSink {
+    private class RecordingHostEventSink(
+        private val acceptColumnMode: Boolean = false,
+    ) : HostEventSink {
+        override fun requestColumnMode(
+            rows: Int,
+            columns: Int,
+        ): Boolean = acceptColumnMode
+
         var bells: Int = 0
         val iconTitles = mutableListOf<String>()
         val windowTitles = mutableListOf<String>()

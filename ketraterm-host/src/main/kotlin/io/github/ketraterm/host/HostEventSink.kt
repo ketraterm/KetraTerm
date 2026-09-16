@@ -21,8 +21,9 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
 /**
  * Host-facing events emitted while parser commands are mapped to core state.
  *
- * This sink is intentionally metadata-only. Grid mutation, terminal modes, and
- * terminal-to-host byte responses remain owned by the public core APIs.
+ * Hosts receive metadata and decide whether host-side actions can be honored.
+ * Grid mutation and terminal modes remain owned by core; session coordinates
+ * transport changes and terminal-to-host byte responses.
  */
 interface HostEventSink {
     /**
@@ -61,6 +62,26 @@ interface HostEventSink {
         rows: Int,
         columns: Int,
     )
+
+    /**
+     * Accepts an application-requested 80/132-column switch before core changes.
+     *
+     * Return `true` only when the host can display this grid. TerminalSession
+     * synchronizes the connector before the adapter applies DECCOLM's destructive
+     * reset. Returning `false` leaves the terminal untouched. A direct adapter
+     * embedder must also arrange transport synchronization before returning true.
+     *
+     * Called synchronously during parsing: do not mutate core or session state,
+     * or wait for a UI thread. UI hosts should use published geometry
+     * and schedule their window update. The default rejects the request.
+     *
+     * @param rows unchanged terminal row count.
+     * @param columns requested width, either 80 or 132.
+     */
+    fun requestColumnMode(
+        rows: Int,
+        columns: Int,
+    ): Boolean = false
 
     /**
      * Called when the shell requests moving the window.

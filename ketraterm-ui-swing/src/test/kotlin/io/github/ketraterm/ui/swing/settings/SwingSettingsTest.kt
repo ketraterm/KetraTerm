@@ -436,15 +436,25 @@ class SwingSettingsTest {
     }
 
     @Test
-    fun preferredGridSizeIncludesPrimaryChrome() {
-        val component =
-            SwingTerminal(settingsProvider = {
-                SwingSettings(columns = 10, rows = 4, padding = SwingPadding(3, 5, 7, 11))
-            })
-        val cellWidth = (component.preferredGridSize(2, 1).width - component.preferredGridSize(1, 1).width)
-        val cellHeight = (component.preferredGridSize(1, 2).height - component.preferredGridSize(1, 1).height)
+    fun preferredGridSizeIncludesRequestedScreenChrome() {
+        SwingUtilities.invokeAndWait {
+            val component =
+                SwingTerminal(settingsProvider = {
+                    SwingSettings(
+                        columns = 10,
+                        rows = 4,
+                        padding = SwingPadding(3, 5, 7, 11),
+                        alternateScreenPadding = SwingPadding(2, 4, 6, 8),
+                    )
+                })
+            val cellWidth = (component.preferredGridSize(2, 1).width - component.preferredGridSize(1, 1).width)
+            val cellHeight = (component.preferredGridSize(1, 2).height - component.preferredGridSize(1, 1).height)
 
-        assertEquals(10 * cellWidth + 5 + 16 + 11, component.preferredGridSize(10, 4).width)
-        assertEquals(4 * cellHeight + 3 + 7, component.preferredGridSize(10, 4).height)
+            assertEquals(10 * cellWidth + 5 + 16 + 11, component.preferredGridSize(10, 4).width)
+            assertEquals(4 * cellHeight + 3 + 7, component.preferredGridSize(10, 4).height)
+            assertEquals(10 * cellWidth + 4 + 8, component.preferredGridSize(10, 4, TerminalRenderBufferKind.ALTERNATE).width)
+            assertEquals(4 * cellHeight + 2 + 6, component.preferredGridSize(10, 4, TerminalRenderBufferKind.ALTERNATE).height)
+            component.dispose()
+        }
     }
 }

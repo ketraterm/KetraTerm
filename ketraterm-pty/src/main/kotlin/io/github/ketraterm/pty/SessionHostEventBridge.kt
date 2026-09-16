@@ -64,6 +64,15 @@ internal class SessionHostEventBridge(
         safeDispatch { session -> listener.moveWindow(session, x, y) }
     }
 
+    override fun requestColumnMode(
+        rows: Int,
+        columns: Int,
+    ): Boolean {
+        var accepted = false
+        safeDispatch { session -> accepted = listener.requestColumnMode(session, rows, columns) }
+        return accepted
+    }
+
     override fun minimizeWindow() {
         safeDispatch { session -> listener.minimizeWindow(session) }
     }
