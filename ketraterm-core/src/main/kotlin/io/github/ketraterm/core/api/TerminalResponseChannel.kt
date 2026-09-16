@@ -15,9 +15,6 @@
  */
 package io.github.ketraterm.core.api
 
-import io.github.ketraterm.core.api.TerminalResponseChannel.Companion.WINDOW_REPORT_GRID_CELLS
-import io.github.ketraterm.core.api.TerminalResponseChannel.Companion.WINDOW_REPORT_PIXELS
-
 /**
  * Terminal-to-host response channel.
  *
@@ -39,7 +36,14 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
     /**
      * Enqueues a device status report (DSR) response.
      *
-     * @param mode The DSR mode parameter (e.g. 5 for status, 6 for cursor position).
+     * Allowlisted requests are ANSI 5 (operating status), ANSI/private 6 (cursor
+     * position), and private 996 (host color scheme). The latter replies with
+     * `CSI ?997;1n` for dark or `CSI ?997;2n` for light using the host theme
+     * palette, independently of application color overrides. Unsupported
+     * requests stay silent; the color-scheme protocol defines no failure reply.
+     * Host adapters must enforce terminal-response policy before calling this API.
+     *
+     * @param mode The DSR mode parameter.
      * @param decPrivate `true` if this is a DEC private DSR (? prefix), `false` for standard ANSI.
      */
     fun requestDeviceStatusReport(

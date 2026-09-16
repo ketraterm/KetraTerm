@@ -433,6 +433,7 @@ enum class TerminalTheme {
                             ),
                         ),
                     boldAsBright = true,
+                    isDark = true,
                 )
             ONE_DARK ->
                 TerminalColorPalette(
@@ -464,6 +465,7 @@ enum class TerminalTheme {
                             ),
                         ),
                     boldAsBright = true,
+                    isDark = true,
                 )
             NORD ->
                 TerminalColorPalette(
@@ -495,6 +497,7 @@ enum class TerminalTheme {
                             ),
                         ),
                     boldAsBright = true,
+                    isDark = true,
                 )
             TOKYO_NIGHT ->
                 TerminalColorPalette(
@@ -526,6 +529,7 @@ enum class TerminalTheme {
                             ),
                         ),
                     boldAsBright = true,
+                    isDark = true,
                 )
             EVERFOREST ->
                 TerminalColorPalette(
@@ -557,6 +561,7 @@ enum class TerminalTheme {
                             ),
                         ),
                     boldAsBright = true,
+                    isDark = true,
                 )
         }
 

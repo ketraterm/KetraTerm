@@ -20,11 +20,43 @@ import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalResponseChannel
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
+import io.github.ketraterm.render.api.TerminalColorPalette
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class TerminalResponseChannelTest {
+    @Test
+    fun `private color scheme query follows host palette independently of application colors and resets`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+        buffer.requestDeviceStatusReport(996, decPrivate = true)
+        assertEquals("\u001B[?997;1n", drain(buffer))
+
+        buffer.setThemePalette(
+            TerminalColorPalette(defaultForeground = 0xff000000.toInt(), defaultBackground = 0xffffffff.toInt(), isDark = false),
+        )
+        assertEquals(0, buffer.pendingResponseBytes)
+        buffer.setDynamicColor(10, 0xffffffff.toInt())
+        buffer.setDynamicColor(11, 0xff000000.toInt())
+        buffer.enterAltBuffer()
+        buffer.requestDeviceStatusReport(996, decPrivate = true)
+        assertEquals("\u001B[?997;2n", drain(buffer))
+
+        buffer.softReset()
+        buffer.requestDeviceStatusReport(996, decPrivate = true)
+        assertEquals("\u001B[?997;2n", drain(buffer))
+        buffer.reset()
+        buffer.requestDeviceStatusReport(996, decPrivate = true)
+        assertEquals("\u001B[?997;2n", drain(buffer))
+
+        buffer.setThemePalette(TerminalColorPalette())
+        buffer.requestDeviceStatusReport(996, decPrivate = true)
+        assertEquals("\u001B[?997;1n", drain(buffer))
+        buffer.requestDeviceStatusReport(996, decPrivate = false)
+        buffer.requestDeviceStatusReport(997, decPrivate = true)
+        assertEquals(0, buffer.pendingResponseBytes)
+    }
+
     @Test
     fun `response queue starts empty and supports zero length reads`() {
         val buffer = TerminalBuffers.create(width = 10, height = 5)

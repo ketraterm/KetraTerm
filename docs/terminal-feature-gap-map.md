@@ -106,7 +106,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ### Query and Response Channel
 - `DONE(core/host/policy)`: terminal-to-host response channel exists for DA, DSR/CPR, safe window reports, palette queries, `DECRQSS`, and allowlisted `XTGETTCAP`; host policy can deny terminal responses before they enqueue bytes.
-- `TODO(core)`: light/dark color-scheme query (`CSI ?996n`). Private DSR dispatch already reaches core, but there is no `CSI ?997;Ps n` reply or host-supplied scheme state for applications that use this protocol to select their theme. Add the response and active-host scheme integration under the terminal-response policy; existing OSC background-color queries do not cover this protocol.
+- `DONE(core/host/policy)`: light/dark color-scheme query (`CSI ?996n`) returns `CSI ?997;1n` (dark) or `CSI ?997;2n` (light) from the active host theme palette under terminal-response policy. Standalone and IDE theme updates use the existing synchronized palette publication path; application color overrides do not affect the reply. Denied requests stay silent because this protocol has no failure response. The implemented slice is the one-shot query, without mode 2031 unsolicited notifications.
 - `TODO(core/parser/host/policy)`: OSC query responses and future query/response protocols need explicit response shape, allowlist, and host policy before implementation.
 - `TODO(core/host)`: event API for hyperlinks, palette updates, and terminal notifications if these move out of host or render-frame metadata.
 

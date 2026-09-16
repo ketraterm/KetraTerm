@@ -49,6 +49,30 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @Test
+    fun `color scheme replies track live host theme and policy updates through transport`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector)
+        try {
+            connector.feedFromHost("\u001B[?996n".ascii())
+            session.setThemePalette(
+                TerminalColorPalette(defaultForeground = 0xff000000.toInt(), defaultBackground = 0xffffffff.toInt(), isDark = false),
+            )
+            assertEquals("\u001B[?997;1n", connector.writtenBytes.asciiText())
+            connector.feedFromHost("\u001B]11;#000000\u0007\u001B[?996n".ascii())
+            assertEquals("\u001B[?997;1n\u001B[?997;2n", connector.writtenBytes.asciiText())
+
+            session.setHostPolicy(HostPolicy(terminalResponsePolicy = HostControlPolicy.DENY))
+            connector.feedFromHost("\u001B[?996n".ascii())
+            session.setThemePalette(TerminalColorPalette())
+            session.setHostPolicy(HostPolicy())
+            connector.feedFromHost("\u001B[?996n\u001B[5n".ascii())
+            assertEquals("\u001B[?997;1n\u001B[?997;2n\u001B[?997;1n\u001B[0n", connector.writtenBytes.asciiText())
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
     fun `DSR CSI 5 n replies OK status`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)

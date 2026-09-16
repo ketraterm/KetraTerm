@@ -96,6 +96,7 @@ internal object KetraTermIntellijThemePalette {
             cursorBackground = cursorBackground,
             indexedColors = indexed,
             boldAsBright = true,
+            isDark = dark,
         )
     }
 
