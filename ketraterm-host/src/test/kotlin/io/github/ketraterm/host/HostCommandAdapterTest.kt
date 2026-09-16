@@ -25,12 +25,16 @@ import io.github.ketraterm.protocol.*
 import io.github.ketraterm.protocol.keyboard.FormatOtherKeysMode
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.protocol.keyboard.ModifyOtherKeysMode
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("HostCommandAdapter")
 class HostCommandAdapterTest {
@@ -60,6 +64,13 @@ class HostCommandAdapterTest {
             val destination = ByteArray(128)
             val count = terminal.readResponseBytes(destination)
             return destination.decodeToString(0, count)
+        }
+
+        fun advanceToLastHyperlinkId() {
+            HostCommandAdapter::class.java
+                .getDeclaredField("nextHyperlinkNumericId")
+                .apply { isAccessible = true }
+                .setInt(sink, Int.MAX_VALUE)
         }
     }
 
@@ -1030,6 +1041,370 @@ class HostCommandAdapterTest {
     }
 
     @Nested
+    @DisplayName("alternate screen history")
+    inner class AlternateScreenHistory {
+        @ParameterizedTest(name = "alternate entry {0}")
+        @ValueSource(ints = [47, 1047, 1049])
+        fun `ED3 on alternate preserves its viewport and primary history until primary is explicitly cleared`(entryMode: Int) {
+            val f = populatedPrimary()
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[?${entryMode}hA0\r\nA1\r\nA2\r\nA3\r\nAe\u0301\r\n界")
+            f.acceptAscii("\u001B[2;5H\u001B[?1048h")
+            assertAlternateScreen(f, "A3\nAe\u0301\n界")
+
+            repeat(2) {
+                f.acceptAscii("\u001B[3J")
+                assertAlternateScreen(f, "A3\nAe\u0301\n界")
+                assertAll(
+                    { assertEquals(4, f.terminal.cursorCol) },
+                    { assertEquals(1, f.terminal.cursorRow) },
+                )
+            }
+            f.acceptAscii("\u001B[H\u001B[?1048l")
+            assertAll(
+                { assertEquals(4, f.terminal.cursorCol) },
+                { assertEquals(1, f.terminal.cursorRow) },
+            )
+
+            f.acceptAscii("\u001B[?${entryMode}l")
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[3J")
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("P0\nP1\nP2", f.terminal.getAllAsString()) },
+                { assertEquals("P0\nP1\nP2", f.terminal.getScreenAsString()) },
+            )
+
+            f.acceptAscii("\u001B[?47h")
+            assertAlternateScreen(f, "A3\nAe\u0301\n界")
+        }
+
+        @ParameterizedTest(name = "alternate entry {0}")
+        @ValueSource(ints = [47, 1047, 1049])
+        fun `ED2 clears only the active alternate viewport and preserves primary history`(entryMode: Int) {
+            val f = populatedPrimary()
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[?${entryMode}hA0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5\u001B[2;5H")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+
+            f.acceptAscii("\u001B[2J")
+
+            assertAlternateScreen(f, "\n\n")
+            assertAll(
+                { assertEquals(4, f.terminal.cursorCol) },
+                { assertEquals(1, f.terminal.cursorRow) },
+            )
+            f.acceptAscii("\u001B[?${entryMode}l")
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[?47h")
+            assertAlternateScreen(f, "\n\n")
+        }
+
+        @ParameterizedTest(name = "alternate entry {0}")
+        @ValueSource(ints = [47, 1047, 1049])
+        fun `DECSTR on alternate preserves both buffers and history while resetting saved cursors`(entryMode: Int) {
+            val f = populatedPrimary()
+            f.acceptAscii("\u001B[2;2H\u001B[?1048h\u001B[?${entryMode}h")
+            f.acceptAscii("A0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            f.acceptAscii("\u001B[2;3r\u001B[?69h\u001B[2;9s\u001B[?6h\u001B[1;2H\u001B[?1048h")
+            f.acceptAscii("\u001B[2;3H\u001B[4h")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+            assertAll(
+                { assertEquals(3, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+                { assertTrue(f.terminal.getModeSnapshot().isOriginMode) },
+                { assertTrue(f.terminal.getModeSnapshot().isLeftRightMarginMode) },
+                { assertTrue(f.terminal.getModeSnapshot().isInsertMode) },
+            )
+
+            repeat(2) {
+                f.acceptAscii("\u001B[!p")
+                assertAlternateScreen(f, "A3\nA4\nA5")
+                assertAll(
+                    { assertEquals(12, f.terminal.width) },
+                    { assertEquals(3, f.terminal.height) },
+                    { assertEquals(3, f.terminal.cursorCol) },
+                    { assertEquals(2, f.terminal.cursorRow) },
+                    { assertFalse(f.terminal.getModeSnapshot().isOriginMode) },
+                    { assertFalse(f.terminal.getModeSnapshot().isLeftRightMarginMode) },
+                    { assertFalse(f.terminal.getModeSnapshot().isInsertMode) },
+                )
+            }
+            f.acceptAscii("\u001B[?1048l")
+            assertAll(
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(0, f.terminal.cursorRow) },
+            )
+            f.acceptAscii("\u001B[?${entryMode}l\u001B[?1048l")
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(0, f.terminal.cursorRow) },
+            )
+            f.acceptAscii("\u001B[?47h")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+        }
+
+        @ParameterizedTest(name = "enter {0}, exit {1}")
+        @CsvSource(
+            "47, 47",
+            "47, 1047",
+            "47, 1049",
+            "1047, 47",
+            "1047, 1047",
+            "1047, 1049",
+            "1049, 47",
+            "1049, 1047",
+            "1049, 1049",
+        )
+        fun `every alternate entry and exit pairing preserves populated primary history`(
+            entryMode: Int,
+            exitMode: Int,
+        ) {
+            val f = populatedPrimary()
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[3;3H\u001B[?1048h\u001B[?${entryMode}h")
+            assertAlternateScreen(f, "\n\n")
+
+            f.acceptAscii("A0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+            f.acceptAscii("\u001B[?${exitMode}l")
+
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(2, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+        }
+
+        @ParameterizedTest(name = "enter {0}, repeat {1}")
+        @CsvSource(
+            "47, 47",
+            "47, 1047",
+            "47, 1049",
+            "1047, 47",
+            "1047, 1047",
+            "1047, 1049",
+            "1049, 47",
+            "1049, 1047",
+            "1049, 1049",
+        )
+        fun `repeated alternate mode commands preserve content and do not restore twice`(
+            entryMode: Int,
+            repeatedMode: Int,
+        ) {
+            val f = populatedPrimary()
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[3;3H\u001B[?${entryMode}hALT")
+            repeat(2) {
+                f.acceptAscii("\u001B[?${repeatedMode}h")
+                assertAlternateScreen(f, "ALT\n\n")
+                assertAll(
+                    { assertEquals(3, f.terminal.cursorCol) },
+                    { assertEquals(0, f.terminal.cursorRow) },
+                )
+            }
+
+            f.acceptAscii("\u001B[?${entryMode}l")
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(2, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+
+            f.acceptAscii("\u001B[1;5H")
+            repeat(2) {
+                f.acceptAscii("\u001B[?${repeatedMode}l")
+                assertPrimaryHistory(f)
+                assertAll(
+                    { assertEquals(4, f.terminal.cursorCol) },
+                    { assertEquals(0, f.terminal.cursorRow) },
+                )
+            }
+        }
+
+        @ParameterizedTest(name = "mode {0}")
+        @ValueSource(ints = [47, 1047, 1049])
+        fun `alternate reentry preserves or clears only alternate text across repeated sessions`(mode: Int) {
+            val f = populatedPrimary()
+            assertPrimaryHistory(f)
+
+            repeat(3) { cycle ->
+                f.acceptAscii("\u001B[?${mode}h")
+                val previous = cycle - 1
+                val expected = if (mode == 47 && cycle > 0) "$previous-3\n$previous-4\n$previous-5" else "\n\n"
+                assertAlternateScreen(f, expected)
+
+                f.acceptAscii("\u001B[H$cycle-0\r\n$cycle-1\r\n$cycle-2\r\n$cycle-3\r\n$cycle-4\r\n$cycle-5")
+                assertAlternateScreen(f, "$cycle-3\n$cycle-4\n$cycle-5")
+                f.acceptAscii("\u001B[?${mode}l")
+                assertPrimaryHistory(f)
+            }
+        }
+
+        @ParameterizedTest(name = "alternate entry {0}")
+        @ValueSource(ints = [47, 1047, 1049])
+        fun `1048 uses separate latest saved cursor slots without changing retained history`(entryMode: Int) {
+            val f = populatedPrimary()
+            f.acceptAscii("\u001B[2;2H\u001B[?1048h\u001B[3;3H\u001B[?1048h\u001B[H\u001B[?1048l")
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(2, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+
+            f.acceptAscii("\u001B[?${entryMode}hA0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            f.acceptAscii("\u001B[2;2H\u001B[?1048h\u001B[3;1H\u001B[?1048h\u001B[H\u001B[?1048l")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+            assertAll(
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+
+            f.acceptAscii("\u001B[?${entryMode}l\u001B[H\u001B[?1048l")
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(2, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+
+            f.acceptAscii("\u001B[?47h\u001B[H\u001B[?1048l")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+            assertAll(
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(2, f.terminal.cursorRow) },
+            )
+            f.acceptAscii("\u001B[?47l")
+            assertPrimaryHistory(f)
+        }
+
+        @ParameterizedTest(name = "exit list {0}")
+        @CsvSource("1048;47;1049, 2", "47;1048;1049, 1")
+        fun `combined private mode lists apply cursor restore to the screen active at that position`(
+            exitModes: String,
+            expectedCoordinate: Int,
+        ) {
+            val f = populatedPrimary()
+            f.acceptAscii("\u001B[2;2H\u001B[?1048h\u001B[3;3H\u001B[?47;1048;1049h")
+            f.acceptAscii("A0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+
+            f.acceptAscii("\u001B[?${exitModes}l")
+
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(expectedCoordinate, f.terminal.cursorCol) },
+                { assertEquals(expectedCoordinate, f.terminal.cursorRow) },
+            )
+        }
+
+        @ParameterizedTest(name = "alternate mode {0}, width {1}, DECCOLM {2}, expected width {3}")
+        @CsvSource(
+            "47, 80, h, 132",
+            "47, 132, l, 80",
+            "47, 80, l, 80",
+            "47, 132, h, 132",
+            "1047, 80, h, 132",
+            "1047, 132, l, 80",
+            "1047, 80, l, 80",
+            "1047, 132, h, 132",
+            "1049, 80, h, 132",
+            "1049, 132, l, 80",
+            "1049, 80, l, 80",
+            "1049, 132, h, 132",
+        )
+        fun `DECCOLM on alternate clears its display and preserves primary history even at the current width`(
+            entryMode: Int,
+            initialWidth: Int,
+            commandSuffix: String,
+            expectedWidth: Int,
+        ) {
+            val f = Fixture(terminal = TerminalBuffers.create(width = initialWidth, height = 3, maxHistory = 8))
+            f.acceptAscii("H0\r\nH1\r\nH2\r\nP0\r\nP1\r\nP2")
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[?${entryMode}hA0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+
+            f.acceptAscii("\u001B[?3$commandSuffix")
+
+            assertAlternateScreen(f, "\n\n")
+            assertAll(
+                { assertEquals(expectedWidth, f.terminal.width) },
+                { assertEquals(3, f.terminal.height) },
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(0, f.terminal.cursorRow) },
+            )
+            f.acceptAscii("\u001B[?${entryMode}l")
+            assertPrimaryHistory(f)
+            assertAll(
+                { assertEquals(expectedWidth, f.terminal.width) },
+                { assertEquals(3, f.terminal.height) },
+            )
+        }
+
+        @ParameterizedTest(name = "primary width {0}, DECCOLM {1}, expected width {2}")
+        @CsvSource("80, h, 132", "132, l, 80", "80, l, 80", "132, h, 132")
+        fun `DECCOLM on primary clears its display and history even at the current width`(
+            initialWidth: Int,
+            commandSuffix: String,
+            expectedWidth: Int,
+        ) {
+            val f = Fixture(terminal = TerminalBuffers.create(width = initialWidth, height = 3, maxHistory = 8))
+            f.acceptAscii("H0\r\nH1\r\nH2\r\nP0\r\nP1\r\nP2")
+            assertPrimaryHistory(f)
+            f.acceptAscii("\u001B[?47hA0\r\nA1\r\nA2\r\nA3\r\nA4\r\nA5")
+            assertAlternateScreen(f, "A3\nA4\nA5")
+            f.acceptAscii("\u001B[?47l")
+            assertPrimaryHistory(f)
+
+            f.acceptAscii("\u001B[?3$commandSuffix")
+
+            assertAll(
+                { assertEquals(expectedWidth, f.terminal.width) },
+                { assertEquals(3, f.terminal.height) },
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals("\n\n", f.terminal.getAllAsString()) },
+                { assertEquals("\n\n", f.terminal.getScreenAsString()) },
+                { assertEquals(0, f.terminal.cursorCol) },
+                { assertEquals(0, f.terminal.cursorRow) },
+            )
+            (f.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                assertEquals(TerminalRenderBufferKind.PRIMARY, frame.activeBuffer)
+            }
+        }
+
+        private fun populatedPrimary(): Fixture {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 12, height = 3, maxHistory = 8))
+            f.acceptAscii("H0\r\nH1\r\nH2\r\nP0\r\nP1\r\nP2")
+            return f
+        }
+
+        private fun assertPrimaryHistory(f: Fixture) {
+            assertAll(
+                { assertEquals(3, f.terminal.historySize) },
+                { assertEquals("H0\nH1\nH2\nP0\nP1\nP2", f.terminal.getAllAsString()) },
+                { assertEquals("P0\nP1\nP2", f.terminal.getScreenAsString()) },
+            )
+            (f.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                assertEquals(TerminalRenderBufferKind.PRIMARY, frame.activeBuffer)
+            }
+        }
+
+        private fun assertAlternateScreen(
+            f: Fixture,
+            expectedText: String,
+        ) {
+            assertAll(
+                { assertEquals(0, f.terminal.historySize) },
+                { assertEquals(expectedText, f.terminal.getAllAsString()) },
+            )
+            (f.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                assertEquals(TerminalRenderBufferKind.ALTERNATE, frame.activeBuffer)
+            }
+        }
+    }
+
+    @Nested
     @DisplayName("SGR and OSC policy")
     inner class SgrAndOscPolicy {
         @Test
@@ -1605,6 +1980,160 @@ class HostCommandAdapterTest {
                 { assertEquals(18, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
                 { assertEquals(0, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
             )
+        }
+
+        @ParameterizedTest(name = "reset from alternate screen = {0}")
+        @ValueSource(booleans = [false, true])
+        fun `RIS never rebinds hyperlinks retained by mode 47`(resetFromAlternate: Boolean) {
+            val f = Fixture()
+            f.acceptAscii("\u001B[?47h\u001B]8;id=old;https://example.com/old\u0007ALT\u001B]8;;\u0007")
+            val retainedId = requireNotNull(f.terminal.getAttrAt(0, 0)).hyperlinkId
+            assertEquals("https://example.com/old", f.sink.hyperlinkUri(retainedId))
+
+            if (!resetFromAlternate) f.acceptAscii("\u001B[?47l")
+            f.acceptAscii("\u001Bc")
+            assertNull(f.sink.hyperlinkUri(retainedId))
+
+            f.acceptAscii("\u001B]8;id=new;https://example.com/new\u0007NEW\u001B]8;;\u0007")
+            val newId = requireNotNull(f.terminal.getAttrAt(0, 0)).hyperlinkId
+            f.acceptAscii("\u001B[?47h")
+
+            assertAll(
+                { assertEquals("ALT", f.terminal.getLineAsString(0)) },
+                { assertEquals(retainedId, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                { assertTrue(newId > 0) },
+                { assertNotEquals(retainedId, newId) },
+                { assertNull(f.sink.hyperlinkUri(retainedId)) },
+                { assertEquals("https://example.com/new", f.sink.hyperlinkUri(newId)) },
+            )
+        }
+
+        @Test
+        fun `captured hyperlink ids stay invalid across repeated RIS and new links`() {
+            val f = Fixture()
+            val capturedIds = mutableListOf<Int>()
+
+            repeat(3) { cycle ->
+                f.acceptAscii("\u001B[H\u001B]8;id=stable;https://example.com/$cycle\u0007X")
+                val currentId = requireNotNull(f.terminal.getAttrAt(0, 0)).hyperlinkId
+                assertTrue(currentId > 0)
+                assertFalse(currentId in capturedIds)
+                assertEquals("https://example.com/$cycle", f.sink.hyperlinkUri(currentId))
+                capturedIds.forEach { assertNull(f.sink.hyperlinkUri(it)) }
+                capturedIds += currentId
+
+                f.acceptAscii("\u001BcN")
+                assertAll(
+                    { assertNull(f.sink.activeHyperlinkUri) },
+                    { assertNull(f.sink.activeHyperlinkId) },
+                    { assertEquals(0, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                )
+                capturedIds.forEach { assertNull(f.sink.hyperlinkUri(it)) }
+            }
+        }
+
+        @Test
+        fun `reopening an evicted explicit hyperlink never rebinds its old numeric id`() {
+            val f = Fixture(hostPolicy = HostPolicy(maxHyperlinkEntries = 1))
+
+            f.acceptAscii("\u001B]8;id=same;https://example.com/a\u0007A")
+            val originalId = requireNotNull(f.terminal.getAttrAt(0, 0)).hyperlinkId
+            f.acceptAscii("\u001B]8;id=other;https://example.com/b\u0007B")
+            val otherId = requireNotNull(f.terminal.getAttrAt(1, 0)).hyperlinkId
+            assertNull(f.sink.hyperlinkUri(originalId))
+            f.acceptAscii("\u001B]8;id=same;https://example.com/a\u0007C")
+            val reopenedId = requireNotNull(f.terminal.getAttrAt(2, 0)).hyperlinkId
+
+            assertAll(
+                { assertEquals("ABC", f.terminal.getLineAsString(0)) },
+                { assertEquals(originalId, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                { assertTrue(reopenedId > 0) },
+                { assertNotEquals(originalId, reopenedId) },
+                { assertNotEquals(otherId, reopenedId) },
+                { assertNull(f.sink.hyperlinkUri(originalId)) },
+                { assertNull(f.sink.hyperlinkUri(otherId)) },
+                { assertEquals("https://example.com/a", f.sink.hyperlinkUri(reopenedId)) },
+            )
+        }
+
+        @Test
+        fun `exhausted hyperlink ids do not wrap or evict mappings and clear the active link`() {
+            val f = Fixture(hostPolicy = HostPolicy(maxHyperlinkEntries = 2))
+            f.acceptAscii("\u001B]8;id=first;https://example.com/first\u0007A")
+            assertEquals(1, f.terminal.getAttrAt(0, 0)?.hyperlinkId)
+            f.advanceToLastHyperlinkId()
+
+            f.acceptAscii("\u001B]8;id=last;https://example.com/last\u0007B")
+            assertEquals(Int.MAX_VALUE, f.terminal.getAttrAt(1, 0)?.hyperlinkId)
+            f.acceptAscii("\u001B]8;id=overflow;https://example.com/overflow\u0007C")
+
+            assertAll(
+                { assertEquals(0, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
+                { assertNull(f.sink.activeHyperlinkUri) },
+                { assertNull(f.sink.activeHyperlinkId) },
+                { assertEquals("https://example.com/first", f.sink.hyperlinkUri(1)) },
+                { assertEquals("https://example.com/last", f.sink.hyperlinkUri(Int.MAX_VALUE)) },
+                { assertNull(f.sink.hyperlinkUri(0)) },
+            )
+
+            f.acceptAscii("\u001B]8;;https://example.com/anonymous\u0007D")
+            assertAll(
+                { assertEquals("ABCD", f.terminal.getLineAsString(0)) },
+                { assertEquals(0, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
+                { assertNull(f.sink.activeHyperlinkUri) },
+                { assertNull(f.sink.activeHyperlinkId) },
+                { assertEquals("https://example.com/first", f.sink.hyperlinkUri(1)) },
+                { assertEquals("https://example.com/last", f.sink.hyperlinkUri(Int.MAX_VALUE)) },
+            )
+        }
+
+        @Test
+        fun `exhausted hyperlink allocation still reuses a registered explicit id and uri`() {
+            val f = Fixture()
+            f.advanceToLastHyperlinkId()
+            f.acceptAscii("\u001B]8;id=same;https://example.com/a\u0007A\u001B]8;;\u0007")
+            f.acceptAscii("\u001B]8;id=same;https://example.com/a\u0007B")
+
+            assertAll(
+                { assertEquals(Int.MAX_VALUE, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                { assertEquals(Int.MAX_VALUE, f.terminal.getAttrAt(1, 0)?.hyperlinkId) },
+                { assertEquals("https://example.com/a", f.sink.activeHyperlinkUri) },
+                { assertEquals("same", f.sink.activeHyperlinkId) },
+            )
+
+            f.acceptAscii("\u001B]8;;https://example.com/a\u0007C")
+            f.acceptAscii("\u001B]8;id=same;https://example.com/b\u0007D")
+            f.acceptAscii("\u001B]8;id=other;https://example.com/a\u0007E")
+
+            assertAll(
+                { assertEquals("ABCDE", f.terminal.getLineAsString(0)) },
+                { assertEquals(0, f.terminal.getAttrAt(2, 0)?.hyperlinkId) },
+                { assertEquals(0, f.terminal.getAttrAt(3, 0)?.hyperlinkId) },
+                { assertEquals(0, f.terminal.getAttrAt(4, 0)?.hyperlinkId) },
+                { assertNull(f.sink.activeHyperlinkUri) },
+                { assertNull(f.sink.activeHyperlinkId) },
+                { assertEquals("https://example.com/a", f.sink.hyperlinkUri(Int.MAX_VALUE)) },
+            )
+        }
+
+        @Test
+        fun `RIS does not restart exhausted hyperlink allocation`() {
+            val f = Fixture()
+            f.advanceToLastHyperlinkId()
+            f.acceptAscii("\u001B]8;id=last;https://example.com/last\u0007A")
+            assertEquals(Int.MAX_VALUE, f.terminal.getAttrAt(0, 0)?.hyperlinkId)
+
+            repeat(2) {
+                f.acceptAscii("\u001Bc\u001B]8;id=last;https://example.com/last\u0007B")
+                assertAll(
+                    { assertEquals("B", f.terminal.getLineAsString(0)) },
+                    { assertEquals(0, f.terminal.getAttrAt(0, 0)?.hyperlinkId) },
+                    { assertNull(f.sink.activeHyperlinkUri) },
+                    { assertNull(f.sink.activeHyperlinkId) },
+                    { assertNull(f.sink.hyperlinkUri(Int.MAX_VALUE)) },
+                    { assertNull(f.sink.hyperlinkUri(1)) },
+                )
+            }
         }
 
         @Test
