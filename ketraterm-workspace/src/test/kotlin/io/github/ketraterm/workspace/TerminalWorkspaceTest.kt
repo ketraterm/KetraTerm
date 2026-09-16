@@ -41,6 +41,46 @@ import kotlin.test.*
 
 class TerminalWorkspaceTest {
     @Test
+    fun `column mode requests require acceptance from the owning tab host`() {
+        val session = testSession()
+        lateinit var events: PtyEventListener
+        var accept = false
+        var requestedTab: TerminalWorkspaceTab? = null
+        TerminalWorkspace(
+            listener =
+                object : TerminalWorkspaceListener {
+                    override fun requestColumnMode(
+                        tab: TerminalWorkspaceTab,
+                        rows: Int,
+                        columns: Int,
+                    ): Boolean {
+                        requestedTab = tab
+                        assertEquals(24, rows)
+                        assertEquals(132, columns)
+                        return accept
+                    }
+                },
+            sessionFactory =
+                TerminalWorkspaceSessionFactory { _, _, listener ->
+                    events = listener
+                    session
+                },
+        ).use { workspace ->
+            val tab =
+                workspace.openTab(
+                    TerminalProfile("test", "Test", listOf("unused-shell")),
+                    TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                )
+            assertFalse(events.requestColumnMode(session, 24, 132))
+            assertSame(tab, requestedTab)
+            accept = true
+            assertTrue(events.requestColumnMode(session, 24, 132))
+            workspace.closeTab(tab.id)
+            assertFalse(events.requestColumnMode(session, 24, 132))
+        }
+    }
+
+    @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun `startup cancellation is delivered once with its owning tab even before observer starts`() =
         runTest {

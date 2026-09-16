@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- DECCOLM now requires explicit host acceptance and synchronizes grid and connector dimensions before subsequent output. Standalone shares its existing resize permission and layout checks with ordinary grid resize requests; IDE hosts reject column switches.
 - Added policy-gated `CSI ?996n` color-scheme queries using explicit host theme metadata, including live IDE theme updates.
 - Added validated startup commands to session, PTY, and workspace APIs, with once-per-session prompt readiness, serialized submission, cancellation on early input, and standalone plus project-local IntelliJ configuration.
 - Fixed lost spaces and line breaks in copy/export and command capture. Added `WRAP_PADDING` render metadata to preserve text across soft wraps and resize/reflow without new per-frame storage.

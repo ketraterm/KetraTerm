@@ -652,7 +652,7 @@ internal class SettingsDialog(
             windowSection,
             0,
             shellRequestResizeWindowCheckbox,
-            "Allow the terminal window to resize itself when the shell requests a grid resize.",
+            "Allow applications to resize a normal window with one visible pane, including switching between 80 and 132 columns.",
         )
         addCheckboxRow(
             windowSection,

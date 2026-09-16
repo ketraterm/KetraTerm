@@ -16,10 +16,7 @@
 package io.github.ketraterm.intellij.settings
 
 import com.intellij.openapi.progress.ProcessCanceledException
-import io.github.ketraterm.host.TerminalClipboardOrigin
-import io.github.ketraterm.host.TerminalClipboardPermission
-import io.github.ketraterm.host.TerminalTitleOrigin
-import io.github.ketraterm.host.TerminalTitlePermission
+import io.github.ketraterm.host.*
 import io.github.ketraterm.input.policy.PasteSanitizationPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.settings.SwingPadding
@@ -33,6 +30,16 @@ import java.util.concurrent.CancellationException
  * Tests IntelliJ settings persistence mapping without opening an IDE window.
  */
 class KetraTermIntellijSettingsTest {
+    @Test
+    fun `IDE host denies application window and column mode requests`() {
+        val settings = KetraTermIntellijSettings()
+        for (command in listOf(listOf("powershell.exe"), listOf("ssh", "example.com"))) {
+            assertEquals(HostControlPolicy.DENY, settings.createHostPolicy(command).windowManipulationPolicy)
+        }
+        val swingSettings = KetraTermIntellijSettingsMapper.toSwingSettings(settings.state.copy(themeId = "nord"))
+        assertFalse(swingSettings.shellRequestResizeWindow)
+    }
+
     @Test
     fun `paste policies survive state reload and map to embedding settings`() {
         val service = KetraTermIntellijSettings()

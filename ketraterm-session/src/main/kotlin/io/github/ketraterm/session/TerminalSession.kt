@@ -262,8 +262,9 @@ class TerminalSession(
     }
 
     /**
-     * Resizes the terminal and captures its viewport anchor and history baseline
-     * under the same mutation lock before notifying the connector.
+     * Resizes the terminal and connector and captures the viewport anchor and
+     * history baseline under the same mutation lock. This keeps viewport resizes
+     * ordered with application-requested column switches.
      *
      * Reflow may replace history storage and change its discarded-row counter.
      * Consumers that retain scrollback position must adopt the complete result
@@ -289,9 +290,9 @@ class TerminalSession(
                 renderReader.readRenderFrame { frame ->
                     resizedViewport = TerminalViewportResizeResult(scrollbackOffset, historySize, frame.discardedCount)
                 }
+                connector.resize(columns, rows)
                 checkNotNull(resizedViewport) { "Render reader did not expose the resized terminal frame" }
             }
-        connector.resize(columns, rows)
         invalidateRender()
         return result
     }
@@ -941,10 +942,11 @@ class TerminalSession(
                     ?: error("terminal must implement TerminalRenderFrameReader")
             val shellIntegrationState = TerminalShellIntegrationState()
             val recordingHostEvents =
-                ShellIntegrationRecordingHostEventSink(
+                SessionHostEventSink(
                     delegate = hostEvents,
                     renderReader = renderReader,
                     state = shellIntegrationState,
+                    connector = connector,
                 )
             val sink = HostCommandAdapter(terminal, recordingHostEvents, hostPolicy, kittyKeyboardSupportedFlags)
             val parser = TerminalParsers.create(sink)
@@ -984,10 +986,11 @@ class TerminalSession(
     }
 }
 
-private class ShellIntegrationRecordingHostEventSink(
+private class SessionHostEventSink(
     private val delegate: HostEventSink,
     private val renderReader: TerminalRenderFrameReader,
     private val state: TerminalShellIntegrationState,
+    private val connector: TerminalConnector,
 ) : HostEventSink {
     var startupMarkerObserver: ((ShellIntegrationMarker, Boolean) -> Unit)? = null
     private val commandTextExtractor = ShellIntegrationCommandTextExtractor()
@@ -1023,6 +1026,15 @@ private class ShellIntegrationRecordingHostEventSink(
         columns: Int,
     ) {
         delegate.resizeWindow(rows, columns)
+    }
+
+    override fun requestColumnMode(
+        rows: Int,
+        columns: Int,
+    ): Boolean {
+        if (!delegate.requestColumnMode(rows, columns)) return false
+        connector.resize(columns, rows)
+        return true
     }
 
     override fun moveWindow(

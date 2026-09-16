@@ -471,7 +471,12 @@ class HostCommandAdapter(
     ) {
         when (mode) {
             DecPrivateMode.APPLICATION_CURSOR_KEYS -> terminal.setApplicationCursorKeys(enable)
-            DecPrivateMode.DECCOLM -> terminal.executeDeccolm(if (enable) 132 else 80)
+            DecPrivateMode.DECCOLM -> {
+                val columns = if (enable) 132 else 80
+                if (hostPolicy.windowManipulationPolicy.isAllowed && hostEvents.requestColumnMode(terminal.height, columns)) {
+                    terminal.executeDeccolm(columns)
+                }
+            }
             DecPrivateMode.REVERSE_VIDEO -> terminal.setReverseVideo(enable)
             DecPrivateMode.ORIGIN -> terminal.setOriginMode(enable)
             DecPrivateMode.AUTO_WRAP -> terminal.setAutoWrap(enable)

@@ -1860,23 +1860,25 @@ class SwingTerminal
         }
 
         /**
-         * Returns the component size in pixels for a primary-screen grid.
+         * Returns the component size in pixels for the requested grid and screen.
          *
          * Must be called on the EDT because it reads the current settings and
-         * font metrics. The calculation includes primary-screen chrome even
-         * when the alternate screen is active.
+         * font metrics. Primary-screen chrome is the default for initial sizing.
          *
          * @param columns requested number of terminal columns.
          * @param rows requested number of terminal rows.
+         * @param activeBuffer screen whose chrome insets should be included.
          * @return a new caller-owned dimension containing pixel width and height.
          */
+        @JvmOverloads
         fun preferredGridSize(
             columns: Int,
             rows: Int,
+            activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
         ): Dimension =
             Dimension(
-                columns * metrics.cellWidth + SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY),
-                rows * metrics.cellHeight + SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.PRIMARY),
+                columns * metrics.cellWidth + SwingTerminalChrome.horizontalInset(settings, activeBuffer),
+                rows * metrics.cellHeight + SwingTerminalChrome.verticalInset(settings, activeBuffer),
             )
 
         private fun resizeSessionToVisibleGridOnEdt(publishWhenUnchanged: Boolean = true): Boolean {

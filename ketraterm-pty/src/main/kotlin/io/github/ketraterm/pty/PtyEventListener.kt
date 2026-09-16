@@ -97,6 +97,17 @@ interface PtyEventListener {
     )
 
     /**
+     * Accepts a DECCOLM grid change before terminal/transport mutation. Defaults
+     * to rejection. See [io.github.ketraterm.host.HostEventSink.requestColumnMode]
+     * for the synchronous, nonblocking host acceptance contract.
+     */
+    fun requestColumnMode(
+        session: TerminalSession,
+        rows: Int,
+        columns: Int,
+    ): Boolean = false
+
+    /**
      * Called when the shell requests moving the window.
      *
      * @param session session that received the event.

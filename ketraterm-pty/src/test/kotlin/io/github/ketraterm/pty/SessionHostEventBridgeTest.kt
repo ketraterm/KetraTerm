@@ -16,12 +16,7 @@
 package io.github.ketraterm.pty
 
 import io.github.ketraterm.core.TerminalBuffers
-import io.github.ketraterm.host.TerminalClipboardAuditEvent
-import io.github.ketraterm.host.TerminalClipboardDecision
-import io.github.ketraterm.host.TerminalClipboardOperation
-import io.github.ketraterm.host.TerminalClipboardOrigin
-import io.github.ketraterm.host.TerminalClipboardPromptEvent
-import io.github.ketraterm.host.TerminalClipboardWriteEvent
+import io.github.ketraterm.host.*
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
@@ -33,6 +28,49 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class SessionHostEventBridgeTest {
+    @Test
+    fun `column mode acceptance is explicit and listener failures reject the request`() {
+        val session = testSession()
+        var accept = false
+        var fail = false
+        val failures = mutableListOf<String?>()
+        val listener =
+            object : PtyEventListener by PtyEventListener.NONE {
+                override fun requestColumnMode(
+                    session: TerminalSession,
+                    rows: Int,
+                    columns: Int,
+                ): Boolean {
+                    assertEquals(24, rows)
+                    assertEquals(132, columns)
+                    if (fail) error("resize rejected")
+                    return accept
+                }
+
+                override fun listenerFailed(
+                    session: TerminalSession,
+                    exception: Exception,
+                ) {
+                    failures += exception.message
+                }
+            }
+        try {
+            val bridge = SessionHostEventBridge(listener)
+            bridge.attach(session)
+            assertEquals(false, bridge.requestColumnMode(24, 132))
+            accept = true
+            assertEquals(true, bridge.requestColumnMode(24, 132))
+            fail = true
+            assertEquals(false, bridge.requestColumnMode(24, 132))
+            assertEquals(listOf("resize rejected"), failures)
+            val defaultBridge = SessionHostEventBridge(PtyEventListener.NONE)
+            defaultBridge.attach(session)
+            assertEquals(false, defaultBridge.requestColumnMode(24, 132))
+        } finally {
+            session.close()
+        }
+    }
+
     @Test
     fun `attach twice fails`() {
         val bridge = SessionHostEventBridge(RecordingListener())
