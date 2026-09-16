@@ -108,8 +108,9 @@ class HostCommandAdapter(
     private var inverse: Boolean = false
     private var conceal: Boolean = false
     private var activeHyperlinkNumericId: Int = 0
+
+    // Zero marks exhaustion. IDs can outlive registry entries in cells and UI snapshots.
     private var nextHyperlinkNumericId: Int = 1
-    private var nextAnonymousHyperlinkInstance: Int = 1
     private val hyperlinkIds = LinkedHashMap<HyperlinkKey, Int>(256, 0.75f, true)
     private val hyperlinkKeysByNumericId = HashMap<Int, HyperlinkKey>(256)
 
@@ -177,8 +178,6 @@ class HostCommandAdapter(
         activeHyperlinkNumericId = 0
         hyperlinkIds.clear()
         hyperlinkKeysByNumericId.clear()
-        nextHyperlinkNumericId = 1
-        nextAnonymousHyperlinkInstance = 1
     }
 
     override fun decaln() {
@@ -882,9 +881,15 @@ class HostCommandAdapter(
             return
         }
 
+        val numericId = hyperlinkIdFor(uri, id)
+        if (numericId == NO_HYPERLINK_ID) {
+            clearActiveHyperlink()
+            return
+        }
+
         activeHyperlinkUri = uri
         activeHyperlinkId = id
-        activeHyperlinkNumericId = hyperlinkIdFor(uri, id)
+        activeHyperlinkNumericId = numericId
         terminal.setHyperlinkId(activeHyperlinkNumericId)
     }
 
@@ -980,8 +985,11 @@ class HostCommandAdapter(
      *
      * The renderer stores only primitive ids in cells. This adapter owns the
      * bounded metadata registry that maps those ids back to validated URIs for
-     * explicit host/UI activation. Ids evicted by [hostPolicy] are intentionally
-     * unresolved even if older cells still contain their primitive id.
+     * explicit host/UI activation. IDs invalidated by reset or evicted by
+     * [hostPolicy] remain unresolved even if cells or UI snapshots retain them.
+     * An issued ID is never assigned to another link during this adapter's
+     * lifetime. Exhausting the positive ID range prevents new entries while
+     * existing explicit OSC 8 keys can still reuse their retained entries.
      *
      * @param hyperlinkId render-cell hyperlink id.
      * @return target URI, or `null`.
@@ -1120,16 +1128,17 @@ class HostCommandAdapter(
         uri: String,
         id: String?,
     ): Int {
+        val numericId = nextHyperlinkNumericId
         val key =
             if (id == null) {
-                HyperlinkKey(id = "", uri = uri, anonymousInstance = nextAnonymousHyperlinkInstance)
-                    .also { nextAnonymousHyperlinkInstance = nextHyperlinkIdAfter(nextAnonymousHyperlinkInstance) }
+                HyperlinkKey(id = "", uri = uri, anonymousInstance = numericId)
             } else {
                 HyperlinkKey(id = id, uri = uri, anonymousInstance = EXPLICIT_HYPERLINK_INSTANCE)
             }
         if (id != null) {
             hyperlinkIds[key]?.let { return it }
         }
+        if (numericId == NO_HYPERLINK_ID) return NO_HYPERLINK_ID
 
         if (hyperlinkIds.size >= hostPolicy.maxHyperlinkEntries) {
             val eldest = hyperlinkIds.entries.iterator()
@@ -1140,13 +1149,9 @@ class HostCommandAdapter(
             }
         }
 
-        val numericId = nextHyperlinkNumericId
-        hyperlinkKeysByNumericId[numericId]?.let { staleKey ->
-            hyperlinkIds.remove(staleKey)
-        }
         hyperlinkIds[key] = numericId
         hyperlinkKeysByNumericId[numericId] = key
-        nextHyperlinkNumericId = nextHyperlinkIdAfter(numericId)
+        nextHyperlinkNumericId = if (numericId == Int.MAX_VALUE) NO_HYPERLINK_ID else numericId + 1
         return numericId
     }
 
@@ -1166,8 +1171,6 @@ class HostCommandAdapter(
             TerminalTitleOverflowPolicy.CLAMP -> title.take(policy.maxLength)
         }
     }
-
-    private fun nextHyperlinkIdAfter(current: Int): Int = if (current == Int.MAX_VALUE) 1 else current + 1
 
     private fun applyPen() {
         terminal.setPenColors(

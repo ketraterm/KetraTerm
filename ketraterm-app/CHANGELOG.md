@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 - Improved compatibility with apps that switch terminal width, while respecting resize settings and protecting split layouts.
+- Fixed cursor and scroll-position jumps when resizing terminals with a full history.
+- Fixed terminal links opening the wrong destination after a reset.
 - Compatible terminal apps can now match the terminal's light or dark theme.
 - Added a startup command setting for new terminal tabs and splits.
 - Fixed missing spaces and line breaks when copying or exporting terminal text, including after resizing.

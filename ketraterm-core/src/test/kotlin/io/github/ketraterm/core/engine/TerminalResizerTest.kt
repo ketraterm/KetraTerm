@@ -269,6 +269,7 @@ class TerminalResizerTest {
             state.writeLine(1, "mid")
             state.writeLine(2, "abcdef")
             state.cursor.row = 2
+            state.cursor.col = 0
 
             resizeState(state, 3, 3)
 
@@ -276,7 +277,9 @@ class TerminalResizerTest {
                 { assertEquals("mid", state.screenLines()[0]) },
                 { assertEquals("abc", state.screenLines()[1]) },
                 { assertEquals("def", state.screenLines()[2]) },
-                { assertEquals(2, state.cursor.row) },
+                { assertEquals(1, state.cursor.row) },
+                { assertEquals(0, state.cursor.col) },
+                { assertEquals('a'.code, state.ring[state.cursor.row].getCodepoint(state.cursor.col)) },
             )
         }
 
@@ -850,7 +853,12 @@ class TerminalResizerTest {
 
             resizeState(state, 8, 2)
 
-            assertTrue(state.ring.size <= state.primaryBuffer.maxHistory + state.dimensions.height)
+            assertAll(
+                { assertEquals(3, state.ring.capacity) },
+                { assertEquals(2, state.ring.size) },
+                { assertEquals(0, state.historySize) },
+                { assertEquals(listOf("dDeE", "fF"), state.screenLines()) },
+            )
         }
 
         @Test
@@ -861,7 +869,12 @@ class TerminalResizerTest {
 
             resizeState(state, 10, 3)
 
-            assertTrue(state.ring.size >= 3)
+            assertAll(
+                { assertEquals(2, state.historySize) },
+                { assertEquals("Row0", state.ring[0].toTextTrimmed()) },
+                { assertEquals("Row1", state.ring[1].toTextTrimmed()) },
+                { assertEquals(listOf("Row2", "", ""), state.screenLines()) },
+            )
         }
 
         @Test
@@ -870,7 +883,12 @@ class TerminalResizerTest {
 
             resizeState(state, 10, 10)
 
-            assertTrue(state.ring.size >= 10)
+            assertAll(
+                { assertEquals(110, state.ring.capacity) },
+                { assertEquals(10, state.ring.size) },
+                { assertEquals(0, state.historySize) },
+                { assertEquals(List(10) { "" }, state.screenLines()) },
+            )
         }
     }
 
