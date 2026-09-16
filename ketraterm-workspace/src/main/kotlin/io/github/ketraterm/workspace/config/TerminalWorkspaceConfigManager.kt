@@ -194,6 +194,7 @@ class TerminalWorkspaceConfigManager(
                 cursorShape = cleanCursorShape,
                 shellPath = cleanShellPath,
                 startDirectory = startDirectory,
+                startupCommand = shell["startup_command"].orEmpty(),
                 audibleBell = audibleBell,
                 visualBell = visualBell,
                 pasteOnMiddleClick = pasteOnMiddleClick,
@@ -274,6 +275,9 @@ class TerminalWorkspaceConfigManager(
         path = "${config.shellPath}"
         # Initial working directory when opening a new tab
         start_directory = "${config.startDirectory}"
+        # Optional command line to run once after shell readiness; blank disables it.
+        # Requires interactive PowerShell, Bash, zsh, or fish. Use a script for multiline programs.
+        startup_command = ${TomlParser.quoteSingleLineString(config.startupCommand)}
 
         [window]
         # Preferred default terminal size in columns and rows

@@ -255,7 +255,9 @@ interface TerminalModeController {
     /**
      * Sets the theme-configured color palette for the terminal session.
      *
-     * This updates both the default theme palette and the active palette.
+     * This updates both the default theme palette and the active palette. The
+     * host palette's light/dark classification is also used by private DSR 996;
+     * application palette overrides do not change that host preference.
      *
      * @param palette the theme color palette configuration.
      */

@@ -188,7 +188,7 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.SU -> sink.scrollUp(countParam(state, 0))
             CsiCommand.SD -> sink.scrollDown(countParam(state, 0))
             CsiCommand.DSR -> sink.requestDeviceStatusReport(modeParam(state, 0), decPrivate = false)
-            CsiCommand.DSR_DEC -> sink.requestDeviceStatusReport(modeParam(state, 0), decPrivate = true)
+            CsiCommand.DSR_DEC -> dispatchPrivateDeviceStatusReport(sink, state)
             CsiCommand.TBC -> dispatchTabClear(sink, state)
             CsiCommand.WINDOW_OP -> dispatchWindowOperation(sink, state)
             CsiCommand.XTFMTKEYS -> dispatchKeyFormatOption(sink, state)
@@ -507,6 +507,15 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             resetOne = { resource -> sink.resetKeyFormatOption(resource) },
             set = { resource, value -> sink.setKeyFormatOption(resource, value) },
         )
+    }
+
+    private fun dispatchPrivateDeviceStatusReport(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        val mode = modeParam(state, 0)
+        if (mode == 996 && (state.paramCount != 1 || isSubParameter(state, 0))) return
+        sink.requestDeviceStatusReport(mode, decPrivate = true)
     }
 
     private fun dispatchDisableKeyModifierOption(

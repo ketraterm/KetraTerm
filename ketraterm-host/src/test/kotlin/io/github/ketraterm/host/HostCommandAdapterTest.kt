@@ -751,6 +751,31 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `color scheme query survives every chunk boundary and uses terminal response policy`() {
+            val query = "\u001B[?996n"
+            for (policy in HostControlPolicy.entries) {
+                for (split in 0..query.length) {
+                    val f = Fixture(hostPolicy = HostPolicy(terminalResponsePolicy = policy, palettePolicy = HostControlPolicy.DENY))
+                    f.acceptAscii(query.take(split))
+                    f.acceptAscii(query.drop(split))
+                    f.end()
+                    assertEquals(if (policy == HostControlPolicy.ALLOW) "\u001B[?997;1n" else "", f.drainResponses())
+                }
+            }
+        }
+
+        @Test
+        fun `invalid color scheme requests are silent and do not prevent the next query`() {
+            for (request in listOf("996n", "?997;1n", ">996n", "?996;1n", "?996:1n", "?999999999999999999999996n", "?n")) {
+                val f = Fixture()
+                f.acceptAscii("\u001B[$request")
+                assertEquals("", f.drainResponses(), request)
+                f.acceptAscii("\u001B[?996n")
+                assertEquals("\u001B[?997;1n", f.drainResponses(), request)
+            }
+        }
+
+        @Test
         fun `terminal response policy can deny DSR CPR and DA responses`() {
             val f =
                 Fixture(

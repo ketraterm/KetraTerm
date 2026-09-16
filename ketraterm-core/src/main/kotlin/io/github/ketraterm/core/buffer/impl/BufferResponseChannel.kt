@@ -47,6 +47,7 @@ internal class BufferResponseChannel(
         when {
             !decPrivate && mode == 5 -> enqueueOperatingStatusReport()
             mode == 6 -> enqueueCursorPositionReport(decPrivate)
+            decPrivate && mode == 996 -> enqueueColorSchemeReport()
         }
     }
 
@@ -160,6 +161,15 @@ internal class BufferResponseChannel(
     private fun enqueueOperatingStatusReport() {
         enqueueCsiPrefix()
         state.hostResponses.enqueueByte('0'.code)
+        state.hostResponses.enqueueByte('n'.code)
+    }
+
+    private fun enqueueColorSchemeReport() {
+        enqueueCsiPrefix()
+        state.hostResponses.enqueueByte('?'.code)
+        state.hostResponses.enqueuePositiveDecimal(997)
+        state.hostResponses.enqueueByte(';'.code)
+        state.hostResponses.enqueueByte(if (state.themePalette.isDark) '1'.code else '2'.code)
         state.hostResponses.enqueueByte('n'.code)
     }
 

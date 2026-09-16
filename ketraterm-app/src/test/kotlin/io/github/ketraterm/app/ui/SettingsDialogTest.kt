@@ -41,6 +41,22 @@ import kotlin.test.assertTrue
 
 class SettingsDialogTest {
     @Test
+    fun `startup command field persists exact text`() {
+        withDialog { settings, dialog, closed ->
+            onEdt {
+                val field =
+                    components(dialog).filterIsInstance<JTextField>().first {
+                        it.toolTipText?.startsWith("Run once when a new shell is ready") == true
+                    }
+                field.text = "  echo 'ready'  "
+                button(dialog, "OK").doClick()
+            }
+            assertTrue(closed.await(5, TimeUnit.SECONDS))
+            assertEquals("  echo 'ready'  ", settings.config.startupCommand)
+        }
+    }
+
+    @Test
     fun `OK saves off EDT and waits for the single in-flight save before closing`() {
         assumeFalse(GraphicsEnvironment.isHeadless())
         val directory = Files.createTempDirectory("ketraterm-settings-dialog")

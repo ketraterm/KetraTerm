@@ -730,6 +730,26 @@ class TerminalParserTest {
         }
 
         @Test
+        fun `color scheme query rejects malformed parameters and recovers at next query`() {
+            val malformed =
+                listOf(
+                    "\u001B[?996;1n",
+                    "\u001B[?996;n",
+                    "\u001B[?996:1n",
+                    "\u001B[?996:n",
+                    "\u001B[?996 n",
+                    "\u001B[?996\u0018",
+                    "\u001B[?996\u001a",
+                )
+            for (sequence in malformed) {
+                val f = TerminalParserFixture()
+                f.acceptAscii(sequence)
+                f.acceptAscii("\u001B[?996n")
+                assertEquals(listOf("requestDeviceStatusReport:996:true"), f.sink.events, sequence)
+            }
+        }
+
+        @Test
         fun `safe xterm window reports and title stack operations dispatch through the full parser`() {
             val f = TerminalParserFixture()
 

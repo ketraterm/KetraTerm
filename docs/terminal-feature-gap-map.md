@@ -107,7 +107,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ### Query and Response Channel
 - `DONE(core/host/policy)`: terminal-to-host response channel exists for DA, DSR/CPR, safe window reports, palette queries, `DECRQSS`, and allowlisted `XTGETTCAP`; host policy can deny terminal responses before they enqueue bytes.
-- `TODO(core)`: light/dark color-scheme query (`CSI ?996n`). Private DSR dispatch already reaches core, but there is no `CSI ?997;Ps n` reply or host-supplied scheme state for applications that use this protocol to select their theme. Add the response and active-host scheme integration under the terminal-response policy; existing OSC background-color queries do not cover this protocol.
+- `DONE(core/host/policy)`: light/dark color-scheme query (`CSI ?996n`) returns `CSI ?997;1n` (dark) or `CSI ?997;2n` (light) from the active host theme palette under terminal-response policy. Standalone and IDE theme updates use the existing synchronized palette publication path; application color overrides do not affect the reply. Denied requests stay silent because this protocol has no failure response. The implemented slice is the one-shot query, without mode 2031 unsolicited notifications.
 - `TODO(core/parser/host/policy)`: OSC query responses and future query/response protocols need explicit response shape, allowlist, and host policy before implementation.
 - `TODO(core/host)`: event API for hyperlinks, palette updates, and terminal notifications if these move out of host or render-frame metadata.
 
@@ -125,7 +125,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 - `DONE(input/policy)`: paste encoding, bracketed-paste wrapping, and `TerminalInputPolicy` paste sanitization are implemented and tested. The generic encoder preserves payloads by default, can strip C0 controls except TAB/CR/LF, can canonicalize CRLF/CR/LF through an explicit host policy, and wraps with `CSI 200~` / `CSI 201~` when bracketed paste mode is active. Bracketed payloads preserve their original line endings; unbracketed local PTY input canonicalizes newline forms to CR.
 - `DONE(host/profile)`: standalone/workspace local PTY profiles persist `paste_sanitization` (`raw`, `strip-c0`, or `normalize-line-endings`) and apply it to newly opened tabs and splits through `TerminalWorkspaceOpenOptions` and `PtyOptions.inputPolicy`.
-- `TODO(host/profile)`: expose paste policy defaults for SSH and IDE/workspace embedding profiles when those product surfaces are wired; input already provides the mechanism.
+- `DONE(host/profile)`: IDE settings expose and persist raw paste, C0 stripping, and line-ending normalization. The IDE-wide choice applies to new local sessions through workspace open options and to existing panes through Swing settings reload. Embedders can supply defaults through `TerminalWorkspaceOpenOptions` or `SwingSettings`, and update a running session through `TerminalSession.setPasteSanitizationPolicy` without replacing transport-specific input policy.
+- `TODO(host/profile)`: expose paste policy defaults for SSH profiles when that product surface is wired; input already provides the mechanism.
 - `TODO(input)`: broader modified-key encoding:
   - xterm modifyOtherKeys subparameter mask support such as `CSI > 4 : 1 m`; this factors modifiers out of the source keysym and therefore remains deferred with rich layout-aware input metadata.
 - `TODO(parser/core/input)`: xterm modified-key policy surface for `modifyCursorKeys`, `modifyFunctionKeys`, and `modifyKeypadKeys`.
@@ -151,7 +152,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ## Session, Transport, Rendering, and Host Integration Gaps
 
-- `TODO(session)`: startup command inside an interactive shell. Profiles currently specify the launched process and arguments, but cannot separately request a command to execute once that shell is ready. Add host/profile configuration and shell-readiness-aware, once-per-session execution so a tab can start a requested command without replacing its interactive shell or relying on a fixed delay.
+- `DONE(session)`: startup commands execute once after supported shell readiness, with standalone configuration and project-local IntelliJ settings. The [feature map](terminal-feature-map.md#7-embedding--swing-ui) defines supported shells, input cancellation, and launch restrictions; WSL launchers and multiline command payloads are outside this slice.
 - `TODO(session)`: automatic foreground-process tab titles. Existing titles come from application-reported titles, user overrides, and directory/profile fallbacks; there is no independent foreground-process detection for applications that do not report a title. Add lifecycle-bound process tracking and a product setting for displaying the detected name, preserving custom-title precedence and existing fallbacks when detection is unavailable.
 - `DONE(host/profile)`: IntelliJ **Open in KetraTerm** opens a new tab from local Project View, editor, and editor-tab file contexts. The [feature map](terminal-feature-map.md#7-embedding--swing-ui) defines directory selection and launch behavior.
 - `DONE(host/profile)`: IntelliJ project workspace persistence restores open tabs, custom names, local working directories, profile choice, order, and selection. The [feature map](terminal-feature-map.md#7-embedding--swing-ui) defines lazy startup, directory fallback, and the local-host boundary.

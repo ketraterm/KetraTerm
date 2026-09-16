@@ -6,6 +6,8 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 - Fixed cursor and scrollback viewport drift when resize reflow evicts older rows. Added exact retention coverage for history capacity boundaries and repeated alternate-screen resize cycles.
 - Fixed OSC 8 hyperlink IDs being reassigned after hard reset. Retained IDs now stay invalid after reset or eviction, and ID exhaustion cannot retarget old links.
+- Added policy-gated `CSI ?996n` color-scheme queries using explicit host theme metadata, including live IDE theme updates.
+- Added validated startup commands to session, PTY, and workspace APIs, with once-per-session prompt readiness, serialized submission, cancellation on early input, and standalone plus project-local IntelliJ configuration.
 - Fixed lost spaces and line breaks in copy/export and command capture. Added `WRAP_PADDING` render metadata to preserve text across soft wraps and resize/reflow without new per-frame storage.
 - Added `TerminalProfile.shellEnvironment` for toolchain overrides at launch and after supported shell startup files, enabling IntelliJ project JDK selection.
 - Hardened shell startup argument handling and added real-shell coverage for Bash, zsh, fish, and PowerShell.

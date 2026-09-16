@@ -18,6 +18,7 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
+import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfile
@@ -139,6 +140,10 @@ internal class SettingsDialog(
         }
     private val customShellField = createTextField(if (isCustomShell) settings.config.shellPath else "", 140) // Will be wrapped with button
     private val startDirectoryField = createTextField(settings.config.startDirectory, 140) // Will be wrapped with button
+    private val startupCommandField =
+        createTextField(settings.config.startupCommand, 140).apply {
+            toolTipText = "Run once when a new shell is ready. Requires PowerShell, Bash, zsh, or fish. Leave blank to disable."
+        }
     private val audibleBellCheckbox = JCheckBox("Audible bell", settings.config.audibleBell)
     private val visualBellCheckbox = JCheckBox("Visual bell", settings.config.visualBell)
 
@@ -255,6 +260,7 @@ internal class SettingsDialog(
         registerChangeListener(shellPathCombo, updateApplyState)
         registerChangeListener(customShellField, updateApplyState)
         registerChangeListener(startDirectoryField, updateApplyState)
+        registerChangeListener(startupCommandField, updateApplyState)
         registerChangeListener(audibleBellCheckbox, updateApplyState)
         registerChangeListener(visualBellCheckbox, updateApplyState)
         registerChangeListener(fontFamilyCombo, updateApplyState)
@@ -390,6 +396,7 @@ internal class SettingsDialog(
                 add(browseBtn, BorderLayout.EAST)
             }
         addFormRow(projectSection, 2, "Start directory:", startDirWrapper)
+        addFormRow(projectSection, 3, "Startup command:", startupCommandField)
         panel.add(projectSection)
 
         panel.add(SectionHeader("Terminal Bells"))
@@ -727,6 +734,7 @@ internal class SettingsDialog(
     private fun resetToDefaults() {
         selectShell(TerminalConfig.DEFAULT_SHELL_PATH)
         startDirectoryField.text = TerminalConfig.DEFAULT_START_DIRECTORY
+        startupCommandField.text = ""
         audibleBellCheckbox.isSelected = TerminalConfig.DEFAULT_AUDIBLE_BELL
         visualBellCheckbox.isSelected = TerminalConfig.DEFAULT_VISUAL_BELL
 
@@ -767,6 +775,12 @@ internal class SettingsDialog(
     private fun applyChanges(closeAfterSave: Boolean = false) {
         if (saving) return
         val uiState = getUiState()
+        try {
+            TerminalStartupCommand.fromText(uiState.startupCommand)
+        } catch (exception: IllegalArgumentException) {
+            JOptionPane.showMessageDialog(this, exception.message, "Invalid Startup Command", JOptionPane.ERROR_MESSAGE)
+            return
+        }
         if (!model.hasChanges(uiState)) {
             if (closeAfterSave) dispose()
             return
@@ -848,6 +862,7 @@ internal class SettingsDialog(
             cursorShape = cursorShapeCombo.selectedItem as? String ?: "",
             shellPath = nextShellPath.ifBlank { TerminalConfig.DEFAULT_SHELL_PATH },
             startDirectory = startDirectoryField.text,
+            startupCommand = startupCommandField.text,
             audibleBell = audibleBellCheckbox.isSelected,
             visualBell = visualBellCheckbox.isSelected,
             pasteOnMiddleClick = pasteOnMiddleClickCheckbox.isSelected,

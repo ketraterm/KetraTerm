@@ -27,6 +27,7 @@ import io.github.ketraterm.pty.TerminalSessions
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
+import io.github.ketraterm.session.TerminalStartupCommandStatus
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
@@ -120,7 +121,18 @@ class TerminalWorkspace internal constructor(
 
         val stateJob =
             workspaceScope.launch {
+                val startupJob =
+                    session.startupCommandStatus?.let { status ->
+                        launch {
+                            if (status.first { it != TerminalStartupCommandStatus.WAITING } ==
+                                TerminalStartupCommandStatus.CANCELLED_BY_INPUT
+                            ) {
+                                listener.startupCommandCancelled(tab)
+                            }
+                        }
+                    }
                 val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
+                startupJob?.cancel()
                 if (!closed.event.locallyRequested) {
                     tabBySession(session)?.let {
                         listener.sessionClosed(it, closed.event.exitCode, closed.event.failure)
@@ -343,6 +355,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
                 maxHistory = options.maxHistory,
                 eventListener = eventListener,
                 hostPolicy = options.hostPolicy,
+                startupCommand = launchProfile.startupCommand,
             ),
         )
     }
@@ -512,6 +525,9 @@ class TerminalWorkspaceTab internal constructor(
  * Host-neutral workspace events.
  */
 interface TerminalWorkspaceListener {
+    /** The user typed before shell readiness, so the configured startup command was not submitted. */
+    fun startupCommandCancelled(tab: TerminalWorkspaceTab) = Unit
+
     /**
      * Called after a tab is opened and selected.
      *

@@ -20,6 +20,7 @@ import io.github.ketraterm.input.policy.EnterNewLineModePolicy
 import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
+import io.github.ketraterm.session.TerminalStartupCommand
 import java.nio.file.Path
 
 /**
@@ -47,6 +48,8 @@ import java.nio.file.Path
  * @param eventListener host callbacks for parser-discovered PTY metadata
  * events such as BEL and title changes.
  * @param hostPolicy safety policy for terminal-triggered host actions.
+ * @param startupCommand command to submit once the shell emits a complete OSC 133 prompt.
+ * The caller is responsible for installing shell integration before launch.
  */
 data class PtyOptions
     @JvmOverloads
@@ -64,6 +67,7 @@ data class PtyOptions
         val watcherThreadName: String = "terminal-pty-watcher",
         val eventListener: PtyEventListener = PtyEventListener.NONE,
         val hostPolicy: HostPolicy = HostPolicy(),
+        val startupCommand: TerminalStartupCommand? = null,
     ) {
         init {
             require(command.isNotEmpty()) { "PTY command must not be empty" }

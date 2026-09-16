@@ -33,6 +33,44 @@ import javax.swing.JComboBox
 import javax.swing.JLabel
 
 class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
+    fun testPasteHandlingChoicesApplyAndResetWithoutChangingOtherSettings() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        val original = settings.state
+        val configurable = KetraTermSettingsConfigurable(emptyList())
+        try {
+            settings.loadState(original.copy(pasteSanitization = "raw"))
+            val baseline = settings.state
+            val component = configurable.createComponent()
+            val rawLabel = KetraTermBundle.message("settings.ketraterm.pasteSanitization.raw")
+            val combo =
+                descendants(component)
+                    .filterIsInstance<JComboBox<*>>()
+                    .single { it.selectedItem?.toString() == rawLabel }
+            val choices =
+                listOf(
+                    "strip-c0" to KetraTermBundle.message("settings.ketraterm.pasteSanitization.stripC0"),
+                    "normalize-line-endings" to KetraTermBundle.message("settings.ketraterm.pasteSanitization.normalize"),
+                    "raw" to rawLabel,
+                )
+            assertEquals(choices.size, combo.itemCount)
+            assertFalse(configurable.isModified())
+            for ((id, label) in choices) {
+                combo.selectedIndex = (0 until combo.itemCount).single { combo.getItemAt(it).toString() == label }
+                assertTrue(configurable.isModified())
+                configurable.apply()
+                assertEquals(baseline.copy(pasteSanitization = id), settings.state)
+                assertFalse(configurable.isModified())
+                combo.selectedIndex = (combo.selectedIndex + 1) % combo.itemCount
+                configurable.reset()
+                assertEquals(label, combo.selectedItem?.toString())
+                assertFalse(configurable.isModified())
+            }
+        } finally {
+            configurable.disposeUIResources()
+            settings.replaceState(original)
+        }
+    }
+
     fun testProjectJdkCheckboxAppliesResetsAndPreservesEnvironmentSettings() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state

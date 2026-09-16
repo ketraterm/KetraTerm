@@ -37,6 +37,12 @@
                                  key="settings.ketraterm.displayName"
                                  bundle="messages.MyMessageBundle"/>
 
+        <projectConfigurable parentId="io.github.ketraterm.terminal.settings"
+                             instance="io.github.ketraterm.intellij.settings.KetraTermProjectSettingsConfigurable"
+                             id="io.github.ketraterm.terminal.project.settings"
+                             key="settings.ketraterm.project.displayName"
+                             bundle="messages.MyMessageBundle"/>
+
         <notificationGroup id="KetraTerm Terminal"
                            displayType="BALLOON"
                            key="notification.group.ketraterm.terminal"/>

@@ -58,6 +58,7 @@ internal object PtySessions {
                 hostEvents = hostEventBridge,
                 hostPolicy = options.hostPolicy,
                 inputPolicy = options.inputPolicy,
+                startupCommand = options.startupCommand,
             )
         hostEventBridge.attach(session)
         session.start(options.columns, options.rows)

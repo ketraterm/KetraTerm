@@ -35,6 +35,7 @@ import io.github.ketraterm.host.TerminalClipboardOrigin
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
+import io.github.ketraterm.intellij.settings.KetraTermProjectSettings
 import io.github.ketraterm.intellij.ui.KetraTermTerminalPane
 import io.github.ketraterm.intellij.ui.KetraTermTerminalPaneHostActions
 import io.github.ketraterm.intellij.ui.KetraTermTerminalStartupView
@@ -42,6 +43,7 @@ import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
 import io.github.ketraterm.session.TerminalSessionState
+import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.workspace.*
 import java.awt.BorderLayout
@@ -290,7 +292,15 @@ class KetraTermProjectTerminalService internal constructor(
                     val profile =
                         pending.sourceProfile
                             ?: TerminalTabRestore.profile(basePath, requireNotNull(pending.restoredState), settingsState)
-                    val launchProfile = profile.withProjectSdkEnvironment(project, enabled = settingsState.addProjectJdkToPath)
+                    val launchProfile =
+                        profile
+                            .withProjectSdkEnvironment(project, enabled = settingsState.addProjectJdkToPath)
+                            .copy(
+                                startupCommand =
+                                    profile.startupCommand ?: TerminalStartupCommand.fromText(
+                                        project.service<KetraTermProjectSettings>().state.startupCommand,
+                                    ),
+                            )
                     val tab =
                         synchronized(workspaceLock) {
                             if (disposed || closing || pending.closed) return@executeOnPooledThread
@@ -598,6 +608,17 @@ class KetraTermProjectTerminalService internal constructor(
             uri: String,
         ) {
             invokeLaterIfAlive { persistence?.capture() }
+        }
+
+        override fun startupCommandCancelled(tab: TerminalWorkspaceTab) {
+            invokeLaterIfAlive {
+                KetraTermIntellijNotifier.showNotification(
+                    project,
+                    "Startup command skipped",
+                    "You entered input before the shell was ready. The startup command was not run.",
+                    NotificationLevel.INFO,
+                )
+            }
         }
 
         override fun showNotification(

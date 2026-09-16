@@ -20,6 +20,7 @@ import io.github.ketraterm.host.TerminalClipboardOrigin
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitleOrigin
 import io.github.ketraterm.host.TerminalTitlePermission
+import io.github.ketraterm.input.policy.PasteSanitizationPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
@@ -32,6 +33,29 @@ import java.util.concurrent.CancellationException
  * Tests IntelliJ settings persistence mapping without opening an IDE window.
  */
 class KetraTermIntellijSettingsTest {
+    @Test
+    fun `paste policies survive state reload and map to embedding settings`() {
+        val service = KetraTermIntellijSettings()
+        assertEquals("raw", service.state.pasteSanitization)
+        val policies =
+            listOf(
+                "raw" to PasteSanitizationPolicy.RAW,
+                "strip-c0" to PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                "normalize-line-endings" to PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS,
+            )
+        for ((id, policy) in policies) {
+            service.loadState(service.state.copy(themeId = "nord", pasteSanitization = " ${id.uppercase(java.util.Locale.ROOT)} "))
+            assertEquals(id, service.state.pasteSanitization)
+            service.replaceState(service.state.copy(visualBell = !service.state.visualBell))
+            val reloaded = KetraTermIntellijSettings()
+            reloaded.loadState(service.state)
+            assertEquals(policy, KetraTermIntellijSettingsMapper.toSwingSettings(reloaded.state).pasteSanitizationPolicy)
+        }
+        service.loadState(service.state.copy(pasteSanitization = "unknown"))
+        assertEquals("raw", service.state.pasteSanitization)
+        assertEquals(PasteSanitizationPolicy.RAW, KetraTermIntellijSettingsMapper.toSwingSettings(service.state).pasteSanitizationPolicy)
+    }
+
     @Test
     fun `project JDK injection defaults on and survives platform state reload`() {
         val service = KetraTermIntellijSettings()
@@ -397,6 +421,7 @@ class KetraTermIntellijSettingsTest {
             )
 
         assertEquals(0xFF202124.toInt(), palette.defaultForeground)
+        assertFalse(palette.isDark)
         assertEquals(0xFFFAFAFA.toInt(), palette.defaultBackground)
         assertEquals(0xFFFFFFFF.toInt(), palette.selectionForeground)
         assertEquals(0xFF3366CC.toInt(), palette.selectionBackground)
@@ -404,5 +429,20 @@ class KetraTermIntellijSettingsTest {
         assertEquals(0xFFFAFAFA.toInt(), palette.indexedColor(0))
         assertEquals(0xFF202124.toInt(), palette.indexedColor(7))
         assertNotEquals(palette.cursorBackground, palette.cursorForeground)
+    }
+
+    @Test
+    fun `native dark palette preserves host theme preference`() {
+        val palette =
+            KetraTermIntellijThemePalette.fromSource(
+                KetraTermIntellijThemePalette.ColorSource(
+                    foreground = 0xffeeeeee.toInt(),
+                    background = 0xff202124.toInt(),
+                    selectionForeground = null,
+                    selectionBackground = null,
+                    cursor = null,
+                ),
+            )
+        assertTrue(palette.isDark)
     }
 }

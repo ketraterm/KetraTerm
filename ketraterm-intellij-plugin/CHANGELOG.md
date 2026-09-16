@@ -4,6 +4,8 @@
 
 - Fixed cursor and scroll-position jumps when resizing terminal panels with a full history.
 - Fixed terminal links opening the wrong destination after a reset.
+- Compatible terminal apps can now match the terminal's light or dark theme, including IDE themes.
+- Added a project-specific startup command setting for new terminals.
 - Fixed missing spaces and line breaks when copying terminal text, including after resizing the terminal panel.
 - Terminal tabs now reopen with their names and working directories after an IDE restart.
 - Added "Rename Tab" to the terminal context menu.
