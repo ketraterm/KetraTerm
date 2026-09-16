@@ -30,6 +30,9 @@ package io.github.ketraterm.render.api
  * @property cursorBackground cursor background ARGB color.
  * @property boldAsBright whether indexed ANSI 0..7 foreground colors should use
  * bright variants 8..15 when bold is active.
+ * @property isDark host-declared dark/light theme preference, independent of
+ * individual color values. Defaults to the built-in dark fallback; hosts with
+ * light or custom themes must supply their preference explicitly.
  * @param indexedColors 256-entry indexed palette in packed ARGB form.
  */
 class TerminalColorPalette(
@@ -41,6 +44,7 @@ class TerminalColorPalette(
     val cursorBackground: Int = 0xFFFFFFFF.toInt(),
     indexedColors: IntArray = defaultIndexedColors(),
     val boldAsBright: Boolean = true,
+    val isDark: Boolean = true,
 ) {
     private val indexedColorStorage: IntArray
 
@@ -141,6 +145,7 @@ class TerminalColorPalette(
      * @param indexedColors 256-entry indexed palette in packed ARGB form.
      * @param boldAsBright whether indexed ANSI 0..7 foreground colors should use
      * bright variants 8..15 when bold is active.
+     * @param isDark host theme preference; retained when individual colors change.
      * @return immutable palette copy.
      */
     fun copy(
@@ -152,6 +157,7 @@ class TerminalColorPalette(
         cursorBackground: Int = this.cursorBackground,
         indexedColors: IntArray = indexedColorStorage,
         boldAsBright: Boolean = this.boldAsBright,
+        isDark: Boolean = this.isDark,
     ): TerminalColorPalette =
         TerminalColorPalette(
             defaultForeground = defaultForeground,
@@ -162,6 +168,7 @@ class TerminalColorPalette(
             cursorBackground = cursorBackground,
             indexedColors = indexedColors,
             boldAsBright = boldAsBright,
+            isDark = isDark,
         )
 
     private fun foregroundWithoutInverse(attrWord: Long): Int {

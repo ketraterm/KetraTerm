@@ -21,6 +21,15 @@ import kotlin.test.assertTrue
 
 class TerminalColorPaletteTest {
     @Test
+    fun retainsHostSchemeWhenColorsChange() {
+        assertTrue(TerminalColorPalette().isDark)
+        val light = TerminalColorPalette(isDark = false)
+        assertEquals(false, light.isDark)
+        assertEquals(false, light.copy(defaultForeground = 0xffffffff.toInt(), defaultBackground = 0xff000000.toInt()).isDark)
+        assertTrue(light.copy(isDark = true).isDark)
+    }
+
+    @Test
     fun defaultPaletteContains256IndexedColors() {
         assertEquals(256, TerminalColorPalette.defaultIndexedColors().size)
     }

@@ -397,6 +397,7 @@ class KetraTermIntellijSettingsTest {
             )
 
         assertEquals(0xFF202124.toInt(), palette.defaultForeground)
+        assertFalse(palette.isDark)
         assertEquals(0xFFFAFAFA.toInt(), palette.defaultBackground)
         assertEquals(0xFFFFFFFF.toInt(), palette.selectionForeground)
         assertEquals(0xFF3366CC.toInt(), palette.selectionBackground)
@@ -404,5 +405,20 @@ class KetraTermIntellijSettingsTest {
         assertEquals(0xFFFAFAFA.toInt(), palette.indexedColor(0))
         assertEquals(0xFF202124.toInt(), palette.indexedColor(7))
         assertNotEquals(palette.cursorBackground, palette.cursorForeground)
+    }
+
+    @Test
+    fun `native dark palette preserves host theme preference`() {
+        val palette =
+            KetraTermIntellijThemePalette.fromSource(
+                KetraTermIntellijThemePalette.ColorSource(
+                    foreground = 0xffeeeeee.toInt(),
+                    background = 0xff202124.toInt(),
+                    selectionForeground = null,
+                    selectionBackground = null,
+                    cursor = null,
+                ),
+            )
+        assertTrue(palette.isDark)
     }
 }

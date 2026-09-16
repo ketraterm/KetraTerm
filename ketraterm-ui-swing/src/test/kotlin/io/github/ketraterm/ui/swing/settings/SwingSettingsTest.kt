@@ -405,6 +405,9 @@ class SwingSettingsTest {
 
     @Test
     fun terminalThemesRemainPaletteFactoriesForHosts() {
+        for (theme in TerminalTheme.entries) {
+            assertTrue(theme.createPalette().isDark)
+        }
         val palette = TerminalTheme.ONE_DARK.createPalette()
 
         assertEquals(0xFFABB2BF.toInt(), palette.defaultForeground)
