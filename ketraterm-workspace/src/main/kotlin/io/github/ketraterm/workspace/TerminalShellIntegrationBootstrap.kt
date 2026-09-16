@@ -44,6 +44,13 @@ internal object TerminalShellIntegrationBootstrap {
         enabled: Boolean,
         scriptDirectory: Path = defaultScriptDirectory(),
     ): TerminalProfile {
+        require(profile.startupCommand == null || enabled) {
+            "Startup commands require shell integration. Enable it or clear the startup command."
+        }
+        require(profile.startupCommand == null || profile.kind !in setOf(TerminalProfileKind.WSL, TerminalProfileKind.UBUNTU)) {
+            "Startup commands require a directly configured interactive PowerShell, Bash, zsh, or fish shell. " +
+                "WSL launchers are not supported for startup commands."
+        }
         if (!enabled) return TerminalShellEnvironmentBootstrap.applyInitial(profile)
 
         val integrated =
@@ -60,6 +67,10 @@ internal object TerminalShellIntegrationBootstrap {
                 else -> profile
             }
 
+        require(profile.startupCommand == null || integrated !== profile) {
+            "Startup commands require an interactive PowerShell, Bash, zsh, or fish shell with startup hooks enabled. " +
+                "Remove explicit command/script arguments or clear the startup command."
+        }
         if (integrated === profile) return TerminalShellEnvironmentBootstrap.applyInitial(profile)
 
         val configPath = TerminalWorkspaceConfigManager.getDefaultPath()
@@ -173,7 +184,7 @@ internal object TerminalShellIntegrationBootstrap {
     ): TerminalProfile {
         val command = profile.command
         if (hasExplicitBashEntryPoint(command)) return profile
-        if (profile.shellEnvironment != TerminalShellEnvironment.Empty) {
+        if (profile.shellEnvironment != TerminalShellEnvironment.Empty || profile.startupCommand != null) {
             return withBashStartupWrapper(profile, scriptDirectory)
         }
 

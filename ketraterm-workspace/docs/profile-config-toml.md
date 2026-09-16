@@ -39,7 +39,16 @@ shell_request_window_manipulation = false # permits shell scripts to move, minim
 [shell]
 path = ""                         # Shell path override (empty maps to default shell)
 start_directory = ""              # Shell startup directory
+startup_command = ""              # Command to run once when each new shell is ready
 ```
+
+Set **Startup command** in the standalone settings, or edit `[shell].startup_command`.
+For example, `startup_command = 'npm run dev'` starts the project task in each new
+terminal. For embedded quotes and Windows paths, the settings writer preserves the
+command using TOML triple-quoted strings. Leave the field blank to disable it.
+See the [feature map](../../docs/terminal-feature-map.md#7-embedding--swing-ui)
+for shell requirements and execution behavior. IntelliJ uses its own project-local
+setting rather than this standalone configuration file.
 
 ---
 

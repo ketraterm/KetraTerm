@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- Added validated startup commands to session, PTY, and workspace APIs, with once-per-session prompt readiness, serialized submission, cancellation on early input, and standalone plus project-local IntelliJ configuration.
 - Fixed lost spaces and line breaks in copy/export and command capture. Added `WRAP_PADDING` render metadata to preserve text across soft wraps and resize/reflow without new per-frame storage.
 - Added `TerminalProfile.shellEnvironment` for toolchain overrides at launch and after supported shell startup files, enabling IntelliJ project JDK selection.
 - Hardened shell startup argument handling and added real-shell coverage for Bash, zsh, fish, and PowerShell.

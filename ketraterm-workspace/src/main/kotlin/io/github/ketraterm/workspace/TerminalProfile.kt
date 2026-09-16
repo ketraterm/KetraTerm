@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.workspace
 
+import io.github.ketraterm.session.TerminalStartupCommand
 import java.nio.file.Path
 
 /**
@@ -34,6 +35,8 @@ import java.nio.file.Path
  * @property kind stable presentation category for host UI icons and menus.
  * @property shellEnvironment host-selected variables applied at launch and after
  * supported shell startup files, taking precedence over [environment].
+ * @property startupCommand optional command submitted once after shell readiness,
+ * keeping the interactive shell available when the command completes.
  */
 data class TerminalProfile(
     val id: String,
@@ -43,6 +46,7 @@ data class TerminalProfile(
     val workingDirectory: Path? = null,
     val kind: TerminalProfileKind = TerminalProfileKind.classify(id, displayName, command),
     val shellEnvironment: TerminalShellEnvironment = TerminalShellEnvironment.Empty,
+    val startupCommand: TerminalStartupCommand? = null,
 ) {
     init {
         require(id.isNotBlank()) { "profile id must not be blank" }

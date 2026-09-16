@@ -30,11 +30,54 @@ import io.github.ketraterm.pty.PtyEventListener
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class TerminalWorkspaceTest {
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `startup cancellation is delivered once with its owning tab even before observer starts`() =
+        runTest {
+            val session =
+                TerminalSession.create(
+                    terminal = TerminalBuffers.create(80, 24),
+                    connector = RecordingConnector(),
+                    startupCommand = TerminalStartupCommand("echo ready"),
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            session.start(80, 24)
+            val cancellations = mutableListOf<String>()
+            TerminalWorkspace(
+                listener =
+                    object : TerminalWorkspaceListener {
+                        override fun startupCommandCancelled(tab: TerminalWorkspaceTab) {
+                            cancellations += tab.id
+                        }
+                    },
+                sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+                workerDispatcher = StandardTestDispatcher(testScheduler),
+            ).use { workspace ->
+                val tab =
+                    workspace.openTab(
+                        TerminalProfile("test", "Test", listOf("unused-shell")),
+                        TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                    )
+                session.encodePaste(TerminalPasteEvent("user command"))
+                runCurrent()
+                assertEquals(listOf(tab.id), cancellations)
+                session.encodePaste(TerminalPasteEvent("more input"))
+                runCurrent()
+                assertEquals(listOf(tab.id), cancellations)
+            }
+            runCurrent()
+        }
+
     @Test
     fun testTabTitleRenamingAndPrecedence() {
         val session = testSession()
@@ -279,35 +322,40 @@ class TerminalWorkspaceTest {
     }
 
     @Test
-    fun `remote session close is forwarded with owning tab and exit code`() {
-        val connector = RecordingConnector()
-        val session = testSession(connector)
-        session.start(columns = 80, rows = 24)
-        val closeEvents = mutableListOf<Triple<String, Int?, Throwable?>>()
-        val workspace =
-            TerminalWorkspace(
-                listener =
-                    object : TerminalWorkspaceListener {
-                        override fun sessionClosed(
-                            tab: TerminalWorkspaceTab,
-                            exitCode: Int?,
-                            failure: Throwable?,
-                        ) {
-                            closeEvents += Triple(tab.id, exitCode, failure)
-                        }
-                    },
-                sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
-            )
-        val tab =
-            workspace.openTab(
-                profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
-                options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
-            )
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `remote session close is forwarded with owning tab and exit code`() =
+        runTest {
+            val connector = RecordingConnector()
+            val session = testSession(connector)
+            session.start(columns = 80, rows = 24)
+            val closeEvents = mutableListOf<Triple<String, Int?, Throwable?>>()
+            val workspace =
+                TerminalWorkspace(
+                    listener =
+                        object : TerminalWorkspaceListener {
+                            override fun sessionClosed(
+                                tab: TerminalWorkspaceTab,
+                                exitCode: Int?,
+                                failure: Throwable?,
+                            ) {
+                                closeEvents += Triple(tab.id, exitCode, failure)
+                            }
+                        },
+                    sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            val tab =
+                workspace.openTab(
+                    profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
+                    options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                )
 
-        connector.simulateClosed(1)
+            connector.simulateClosed(1)
+            runCurrent()
 
-        assertEquals(listOf(Triple<String, Int?, Throwable?>(tab.id, 1, null)), closeEvents)
-    }
+            assertEquals(listOf(Triple<String, Int?, Throwable?>(tab.id, 1, null)), closeEvents)
+            workspace.close()
+        }
 
     @Test
     fun `local workspace close is not forwarded as remote session close`() {

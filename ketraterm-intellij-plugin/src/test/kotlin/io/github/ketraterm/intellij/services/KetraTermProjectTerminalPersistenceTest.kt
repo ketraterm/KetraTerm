@@ -28,8 +28,11 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.content.ContentManager
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
+import io.github.ketraterm.intellij.settings.KetraTermProjectSettings
+import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.workspace.TerminalProfile
 import java.lang.reflect.Proxy
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Verifies restart metadata through the project service without showing terminal panes or creating PTYs. */
@@ -229,6 +232,55 @@ class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
 
         assertEquals(saved, storage.state)
         assertEquals(modifications, storage.stateModificationCount)
+    }
+
+    fun testNewTerminalsUseCurrentProjectCommandAndPreserveExplicitProfileCommand() {
+        val projectSettings = project.service<KetraTermProjectSettings>()
+        val original = projectSettings.state
+        val profiles = CopyOnWriteArrayList<TerminalProfile>()
+        val service =
+            KetraTermProjectTerminalService(project) { _, profile, _ ->
+                profiles += profile
+                throw IllegalStateException("PTY startup is disabled in this fixture")
+            }.also { Disposer.register(lifetime, it) }
+        val window = toolWindow(contentManager())
+        try {
+            projectSettings.replaceState(KetraTermProjectSettings.State("echo first"))
+            val first = service.openDefaultTab(window)
+            PlatformTestUtil.waitWithEventsDispatching("Default startup was not published", { first.displayName.startsWith("Failed:") }, 10)
+            assertEquals("echo first", profiles.single().startupCommand?.text)
+
+            projectSettings.replaceState(KetraTermProjectSettings.State("echo second"))
+            val profile = TerminalProfile("bash", "Bash", listOf("bash", "-i"))
+            val second = service.openProfileTab(window, profile)
+            PlatformTestUtil.waitWithEventsDispatching(
+                "Selected startup was not published",
+                { second.displayName.startsWith("Failed:") },
+                10,
+            )
+            assertEquals("echo second", profiles[1].startupCommand?.text)
+            assertEquals(profile.command, profiles[1].command)
+
+            val explicit = profile.copy(startupCommand = TerminalStartupCommand("echo explicit"))
+            val third = service.openProfileTab(window, explicit)
+            PlatformTestUtil.waitWithEventsDispatching(
+                "Explicit startup was not published",
+                { third.displayName.startsWith("Failed:") },
+                10,
+            )
+            assertEquals(explicit.startupCommand, profiles[2].startupCommand)
+
+            projectSettings.replaceState(KetraTermProjectSettings.State())
+            val fourth = service.openProfileTab(window, profile)
+            PlatformTestUtil.waitWithEventsDispatching(
+                "Disabled startup was not published",
+                { fourth.displayName.startsWith("Failed:") },
+                10,
+            )
+            assertNull(profiles[3].startupCommand)
+        } finally {
+            projectSettings.loadState(original)
+        }
     }
 
     private fun service(onStart: () -> Unit = {}): KetraTermProjectTerminalService =

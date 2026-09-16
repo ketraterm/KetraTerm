@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Added a project-specific startup command setting for new terminals.
 - Fixed missing spaces and line breaks when copying terminal text, including after resizing the terminal panel.
 - Terminal tabs now reopen with their names and working directories after an IDE restart.
 - Added "Rename Tab" to the terminal context menu.

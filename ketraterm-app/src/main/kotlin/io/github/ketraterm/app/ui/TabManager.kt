@@ -21,6 +21,7 @@ import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
+import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.workspace.*
 import kotlinx.coroutines.*
@@ -206,7 +207,7 @@ internal class TabManager(
         val workspaceTab =
             try {
                 workspace.openTab(
-                    profile = profile,
+                    profile = profileWithStartupCommand(profile),
                     options =
                         settings.current().let { snapshot ->
                             TerminalWorkspaceOpenOptions(
@@ -246,6 +247,16 @@ internal class TabManager(
         createdPane.requestFocus()
         return true
     }
+
+    private fun profileWithStartupCommand(profile: TerminalProfile): TerminalProfile =
+        if (profile.startupCommand != null) {
+            profile
+        } else {
+            profile.copy(
+                startupCommand =
+                    TerminalStartupCommand.fromText(settings.config.startupCommand),
+            )
+        }
 
     /**
      * Closes the tab identified by [id].
@@ -420,7 +431,7 @@ internal class TabManager(
         val workspaceTab =
             try {
                 workspace.openTab(
-                    profile = profile,
+                    profile = profileWithStartupCommand(profile),
                     options =
                         settings.current().let { snapshot ->
                             TerminalWorkspaceOpenOptions(
@@ -902,6 +913,18 @@ internal class TabManager(
             SwingUtilities.invokeLater {
                 val pane = panes.firstOrNull { it.tab == tab } ?: return@invokeLater
                 closePane(pane, openReplacementWhenLastPane = true)
+            }
+        }
+
+        override fun startupCommandCancelled(tab: TerminalWorkspaceTab) {
+            SwingUtilities.invokeLater {
+                if (panes.none { it.tab == tab }) return@invokeLater
+                JOptionPane.showMessageDialog(
+                    frame,
+                    "The startup command was skipped because you entered input before the shell was ready.",
+                    "Startup Command Skipped",
+                    JOptionPane.INFORMATION_MESSAGE,
+                )
             }
         }
 

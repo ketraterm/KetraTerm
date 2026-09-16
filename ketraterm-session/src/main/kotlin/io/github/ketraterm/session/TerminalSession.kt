@@ -85,6 +85,11 @@ class TerminalSession(
     private val pendingRenderGeneration = AtomicLong(0)
 
     private val mutationLock = Any()
+    private var startupSubmission: StartupCommandSubmission? = null
+
+    /** Retained startup submission outcome, or null when no command was configured. */
+    val startupCommandStatus: StateFlow<TerminalStartupCommandStatus>?
+        get() = startupSubmission?.status
     private val responseScratch = ByteArray(RESPONSE_BUFFER_SIZE)
     private val synchronizedTimeoutJob = AtomicReference<Job?>(null)
     private val renderRequests = Channel<Unit>(Channel.CONFLATED)
@@ -386,7 +391,10 @@ class TerminalSession(
     }
 
     override fun encodeKey(event: TerminalKeyEvent) {
-        withInputLock { encodeKey(event) }
+        withInputLock {
+            if (event.type != TerminalKeyEventType.RELEASE) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+            encodeKey(event)
+        }
     }
 
     /**
@@ -395,7 +403,10 @@ class TerminalSession(
      * Input before [start] is ignored.
      */
     override fun encodePaste(event: TerminalPasteEvent) {
-        withInputLock { encodePaste(event) }
+        withInputLock {
+            if (event.text.isNotEmpty()) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+            encodePaste(event)
+        }
     }
 
     /**
@@ -407,7 +418,10 @@ class TerminalSession(
      * @param event deletion counts and replacement text.
      */
     override fun encodeTextReplacement(event: TerminalTextReplacementEvent) {
-        withInputLock { encodeTextReplacement(event) }
+        withInputLock {
+            startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+            encodeTextReplacement(event)
+        }
     }
 
     /**
@@ -444,6 +458,22 @@ class TerminalSession(
         }
 
         drainResponses()
+        val submission = startupSubmission
+        if (submission?.status?.value == TerminalStartupCommandStatus.WAITING) {
+            synchronized(mutationLock) {
+                synchronized(outboundWriteLock) {
+                    if (isAcceptingInput()) {
+                        renderReader.readRenderFrame { frame ->
+                            if (frame.activeBuffer == TerminalRenderBufferKind.PRIMARY) {
+                                submission.submitIfReady(inputEncoder)
+                            } else {
+                                submission.invalidatePrompt()
+                            }
+                        }
+                    }
+                }
+            }
+        }
         invalidateRender(immediate = false)
     }
 
@@ -841,6 +871,9 @@ class TerminalSession(
     }
 
     private fun cleanupParser() {
+        synchronized(outboundWriteLock) {
+            startupSubmission?.cancel(TerminalStartupCommandStatus.CLOSED)
+        }
         cancelSynchronizedOutputTimeout()
         renderRequests.close()
         immediateRenderRequests.close()
@@ -885,6 +918,8 @@ class TerminalSession(
          * the active input host can provide truthfully. Defaults to the
          * conservative portable-host profile.
          * @param workerDispatcher non-owned dispatcher used for render publication and timeouts.
+         * @param startupCommand optional command submitted once after a complete OSC 133 prompt.
+         * User input before readiness cancels submission; hosts must install supported shell hooks.
          * @return standard production terminal session.
          */
         @JvmStatic
@@ -897,6 +932,7 @@ class TerminalSession(
             inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
             kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
             workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+            startupCommand: TerminalStartupCommand? = null,
         ): TerminalSession {
             val outboundWriteLock = Any()
             val hostOutput = ConnectorTerminalHostOutput(connector, outboundWriteLock)
@@ -933,6 +969,15 @@ class TerminalSession(
                     workerDispatcher = workerDispatcher,
                 )
             session.activeShellCommandLineProvider = recordingHostEvents::activeCommandLine
+            val submission = startupCommand?.let(::StartupCommandSubmission)
+            session.startupSubmission = submission
+            if (submission != null) {
+                recordingHostEvents.startupMarkerObserver = { marker, primary ->
+                    synchronized(outboundWriteLock) {
+                        submission.observe(marker, primary)
+                    }
+                }
+            }
             session.activeShellCommandLineContextProvider = recordingHostEvents::copyActiveCommandLineContext
             return session
         }
@@ -944,6 +989,7 @@ private class ShellIntegrationRecordingHostEventSink(
     private val renderReader: TerminalRenderFrameReader,
     private val state: TerminalShellIntegrationState,
 ) : HostEventSink {
+    var startupMarkerObserver: ((ShellIntegrationMarker, Boolean) -> Unit)? = null
     private val commandTextExtractor = ShellIntegrationCommandTextExtractor()
     private var promptEndLineId = NO_LINE_ID
     private var promptEndColumn = 0
@@ -1016,6 +1062,7 @@ private class ShellIntegrationRecordingHostEventSink(
         var historySize = 0
         var liveRows = 0
         renderReader.readRenderFrame(scrollbackOffset = 0) { frame ->
+            startupMarkerObserver?.invoke(event.marker, frame.activeBuffer == TerminalRenderBufferKind.PRIMARY)
             historySize = frame.historySize
             liveRows = frame.rows
             val firstVisibleRow = frame.discardedCount + frame.historySize

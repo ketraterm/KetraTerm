@@ -62,6 +62,7 @@ private fun defaultFontFamily(): String {
  * @property cursorShape default cursor shape id: `block`, `underline`, or `beam`.
  * @property shellPath command or executable path used when opening a local shell.
  * @property startDirectory initial working directory for newly opened shells.
+ * @property startupCommand optional single command line submitted once a new shell is ready; blank disables it.
  * @property audibleBell whether host UI should play a system bell for BEL events.
  * @property visualBell whether host UI should show a visual indicator for BEL events.
  * @property pasteOnMiddleClick whether middle mouse click should paste clipboard text.
@@ -118,6 +119,7 @@ data class TerminalConfig(
     val titleLocalPermission: TerminalTitlePermission = DEFAULT_TITLE_LOCAL_PERMISSION,
     val titleRemotePermission: TerminalTitlePermission = DEFAULT_TITLE_REMOTE_PERMISSION,
     val scrollOnOutput: Boolean = DEFAULT_SCROLL_ON_OUTPUT,
+    val startupCommand: String = "",
 ) {
     init {
         require(columns in COLUMNS_MIN..COLUMNS_MAX) {
