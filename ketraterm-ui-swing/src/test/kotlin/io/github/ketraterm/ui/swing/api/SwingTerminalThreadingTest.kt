@@ -21,6 +21,9 @@ import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.input.policy.PasteLineEndingPolicy
+import io.github.ketraterm.input.policy.PasteSanitizationPolicy
+import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
@@ -47,6 +50,58 @@ import javax.swing.SwingUtilities
 import kotlin.concurrent.thread
 
 class SwingTerminalThreadingTest {
+    @Test
+    fun `paste policy applies on binding and reload while preserving transport line endings`() {
+        val output = java.io.ByteArrayOutputStream()
+        val connector =
+            object : TerminalConnector by NoOpConnector {
+                override fun write(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    output.write(bytes, offset, length)
+                }
+            }
+        val session =
+            TerminalSession.create(
+                terminal = TerminalBuffers.create(width = 3, height = 1),
+                connector = connector,
+                inputPolicy = TerminalInputPolicy(pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN),
+            )
+        var settings = SwingSettings(pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF)
+        val component = SwingTerminal(settingsProvider = { settings })
+        val paste = TerminalPasteEvent("A\u0001\tB\r\nC\nD\rE")
+        try {
+            session.start(columns = 3, rows = 1)
+            edtCall {
+                component.bind(session)
+                session.encodePaste(paste)
+                assertEquals("A\tB\rC\rD\rE", output.toString(Charsets.UTF_8))
+                output.reset()
+                val enableBracketed = "\u001B[?2004h".toByteArray(Charsets.US_ASCII)
+                session.onBytes(enableBracketed, 0, enableBracketed.size)
+                session.encodePaste(paste)
+                assertEquals("\u001B[200~A\tB\r\nC\nD\rE\u001B[201~", output.toString(Charsets.UTF_8))
+                for (policy in listOf(PasteSanitizationPolicy.RAW, PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS)) {
+                    settings = settings.copy(pasteSanitizationPolicy = policy)
+                    component.reloadSettings()
+                    output.reset()
+                    session.encodePaste(paste)
+                    assertEquals("\u001B[200~A\u0001\tB\r\nC\nD\rE\u001B[201~", output.toString(Charsets.UTF_8))
+                }
+                val disableBracketed = "\u001B[?2004l".toByteArray(Charsets.US_ASCII)
+                session.onBytes(disableBracketed, 0, disableBracketed.size)
+                output.reset()
+                session.encodePaste(paste)
+                assertEquals("A\u0001\tB\rC\rD\rE", output.toString(Charsets.UTF_8))
+            }
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
+        }
+    }
+
     @Test
     fun `host palette binding and reload update color scheme replies`() {
         val replies = java.io.ByteArrayOutputStream()
