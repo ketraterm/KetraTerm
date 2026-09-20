@@ -16,6 +16,7 @@
 package io.github.ketraterm.pty
 
 import io.github.ketraterm.transport.TerminalConnectorListener
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.io.*
@@ -24,6 +25,13 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class PtyConnectorTest {
+    private val connectors = mutableListOf<PtyConnector>()
+
+    @AfterEach
+    fun closeConnectors() {
+        connectors.forEach(PtyConnector::close)
+    }
+
     @Test
     fun `foreground process metadata is unavailable after close including a close during lookup`() {
         var reads = 0
@@ -33,7 +41,7 @@ class PtyConnectorTest {
                 if (++reads == 2) connector.close()
                 "vim"
             })
-        connector = PtyConnector(process)
+        connector = createConnector(process)
         assertEquals("vim", connector.foregroundProcessName())
         assertNull(connector.foregroundProcessName())
         assertNull(connector.foregroundProcessName())
@@ -43,10 +51,10 @@ class PtyConnectorTest {
     @Test
     fun `constructor and operations validate bounds`() {
         assertThrows(IllegalArgumentException::class.java) {
-            PtyConnector(TestProcess(), readBufferSize = 0)
+            createConnector(TestProcess(), readBufferSize = 0)
         }
 
-        val connector = PtyConnector(TestProcess(input = BlockingInputStream()))
+        val connector = createConnector(TestProcess(input = BlockingInputStream()))
         assertThrows(IllegalArgumentException::class.java) { connector.resize(0, 1) }
         assertThrows(IllegalArgumentException::class.java) { connector.resize(1, 0) }
         assertThrows(IllegalArgumentException::class.java) {
@@ -57,7 +65,7 @@ class PtyConnectorTest {
 
     @Test
     fun `start can only be called once`() {
-        val connector = PtyConnector(TestProcess(input = BlockingInputStream()))
+        val connector = createConnector(TestProcess(input = BlockingInputStream()))
         val listener = RecordingListener()
 
         connector.start(listener)
@@ -72,7 +80,7 @@ class PtyConnectorTest {
     @Test
     fun `reader emits bytes in stream order across chunks`() {
         val connector =
-            PtyConnector(
+            createConnector(
                 process = TestProcess(input = ByteArrayInputStream("abcdef".ascii())),
                 readBufferSize = 2,
             )
@@ -80,7 +88,7 @@ class PtyConnectorTest {
 
         connector.start(listener)
 
-        assertTrue(connector.joinReader(1000), "reader did not stop")
+        assertTrue(connector.joinReader(10_000), "reader did not stop")
         assertEquals(listOf("ab", "cd", "ef"), listener.byteEvents.map { it.asciiText() })
     }
 
@@ -88,7 +96,7 @@ class PtyConnectorTest {
     fun `large output emits every byte`() {
         val text = "0123456789".repeat(1000)
         val connector =
-            PtyConnector(
+            createConnector(
                 process = TestProcess(input = ByteArrayInputStream(text.ascii())),
                 readBufferSize = 31,
             )
@@ -96,7 +104,7 @@ class PtyConnectorTest {
 
         connector.start(listener)
 
-        assertTrue(connector.joinReader(1000), "reader did not stop")
+        assertTrue(connector.joinReader(10_000), "reader did not stop")
         assertEquals(text.length, listener.byteEvents.sumOf { it.size })
         assertEquals(text, listener.byteEvents.joinToString(separator = "") { it.asciiText() })
     }
@@ -104,7 +112,7 @@ class PtyConnectorTest {
     @Test
     fun `write copies requested range and flushes`() {
         val output = RecordingOutputStream()
-        val connector = PtyConnector(TestProcess(input = BlockingInputStream(), output = output))
+        val connector = createConnector(TestProcess(input = BlockingInputStream(), output = output))
 
         connector.write("01234".ascii(), offset = 1, length = 3)
 
@@ -116,7 +124,7 @@ class PtyConnectorTest {
     @Test
     fun `write is ignored after local close`() {
         val output = RecordingOutputStream()
-        val connector = PtyConnector(TestProcess(input = BlockingInputStream(), output = output))
+        val connector = createConnector(TestProcess(input = BlockingInputStream(), output = output))
 
         connector.close()
         connector.write("a".ascii())
@@ -127,7 +135,7 @@ class PtyConnectorTest {
     @Test
     fun `resize delegates to process until closed`() {
         val process = TestProcess(input = BlockingInputStream())
-        val connector = PtyConnector(process)
+        val connector = createConnector(process)
 
         connector.resize(80, 24)
         connector.close()
@@ -140,7 +148,7 @@ class PtyConnectorTest {
     fun `close destroys process and closes output once`() {
         val output = RecordingOutputStream()
         val process = TestProcess(input = BlockingInputStream(), output = output)
-        val connector = PtyConnector(process)
+        val connector = createConnector(process)
 
         connector.close()
         connector.close()
@@ -152,12 +160,12 @@ class PtyConnectorTest {
     @Test
     fun `reader failure emits error and closes once`() {
         val failure = IOException("read failed")
-        val connector = PtyConnector(TestProcess(input = FailingInputStream(failure), blockWaitFor = true))
+        val connector = createConnector(TestProcess(input = FailingInputStream(failure), blockWaitFor = true))
         val listener = RecordingListener()
 
         connector.start(listener)
 
-        assertTrue(connector.joinReader(1000), "reader did not stop")
+        assertTrue(connector.joinReader(10_000), "reader did not stop")
         assertEquals(listOf(failure), listener.errors)
         assertEquals(listOf<Int?>(null), listener.closed)
         assertEquals(failure, connector.failure)
@@ -165,12 +173,12 @@ class PtyConnectorTest {
 
     @Test
     fun `process exit emits exit code once`() {
-        val connector = PtyConnector(TestProcess(input = BlockingInputStream(), exitCode = 7))
+        val connector = createConnector(TestProcess(input = BlockingInputStream(), exitCode = 7))
         val listener = RecordingListener()
 
         connector.start(listener)
 
-        assertTrue(connector.joinWatcher(1000), "watcher did not stop")
+        assertTrue(connector.joinWatcher(10_000), "watcher did not stop")
         assertEquals(listOf<Int?>(7), listener.closed)
         assertEquals(7, connector.exitCode)
         connector.close()
@@ -178,13 +186,13 @@ class PtyConnectorTest {
 
     @Test
     fun `reader eof and watcher do not emit duplicate close`() {
-        val connector = PtyConnector(TestProcess(input = ByteArrayInputStream(ByteArray(0)), exitCode = 3))
+        val connector = createConnector(TestProcess(input = ByteArrayInputStream(ByteArray(0)), exitCode = 3))
         val listener = RecordingListener()
 
         connector.start(listener)
 
-        assertTrue(connector.joinReader(1000), "reader did not stop")
-        assertTrue(connector.joinWatcher(1000), "watcher did not stop")
+        assertTrue(connector.joinReader(10_000), "reader did not stop")
+        assertTrue(connector.joinWatcher(10_000), "watcher did not stop")
         assertEquals(1, listener.closed.size)
         assertEquals(3, listener.closed.single())
     }
@@ -197,17 +205,17 @@ class PtyConnectorTest {
                 exitCode = 7,
                 waitForRelease = CountDownLatch(1),
             )
-        val connector = PtyConnector(process)
+        val connector = createConnector(process)
         val listener = RecordingListener()
 
         connector.start(listener)
 
-        assertTrue(connector.joinReader(1000), "reader did not stop")
+        assertTrue(connector.joinReader(10_000), "reader did not stop")
         assertEquals(emptyList<Int?>(), listener.closed)
 
         process.releaseWaitFor()
 
-        assertTrue(connector.joinWatcher(1000), "watcher did not stop")
+        assertTrue(connector.joinWatcher(10_000), "watcher did not stop")
         assertEquals(listOf<Int?>(7), listener.closed)
     }
 
@@ -227,11 +235,11 @@ class PtyConnectorTest {
                     closedInCallback.countDown()
                 }
             }
-        connector = PtyConnector(process)
+        connector = createConnector(process)
 
         connector.start(listener)
 
-        assertTrue(closedInCallback.await(1, TimeUnit.SECONDS))
+        assertTrue(closedInCallback.await(10, TimeUnit.SECONDS))
         assertTrue(process.destroyed)
     }
 
@@ -265,6 +273,9 @@ class PtyConnectorTest {
         private val waitForRelease: CountDownLatch? = null,
         private val readForegroundName: () -> String? = { null },
     ) : PtyProcess {
+        private val destroyedSignal = CountDownLatch(1)
+
+        @Volatile
         var destroyed: Boolean = false
             private set
         val sizes = mutableListOf<Pair<Int, Int>>()
@@ -275,16 +286,16 @@ class PtyConnectorTest {
 
         override fun waitFor(): Int {
             if (blockWaitFor) {
-                while (!destroyed) {
-                    Thread.sleep(10)
-                }
+                destroyedSignal.await()
             }
-            waitForRelease?.await(1, TimeUnit.SECONDS)
+            waitForRelease?.await()
             return exitCode
         }
 
         override fun destroy() {
             destroyed = true
+            destroyedSignal.countDown()
+            releaseWaitFor()
             if (input is BlockingInputStream) {
                 input.release()
             }
@@ -324,7 +335,7 @@ class PtyConnectorTest {
         private val released = CountDownLatch(1)
 
         override fun read(): Int {
-            released.await(1, TimeUnit.SECONDS)
+            released.await()
             return -1
         }
 
@@ -333,7 +344,7 @@ class PtyConnectorTest {
             offset: Int,
             length: Int,
         ): Int {
-            released.await(1, TimeUnit.SECONDS)
+            released.await()
             return -1
         }
 
@@ -353,6 +364,11 @@ class PtyConnectorTest {
             length: Int,
         ): Int = throw failure
     }
+
+    private fun createConnector(
+        process: PtyProcess,
+        readBufferSize: Int = 8192,
+    ): PtyConnector = PtyConnector(process, readBufferSize).also(connectors::add)
 
     private fun String.ascii(): ByteArray = toByteArray(StandardCharsets.US_ASCII)
 

@@ -455,8 +455,10 @@ class TerminalWorkspaceTab internal constructor(
         set(enabled) {
             val changedTitle =
                 updateTitleState {
+                    if (mutableProcessTitleEnabled.value == enabled) return
                     mutableProcessTitleEnabled.value = enabled
-                    if (!enabled) foregroundProcessTitle = null
+                    // A rapid off/on pair can be conflated before the collector restarts.
+                    foregroundProcessTitle = acceptedForegroundProcessTitle(if (enabled) session.foregroundProcessName.value else null)
                 }
             changedTitle?.let { onTitleChanged(this, it) }
         }
@@ -464,15 +466,17 @@ class TerminalWorkspaceTab internal constructor(
     internal fun updateForegroundProcessName(name: String?) {
         val changedTitle =
             updateTitleState {
-                foregroundProcessTitle =
-                    if (processTitleEnabled.value && !session.isClosed) {
-                        name?.let(::sanitizeTitle)?.takeUnless(::isLaunchExecutableTitle)
-                    } else {
-                        null
-                    }
+                foregroundProcessTitle = acceptedForegroundProcessTitle(name)
             }
         changedTitle?.let { onTitleChanged(this, it) }
     }
+
+    private fun acceptedForegroundProcessTitle(name: String?): String? =
+        if (processTitleEnabled.value && !session.isClosed) {
+            name?.let(::sanitizeTitle)?.takeUnless(::isLaunchExecutableTitle)
+        } else {
+            null
+        }
 
     /**
      * Latest host-validated OSC 7 current-working-directory URI.

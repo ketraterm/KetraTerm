@@ -33,23 +33,23 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withTimeout
 import kotlin.test.*
-import kotlin.time.Duration.Companion.milliseconds
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TerminalWorkspaceTest {
     @Test
     fun `workspace tracks connector metadata applies live toggles and clears on remote exit`() =
-        runBlocking {
-            val titles = Channel<String>(Channel.UNLIMITED)
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val titles = mutableListOf<String>()
             val connector = RecordingConnector(foregroundName = "vim")
-            val session = testSession(connector)
+            val session = testSession(connector, dispatcher)
             session.start(80, 24)
             TerminalWorkspace(
                 listener =
@@ -58,10 +58,11 @@ class TerminalWorkspaceTest {
                             tab: TerminalWorkspaceTab,
                             title: String,
                         ) {
-                            titles.trySend(title)
+                            titles += title
                         }
                     },
                 sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+                workerDispatcher = dispatcher,
             ).use { workspace ->
                 val tab =
                     workspace.openTab(
@@ -69,18 +70,68 @@ class TerminalWorkspaceTest {
                         TerminalWorkspaceOpenOptions(80, 24, false, 100, showForegroundProcessName = false),
                     )
                 assertEquals("Profile", tab.title)
+                runCurrent()
+                assertEquals(0, connector.foregroundReads)
                 tab.showForegroundProcessName = true
-                assertEquals("vim", withTimeout(5_000.milliseconds) { titles.receive() })
+                runCurrent()
+                assertEquals("vim", tab.title)
+                assertEquals(listOf("vim"), titles)
                 tab.showForegroundProcessName = false
                 assertEquals("Profile", tab.title)
-                assertEquals("Profile", withTimeout(5_000.milliseconds) { titles.receive() })
+                runCurrent()
+                val readsWhileDisabled = connector.foregroundReads
+                advanceTimeBy(5_000)
+                runCurrent()
+                assertEquals(readsWhileDisabled, connector.foregroundReads)
+                assertEquals(listOf("vim", "Profile"), titles)
                 tab.showForegroundProcessName = true
-                assertEquals("vim", withTimeout(5_000.milliseconds) { titles.receive() })
+                runCurrent()
+                assertEquals("vim", tab.title)
+                assertEquals(listOf("vim", "Profile", "vim"), titles)
                 connector.simulateClosed(0)
-                assertEquals("Profile", withTimeout(5_000.milliseconds) { titles.receive() })
+                runCurrent()
+                assertEquals(listOf("vim", "Profile", "vim", "Profile"), titles)
                 assertTrue(session.isClosed)
                 assertEquals("Profile", tab.title)
+                val readsAtExit = connector.foregroundReads
+                advanceTimeBy(5_000)
+                runCurrent()
+                assertEquals(readsAtExit, connector.foregroundReads)
             }
+            runCurrent()
+        }
+
+    @Test
+    fun `rapid process title toggle restores retained metadata without waiting for another process change`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = RecordingConnector(foregroundName = "vim")
+            val session = testSession(connector, dispatcher)
+            session.start(80, 24)
+            TerminalWorkspace(
+                listener = TerminalWorkspaceListener.NONE,
+                sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+                workerDispatcher = dispatcher,
+            ).use { workspace ->
+                val tab =
+                    workspace.openTab(
+                        TerminalProfile("p1", "Profile", listOf("mock-shell")),
+                        TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                    )
+                runCurrent()
+                assertEquals("vim", tab.title)
+                assertEquals(1, connector.foregroundReads)
+                tab.showForegroundProcessName = false
+                assertEquals("Profile", tab.title)
+                tab.showForegroundProcessName = true
+                runCurrent()
+                assertEquals("vim", tab.title)
+                assertEquals(1, connector.foregroundReads)
+                advanceTimeBy(1_000)
+                runCurrent()
+                assertEquals("vim", tab.title)
+            }
+            runCurrent()
         }
 
     @Test
@@ -480,7 +531,7 @@ class TerminalWorkspaceTest {
     fun `remote session close is forwarded with owning tab and exit code`() =
         runTest {
             val connector = RecordingConnector()
-            val session = testSession(connector)
+            val session = testSession(connector, StandardTestDispatcher(testScheduler))
             session.start(columns = 80, rows = 24)
             val closeEvents = mutableListOf<Triple<String, Int?, Throwable?>>()
             val workspace =
@@ -658,7 +709,10 @@ class TerminalWorkspaceTest {
                 ),
         )
 
-    private fun testSession(connector: TerminalConnector = NoOpConnector): TerminalSession {
+    private fun testSession(
+        connector: TerminalConnector = NoOpConnector,
+        dispatcher: CoroutineDispatcher = StandardTestDispatcher(),
+    ): TerminalSession {
         val terminal = TerminalBuffers.create(width = 80, height = 24, maxHistory = 100)
         return TerminalSession(
             terminal = terminal,
@@ -668,6 +722,8 @@ class TerminalWorkspaceTest {
             connector = connector,
             parser = NoOpParser,
             inputEncoder = NoOpInputEncoder,
+            workerDispatcher = dispatcher,
+            ioDispatcher = dispatcher,
         )
     }
 
@@ -692,8 +748,13 @@ class TerminalWorkspaceTest {
         private val foregroundName: String? = null,
     ) : TerminalConnector {
         private var listener: TerminalConnectorListener? = null
+        var foregroundReads = 0
+            private set
 
-        override fun foregroundProcessName(): String? = foregroundName
+        override fun foregroundProcessName(): String? {
+            foregroundReads++
+            return foregroundName
+        }
 
         override fun start(listener: TerminalConnectorListener) {
             this.listener = listener

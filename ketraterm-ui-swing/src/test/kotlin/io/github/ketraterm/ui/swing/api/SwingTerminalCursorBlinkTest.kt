@@ -30,18 +30,22 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.render.TestRenderFrame
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.awt.event.FocusEvent
 import java.awt.event.KeyEvent
-import java.util.concurrent.TimeUnit
 import javax.swing.JComponent
 import javax.swing.JFrame
 import javax.swing.RepaintManager
 import javax.swing.SwingUtilities
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalCursorBlinkTest {
+    private val dispatcher = StandardTestDispatcher()
+
     @Test
     fun `focus reset repaints blinking text even without a terminal cursor`() {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 1)
@@ -55,9 +59,10 @@ class SwingTerminalCursorBlinkTest {
                 connector = NoOpConnector,
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
+                workerDispatcher = dispatcher,
             )
         session.renderPublisher.updateAndPublish(reader)
-        try {
+        session.use { session ->
             SwingUtilities.invokeAndWait {
                 val component =
                     SwingTerminal(settingsProvider = {
@@ -96,8 +101,6 @@ class SwingTerminalCursorBlinkTest {
                     component.dispose()
                 }
             }
-        } finally {
-            session.close()
         }
     }
 
@@ -166,6 +169,7 @@ class SwingTerminalCursorBlinkTest {
                 connector = NoOpConnector,
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
+                workerDispatcher = dispatcher,
             )
         val component = SwingTerminal()
 
@@ -180,10 +184,9 @@ class SwingTerminalCursorBlinkTest {
             // Verify cursor timer is started when component is added
             assertTrue(component.cursorTimer.isRunning)
 
-            // Prevent timer from firing during the test by setting a very large delay
+            // Drive blink state explicitly after verifying that binding starts the timer.
             SwingUtilities.invokeAndWait {
-                component.cursorTimer.delay = 100_000
-                component.cursorTimer.restart()
+                component.cursorTimer.stop()
             }
 
             // 1. Manually set cursorBlinkVisible to false and verify, then dispatch key event and verify, then set back to false and verify
@@ -209,32 +212,20 @@ class SwingTerminalCursorBlinkTest {
                 assertFalse(component.cursorBlinkVisible)
             }
 
-            val previousGeneration = session.renderGeneration.value
-            session.requestRender(scrollbackOffset = 0)
-            awaitRenderPublication(session, previousGeneration)
             SwingUtilities.invokeAndWait {
-                // Drain the StateFlow collection on the EDT.
+                component.cursorBlinkVisible = false
+                val previousGeneration = session.renderGeneration.value
+                session.requestRender(scrollbackOffset = 0)
+                dispatcher.scheduler.runCurrent()
+                assertTrue(session.renderGeneration.value > previousGeneration, "render was not published")
+                assertTrue(component.cursorBlinkVisible)
             }
-
-            // Verify cursorBlinkVisible resets back to true on frame updates
-            assertTrue(component.cursorBlinkVisible)
         } finally {
             SwingUtilities.invokeAndWait {
                 frame.dispose()
             }
             session.close()
         }
-    }
-
-    private fun awaitRenderPublication(
-        session: TerminalSession,
-        previousGeneration: Long,
-    ) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1)
-        while (session.renderGeneration.value <= previousGeneration && System.nanoTime() < deadline) {
-            Thread.onSpinWait()
-        }
-        assertTrue(session.renderGeneration.value > previousGeneration, "render was not published")
     }
 
     private class SimpleFrameReader : TerminalRenderFrameReader {

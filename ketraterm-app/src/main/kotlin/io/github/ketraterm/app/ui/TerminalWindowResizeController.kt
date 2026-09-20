@@ -19,17 +19,18 @@ import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import java.awt.Dimension
-import java.awt.Frame
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
-import java.awt.event.WindowStateListener
 import javax.swing.JFrame
 import javax.swing.SwingUtilities
 
 /** Publishes EDT geometry for nonblocking application resize decisions. */
 internal class TerminalWindowResizeController(
-    private val frame: JFrame,
+    private val window: WindowResizeHost,
+    private val dispatch: (() -> Unit) -> Unit = { SwingUtilities.invokeLater(it) },
 ) : AutoCloseable {
+    constructor(frame: JFrame) : this(SwingWindowResizeHost(frame))
+
     @Volatile private var snapshot: Snapshot? = null
     private var closed = false
     private var eligibleTerminal: SwingTerminal? = null
@@ -44,12 +45,7 @@ internal class TerminalWindowResizeController(
 
             override fun componentHidden(event: ComponentEvent) = refresh()
         }
-    private val windowStateListener = WindowStateListener { refresh() }
-
-    init {
-        frame.addComponentListener(componentListener)
-        frame.addWindowStateListener(windowStateListener)
-    }
+    private val windowObservation = window.observeGeometryChanges(::refresh)
 
     /** Publishes the product's single eligible pane; all calls must run on the EDT. */
     fun setTarget(
@@ -75,39 +71,10 @@ internal class TerminalWindowResizeController(
     private fun refresh() {
         check(SwingUtilities.isEventDispatchThread())
         if (closed) return
-        frame.validate()
-        snapshot = null
         val terminal = eligibleTerminal ?: return
         val session = eligibleSession ?: return
-        if (!frame.isShowing || !terminal.isShowing || frame.extendedState != Frame.NORMAL) return
-        val configuration = frame.graphicsConfiguration ?: return
-        if (configuration.device.fullScreenWindow != null) return
-        if (terminal.width <= 0 || terminal.height <= 0) return
-        val bounds = configuration.bounds
-        val insets = frame.toolkit.getScreenInsets(configuration)
-        val primary = terminal.preferredGridSize(0, 0)
-        val alternate = terminal.preferredGridSize(0, 0, TerminalRenderBufferKind.ALTERNATE)
-        val cell = terminal.preferredGridSize(1, 1)
-        snapshot =
-            Snapshot(
-                session,
-                terminal,
-                WindowResizeGeometry(
-                    cellWidth = cell.width - primary.width,
-                    cellHeight = cell.height - primary.height,
-                    windowExtraWidth = frame.width - terminal.width,
-                    windowExtraHeight = frame.height - terminal.height,
-                    primaryInsetWidth = primary.width,
-                    primaryInsetHeight = primary.height,
-                    alternateInsetWidth = alternate.width,
-                    alternateInsetHeight = alternate.height,
-                    minimumWidth = frame.minimumSize.width,
-                    minimumHeight = frame.minimumSize.height,
-                    availableWidth = bounds.x + bounds.width - insets.right - frame.x,
-                    availableHeight = bounds.y + bounds.height - insets.bottom - frame.y,
-                    windowOriginFits = frame.x >= bounds.x + insets.left && frame.y >= bounds.y + insets.top,
-                ),
-            )
+        // Publish one complete replacement: requests may read the previous valid geometry during refresh.
+        snapshot = window.readGeometry(terminal)?.let { Snapshot(session, terminal, it) }
     }
 
     /** Called under the session mutation lock; no Swing access on this path. */
@@ -121,15 +88,14 @@ internal class TerminalWindowResizeController(
         var alternate = false
         session.readRenderFrame { alternate = it.activeBuffer == TerminalRenderBufferKind.ALTERNATE }
         if (current.geometry.targetSize(columns, rows, alternate) == null) return false
-        SwingUtilities.invokeLater {
-            if (closed || session.isClosed) return@invokeLater
+        dispatch {
+            if (closed || session.isClosed) return@dispatch
             // A user layout change after acceptance takes precedence over the queued request.
             refresh()
             val latest = snapshot
             val target = latest?.takeIf { it.session === session }?.geometry?.targetSize(columns, rows, alternate)
             if (target != null) {
-                frame.size = target
-                frame.validate()
+                window.resize(target)
             } else if (!session.isClosed) {
                 val visible = current.terminal.visibleGridSize()
                 session.resize(visible.width, visible.height)
@@ -139,10 +105,11 @@ internal class TerminalWindowResizeController(
     }
 
     override fun close() {
+        check(SwingUtilities.isEventDispatchThread())
+        if (closed) return
         closed = true
         clearTarget()
-        frame.removeComponentListener(componentListener)
-        frame.removeWindowStateListener(windowStateListener)
+        windowObservation.close()
     }
 
     private data class Snapshot(

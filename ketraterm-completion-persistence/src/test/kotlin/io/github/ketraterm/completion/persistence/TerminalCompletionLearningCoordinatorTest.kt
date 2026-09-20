@@ -753,7 +753,7 @@ class TerminalCompletionLearningCoordinatorTest {
 
     @Test
     fun `cancelling a close waiter does not wait for blocked file IO`() =
-        runBlocking {
+        runTest {
             val loadFinished = CountDownLatch(1)
             val writeStarted = CountDownLatch(1)
             val releaseWrite = CountDownLatch(1)
@@ -779,11 +779,13 @@ class TerminalCompletionLearningCoordinatorTest {
                 assertTrue(loadFinished.await(5L, TimeUnit.SECONDS))
                 coordinator.recordCommandResult("git status", true, null, null, 42L)
 
-                val closeWaiter = async(Dispatchers.Default) { coordinator.closeAndFlush() }
+                val closeWaiter = async { coordinator.closeAndFlush() }
+                runCurrent()
                 assertTrue(writeStarted.await(5L, TimeUnit.SECONDS))
                 closeWaiter.cancel()
-                withTimeout(500L.milliseconds) { closeWaiter.join() }
+                runCurrent()
 
+                assertTrue(closeWaiter.isCompleted, "Cancellation must complete before the blocked file write is released")
                 assertTrue(closeWaiter.isCancelled)
                 assertEquals(1, files.writeAttempts.get())
             } finally {

@@ -19,8 +19,8 @@ import io.github.ketraterm.render.api.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 class TerminalRenderPublisherTest {
@@ -30,18 +30,7 @@ class TerminalRenderPublisherTest {
         val texts = listOf("abc", "def", "ghi", "jkl", "mno", "pqr")
 
         texts.forEach { text ->
-            var exception: Throwable? = null
-            val renderThread =
-                thread(start = true) {
-                    try {
-                        publisher.updateAndPublish(MockFrame(3, 1, text))
-                    } catch (error: Throwable) {
-                        exception = error
-                    }
-                }
-            renderThread.join()
-
-            assertNull(exception)
+            TestWorker { publisher.updateAndPublish(MockFrame(3, 1, text)) }.use { it.await() }
         }
 
         assertEquals("pqr", publisher.current()?.rowText(0))
@@ -89,22 +78,17 @@ class TerminalRenderPublisherTest {
     }
 
     @Test
-    fun `publication completes successfully when writer is blocked briefly`() {
+    fun `publication completes after the frame copy is released`() {
         val publisher = TerminalRenderPublisher(3, 1)
         val frame = BlockingMockFrame(3, 1, "abc")
-        val writerFinished = AtomicBoolean(false)
-
-        val writer =
-            thread(start = true) {
-                publisher.updateAndPublish(frame)
-                writerFinished.set(true)
+        TestWorker { publisher.updateAndPublish(frame) }.use { writer ->
+            try {
+                assertTrue(frame.awaitCopy(), "writer did not enter copyLine")
+            } finally {
+                frame.releaseCopy()
             }
-
-        assertTrue(frame.awaitCopy(), "writer did not enter copyLine")
-        frame.releaseCopy()
-        writer.join(1_000)
-
-        assertTrue(writerFinished.get(), "writer did not finish")
+            writer.await()
+        }
         assertAll(
             { assertEquals(3, publisher.current()?.columns) },
             { assertEquals(1, publisher.current()?.rows) },
@@ -116,27 +100,20 @@ class TerminalRenderPublisherTest {
     fun `overscan cluster copy works correctly`() {
         val publisher = TerminalRenderPublisher(1, 30)
         val frame = BlockingOverscanClusterFrame(rows = 31)
-        var exception: Throwable? = null
-
-        val writer =
-            thread(start = true) {
-                try {
-                    publisher.updateAndPublish(frame)
-                } catch (error: Throwable) {
-                    exception = error
-                }
+        TestWorker { publisher.updateAndPublish(frame) }.use { writer ->
+            try {
+                assertTrue(frame.awaitOverscanRowCopy(), "writer did not reach overscan row")
+            } finally {
+                frame.releaseOverscanRowCopy()
             }
-
-        assertTrue(frame.awaitOverscanRowCopy(), "writer did not reach overscan row")
-        frame.releaseOverscanRowCopy()
-        writer.join(1_000)
+            writer.await()
+        }
 
         val current = publisher.current()
         assertNotNull(current)
         val clusterRef = current!!.clusterRefs[current.rowOffset(30)]
         val clusterOffset = current.clusterOffset(clusterRef)
         val clusterLength = current.clusterLength(clusterRef)
-        assertNull(exception)
         assertAll(
             { assertEquals(31, current.rows) },
             { assertNotEquals(0L, clusterRef) },
@@ -157,24 +134,8 @@ class TerminalRenderPublisherTest {
         val firstFrame = MockFrame(3, 1, "abc")
         val secondFrame = MockFrame(5, 2, "12345")
 
-        val firstRenderThread =
-            thread(start = true) {
-                publisher.updateAndPublish(firstFrame)
-            }
-        firstRenderThread.join()
-
-        var exception: Throwable? = null
-        val secondRenderThread =
-            thread(start = true) {
-                try {
-                    publisher.updateAndPublish(secondFrame)
-                } catch (e: Throwable) {
-                    exception = e
-                }
-            }
-        secondRenderThread.join()
-
-        assertNull(exception)
+        TestWorker { publisher.updateAndPublish(firstFrame) }.use { it.await() }
+        TestWorker { publisher.updateAndPublish(secondFrame) }.use { it.await() }
         assertEquals("12345", publisher.current()?.rowText(0))
     }
 
@@ -217,31 +178,24 @@ class TerminalRenderPublisherTest {
 
         val readerEntered = CountDownLatch(1)
         val releaseReader = CountDownLatch(1)
-        val writerFinished = AtomicBoolean(false)
-
-        val reader =
-            thread(start = true) {
-                publisher.readCurrent { front ->
-                    readerEntered.countDown()
-                    assertEquals("abc", front.rowText(0))
-                    assertTrue(releaseReader.await(1, TimeUnit.SECONDS))
-                    assertEquals("abc", front.rowText(0))
+        TestWorker {
+            publisher.readCurrent { front ->
+                readerEntered.countDown()
+                assertEquals("abc", front.rowText(0))
+                releaseReader.await()
+                assertEquals("abc", front.rowText(0))
+            }
+        }.use { reader ->
+            try {
+                assertTrue(readerEntered.await(10, TimeUnit.SECONDS), "reader did not acquire a snapshot")
+                TestWorker { publisher.updateAndPublish(MockFrame(3, 1, "def")) }.use { writer ->
+                    writer.await()
                 }
+            } finally {
+                releaseReader.countDown()
             }
-
-        assertTrue(readerEntered.await(1, TimeUnit.SECONDS))
-
-        val writer =
-            thread(start = true) {
-                publisher.updateAndPublish(MockFrame(3, 1, "def"))
-                writerFinished.set(true)
-            }
-
-        writer.join(1_000)
-        assertTrue(writerFinished.get(), "writer was blocked by an active readCurrent callback")
-
-        releaseReader.countDown()
-        reader.join()
+            reader.await()
+        }
 
         assertEquals("def", publisher.current()?.rowText(0))
     }
@@ -254,25 +208,45 @@ class TerminalRenderPublisherTest {
         val readerEntered = CountDownLatch(1)
         val releaseReader = CountDownLatch(1)
 
-        val reader =
-            thread(start = true) {
-                publisher.readCurrent { front ->
-                    readerEntered.countDown()
-                    assertEquals("abc", front.rowText(0))
-                    assertTrue(releaseReader.await(1, TimeUnit.SECONDS))
-                    assertEquals("abc", front.rowText(0))
-                }
+        TestWorker {
+            publisher.readCurrent { front ->
+                readerEntered.countDown()
+                assertEquals("abc", front.rowText(0))
+                releaseReader.await()
+                assertEquals("abc", front.rowText(0))
             }
-
-        assertTrue(readerEntered.await(1, TimeUnit.SECONDS))
-
-        publisher.updateAndPublish(MockFrame(3, 1, "def"))
-        publisher.updateAndPublish(MockFrame(3, 1, "ghi"))
-
-        releaseReader.countDown()
-        reader.join()
+        }.use { reader ->
+            try {
+                assertTrue(readerEntered.await(10, TimeUnit.SECONDS), "reader did not acquire a snapshot")
+                TestWorker {
+                    publisher.updateAndPublish(MockFrame(3, 1, "def"))
+                    publisher.updateAndPublish(MockFrame(3, 1, "ghi"))
+                }.use { it.await() }
+            } finally {
+                releaseReader.countDown()
+            }
+            reader.await()
+        }
 
         assertEquals("ghi", publisher.current()?.rowText(0))
+    }
+
+    /** Keeps real thread ownership tests bounded and propagates worker assertions to JUnit. */
+    private class TestWorker(
+        action: () -> Unit,
+    ) : AutoCloseable {
+        private val result = FutureTask(action)
+        private val worker = thread(isDaemon = true, block = result::run)
+
+        fun await() {
+            result.get(10, TimeUnit.SECONDS)
+        }
+
+        override fun close() {
+            result.cancel(true)
+            worker.join(10_000)
+            assertFalse(worker.isAlive, "worker did not stop")
+        }
     }
 
     private fun TerminalRenderCache.rowText(row: Int): String =
@@ -359,7 +333,7 @@ class TerminalRenderPublisherTest {
             clusterDataSink: TerminalRenderClusterDataSink?,
         ) {
             copyEntered.countDown()
-            assertTrue(releaseCopy.await(1, TimeUnit.SECONDS), "copyLine was not released")
+            releaseCopy.await()
             super.copyLine(
                 row,
                 codeWords,
@@ -377,7 +351,7 @@ class TerminalRenderPublisherTest {
             )
         }
 
-        fun awaitCopy(): Boolean = copyEntered.await(1, TimeUnit.SECONDS)
+        fun awaitCopy(): Boolean = copyEntered.await(10, TimeUnit.SECONDS)
 
         fun releaseCopy() {
             releaseCopy.countDown()
@@ -434,7 +408,7 @@ class TerminalRenderPublisherTest {
 
             if (row == rows - 1) {
                 overscanRowCopyEntered.countDown()
-                assertTrue(releaseOverscanRowCopy.await(1, TimeUnit.SECONDS), "overscan row copy was not released")
+                releaseOverscanRowCopy.await()
                 codeWords[codeOffset] = 0
                 flags[flagOffset] = TerminalRenderCellFlags.CLUSTER
                 clusterSink?.onCluster(0, "e\u0301")
@@ -445,7 +419,7 @@ class TerminalRenderPublisherTest {
             }
         }
 
-        fun awaitOverscanRowCopy(): Boolean = overscanRowCopyEntered.await(1, TimeUnit.SECONDS)
+        fun awaitOverscanRowCopy(): Boolean = overscanRowCopyEntered.await(10, TimeUnit.SECONDS)
 
         fun releaseOverscanRowCopy() {
             releaseOverscanRowCopy.countDown()

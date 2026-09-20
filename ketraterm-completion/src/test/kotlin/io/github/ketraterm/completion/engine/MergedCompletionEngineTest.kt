@@ -21,6 +21,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.runTest
 import java.io.IOException
 import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
@@ -897,7 +898,7 @@ class MergedCompletionEngineTest {
 
     @Test
     fun `rapid typing bursts cleanly cancel obsolete queries and converge to final request`(): Unit =
-        runBlocking {
+        runTest {
             var activeCancelledCount = 0
             val delayedSource =
                 TerminalCompletionSource { req, _, _ ->
@@ -946,7 +947,7 @@ class MergedCompletionEngineTest {
 
     @Test
     fun `concurrent multi-source slow I_O yields progressive updates without race conditions`(): Unit =
-        runBlocking {
+        runTest {
             val sourceA =
                 TerminalCompletionSource { _, _, _ ->
                     delay(5.milliseconds)

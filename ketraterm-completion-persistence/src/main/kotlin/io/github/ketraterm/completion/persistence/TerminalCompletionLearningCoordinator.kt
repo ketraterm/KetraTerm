@@ -42,6 +42,22 @@ class TerminalCompletionLearningCoordinator
         private val ioDispatcher: CoroutineDispatcher,
         private val onPersistenceLoadFailure: (Throwable) -> Unit = {},
     ) {
+        /** Creates a learning owner using [Dispatchers.IO] for blocking snapshot file access. */
+        constructor(
+            learningStore: TerminalCompletionLearningStore,
+            coroutineScope: CoroutineScope,
+            persistencePath: Path,
+            persistenceEnabled: Boolean,
+            onPersistenceLoadFailure: (Throwable) -> Unit,
+        ) : this(
+            learningStore = learningStore,
+            coroutineScope = coroutineScope,
+            persistencePath = persistencePath,
+            persistenceEnabled = persistenceEnabled,
+            ioDispatcher = Dispatchers.IO,
+            onPersistenceLoadFailure = onPersistenceLoadFailure,
+        )
+
         /**
          * Creates a lifecycle-bound learning owner for one fixed persistence path.
          *
@@ -49,6 +65,7 @@ class TerminalCompletionLearningCoordinator
          * @param coroutineScope caller-owned lifecycle scope for the persistence worker.
          * @param persistencePath fixed snapshot path owned by the product.
          * @param persistenceEnabled whether the snapshot may initially be read and written.
+         * @param ioDispatcher dispatcher used for blocking snapshot file access.
          * @param onPersistenceLoadFailure invoked once when an existing file is rejected or cannot be read.
          * Exceptions thrown by this diagnostic callback are ignored.
          */
@@ -57,6 +74,7 @@ class TerminalCompletionLearningCoordinator
             coroutineScope: CoroutineScope,
             persistencePath: Path,
             persistenceEnabled: Boolean,
+            ioDispatcher: CoroutineDispatcher,
             onPersistenceLoadFailure: (Throwable) -> Unit,
         ) : this(
             learningStore = learningStore,
@@ -67,7 +85,7 @@ class TerminalCompletionLearningCoordinator
             coroutineScope = coroutineScope,
             persistenceEnabled = persistenceEnabled,
             checkpointIntervalMillis = DEFAULT_CHECKPOINT_INTERVAL_MILLIS,
-            ioDispatcher = Dispatchers.IO,
+            ioDispatcher = ioDispatcher,
             onPersistenceLoadFailure = onPersistenceLoadFailure,
         )
 

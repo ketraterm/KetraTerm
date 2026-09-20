@@ -240,6 +240,7 @@ class SwingTerminalShellSuggestionTest {
     @Test
     fun `replaced progressive flow cannot publish after newer request`() {
         val firstRelease = CompletableDeferred<Unit>()
+        val firstFinished = CompletableDeferred<Unit>()
         val view = RecordingSuggestionView()
         val component =
             SwingTerminal(
@@ -249,10 +250,16 @@ class SwingTerminalShellSuggestionTest {
                         shellSuggestionProvider =
                             SwingShellSuggestionProvider { request ->
                                 flow {
-                                    emit(suggestions(request.commandText))
-                                    if (request.commandText == "first") {
-                                        firstRelease.await()
-                                        emit(listOf(suggestion("stale", commandText = request.commandText)))
+                                    try {
+                                        emit(suggestions(request.commandText))
+                                        if (request.commandText == "first") {
+                                            firstRelease.await()
+                                            emit(listOf(suggestion("stale", commandText = request.commandText)))
+                                        }
+                                    } finally {
+                                        if (request.commandText == "first") {
+                                            firstFinished.complete(Unit)
+                                        }
                                     }
                                 }
                             },
@@ -269,7 +276,7 @@ class SwingTerminalShellSuggestionTest {
         view.awaitUpdate()
         firstRelease.complete(Unit)
 
-        runBlocking { delay(100.milliseconds) }
+        runBlocking { withTimeout(5_000.milliseconds) { firstFinished.await() } }
         SwingUtilities.invokeAndWait {
             assertTrue(component.currentShellSuggestionState().visible)
             assertEquals(2, component.currentShellSuggestionState().count)

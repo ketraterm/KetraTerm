@@ -20,13 +20,13 @@ import io.github.ketraterm.input.event.*
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class TerminalStartupCommandTest {
@@ -187,24 +187,31 @@ class TerminalStartupCommandTest {
                     length: Int,
                 ) {
                     enteredWrite.countDown()
-                    check(continueWrite.await(5, TimeUnit.SECONDS))
+                    continueWrite.await()
                     delegate.write(bytes, offset, length)
                 }
             }
         session(connector).use { session ->
-            Executors.newFixedThreadPool(2).use { executor ->
-                val prompt = executor.submit { delegate.feedFromHost(PROMPT.toByteArray()) }
+            SessionTestThread("startup-prompt") { delegate.feedFromHost(PROMPT.toByteArray()) }.use { prompt ->
                 try {
-                    assertTrue(enteredWrite.await(5, TimeUnit.SECONDS))
-                    val typing = executor.submit { session.encodeKey(TerminalKeyEvent(codepoint = 'x'.code)) }
-                    continueWrite.countDown()
-                    prompt.get(5, TimeUnit.SECONDS)
-                    typing.get(5, TimeUnit.SECONDS)
-                    assertEquals("echo ready\rx", delegate.writtenBytes.decodeToString())
+                    assertTrue(enteredWrite.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                    SessionTestThread("startup-concurrent-input") {
+                        session.encodeKey(TerminalKeyEvent(codepoint = 'x'.code))
+                    }.use { typing ->
+                        try {
+                            typing.awaitBlockedBy(prompt)
+                            assertEquals("", delegate.writtenBytes.decodeToString())
+                        } finally {
+                            continueWrite.countDown()
+                        }
+                        prompt.awaitCompletion()
+                        typing.awaitCompletion()
+                    }
                 } finally {
                     continueWrite.countDown()
                 }
             }
+            assertEquals("echo ready\rx", delegate.writtenBytes.decodeToString())
         }
     }
 
@@ -230,6 +237,7 @@ class TerminalStartupCommandTest {
                 terminal = TerminalBuffers.create(width = 40, height = 4),
                 connector = connector,
                 startupCommand = TerminalStartupCommand(command),
+                workerDispatcher = StandardTestDispatcher(),
             ).also { it.start(40, 4) }
 
     private companion object {
