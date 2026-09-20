@@ -21,6 +21,16 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
 
 internal class RecordingTerminalCommandSink : TerminalCommandSink {
     val events = ArrayList<String>()
+    var isLeftRightMarginMode: Boolean = false
+
+    override fun saveCursorOrResetMargins(): Boolean {
+        if (isLeftRightMarginMode) {
+            setLeftRightMargins(0, -1)
+            return false
+        }
+        saveCursor()
+        return true
+    }
 
     override fun writeCodepoint(codepoint: Int) {
         events += "writeCodepoint:$codepoint"

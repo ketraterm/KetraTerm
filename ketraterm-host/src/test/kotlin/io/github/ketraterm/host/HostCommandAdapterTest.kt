@@ -75,6 +75,144 @@ class HostCommandAdapterTest {
     }
 
     @Nested
+    @DisplayName("ANSI SCO cursor save compatibility")
+    inner class ScoCursorSave {
+        @Test
+        fun `DEC and SCO forms restore position pen origin wrap and charset across every split`() {
+            for (save in listOf("\u001B7", "\u001B[s")) {
+                for (restore in listOf("\u001B8", "\u001B[u")) {
+                    val bytes =
+                        (
+                            "\u001B[2;4r\u001B[?6h\u001B[1;10H\u001B[1;31;44;4:3;58;5;123;9;53m\u001B)0\u000Eq" +
+                                save + "\u001B[?6l\u001B[0m\u001B)B\u000F\u001B[1;1H" + restore + "q"
+                        ).encodeToByteArray()
+                    for (split in 0..bytes.size) {
+                        val f = Fixture()
+                        f.parser.accept(bytes, 0, split)
+                        f.parser.accept(bytes, split, bytes.size - split)
+                        f.end()
+                        assertAll(
+                            "save=$save restore=$restore split=$split",
+                            { assertEquals(1, f.terminal.cursorCol) },
+                            { assertEquals(2, f.terminal.cursorRow) },
+                            { assertTrue(f.terminal.getModeSnapshot().isOriginMode) },
+                            { assertEquals('─'.code, f.terminal.getCodepointAt(9, 1)) },
+                            { assertEquals("─", f.terminal.getLineAsString(2)) },
+                            { assertEquals(f.terminal.getPackedAttrAt(9, 1), f.terminal.getPackedAttrAt(0, 2)) },
+                            { assertEquals(f.terminal.getPackedExtendedAttrAt(9, 1), f.terminal.getPackedExtendedAttrAt(0, 2)) },
+                        )
+                    }
+                }
+            }
+        }
+
+        @Test
+        fun `SCO save overwrites the DEC slot and DEC save overwrites the SCO slot`() {
+            val f = Fixture()
+            f.acceptAscii("\u001B[2;3H\u001B7\u001B[3;5H\u001B[s\u001B[H\u001B8")
+            assertEquals(4, f.terminal.cursorCol)
+            assertEquals(2, f.terminal.cursorRow)
+            f.acceptAscii("\u001B[4;7H\u001B7\u001B[H\u001B[u")
+            assertEquals(6, f.terminal.cursorCol)
+            assertEquals(3, f.terminal.cursorRow)
+        }
+
+        @Test
+        fun `CSI s resets active margins and homes without overwriting cursor or charset save`() {
+            val f = Fixture()
+            f.acceptAscii("\u001B[3;5H\u001B(0\u001B[s\u001B(B\u001B[?69h\u001B[3;7s\u001B[4;6H\u001B[s")
+            assertEquals(0, f.terminal.cursorCol)
+            assertEquals(0, f.terminal.cursorRow)
+            f.acceptAscii("\u001B[99C")
+            assertEquals(9, f.terminal.cursorCol)
+            f.acceptAscii("\u001B[uq")
+            assertEquals(5, f.terminal.cursorCol)
+            assertEquals(2, f.terminal.cursorRow)
+            assertEquals('─'.code, f.terminal.getCodepointAt(4, 2))
+            assertTrue(f.terminal.getModeSnapshot().isLeftRightMarginMode)
+        }
+
+        @Test
+        fun `restore honors current margins even while horizontal margin mode is enabled`() {
+            val f = Fixture()
+            f.acceptAscii("\u001B[2;10H\u001B[s\u001B[?69h\u001B[3;7s\u001B[u")
+            assertEquals(6, f.terminal.cursorCol)
+            assertEquals(1, f.terminal.cursorRow)
+        }
+
+        @Test
+        fun `explicit margin parameters with DECLRMM disabled never replace saved cursor`() {
+            for (parameters in listOf("0", ";", "0;0", "3;7", "99999999999999999999")) {
+                val f = Fixture()
+                f.acceptAscii("\u001B[2;3H\u001B[s\u001B[4;5H\u001B[${parameters}s\u001B[u")
+                assertEquals(2, f.terminal.cursorCol, parameters)
+                assertEquals(1, f.terminal.cursorRow, parameters)
+            }
+        }
+
+        @Test
+        fun `SCO disambiguation reads mode changes made through the core API`() {
+            val f = Fixture()
+            f.terminal.setLeftRightMarginMode(true)
+            f.terminal.setLeftRightMargins(3, 7)
+            f.acceptAscii("\u001B[s\u001B[99C")
+            assertEquals(9, f.terminal.cursorCol)
+            f.terminal.setLeftRightMarginMode(false)
+            f.acceptAscii("\u001B[3;5H\u001B[s\u001B[H\u001B[u")
+            assertEquals(4, f.terminal.cursorCol)
+            assertEquals(2, f.terminal.cursorRow)
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["\u001Bc", "\u001B[!p"])
+        fun `reset disables margin disambiguation and clears the cursor save`(reset: String) {
+            val f = Fixture()
+            f.acceptAscii("\u001B[3;5H\u001B[s\u001B[?69h\u001B[3;7s$reset\u001B[u")
+            assertEquals(0, f.terminal.cursorCol)
+            assertEquals(0, f.terminal.cursorRow)
+            f.acceptAscii("\u001B[2;4H\u001B[s\u001B[H\u001B[u")
+            assertEquals(3, f.terminal.cursorCol)
+            assertEquals(1, f.terminal.cursorRow)
+        }
+
+        @Test
+        fun `restore without save follows DEC home and pen defaults`() {
+            val f = Fixture()
+            f.acceptAscii("\u001B[?69h\u001B[3;7s\u001B[?6h\u001B[31m\u001B[u")
+            assertEquals(0, f.terminal.cursorCol)
+            assertEquals(0, f.terminal.cursorRow)
+            f.acceptAscii("\u001B[?69lA")
+            assertEquals("A", f.terminal.getLineAsString(0))
+            assertFalse(f.terminal.getModeSnapshot().isOriginMode)
+            val plain = Fixture()
+            plain.acceptAscii("A")
+            assertEquals(plain.terminal.getPackedAttrAt(0, 0), f.terminal.getPackedAttrAt(0, 0))
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = [47, 1047, 1049])
+        fun `SCO position saves are local to the active screen`(mode: Int) {
+            val f = Fixture()
+            f.acceptAscii("\u001B[2;3H\u001B[s\u001B[?${mode}h\u001B[3;5H\u001B[s\u001B[H\u001B[u")
+            assertEquals(4, f.terminal.cursorCol)
+            assertEquals(2, f.terminal.cursorRow)
+            f.acceptAscii("\u001B[?${mode}l\u001B[H\u001B[u")
+            assertEquals(2, f.terminal.cursorCol)
+            assertEquals(1, f.terminal.cursorRow)
+        }
+
+        @Test
+        fun `restoring after resize clamps saved coordinates to the new dimensions`() {
+            val f = Fixture()
+            f.acceptAscii("\u001B[5;10H\u001B[s")
+            f.terminal.resize(5, 3)
+            f.acceptAscii("\u001B[u")
+            assertEquals(4, f.terminal.cursorCol)
+            assertEquals(2, f.terminal.cursorRow)
+        }
+    }
+
+    @Nested
     @DisplayName("printable and cursor pipeline")
     inner class PrintableAndCursorPipeline {
         @Test

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Improved cursor positioning compatibility with terminal apps that save and restore the cursor.
 - Fixed cursor and scroll-position jumps when resizing terminal panels with a full history.
 - Fixed terminal links opening the wrong destination after a reset.
 - Compatible terminal apps can now match the terminal's light or dark theme, including IDE themes.

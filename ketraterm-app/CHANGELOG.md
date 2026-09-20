@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Improved cursor positioning compatibility with terminal apps that save and restore the cursor.
 - Improved compatibility with apps that switch terminal width, while respecting resize settings and protecting split layouts.
 - Fixed cursor and scroll-position jumps when resizing terminals with a full history.
 - Fixed terminal links opening the wrong destination after a reset.

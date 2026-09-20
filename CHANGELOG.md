@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- Added parameterless ANSI/SCO cursor save/restore (`CSI s` / `CSI u`) with DECLRMM-aware margin reset and shared DEC cursor/charset state. Added the required `TerminalCommandSink.saveCursorOrResetMargins()` operation so embedders resolve mode-dependent saves without duplicating core mode state. Parameterized restores and malformed margin forms are ignored; Kitty keyboard controls retain separate dispatch.
 - DECCOLM now requires explicit host acceptance and synchronizes grid and connector dimensions before subsequent output. Standalone shares its existing resize permission and layout checks with ordinary grid resize requests; IDE hosts reject column switches.
 - Fixed cursor and scrollback viewport drift when resize reflow evicts older rows. Added exact retention coverage for history capacity boundaries and repeated alternate-screen resize cycles.
 - Fixed OSC 8 hyperlink IDs being reassigned after hard reset. Retained IDs now stay invalid after reset or eviction, and ID exhaustion cannot retarget old links.

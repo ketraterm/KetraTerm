@@ -52,7 +52,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 ## Parser Gaps
 
 ### CSI Protocols
-- `TODO(parser/core)`: conditional ANSI SCP compatibility for parameterless `CSI s` / `CSI u`. KetraTerm currently reserves plain `CSI s` for DECSLRM; xterm-style save/restore requires mode-aware disambiguation so parameterless DECSLRM continues to reset horizontal margins when DECLRMM is active.
+- `DONE(parser/host)`: parameterless ANSI/SCO `CSI s` / `CSI u` compatibility, including mode-aware DECSLRM disambiguation and shared DEC/SCO cursor and charset save/restore. The [feature map](terminal-feature-map.md#1-terminal-protocols--control-sequences) defines the supported forms; byte-stream tests cover mixed forms, chunk boundaries, margin changes, resets, screen-local cursor slots, resize, and malformed input.
 - `TODO(parser/core)`: broader DEC-specific status reports beyond the safe DSR/CPR/DA baseline.
 - `TODO(parser)`: full tab-stop and margin variants beyond the current common set.
 - `DONE(parser/core/host)`: rectangular erase (`DECERA`), selective erase (`DECSERA`), fill (`DECFRA`), copy (`DECCRA`), and checksum response (`DECRQCRA`) preserve active margin/origin coordinates; mutation operations preserve wide/cluster span integrity and `DECCRA` uses overlap-safe snapshot semantics. Copy/checksum intentionally support only the active single page (`0` omitted or `1`); checksum responses are terminal-response-policy gated and use the VT420 default 16-bit algorithm.
@@ -67,7 +67,6 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(parser)`: broader ISO 2022 national replacement sets:
   - UK, US, Dutch, Finnish, French, German, Italian, Norwegian/Danish, Spanish, Swedish, Swiss, Portuguese.
 - `TODO(parser)`: 8-bit C1 equivalents for ESC-prefixed controls if raw C1 mode is supported later.
-- `TODO(parser)`: save/restore state parity between DEC and SCO cursor save forms, if compatibility requires it.
 
 ### OSC Protocols
 - `DONE(parser/host/session/pty/workspace/ui/policy)`: OSC 52 clipboard write requests are bounded, parsed, denied by default, size-checked, origin-aware, surfaced as content-free host audit events, forwarded as decoded text to product-host clipboard callbacks only when policy allows the write, and forwarded to compact standalone/IntelliJ confirmation dialogs when policy requires a prompt. Product prompts use terminal profile names, character counts for text writes, and clear-clipboard wording for empty writes instead of exposing raw OSC 52 selection tokens.

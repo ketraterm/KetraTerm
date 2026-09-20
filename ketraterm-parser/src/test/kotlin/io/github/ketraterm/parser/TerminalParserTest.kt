@@ -592,6 +592,7 @@ class TerminalParserTest {
         @Test
         fun `DECSLRM omitted margins leave terminal right edge ownership to the sink`() {
             val full = TerminalParserFixture()
+            full.sink.isLeftRightMarginMode = true
             val leftOnly = TerminalParserFixture()
             val rightOnly = TerminalParserFixture()
 
@@ -604,6 +605,76 @@ class TerminalParserTest {
                 { assertEquals(listOf("setLeftRightMargins:4:-1"), leftOnly.sink.events) },
                 { assertEquals(listOf("setLeftRightMargins:0:9"), rightOnly.sink.events) },
             )
+        }
+
+        @Test
+        fun `DEC and SCO forms share charset saves across every byte split`() {
+            for (save in listOf("\u001B7", "\u001B[s")) {
+                for (restore in listOf("\u001B8", "\u001B[u")) {
+                    val bytes = "\u001B)0\u000E${save}\u001B)B\u000F${restore}q".encodeToByteArray()
+                    for (split in 0..bytes.size) {
+                        val f = TerminalParserFixture()
+                        f.parser.accept(bytes, 0, split)
+                        f.parser.accept(bytes, split, bytes.size - split)
+                        f.endOfInput()
+                        assertEquals(
+                            listOf("saveCursor", "restoreCursor", writeCodepoint(0x2500)),
+                            f.sink.events,
+                            "save=$save restore=$restore split=$split",
+                        )
+                    }
+                }
+            }
+        }
+
+        @Test
+        fun `parameterless margin reset does not overwrite the saved charset`() {
+            val f = TerminalParserFixture()
+            f.acceptAscii("\u001B(0\u001B7\u001B(B")
+            f.sink.isLeftRightMarginMode = true
+            f.acceptAscii("\u001B[s\u001B[uq")
+            assertEquals(
+                listOf("saveCursor", "setLeftRightMargins:0:-1", "restoreCursor", writeCodepoint(0x2500)),
+                f.sink.events,
+            )
+        }
+
+        @Test
+        fun `invalid SCO forms do not save restore or change charsets across chunks`() {
+            val invalid =
+                listOf(
+                    "\u001B[0u",
+                    "\u001B[1u",
+                    "\u001B[;u",
+                    "\u001B[1:2u",
+                    "\u001B[999999999999999999999u",
+                    "\u001B[${"1;".repeat(40)}u",
+                    "\u001B[?s",
+                    "\u001B[>s",
+                    "\u001B[ s",
+                    "\u001B[ u",
+                    "\u001B[1:2s",
+                    "\u001B[1;2;3s",
+                    "\u001B[${"1;".repeat(40)}s",
+                    "\u001B[\u0018",
+                    "\u001B[\u001A",
+                )
+            for (sequence in invalid) {
+                val bytes = sequence.encodeToByteArray()
+                for (split in 0..bytes.size) {
+                    val f = TerminalParserFixture()
+                    f.acceptAscii("\u001B(0\u001B7\u001B(B")
+                    f.sink.events.clear()
+                    f.parser.accept(bytes, 0, split)
+                    f.parser.accept(bytes, split, bytes.size - split)
+                    f.acceptAscii("q\u001B[uq")
+                    assertEquals(
+                        listOf(writeCodepoint('q'.code), "restoreCursor", writeCodepoint(0x2500)),
+                        f.sink.events,
+                        "sequence=$sequence split=$split",
+                    )
+                }
+            }
         }
 
         @Test

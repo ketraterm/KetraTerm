@@ -55,6 +55,8 @@ internal class NoOpCommandSink : TerminalCommandSink {
 
     override fun saveCursor() {}
 
+    override fun saveCursorOrResetMargins(): Boolean = true
+
     override fun restoreCursor() {}
 
     override fun setCursorStyle(style: Int) {}

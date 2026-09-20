@@ -206,11 +206,8 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
                     top = scrollRegionTopParam(state, 0),
                     bottom = scrollRegionBottomParam(state, 1),
                 )
-            CsiCommand.DECSLRM ->
-                sink.setLeftRightMargins(
-                    left = leftRightMarginLeftParam(state, 0),
-                    right = leftRightMarginRightParam(state, 1),
-                )
+            CsiCommand.SCOSC_OR_DECSLRM -> dispatchCursorSaveOrMargins(sink, state)
+            CsiCommand.SCORC -> dispatchCursorRestore(sink, state)
             CsiCommand.DECSCA -> dispatchSelectiveEraseProtection(sink, state)
 
             CsiCommand.SM_ANSI -> dispatchAnsiMode(sink, state, enable = true)
@@ -221,6 +218,30 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.DECSTR -> sink.softReset()
             CsiCommand.DECSCUSR -> sink.setCursorStyle(modeParam(state, 0))
             CsiCommand.SGR -> SgrDispatcher.dispatch(sink, state)
+        }
+    }
+
+    private fun dispatchCursorSaveOrMargins(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        if (state.paramCount == 0) {
+            if (sink.saveCursorOrResetMargins()) state.saveCursor()
+        } else if (state.paramCount <= 2 && state.subParameterMask == 0) {
+            sink.setLeftRightMargins(
+                left = leftRightMarginLeftParam(state, 0),
+                right = leftRightMarginRightParam(state, 1),
+            )
+        }
+    }
+
+    private fun dispatchCursorRestore(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        if (state.paramCount == 0) {
+            state.restoreCursor()
+            sink.restoreCursor()
         }
     }
 

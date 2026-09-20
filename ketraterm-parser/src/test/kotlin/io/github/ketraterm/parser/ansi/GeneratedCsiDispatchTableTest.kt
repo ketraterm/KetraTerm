@@ -55,8 +55,9 @@ class GeneratedCsiDispatchTableTest {
             assertEquals(CsiCommand.SGR, lookup('m'))
             assertEquals(CsiCommand.DSR, lookup('n'))
             assertEquals(CsiCommand.DECSTBM, lookup('r'))
-            assertEquals(CsiCommand.DECSLRM, lookup('s'))
+            assertEquals(CsiCommand.SCOSC_OR_DECSLRM, lookup('s'))
             assertEquals(CsiCommand.WINDOW_OP, lookup('t'))
+            assertEquals(CsiCommand.SCORC, lookup('u'))
         }
 
         @Test

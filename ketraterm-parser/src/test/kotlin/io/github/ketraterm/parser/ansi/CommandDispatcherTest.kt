@@ -563,8 +563,8 @@ class CommandDispatcherTest {
         }
 
         @Test
-        fun `CSI s dispatches DECSLRM left right margins as zero-origin margins`() {
-            assertEquals(listOf("setLeftRightMargins:0:-1"), dispatchCsi('s').events)
+        fun `CSI s distinguishes parameterless save from zero-origin margin parameters`() {
+            assertEquals(listOf("saveCursor"), dispatchCsi('s').events)
             assertEquals(listOf("setLeftRightMargins:0:9"), dispatchCsi('s', params = listOf(-1, 10)).events)
             assertEquals(listOf("setLeftRightMargins:4:-1"), dispatchCsi('s', params = listOf(5, -1)).events)
             assertEquals(listOf("setLeftRightMargins:4:9"), dispatchCsi('s', params = listOf(5, 10)).events)
