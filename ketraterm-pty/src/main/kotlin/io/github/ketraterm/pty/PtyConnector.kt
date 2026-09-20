@@ -100,6 +100,17 @@ class PtyConnector internal constructor(
     val isAlive: Boolean
         get() = process.isAlive()
 
+    /**
+     * Reads the Unix foreground process-group leader or uses the newest live descendant on Windows.
+     * The Windows result is a heuristic and may identify a background child. Returns only a basename,
+     * or null on closure/unavailable metadata; applications inside SSH or WSL are not inspected.
+     */
+    override fun foregroundProcessName(): String? {
+        if (isClosed() || !process.isAlive()) return null
+        val name = process.foregroundProcessName()
+        return name.takeUnless { isClosed() || !process.isAlive() }
+    }
+
     override fun start(listener: TerminalConnectorListener) {
         check(started.compareAndSet(false, true)) { "connector already started" }
         this.listener = listener
@@ -223,17 +234,16 @@ class PtyConnector internal constructor(
     private fun joinThread(
         thread: Thread?,
         timeoutMillis: Long,
-    ): Boolean {
-        if (thread == null || Thread.currentThread() === thread) return true
-
-        return try {
-            thread.join(timeoutMillis)
-            !thread.isAlive
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            false
-        }
-    }
+    ): Boolean =
+        thread == null ||
+            Thread.currentThread() === thread ||
+            try {
+                thread.join(timeoutMillis)
+                !thread.isAlive
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                false
+            }
 
     private fun isClosed(): Boolean = localCloseRequested.get() || closedNotified.get()
 

@@ -219,6 +219,7 @@ internal class TabManager(
                                 maxHistory = snapshot.scrollbackLines,
                                 pasteSanitizationPolicy = snapshot.pasteSanitizationPolicy,
                                 hostPolicy = settings.createHostPolicy(profile.command),
+                                showForegroundProcessName = settings.config.showForegroundProcessName,
                             )
                         },
                 )
@@ -381,7 +382,10 @@ internal class TabManager(
             tabContentPanel.background = Chrome.terminalBackground
             tabBar.repaint()
         }
-        panes.forEach { it.reloadSettings() }
+        panes.forEach {
+            it.tab.showForegroundProcessName = settings.config.showForegroundProcessName
+            it.reloadSettings()
+        }
         refreshWindowResizeTarget()
         reconcileCompletion()
     }
@@ -447,6 +451,7 @@ internal class TabManager(
                                 maxHistory = snapshot.scrollbackLines,
                                 pasteSanitizationPolicy = snapshot.pasteSanitizationPolicy,
                                 hostPolicy = settings.createHostPolicy(profile.command),
+                                showForegroundProcessName = settings.config.showForegroundProcessName,
                             )
                         },
                 )
@@ -912,7 +917,7 @@ internal class TabManager(
             title: String,
         ) {
             SwingUtilities.invokeLater {
-                updateTabTitle(tab.id, title)
+                updateTabTitle(tab.id, tab.title)
             }
         }
 

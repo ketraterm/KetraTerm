@@ -34,12 +34,126 @@ import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlin.test.*
+import kotlin.time.Duration.Companion.milliseconds
 
 class TerminalWorkspaceTest {
+    @Test
+    fun `workspace tracks connector metadata applies live toggles and clears on remote exit`() =
+        runBlocking {
+            val titles = Channel<String>(Channel.UNLIMITED)
+            val connector = RecordingConnector(foregroundName = "vim")
+            val session = testSession(connector)
+            session.start(80, 24)
+            TerminalWorkspace(
+                listener =
+                    object : TerminalWorkspaceListener {
+                        override fun titleChanged(
+                            tab: TerminalWorkspaceTab,
+                            title: String,
+                        ) {
+                            titles.trySend(title)
+                        }
+                    },
+                sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+            ).use { workspace ->
+                val tab =
+                    workspace.openTab(
+                        TerminalProfile("p1", "Profile", listOf("mock-shell")),
+                        TerminalWorkspaceOpenOptions(80, 24, false, 100, showForegroundProcessName = false),
+                    )
+                assertEquals("Profile", tab.title)
+                tab.showForegroundProcessName = true
+                assertEquals("vim", withTimeout(5_000.milliseconds) { titles.receive() })
+                tab.showForegroundProcessName = false
+                assertEquals("Profile", tab.title)
+                assertEquals("Profile", withTimeout(5_000.milliseconds) { titles.receive() })
+                tab.showForegroundProcessName = true
+                assertEquals("vim", withTimeout(5_000.milliseconds) { titles.receive() })
+                connector.simulateClosed(0)
+                assertEquals("Profile", withTimeout(5_000.milliseconds) { titles.receive() })
+                assertTrue(session.isClosed)
+                assertEquals("Profile", tab.title)
+            }
+        }
+
+    @Test
+    fun `process titles preserve custom application and directory precedence`() {
+        testSession().use { session ->
+            val titles = mutableListOf<String>()
+            val tab =
+                TerminalWorkspaceTab(
+                    "t1",
+                    TerminalProfile("p1", "Profile", listOf("mock-shell")),
+                    "Profile",
+                    session,
+                    { _, _ -> },
+                    { _, title -> titles += title },
+                    { _, _ -> },
+                )
+            tab.updateForegroundProcessName("mock-shell")
+            assertEquals("Profile", tab.title)
+            tab.updateCurrentWorkingDirectoryUri("file:///work/project")
+            tab.updateForegroundProcessName("vim")
+            assertEquals("vim", tab.title)
+            tab.updateForegroundProcessName("vim")
+            assertEquals(listOf("project", "vim"), titles)
+            tab.updateDynamicTitle("Editor")
+            tab.updateForegroundProcessName("git")
+            assertEquals("Editor", tab.title)
+            tab.customTitle = "Mine"
+            tab.updateDynamicTitle("Build")
+            tab.updateForegroundProcessName(null)
+            assertEquals("Mine", tab.title)
+            tab.customTitle = null
+            assertEquals("Build", tab.title)
+            tab.updateDynamicTitle("mock-shell")
+            assertEquals("project", tab.title)
+            tab.updateForegroundProcessName("git")
+            assertEquals("git", tab.title)
+            tab.updateForegroundProcessName(null)
+            assertEquals("project", tab.title)
+            assertEquals(listOf("project", "vim", "Editor", "Mine", "Build", "project", "git", "project"), titles)
+        }
+    }
+
+    @Test
+    fun `process titles are sanitized bounded and ignored when disabled or closed`() {
+        testSession().use { session ->
+            val tab =
+                TerminalWorkspaceTab(
+                    "t1",
+                    TerminalProfile("p1", "Profile", listOf("mock-shell")),
+                    "Profile",
+                    session,
+                    { _, _ -> },
+                    { _, _ -> },
+                    { _, _ -> },
+                )
+            tab.updateForegroundProcessName("  vi\u001b\u202Em  ")
+            assertEquals("vim", tab.title)
+            tab.updateForegroundProcessName("x".repeat(300))
+            assertEquals("x".repeat(256), tab.title)
+            tab.showForegroundProcessName = false
+            assertEquals("Profile", tab.title)
+            tab.updateForegroundProcessName("git")
+            assertEquals("Profile", tab.title)
+            tab.showForegroundProcessName = true
+            assertEquals("Profile", tab.title)
+            tab.updateForegroundProcessName("git")
+            assertEquals("git", tab.title)
+            session.close()
+            tab.updateForegroundProcessName("stale")
+            assertEquals("Profile", tab.title)
+        }
+    }
+
     @Test
     fun `column mode requests require acceptance from the owning tab host`() {
         val session = testSession()
@@ -574,8 +688,12 @@ class TerminalWorkspaceTest {
         override fun close() = Unit
     }
 
-    private class RecordingConnector : TerminalConnector {
+    private class RecordingConnector(
+        private val foregroundName: String? = null,
+    ) : TerminalConnector {
         private var listener: TerminalConnectorListener? = null
+
+        override fun foregroundProcessName(): String? = foregroundName
 
         override fun start(listener: TerminalConnectorListener) {
             this.listener = listener

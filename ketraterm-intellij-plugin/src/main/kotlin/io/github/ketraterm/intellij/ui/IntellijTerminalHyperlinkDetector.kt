@@ -182,12 +182,12 @@ private class IntellijTerminalHyperlinkAction(
     private val project: Project,
     private val hyperlinkInfo: HyperlinkInfo,
 ) : SwingHyperlinkAction {
-    override fun open(): Boolean {
-        return !project.isDisposed && try {
-            hyperlinkInfo.navigate(project)
-            true
-        } catch (_: Exception) {
-            false
-        }
-    }
+    override fun open(): Boolean =
+        !project.isDisposed &&
+            try {
+                hyperlinkInfo.navigate(project)
+                true
+            } catch (_: Exception) {
+                false
+            }
 }

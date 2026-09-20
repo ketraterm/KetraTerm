@@ -4,6 +4,8 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- Added optional foreground-process metadata from local PTYs and subscription-bound session polling on the I/O dispatcher. Unix uses the PTY foreground process-group leader; Windows uses the newest live descendant, rejecting snapshots with more than 256 candidates or unavailable start times. Shared workspace title precedence is custom name, application title, detected executable, then existing directory/profile fallback. Both products expose a live persisted setting; tracking stops on session close and when unobserved, with no process queries in rendering or byte handling.
+- Wired the native PTY test opt-in through to test JVMs and preserved PowerShell fixture-script quoting with encoded commands.
 - Added parameterless ANSI/SCO cursor save/restore (`CSI s` / `CSI u`) with DECLRMM-aware margin reset and shared DEC cursor/charset state. Added the required `TerminalCommandSink.saveCursorOrResetMargins()` operation so embedders resolve mode-dependent saves without duplicating core mode state. Parameterized restores and malformed margin forms are ignored; Kitty keyboard controls retain separate dispatch.
 - DECCOLM now requires explicit host acceptance and synchronizes grid and connector dimensions before subsequent output. Standalone shares its existing resize permission and layout checks with ordinary grid resize requests; IDE hosts reject column switches.
 - Fixed cursor and scrollback viewport drift when resize reflow evicts older rows. Added exact retention coverage for history capacity boundaries and repeated alternate-screen resize cycles.
