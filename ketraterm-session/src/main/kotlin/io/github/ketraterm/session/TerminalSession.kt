@@ -111,6 +111,18 @@ class TerminalSession(
     val state: StateFlow<TerminalSessionState> = mutableState.asStateFlow()
 
     /**
+     * Best-effort foreground executable name, or `null` when unavailable.
+     *
+     * OS queries run once per second on the I/O dispatcher, only while collected.
+     * Collectors share one tracker; no work is tied to rendering or terminal output.
+     * Session closure cancels tracking and clears the retained name. Consumers own
+     * their collection lifetime; this state flow does not complete on closure.
+     */
+    val foregroundProcessName: StateFlow<String?> by lazy {
+        ForegroundProcessTracker(sessionScope, connector::foregroundProcessName).name
+    }
+
+    /**
      * Latest successfully published render generation, or `-1` before the
      * first frame is available.
      */

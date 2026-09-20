@@ -41,6 +41,23 @@ import kotlin.test.assertTrue
 
 class SettingsDialogTest {
     @Test
+    fun `process title checkbox persists its selection`() {
+        withDialog { settings, dialog, closed ->
+            onEdt {
+                val checkbox =
+                    components(dialog).filterIsInstance<JCheckBox>().single {
+                        it.text == "Show running process in tab titles"
+                    }
+                assertTrue(checkbox.isSelected)
+                checkbox.doClick()
+                button(dialog, "OK").doClick()
+            }
+            assertTrue(closed.await(5, TimeUnit.SECONDS))
+            assertFalse(settings.config.showForegroundProcessName)
+        }
+    }
+
+    @Test
     fun `startup command field persists exact text`() {
         withDialog { settings, dialog, closed ->
             onEdt {

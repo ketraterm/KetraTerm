@@ -24,6 +24,16 @@ package io.github.ketraterm.transport
  */
 interface TerminalConnector : AutoCloseable {
     /**
+     * Returns the current foreground executable name, without arguments or a path.
+     *
+     * Optional, best-effort metadata: `null` means unavailable, ambiguous, or idle.
+     * Implementations may perform OS queries and must be called off UI and byte-processing
+     * threads. Queries must be bounded, tolerate concurrent close, and never launch commands.
+     * Platform-specific detection limitations belong in the implementing connector's contract.
+     */
+    fun foregroundProcessName(): String? = null
+
+    /**
      * Starts delivering transport events to [listener].
      *
      * Implementations may call listener methods from transport-owned threads.

@@ -253,6 +253,7 @@ class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTerm
         @JvmField val titleLocalPermission: String = TerminalConfig.DEFAULT_TITLE_LOCAL_PERMISSION.name.lowercase(Locale.ROOT),
         @JvmField val titleRemotePermission: String = TerminalConfig.DEFAULT_TITLE_REMOTE_PERMISSION.name.lowercase(Locale.ROOT),
         @JvmField val scrollOnOutput: Boolean = true,
+        @JvmField val showForegroundProcessName: Boolean = TerminalConfig.DEFAULT_SHOW_FOREGROUND_PROCESS_NAME,
     )
 
     companion object {

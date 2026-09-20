@@ -63,6 +63,7 @@ private fun defaultFontFamily(): String {
  * @property shellPath command or executable path used when opening a local shell.
  * @property startDirectory initial working directory for newly opened shells.
  * @property startupCommand optional single command line submitted once a new shell is ready; blank disables it.
+ * @property showForegroundProcessName whether detected processes provide automatic tab-title fallbacks.
  * @property audibleBell whether host UI should play a system bell for BEL events.
  * @property visualBell whether host UI should show a visual indicator for BEL events.
  * @property pasteOnMiddleClick whether middle mouse click should paste clipboard text.
@@ -120,6 +121,7 @@ data class TerminalConfig(
     val titleRemotePermission: TerminalTitlePermission = DEFAULT_TITLE_REMOTE_PERMISSION,
     val scrollOnOutput: Boolean = DEFAULT_SCROLL_ON_OUTPUT,
     val startupCommand: String = "",
+    val showForegroundProcessName: Boolean = DEFAULT_SHOW_FOREGROUND_PROCESS_NAME,
 ) {
     init {
         require(columns in COLUMNS_MIN..COLUMNS_MAX) {
@@ -161,6 +163,8 @@ data class TerminalConfig(
      * everywhere automatically.
      */
     companion object {
+        const val DEFAULT_SHOW_FOREGROUND_PROCESS_NAME: Boolean = true
+
         // Defaults
         const val DEFAULT_THEME: String = "one-dark"
         const val DEFAULT_TREAT_AMBIGUOUS_AS_WIDE: Boolean = false

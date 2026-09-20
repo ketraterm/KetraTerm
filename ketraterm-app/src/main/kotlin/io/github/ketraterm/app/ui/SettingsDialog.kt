@@ -200,6 +200,8 @@ internal class SettingsDialog(
     // private val persistentSuggestionLearningCheckbox =
     //     JCheckBox("Persist suggestion learning", settings.config.persistentSuggestionLearningEnabled)
     private val scrollOnOutputCheckbox = JCheckBox("Scroll on output", settings.config.scrollOnOutput)
+    private val showForegroundProcessNameCheckbox =
+        JCheckBox("Show running process in tab titles", settings.config.showForegroundProcessName)
     private val cursorBlinkSpinner =
         createSpinner(settings.config.cursorBlinkMillis, TerminalConfig.CURSOR_BLINK_MIN, TerminalConfig.CURSOR_BLINK_MAX, 50, 70)
     private val cursorShapeCombo =
@@ -288,6 +290,7 @@ internal class SettingsDialog(
         // registerChangeListener(acceptSelectedSuggestionWithEnterCheckbox, updateApplyState)
         // registerChangeListener(persistentSuggestionLearningCheckbox, updateApplyState)
         registerChangeListener(scrollOnOutputCheckbox, updateApplyState)
+        registerChangeListener(showForegroundProcessNameCheckbox, updateApplyState)
         registerChangeListener(cursorBlinkSpinner, updateApplyState)
         registerChangeListener(cursorShapeCombo, updateApplyState)
     }
@@ -541,6 +544,16 @@ internal class SettingsDialog(
         )
         panel.add(scrollingSection)
 
+        panel.add(SectionHeader("Tab titles"))
+        val titleSection = createSectionPanel()
+        addCheckboxRow(
+            titleSection,
+            0,
+            showForegroundProcessNameCheckbox,
+            "Use the detected process name when an app does not report a title. Custom names take priority.",
+        )
+        panel.add(titleSection)
+
         return panel
     }
 
@@ -761,6 +774,7 @@ internal class SettingsDialog(
         // acceptSelectedSuggestionWithEnterCheckbox.isSelected = TerminalConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER
         // persistentSuggestionLearningCheckbox.isSelected = TerminalConfig.DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED
         scrollOnOutputCheckbox.isSelected = TerminalConfig.DEFAULT_SCROLL_ON_OUTPUT
+        showForegroundProcessNameCheckbox.isSelected = TerminalConfig.DEFAULT_SHOW_FOREGROUND_PROCESS_NAME
         cursorBlinkSpinner.value = TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS
         cursorShapeCombo.selectedItem = TerminalConfig.DEFAULT_CURSOR_SHAPE
 
@@ -897,6 +911,7 @@ internal class SettingsDialog(
                     TerminalTitlePermission.DENY
                 },
             scrollOnOutput = scrollOnOutputCheckbox.isSelected,
+            showForegroundProcessName = showForegroundProcessNameCheckbox.isSelected,
         )
     }
 

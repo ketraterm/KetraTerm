@@ -33,6 +33,34 @@ import javax.swing.JComboBox
 import javax.swing.JLabel
 
 class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
+    fun testProcessTitleCheckboxAppliesAndResetsWithoutChangingOtherSettings() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        val original = settings.state
+        val configurable = KetraTermSettingsConfigurable(emptyList())
+        try {
+            settings.loadState(original.copy(showForegroundProcessName = true))
+            val baseline = settings.state
+            val checkbox =
+                descendants(configurable.createComponent()).filterIsInstance<AbstractButton>().single {
+                    it.text == KetraTermBundle.message("settings.ketraterm.showForegroundProcessName")
+                }
+            assertTrue(checkbox.isSelected)
+            assertFalse(configurable.isModified())
+            checkbox.isSelected = false
+            assertTrue(configurable.isModified())
+            configurable.apply()
+            assertEquals(baseline.copy(showForegroundProcessName = false), settings.state)
+            assertFalse(configurable.isModified())
+            checkbox.isSelected = true
+            configurable.reset()
+            assertFalse(checkbox.isSelected)
+            assertFalse(configurable.isModified())
+        } finally {
+            configurable.disposeUIResources()
+            settings.replaceState(original)
+        }
+    }
+
     fun testPasteHandlingChoicesApplyAndResetWithoutChangingOtherSettings() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state

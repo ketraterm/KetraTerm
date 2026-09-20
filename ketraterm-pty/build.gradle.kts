@@ -31,6 +31,7 @@ dependencies {
     api(project(":ketraterm-session"))
     implementation(project(":ketraterm-transport-api"))
     implementation("org.jetbrains.pty4j:pty4j:0.13.12")
+    implementation("net.java.dev.jna:jna:5.14.0")
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
@@ -38,4 +39,5 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("terminal.pty.host", providers.systemProperty("terminal.pty.host").getOrElse("false"))
 }

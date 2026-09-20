@@ -16,13 +16,42 @@
 package io.github.ketraterm.pty
 
 import io.github.ketraterm.input.event.TerminalPasteEvent
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
+import java.nio.charset.StandardCharsets
 import java.nio.file.Path
+import java.util.*
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.milliseconds
 
 class PtyRealProcessTest {
+    @Test
+    fun `real PTY detects a running executable and clears it after exit`() =
+        runBlocking {
+            assumeNativePty()
+            val command =
+                if (isWindows()) {
+                    sleepCommand(3)
+                } else {
+                    // exec makes the foreground group leader unambiguous without shell job-control support.
+                    listOf("/bin/sh", "-c", "exec sleep 3")
+                }
+            TerminalSessions.localPty(PtyOptions(command = command, columns = 40, rows = 5)).use { session ->
+                val expected = if (isWindows()) "PING.EXE" else "sleep"
+                val detected =
+                    withTimeout(5_000.milliseconds) {
+                        session.foregroundProcessName.first { it.equals(expected, ignoreCase = true) }
+                    }
+                assertTrue(expected.equals(detected, ignoreCase = true))
+                waitUntil(timeoutMillis = 8_000) { session.isClosed }
+                assertNull(withTimeout(5_000.milliseconds) { session.foregroundProcessName.first { it == null } })
+            }
+        }
+
     @Test
     fun `real PTY echo output reaches terminal core`() {
         assumeNativePty()
@@ -247,29 +276,21 @@ class PtyRealProcessTest {
         count: Int,
     ): List<String> =
         if (isWindows()) {
-            listOf(
-                "powershell.exe",
-                "-NoProfile",
-                "-Command",
-                "[Console]::Out.Write(('$char' * $count) + \"`n\")",
-            )
+            powerShellCommand("[Console]::Out.Write(('$char' * $count) + \"`n\")")
         } else {
             listOf("/bin/sh", "-lc", "printf '%*s\n' $count '' | tr ' ' '$char'")
         }
 
     private fun mixedLineEndingCommand(): List<String> =
         if (isWindows()) {
-            listOf("powershell.exe", "-NoProfile", "-Command", "[Console]::Out.Write(\"A`r`nB`rC`n\")")
+            powerShellCommand("[Console]::Out.Write(\"A`r`nB`rC`n\")")
         } else {
             listOf("/bin/sh", "-lc", "printf 'A\\r\\nB\\rC\\n'")
         }
 
     private fun shellRedrawAndAlternateScreenCommand(): List<String> =
         if (isWindows()) {
-            listOf(
-                "powershell.exe",
-                "-NoProfile",
-                "-Command",
+            powerShellCommand(
                 "[Console]::Out.Write('prompt> old' + [char]13 + [char]27 + '[2Kprompt> done' + [char]13 + [char]10 + [char]27 + '[?1049hFULL' + [char]27 + '[?1049lafter' + [char]13 + [char]10')",
             )
         } else {
@@ -278,15 +299,21 @@ class PtyRealProcessTest {
 
     private fun bracketedPasteShellCommand(): List<String> =
         if (isWindows()) {
-            listOf(
-                "powershell.exe",
-                "-NoProfile",
-                "-Command",
+            powerShellCommand(
                 "[Console]::Out.Write([char]27 + '[?2004h'); Start-Sleep -Seconds 2",
             )
         } else {
             listOf("/bin/sh", "-lc", "printf '\\033[?2004h'; sleep 2")
         }
+
+    // Preserve script quotes across ConPTY's Windows command-line construction.
+    private fun powerShellCommand(script: String): List<String> =
+        listOf(
+            "powershell.exe",
+            "-NoProfile",
+            "-EncodedCommand",
+            Base64.getEncoder().encodeToString(script.toByteArray(StandardCharsets.UTF_16LE)),
+        )
 
     private fun isWindows(): Boolean = System.getProperty("os.name").lowercase().contains("windows")
 
