@@ -16,6 +16,7 @@
 package io.github.ketraterm.host
 
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.parser.spi.TerminalCommandSink
@@ -186,6 +187,15 @@ class HostCommandAdapter(
 
     override fun saveCursor() {
         terminal.saveCursor()
+    }
+
+    override fun saveCursorOrResetMargins(): Boolean {
+        if (TerminalModeBits.hasFlag(terminal.getModeBitsSnapshot(), TerminalModeBits.LEFT_RIGHT_MARGIN_MODE)) {
+            terminal.setLeftRightMargins(left = 1, right = terminal.width)
+            return false
+        }
+        terminal.saveCursor()
+        return true
     }
 
     override fun restoreCursor() {

@@ -57,8 +57,9 @@ internal object GeneratedCsiDispatchTable {
             109L, // CSI m  SGR
             110L, // CSI n  DSR
             114L, // CSI r  DECSTBM
-            115L, // CSI s  DECSLRM
+            115L, // CSI s  SCOSC / DECSLRM
             116L, // CSI t  xterm window/title operation
+            117L, // CSI u  SCORC
             15477L, // CSI < u  Kitty keyboard pop flags
             15715L, // CSI = c  DA3
             15733L, // CSI = u  Kitty keyboard apply flags
@@ -119,8 +120,9 @@ internal object GeneratedCsiDispatchTable {
             CsiCommand.SGR,
             CsiCommand.DSR,
             CsiCommand.DECSTBM,
-            CsiCommand.DECSLRM,
+            CsiCommand.SCOSC_OR_DECSLRM,
             CsiCommand.WINDOW_OP,
+            CsiCommand.SCORC,
             CsiCommand.KITTY_KEYBOARD_POP,
             CsiCommand.DA_TERTIARY,
             CsiCommand.KITTY_KEYBOARD_FLAGS,

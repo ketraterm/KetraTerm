@@ -207,6 +207,11 @@ class ActionEngineTest {
             sinkCalls += "saveCursor"
         }
 
+        override fun saveCursorOrResetMargins(): Boolean {
+            saveCursor()
+            return true
+        }
+
         override fun restoreCursor() {
             sinkCalls += "restoreCursor"
         }

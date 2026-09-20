@@ -54,7 +54,7 @@ class CsiCommandTest {
             CsiCommand.CBT,
             CsiCommand.TBC,
             CsiCommand.DECSTBM,
-            CsiCommand.DECSLRM,
+            CsiCommand.SCOSC_OR_DECSLRM,
             CsiCommand.DECSED,
             CsiCommand.DECSEL,
             CsiCommand.DECSCA,

@@ -133,6 +133,16 @@ interface TerminalCommandSink {
     fun saveCursor()
 
     /**
+     * Resolves parameterless CSI s against the current horizontal-margin mode (DECLRMM).
+     *
+     * With DECLRMM disabled, saves the same state as [saveCursor] and returns `true`.
+     * Otherwise resets left/right margins to the full width, with normal DECSLRM cursor
+     * homing, and returns `false`. The parser saves its charset state only on `true`.
+     * Mode ownership stays with the sink; implementations must not cache a second mode flag.
+     */
+    fun saveCursorOrResetMargins(): Boolean
+
+    /**
      * Restores the cursor position, SGR attributes, wrap state, and origin mode.
      */
     fun restoreCursor()
