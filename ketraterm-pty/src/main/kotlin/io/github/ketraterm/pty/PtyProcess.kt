@@ -25,6 +25,8 @@ internal interface PtyProcess {
     val input: InputStream
     val output: OutputStream
 
+    fun foregroundProcessName(): String? = null
+
     fun isAlive(): Boolean
 
     fun waitFor(): Int
@@ -62,6 +64,10 @@ internal object Pty4jProcessFactory : PtyProcessFactory {
 internal class Pty4jProcess(
     private val process: Pty4jNativeProcess,
 ) : PtyProcess {
+    private val foregroundProcessDetector by lazy { PtyForegroundProcessDetector(process) }
+
+    override fun foregroundProcessName(): String? = foregroundProcessDetector.readName()
+
     override val input: InputStream
         get() = process.inputStream
 

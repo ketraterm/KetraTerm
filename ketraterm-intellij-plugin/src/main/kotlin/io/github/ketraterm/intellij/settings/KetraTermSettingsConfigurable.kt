@@ -98,6 +98,7 @@ class KetraTermSettingsConfigurable internal constructor(
     // private val completionLearningPersistenceCheckBox =
     //     JBCheckBox(KetraTermBundle.message("settings.ketraterm.completionLearningPersistence"))
     private val scrollOnOutputCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.scrollOnOutput"))
+    private val showForegroundProcessNameCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.showForegroundProcessName"))
 
     private val pasteSanitizationCombo = ComboBox(pasteSanitizationOptions())
     private val clipboardLocalWriteCombo = ComboBox(permissionOptions())
@@ -232,6 +233,10 @@ class KetraTermSettingsConfigurable internal constructor(
                     row {
                         cell(scrollOnOutputCheckBox)
                     }
+                    row {
+                        cell(showForegroundProcessNameCheckBox)
+                            .comment(KetraTermBundle.message("settings.ketraterm.showForegroundProcessName.comment"))
+                    }
                 }
 
                 group(KetraTermBundle.message("settings.ketraterm.group.security")) {
@@ -304,6 +309,7 @@ class KetraTermSettingsConfigurable internal constructor(
         // acceptSelectedSuggestionWithEnterCheckBox.isSelected = state.acceptSelectedSuggestionWithEnter
         // completionLearningPersistenceCheckBox.isSelected = state.completionLearningPersistenceEnabled
         scrollOnOutputCheckBox.isSelected = state.scrollOnOutput
+        showForegroundProcessNameCheckBox.isSelected = state.showForegroundProcessName
         pasteSanitizationCombo.selectedItem = pasteSanitizationOptions().firstOrNull { it.id == state.pasteSanitization }
         clipboardLocalWriteCombo.selectPermission(state.clipboardLocalWrite)
         clipboardRemoteWriteCombo.selectPermission(state.clipboardRemoteWrite)
@@ -348,6 +354,7 @@ class KetraTermSettingsConfigurable internal constructor(
             titleLocalPermission = if (titleLocalPermissionCheckBox.isSelected) "allow" else "deny",
             titleRemotePermission = if (titleRemotePermissionCheckBox.isSelected) "allow" else "deny",
             scrollOnOutput = scrollOnOutputCheckBox.isSelected,
+            showForegroundProcessName = showForegroundProcessNameCheckBox.isSelected,
         )
 
     private fun selectedThemeId(): String = (themeCombo.selectedItem as? ThemeOption)?.id ?: KetraTermIntellijSettings.DEFAULT_THEME_ID

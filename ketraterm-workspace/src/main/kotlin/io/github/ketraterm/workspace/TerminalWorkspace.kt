@@ -29,8 +29,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalStartupCommandStatus
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.*
 import java.net.URI
 import java.net.URISyntaxException
 import java.nio.file.Path
@@ -111,6 +110,7 @@ class TerminalWorkspace internal constructor(
                 onColorChanged = { t, color -> listener.colorChanged(t, color) },
                 onTitleChanged = { t, titleText -> listener.titleChanged(t, titleText) },
                 onCurrentWorkingDirectoryChanged = { t, uri -> listener.currentWorkingDirectoryChanged(t, uri) },
+                showForegroundProcessName = options.showForegroundProcessName,
             )
         synchronized(stateLock) {
             tabs += tab
@@ -121,6 +121,12 @@ class TerminalWorkspace internal constructor(
 
         val stateJob =
             workspaceScope.launch {
+                val processTitleJob =
+                    launch {
+                        tab.processTitleEnabled.collectLatest { enabled ->
+                            if (enabled) session.foregroundProcessName.collect(tab::updateForegroundProcessName)
+                        }
+                    }
                 val startupJob =
                     session.startupCommandStatus?.let { status ->
                         launch {
@@ -133,6 +139,8 @@ class TerminalWorkspace internal constructor(
                     }
                 val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
                 startupJob?.cancel()
+                processTitleJob.cancelAndJoin()
+                tab.updateForegroundProcessName(null)
                 if (!closed.event.locallyRequested) {
                     tabBySession(session)?.let {
                         listener.sessionClosed(it, closed.event.exitCode, closed.event.failure)
@@ -176,6 +184,7 @@ class TerminalWorkspace internal constructor(
                 tab to selectedTabId
             }
         val (tab, nextSelectedTabId) = result
+        tab.showForegroundProcessName = false
         tab.session.close()
         listener.tabClosed(id)
         nextSelectedTabId?.let(listener::tabSelected)
@@ -381,6 +390,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
  * @property shellIntegrationEnabled whether supported launch profiles should
  * install shell hooks that emit OSC 7 and OSC 133 metadata.
  * @property hostPolicy safety policy.
+ * @property showForegroundProcessName whether detected processes provide automatic title fallbacks.
  */
 data class TerminalWorkspaceOpenOptions(
     val columns: Int,
@@ -390,6 +400,7 @@ data class TerminalWorkspaceOpenOptions(
     val pasteSanitizationPolicy: PasteSanitizationPolicy = PasteSanitizationPolicy.RAW,
     val shellIntegrationEnabled: Boolean = true,
     val hostPolicy: HostPolicy = HostPolicy(),
+    val showForegroundProcessName: Boolean = true,
 ) {
     init {
         require(columns > 0) { "columns must be > 0, was $columns" }
@@ -416,7 +427,12 @@ class TerminalWorkspaceTab internal constructor(
     private val onColorChanged: (TerminalWorkspaceTab, String?) -> Unit,
     private val onTitleChanged: (TerminalWorkspaceTab, String) -> Unit,
     private val onCurrentWorkingDirectoryChanged: (TerminalWorkspaceTab, String) -> Unit,
+    showForegroundProcessName: Boolean = true,
 ) {
+    private val titleLock = Any()
+    private val mutableProcessTitleEnabled = MutableStateFlow(showForegroundProcessName)
+    internal val processTitleEnabled = mutableProcessTitleEnabled.asStateFlow()
+    private var foregroundProcessTitle: String? = null
     private var dynamicTitle: String = title
     private var applicationTitleActive: Boolean = title != profile.displayName
     private var directoryTitle: String? = null
@@ -428,7 +444,35 @@ class TerminalWorkspaceTab internal constructor(
      * Current host-visible title for this tab.
      */
     val title: String
-        get() = customTitle ?: if (applicationTitleActive) dynamicTitle else directoryTitle ?: dynamicTitle
+        get() = synchronized(titleLock) { titleLocked() }
+
+    private fun titleLocked(): String =
+        customTitle ?: if (applicationTitleActive) dynamicTitle else foregroundProcessTitle ?: directoryTitle ?: dynamicTitle
+
+    /** Enables process-title tracking; disabling immediately restores the existing title fallback. */
+    var showForegroundProcessName: Boolean
+        get() = processTitleEnabled.value
+        set(enabled) {
+            val changedTitle =
+                updateTitleState {
+                    mutableProcessTitleEnabled.value = enabled
+                    if (!enabled) foregroundProcessTitle = null
+                }
+            changedTitle?.let { onTitleChanged(this, it) }
+        }
+
+    internal fun updateForegroundProcessName(name: String?) {
+        val changedTitle =
+            updateTitleState {
+                foregroundProcessTitle =
+                    if (processTitleEnabled.value && !session.isClosed) {
+                        name?.let(::sanitizeTitle)?.takeUnless(::isLaunchExecutableTitle)
+                    } else {
+                        null
+                    }
+            }
+        changedTitle?.let { onTitleChanged(this, it) }
+    }
 
     /**
      * Latest host-validated OSC 7 current-working-directory URI.
@@ -440,38 +484,37 @@ class TerminalWorkspaceTab internal constructor(
         get() = currentWorkingDirectory
 
     /**
-     * Optional custom title set by the user. If null, falls back to the dynamic PTY title.
+     * Optional user title, taking precedence over application, process, and directory titles.
      */
     var customTitle: String? = null
+        get() = synchronized(titleLock) { field }
         set(value) {
-            if (field != value) {
-                field = value
-                onTitleChanged(this, title)
-            }
+            val changedTitle =
+                updateTitleState {
+                    field = value
+                }
+            changedTitle?.let { onTitleChanged(this, it) }
         }
 
     internal fun updateDynamicTitle(nextTitle: String?) {
-        val previousTitle = title
-        val acceptedTitle = nextTitle?.trim()?.takeIf(String::isNotEmpty)?.takeUnless(::isLaunchExecutableTitle)
-        applicationTitleActive = acceptedTitle != null
-        dynamicTitle = acceptedTitle ?: profile.displayName
-        notifyTitleChanged(previousTitle)
+        val changedTitle =
+            updateTitleState {
+                val acceptedTitle = nextTitle?.trim()?.takeIf(String::isNotEmpty)?.takeUnless(::isLaunchExecutableTitle)
+                applicationTitleActive = acceptedTitle != null
+                dynamicTitle = acceptedTitle ?: profile.displayName
+            }
+        changedTitle?.let { onTitleChanged(this, it) }
     }
 
     internal fun updateCurrentWorkingDirectoryUri(uri: String) {
-        if (currentWorkingDirectory == uri) return
-        val previousTitle = title
-        currentWorkingDirectory = uri
-        directoryTitle = workingDirectoryTitle(uri)
+        val changedTitle =
+            updateTitleState {
+                if (currentWorkingDirectory == uri) return
+                currentWorkingDirectory = uri
+                directoryTitle = workingDirectoryTitle(uri)
+            }
         onCurrentWorkingDirectoryChanged(this, uri)
-        notifyTitleChanged(previousTitle)
-    }
-
-    private fun notifyTitleChanged(previousTitle: String) {
-        val nextTitle = title
-        if (previousTitle != nextTitle) {
-            onTitleChanged(this, nextTitle)
-        }
+        changedTitle?.let { onTitleChanged(this, it) }
     }
 
     /**
@@ -483,6 +526,14 @@ class TerminalWorkspaceTab internal constructor(
                 field = value
                 onColorChanged(this, value)
             }
+        }
+
+    // All title sources share this lock; listeners run outside it to allow host re-entry.
+    private inline fun updateTitleState(update: () -> Unit): String? =
+        synchronized(titleLock) {
+            val previous = titleLocked()
+            update()
+            titleLocked().takeUnless { it == previous }
         }
 
     private fun workingDirectoryTitle(uriValue: String): String? {
@@ -500,14 +551,16 @@ class TerminalWorkspaceTab internal constructor(
             } else {
                 withoutTrailingSeparators.substringAfterLast('/').substringAfterLast('\\')
             }
-        val sanitized =
-            candidate
-                .filter { character ->
-                    !character.isISOControl() && Character.getType(character) != Character.FORMAT.toInt()
-                }.take(MAX_DIRECTORY_TITLE_LENGTH)
-                .trim()
-        return sanitized.ifEmpty { null }
+        return sanitizeTitle(candidate)
     }
+
+    private fun sanitizeTitle(value: String): String? =
+        value
+            .filter { character ->
+                !character.isISOControl() && Character.getType(character) != Character.FORMAT.toInt()
+            }.take(MAX_FALLBACK_TITLE_LENGTH)
+            .trim()
+            .ifEmpty { null }
 
     private fun isLaunchExecutableTitle(candidate: String): Boolean {
         val launchExecutable = profile.command.firstOrNull() ?: return false
@@ -523,7 +576,7 @@ class TerminalWorkspaceTab internal constructor(
             .lowercase(Locale.ROOT)
 
     private companion object {
-        private const val MAX_DIRECTORY_TITLE_LENGTH = 256
+        private const val MAX_FALLBACK_TITLE_LENGTH = 256
     }
 }
 
@@ -662,6 +715,9 @@ interface TerminalWorkspaceListener {
 
     /**
      * Called when a tab title changes.
+     *
+     * Sources may notify from different threads. Hosts dispatching to a UI thread should
+     * read [TerminalWorkspaceTab.title] there so a queued callback cannot restore a stale title.
      *
      * @param tab tab whose title changed.
      * @param title new title.

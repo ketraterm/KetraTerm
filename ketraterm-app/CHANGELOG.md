@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Tabs can now show the running application's name when it does not supply a title. Custom names keep priority, and automatic process titles can be turned off in settings.
 - Improved cursor positioning compatibility with terminal apps that save and restore the cursor.
 - Improved compatibility with apps that switch terminal width, while respecting resize settings and protecting split layouts.
 - Fixed cursor and scroll-position jumps when resizing terminals with a full history.

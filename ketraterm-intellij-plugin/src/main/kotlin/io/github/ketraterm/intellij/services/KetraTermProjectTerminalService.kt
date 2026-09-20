@@ -495,6 +495,9 @@ class KetraTermProjectTerminalService internal constructor(
 
     private fun reloadOpenTerminalSettings() {
         invokeLaterIfAlive {
+            for (tab in workspace.tabSnapshot()) {
+                tab.showForegroundProcessName = KetraTermIntellijSettings.getInstance().state.showForegroundProcessName
+            }
             for (pane in panesByTabId.values) {
                 pane.reloadSettings()
             }
@@ -512,6 +515,7 @@ class KetraTermProjectTerminalService internal constructor(
             maxHistory = settings.scrollbackLines,
             pasteSanitizationPolicy = settings.pasteSanitizationPolicy,
             hostPolicy = KetraTermIntellijSettings.getInstance().createHostPolicy(profile.command),
+            showForegroundProcessName = KetraTermIntellijSettings.getInstance().state.showForegroundProcessName,
         )
 
     private fun installCloseQueryListener(

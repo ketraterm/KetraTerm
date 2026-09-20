@@ -215,6 +215,8 @@ class TerminalWorkspaceConfigManager(
                 titleLocalPermission = titleLocalPermission,
                 titleRemotePermission = titleRemotePermission,
                 scrollOnOutput = scrollOnOutput,
+                showForegroundProcessName =
+                    behavior["show_foreground_process_name"]?.toBooleanStrictOrNull() ?: default.showForegroundProcessName,
             )
         } catch (failure: IOException) {
             System.err.println("Using default configuration; could not read $configPath: ${failure.message}")
@@ -331,6 +333,7 @@ class TerminalWorkspaceConfigManager(
         $SUGGESTION_LEARNING_PERSISTENCE_KEY = ${config.persistentSuggestionLearningEnabled}
         # Automatically scroll to bottom when new process output arrives
         scroll_on_output = ${config.scrollOnOutput}
+        show_foreground_process_name = ${config.showForegroundProcessName}
 
         [security]
         # OSC 52 clipboard write permission for local sessions (allow, prompt, allowlist, deny)

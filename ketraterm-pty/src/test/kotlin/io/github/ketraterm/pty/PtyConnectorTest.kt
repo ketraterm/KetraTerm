@@ -25,6 +25,22 @@ import java.util.concurrent.TimeUnit
 
 class PtyConnectorTest {
     @Test
+    fun `foreground process metadata is unavailable after close including a close during lookup`() {
+        var reads = 0
+        lateinit var connector: PtyConnector
+        val process =
+            TestProcess(readForegroundName = {
+                if (++reads == 2) connector.close()
+                "vim"
+            })
+        connector = PtyConnector(process)
+        assertEquals("vim", connector.foregroundProcessName())
+        assertNull(connector.foregroundProcessName())
+        assertNull(connector.foregroundProcessName())
+        assertEquals(2, reads)
+    }
+
+    @Test
     fun `constructor and operations validate bounds`() {
         assertThrows(IllegalArgumentException::class.java) {
             PtyConnector(TestProcess(), readBufferSize = 0)
@@ -247,12 +263,15 @@ class PtyConnectorTest {
         private val exitCode: Int = 0,
         private val blockWaitFor: Boolean = false,
         private val waitForRelease: CountDownLatch? = null,
+        private val readForegroundName: () -> String? = { null },
     ) : PtyProcess {
         var destroyed: Boolean = false
             private set
         val sizes = mutableListOf<Pair<Int, Int>>()
 
         override fun isAlive(): Boolean = !destroyed
+
+        override fun foregroundProcessName(): String? = readForegroundName()
 
         override fun waitFor(): Int {
             if (blockWaitFor) {
