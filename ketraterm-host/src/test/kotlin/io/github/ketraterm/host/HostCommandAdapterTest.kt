@@ -1152,10 +1152,56 @@ class HostCommandAdapterTest {
         }
 
         @Test
+        fun `alternate screen cursor styling cannot replace the primary cursor presentation`() {
+            for (entry in listOf(47, 1047, 1049)) {
+                for (exit in listOf(47, 1047, 1049)) {
+                    for (style in 1..6) {
+                        val f = Fixture()
+                        f.acceptAscii("\u001B[$style q\u001B[?${entry}h\u001B[2 q\u001B[?12l")
+                        // Repeated entry must not overwrite the saved primary presentation.
+                        f.acceptAscii("\u001B[?${entry}h\u001B[?${exit}l\u001B[?${exit}l")
+                        f.acceptAscii("\u001BP\$qq\u001B\\")
+                        assertEquals("\u001BP1\$r$style q\u001B\\", f.drainResponses(), "entry=$entry exit=$exit style=$style")
+                        assertEquals(style % 2 == 1, f.terminal.getModeSnapshot().isCursorBlinking)
+                    }
+                }
+            }
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["\u001B[ q", "\u001B[0 q"])
+        fun `default cursor style restores configured shape and blinking across every split`(reset: String) {
+            for (shape in TerminalRenderCursorShape.entries) {
+                val bytes = reset.encodeToByteArray()
+                for (split in 0..bytes.size) {
+                    val f = Fixture()
+                    f.terminal.setDefaultCursorShape(shape)
+                    f.acceptAscii("text\u001B[2;4H\u001B[31m\u001B[?25l\u001B[4 q")
+                    f.parser.accept(bytes, 0, split)
+                    f.parser.accept(bytes, split, bytes.size - split)
+                    (f.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                        assertEquals(shape, frame.cursor.shape)
+                        assertTrue(frame.cursor.blinking)
+                        assertFalse(frame.cursor.visible)
+                    }
+                    assertEquals(3, f.terminal.cursorCol)
+                    assertEquals(1, f.terminal.cursorRow)
+                    assertEquals("text", f.terminal.getLineAsString(0))
+                    // Explicit style 1 remains blinking block regardless of the configured default.
+                    f.acceptAscii("\u001B[1 q")
+                    (f.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                        assertEquals(TerminalRenderCursorShape.BLOCK, frame.cursor.shape)
+                        assertTrue(frame.cursor.blinking)
+                    }
+                }
+            }
+        }
+
+        @Test
         fun `DECSCUSR cursor style parsed from bytes updates core cursor shape and blinking`() {
             val f = Fixture()
 
-            // 0 -> Blinking Block (default/omitted is 0)
+            // Omitted style restores the configured default, initially blinking block.
             f.acceptAscii("\u001B[ q")
             (f.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
                 assertAll(

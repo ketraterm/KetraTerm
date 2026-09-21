@@ -160,7 +160,7 @@ internal class DefaultTerminalBuffer private constructor(
             state.markGlobalAttributesChanged()
         }
         state.tabStops.resetToDefault()
-        state.cursorShape = state.defaultCursorShape
+        resetCursorStyle()
         state.palette = state.themePalette
         state.markStructureChanged()
         state.markCursorChanged()
@@ -183,7 +183,7 @@ internal class DefaultTerminalBuffer private constructor(
         state.altBuffer.cursor.pendingWrap = false
         resetSavedCursorToHome(state.primaryBuffer.savedCursor)
         resetSavedCursorToHome(state.altBuffer.savedCursor)
-        state.cursorShape = state.defaultCursorShape
+        resetCursorStyle()
         if (wasReverseVideo != state.modes.isReverseVideo) {
             state.markGlobalAttributesChanged()
         }

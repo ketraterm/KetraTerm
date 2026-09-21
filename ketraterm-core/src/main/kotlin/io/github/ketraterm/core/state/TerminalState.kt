@@ -69,6 +69,10 @@ internal class TerminalState(
 
     var defaultCursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
 
+    // Valid only while alternate is active; separate from the application's DECSC save slot.
+    private var primaryCursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
+    private var primaryCursorBlinking: Boolean = true
+
     var cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
         set(value) {
             if (field != value) {
@@ -126,10 +130,13 @@ internal class TerminalState(
      * `1049`. Non-clearing `47` entries reuse the alternate buffer's existing
      * content and cursor state.
      *
+     * Saves primary cursor presentation independently of the DECSC slot.
      * No-op when already in the alternate screen.
      */
     fun enterAltScreen(clearBeforeEnter: Boolean) {
         if (isAltScreenActive) return
+        primaryCursorShape = cursorShape
+        primaryCursorBlinking = modes.isCursorBlinking
         activeBuffer.kittyKeyboardFlags = modes.kittyKeyboardFlags
         if (clearBeforeEnter) {
             altBuffer.clearGrid(pen.blankAttr, pen.blankExtendedAttr, dimensions.height)
@@ -146,17 +153,19 @@ internal class TerminalState(
     }
 
     /**
-     * Returns to the primary screen (`CSI ? 1049 l`).
+     * Returns to the primary screen and restores its cursor shape and blink flag.
      *
-     * Callers must invoke `CursorEngine.restoreCursor()` after this call (DECRC).
-     * Alternate content becomes invisible after the switch and will be discarded
-     * on the next alternate entry or resize.
+     * The `1049` caller also restores its DECSC slot after switching; `47` and
+     * `1047` leave cursor position alone. Alternate content remains available to
+     * non-clearing entries until a clearing entry or resize discards it.
      */
     fun exitAltScreen() {
         if (!isAltScreenActive) return
         activeBuffer.kittyKeyboardFlags = modes.kittyKeyboardFlags
         activeBuffer = primaryBuffer
         modes.kittyKeyboardFlags = activeBuffer.kittyKeyboardFlags
+        cursorShape = primaryCursorShape
+        modes.isCursorBlinking = primaryCursorBlinking
     }
 
     // Transparent engine accessors.

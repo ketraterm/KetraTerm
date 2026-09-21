@@ -204,7 +204,8 @@ class HostCommandAdapter(
 
     override fun setCursorStyle(style: Int) {
         when (style) {
-            0, 1 -> {
+            0 -> terminal.resetCursorStyle()
+            1 -> {
                 terminal.setCursorBlinking(true)
                 terminal.setCursorShape(TerminalRenderCursorShape.BLOCK)
             }

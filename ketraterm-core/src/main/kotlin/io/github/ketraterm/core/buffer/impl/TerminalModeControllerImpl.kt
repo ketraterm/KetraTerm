@@ -148,6 +148,11 @@ internal class TerminalModeControllerImpl(
         }
     }
 
+    override fun resetCursorStyle() {
+        setCursorShape(state.defaultCursorShape)
+        setCursorBlinking(true)
+    }
+
     override fun setTreatAmbiguousAsWide(enabled: Boolean) {
         mutateMode { state.modes.treatAmbiguousAsWide = enabled }
     }

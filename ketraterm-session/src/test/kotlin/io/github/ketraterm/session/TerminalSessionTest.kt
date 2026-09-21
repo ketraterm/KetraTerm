@@ -48,6 +48,45 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @Test
+    fun `published cursor presentation follows application style and restores host defaults`() =
+        runTest {
+            val connector = MockConnector()
+            TerminalSession
+                .create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                ).use { session ->
+                    session.setCursorShape(TerminalRenderCursorShape.BAR)
+                    session.start(10, 3)
+                    connector.feedFromHost("\u001B[?1049h\u001B[2 q".ascii())
+                    session.requestRender(0)
+                    runCurrent()
+                    val alternate = requireNotNull(session.renderPublisher.current())
+                    assertEquals(TerminalRenderCursorShape.BLOCK, alternate.cursorShape)
+                    assertFalse(alternate.cursorBlinking)
+                    val generation = session.renderGeneration.value
+
+                    connector.feedFromHost("\u001B[?1049l".ascii())
+                    session.requestRender(0)
+                    advanceTimeBy(TerminalSession.RENDER_PUBLICATION_INTERVAL_MS.milliseconds)
+                    runCurrent()
+                    val primary = requireNotNull(session.renderPublisher.current())
+                    assertTrue(session.renderGeneration.value > generation)
+                    assertEquals(TerminalRenderCursorShape.BAR, primary.cursorShape)
+                    assertTrue(primary.cursorBlinking)
+
+                    connector.feedFromHost("\u001B[2 q\u001B[0 q".ascii())
+                    session.requestRender(0)
+                    advanceTimeBy(TerminalSession.RENDER_PUBLICATION_INTERVAL_MS.milliseconds)
+                    runCurrent()
+                    val reset = requireNotNull(session.renderPublisher.current())
+                    assertEquals(TerminalRenderCursorShape.BAR, reset.cursorShape)
+                    assertTrue(reset.cursorBlinking)
+                }
+        }
+
+    @Test
     fun `accepted DECCOLM synchronizes connector and core before following output and queries`() {
         val stream = "old\u001B[?3hwide\u001B[18t\u001B[?3lnarrow\u001B[18t"
         for (split in 0..stream.length) {

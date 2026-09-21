@@ -18,6 +18,8 @@ package io.github.ketraterm.pty
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.render.api.TerminalRenderCursorShape
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
 import kotlinx.coroutines.flow.first
@@ -175,6 +177,28 @@ class PtyRealProcessTest {
         )
         releaseAndAwaitExit(session)
         assertEquals(0, session.exitCode)
+    }
+
+    @Test
+    fun `real PTY alternate screen teardown restores the shells blinking bar cursor`() {
+        // Neovim on Windows emits a steady block reset before leaving alternate.
+        val stream = "\u001B[5 q\u001B[?1049h\u001B[2 q\u001B[?25h\u001B[2 q\u001B[?1049l\u001B[?25h"
+        val session =
+            startReadySession(
+                outputScript =
+                    if (isWindows()) {
+                        "[Console]::Out.Write('${stream.replace("\u001B", "' + [char]27 + '")}')"
+                    } else {
+                        "printf '${stream.replace("\u001B", "\\033")}'"
+                    },
+                readBufferSize = 1,
+            )
+        (session.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+            assertEquals(TerminalRenderCursorShape.BAR, frame.cursor.shape)
+            assertTrue(frame.cursor.blinking)
+            assertTrue(frame.cursor.visible)
+        }
+        releaseAndAwaitExit(session)
     }
 
     @Test
