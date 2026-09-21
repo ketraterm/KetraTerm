@@ -21,6 +21,28 @@ import kotlin.test.assertTrue
 
 class TerminalColorPaletteTest {
     @Test
+    fun contentComparisonIncludesEveryColorAndPreference() {
+        val palette = TerminalColorPalette()
+        assertEquals(palette, palette.copy())
+        assertEquals(palette.hashCode(), palette.copy().hashCode())
+        val colors = palette.toIndexedColorsArray().apply { this[255] = 123 }
+        for (different in listOf(
+            palette.copy(defaultForeground = 123),
+            palette.copy(defaultBackground = 123),
+            palette.copy(selectionForeground = 123),
+            palette.copy(selectionBackground = 123),
+            palette.copy(cursorForeground = 123),
+            palette.copy(cursorBackground = 123),
+            palette.copy(boldAsBright = false),
+            palette.copy(isDark = false),
+            palette.copy(indexedColors = colors),
+        )) {
+            assertEquals(false, palette == different)
+            assertEquals(false, different == palette)
+        }
+    }
+
+    @Test
     fun retainsHostSchemeWhenColorsChange() {
         assertTrue(TerminalColorPalette().isDark)
         val light = TerminalColorPalette(isDark = false)

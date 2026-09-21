@@ -28,6 +28,37 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalModeControllerImplTest {
+    @Test
+    fun `unchanged and unsupported palette controls preserve palette and render generation`() {
+        val terminal = DefaultTerminalBuffer(4, 3)
+        val initial = terminal.palette
+        var generation = 0L
+        terminal.readRenderFrame { generation = it.lineGeneration(0) }
+        terminal.setPaletteColor(1, initial.indexedColor(1))
+        terminal.setPaletteColor(-1, 0)
+        terminal.setPaletteColor(256, 0)
+        terminal.setDynamicColor(10, initial.defaultForeground)
+        terminal.setDynamicColor(11, initial.defaultBackground)
+        terminal.setDynamicColor(12, initial.cursorBackground)
+        terminal.setDynamicColor(13, 0)
+        terminal.setThemePalette(initial.copy())
+        assertSame(initial, terminal.palette)
+        terminal.readRenderFrame { assertEquals(generation, it.lineGeneration(0)) }
+    }
+
+    @Test
+    fun `equal active host theme still replaces the reset baseline`() {
+        val terminal = DefaultTerminalBuffer(4, 3)
+        terminal.setPaletteColor(1, 0xff123456.toInt())
+        val active = terminal.palette
+        terminal.setThemePalette(active.copy())
+        assertSame(active, terminal.palette)
+        terminal.setPaletteColor(1, 0xffabcdef.toInt())
+        terminal.reset()
+        assertEquals(active, terminal.palette)
+        assertEquals(0xff123456.toInt(), terminal.palette.indexedColor(1))
+    }
+
     private fun assertCancelsPendingWrap(
         state: TerminalState,
         assertion: () -> Unit,

@@ -20,6 +20,7 @@ import io.github.ketraterm.host.*
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
+import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
@@ -28,6 +29,108 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class SessionHostEventBridgeTest {
+    @Test
+    fun `metadata listener failures are isolated per event while parsing continues`() {
+        val delivered = mutableListOf<String>()
+        val failures = mutableListOf<String?>()
+        val listener =
+            object : PtyEventListener by PtyEventListener.NONE {
+                override fun paletteChanged(
+                    session: TerminalSession,
+                    palette: TerminalColorPalette,
+                ) {
+                    delivered += "palette"
+                    assertEquals(palette, session.palette)
+                    error("palette")
+                }
+
+                override fun hyperlinkRegistered(
+                    session: TerminalSession,
+                    hyperlinkId: Int,
+                    uri: String,
+                    id: String?,
+                ) {
+                    delivered += "registered:$hyperlinkId"
+                    assertEquals(uri, session.hyperlinkUri(hyperlinkId))
+                    error("registered")
+                }
+
+                override fun hyperlinkRemoved(
+                    session: TerminalSession,
+                    hyperlinkId: Int,
+                ) {
+                    delivered += "removed:$hyperlinkId"
+                    assertEquals(null, session.hyperlinkUri(hyperlinkId))
+                    error("removed")
+                }
+
+                override fun hyperlinksCleared(session: TerminalSession) {
+                    delivered += "cleared"
+                    assertEquals(null, session.hyperlinkUri(2))
+                    error("cleared")
+                }
+
+                override fun showNotification(
+                    session: TerminalSession,
+                    title: String,
+                    body: String,
+                    level: NotificationLevel,
+                ) {
+                    delivered += "notification:$body"
+                    error("notification")
+                }
+
+                override fun listenerFailed(
+                    session: TerminalSession,
+                    exception: Exception,
+                ) {
+                    failures += exception.message
+                }
+            }
+        val bridge = SessionHostEventBridge(listener)
+        TerminalSession
+            .create(
+                TerminalBuffers.create(10, 3),
+                NoopConnector,
+                bridge,
+                HostPolicy(maxHyperlinkEntries = 1),
+            ).use { session ->
+                bridge.attach(session)
+                val bytes =
+                    (
+                        "\u001B]4;1;#123456\u0007\u001B]8;;https://a\u0007" +
+                            "\u001B]8;;https://b\u0007\u001B]9;hello\u0007\u001B]9;hello\u0007\u001Bc"
+                    ).encodeToByteArray()
+                session.onBytes(bytes, 0, bytes.size)
+                assertEquals(
+                    listOf(
+                        "palette",
+                        "registered:1",
+                        "removed:1",
+                        "registered:2",
+                        "notification:hello",
+                        "notification:hello",
+                        "cleared",
+                        "palette",
+                    ),
+                    delivered,
+                )
+                assertEquals(
+                    listOf(
+                        "palette",
+                        "registered",
+                        "removed",
+                        "registered",
+                        "notification",
+                        "notification",
+                        "cleared",
+                        "palette",
+                    ),
+                    failures,
+                )
+            }
+    }
+
     @Test
     fun `column mode acceptance is explicit and listener failures reject the request`() {
         val session = testSession()

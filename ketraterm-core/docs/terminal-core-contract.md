@@ -52,6 +52,15 @@ need instead of the full facade.
 
 ### Render frame generations
 
+`TerminalReader.palette` exposes the current immutable effective palette without
+allocating or acquiring a render frame. Callers serialize reads with mutation;
+retained values remain safe after releasing synchronization. Unchanged indexed
+or dynamic color writes and unsupported targets preserve palette identity and
+row generations. A host theme update always replaces the reset baseline, even
+when its values match the effective palette; only an effective change invalidates
+visible rows. Palette equality includes all colors and presentation preferences,
+including the host's dark/light classification, without copying storage.
+
 Render frames distinguish stored content from its global presentation:
 
 - `contentGeneration` advances for retained cell or row-mapping changes. A

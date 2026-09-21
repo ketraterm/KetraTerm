@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.core.api
 
+import io.github.ketraterm.render.api.TerminalColorPalette
+
 /**
  * Zero-allocation read contract for the terminal buffer.
  *
@@ -23,6 +25,14 @@ package io.github.ketraterm.core.api
  * sentinel values so renderers can remain branch-light.
  */
 interface TerminalReader {
+    /**
+     * Current immutable effective palette, including application color overrides.
+     * Reading retains the existing object without allocating or reading a render
+     * frame. Synchronize with terminal mutations before reading; a retained palette
+     * remains safe to use after releasing that synchronization.
+     */
+    val palette: TerminalColorPalette
+
     /** Current viewport width in cells. */
     val width: Int
 

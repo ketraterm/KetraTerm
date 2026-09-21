@@ -31,7 +31,6 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 
 ### Tier 3: Optional (Graphics & advanced features)
 - Sixel or modern graphics protocols (e.g. Kitty graphics protocol).
-- Richer hyperlink, title, palette, and notification host callbacks.
 
 ---
 
@@ -93,9 +92,6 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ## Core Gaps
 
-### Reset and Mode Semantics
-- `TODO(core/host)`: richer event API for hyperlink metadata, palette changes, terminal notifications, and any future host-observable state that should not be read from render frames.
-
 ### Grid Operations
 - DONE(core): deterministic randomized left/right-margin properties cover ICH/DCH, selective erase, IL/DL, and partial-region scroll up/down. They model guard-column movement, preserve rows outside the scroll region, and verify protected wide spans plus wide/cluster storage invariants.
 - `DONE(core/host)`: alternate-screen byte-stream coverage verifies exact primary history retention and zero alternate history across every `47`/`1047`/`1049` entry/exit pairing, repeated commands and re-entry, screen-local `1048` saves, and ordered private-mode lists. `ED2`, repeated `ED3`, and repeated `DECSTR` tests verify active-buffer clearing or text preservation, including combining/wide text and saved-cursor behavior. `DECCOLM` tests cover both 80/132-column directions and current-width requests, preserving primary history while alternate is active and clearing primary history when primary is active.
@@ -109,7 +105,6 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(core/host/policy)`: terminal-to-host response channel exists for DA, DSR/CPR, safe window reports, palette queries, `DECRQSS`, and allowlisted `XTGETTCAP`; host policy can deny terminal responses before they enqueue bytes.
 - `DONE(core/host/policy)`: light/dark color-scheme query (`CSI ?996n`) returns `CSI ?997;1n` (dark) or `CSI ?997;2n` (light) from the active host theme palette under terminal-response policy. Standalone and IDE theme updates use the existing synchronized palette publication path; application color overrides do not affect the reply. Denied requests stay silent because this protocol has no failure response. The implemented slice is the one-shot query, without mode 2031 unsolicited notifications.
 - `TODO(core/parser/host/policy)`: OSC query responses and future query/response protocols need explicit response shape, allowlist, and host policy before implementation.
-- `TODO(core/host)`: event API for hyperlinks, palette updates, and terminal notifications if these move out of host or render-frame metadata.
 
 ---
 
@@ -117,7 +112,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 - `DONE(host/policy)`: host-adapter allow/deny policy surface for title updates, OSC 8 hyperlinks, OSC 7 current-working-directory reports, desktop notifications, window manipulation requests, palette controls, terminal response channels, and OSC 52 clipboard request auditing.
 - `DONE(host)`: DECCOLM requires policy permission and explicit host acceptance before changing core state. Session synchronizes accepted 80/132-column changes with the connector before following output. IntelliJ ignores requests; standalone uses its existing resize permission and rejects disruptive or unrepresentable layouts. Embedders default to rejection. Product behavior is described under [Column Toggles](terminal-feature-map.md#1-terminal-protocols--control-sequences).
-- `TODO(host)`: richer host callbacks for palette updates, terminal notifications, mouse-report policy, and future clipboard decisions when those product surfaces need UI or embedding feedback.
+- `DONE(core/host/session/pty/workspace)`: targeted metadata callbacks publish effective palette changes and OSC 8 registry registration, eviction, and clearing through the existing host/PTY/workspace boundaries. Existing notification callbacks preserve individual requests, including identical repetitions. Callbacks are synchronous, policy-filtered for application controls, and independent of render publication; they do not replay initial state. Workspace forwarding applies to attached tabs. Active OSC 8 writing-attribute observation and application-facing color-scheme notifications are outside this slice. See [Targeted Host Metadata Events](terminal-feature-map.md#targeted-host-metadata-events) for delivery and reset semantics.
+- `TODO(host)`: host callbacks for mouse-report policy when product surfaces need UI or embedding feedback.
 
 ---
 

@@ -224,8 +224,9 @@ class TerminalColorPalette(
             selectionBackground == other.selectionBackground &&
             cursorForeground == other.cursorForeground &&
             cursorBackground == other.cursorBackground &&
-            indexedColorStorage.contentEquals(other.indexedColorStorage) &&
-            boldAsBright == other.boldAsBright
+            boldAsBright == other.boldAsBright &&
+            isDark == other.isDark &&
+            indexedColorStorage.contentEquals(other.indexedColorStorage)
     }
 
     override fun hashCode(): Int {
@@ -237,6 +238,7 @@ class TerminalColorPalette(
         result = 31 * result + cursorBackground
         result = 31 * result + indexedColorStorage.contentHashCode()
         result = 31 * result + boldAsBright.hashCode()
+        result = 31 * result + isDark.hashCode()
         return result
     }
 
@@ -249,7 +251,8 @@ class TerminalColorPalette(
             "cursorForeground=$cursorForeground, " +
             "cursorBackground=$cursorBackground, " +
             "indexedColors=${indexedColorStorage.contentToString()}, " +
-            "boldAsBright=$boldAsBright" +
+            "boldAsBright=$boldAsBright, " +
+            "isDark=$isDark" +
             ")"
 
     companion object {

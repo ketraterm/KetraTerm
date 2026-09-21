@@ -205,6 +205,7 @@ internal class TerminalModeControllerImpl(
     override fun setThemePalette(palette: TerminalColorPalette) {
         mutateMode {
             state.themePalette = palette
+            if (state.palette == palette) return
             state.palette = palette
             state.markVisibleLinesChanged()
         }
@@ -214,7 +215,7 @@ internal class TerminalModeControllerImpl(
         index: Int,
         color: Int,
     ) {
-        if (index !in 0..255) return
+        if (index !in 0..255 || state.palette.indexedColor(index) == color) return
         mutateMode {
             val newIndexed = state.palette.toIndexedColorsArray()
             newIndexed[index] = color
@@ -227,6 +228,14 @@ internal class TerminalModeControllerImpl(
         target: Int,
         color: Int,
     ) {
+        val current =
+            when (target) {
+                10 -> state.palette.defaultForeground
+                11 -> state.palette.defaultBackground
+                12 -> state.palette.cursorBackground
+                else -> return
+            }
+        if (current == color) return
         mutateMode {
             state.palette =
                 when (target) {
