@@ -30,6 +30,8 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 - **Cursor Settings**:
   - Blinking and visibility controls (`?25`).
   - Cursor shape styling (`DECSCUSR` / `CSI Ps SP q`) supporting Blinking Block (`1`), Steady Block (`2`), Blinking Underline (`3`), Steady Underline (`4`), Blinking Bar (`5`), and Steady Bar (`6`).
+  - Omitted/zero `DECSCUSR` restores the host-configured default shape and enables the terminal blink flag, following [modern default-style semantics](https://ghostty.org/docs/vt/csi/decscusr). Host blink settings still control animation. Explicit `1` always selects blinking block.
+  - Actual alternate-screen entry snapshots the primary cursor shape and blink flag; every `47`/`1047`/`1049` exit pairing restores them. Repeated entry/exit commands do not overwrite that snapshot. Presentation restoration is independent of DEC/SCO cursor save slots; an alternate-screen soft reset does not replace the saved primary presentation.
 - **Resets**: Hard Reset (`RIS` / `ESC c`) and Soft Reset (`DECSTR` / `CSI ! p`). Alternate-screen byte-stream tests verify that repeated soft resets preserve both buffers' text and primary history while resetting saved-cursor slots; display erase (`ED2`) and history erase (`ED3`) affect only the active buffer with their respective viewport-clearing and viewport-preserving behavior.
 - **Synchronized Output Mode**: Supports rendering synchronization (private mode `2026`). When enabled, terminal output updates are buffered in `TerminalSession` and flushed only when disabled or when the synchronization timeout (default 250ms) expires, preventing visual flickering during heavy stdout.
 - **DEC Alignment Test**: Renders DEC alignment test character grid (`DECALN` / `ESC # 8`).

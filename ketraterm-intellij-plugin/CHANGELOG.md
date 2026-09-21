@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Fixed cursor shape and blinking not returning after leaving full-screen terminal apps such as Neovim.
 - Tabs can now show the running application's name when it does not supply a title. Custom names keep priority, and automatic process titles can be turned off in settings.
 - Improved cursor positioning compatibility with terminal apps that save and restore the cursor.
 - Fixed cursor and scroll-position jumps when resizing terminal panels with a full history.

@@ -193,6 +193,14 @@ interface TerminalModeController {
     fun setDefaultCursorShape(shape: io.github.ketraterm.render.api.TerminalRenderCursorShape)
 
     /**
+     * Restores the configured default shape and enables cursor blinking.
+     *
+     * Cursor visibility, position, saved state, and screen contents are preserved.
+     * Hosts still control whether a blink timer runs through their presentation settings.
+     */
+    fun resetCursorStyle()
+
+    /**
      * Controls how East Asian Ambiguous codepoints are measured for future writes.
      *
      * Existing stored content is not reinterpreted when this flag changes.

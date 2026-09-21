@@ -198,6 +198,9 @@ Guaranteed behavior:
   input, reporting, presentation, palette, and other non-cursor modes preserve it
 - public mode reads are immutable snapshots
 - input/UI code cannot mutate internal mode storage directly
+- `resetCursorStyle()` restores the configured default shape and enables the
+  cursor blink flag without changing visibility, position, or pending wrap;
+  hosts retain control of blink animation through their presentation settings
 
 ## Reader contract
 
@@ -232,6 +235,10 @@ Not guaranteed:
 - `1049` combines cursor save/restore with a clearing alternate-buffer switch
 - leaving alternate screen returns to primary as it was left unless the selected
   variant explicitly restores the saved cursor
+- actual alternate-screen entry saves the primary cursor shape and blink flag;
+  exit restores them independently of cursor save slots. Repeated entry/exit
+  commands preserve that snapshot, as do resize and soft reset while alternate
+  is active. Hard reset restores the configured default presentation
 - resize reflows primary and wipes alt
 
 ### Resize

@@ -23,6 +23,7 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 
 ### Tier 1: Required (Gaps in core modern features)
 - *No outstanding CSI cursor, SGR color, alternate screen, or basic input gaps.*
+- `DONE(core/host)`: default cursor-style resets restore the configured shape and enable blinking; alternate-screen exit restores the primary shape and blink flag. Coverage includes all screen-switch pairings, repeated commands, split reset sequences, resize/reset interactions, render publication, and a real PTY teardown fixture matching Neovim's steady-block exit sequence. See [Cursor Settings](terminal-feature-map.md#1-terminal-protocols--control-sequences) for the supported semantics.
 
 ### Tier 2: Useful (Under consideration / partial gaps)
 - *The existing safe query-response baseline, DECRQSS/XTGETTCAP, push/pop title stack, and host-adapter allow/deny policy surface are implemented and verified. Additional query protocols are tracked below.*

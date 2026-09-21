@@ -123,6 +123,66 @@ class TerminalModeControllerImplTest {
     }
 
     @Test
+    fun `cursor style reset publishes blink-only changes and preserves visibility and position`() {
+        val state = TerminalState(4, 3, 2)
+        val controller = TerminalModeControllerImpl(state, CursorEngine(state))
+        controller.setDefaultCursorShape(TerminalRenderCursorShape.BAR)
+        controller.setCursorShape(TerminalRenderCursorShape.BAR)
+        controller.setCursorBlinking(false)
+        controller.setCursorVisible(false)
+        state.cursor.col = 2
+        state.cursor.row = 1
+        state.cursor.pendingWrap = true
+        val generation = state.cursorGeneration
+
+        controller.resetCursorStyle()
+
+        assertEquals(TerminalRenderCursorShape.BAR, state.cursorShape)
+        assertTrue(state.modes.isCursorBlinking)
+        assertTrue(state.cursorGeneration > generation)
+        assertFalse(state.modes.isCursorVisible)
+        assertEquals(2, state.cursor.col)
+        assertEquals(1, state.cursor.row)
+        assertTrue(state.cursor.pendingWrap)
+        val resetGeneration = state.cursorGeneration
+        controller.resetCursorStyle()
+        assertEquals(resetGeneration, state.cursorGeneration)
+    }
+
+    @Test
+    fun `alternate resize and soft reset preserve primary presentation while hard reset clears it`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 3)
+        buffer.setDefaultCursorShape(TerminalRenderCursorShape.BAR)
+        buffer.setCursorShape(TerminalRenderCursorShape.UNDERLINE)
+        buffer.setCursorBlinking(false)
+        buffer.enterAltBuffer()
+        buffer.setCursorShape(TerminalRenderCursorShape.BLOCK)
+        buffer.resize(6, 4)
+        buffer.softReset()
+        buffer.exitAltBuffer()
+        buffer.readRenderFrame { frame ->
+            assertEquals(TerminalRenderCursorShape.UNDERLINE, frame.cursor.shape)
+            assertFalse(frame.cursor.blinking)
+        }
+
+        buffer.enterAltBuffer()
+        buffer.setCursorShape(TerminalRenderCursorShape.BLOCK)
+        buffer.reset()
+        buffer.readRenderFrame { frame ->
+            assertEquals(TerminalRenderCursorShape.BAR, frame.cursor.shape)
+            assertTrue(frame.cursor.blinking)
+        }
+        buffer.enterAltBuffer()
+        buffer.setCursorShape(TerminalRenderCursorShape.BLOCK)
+        buffer.setCursorBlinking(false)
+        buffer.exitAltBuffer()
+        buffer.readRenderFrame { frame ->
+            assertEquals(TerminalRenderCursorShape.BAR, frame.cursor.shape)
+            assertTrue(frame.cursor.blinking)
+        }
+    }
+
+    @Test
     fun `new fields round trip into shared state`() {
         val state = TerminalState(4, 3, 2)
         val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
