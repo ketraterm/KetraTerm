@@ -30,7 +30,7 @@ dependencies {
     implementation(project(":ketraterm-protocol"))
     api(project(":ketraterm-session"))
     implementation(project(":ketraterm-transport-api"))
-    implementation("org.jetbrains.pty4j:pty4j:0.13.12")
+    implementation("org.jetbrains.pty4j:pty4j:0.13.13")
     implementation("net.java.dev.jna:jna:5.14.0")
 
     testImplementation(kotlin("test"))
