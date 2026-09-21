@@ -203,7 +203,11 @@ class TerminalSession(
      * @param hyperlinkId cell hyperlink id; `0` means no hyperlink.
      * @return target URI, or `null` if none.
      */
-    fun hyperlinkUri(hyperlinkId: Int): String? = hyperlinkResolver.uriForHyperlinkId(hyperlinkId)
+    fun hyperlinkUri(hyperlinkId: Int): String? = synchronized(mutationLock) { hyperlinkResolver.uriForHyperlinkId(hyperlinkId) }
+
+    /** Current immutable effective palette, read under the session mutation lock. */
+    val palette: TerminalColorPalette
+        get() = synchronized(mutationLock) { terminal.palette }
 
     /**
      * Returns the latest valid OSC 7 current-working-directory URI.
@@ -335,7 +339,9 @@ class TerminalSession(
      */
     fun setThemePalette(palette: TerminalColorPalette) {
         synchronized(mutationLock) {
-            terminal.setThemePalette(palette)
+            if (isSessionClosed()) return
+            val adapter = hostCommandAdapter
+            if (adapter != null) adapter.setThemePalette(palette) else terminal.setThemePalette(palette)
         }
         invalidateRender()
     }
@@ -469,6 +475,7 @@ class TerminalSession(
         if (isSessionClosed()) return
 
         synchronized(mutationLock) {
+            if (isSessionClosed()) return
             parser.accept(bytes, offset, length)
         }
 
@@ -1009,6 +1016,18 @@ private class SessionHostEventSink(
     private val state: TerminalShellIntegrationState,
     private val connector: TerminalConnector,
 ) : HostEventSink {
+    override fun paletteChanged(palette: TerminalColorPalette) = delegate.paletteChanged(palette)
+
+    override fun hyperlinkRegistered(
+        hyperlinkId: Int,
+        uri: String,
+        id: String?,
+    ) = delegate.hyperlinkRegistered(hyperlinkId, uri, id)
+
+    override fun hyperlinkRemoved(hyperlinkId: Int) = delegate.hyperlinkRemoved(hyperlinkId)
+
+    override fun hyperlinksCleared() = delegate.hyperlinksCleared()
+
     var startupMarkerObserver: ((ShellIntegrationMarker, Boolean) -> Unit)? = null
     private val commandTextExtractor = ShellIntegrationCommandTextExtractor()
     private var promptEndLineId = NO_LINE_ID

@@ -22,6 +22,7 @@ import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.protocol.*
 import io.github.ketraterm.protocol.keyboard.*
+import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import java.net.URI
 import java.net.URISyntaxException
@@ -36,7 +37,7 @@ import kotlin.collections.ArrayDeque
  * mode ids become concrete core API calls.
  *
  * @param terminal public core buffer API mutated by parser semantic commands.
- * @param hostEvents optional metadata callback sink for BEL and title changes.
+ * @param hostEvents optional sink for accepted host metadata and requests.
  * @param hostPolicy safety limits for host-owned metadata.
  * @param kittyKeyboardSupportedFlags progressive Kitty keyboard flags the
  * active input host can provide truthfully. The value must be a subset of the
@@ -172,6 +173,8 @@ class HostCommandAdapter(
     }
 
     override fun resetTerminal() {
+        val previousPalette = terminal.palette
+        val hadHyperlinks = hyperlinkIds.isNotEmpty()
         terminal.reset()
         resetPenMirror()
         activeHyperlinkUri = null
@@ -179,6 +182,8 @@ class HostCommandAdapter(
         activeHyperlinkNumericId = 0
         hyperlinkIds.clear()
         hyperlinkKeysByNumericId.clear()
+        if (hadHyperlinks) hostEvents.hyperlinksCleared()
+        publishPaletteChange(previousPalette)
     }
 
     override fun decaln() {
@@ -945,7 +950,9 @@ class HostCommandAdapter(
         color: Int,
     ) {
         if (!hostPolicy.palettePolicy.isAllowed) return
+        val previous = terminal.palette
         terminal.setPaletteColor(index, color)
+        publishPaletteChange(previous)
     }
 
     override fun queryPaletteColor(index: Int) {
@@ -958,7 +965,25 @@ class HostCommandAdapter(
         color: Int,
     ) {
         if (!hostPolicy.palettePolicy.isAllowed) return
+        val previous = terminal.palette
         terminal.setDynamicColor(target, color)
+        publishPaletteChange(previous)
+    }
+
+    /**
+     * Applies a host-selected theme and publishes an effective palette change.
+     * Unlike application OSC controls, this operation is not gated by host policy.
+     * The caller must serialize it with parser/core mutations.
+     */
+    fun setThemePalette(palette: TerminalColorPalette) {
+        val previous = terminal.palette
+        terminal.setThemePalette(palette)
+        publishPaletteChange(previous)
+    }
+
+    private fun publishPaletteChange(previous: TerminalColorPalette) {
+        val current = terminal.palette
+        if (previous != current) hostEvents.paletteChanged(current)
     }
 
     override fun queryDynamicColor(target: Int) {
@@ -1151,10 +1176,12 @@ class HostCommandAdapter(
         }
         if (numericId == NO_HYPERLINK_ID) return NO_HYPERLINK_ID
 
+        var evictedId = NO_HYPERLINK_ID
         if (hyperlinkIds.size >= hostPolicy.maxHyperlinkEntries) {
             val eldest = hyperlinkIds.entries.iterator()
             if (eldest.hasNext()) {
                 val entry = eldest.next()
+                evictedId = entry.value
                 hyperlinkKeysByNumericId.remove(entry.value)
                 eldest.remove()
             }
@@ -1163,6 +1190,8 @@ class HostCommandAdapter(
         hyperlinkIds[key] = numericId
         hyperlinkKeysByNumericId[numericId] = key
         nextHyperlinkNumericId = if (numericId == Int.MAX_VALUE) NO_HYPERLINK_ID else numericId + 1
+        if (evictedId != NO_HYPERLINK_ID) hostEvents.hyperlinkRemoved(evictedId)
+        hostEvents.hyperlinkRegistered(numericId, uri, id)
         return numericId
     }
 

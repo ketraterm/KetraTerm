@@ -302,6 +302,33 @@ class TerminalWorkspace internal constructor(
                 tabBySession(session)?.let { listener.showNotification(it, title, body, level) }
             }
 
+            override fun paletteChanged(
+                session: TerminalSession,
+                palette: TerminalColorPalette,
+            ) {
+                tabBySession(session)?.let { listener.paletteChanged(it, palette) }
+            }
+
+            override fun hyperlinkRegistered(
+                session: TerminalSession,
+                hyperlinkId: Int,
+                uri: String,
+                id: String?,
+            ) {
+                tabBySession(session)?.let { listener.hyperlinkRegistered(it, hyperlinkId, uri, id) }
+            }
+
+            override fun hyperlinkRemoved(
+                session: TerminalSession,
+                hyperlinkId: Int,
+            ) {
+                tabBySession(session)?.let { listener.hyperlinkRemoved(it, hyperlinkId) }
+            }
+
+            override fun hyperlinksCleared(session: TerminalSession) {
+                tabBySession(session)?.let { listener.hyperlinksCleared(it) }
+            }
+
             override fun terminalClipboardWrite(
                 session: TerminalSession,
                 event: TerminalClipboardWriteEvent,
@@ -588,6 +615,35 @@ class TerminalWorkspaceTab internal constructor(
  * Host-neutral workspace events.
  */
 interface TerminalWorkspaceListener {
+    /**
+     * Effective palette change for an attached tab. The immutable value may be
+     * retained. Metadata callbacks run synchronously under the session mutation
+     * lock: return promptly and schedule UI work without waiting or reentering
+     * terminal mutation. There is no initial replay; read the session's palette
+     * for current state. Events before tab attachment or after removal are ignored.
+     */
+    fun paletteChanged(
+        tab: TerminalWorkspaceTab,
+        palette: TerminalColorPalette,
+    ) = Unit
+
+    /** New accepted OSC 8 registry entry for an attached tab; no browser action is implied. */
+    fun hyperlinkRegistered(
+        tab: TerminalWorkspaceTab,
+        hyperlinkId: Int,
+        uri: String,
+        id: String?,
+    ) = Unit
+
+    /** An evicted OSC 8 identity is no longer resolvable in this tab's session. */
+    fun hyperlinkRemoved(
+        tab: TerminalWorkspaceTab,
+        hyperlinkId: Int,
+    ) = Unit
+
+    /** Hard reset cleared this tab's nonempty OSC 8 registry. */
+    fun hyperlinksCleared(tab: TerminalWorkspaceTab) = Unit
+
     /** The user typed before shell readiness, so the configured startup command was not submitted. */
     fun startupCommandCancelled(tab: TerminalWorkspaceTab) = Unit
 

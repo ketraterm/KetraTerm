@@ -20,6 +20,7 @@ import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.session.TerminalSession
 
 internal class SessionHostEventBridge(
@@ -36,6 +37,26 @@ internal class SessionHostEventBridge(
 
     override fun bell() {
         safeDispatch { session -> listener.bell(session) }
+    }
+
+    override fun paletteChanged(palette: TerminalColorPalette) {
+        safeDispatch { session -> listener.paletteChanged(session, palette) }
+    }
+
+    override fun hyperlinkRegistered(
+        hyperlinkId: Int,
+        uri: String,
+        id: String?,
+    ) {
+        safeDispatch { session -> listener.hyperlinkRegistered(session, hyperlinkId, uri, id) }
+    }
+
+    override fun hyperlinkRemoved(hyperlinkId: Int) {
+        safeDispatch { session -> listener.hyperlinkRemoved(session, hyperlinkId) }
+    }
+
+    override fun hyperlinksCleared() {
+        safeDispatch { session -> listener.hyperlinksCleared(session) }
     }
 
     override fun iconTitleChanged(title: String) {

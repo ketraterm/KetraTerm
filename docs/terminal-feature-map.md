@@ -59,7 +59,7 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 - **OSC 8 Hyperlinks**: Inline hyperlink parsing (`OSC 8 ; id ; url ESC \`) with interactive Ctrl-click navigation and a bounded, double-indexed LRU eviction registry in the host. Numeric IDs are never reassigned during the host adapter's lifetime: reset and eviction invalidate old links, and ID exhaustion leaves new links unresolved without retargeting retained cells or UI references.
 - **OSC 7 Current Working Directory**: Absolute `file://` directory URIs are parsed from bounded OSC payloads, validated and length-limited by host policy, retained as thread-safe session and per-tab workspace metadata, forwarded through PTY/workspace callbacks, and snapshotted onto bounded OSC 133 command records. Workspace launch profiles emit percent-encoded OSC 7 reports before each prompt for supported interactive PowerShell/PowerShell Core, Bash/Git Bash, zsh, and fish shells. The standalone app uses a sanitized directory-name tab-title fallback and offers **Open Terminal Here** for existing local directories; remote-authority reports remain observable metadata and are not treated as local paths. Invalid, duplicate, or oversized reports do not create redundant workspace changes.
 - **OSC 133 Shell Integration Markers**: FinalTerm/iTerm-compatible shell lifecycle marker events (`OSC 133 ; A/B/C/D ST`) are parsed and forwarded through host, PTY, and workspace event boundaries. Core exposes stable primitive render-line identities that move with content through scroll, clear-history, and resize reflow; session-owned shell integration state stores a bounded primitive command timeline keyed by those identities and projects prompt starts, failed-command output, command boundaries, stable command record ids, and primitive lifecycle states into caller-owned viewport arrays. Prompt spans whose `A` marker precedes leading blank layout rows, including the default Git Bash prompt, anchor their gutter decoration to the first proven rendered prompt row at `B`; unavailable or empty spans preserve the protocol anchor instead of guessing. Records expose event-driven command, working-directory, exit-status, and start/finish timestamp snapshots without adding objects to viewport projection. Swing paints compact prompt dots and failed-output rails without changing row pitch, supports prompt-marker click selection of the prompt/input-and-output command block, previous/next command navigation, command hit-testing, and exact retained-output copy/export with soft-wrap reconstruction. Session metadata reconstructs bounded single-line and multiline command text between prompt-end and command-start markers, including retained scrollback rows and grapheme clusters; ambiguous, unavailable, or oversized text remains unknown instead of being guessed. The standalone host offers opt-in, versioned, atomic, bounded command-metadata persistence on a background worker (fully detailed in [Persistent Terminal Storage Layout](persistent-terminal-storage.md)), equipped with built-in security filters that prevent raw commands containing secrets, tokens, or credentials, or commands with leading whitespace, from being written to disk; raw terminal output is never persisted automatically. Workspace launch profiles inject idempotent startup hooks for supported interactive PowerShell/PowerShell Core, Bash/Git Bash, zsh, fish, and explicitly selected Bash/zsh/fish shells under WSL/Ubuntu launchers. Unknown WSL default shells remain untouched to preserve launch semantics.
-- **OSC Palette Queries**: Dynamic color palette queries and updates (`OSC 4 / 10 / 11 / 12`), allowing applications to query standard palette colors or default foreground/background/cursor colors.
+- **OSC Palette Queries**: Dynamic color palette queries and updates (`OSC 4 / 10 / 11 / 12`), allowing applications to query standard palette colors or default foreground/background/cursor colors. Unchanged values preserve the existing palette and avoid copying its storage or invalidating rows.
 - **Desktop Notifications**:
   - **iTerm2 Style (`OSC 9`)**: Triggers a notification body payload (`OSC 9 ; message ST` or `BEL`).
   - **urxvt Style (`OSC 777`)**: Triggers a notification with separate title and body (`OSC 777 ; notify ; title ; body ST` or `BEL`).
@@ -70,6 +70,34 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   - **XTGETTCAP / XTSETTCAP**: Queries color capabilities (`Co`/`colors` returning `256`), terminal name (`TN`/`name` returning `xterm-256color`), and TrueColor support (`RGB`/`Tc` returning boolean success). Responses are strictly checked against a security allowlist and sourced from the shared terminal capability identity contract.
 
 ---
+
+### Targeted Host Metadata Events
+
+`HostEventSink`, `PtyEventListener`, and `TerminalWorkspaceListener` expose
+effective palette changes and OSC 8 registry registration, eviction, and clearing.
+Palette events retain the immutable core-owned palette and cover OSC 4/10/11/12,
+host theme replacement, and hard reset. Equal values, queries, unsupported targets,
+and denied application changes do not emit events. Core and session expose the
+current palette independently of render frames.
+
+Hyperlink registration carries the positive numeric identity, accepted URI, and
+optional application ID. Explicit-key reuse does not register again; anonymous
+opens retain their distinct identities. Eviction emits removal before replacement
+registration, and hard reset emits one clearing event for a nonempty registry.
+OSC 8 close and soft reset leave registered links resolvable. IDs are never reused;
+denied, oversized, or exhausted registrations create no metadata event. Session
+resolution is synchronized with registry mutation. Notifications remain individual
+policy-filtered requests; identical repetitions are delivered separately.
+
+Callbacks run synchronously in mutation order, under the session mutation lock
+when using `TerminalSession.create`, without initial replay or per-frame events.
+Hosts return promptly and schedule UI work on their own lifecycle without waiting
+for the UI or reentering mutation. Direct sink exceptions propagate; the PTY
+bridge reports and isolates listener exceptions. Workspace callbacks apply to
+attached tabs, excluding events before attachment and after removal. Session
+close rejects subsequent ingress and theme updates; an already-running mutation
+finishes before parser cleanup. Active OSC 8 writing-attribute callbacks and
+mode 2031 application-facing notifications are outside this slice.
 
 ## 4. Query-Response Channels
 

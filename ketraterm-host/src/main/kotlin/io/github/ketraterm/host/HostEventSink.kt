@@ -17,6 +17,7 @@ package io.github.ketraterm.host
 
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.render.api.TerminalColorPalette
 
 /**
  * Host-facing events emitted while parser commands are mapped to core state.
@@ -24,8 +25,43 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
  * Hosts receive metadata and decide whether host-side actions can be honored.
  * Grid mutation and terminal modes remain owned by core; session coordinates
  * transport changes and terminal-to-host byte responses.
+ *
+ * Callbacks are synchronous and ordered on the mutation caller's thread. A
+ * TerminalSession holds its mutation lock during delivery. Return promptly;
+ * do not mutate the session or wait for a UI thread. Schedule UI work using
+ * the product's lifecycle. Direct sinks propagate exceptions to the caller;
+ * the PTY convenience bridge isolates and reports listener failures.
+ * No initial state replay or per-frame delivery is performed.
  */
 interface HostEventSink {
+    /**
+     * Called after the effective palette changes through OSC, host theme update,
+     * or hard reset. [palette] is the immutable core-owned value and may be retained.
+     * Queries, denied/invalid operations, and equal values do not emit an event.
+     */
+    fun paletteChanged(palette: TerminalColorPalette) = Unit
+
+    /**
+     * Called after a new OSC 8 registry entry is accepted. [hyperlinkId] is a
+     * positive session-local numeric identity; [id] is the optional application ID.
+     * Reusing an existing entry emits nothing. No browser action is implied.
+     */
+    fun hyperlinkRegistered(
+        hyperlinkId: Int,
+        uri: String,
+        id: String?,
+    ) = Unit
+
+    /**
+     * Called after LRU eviction makes [hyperlinkId] unresolvable. Registration of
+     * its replacement follows this event. Numeric IDs are never reassigned.
+     * Closing OSC 8 or soft reset does not remove existing registry entries.
+     */
+    fun hyperlinkRemoved(hyperlinkId: Int) = Unit
+
+    /** Called after hard reset clears a nonempty registry, instead of per-ID removals. */
+    fun hyperlinksCleared() = Unit
+
     /**
      * Called when the parser emits BEL.
      */
