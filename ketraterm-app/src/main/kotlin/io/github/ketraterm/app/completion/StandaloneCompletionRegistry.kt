@@ -46,6 +46,7 @@ internal class StandaloneCompletionRegistry private constructor(
     private val learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
     onPersistenceLoadFailure: (Throwable) -> Unit = {},
     internal val completionScope: CoroutineScope,
+    ioDispatcher: CoroutineDispatcher,
 ) {
     private val lifecycleLock = Any()
     private var closed = false
@@ -55,6 +56,7 @@ internal class StandaloneCompletionRegistry private constructor(
             coroutineScope = completionScope,
             persistencePath = persistencePath,
             persistenceEnabled = persistenceEnabled,
+            ioDispatcher = ioDispatcher,
             onPersistenceLoadFailure = onPersistenceLoadFailure,
         )
     private val engine =
@@ -194,9 +196,11 @@ internal class StandaloneCompletionRegistry private constructor(
             specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
             learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
             onPersistenceLoadFailure: (Throwable) -> Unit = {},
+            workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         ): StandaloneCompletionRegistry {
             val completionScope =
-                CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("standalone-completion"))
+                CoroutineScope(SupervisorJob() + workerDispatcher + CoroutineName("standalone-completion"))
             return try {
                 StandaloneCompletionRegistry(
                     persistencePath = persistencePath,
@@ -205,6 +209,7 @@ internal class StandaloneCompletionRegistry private constructor(
                     learningStore = learningStore,
                     onPersistenceLoadFailure = onPersistenceLoadFailure,
                     completionScope = completionScope,
+                    ioDispatcher = ioDispatcher,
                 )
             } catch (failure: Throwable) {
                 completionScope.cancel()

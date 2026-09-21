@@ -62,6 +62,7 @@ private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
  * @property renderPublisher the render publisher responsible for frame updates.
  * @property shellIntegrationState shared host-side prompt and command marker state.
  * @property workerDispatcher non-owned dispatcher used for session background work.
+ * @property ioDispatcher non-owned dispatcher used for blocking connector metadata queries.
  */
 class TerminalSession(
     val terminal: TerminalBuffer,
@@ -77,6 +78,7 @@ class TerminalSession(
     private val hostCommandAdapter: HostCommandAdapter? = null,
     private var inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
     private val workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : TerminalConnectorListener,
     TerminalInputEncoder,
     TerminalRenderFrameReader,
@@ -119,7 +121,7 @@ class TerminalSession(
      * their collection lifetime; this state flow does not complete on closure.
      */
     val foregroundProcessName: StateFlow<String?> by lazy {
-        ForegroundProcessTracker(sessionScope, connector::foregroundProcessName).name
+        ForegroundProcessTracker(sessionScope, connector::foregroundProcessName, ioDispatcher).name
     }
 
     /**
@@ -933,6 +935,7 @@ class TerminalSession(
          * @param workerDispatcher non-owned dispatcher used for render publication and timeouts.
          * @param startupCommand optional command submitted once after a complete OSC 133 prompt.
          * User input before readiness cancels submission; hosts must install supported shell hooks.
+         * @param ioDispatcher non-owned dispatcher used for blocking connector metadata queries.
          * @return standard production terminal session.
          */
         @JvmStatic
@@ -946,6 +949,7 @@ class TerminalSession(
             kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
             workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
             startupCommand: TerminalStartupCommand? = null,
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         ): TerminalSession {
             val outboundWriteLock = Any()
             val hostOutput = ConnectorTerminalHostOutput(connector, outboundWriteLock)
@@ -981,6 +985,7 @@ class TerminalSession(
                     hostCommandAdapter = sink,
                     inputPolicy = inputPolicy,
                     workerDispatcher = workerDispatcher,
+                    ioDispatcher = ioDispatcher,
                 )
             session.activeShellCommandLineProvider = recordingHostEvents::activeCommandLine
             val submission = startupCommand?.let(::StartupCommandSubmission)

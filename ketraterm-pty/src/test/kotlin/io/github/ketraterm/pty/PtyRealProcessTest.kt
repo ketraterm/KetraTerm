@@ -15,76 +15,64 @@
  */
 package io.github.ketraterm.pty
 
+import io.github.ketraterm.input.event.TerminalKey
+import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalSessionState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.*
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class PtyRealProcessTest {
+    private val sessions = mutableListOf<TerminalSession>()
+
+    @AfterEach
+    fun closeSessions() {
+        sessions.forEach(TerminalSession::close)
+    }
+
     @Test
     fun `real PTY detects a running executable and clears it after exit`() =
         runBlocking {
-            assumeNativePty()
-            val command =
-                if (isWindows()) {
-                    sleepCommand(3)
-                } else {
-                    // exec makes the foreground group leader unambiguous without shell job-control support.
-                    listOf("/bin/sh", "-c", "exec sleep 3")
+            val session = startReadySession()
+            val expected = if (isWindows()) "powershell.exe" else "sh"
+            val detected =
+                withTimeout(10.seconds) {
+                    session.foregroundProcessName.first { it.equals(expected, ignoreCase = true) }
                 }
-            TerminalSessions.localPty(PtyOptions(command = command, columns = 40, rows = 5)).use { session ->
-                val expected = if (isWindows()) "PING.EXE" else "sleep"
-                val detected =
-                    withTimeout(5_000.milliseconds) {
-                        session.foregroundProcessName.first { it.equals(expected, ignoreCase = true) }
-                    }
-                assertTrue(expected.equals(detected, ignoreCase = true))
-                waitUntil(timeoutMillis = 8_000) { session.isClosed }
-                assertNull(withTimeout(5_000.milliseconds) { session.foregroundProcessName.first { it == null } })
-            }
+            assertTrue(expected.equals(detected, ignoreCase = true))
+
+            session.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER))
+            withTimeout(10.seconds) { session.state.first { it is TerminalSessionState.Closed } }
+            assertNull(withTimeout(10.seconds) { session.foregroundProcessName.first { it == null } })
         }
 
     @Test
     fun `real PTY echo output reaches terminal core`() {
-        assumeNativePty()
-
         val session =
-            TerminalSessions.localPty(
-                PtyOptions(
-                    command = printCommand("hello"),
-                    workingDirectory = Path.of(System.getProperty("user.home")),
-                    columns = 40,
-                    rows = 5,
-                    maxHistory = 10,
-                ),
+            startReadySession(
+                outputScript = if (isWindows()) "[Console]::Out.Write('hello')" else "printf 'hello'",
             )
 
-        waitUntil { session.exitCode == 0 && session.terminal.getAllAsString().contains("hello") }
-
-        assertEquals(0, session.exitCode)
         assertTrue(session.terminal.getAllAsString().contains("hello"))
+        releaseAndAwaitExit(session)
+        assertEquals(0, session.exitCode)
     }
 
     @Test
     fun `real PTY resize mutates session without deadlock`() {
-        assumeNativePty()
-
-        val session =
-            TerminalSessions.localPty(
-                PtyOptions(
-                    command = sleepCommand(seconds = 2),
-                    columns = 40,
-                    rows = 5,
-                ),
-            )
+        val session = startReadySession()
 
         session.resize(columns = 100, rows = 30)
         session.close()
@@ -95,16 +83,7 @@ class PtyRealProcessTest {
 
     @Test
     fun `real PTY retains final geometry after rapid sequential resizes`() {
-        assumeNativePty()
-
-        val session =
-            TerminalSessions.localPty(
-                PtyOptions(
-                    command = sleepCommand(seconds = 2),
-                    columns = 40,
-                    rows = 5,
-                ),
-            )
+        val session = startReadySession()
 
         val sizes = listOf(80 to 24, 132 to 43, 17 to 9, 101 to 31)
         for ((columns, rows) in sizes) {
@@ -118,16 +97,7 @@ class PtyRealProcessTest {
 
     @Test
     fun `real PTY close requests local shutdown without fake exit code`() {
-        assumeNativePty()
-
-        val session =
-            TerminalSessions.localPty(
-                PtyOptions(
-                    command = sleepCommand(seconds = 5),
-                    columns = 40,
-                    rows = 5,
-                ),
-            )
+        val session = startReadySession()
 
         session.close()
 
@@ -136,83 +106,66 @@ class PtyRealProcessTest {
 
     @Test
     fun `real PTY process exit sets session exit code`() {
-        assumeNativePty()
+        val session = startReadySession(exitCode = 7)
 
-        val session =
-            TerminalSessions.localPty(
-                PtyOptions(
-                    command = exitCommand(7),
-                    columns = 40,
-                    rows = 5,
-                ),
-            )
-
-        waitUntil { session.exitCode == 7 }
+        releaseAndAwaitExit(session)
 
         assertEquals(7, session.exitCode)
     }
 
     @Test
     fun `real PTY large output does not lose bytes`() {
-        assumeNativePty()
-
         val expectedCount = 12_000
         val session =
-            TerminalSessions.localPty(
-                PtyOptions(
-                    command = repeatCommand('x', expectedCount),
-                    columns = 200,
-                    rows = 80,
-                    maxHistory = 200,
-                    readBufferSize = 257,
-                ),
+            startReadySession(
+                outputScript =
+                    if (isWindows()) {
+                        "[Console]::Out.Write(('x' * $expectedCount))"
+                    } else {
+                        "printf '%*s' $expectedCount '' | tr ' ' 'x'"
+                    },
+                columns = 200,
+                rows = 80,
+                readBufferSize = 257,
             )
 
-        waitUntil(timeoutMillis = 5000) {
-            session.exitCode == 0 &&
-                session.terminal.getAllAsString().count { it == 'x' } == expectedCount
-        }
-
         assertEquals(expectedCount, session.terminal.getAllAsString().count { it == 'x' })
+        releaseAndAwaitExit(session)
+        assertEquals(0, session.exitCode)
     }
 
     @Test
     fun `real PTY one byte reads preserve mixed line terminator output`() {
-        assumeNativePty()
-
         val session =
-            TerminalSessions.localPty(
-                PtyOptions(
-                    command = mixedLineEndingCommand(),
-                    columns = 40,
-                    rows = 5,
-                    maxHistory = 10,
-                    readBufferSize = 1,
-                ),
+            startReadySession(
+                outputScript =
+                    if (isWindows()) {
+                        "[Console]::Out.Write('A' + [char]13 + [char]10 + 'B' + [char]13 + 'C' + [char]10)"
+                    } else {
+                        "printf 'A\\r\\nB\\rC\\n'"
+                    },
+                readBufferSize = 1,
             )
 
-        waitUntil { session.exitCode == 0 && session.terminal.getAllAsString().contains("A\nB\nC") }
-
+        // CR returns to column zero: C overwrites B on the same row.
+        assertEquals("A", session.terminal.getLineAsString(0))
+        assertEquals("C", session.terminal.getLineAsString(1))
+        releaseAndAwaitExit(session)
         assertEquals(0, session.exitCode)
-        assertTrue(session.terminal.getAllAsString().contains("A\nB\nC"))
     }
 
     @Test
     fun `real PTY shell redraw and alternate screen restore primary terminal state`() {
-        assumeNativePty()
-
         val session =
-            TerminalSessions.localPty(
-                PtyOptions(
-                    command = shellRedrawAndAlternateScreenCommand(),
-                    columns = 40,
-                    rows = 5,
-                    maxHistory = 10,
-                    readBufferSize = 1,
-                ),
+            startReadySession(
+                outputScript =
+                    if (isWindows()) {
+                        "[Console]::Out.Write('prompt> old' + [char]13 + [char]27 + '[2Kprompt> done' + [char]13 + [char]10 + [char]27 + '[?1049hFULL' + [char]27 + '[?1049lafter' + [char]13 + [char]10)"
+                    } else {
+                        "printf 'prompt> old\\r\\033[2Kprompt> done\\r\\n\\033[?1049hFULL\\033[?1049lafter\\r\\n'"
+                    },
+                readBufferSize = 1,
             )
-
-        waitUntil { session.exitCode == 0 && session.terminal.getAllAsString().contains("after") }
 
         val primaryText = session.terminal.getAllAsString()
         assertAll(
@@ -220,90 +173,84 @@ class PtyRealProcessTest {
             { assertTrue(primaryText.contains("after")) },
             { assertFalse(primaryText.contains("FULL"), "alternate-screen content must not leak into primary") },
         )
+        releaseAndAwaitExit(session)
+        assertEquals(0, session.exitCode)
     }
 
     @Test
     fun `real PTY accepts bracketed paste while a shell advertises paste mode`() {
-        assumeNativePty()
-
         val session =
-            TerminalSessions.localPty(
-                PtyOptions(
-                    command = bracketedPasteShellCommand(),
-                    columns = 40,
-                    rows = 5,
-                    readBufferSize = 1,
-                ),
+            startReadySession(
+                outputScript =
+                    if (isWindows()) {
+                        "[Console]::Out.Write([char]27 + '[?2004h')"
+                    } else {
+                        "printf '\\033[?2004h'"
+                    },
+                readBufferSize = 1,
             )
 
-        waitUntil { session.terminal.getModeSnapshot().isBracketedPasteEnabled }
+        assertTrue(session.terminal.getModeSnapshot().isBracketedPasteEnabled)
         session.encodePaste(TerminalPasteEvent("first\nsecond"))
-
         assertTrue(session.terminal.getModeSnapshot().isBracketedPasteEnabled)
         session.close()
     }
 
-    private fun assumeNativePty() {
+    /**
+     * BEL acknowledges every preceding output byte; the child then waits for input.
+     * Readiness and exit are explicit events, so slow native startup cannot shorten
+     * the test's observation window. The timeout only detects a stuck fixture.
+     */
+    private fun startReadySession(
+        outputScript: String = "",
+        exitCode: Int = 0,
+        columns: Int = 40,
+        rows: Int = 5,
+        readBufferSize: Int = 8192,
+    ): TerminalSession {
         assumeTrue(
             System.getProperty("terminal.pty.host") == "true",
             "Set -Dterminal.pty.host=true to run native PTY host tests",
         )
+        val ready = CountDownLatch(1)
+        val listener =
+            object : PtyEventListener by PtyEventListener.NONE {
+                override fun bell(session: TerminalSession) {
+                    ready.countDown()
+                }
+            }
+        val prefix = if (outputScript.isEmpty()) "" else "$outputScript; "
+        val command =
+            if (isWindows()) {
+                // Keep a shell parent so the Windows detector exercises descendant selection.
+                listOf("cmd.exe", "/d", "/c") +
+                    powerShellCommand(
+                        "$prefix[Console]::Out.Write([char]7); [void][Console]::ReadLine(); exit $exitCode",
+                    )
+            } else {
+                listOf("/bin/sh", "-c", "${prefix}printf '\\007'; read -r release; exit $exitCode")
+            }
+        val session =
+            TerminalSessions.localPty(
+                PtyOptions(
+                    command = command,
+                    workingDirectory = Path.of(System.getProperty("user.home")),
+                    columns = columns,
+                    rows = rows,
+                    maxHistory = 200,
+                    readBufferSize = readBufferSize,
+                    eventListener = listener,
+                ),
+            )
+        sessions += session
+        assertTrue(ready.await(10, TimeUnit.SECONDS), "native child did not acknowledge its output")
+        return session
     }
 
-    private fun printCommand(text: String): List<String> =
-        if (isWindows()) {
-            listOf("cmd.exe", "/c", "echo $text")
-        } else {
-            listOf("/bin/sh", "-lc", "printf '$text\n'")
-        }
-
-    private fun sleepCommand(seconds: Int): List<String> =
-        if (isWindows()) {
-            listOf("cmd.exe", "/c", "ping -n ${seconds + 1} 127.0.0.1 > nul")
-        } else {
-            listOf("/bin/sh", "-lc", "sleep $seconds")
-        }
-
-    private fun exitCommand(code: Int): List<String> =
-        if (isWindows()) {
-            listOf("cmd.exe", "/c", "exit $code")
-        } else {
-            listOf("/bin/sh", "-lc", "exit $code")
-        }
-
-    private fun repeatCommand(
-        char: Char,
-        count: Int,
-    ): List<String> =
-        if (isWindows()) {
-            powerShellCommand("[Console]::Out.Write(('$char' * $count) + \"`n\")")
-        } else {
-            listOf("/bin/sh", "-lc", "printf '%*s\n' $count '' | tr ' ' '$char'")
-        }
-
-    private fun mixedLineEndingCommand(): List<String> =
-        if (isWindows()) {
-            powerShellCommand("[Console]::Out.Write(\"A`r`nB`rC`n\")")
-        } else {
-            listOf("/bin/sh", "-lc", "printf 'A\\r\\nB\\rC\\n'")
-        }
-
-    private fun shellRedrawAndAlternateScreenCommand(): List<String> =
-        if (isWindows()) {
-            powerShellCommand(
-                "[Console]::Out.Write('prompt> old' + [char]13 + [char]27 + '[2Kprompt> done' + [char]13 + [char]10 + [char]27 + '[?1049hFULL' + [char]27 + '[?1049lafter' + [char]13 + [char]10')",
-            )
-        } else {
-            listOf("/bin/sh", "-lc", "printf 'prompt> old\\r\\033[2Kprompt> done\\r\\n\\033[?1049hFULL\\033[?1049lafter\\r\\n'")
-        }
-
-    private fun bracketedPasteShellCommand(): List<String> =
-        if (isWindows()) {
-            powerShellCommand(
-                "[Console]::Out.Write([char]27 + '[?2004h'); Start-Sleep -Seconds 2",
-            )
-        } else {
-            listOf("/bin/sh", "-lc", "printf '\\033[?2004h'; sleep 2")
+    private fun releaseAndAwaitExit(session: TerminalSession) =
+        runBlocking {
+            session.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER))
+            withTimeout(10.seconds) { session.state.first { it is TerminalSessionState.Closed } }
         }
 
     // Preserve script quotes across ConPTY's Windows command-line construction.
@@ -316,16 +263,4 @@ class PtyRealProcessTest {
         )
 
     private fun isWindows(): Boolean = System.getProperty("os.name").lowercase().contains("windows")
-
-    private fun waitUntil(
-        timeoutMillis: Long = 3000,
-        condition: () -> Boolean,
-    ) {
-        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
-        while (System.nanoTime() < deadline) {
-            if (condition()) return
-            Thread.sleep(20)
-        }
-        assertTrue(condition(), "condition was not met within ${timeoutMillis}ms")
-    }
 }

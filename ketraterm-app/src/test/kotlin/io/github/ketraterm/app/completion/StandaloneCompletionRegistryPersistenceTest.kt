@@ -18,19 +18,25 @@ package io.github.ketraterm.app.completion
 import io.github.ketraterm.completion.api.TerminalCompletionLearningStore
 import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
-import kotlinx.coroutines.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.io.TempDir
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.*
-import kotlin.time.Duration.Companion.milliseconds
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class StandaloneCompletionRegistryPersistenceTest {
     @Test
     fun `disable preserves disk state and replacement runtime loads only saved learning`(
         @TempDir directory: Path,
-    ) = runBlocking {
+    ) = runTest {
         val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
         val seed = registry(TerminalCompletionLearningStore(), path, persistenceEnabled = true)
         seed.recordFinishedCommand("git status", true, null, null, 1L)
@@ -51,7 +57,7 @@ class StandaloneCompletionRegistryPersistenceTest {
     @Test
     fun `shutdown persists the final learned command`(
         @TempDir directory: Path,
-    ) = runBlocking {
+    ) = runTest {
         val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
         val learning = TerminalCompletionLearningStore()
         val registry = registry(learning, path, persistenceEnabled = true)
@@ -69,7 +75,7 @@ class StandaloneCompletionRegistryPersistenceTest {
     @Test
     fun `disabled persistence keeps learning in memory only`(
         @TempDir directory: Path,
-    ) = runBlocking {
+    ) = runTest {
         val path = directory.resolve(TerminalCompletionLearningCoordinator.currentFileName())
         val learning = TerminalCompletionLearningStore()
         val registry = registry(learning, path, persistenceEnabled = false)
@@ -91,7 +97,7 @@ class StandaloneCompletionRegistryPersistenceTest {
     @Test
     fun `failed final write still closes the registry and remains idempotent`(
         @TempDir directory: Path,
-    ) = runBlocking {
+    ) = runTest {
         val parent = directory.resolve("learning")
         val path = parent.resolve(TerminalCompletionLearningCoordinator.currentFileName())
         val seedLearning = TerminalCompletionLearningStore()
@@ -101,11 +107,8 @@ class StandaloneCompletionRegistryPersistenceTest {
 
         val learning = TerminalCompletionLearningStore()
         val registry = registry(learning, path, persistenceEnabled = true)
-        withTimeout(5_000L.milliseconds) {
-            while (learning.snapshot().replayCommands.none { it.commandLine == "git status" }) {
-                delay(10L.milliseconds)
-            }
-        }
+        runCurrent()
+        assertEquals(listOf("git status"), learning.snapshot().replayCommands.map { it.commandLine })
         Files.delete(path)
         Files.delete(parent)
         Files.writeString(parent, "blocks the persistence directory")
@@ -120,7 +123,7 @@ class StandaloneCompletionRegistryPersistenceTest {
         assertFalse(learning.snapshot().replayCommands.any { it.commandLine == "late command" })
     }
 
-    private fun registry(
+    private fun TestScope.registry(
         learning: TerminalCompletionLearningStore,
         path: Path,
         persistenceEnabled: Boolean,
@@ -130,9 +133,11 @@ class StandaloneCompletionRegistryPersistenceTest {
             persistenceEnabled = persistenceEnabled,
             specs = emptyList(),
             learningStore = learning,
+            workerDispatcher = StandardTestDispatcher(testScheduler),
+            ioDispatcher = StandardTestDispatcher(testScheduler),
         )
 
-    private suspend fun persistedSnapshot(path: Path): TerminalCompletionLearningSnapshot =
+    private suspend fun TestScope.persistedSnapshot(path: Path): TerminalCompletionLearningSnapshot =
         coroutineScope {
             val learning = TerminalCompletionLearningStore()
             val coordinator =
@@ -141,6 +146,7 @@ class StandaloneCompletionRegistryPersistenceTest {
                     coroutineScope = this,
                     persistencePath = path,
                     persistenceEnabled = true,
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
                     onPersistenceLoadFailure = {},
                 )
             coordinator.closeAndFlush()

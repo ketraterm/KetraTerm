@@ -39,6 +39,7 @@ dependencies {
     runtimeOnly("org.slf4j:slf4j-nop:2.0.19")
 
     testImplementation(kotlin("test"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion")
 }
 
 application {

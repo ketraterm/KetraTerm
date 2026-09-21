@@ -20,6 +20,11 @@ import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalSessionState
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
@@ -28,9 +33,16 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 class PtySessionTest {
+    private val sessions = mutableListOf<TerminalSession>()
+
+    @AfterEach
+    fun closeSessions() {
+        sessions.forEach(TerminalSession::close)
+    }
+
     @Test
     fun `default environment advertises the shared terminal capability identity`() {
         val environment = PtyOptions.defaultEnvironment()
@@ -42,7 +54,7 @@ class PtySessionTest {
     fun `pty stdout is parsed into terminal core through shared session`() {
         val process = FakePtyProcess(inputBytes = "hello\u001B[5n".ascii())
         val session =
-            PtySessions.start(
+            startSession(
                 options =
                     PtyOptions(
                         command = listOf("fake"),
@@ -53,7 +65,7 @@ class PtySessionTest {
                 processFactory = FixedProcessFactory(process),
             )
 
-        waitUntil { session.terminal.getLineAsString(0) == "hello" }
+        awaitClosed(session)
 
         assertEquals("hello", session.terminal.getLineAsString(0))
     }
@@ -62,12 +74,12 @@ class PtySessionTest {
     fun `parser core responses are written back to pty stdin`() {
         val process = FakePtyProcess(inputBytes = "\u001B[6n".ascii())
         val session =
-            PtySessions.start(
+            startSession(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
 
-        waitUntil { process.outputText() == "\u001B[1;1R" }
+        awaitClosed(session)
 
         assertEquals("\u001B[1;1R", process.outputText())
         assertEquals(0, session.terminal.pendingResponseBytes)
@@ -77,7 +89,7 @@ class PtySessionTest {
     fun `input events are encoded to pty stdin through session serialization point`() {
         val process = FakePtyProcess.running()
         val session =
-            PtySessions.start(
+            startSession(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
@@ -91,7 +103,7 @@ class PtySessionTest {
     fun `default pty input policy sends Return as CR even when newline mode is active`() {
         val process = FakePtyProcess.running()
         val session =
-            PtySessions.start(
+            startSession(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
@@ -106,7 +118,7 @@ class PtySessionTest {
     fun `default PTY paste canonicalizes unbracketed clipboard newlines to CR`() {
         val process = FakePtyProcess.running()
         val session =
-            PtySessions.start(
+            startSession(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
@@ -120,7 +132,7 @@ class PtySessionTest {
     fun `resize updates process and terminal dimensions`() {
         val process = FakePtyProcess.running()
         val session =
-            PtySessions.start(
+            startSession(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
@@ -136,7 +148,7 @@ class PtySessionTest {
     fun `ambiguous width option is applied before pty output is parsed`() {
         val process = FakePtyProcess(inputBytes = "\u20ACX".toByteArray(StandardCharsets.UTF_8))
         val session =
-            PtySessions.start(
+            startSession(
                 options =
                     PtyOptions(
                         command = listOf("fake"),
@@ -147,7 +159,7 @@ class PtySessionTest {
                 processFactory = FixedProcessFactory(process),
             )
 
-        waitUntil { session.terminal.getCodepointAt(2, 0) == 'X'.code }
+        awaitClosed(session)
 
         assertAll(
             { assertEquals(0x20AC, session.terminal.getCodepointAt(0, 0)) },
@@ -161,7 +173,7 @@ class PtySessionTest {
     fun `close destroys process and does not fake an exit code`() {
         val process = FakePtyProcess.running()
         val session =
-            PtySessions.start(
+            startSession(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
@@ -176,12 +188,12 @@ class PtySessionTest {
     fun `process exit is captured on shared session`() {
         val process = FakePtyProcess(inputBytes = ByteArray(0), exitCode = 7)
         val session =
-            PtySessions.start(
+            startSession(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
 
-        waitUntil { session.exitCode == 7 }
+        awaitClosed(session)
 
         assertEquals(7, session.exitCode)
     }
@@ -191,7 +203,7 @@ class PtySessionTest {
         val text = "x".repeat(20_000) + "\n"
         val process = FakePtyProcess(inputBytes = text.ascii())
         val session =
-            PtySessions.start(
+            startSession(
                 options =
                     PtyOptions(
                         command = listOf("fake"),
@@ -203,7 +215,7 @@ class PtySessionTest {
                 processFactory = FixedProcessFactory(process),
             )
 
-        waitUntil { session.terminal.getAllAsString().count { it == 'x' } == 20_000 }
+        awaitClosed(session)
 
         assertEquals(20_000, session.terminal.getAllAsString().count { it == 'x' })
     }
@@ -213,18 +225,19 @@ class PtySessionTest {
         val listener = RecordingPtyEventListener()
         val input = "\u0007\u001B]0;both\u001B\\".ascii()
         val process = FakePtyProcess(inputBytes = input)
-        PtySessions.start(
-            options =
-                PtyOptions(
-                    command = listOf("fake"),
-                    columns = 10,
-                    rows = 3,
-                    eventListener = listener,
-                ),
-            processFactory = FixedProcessFactory(process),
-        )
+        val session =
+            startSession(
+                options =
+                    PtyOptions(
+                        command = listOf("fake"),
+                        columns = 10,
+                        rows = 3,
+                        eventListener = listener,
+                    ),
+                processFactory = FixedProcessFactory(process),
+            )
 
-        waitUntil { listener.bells == 1 && listener.iconTitles == listOf("both") }
+        awaitClosed(session)
 
         assertEquals(1, listener.bells)
         assertEquals(listOf("both"), listener.iconTitles)
@@ -247,12 +260,13 @@ class PtySessionTest {
                 }
             }
         val process = FakePtyProcess(inputBytes = "\u0007".ascii())
-        PtySessions.start(
-            options = PtyOptions(command = listOf("fake"), eventListener = listener),
-            processFactory = FixedProcessFactory(process),
-        )
+        val session =
+            startSession(
+                options = PtyOptions(command = listOf("fake"), eventListener = listener),
+                processFactory = FixedProcessFactory(process),
+            )
 
-        waitUntil { listener.failures.isNotEmpty() }
+        awaitClosed(session)
 
         assertEquals(listOf("bell failed"), listener.failures.map { it.message })
     }
@@ -275,6 +289,8 @@ class PtySessionTest {
 
         private val capturedOutput = ByteArrayOutputStream()
         override val output: OutputStream = capturedOutput
+
+        @Volatile
         var destroyed: Boolean = false
             private set
         val sizes = mutableListOf<Pair<Int, Int>>()
@@ -282,17 +298,18 @@ class PtySessionTest {
         override fun isAlive(): Boolean = !destroyed
 
         override fun waitFor(): Int {
-            inputDrained?.await(1, TimeUnit.SECONDS)
+            inputDrained?.await()
             if (input is DrainingByteArrayInputStream) {
-                input.drained.await(1, TimeUnit.SECONDS)
+                input.drained.await()
             }
             return exitCode
         }
 
         override fun destroy() {
             destroyed = true
-            if (input is BlockingInputStream) {
-                input.release()
+            when (input) {
+                is BlockingInputStream -> input.release()
+                is DrainingByteArrayInputStream -> input.drained.countDown()
             }
         }
 
@@ -339,7 +356,7 @@ class PtySessionTest {
         val released = CountDownLatch(1)
 
         override fun read(): Int {
-            released.await(1, TimeUnit.SECONDS)
+            released.await()
             return -1
         }
 
@@ -348,7 +365,7 @@ class PtySessionTest {
             offset: Int,
             length: Int,
         ): Int {
-            released.await(1, TimeUnit.SECONDS)
+            released.await()
             return -1
         }
 
@@ -396,15 +413,13 @@ class PtySessionTest {
 
     private fun String.ascii(): ByteArray = toByteArray(StandardCharsets.US_ASCII)
 
-    private fun waitUntil(
-        timeoutMillis: Long = 1000,
-        condition: () -> Boolean,
-    ) {
-        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
-        while (System.nanoTime() < deadline) {
-            if (condition()) return
-            Thread.sleep(10)
+    private fun startSession(
+        options: PtyOptions,
+        processFactory: PtyProcessFactory,
+    ): TerminalSession = PtySessions.start(options, processFactory).also(sessions::add)
+
+    private fun awaitClosed(session: TerminalSession) =
+        runBlocking {
+            withTimeout(10.seconds) { session.state.first { it is TerminalSessionState.Closed } }
         }
-        assertTrue(condition(), "condition was not met within ${timeoutMillis}ms")
-    }
 }

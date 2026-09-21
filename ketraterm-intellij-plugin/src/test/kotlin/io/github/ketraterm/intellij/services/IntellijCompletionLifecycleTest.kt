@@ -17,10 +17,11 @@ package io.github.ketraterm.intellij.services
 
 import org.junit.Assert.*
 import org.junit.Test
+import java.lang.management.ManagementFactory
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 
 class IntellijCompletionLifecycleTest {
     @Test
@@ -28,33 +29,81 @@ class IntellijCompletionLifecycleTest {
         val lifecycle = IntellijCompletionLifecycle()
         val enteredCreation = CountDownLatch(1)
         val releaseCreation = CountDownLatch(1)
-        val enteredClose = CountDownLatch(1)
-        val executor = Executors.newFixedThreadPool(2)
-        try {
-            val creation =
-                executor.submit {
-                    lifecycle.requireOpen {
-                        enteredCreation.countDown()
-                        assertTrue(releaseCreation.await(5, TimeUnit.SECONDS))
+        val completed = ConcurrentLinkedQueue<String>()
+        MonitorThread("completion-creation-test") {
+            lifecycle.requireOpen {
+                enteredCreation.countDown()
+                releaseCreation.await()
+                completed.add("creation")
+            }
+        }.use { creation ->
+            try {
+                assertTrue(enteredCreation.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                MonitorThread("completion-close-test") {
+                    assertTrue(lifecycle.beginClose())
+                    completed.add("close")
+                }.use { close ->
+                    try {
+                        close.awaitBlockedBy(creation)
+                        assertTrue(completed.isEmpty())
+                    } finally {
+                        releaseCreation.countDown()
                     }
+                    creation.awaitCompletion()
+                    close.awaitCompletion()
                 }
-            assertTrue(enteredCreation.await(5, TimeUnit.SECONDS))
-            val close =
-                executor.submit<Boolean> {
-                    enteredClose.countDown()
-                    lifecycle.beginClose()
-                }
-            assertTrue(enteredClose.await(5, TimeUnit.SECONDS))
-            assertThrows(TimeoutException::class.java) { close.get(100, TimeUnit.MILLISECONDS) }
-
-            releaseCreation.countDown()
-            creation.get(5, TimeUnit.SECONDS)
-            assertTrue(close.get(5, TimeUnit.SECONDS))
-            assertFalse(lifecycle.beginClose())
-            assertThrows(IllegalStateException::class.java) { assertTrue(lifecycle.requireOpen { true }) }
-        } finally {
-            releaseCreation.countDown()
-            executor.shutdownNow()
+                assertEquals(listOf("creation", "close"), completed.toList())
+                assertFalse(lifecycle.beginClose())
+                assertThrows(IllegalStateException::class.java) { assertTrue(lifecycle.requireOpen { true }) }
+            } finally {
+                releaseCreation.countDown()
+            }
         }
+    }
+
+    /** Uses actual JVM monitor ownership to distinguish exclusion from a thread that has not run yet. */
+    private class MonitorThread(
+        name: String,
+        action: () -> Unit,
+    ) : AutoCloseable {
+        private val result = FutureTask(action)
+        private val thread =
+            Thread
+                .ofPlatform()
+                .daemon()
+                .name(name)
+                .start(result)
+
+        fun awaitBlockedBy(owner: MonitorThread) {
+            val threads = ManagementFactory.getThreadMXBean()
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS)
+            while (true) {
+                val info = threads.getThreadInfo(thread.threadId())
+                if (info?.threadState == Thread.State.BLOCKED && info.lockOwnerId == owner.thread.threadId()) return
+                if (result.isDone) {
+                    awaitCompletion()
+                    error("${thread.name} completed without contending with ${owner.thread.name}")
+                }
+                check(System.nanoTime() < deadline) {
+                    "${thread.name} did not contend with ${owner.thread.name}; observed $info"
+                }
+                Thread.onSpinWait()
+            }
+        }
+
+        fun awaitCompletion() {
+            result.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        }
+
+        override fun close() {
+            if (!result.isDone) result.cancel(true)
+            thread.join(TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS))
+            check(!thread.isAlive) { "${thread.name} did not terminate after cancellation" }
+            if (!result.isCancelled) result.get()
+        }
+    }
+
+    private companion object {
+        private const val TIMEOUT_SECONDS = 10L
     }
 }

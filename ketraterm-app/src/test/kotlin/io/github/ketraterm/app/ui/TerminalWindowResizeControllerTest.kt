@@ -21,14 +21,11 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
-import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.junit.jupiter.api.Test
+import java.awt.Dimension
 import java.awt.Font
-import java.awt.Frame
-import java.awt.GraphicsEnvironment
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
-import javax.swing.JFrame
 import javax.swing.SwingUtilities
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -37,24 +34,20 @@ import kotlin.test.assertTrue
 class TerminalWindowResizeControllerTest {
     @Test
     fun `requests resize only the eligible visible session and stop after disposal`() {
-        withWindow { frame, terminal, session, controller ->
+        withWindow { window, terminal, session, controller, updates ->
             TerminalSession.create(TerminalBuffers.create(80, 10), NoopConnector).use { background ->
                 assertFalse(controller.request(background, 10, 80))
             }
-            val original =
-                onEdt {
-                    controller.clearTarget()
-                    frame.size
-                }
+            onEdt { controller.clearTarget() }
             assertFalse(controller.request(session, 10, 80))
-            assertEquals(original, onEdt { frame.size })
+            assertTrue(updates.isEmpty())
             onEdt { controller.setTarget(session, terminal) }
             for (columns in listOf(132, 80)) {
                 assertTrue(controller.request(session, 10, columns))
+                assertEquals(1, updates.size)
                 onEdt {
-                    val visible = terminal.visibleGridSize()
-                    assertEquals(columns, visible.width)
-                    assertEquals(10, visible.height)
+                    updates.removeFirst().invoke()
+                    assertEquals(Dimension(columns * 8 + 20, 200), window.sizes.last())
                 }
             }
             onEdt {
@@ -62,74 +55,153 @@ class TerminalWindowResizeControllerTest {
                 controller.setTarget(session, terminal)
             }
             assertFalse(controller.request(session, 10, 132))
+            assertEquals(1, window.observationClosed)
+            assertTrue(updates.isEmpty())
         }
     }
 
     @Test
-    fun `non-normal windows reject requests and layout changes cancel queued window updates`() {
-        withWindow { frame, terminal, session, controller ->
-            for (state in listOf(Frame.MAXIMIZED_BOTH, Frame.MAXIMIZED_HORIZ, Frame.MAXIMIZED_VERT, Frame.ICONIFIED)) {
-                onEdt {
-                    frame.reportedState = state
-                    controller.setTarget(session, terminal)
-                }
-                assertFalse(controller.request(session, 10, 132))
-            }
-            val original =
-                onEdt {
-                    frame.reportedState = Frame.NORMAL
-                    controller.setTarget(session, terminal)
-                    val original = frame.size
-                    assertTrue(controller.request(session, 10, 132))
-                    // A split or tab selection changes eligibility before the queued update.
-                    controller.clearTarget()
-                    original
-                }
+    fun `ineligible geometry rejects requests and layout changes cancel queued window updates`() {
+        withWindow { window, _, session, controller, updates ->
+            val geometry = window.geometry
             onEdt {
-                assertEquals(original, frame.size)
-                assertEquals(terminal.visibleGridSize().width, session.terminal.width)
+                window.geometry = null
+                window.refresh()
+            }
+            assertFalse(controller.request(session, 10, 132))
+            assertTrue(updates.isEmpty())
+            onEdt {
+                window.geometry = geometry
+                window.refresh()
+                assertTrue(controller.request(session, 10, 132))
+                // A split or tab selection changes eligibility before the queued update.
+                controller.clearTarget()
+                updates.removeFirst().invoke()
+                assertTrue(window.sizes.isEmpty())
             }
         }
     }
 
-    private fun withWindow(action: (TestFrame, SwingTerminal, TerminalSession, TerminalWindowResizeController) -> Unit) {
-        assumeFalse(GraphicsEnvironment.isHeadless())
+    @Test
+    fun `rejected queued resize restores the session to its actual visible grid`() {
+        withWindow { window, terminal, session, controller, updates ->
+            onEdt {
+                val visible = terminal.visibleGridSize()
+                assertTrue(controller.request(session, 10, 132))
+                session.resize(132, 10)
+                window.geometry = null
+                updates.removeFirst().invoke()
+                assertTrue(window.sizes.isEmpty())
+                assertEquals(visible.width, session.terminal.width)
+                assertEquals(visible.height, session.terminal.height)
+            }
+        }
+    }
+
+    @Test
+    fun `geometry refresh keeps the previous complete snapshot available to requests`() {
+        withWindow { window, _, session, controller, updates ->
+            onEdt {
+                window.beforeRead = { assertTrue(controller.request(session, 10, 132)) }
+                window.refresh()
+                window.beforeRead = {}
+                assertEquals(1, updates.size)
+                updates.removeFirst().invoke()
+                assertEquals(listOf(Dimension(1076, 200)), window.sizes)
+            }
+        }
+    }
+
+    @Test
+    fun `closing the controller or session cancels accepted window updates`() {
+        withWindow { window, _, session, controller, updates ->
+            assertTrue(controller.request(session, 10, 132))
+            onEdt {
+                controller.close()
+                updates.removeFirst().invoke()
+                assertTrue(window.sizes.isEmpty())
+            }
+        }
+        withWindow { window, _, session, controller, updates ->
+            assertTrue(controller.request(session, 10, 132))
+            session.close()
+            onEdt {
+                updates.removeFirst().invoke()
+                assertTrue(window.sizes.isEmpty())
+            }
+        }
+    }
+
+    private fun withWindow(
+        action: (TestWindow, SwingTerminal, TerminalSession, TerminalWindowResizeController, ArrayDeque<() -> Unit>) -> Unit,
+    ) {
         val session = TerminalSession.create(TerminalBuffers.create(80, 10), NoopConnector)
+        val window = TestWindow()
+        val updates = ArrayDeque<() -> Unit>()
         var ownedTerminal: SwingTerminal? = null
-        var ownedFrame: TestFrame? = null
         var ownedController: TerminalWindowResizeController? = null
         try {
             onEdt {
                 val terminal = SwingTerminal(settingsProvider = { SwingSettings(font = Font(Font.MONOSPACED, Font.PLAIN, 10)) })
                 ownedTerminal = terminal
                 terminal.bind(session)
-                val frame = TestFrame()
-                ownedFrame = frame
-                frame.contentPane.add(terminal)
-                frame.setSize(600, 300)
-                val bounds = frame.graphicsConfiguration.bounds
-                val insets = frame.toolkit.getScreenInsets(frame.graphicsConfiguration)
-                frame.setLocation(bounds.x + insets.left, bounds.y + insets.top)
-                val controller = TerminalWindowResizeController(frame)
+                terminal.setSize(640, 160)
+                val controller = TerminalWindowResizeController(window, updates::addLast)
                 ownedController = controller
-                frame.isVisible = true
                 controller.setTarget(session, terminal)
             }
-            action(requireNotNull(ownedFrame), requireNotNull(ownedTerminal), session, requireNotNull(ownedController))
+            action(window, requireNotNull(ownedTerminal), session, requireNotNull(ownedController), updates)
         } finally {
             onEdt {
                 ownedController?.close()
                 ownedTerminal?.dispose()
-                ownedFrame?.dispose()
             }
             session.close()
         }
     }
 
-    private class TestFrame : JFrame() {
-        var reportedState = NORMAL
+    private class TestWindow : WindowResizeHost {
+        var geometry: WindowResizeGeometry? =
+            WindowResizeGeometry(
+                cellWidth = 8,
+                cellHeight = 16,
+                windowExtraWidth = 20,
+                windowExtraHeight = 40,
+                primaryInsetWidth = 0,
+                primaryInsetHeight = 0,
+                alternateInsetWidth = 0,
+                alternateInsetHeight = 0,
+                minimumWidth = 100,
+                minimumHeight = 100,
+                availableWidth = 1600,
+                availableHeight = 1000,
+                windowOriginFits = true,
+            )
+        val sizes = mutableListOf<Dimension>()
+        var beforeRead: () -> Unit = {}
+        var refresh: () -> Unit = {}
+        var observationClosed = 0
 
-        override fun getExtendedState(): Int = reportedState
+        override fun readGeometry(terminal: SwingTerminal): WindowResizeGeometry? {
+            check(SwingUtilities.isEventDispatchThread())
+            beforeRead()
+            return geometry
+        }
+
+        override fun resize(size: Dimension) {
+            check(SwingUtilities.isEventDispatchThread())
+            sizes.add(size)
+        }
+
+        override fun observeGeometryChanges(refresh: () -> Unit): AutoCloseable {
+            check(SwingUtilities.isEventDispatchThread())
+            this.refresh = refresh
+            return AutoCloseable {
+                check(SwingUtilities.isEventDispatchThread())
+                this.refresh = {}
+                observationClosed++
+            }
+        }
     }
 
     private fun <T> onEdt(action: () -> T): T {

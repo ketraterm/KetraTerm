@@ -35,6 +35,8 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -42,6 +44,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.awt.*
 import java.awt.event.ComponentEvent
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -49,7 +52,10 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 import kotlin.concurrent.thread
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalThreadingTest {
+    private val dispatcher = StandardTestDispatcher()
+
     @Test
     fun `paste policy applies on binding and reload while preserving transport line endings`() {
         val output = java.io.ByteArrayOutputStream()
@@ -239,6 +245,7 @@ class SwingTerminalThreadingTest {
                 terminal = terminal,
                 renderPublisher = TerminalRenderPublisher(3, 1),
                 renderReader = checkingReader,
+                workerDispatcher = dispatcher,
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
@@ -317,23 +324,13 @@ class SwingTerminalThreadingTest {
                         uiDispatcher = dispatcher,
                     ),
             )
-        val edtBlocked = CountDownLatch(1)
-        val releaseEdt = CountDownLatch(1)
-        SwingUtilities.invokeLater {
-            edtBlocked.countDown()
-            releaseEdt.await(2, TimeUnit.SECONDS)
-        }
-        assertTrue(edtBlocked.await(1, TimeUnit.SECONDS), "EDT blocker did not start")
-
-        try {
+        withEdtBlocked {
             runOffEdt {
                 component.bind(session)
                 component.reloadSettings()
                 component.unbind()
             }
             assertEquals(3, dispatcher.dispatchCount.get())
-        } finally {
-            releaseEdt.countDown()
         }
         drainEdt()
 
@@ -345,42 +342,18 @@ class SwingTerminalThreadingTest {
     fun `bind called off EDT does not wait for EDT execution`() {
         val session = testSession()
         val component = SwingTerminal()
-        val edtBlocked = CountDownLatch(1)
-        val releaseEdt = CountDownLatch(1)
-        val bindReturned = AtomicBoolean(false)
-        val failure = AtomicReference<Throwable?>()
-
-        SwingUtilities.invokeLater {
-            try {
-                edtBlocked.countDown()
-                if (!releaseEdt.await(1, TimeUnit.SECONDS)) {
-                    failure.set(AssertionError("EDT blocker was not released"))
-                }
-            } catch (error: Throwable) {
-                failure.set(error)
+        try {
+            withEdtBlocked {
+                // Completion is observed while the EDT is still held, not inferred from elapsed time.
+                runOffEdt { component.bind(session) }
+                assertFalse(component.hasActiveRenderBinding)
             }
+            drainEdt()
+            assertTrue(component.hasActiveRenderBinding)
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
         }
-        assertTrue(edtBlocked.await(1, TimeUnit.SECONDS), "EDT blocker did not start")
-
-        val worker =
-            thread(start = true) {
-                try {
-                    component.bind(session)
-                    bindReturned.set(true)
-                } catch (error: Throwable) {
-                    failure.set(error)
-                }
-            }
-
-        worker.join(500)
-        assertTrue(bindReturned.get(), "bind should post to EDT and return without waiting")
-
-        releaseEdt.countDown()
-        worker.join(1_000)
-        failure.get()?.let { throw it }
-        drainEdt()
-        assertTrue(component.hasActiveRenderBinding)
-        session.close()
     }
 
     @Test
@@ -420,39 +393,14 @@ class SwingTerminalThreadingTest {
                 component.visibleGridSize()
             }
         val visibleFromBackground = AtomicReference<Dimension>()
-        val edtBlocked = CountDownLatch(1)
-        val releaseEdt = CountDownLatch(1)
-        val returned = CountDownLatch(1)
-        val failure = AtomicReference<Throwable?>()
-
-        SwingUtilities.invokeLater {
-            try {
-                edtBlocked.countDown()
-                if (!releaseEdt.await(1, TimeUnit.SECONDS)) {
-                    failure.set(AssertionError("EDT blocker was not released"))
-                }
-            } catch (error: Throwable) {
-                failure.set(error)
+        try {
+            withEdtBlocked {
+                runOffEdt { visibleFromBackground.set(component.visibleGridSize()) }
+                assertEquals(expected, visibleFromBackground.get())
             }
+        } finally {
+            edtCall { component.dispose() }
         }
-        assertTrue(edtBlocked.await(1, TimeUnit.SECONDS), "EDT blocker did not start")
-
-        val worker =
-            thread(start = true) {
-                try {
-                    visibleFromBackground.set(component.visibleGridSize())
-                    returned.countDown()
-                } catch (error: Throwable) {
-                    failure.set(error)
-                }
-            }
-
-        val completedWhileEdtBlocked = returned.await(500, TimeUnit.MILLISECONDS)
-        releaseEdt.countDown()
-        worker.join(1_000)
-        failure.get()?.let { throw it }
-        assertTrue(completedWhileEdtBlocked, "visibleGridSize should not wait for the EDT")
-        assertEquals(expected, visibleFromBackground.get())
     }
 
     @Test
@@ -654,23 +602,37 @@ class SwingTerminalThreadingTest {
             connector = connector,
             parser = NoOpParser,
             inputEncoder = NoOpInputEncoder,
+            workerDispatcher = dispatcher,
         )
     }
 
     private fun runOffEdt(action: () -> Unit) {
         assertFalse(SwingUtilities.isEventDispatchThread())
-        val failure = AtomicReference<Throwable?>()
-        val worker =
-            thread(start = true) {
-                try {
-                    assertFalse(SwingUtilities.isEventDispatchThread())
-                    action()
-                } catch (error: Throwable) {
-                    failure.set(error)
-                }
+        val task = FutureTask(action)
+        val worker = thread(isDaemon = true, block = task::run)
+        try {
+            task.get(10, TimeUnit.SECONDS)
+        } finally {
+            worker.interrupt()
+        }
+    }
+
+    private fun withEdtBlocked(action: () -> Unit) {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val blocker =
+            FutureTask {
+                entered.countDown()
+                release.await()
             }
-        worker.join()
-        failure.get()?.let { throw it }
+        SwingUtilities.invokeLater(blocker)
+        try {
+            assertTrue(entered.await(10, TimeUnit.SECONDS), "EDT blocker did not start")
+            action()
+        } finally {
+            release.countDown()
+            blocker.get(10, TimeUnit.SECONDS)
+        }
     }
 
     private fun <T> edtCall(action: () -> T): T {
@@ -691,10 +653,9 @@ class SwingTerminalThreadingTest {
         session: TerminalSession,
         generation: Long,
     ) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1)
-        while (session.renderGeneration.value <= generation && System.nanoTime() < deadline) {
-            Thread.onSpinWait()
-        }
+        drainEdt()
+        dispatcher.scheduler.runCurrent()
+        drainEdt()
         assertTrue(session.renderGeneration.value > generation, "render was not published")
     }
 
@@ -702,14 +663,8 @@ class SwingTerminalThreadingTest {
         component: SwingTerminal,
         predicate: (Int) -> Boolean,
     ) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
-        var historySize = component.viewportState().historySize
-        while (System.nanoTime() < deadline) {
-            drainEdt()
-            historySize = component.viewportState().historySize
-            if (predicate(historySize)) return
-            Thread.sleep(5)
-        }
+        drainEdt()
+        val historySize = component.viewportState().historySize
         assertTrue(predicate(historySize), "unexpected Swing history size: $historySize")
     }
 

@@ -40,7 +40,6 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -335,28 +334,23 @@ class TerminalSessionTest {
         lateinit var session: TerminalSession
         val connector =
             ReplacementInterleavingConnector {
-                Thread {
-                    it.countDown()
+                SessionTestThread("terminal-session-replacement-ordering-test") {
                     session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
-                }.apply {
-                    name = "terminal-session-replacement-ordering-test"
-                    start()
                 }
             }
         session = createStartedSession(connector)
+        session.use {
+            session.encodeTextReplacement(
+                TerminalTextReplacementEvent(
+                    deleteAfterCursorCount = 1,
+                    deleteBeforeCursorCount = 1,
+                    replacementText = "status",
+                ),
+            )
 
-        session.encodeTextReplacement(
-            TerminalTextReplacementEvent(
-                deleteAfterCursorCount = 1,
-                deleteBeforeCursorCount = 1,
-                replacementText = "status",
-            ),
-        )
-
-        assertTrue(connector.awaitTriggeredWriter(), "concurrent key writer was not started")
-        assertTrue(connector.awaitWrites(), "replacement and key writes did not complete")
-        assertArrayEquals("\u001B[3~\u007Fstatusa".ascii(), connector.writtenBytes)
-        session.close()
+            connector.awaitWrites()
+            assertArrayEquals("\u001B[3~\u007Fstatusa".ascii(), connector.writtenBytes)
+        }
     }
 
     @Test
@@ -381,22 +375,17 @@ class TerminalSessionTest {
         lateinit var session: TerminalSession
         val connector =
             SlowFirstWriteConnector {
-                Thread {
-                    it.countDown()
+                SessionTestThread("terminal-session-ordering-test") {
                     session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
-                }.apply {
-                    name = "terminal-session-ordering-test"
-                    start()
                 }
             }
         session = createStartedSession(connector)
+        session.use {
+            connector.feedFromHost("\u001B[5n".ascii())
 
-        connector.feedFromHost("\u001B[5n".ascii())
-
-        assertTrue(connector.awaitTriggeredWriter(), "key writer was not started")
-        assertTrue(connector.awaitWrites(2), "key write did not complete")
-        assertEquals("\u001B[0na", connector.writtenBytes.asciiText())
-        session.close()
+            connector.awaitWrites()
+            assertEquals("\u001B[0na", connector.writtenBytes.asciiText())
+        }
     }
 
     @Test
@@ -1340,30 +1329,34 @@ class TerminalSessionTest {
     }
 
     @Test
-    fun `requestRender publishes caller owned scrollback offset`() {
-        val terminal = TerminalBuffers.create(width = 10, height = 3)
-        val connector = MockConnector()
-        val renderReader = OffsetRecordingRenderReader()
-        val session =
-            TerminalSession(
-                terminal = terminal,
-                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
-                renderReader = renderReader,
-                responseReader = terminal,
-                connector = connector,
-                parser = RecordingParser(),
-                inputEncoder = NoOpInputEncoder,
-            )
-        val previousGeneration = session.renderGeneration.value
-        session.requestRender(scrollbackOffset = 3)
+    fun `requestRender publishes caller owned scrollback offset`() =
+        runTest {
+            val terminal = TerminalBuffers.create(width = 10, height = 3)
+            val connector = MockConnector()
+            val renderReader = OffsetRecordingRenderReader()
+            val session =
+                TerminalSession(
+                    terminal = terminal,
+                    renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                    renderReader = renderReader,
+                    responseReader = terminal,
+                    connector = connector,
+                    parser = RecordingParser(),
+                    inputEncoder = NoOpInputEncoder,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            session.use {
+                val previousGeneration = session.renderGeneration.value
+                session.requestRender(scrollbackOffset = 3)
 
-        session.awaitRenderGenerationAfter(previousGeneration)
-        assertAll(
-            { assertEquals(3, renderReader.lastOffset) },
-            { assertEquals(3, session.renderPublisher.current()?.scrollbackOffset) },
-        )
-        session.close()
-    }
+                runCurrent()
+                assertTrue(session.renderGeneration.value > previousGeneration)
+                assertAll(
+                    { assertEquals(3, renderReader.lastOffset) },
+                    { assertEquals(3, session.renderPublisher.current()?.scrollbackOffset) },
+                )
+            }
+        }
 
     @Test
     fun `synchronized output mode defers rendering and flushes on disable`() =
@@ -1418,34 +1411,33 @@ class TerminalSessionTest {
         }
 
     @Test
-    fun `render requests coalesce while worker is busy`() {
-        val terminal = TerminalBuffers.create(width = 10, height = 3)
-        val connector = MockConnector()
-        val renderReader = BlockingFirstRenderReader()
-        val session =
-            TerminalSession(
-                terminal = terminal,
-                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
-                renderReader = renderReader,
-                responseReader = terminal,
-                connector = connector,
-                parser = RecordingParser(),
-                inputEncoder = NoOpInputEncoder,
-            )
-        session.requestRender(scrollbackOffset = 0)
-        assertTrue(renderReader.awaitFirstRead(), "first render did not start")
+    fun `render requests coalesce while worker is busy`() =
+        runTest {
+            val terminal = TerminalBuffers.create(width = 10, height = 3)
+            val connector = MockConnector()
+            val renderReader = OffsetRecordingRenderReader()
+            val session =
+                TerminalSession(
+                    terminal = terminal,
+                    renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                    renderReader = renderReader,
+                    responseReader = terminal,
+                    connector = connector,
+                    parser = RecordingParser(),
+                    inputEncoder = NoOpInputEncoder,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            session.use {
+                renderReader.beforeRead = { call ->
+                    if (call == 1) repeat(5) { session.requestRender(scrollbackOffset = 0) }
+                }
+                session.requestRender(scrollbackOffset = 0)
+                runCurrent()
 
-        repeat(5) {
-            session.requestRender(scrollbackOffset = 0)
+                assertEquals(2, renderReader.readCalls)
+                assertEquals(6L, session.renderGeneration.value)
+            }
         }
-
-        renderReader.releaseFirstRead()
-
-        session.awaitRenderGenerationAfter(4L)
-
-        assertEquals(2, renderReader.readCalls)
-        session.close()
-    }
 
     @Test
     fun `sustained host output publishes only the latest generation once per interval`() =
@@ -1522,117 +1514,133 @@ class TerminalSessionTest {
         }
 
     @Test
-    fun `requestRender publishes latest viewport after in flight render`() {
-        val terminal = TerminalBuffers.create(width = 10, height = 3)
-        val connector = MockConnector()
-        val renderReader = BlockingFirstOffsetRenderReader()
-        val session =
-            TerminalSession(
-                terminal = terminal,
-                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
-                renderReader = renderReader,
-                responseReader = terminal,
-                connector = connector,
-                parser = RecordingParser(),
-                inputEncoder = NoOpInputEncoder,
-            )
-        session.requestRender(scrollbackOffset = 1)
-        assertTrue(renderReader.awaitFirstRead(), "first render did not start")
+    fun `requestRender publishes latest viewport after in flight render`() =
+        runTest {
+            val terminal = TerminalBuffers.create(width = 10, height = 3)
+            val connector = MockConnector()
+            val renderReader = OffsetRecordingRenderReader()
+            val session =
+                TerminalSession(
+                    terminal = terminal,
+                    renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                    renderReader = renderReader,
+                    responseReader = terminal,
+                    connector = connector,
+                    parser = RecordingParser(),
+                    inputEncoder = NoOpInputEncoder,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            session.use {
+                renderReader.beforeRead = { call ->
+                    if (call == 1) {
+                        session.requestRender(scrollbackOffset = 2)
+                        session.requestRender(scrollbackOffset = 5)
+                    }
+                }
+                session.requestRender(scrollbackOffset = 1)
+                runCurrent()
 
-        session.requestRender(scrollbackOffset = 2)
-        session.requestRender(scrollbackOffset = 5)
-        renderReader.releaseFirstRead()
-
-        session.awaitRenderGenerationAfter(1L)
-
-        assertAll(
-            { assertEquals(2, renderReader.readCalls) },
-            { assertEquals(listOf(1, 5), renderReader.offsets.toList()) },
-            { assertEquals(5, session.renderPublisher.current()?.scrollbackOffset) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `requestRender waits for a new generation after publish failure`() {
-        val terminal = TerminalBuffers.create(width = 10, height = 3)
-        val connector = MockConnector()
-        val renderReader = FailingFirstOffsetRenderReader()
-        val session =
-            TerminalSession(
-                terminal = terminal,
-                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
-                renderReader = renderReader,
-                responseReader = terminal,
-                connector = connector,
-                parser = RecordingParser(),
-                inputEncoder = NoOpInputEncoder,
-            )
-        session.requestRender(scrollbackOffset = 1)
-        assertTrue(renderReader.awaitFirstRead(), "first render did not start")
-
-        assertAll(
-            { assertEquals(1, renderReader.readCalls) },
-            { assertEquals(-1L, session.renderGeneration.value) },
-            { assertNull(session.renderPublisher.current()) },
-        )
-
-        session.requestRender(scrollbackOffset = 2)
-
-        session.awaitRenderGenerationAfter(-1L)
-        assertAll(
-            { assertEquals(2, renderReader.readCalls) },
-            { assertEquals(2, session.renderPublisher.current()?.scrollbackOffset) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `subscriber failure does not stop render publication`() {
-        val terminal = TerminalBuffers.create(width = 10, height = 3)
-        val connector = MockConnector()
-        val renderReader = OffsetRecordingRenderReader()
-        val session =
-            TerminalSession(
-                terminal = terminal,
-                renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
-                renderReader = renderReader,
-                responseReader = terminal,
-                connector = connector,
-                parser = RecordingParser(),
-                inputEncoder = NoOpInputEncoder,
-            )
-        val collectorFailed = CountDownLatch(1)
-        val collectorScope =
-            CoroutineScope(
-                SupervisorJob() +
-                    Dispatchers.Default +
-                    CoroutineExceptionHandler { _, _ -> collectorFailed.countDown() },
-            )
-        collectorScope.launch {
-            session.renderGeneration.first { it >= 0L }
-            throw IllegalStateException("subscriber failed")
+                assertAll(
+                    { assertEquals(2, renderReader.readCalls) },
+                    { assertEquals(listOf(1, 5), renderReader.offsets.toList()) },
+                    { assertEquals(5, session.renderPublisher.current()?.scrollbackOffset) },
+                )
+            }
         }
 
-        session.requestRender(scrollbackOffset = 1)
-        val firstGeneration = session.awaitRenderGenerationAfter(-1L)
-        assertTrue(collectorFailed.await(1, TimeUnit.SECONDS), "subscriber failure was not observed")
+    @Test
+    fun `requestRender waits for a new generation after publish failure`() =
+        runTest {
+            val terminal = TerminalBuffers.create(width = 10, height = 3)
+            val connector = MockConnector()
+            val renderReader = OffsetRecordingRenderReader()
+            renderReader.beforeRead = { call -> check(call != 1) { "first render fails before publish" } }
+            val session =
+                TerminalSession(
+                    terminal = terminal,
+                    renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                    renderReader = renderReader,
+                    responseReader = terminal,
+                    connector = connector,
+                    parser = RecordingParser(),
+                    inputEncoder = NoOpInputEncoder,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            session.use {
+                session.requestRender(scrollbackOffset = 1)
+                runCurrent()
 
-        assertAll(
-            { assertEquals(1, renderReader.readCalls) },
-            { assertEquals(1, session.renderPublisher.current()?.scrollbackOffset) },
-        )
+                assertAll(
+                    { assertEquals(1, renderReader.readCalls) },
+                    { assertEquals(-1L, session.renderGeneration.value) },
+                    { assertNull(session.renderPublisher.current()) },
+                )
 
-        session.requestRender(scrollbackOffset = 2)
+                session.requestRender(scrollbackOffset = 2)
 
-        session.awaitRenderGenerationAfter(firstGeneration)
-        assertAll(
-            { assertEquals(2, renderReader.readCalls) },
-            { assertEquals(2, session.renderPublisher.current()?.scrollbackOffset) },
-        )
-        collectorScope.cancel()
-        session.close()
-    }
+                runCurrent()
+                assertAll(
+                    { assertEquals(2, renderReader.readCalls) },
+                    { assertEquals(2, session.renderPublisher.current()?.scrollbackOffset) },
+                )
+            }
+        }
+
+    @Test
+    fun `subscriber failure does not stop render publication`() =
+        runTest {
+            val terminal = TerminalBuffers.create(width = 10, height = 3)
+            val connector = MockConnector()
+            val renderReader = OffsetRecordingRenderReader()
+            val session =
+                TerminalSession(
+                    terminal = terminal,
+                    renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height),
+                    renderReader = renderReader,
+                    responseReader = terminal,
+                    connector = connector,
+                    parser = RecordingParser(),
+                    inputEncoder = NoOpInputEncoder,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            session.use {
+                val subscriberFailure = IllegalStateException("subscriber failed")
+                var observedFailure: Throwable? = null
+                val collectorScope =
+                    CoroutineScope(
+                        SupervisorJob() +
+                            StandardTestDispatcher(testScheduler) +
+                            CoroutineExceptionHandler { _, failure -> observedFailure = failure },
+                    )
+                try {
+                    collectorScope.launch {
+                        session.renderGeneration.first { it >= 0L }
+                        throw subscriberFailure
+                    }
+
+                    session.requestRender(scrollbackOffset = 1)
+                    runCurrent()
+                    val firstGeneration = session.renderGeneration.value
+                    assertSame(subscriberFailure, observedFailure)
+
+                    assertAll(
+                        { assertEquals(1, renderReader.readCalls) },
+                        { assertEquals(1, session.renderPublisher.current()?.scrollbackOffset) },
+                    )
+
+                    session.requestRender(scrollbackOffset = 2)
+
+                    runCurrent()
+                    assertTrue(session.renderGeneration.value > firstGeneration)
+                    assertAll(
+                        { assertEquals(2, renderReader.readCalls) },
+                        { assertEquals(2, session.renderPublisher.current()?.scrollbackOffset) },
+                    )
+                } finally {
+                    collectorScope.cancel()
+                }
+            }
+        }
 
     @Test
     fun `readRenderFrame blocks host byte mutation until callback returns`() {
@@ -1648,6 +1656,7 @@ class TerminalSessionTest {
                 connector = connector,
                 parser = parser,
                 inputEncoder = NoOpInputEncoder,
+                workerDispatcher = StandardTestDispatcher(),
             )
         val callbackEntered = CountDownLatch(1)
         val releaseCallback = CountDownLatch(1)
@@ -1655,38 +1664,36 @@ class TerminalSessionTest {
 
         session.start(columns = 10, rows = 3)
 
-        val renderThread =
-            Thread {
+        session.use {
+            SessionTestThread("terminal-session-render-lock-test") {
                 session.readRenderFrame {
                     callbackEntered.countDown()
-                    assertTrue(releaseCallback.await(1, TimeUnit.SECONDS), "render callback was not released")
+                    releaseCallback.await()
                 }
-            }.apply {
-                name = "terminal-session-render-lock-test"
-                start()
+            }.use { renderThread ->
+                try {
+                    assertTrue(callbackEntered.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS), "render callback did not start")
+                    SessionTestThread("terminal-session-feed-lock-test") {
+                        connector.feedFromHost("A".ascii())
+                        feedCompleted.countDown()
+                    }.use { feedThread ->
+                        try {
+                            feedThread.awaitBlockedBy(renderThread)
+                            assertEquals(1L, feedCompleted.count, "host bytes mutated during render callback")
+                            assertEquals(0, parser.acceptCalls)
+                        } finally {
+                            releaseCallback.countDown()
+                        }
+                        renderThread.awaitCompletion()
+                        feedThread.awaitCompletion()
+                    }
+                } finally {
+                    releaseCallback.countDown()
+                }
             }
-
-        assertTrue(callbackEntered.await(1, TimeUnit.SECONDS), "render callback did not start")
-
-        val feedThread =
-            Thread {
-                connector.feedFromHost("A".ascii())
-                feedCompleted.countDown()
-            }.apply {
-                name = "terminal-session-feed-lock-test"
-                start()
-            }
-
-        assertFalse(feedCompleted.await(100, TimeUnit.MILLISECONDS), "host bytes mutated during render callback")
-        assertEquals(0, parser.acceptCalls)
-
-        releaseCallback.countDown()
-        renderThread.join(1000)
-        feedThread.join(1000)
-
-        assertTrue(feedCompleted.await(1, TimeUnit.SECONDS), "host byte feed did not complete")
-        assertEquals(1, parser.acceptCalls)
-        session.close()
+            assertEquals(0L, feedCompleted.count, "host byte feed did not complete")
+            assertEquals(1, parser.acceptCalls)
+        }
     }
 
     @Test
@@ -1697,40 +1704,38 @@ class TerminalSessionTest {
         val releaseCallback = CountDownLatch(1)
         val resizeCompleted = CountDownLatch(1)
 
-        val renderThread =
-            Thread {
+        session.use {
+            SessionTestThread("terminal-session-render-resize-lock-test") {
                 session.readRenderFrame {
                     callbackEntered.countDown()
-                    assertTrue(releaseCallback.await(1, TimeUnit.SECONDS), "render callback was not released")
+                    releaseCallback.await()
                 }
-            }.apply {
-                name = "terminal-session-render-resize-lock-test"
-                start()
+            }.use { renderThread ->
+                try {
+                    assertTrue(callbackEntered.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS), "render callback did not start")
+                    SessionTestThread("terminal-session-resize-lock-test") {
+                        session.resize(columns = 20, rows = 5)
+                        resizeCompleted.countDown()
+                    }.use { resizeThread ->
+                        try {
+                            resizeThread.awaitBlockedBy(renderThread)
+                            assertEquals(1L, resizeCompleted.count, "resize completed during render callback")
+                            assertEquals(10, session.terminal.width)
+                            assertEquals(3, session.terminal.height)
+                        } finally {
+                            releaseCallback.countDown()
+                        }
+                        renderThread.awaitCompletion()
+                        resizeThread.awaitCompletion()
+                    }
+                } finally {
+                    releaseCallback.countDown()
+                }
             }
-
-        assertTrue(callbackEntered.await(1, TimeUnit.SECONDS), "render callback did not start")
-
-        val resizeThread =
-            Thread {
-                session.resize(columns = 20, rows = 5)
-                resizeCompleted.countDown()
-            }.apply {
-                name = "terminal-session-resize-lock-test"
-                start()
-            }
-
-        assertFalse(resizeCompleted.await(100, TimeUnit.MILLISECONDS), "resize completed during render callback")
-        assertEquals(10, session.terminal.width)
-        assertEquals(3, session.terminal.height)
-
-        releaseCallback.countDown()
-        renderThread.join(1000)
-        resizeThread.join(1000)
-
-        assertTrue(resizeCompleted.await(1, TimeUnit.SECONDS), "resize did not complete")
-        assertEquals(20, session.terminal.width)
-        assertEquals(5, session.terminal.height)
-        session.close()
+            assertEquals(0L, resizeCompleted.count, "resize did not complete")
+            assertEquals(20, session.terminal.width)
+            assertEquals(5, session.terminal.height)
+        }
     }
 
     @Test
@@ -1750,11 +1755,12 @@ class TerminalSessionTest {
                 connector = connector,
                 parser = parser,
                 inputEncoder = NoOpInputEncoder,
+                workerDispatcher = StandardTestDispatcher(),
             )
         session.start(columns = 10, rows = 3)
 
-        val renderThread =
-            Thread {
+        session.use {
+            SessionTestThread("terminal-session-copyline-lock-test") {
                 session.readRenderFrame { frame ->
                     frame.copyLine(
                         row = 0,
@@ -1763,32 +1769,30 @@ class TerminalSessionTest {
                         flags = IntArray(frame.columns),
                     )
                 }
-            }.apply {
-                name = "terminal-session-copyline-lock-test"
-                start()
+            }.use { renderThread ->
+                try {
+                    assertTrue(copyEntered.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS), "copyLine did not start")
+                    SessionTestThread("terminal-session-feed-during-copyline-test") {
+                        connector.feedFromHost("A".ascii())
+                        feedCompleted.countDown()
+                    }.use { feedThread ->
+                        try {
+                            feedThread.awaitBlockedBy(renderThread)
+                            assertEquals(1L, feedCompleted.count, "host bytes mutated during copyLine")
+                            assertEquals(0, parser.acceptCalls)
+                        } finally {
+                            releaseCopy.countDown()
+                        }
+                        renderThread.awaitCompletion()
+                        feedThread.awaitCompletion()
+                    }
+                } finally {
+                    releaseCopy.countDown()
+                }
             }
-
-        assertTrue(copyEntered.await(1, TimeUnit.SECONDS), "copyLine did not start")
-
-        val feedThread =
-            Thread {
-                connector.feedFromHost("A".ascii())
-                feedCompleted.countDown()
-            }.apply {
-                name = "terminal-session-feed-during-copyline-test"
-                start()
-            }
-
-        assertFalse(feedCompleted.await(100, TimeUnit.MILLISECONDS), "host bytes mutated during copyLine")
-        assertEquals(0, parser.acceptCalls)
-
-        releaseCopy.countDown()
-        renderThread.join(1000)
-        feedThread.join(1000)
-
-        assertTrue(feedCompleted.await(1, TimeUnit.SECONDS), "host byte feed did not complete")
-        assertEquals(1, parser.acceptCalls)
-        session.close()
+            assertEquals(0L, feedCompleted.count, "host byte feed did not complete")
+            assertEquals(1, parser.acceptCalls)
+        }
     }
 
     @Test
@@ -1798,7 +1802,6 @@ class TerminalSessionTest {
         val firstWriteDone = CountDownLatch(1)
         val releaseSecondWrite = CountDownLatch(1)
         val renderEntered = CountDownLatch(1)
-        val renderSawCompleteRow = CountDownLatch(1)
         val parser = HalfRowParser(terminal, firstWriteDone, releaseSecondWrite)
         val session =
             TerminalSession(
@@ -1809,50 +1812,47 @@ class TerminalSessionTest {
                 connector = connector,
                 parser = parser,
                 inputEncoder = NoOpInputEncoder,
+                workerDispatcher = StandardTestDispatcher(),
             )
         session.start(columns = 10, rows = 3)
 
-        val feedThread =
-            Thread {
+        session.use {
+            SessionTestThread("terminal-session-half-row-feed-test") {
                 connector.feedFromHost("ignored".ascii())
-            }.apply {
-                name = "terminal-session-half-row-feed-test"
-                start()
-            }
-
-        assertTrue(firstWriteDone.await(1, TimeUnit.SECONDS), "parser did not perform first write")
-
-        val renderThread =
-            Thread {
-                session.readRenderFrame { frame ->
-                    renderEntered.countDown()
-                    val codeWords = IntArray(frame.columns)
-                    val attrWords = LongArray(frame.columns)
-                    val flags = IntArray(frame.columns)
-                    frame.copyLine(
-                        row = 0,
-                        codeWords = codeWords,
-                        attrWords = attrWords,
-                        flags = flags,
-                    )
-                    if (codeWords[0] == 'A'.code && codeWords[1] == 'B'.code) {
-                        renderSawCompleteRow.countDown()
+            }.use { feedThread ->
+                try {
+                    assertTrue(firstWriteDone.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS), "parser did not perform first write")
+                    SessionTestThread("terminal-session-half-row-render-test") {
+                        session.readRenderFrame { frame ->
+                            renderEntered.countDown()
+                            val codeWords = IntArray(frame.columns)
+                            val attrWords = LongArray(frame.columns)
+                            val flags = IntArray(frame.columns)
+                            frame.copyLine(
+                                row = 0,
+                                codeWords = codeWords,
+                                attrWords = attrWords,
+                                flags = flags,
+                            )
+                            assertEquals('A'.code, codeWords[0])
+                            assertEquals('B'.code, codeWords[1])
+                        }
+                    }.use { renderThread ->
+                        try {
+                            renderThread.awaitBlockedBy(feedThread)
+                            assertEquals(1L, renderEntered.count, "render callback observed half-mutated row")
+                        } finally {
+                            releaseSecondWrite.countDown()
+                        }
+                        feedThread.awaitCompletion()
+                        renderThread.awaitCompletion()
                     }
+                } finally {
+                    releaseSecondWrite.countDown()
                 }
-            }.apply {
-                name = "terminal-session-half-row-render-test"
-                start()
             }
-
-        assertFalse(renderEntered.await(100, TimeUnit.MILLISECONDS), "render callback observed half-mutated row")
-
-        releaseSecondWrite.countDown()
-        feedThread.join(1000)
-        renderThread.join(1000)
-
-        assertTrue(renderEntered.await(1, TimeUnit.SECONDS), "render callback did not run")
-        assertTrue(renderSawCompleteRow.await(1, TimeUnit.SECONDS), "render callback did not see complete row")
-        session.close()
+            assertEquals(0L, renderEntered.count, "render callback did not run")
+        }
     }
 
     private fun createStartedSession(
@@ -1863,17 +1863,17 @@ class TerminalSessionTest {
         hostPolicy: HostPolicy = HostPolicy(),
     ): TerminalSession {
         val terminal = TerminalBuffers.create(width = columns, height = rows)
-        val session = TerminalSession.create(terminal, connector, hostEvents = hostEvents, hostPolicy = hostPolicy)
+        val session =
+            TerminalSession.create(
+                terminal,
+                connector,
+                hostEvents = hostEvents,
+                hostPolicy = hostPolicy,
+                workerDispatcher = StandardTestDispatcher(),
+            )
         session.start(columns, rows)
         return session
     }
-
-    private fun TerminalSession.awaitRenderGenerationAfter(generation: Long): Long =
-        runBlocking {
-            withTimeout(1_000.milliseconds) {
-                renderGeneration.first { it > generation }
-            }
-        }
 
     private class RecordingHostEvents : HostEventSink by HostEventSink.NONE {
         val clipboardAudits = mutableListOf<TerminalClipboardAuditEvent>()
@@ -2006,9 +2006,7 @@ class TerminalSessionTest {
         ) {
             terminal.writeCodepoint('A'.code)
             firstWriteDone.countDown()
-            check(releaseSecondWrite.await(1, TimeUnit.SECONDS)) {
-                "second write was not released"
-            }
+            releaseSecondWrite.await()
             terminal.writeCodepoint('B'.code)
         }
 
@@ -2061,9 +2059,7 @@ class TerminalSessionTest {
                         clusterDataSink: TerminalRenderClusterDataSink?,
                     ) {
                         copyEntered.countDown()
-                        check(releaseCopy.await(1, TimeUnit.SECONDS)) {
-                            "copyLine was not released"
-                        }
+                        releaseCopy.await()
                         codeWords[codeOffset] = 'X'.code
                         flags[flagOffset] = TerminalRenderCellFlags.CODEPOINT
                     }
@@ -2072,69 +2068,10 @@ class TerminalSessionTest {
         }
     }
 
-    private class BlockingFirstRenderReader : TerminalRenderFrameReader {
-        private val firstReadEntered = CountDownLatch(1)
-        private val releaseFirstRead = CountDownLatch(1)
-        private val calls = AtomicInteger(0)
-
-        val readCalls: Int
-            get() = calls.get()
-
-        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-            val call = calls.incrementAndGet()
-            if (call == 1) {
-                firstReadEntered.countDown()
-                check(releaseFirstRead.await(1, TimeUnit.SECONDS)) {
-                    "first render was not released"
-                }
-            }
-            consumer.accept(SimpleRenderFrame)
-        }
-
-        fun awaitFirstRead(): Boolean = firstReadEntered.await(1, TimeUnit.SECONDS)
-
-        fun releaseFirstRead() {
-            releaseFirstRead.countDown()
-        }
-    }
-
-    private class BlockingFirstOffsetRenderReader : TerminalRenderFrameReader {
-        private val firstReadEntered = CountDownLatch(1)
-        private val releaseFirstRead = CountDownLatch(1)
-        private val calls = AtomicInteger(0)
-
-        val offsets = CopyOnWriteArrayList<Int>()
-        val readCalls: Int
-            get() = calls.get()
-
-        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-            readRenderFrame(scrollbackOffset = 0, consumer = consumer)
-        }
-
-        override fun readRenderFrame(
-            scrollbackOffset: Int,
-            consumer: TerminalRenderFrameConsumer,
-        ) {
-            val call = calls.incrementAndGet()
-            offsets.add(scrollbackOffset)
-            if (call == 1) {
-                firstReadEntered.countDown()
-                check(releaseFirstRead.await(1, TimeUnit.SECONDS)) {
-                    "first render was not released"
-                }
-            }
-            consumer.accept(OffsetRenderFrame(scrollbackOffset))
-        }
-
-        fun awaitFirstRead(): Boolean = firstReadEntered.await(1, TimeUnit.SECONDS)
-
-        fun releaseFirstRead() {
-            releaseFirstRead.countDown()
-        }
-    }
-
     private class OffsetRecordingRenderReader : TerminalRenderFrameReader {
         private val calls = AtomicInteger(0)
+        val offsets = mutableListOf<Int>()
+        var beforeRead: (Int) -> Unit = {}
 
         var lastOffset: Int = -1
             private set
@@ -2150,36 +2087,12 @@ class TerminalSessionTest {
             scrollbackOffset: Int,
             consumer: TerminalRenderFrameConsumer,
         ) {
-            calls.incrementAndGet()
-            lastOffset = scrollbackOffset
-            consumer.accept(OffsetRenderFrame(scrollbackOffset))
-        }
-    }
-
-    private class FailingFirstOffsetRenderReader : TerminalRenderFrameReader {
-        private val firstReadEntered = CountDownLatch(1)
-        private val calls = AtomicInteger(0)
-
-        val readCalls: Int
-            get() = calls.get()
-
-        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-            readRenderFrame(scrollbackOffset = 0, consumer = consumer)
-        }
-
-        override fun readRenderFrame(
-            scrollbackOffset: Int,
-            consumer: TerminalRenderFrameConsumer,
-        ) {
             val call = calls.incrementAndGet()
-            if (call == 1) {
-                firstReadEntered.countDown()
-                throw IllegalStateException("first render fails before publish")
-            }
+            lastOffset = scrollbackOffset
+            offsets += scrollbackOffset
+            beforeRead(call)
             consumer.accept(OffsetRenderFrame(scrollbackOffset))
         }
-
-        fun awaitFirstRead(): Boolean = firstReadEntered.await(1, TimeUnit.SECONDS)
     }
 
     private class OffsetRenderFrame(
@@ -2222,53 +2135,6 @@ class TerminalSessionTest {
         ) = Unit
     }
 
-    private object SimpleRenderFrame : TerminalRenderFrame {
-        override val columns: Int = 10
-        override val rows: Int = 3
-        override val frameGeneration: Long = 1
-        override val structureGeneration: Long = 1
-        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
-        override val cursor: TerminalRenderCursor =
-            TerminalRenderCursor(
-                column = 0,
-                row = 0,
-                visible = true,
-                blinking = false,
-                shape = TerminalRenderCursorShape.BLOCK,
-                generation = 1,
-            )
-
-        override fun lineGeneration(row: Int): Long = 1
-
-        override fun lineWrapped(row: Int): Boolean = false
-
-        override fun copyLine(
-            row: Int,
-            codeWords: IntArray,
-            codeOffset: Int,
-            attrWords: LongArray,
-            attrOffset: Int,
-            flags: IntArray,
-            flagOffset: Int,
-            extraAttrWords: LongArray?,
-            extraAttrOffset: Int,
-            hyperlinkIds: IntArray?,
-            hyperlinkOffset: Int,
-            clusterSink: TerminalRenderClusterSink?,
-            clusterDataSink: TerminalRenderClusterDataSink?,
-        ) {
-            var column = 0
-            while (column < columns) {
-                codeWords[codeOffset + column] = 0
-                attrWords[attrOffset + column] = TerminalRenderAttrs.DEFAULT
-                flags[flagOffset + column] = TerminalRenderCellFlags.EMPTY
-                extraAttrWords?.set(extraAttrOffset + column, TerminalRenderExtraAttrs.DEFAULT)
-                hyperlinkIds?.set(hyperlinkOffset + column, 0)
-                column++
-            }
-        }
-    }
-
     private object NoOpInputEncoder : TerminalInputEncoder {
         override fun encodeKey(event: TerminalKeyEvent) = Unit
 
@@ -2280,15 +2146,12 @@ class TerminalSessionTest {
     }
 
     private class SlowFirstWriteConnector(
-        private val startSecondWriter: (CountDownLatch) -> Thread,
+        private val startSecondWriter: () -> SessionTestThread,
     ) : TerminalConnector {
-        private val writesDone = CountDownLatch(2)
-        private val triggeredWriter = CountDownLatch(1)
-        private val secondWriterAttempted = CountDownLatch(1)
         private val bytes = ArrayList<Byte>()
         private var listener: TerminalConnectorListener? = null
         private var writes: Int = 0
-        private var writerThread: Thread? = null
+        private var writerThread: SessionTestThread? = null
 
         val writtenBytes: ByteArray
             get() =
@@ -2312,11 +2175,9 @@ class TerminalSessionTest {
                 }
 
             if (currentWrite == 1) {
-                writerThread = startSecondWriter(secondWriterAttempted)
-                triggeredWriter.countDown()
-                check(secondWriterAttempted.await(1, TimeUnit.SECONDS)) {
-                    "second writer did not attempt to write"
-                }
+                val writer = startSecondWriter()
+                writerThread = writer
+                writer.awaitBlockedBy(Thread.currentThread())
             }
 
             synchronized(this.bytes) {
@@ -2326,7 +2187,6 @@ class TerminalSessionTest {
                     index++
                 }
             }
-            writesDone.countDown()
         }
 
         override fun resize(
@@ -2335,32 +2195,25 @@ class TerminalSessionTest {
         ) = Unit
 
         override fun close() {
-            writerThread?.join(1000)
+            writerThread?.close()
         }
 
         fun feedFromHost(bytes: ByteArray) {
             listener?.onBytes(bytes, 0, bytes.size)
         }
 
-        fun awaitTriggeredWriter(): Boolean = triggeredWriter.await(1, TimeUnit.SECONDS)
-
-        fun awaitWrites(count: Int): Boolean {
-            require(count == 2) { "this fixture only waits for the two expected writes" }
-            val completed = writesDone.await(1, TimeUnit.SECONDS)
-            writerThread?.join(1000)
-            return completed
+        fun awaitWrites() {
+            checkNotNull(writerThread).awaitCompletion()
+            assertEquals(2, writes)
         }
     }
 
     private class ReplacementInterleavingConnector(
-        private val startConcurrentWriter: (CountDownLatch) -> Thread,
+        private val startConcurrentWriter: () -> SessionTestThread,
     ) : TerminalConnector {
-        private val writesDone = CountDownLatch(3)
-        private val triggeredWriter = CountDownLatch(1)
-        private val concurrentWriterAttempted = CountDownLatch(1)
         private val bytes = ArrayList<Byte>()
         private var writes = 0
-        private var writerThread: Thread? = null
+        private var writerThread: SessionTestThread? = null
 
         val writtenBytes: ByteArray
             get() = synchronized(bytes) { ByteArray(bytes.size) { index -> bytes[index] } }
@@ -2374,11 +2227,9 @@ class TerminalSessionTest {
         ) {
             val currentWrite = synchronized(this) { ++writes }
             if (currentWrite == 1) {
-                writerThread = startConcurrentWriter(concurrentWriterAttempted)
-                triggeredWriter.countDown()
-                check(concurrentWriterAttempted.await(1, TimeUnit.SECONDS)) {
-                    "concurrent writer did not attempt input"
-                }
+                val writer = startConcurrentWriter()
+                writerThread = writer
+                writer.awaitBlockedBy(Thread.currentThread())
             }
             synchronized(this.bytes) {
                 var index = 0
@@ -2387,7 +2238,6 @@ class TerminalSessionTest {
                     index++
                 }
             }
-            writesDone.countDown()
         }
 
         override fun resize(
@@ -2396,15 +2246,12 @@ class TerminalSessionTest {
         ) = Unit
 
         override fun close() {
-            writerThread?.join(1000)
+            writerThread?.close()
         }
 
-        fun awaitTriggeredWriter(): Boolean = triggeredWriter.await(1, TimeUnit.SECONDS)
-
-        fun awaitWrites(): Boolean {
-            val completed = writesDone.await(1, TimeUnit.SECONDS)
-            writerThread?.join(1000)
-            return completed
+        fun awaitWrites() {
+            checkNotNull(writerThread).awaitCompletion()
+            assertEquals(3, writes)
         }
     }
 }
