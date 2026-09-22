@@ -15,8 +15,7 @@
  */
 package io.github.ketraterm.core.util
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.params.ParameterizedTest
@@ -27,6 +26,41 @@ import java.util.stream.Stream
 
 @DisplayName("UnicodeWidth Test Suite")
 class UnicodeWidthTest {
+    @ParameterizedTest
+    @ValueSource(ints = [Int.MIN_VALUE, -2, -1, 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0x110000, Int.MAX_VALUE])
+    fun `non scalars have no width and cannot hide behind presentation selectors`(cp: Int) {
+        for (wide in listOf(false, true)) {
+            assertThrows(IllegalArgumentException::class.java) { UnicodeWidth.calculate(cp, wide) }
+            for (cluster in listOf(intArrayOf(cp), intArrayOf(cp, 0xFE0E), intArrayOf(0x2764, 0xFE0F, cp))) {
+                assertThrows(IllegalArgumentException::class.java) {
+                    UnicodeWidth.calculateCluster(cluster, cluster.size, wide)
+                }
+            }
+        }
+        assertFalse(UnicodeWidth.isEmojiVariationBase(cp))
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0x0378, 0x0380, 0xE0000, 0xFDD0, 0xFDEF, 0xFFFE, 0xFFFF, 0x2FFFE, 0x3FFFF, 0x10FFFF])
+    fun `ordinary unassigned scalars and noncharacters are narrow`(cp: Int) {
+        assertEquals(1, UnicodeWidth.calculate(cp, false))
+        assertEquals(1, UnicodeWidth.calculate(cp, true))
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0xFAFF, 0x2FFFD, 0x3FFFD])
+    fun `reserved CJK scalars retain Unicode wide defaults`(cp: Int) {
+        assertEquals(2, UnicodeWidth.calculate(cp, false))
+        assertEquals(2, UnicodeWidth.calculate(cp, true))
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0xE000, 0xF8FF, 0xF0000, 0xFFFFD, 0x100000, 0x10FFFD, 0xFFFD])
+    fun `private use and replacement scalars follow ambiguous mode`(cp: Int) {
+        assertEquals(1, UnicodeWidth.calculate(cp, false))
+        assertEquals(2, UnicodeWidth.calculate(cp, true))
+    }
+
     @Nested
     @DisplayName("ASCII & Control Fast Paths")
     inner class AsciiAndControlFastPathTests {
@@ -38,7 +72,7 @@ class UnicodeWidthTest {
         }
 
         @ParameterizedTest(name = "Control cp=0x{0} returns width 0")
-        @ValueSource(ints = [0x00, 0x1F, 0x7F, 0x85, 0x9F, -1])
+        @ValueSource(ints = [0x00, 0x1F, 0x7F, 0x85, 0x9F])
         fun `control ranges return 0`(cp: Int) {
             assertEquals(0, UnicodeWidth.calculate(cp, ambiguousAsWide = false))
             assertEquals(0, UnicodeWidth.calculate(cp, ambiguousAsWide = true))

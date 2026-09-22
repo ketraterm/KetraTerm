@@ -34,7 +34,10 @@ internal class ActionEngine(
     private val sink: TerminalCommandSink,
     private val dispatcher: CommandDispatcher,
     private val printableSink: PrintableActionSink,
+    private val clipboardWriteLimitBytes: () -> Int = { 0 },
 ) {
+    private val oscDispatcher = OscDispatcher()
+
     /**
      * Executes one FSM action.
      *
@@ -137,50 +140,39 @@ internal class ActionEngine(
                 state.clearSequenceState()
                 state.clearPayloadState()
 
-                // OSC command code is not fully parsed yet.
-                // Milestone A only accumulates bounded payload bytes.
-                state.payloadCode = -1
                 state.fsmState = nextState
             }
 
             FsmAction.OSC_PUT_ASCII -> {
-                putPayloadByte(state, byteValue)
+                putOscPayloadByte(state, byteValue)
                 state.fsmState = nextState
             }
 
             FsmAction.OSC_PUT_UTF8 -> {
-                putPayloadByte(state, byteValue)
+                putOscPayloadByte(state, byteValue)
                 state.fsmState = nextState
             }
 
             FsmAction.DCS_IGNORE_START -> {
                 flushPrintable(state)
                 state.clearPayloadState()
-                putPayloadByte(state, byteValue)
+                putDcsPayloadByte(state, byteValue)
                 state.fsmState = nextState
             }
 
             FsmAction.DCS_PUT_ASCII -> {
-                putPayloadByte(state, byteValue)
+                putDcsPayloadByte(state, byteValue)
                 state.fsmState = nextState
             }
 
             FsmAction.DCS_PUT_UTF8 -> {
-                putPayloadByte(state, byteValue)
+                putDcsPayloadByte(state, byteValue)
                 state.fsmState = nextState
             }
 
             FsmAction.OSC_EXECUTE_CONTROL -> {
                 if (byteValue == ControlCode.BEL) {
-                    OscDispatcher.dispatch(
-                        sink = sink,
-                        payload = state.payloadBuffer,
-                        length = state.payloadLength,
-                        overflowed = state.payloadOverflowed,
-                    )
-                    state.clearPayloadState()
-                    state.clearSequenceState()
-                    state.fsmState = AnsiState.GROUND
+                    finishOsc(state, AnsiState.GROUND)
                 } else {
                     // Ordinary C0 inside OSC is ignored.
                     state.fsmState = nextState
@@ -188,15 +180,7 @@ internal class ActionEngine(
             }
 
             FsmAction.OSC_END -> {
-                OscDispatcher.dispatch(
-                    sink = sink,
-                    payload = state.payloadBuffer,
-                    length = state.payloadLength,
-                    overflowed = state.payloadOverflowed,
-                )
-                state.clearPayloadState()
-                state.clearSequenceState()
-                state.fsmState = nextState
+                finishOsc(state, nextState)
             }
 
             FsmAction.DCS_END -> {
@@ -326,21 +310,95 @@ internal class ActionEngine(
         return true
     }
 
-    private fun putPayloadByte(
+    private fun putOscPayloadByte(
         state: ParserState,
         byteValue: Int,
     ) {
-        if (state.payloadOverflowed) {
-            return
+        if (!state.payloadOverflowed &&
+            state.clipboardDataStart >= 0 &&
+            state.payloadLength == state.clipboardDataStart &&
+            (
+                byteValue in 'A'.code..'Z'.code ||
+                    byteValue in 'a'.code..'z'.code ||
+                    byteValue in '0'.code..'9'.code ||
+                    byteValue == '+'.code ||
+                    byteValue == '/'.code
+            )
+        ) {
+            // Queries and empty writes never need larger storage. Permissions remain host-owned.
+            val limit = ControlStringPolicy.clipboardLimit(state.clipboardDataStart, clipboardWriteLimitBytes())
+            state.payloadLimit = maxOf(state.payloadLimit, limit)
+        }
+        if (!putPayloadByte(state, byteValue)) return
+        if (!state.payloadHeaderComplete && byteValue == ';'.code) {
+            state.payloadCode = ControlStringPolicy.oscCommand(state.payloadBuffer, state.payloadLength - 1)
+            selectPayloadLimit(state, ControlStringPolicy.oscLimit(state.payloadCode))
+        } else if (state.payloadCode == 52) {
+            if (state.clipboardDataStart < 0 && byteValue == ';'.code) {
+                state.clipboardDataStart = state.payloadLength
+            }
+        }
+    }
+
+    private fun finishOsc(
+        state: ParserState,
+        nextState: Int,
+    ) {
+        try {
+            oscDispatcher.dispatch(
+                sink = sink,
+                payload = state.payloadBuffer,
+                length = state.payloadLength,
+                overflowed = state.payloadOverflowed,
+                payloadLimit = state.payloadLimit,
+            )
+        } finally {
+            state.clearPayloadState()
+            state.clearSequenceState()
+            state.fsmState = nextState
+        }
+    }
+
+    private fun putDcsPayloadByte(
+        state: ParserState,
+        byteValue: Int,
+    ) {
+        if (!putPayloadByte(state, byteValue)) return
+        if (!state.payloadHeaderComplete && state.payloadLength == 2) {
+            selectPayloadLimit(state, ControlStringPolicy.dcsLimit(state.payloadBuffer[0].toInt() and 0xff, byteValue))
+        }
+    }
+
+    private fun selectPayloadLimit(
+        state: ParserState,
+        limit: Int,
+    ) {
+        state.payloadHeaderComplete = true
+        state.payloadLimit = minOf(state.payloadLimit, limit)
+        if (state.payloadLimit > 0 && state.payloadLength > state.payloadLimit) state.payloadOverflowed = true
+    }
+
+    private fun putPayloadByte(
+        state: ParserState,
+        byteValue: Int,
+    ): Boolean {
+        if (state.payloadOverflowed || state.payloadLimit == 0) {
+            return false
         }
 
-        if (state.payloadLength >= state.payloadBuffer.size) {
-            state.payloadOverflowed = true
-            return
+        if (state.payloadLength >= state.payloadLimit) {
+            state.discardOverflowedPayload()
+            return false
+        }
+
+        if (state.payloadLength == state.payloadBuffer.size) {
+            val capacity = minOf(state.payloadBuffer.size.toLong() * 2, state.payloadLimit.toLong()).toInt()
+            state.payloadBuffer = state.payloadBuffer.copyOf(capacity)
         }
 
         state.payloadBuffer[state.payloadLength] = byteValue.toByte()
         state.payloadLength++
+        return true
     }
 
     private fun saturatingAppendDecimal(

@@ -15,19 +15,25 @@
  */
 package io.github.ketraterm.parser.ansi.osc
 
+import io.github.ketraterm.parser.ansi.ControlStringPolicy
 import io.github.ketraterm.parser.spi.TerminalCommandSink
+import io.github.ketraterm.parser.utf8.Utf8DecodeResult
+import io.github.ketraterm.parser.utf8.Utf8Decoder
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
 
-internal object OscDispatcher {
+internal class OscDispatcher {
+    private val utf8Decoder = Utf8Decoder()
+
     fun dispatch(
         sink: TerminalCommandSink,
         payload: ByteArray,
         length: Int,
         overflowed: Boolean,
+        payloadLimit: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES,
     ) {
-        if (overflowed || length <= 0) {
+        if (length <= 0) {
             return
         }
 
@@ -36,7 +42,30 @@ internal object OscDispatcher {
             return
         }
 
-        val command = parseDecimal(payload, commandEnd) ?: return
+        val command = ControlStringPolicy.oscCommand(payload, commandEnd)
+        val limit = if (command == 52) payloadLimit else ControlStringPolicy.oscLimit(command)
+        if (limit == 0) return
+        if (overflowed || length > limit) {
+            if (command == 8) sink.endHyperlink()
+            return
+        }
+        // Display text deliberately uses replacement decoding. Structured metadata must
+        // retain its identity; validate the complete command before emitting any effects.
+        when (command) {
+            4, 7, 8, 10, 11, 12, 133 -> {
+                if (!isValidUtf8(payload, commandEnd + 1, length)) {
+                    if (command == 8) sink.endHyperlink()
+                    return
+                }
+            }
+            52 -> {
+                // Selection and Base64/query syntax are ASCII. Decoded clipboard text
+                // is validated by the host before its permission decision is published.
+                for (i in commandEnd + 1 until length) {
+                    if (payload[i] < 0) return
+                }
+            }
+        }
         when (command) {
             0 -> sink.setIconAndWindowTitle(decodePayload(payload, commandEnd + 1, length))
             1 -> sink.setIconTitle(decodePayload(payload, commandEnd + 1, length))
@@ -214,26 +243,6 @@ internal object OscDispatcher {
         )
     }
 
-    private fun parseDecimal(
-        payload: ByteArray,
-        endExclusive: Int,
-    ): Int? {
-        var value = 0
-        var i = 0
-        while (i < endExclusive) {
-            val digit = (payload[i].toInt() and 0xff) - '0'.code
-            if (digit !in 0..9) {
-                return null
-            }
-            if (value > (Int.MAX_VALUE - digit) / 10) {
-                return null
-            }
-            value = value * 10 + digit
-            i++
-        }
-        return value
-    }
-
     private fun findHyperlinkId(params: String): String? {
         if (params.isEmpty()) {
             return null
@@ -270,6 +279,18 @@ internal object OscDispatcher {
         startInclusive: Int,
         endExclusive: Int,
     ): String = payload.decodeToString(startIndex = startInclusive, endIndex = endExclusive)
+
+    private fun isValidUtf8(
+        payload: ByteArray,
+        start: Int,
+        end: Int,
+    ): Boolean {
+        utf8Decoder.reset()
+        for (i in start until end) {
+            if (Utf8DecodeResult.isMalformed(utf8Decoder.accept(payload[i].toInt() and 0xff))) return false
+        }
+        return !utf8Decoder.hasPendingSequence()
+    }
 
     private fun parseColor(spec: String): Int? {
         val trimmed = spec.trim()

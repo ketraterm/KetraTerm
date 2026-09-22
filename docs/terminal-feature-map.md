@@ -39,6 +39,54 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 - **Window Manipulation**: Support for standard xterm window manipulation sequences (`CSI 1 t` de-minimize, `CSI 2 t` minimize, `CSI 3 ; x ; y t` move, `CSI 5 t` raise, `CSI 6 t` lower, `CSI 8 ; rows ; cols t` resize, `CSI 9 ; mode t` maximize/restore) gated by a secure user setting (`shell_request_window_manipulation`).
 - **ISO 2022 Charsets**: G0-G3 designation sets (ASCII and DEC Special Graphics) with locking shifts (`SO`/`SI`) and single shifts (`SS2`/`SS3`).
 
+### OSC Encoding and Recovery Contract
+
+OSC uses UTF-8 only; there is no locale-dependent decoding, encoding detection, or Latin-1 fallback. These are fixed protocol rules, independent of host permission settings. They apply to collected payload bytes after the parser's existing string-control handling. A correctly encoded literal `U+FFFD` is valid Unicode and is never evidence of malformed input. URI percent escapes are not decoded by this encoding check.
+
+| OSC family | Encoding rule | Effect of malformed encoding |
+| --- | --- | --- |
+| `0`, `1`, `2`: icon/window titles | UTF-8 with Kotlin/JVM replacement decoding (`U+FFFD`) | Repaired display text passes through the existing title permission and overflow policy. |
+| `9`, `777`: notification text | UTF-8 with the same replacement decoding | Recognized notifications pass through host permissions and length limits; existing ConEmu exclusion and notification grammar remain in force. |
+| `7`: working-directory URI | Strict UTF-8 | Discard the command; retain the previous directory and emit no directory callback. Valid text still undergoes URI and host-policy validation. |
+| `8`: hyperlink URI and parameters | Strict UTF-8 across the complete payload | End the active hyperlink context so subsequent cells do not inherit an older destination. Already written cells and retained registry entries remain unchanged. A valid empty URI also ends the context. |
+| `4`, `10`, `11`, `12`: palette/dynamic colors | Strict UTF-8 before interpreting fields | Discard the complete command before any color mutation or query response. This atomic rejection concerns encoding; validly encoded fields retain their existing color grammar. |
+| `133`: shell-integration markers | Strict UTF-8 before interpreting fields | Emit no marker. Validly encoded optional arguments retain existing handling, including an unknown exit code for nonnumeric text. |
+| `52`: clipboard envelope | ASCII selection and Base64/query fields | Non-ASCII or structurally incomplete envelopes are discarded by the parser without a host request or audit. |
+| `52`: Base64-decoded clipboard text | Strict UTF-8, validated by the host within its decoded-byte limit | Emit `DENIED_MALFORMED_PAYLOAD`; never prompt or write repaired text. Base64 syntax is checked first, then the decoded-size limit, then UTF-8 validity, then host write permission. Valid empty text retains clear-style write semantics. Read queries retain their existing policy handling. |
+
+BEL and `ESC \` complete an OSC command. CAN/SUB, parser reset, and end-of-input discard an unfinished OSC without metadata effects. Oversized commands follow the payload contract below; a truncated prefix is never dispatched. Other C0 controls and DEL are ignored inside OSC. ESC is not retained as payload; a following payload byte resumes collection, while repeated ESC remains pending and DEL leaves that pending state unchanged. Bytes `0x80..0xFF` are payload bytes, never raw C1 terminators. Unknown commands and malformed command numbers emit no effects. Subsequent commands recover normally regardless of byte chunking.
+
+Host title and notification limits count UTF-16 code units. Clamping backs off one code unit when necessary to preserve a supplementary scalar; it does not promise grapheme-aware truncation. Title rejection retains the previous value. The parser owns envelope encoding and recovery; the host owns decoded clipboard text, permissions, metadata limits, and audit outcomes. Products choose permission defaults without changing the encoding contract.
+
+### OSC/DCS Payload Resource Contract
+
+`ControlStringPolicy` owns parser collection ceilings. Limits count **collected bytes**, including the OSC command number and separators or DCS family prefix, but excluding introducers, terminators, and bytes ignored by existing string-control handling. Multibyte UTF-8 counts by bytes. Ordinary commands retain the reusable 4,096-byte buffer and ceiling; a smaller internal scratch capacity further restricts ordinary acceptance. Only eligible OSC 52 writes may grow temporary storage under the clipboard budget below.
+
+| Family | Maximum collected bytes | Reason |
+| --- | ---: | --- |
+| OSC `0`, `1`, `2` titles; `7` directory; `8` links; `9`, `777` notifications | 4,096 | Preserve existing metadata compatibility; host limits still govern decoded/retained values. |
+| OSC `4` palette; `133` shell markers | 4,096 | Preserve palette batches and optional shell marker arguments. |
+| OSC `52` clipboard | 4,096 ordinarily; derived budget for eligible writes | Keep command/selection headers and queries bounded; allow larger write data only within the current host-provided decoded-byte budget. |
+| OSC `10`, `11`, `12` dynamic colors | 256 | Only foreground/background/cursor targets are implemented; the ceiling leaves headroom for batched color syntax and whitespace. |
+| DCS `$q` DECRQSS | 64 | Short status selectors, with compatibility headroom for unsupported selectors and extensions. |
+| DCS `+q` XTGETTCAP | 4,096 | Capability names can be batched; the core allowlist remains separate. |
+
+The smaller ceilings are implementation resource policies, not limits prescribed by the [xterm protocol reference](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html). OSC family selection occurs at the first semicolon; DCS selection occurs after its two-byte prefix. Unknown/malformed families stop collecting bodies once identified, without decoding them. Unresolved headers remain subject to the ordinary ceiling, and long leading-zero OSC headers cannot bypass a selected family's ceiling.
+
+At the first excess byte, collection stops. The existing FSM still consumes input through its normal terminator or cancellation rules, preventing discarded bytes from printing. At completion, oversized OSC commands preserve metadata and emit no partial updates, notifications, clipboard requests/audits, shell markers, or color-query responses. **Exception: an identified oversized OSC 8 ends active hyperlink context**, matching malformed UTF-8 rejection; existing cell destinations and registry entries remain unchanged. Oversized DCS requests produce no response, preserving the previous overflow behavior; bounded requests still pass through host permissions and the core query allowlist. No retained query prefix is dispatched. DCS ends with ST, not BEL. CAN/SUB, reset, and EOF discard unfinished OSC/DCS without dispatch, including unfinished oversized hyperlinks, and reset collection state for subsequent input.
+
+#### Bounded OSC 52 Writes
+
+Production sessions wire `TerminalParsers.create(..., clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)` to the existing host clipboard policy. The host supplies `maxDecodedBytes` for `ALLOW`, `PROMPT`, or an admitted `ALLOWLIST` write, using the active local/remote origin; denied writes supply zero. The default eligible decoded budget is **1 MiB**. Permission defaults are unchanged, and no clipboard read response or new selection mapping is enabled.
+
+The parser reads this budget once, when the first Base64-alphabet byte arrives after the bounded command and selection fields. Empty writes and `?` queries need no larger storage. For decoded budget `D` and actual envelope prefix size `H`, collection permits at most `max(ordinaryLimit, H + 4 * ceil(D / 3))` bytes, capped at `Int.MAX_VALUE - 8` for array indexing. The ordinary floor preserves small-request auditing and clear-style writes. Arithmetic uses `Long` to prevent overflow. A parser created without the callback retains the ordinary 4 KiB bound (3,066 decoded bytes for canonical padded Base64 in a `52;c;` envelope).
+
+Storage grows geometrically only when incoming write data exceeds current capacity, never past the selected encoded ceiling. The initial buffer is retained for reuse; grown buffers are released on completion, encoded overflow, CAN/SUB, reset, EOF, and host callback failure. Session shutdown runs parser cleanup. Collection does not allocate per byte or during unrelated render frames; a large transfer inherently allocates temporary byte arrays and final metadata strings.
+
+At completion, the host still validates Base64 syntax and the **current** exact decoded-byte limit before decoding, then strictly validates UTF-8 before permission auditing, prompting, or writing. Base64 lengths cover groups of three decoded bytes, so data that fits the encoded budget can still exceed the exact decoded limit; that receives the existing size-denial audit without decoding. Data exceeding the encoded budget is discarded without a clipboard callback or audit. Malformed data is never repaired into clipboard text. A budget increase does not revive an overflowed write or enlarge an in-progress snapshot; a lower size limit or revoked permission is enforced by the host before execution. Subsequent writes sample the new budget.
+
+These bounds do not enable graphics. Future graphics support also needs APC handling where applicable, transfer-wide budgets, decoded/decompressed image bounds, and retained-image budgets before acceptance is enabled.
+
 ---
 
 ## 2. Text Styling & Color (SGR)
@@ -60,7 +108,7 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 - **OSC 8 Hyperlinks**: Inline hyperlink parsing (`OSC 8 ; id ; url ESC \`) with interactive Ctrl-click navigation and a bounded, double-indexed LRU eviction registry in the host. Numeric IDs are never reassigned during the host adapter's lifetime: reset and eviction invalidate old links, and ID exhaustion leaves new links unresolved without retargeting retained cells or UI references.
 - **OSC 7 Current Working Directory**: Absolute `file://` directory URIs are parsed from bounded OSC payloads, validated and length-limited by host policy, retained as thread-safe session and per-tab workspace metadata, forwarded through PTY/workspace callbacks, and snapshotted onto bounded OSC 133 command records. Workspace launch profiles emit percent-encoded OSC 7 reports before each prompt for supported interactive PowerShell/PowerShell Core, Bash/Git Bash, zsh, and fish shells. The standalone app uses a sanitized directory-name tab-title fallback and offers **Open Terminal Here** for existing local directories; remote-authority reports remain observable metadata and are not treated as local paths. Invalid, duplicate, or oversized reports do not create redundant workspace changes.
 - **OSC 133 Shell Integration Markers**: FinalTerm/iTerm-compatible shell lifecycle marker events (`OSC 133 ; A/B/C/D ST`) are parsed and forwarded through host, PTY, and workspace event boundaries. Core exposes stable primitive render-line identities that move with content through scroll, clear-history, and resize reflow; session-owned shell integration state stores a bounded primitive command timeline keyed by those identities and projects prompt starts, failed-command output, command boundaries, stable command record ids, and primitive lifecycle states into caller-owned viewport arrays. Prompt spans whose `A` marker precedes leading blank layout rows, including the default Git Bash prompt, anchor their gutter decoration to the first proven rendered prompt row at `B`; unavailable or empty spans preserve the protocol anchor instead of guessing. Records expose event-driven command, working-directory, exit-status, and start/finish timestamp snapshots without adding objects to viewport projection. Swing paints compact prompt dots and failed-output rails without changing row pitch, supports prompt-marker click selection of the prompt/input-and-output command block, previous/next command navigation, command hit-testing, and exact retained-output copy/export with soft-wrap reconstruction. Session metadata reconstructs bounded single-line and multiline command text between prompt-end and command-start markers, including retained scrollback rows and grapheme clusters; ambiguous, unavailable, or oversized text remains unknown instead of being guessed. The standalone host offers opt-in, versioned, atomic, bounded command-metadata persistence on a background worker (fully detailed in [Persistent Terminal Storage Layout](persistent-terminal-storage.md)), equipped with built-in security filters that prevent raw commands containing secrets, tokens, or credentials, or commands with leading whitespace, from being written to disk; raw terminal output is never persisted automatically. Workspace launch profiles inject idempotent startup hooks for supported interactive PowerShell/PowerShell Core, Bash/Git Bash, zsh, fish, and explicitly selected Bash/zsh/fish shells under WSL/Ubuntu launchers. Unknown WSL default shells remain untouched to preserve launch semantics.
-- **OSC Palette Queries**: Dynamic color palette queries and updates (`OSC 4 / 10 / 11 / 12`), allowing applications to query standard palette colors or default foreground/background/cursor colors.
+- **OSC Palette Queries**: Dynamic color palette queries and updates (`OSC 4 / 10 / 11 / 12`), allowing applications to query standard palette colors or default foreground/background/cursor colors. Unchanged values preserve the existing palette and avoid copying its storage or invalidating rows.
 - **Desktop Notifications**:
   - **iTerm2 Style (`OSC 9`)**: Triggers a notification body payload (`OSC 9 ; message ST` or `BEL`).
   - **urxvt Style (`OSC 777`)**: Triggers a notification with separate title and body (`OSC 777 ; notify ; title ; body ST` or `BEL`).
@@ -71,6 +119,34 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
   - **XTGETTCAP / XTSETTCAP**: Queries color capabilities (`Co`/`colors` returning `256`), terminal name (`TN`/`name` returning `xterm-256color`), and TrueColor support (`RGB`/`Tc` returning boolean success). Responses are strictly checked against a security allowlist and sourced from the shared terminal capability identity contract.
 
 ---
+
+### Targeted Host Metadata Events
+
+`HostEventSink`, `PtyEventListener`, and `TerminalWorkspaceListener` expose
+effective palette changes and OSC 8 registry registration, eviction, and clearing.
+Palette events retain the immutable core-owned palette and cover OSC 4/10/11/12,
+host theme replacement, and hard reset. Equal values, queries, unsupported targets,
+and denied application changes do not emit events. Core and session expose the
+current palette independently of render frames.
+
+Hyperlink registration carries the positive numeric identity, accepted URI, and
+optional application ID. Explicit-key reuse does not register again; anonymous
+opens retain their distinct identities. Eviction emits removal before replacement
+registration, and hard reset emits one clearing event for a nonempty registry.
+OSC 8 close and soft reset leave registered links resolvable. IDs are never reused;
+denied, oversized, or exhausted registrations create no metadata event. Session
+resolution is synchronized with registry mutation. Notifications remain individual
+policy-filtered requests; identical repetitions are delivered separately.
+
+Callbacks run synchronously in mutation order, under the session mutation lock
+when using `TerminalSession.create`, without initial replay or per-frame events.
+Hosts return promptly and schedule UI work on their own lifecycle without waiting
+for the UI or reentering mutation. Direct sink exceptions propagate; the PTY
+bridge reports and isolates listener exceptions. Workspace callbacks apply to
+attached tabs, excluding events before attachment and after removal. Session
+close rejects subsequent ingress and theme updates; an already-running mutation
+finishes before parser cleanup. Active OSC 8 writing-attribute callbacks and
+mode 2031 application-facing notifications are outside this slice.
 
 ## 4. Query-Response Channels
 
@@ -90,6 +166,7 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 - **Unicode 17.0.0 Data Tables**: Uses generated Unicode 17.0.0 grapheme break, emoji property, and terminal width tables for UAX #29-style multi-scalar grapheme segmentation and emoji presentation states.
 - **Combining Marks**: Full support for zero-width extenders, including Thai and Lao combining characters.
 - **East Asian Width**: Dynamic width calculations supporting wide, narrow, and East Asian Ambiguous width modes.
+- **Invalid and Unassigned Scalars**: Core scalar/cluster ingress rejects non-scalars before mutation; literal string ingress replaces each unpaired UTF-16 surrogate with U+FFFD. Widths use pinned Unicode 17.0.0 tables, never JDK assignment status or font availability: unlisted valid scalars are narrow, reserved CJK wide ranges remain wide, noncharacters are narrow, and private-use characters plus U+FFFD follow ambiguous-width mode. Existing zero-width and cluster-presentation rules still apply. See the [core width contract](../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy).
 - **Live Grapheme Rendering**: Progressive rendering of printable prefixes without cursor movement for combining marks or ZWJ extensions.
 
 ---

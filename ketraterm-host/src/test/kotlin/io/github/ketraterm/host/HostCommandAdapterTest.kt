@@ -38,6 +38,37 @@ import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("HostCommandAdapter")
 class HostCommandAdapterTest {
+    @Test
+    fun `unassigned widths and UTF8 replacement preserve alignment across every byte split`() {
+        val bytes =
+            "\u0378".encodeToByteArray() + byteArrayOf(0xF0.toByte(), 0xAF.toByte(), 0xBF.toByte(), 0xBD.toByte()) +
+                byteArrayOf(0xC3.toByte()) + "X\uFDD0".encodeToByteArray()
+        for (wide in listOf(false, true)) {
+            for (split in 0..bytes.size) {
+                val f = Fixture(terminal = TerminalBuffers.create(width = 5, height = 3))
+                f.terminal.setTreatAmbiguousAsWide(wide)
+                f.parser.accept(bytes.copyOfRange(0, split))
+                f.parser.accept(bytes.copyOfRange(split, bytes.size))
+                f.end()
+                assertEquals(0x0378, f.terminal.getCodepointAt(0, 0))
+                assertEquals(0x2FFFD, f.terminal.getCodepointAt(1, 0))
+                assertEquals(-1, f.terminal.getCodepointAt(2, 0))
+                assertEquals(0xFFFD, f.terminal.getCodepointAt(3, 0))
+                if (wide) {
+                    assertEquals(-1, f.terminal.getCodepointAt(4, 0))
+                    assertEquals('X'.code, f.terminal.getCodepointAt(0, 1))
+                    assertEquals(0xFDD0, f.terminal.getCodepointAt(1, 1))
+                    assertEquals(2, f.terminal.cursorCol)
+                } else {
+                    assertEquals('X'.code, f.terminal.getCodepointAt(4, 0))
+                    assertEquals(0xFDD0, f.terminal.getCodepointAt(0, 1))
+                    assertEquals(1, f.terminal.cursorCol)
+                }
+                assertEquals(1, f.terminal.cursorRow)
+            }
+        }
+    }
+
     private data class Fixture(
         val terminal: TerminalBuffer = TerminalBuffers.create(width = 10, height = 5),
         val hostPolicy: HostPolicy = HostPolicy(),

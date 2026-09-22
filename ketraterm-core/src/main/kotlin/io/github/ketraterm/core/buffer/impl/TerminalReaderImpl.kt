@@ -20,10 +20,12 @@ import io.github.ketraterm.core.api.TerminalReader
 import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.model.VoidLine
 import io.github.ketraterm.core.state.TerminalState
+import io.github.ketraterm.render.api.TerminalColorPalette
 
 internal class TerminalReaderImpl(
     private val state: TerminalState,
 ) : TerminalReader {
+    override val palette: TerminalColorPalette get() = state.palette
     override val width: Int get() = state.dimensions.width
     override val height: Int get() = state.dimensions.height
     override val windowTitle: String get() = state.windowTitle

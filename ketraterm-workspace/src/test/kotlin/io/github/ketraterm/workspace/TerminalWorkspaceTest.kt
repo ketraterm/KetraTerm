@@ -24,9 +24,11 @@ import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.input.policy.PasteSanitizationPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
+import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
 import io.github.ketraterm.pty.PtyEventListener
+import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.session.TerminalSession
@@ -43,6 +45,94 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalWorkspaceTest {
+    @Test
+    fun `metadata callbacks target the attached tab and stop after removal`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            testSession(dispatcher = dispatcher).use { session ->
+                var ptyListener: PtyEventListener? = null
+                val delivered = mutableListOf<Pair<TerminalWorkspaceTab, String>>()
+                val palette = TerminalColorPalette(isDark = false)
+                val listener =
+                    object : TerminalWorkspaceListener {
+                        override fun paletteChanged(
+                            tab: TerminalWorkspaceTab,
+                            palette: TerminalColorPalette,
+                        ) {
+                            assertEquals(false, palette.isDark)
+                            delivered += tab to "palette"
+                        }
+
+                        override fun hyperlinkRegistered(
+                            tab: TerminalWorkspaceTab,
+                            hyperlinkId: Int,
+                            uri: String,
+                            id: String?,
+                        ) {
+                            delivered += tab to "registered:$hyperlinkId:$uri:$id"
+                        }
+
+                        override fun hyperlinkRemoved(
+                            tab: TerminalWorkspaceTab,
+                            hyperlinkId: Int,
+                        ) {
+                            delivered += tab to "removed:$hyperlinkId"
+                        }
+
+                        override fun hyperlinksCleared(tab: TerminalWorkspaceTab) {
+                            delivered += tab to "cleared"
+                        }
+
+                        override fun showNotification(
+                            tab: TerminalWorkspaceTab,
+                            title: String,
+                            body: String,
+                            level: NotificationLevel,
+                        ) {
+                            delivered += tab to "notification:$title:$body:$level"
+                        }
+                    }
+                TerminalWorkspace(
+                    listener,
+                    TerminalWorkspaceSessionFactory { _, _, events ->
+                        ptyListener = events
+                        session
+                    },
+                    workerDispatcher = dispatcher,
+                ).use { workspace ->
+                    val tab =
+                        workspace.openTab(
+                            TerminalProfile("p", "Profile", listOf("mock")),
+                            TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                        )
+                    val events = requireNotNull(ptyListener)
+
+                    fun emit() {
+                        events.paletteChanged(session, palette)
+                        events.hyperlinkRegistered(session, 1, "https://a", "key")
+                        events.hyperlinkRemoved(session, 1)
+                        events.hyperlinksCleared(session)
+                        repeat(2) { events.showNotification(session, "title", "body", NotificationLevel.INFO) }
+                    }
+                    emit()
+                    assertEquals(
+                        listOf(
+                            "palette",
+                            "registered:1:https://a:key",
+                            "removed:1",
+                            "cleared",
+                            "notification:title:body:INFO",
+                            "notification:title:body:INFO",
+                        ).map { tab to it },
+                        delivered,
+                    )
+                    workspace.closeTab(tab.id)
+                    emit()
+                    assertEquals(6, delivered.size)
+                }
+            }
+        }
+
     @Test
     fun `workspace tracks connector metadata applies live toggles and clears on remote exit`() =
         runTest {

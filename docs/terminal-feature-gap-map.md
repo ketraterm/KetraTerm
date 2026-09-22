@@ -31,7 +31,6 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 
 ### Tier 3: Optional (Graphics & advanced features)
 - Sixel or modern graphics protocols (e.g. Kitty graphics protocol).
-- Richer hyperlink, title, palette, and notification host callbacks.
 
 ---
 
@@ -73,7 +72,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(host/ui/policy)`: OSC 52 allowlist management UI, non-clipboard selection mapping, and any read/query response path remain unimplemented until product hosts explicitly opt in. Standalone and IntelliJ settings intentionally hide the `allowlist` option until a product-owned allowlist can persist entries and set `TerminalClipboardPolicy.allowlisted`.
 - `TODO(parser)`: OSC 1337/iTerm2 extensions, if desired.
 - `TODO(parser)`: OSC query responses. Requires terminal-to-host output.
-- `TODO(parser)`: payload encoding policy for non-UTF-8 or invalid UTF-8 OSC data.
+- `DONE(parser/host)`: explicit OSC encoding and recovery rules distinguish replacement-decoded display text from strictly validated structured metadata and clipboard text. Rejected links clear active context; other rejected metadata retains prior state. The [OSC encoding contract](terminal-feature-map.md#osc-encoding-and-recovery-contract) defines family-specific effects, audit precedence, overflow, abort/EOF recovery, and scalar-safe host limits. Legacy encoding detection and fallback are intentionally absent.
 
 ### DCS Protocols
 - `TODO(parser)`: Sixel graphics, if the emulator will support inline graphics.
@@ -92,9 +91,6 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ## Core Gaps
 
-### Reset and Mode Semantics
-- `TODO(core/host)`: richer event API for hyperlink metadata, palette changes, terminal notifications, and any future host-observable state that should not be read from render frames.
-
 ### Grid Operations
 - DONE(core): deterministic randomized left/right-margin properties cover ICH/DCH, selective erase, IL/DL, and partial-region scroll up/down. They preserve guard columns and rows outside the scroll rectangle and verify protected wide spans plus wide/cluster storage invariants.
 - `DONE(core/host)`: alternate-screen byte-stream coverage verifies exact primary history retention and zero alternate history across every `47`/`1047`/`1049` entry/exit pairing, repeated commands and re-entry, screen-local `1048` saves, and ordered private-mode lists. `ED2`, repeated `ED3`, and repeated `DECSTR` tests verify active-buffer clearing or text preservation, including combining/wide text and saved-cursor behavior. `DECCOLM` tests cover both 80/132-column directions and current-width requests, preserving primary history while alternate is active and clearing primary history when primary is active.
@@ -102,13 +98,12 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(core/session/ui)`: soft-wrap text reconstruction preserves written and erased spaces for linear selection, command capture, clipboard copy/paste, and retained-output export. Core distinguishes artificial wide-character wrap padding from meaningful empty cells and preserves that distinction through resize/reflow. Selected hard line breaks survive empty selection endpoints; block selections retain physical row breaks.
 
 ### Unicode Width
-- `TODO(core)`: invalid/unassigned codepoint width policy.
+- `DONE(core/host/ui)`: invalid/unassigned codepoint width policy is explicit in the [core contract](../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy). Typed scalar/cluster writes reject non-scalars atomically; string writes repair unpaired surrogates. Pinned Unicode tables preserve reserved wide ranges and ambiguous-width behavior, with byte-split integration coverage for replacement, wrapping, and cursor alignment, plus real-buffer selection extraction through resize/reflow.
 
 ### Query and Response Channel
 - `DONE(core/host/policy)`: terminal-to-host response channel exists for DA, DSR/CPR, safe window reports, palette queries, `DECRQSS`, and allowlisted `XTGETTCAP`; host policy can deny terminal responses before they enqueue bytes.
 - `DONE(core/host/policy)`: light/dark color-scheme query (`CSI ?996n`) returns `CSI ?997;1n` (dark) or `CSI ?997;2n` (light) from the active host theme palette under terminal-response policy. Standalone and IDE theme updates use the existing synchronized palette publication path; application color overrides do not affect the reply. Denied requests stay silent because this protocol has no failure response. The implemented slice is the one-shot query, without mode 2031 unsolicited notifications.
 - `TODO(core/parser/host/policy)`: OSC query responses and future query/response protocols need explicit response shape, allowlist, and host policy before implementation.
-- `TODO(core/host)`: event API for hyperlinks, palette updates, and terminal notifications if these move out of host or render-frame metadata.
 
 ---
 
@@ -116,7 +111,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 - `DONE(host/policy)`: host-adapter allow/deny policy surface for title updates, OSC 8 hyperlinks, OSC 7 current-working-directory reports, desktop notifications, window manipulation requests, palette controls, terminal response channels, and OSC 52 clipboard request auditing.
 - `DONE(host)`: DECCOLM requires policy permission and explicit host acceptance before changing core state. Session synchronizes accepted 80/132-column changes with the connector before following output. IntelliJ ignores requests; standalone uses its existing resize permission and rejects disruptive or unrepresentable layouts. Embedders default to rejection. Product behavior is described under [Column Toggles](terminal-feature-map.md#1-terminal-protocols--control-sequences).
-- `TODO(host)`: richer host callbacks for palette updates, terminal notifications, mouse-report policy, and future clipboard decisions when those product surfaces need UI or embedding feedback.
+- `DONE(core/host/session/pty/workspace)`: targeted metadata callbacks publish effective palette changes and OSC 8 registry registration, eviction, and clearing through the existing host/PTY/workspace boundaries. Existing notification callbacks preserve individual requests, including identical repetitions. Callbacks are synchronous, policy-filtered for application controls, and independent of render publication; they do not replay initial state. Workspace forwarding applies to attached tabs. Active OSC 8 writing-attribute observation and application-facing color-scheme notifications are outside this slice. See [Targeted Host Metadata Events](terminal-feature-map.md#targeted-host-metadata-events) for delivery and reset semantics.
+- `TODO(host)`: host callbacks for mouse-report policy when product surfaces need UI or embedding feedback.
 
 ---
 
@@ -162,6 +158,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(ui)`: differentiated OSC 8 versus detected-link underlines and wrapped hover spans are implemented in Swing.
 - `TODO(policy)`: richer hyperlink validation and display policy beyond host resource limits, host allow/deny gating, and Swing's explicit-activation handler.
 - `DONE(host/policy)`: host-owned metadata and response controls have explicit policy gates and per-feature host caps for titles, hyperlinks, OSC 7 current-working-directory reports, notifications, palette controls, window manipulation, and terminal response channels.
-- `TODO(parser/policy)`: protocol-family-specific raw OSC/DCS parser payload ceilings beyond the parser's generic bound, especially before large graphics or clipboard protocols are enabled.
+- `DONE(parser/policy)`: current OSC/DCS families have explicit collection ceilings and overflow/recovery semantics in the [payload resource contract](terminal-feature-map.md#oscdcs-payload-resource-contract), including bounded unknown-family discard, hyperlink context clearing on completed overflow, and parser-to-host boundary tests. Ordinary commands retain the 4 KiB ceiling.
+- `DONE(parser/host/session/policy)`: [bounded OSC 52 writes](terminal-feature-map.md#bounded-osc-52-writes) derive a temporary encoded budget from the active host decoded-byte policy, enabling eligible writes up to the default 1 MiB decoded ceiling. Tests cover buffer release, chunking, precise bounds, malformed data, origin/permission combinations, policy changes during transfer, and shutdown; ordinary metadata and clipboard reads retain their existing behavior.
+- `TODO(parser/policy)`: graphics require separate bounded storage/transfer designs, APC where applicable, decoded/decompressed image bounds, and retained-image budgets; current clipboard/family ceilings alone do not enable graphics.
 - `DONE(host/policy)`: title/icon updates are host-gated through `HostPolicy.titlePolicy`, which models local vs remote session origin, local/remote allow decisions, and configurable oversized-title handling (`clamp` by default for standalone compatibility, or `reject` for stricter profiles).
 - `DONE(policy)`: terminal capability identity policy is explicit in `TerminalCapabilityIdentity` and consumed by PTY launch defaults plus core terminal-to-host query responses.

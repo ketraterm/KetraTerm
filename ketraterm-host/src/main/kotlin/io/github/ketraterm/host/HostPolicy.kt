@@ -23,6 +23,8 @@ package io.github.ketraterm.host
  * The parser only recognizes protocols. This policy is evaluated in the host
  * adapter before commands touch core state, host callbacks, metadata registries,
  * or terminal-to-host response queues.
+ * Encoding validity is fixed by the OSC protocol contract before permission
+ * evaluation; permitting a command does not permit malformed structured data.
  *
  * @property titlePolicy origin-aware policy for OSC title updates and
  * title-stack restore operations before adapter/core title metadata changes or
@@ -50,10 +52,10 @@ package io.github.ketraterm.host
  * @property maxHyperlinkIdLength maximum accepted OSC 8 `id=` parameter length
  * in UTF-16 code units. Longer IDs are ignored and mapped to no active
  * hyperlink.
- * @property maxNotificationTitleLength maximum accepted character length for
- * desktop notification titles.
- * @property maxNotificationBodyLength maximum accepted character length for
- * desktop notification bodies.
+ * @property maxNotificationTitleLength maximum retained UTF-16 code units for
+ * desktop notification titles, without splitting a valid surrogate pair.
+ * @property maxNotificationBodyLength maximum retained UTF-16 code units for
+ * desktop notification bodies, without splitting a valid surrogate pair.
  * @property maxCurrentWorkingDirectoryUriLength maximum accepted OSC 7 file URI
  * length in UTF-16 code units. Longer or malformed URIs are ignored.
  */

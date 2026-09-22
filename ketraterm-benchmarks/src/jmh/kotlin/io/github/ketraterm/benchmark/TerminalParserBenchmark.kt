@@ -20,6 +20,7 @@ import io.github.ketraterm.parser.api.TerminalParsers
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.nio.charset.StandardCharsets
+import java.util.*
 import java.util.concurrent.TimeUnit
 
 /**
@@ -36,7 +37,10 @@ import java.util.concurrent.TimeUnit
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 open class TerminalParserBenchmark {
-    @Param("ascii", "cjk", "emoji", "sgr_heavy")
+    @Param(
+        "ascii", "cjk", "emoji", "sgr_heavy", "metadata", "osc_overflow", "dcs_overflow", "unknown_dcs",
+        "clipboard_64k", "clipboard_1m", "clipboard_overflow",
+    )
     lateinit var workload: String
 
     private lateinit var bytes: ByteArray
@@ -44,13 +48,21 @@ open class TerminalParserBenchmark {
 
     @Setup(Level.Trial)
     open fun setup() {
-        parser = TerminalParsers.create(NoOpCommandSink())
+        parser = TerminalParsers.create(NoOpCommandSink(), clipboardWriteLimitBytes = { 1024 * 1024 })
         bytes =
             when (workload) {
                 "ascii" -> buildParserAsciiInput()
                 "cjk" -> buildParserCjkInput()
                 "emoji" -> buildParserEmojiInput()
                 "sgr_heavy" -> buildParserSgrHeavyInput()
+                "metadata" ->
+                    ("\u001B]2;build status\u0007\u001B]10;#123456\u001B\\\u001BP\$qm\u001B\\").repeat(1024).encodeToByteArray()
+                "osc_overflow" -> ("\u001B]2;" + "x".repeat(4096) + "\u0007").repeat(128).encodeToByteArray()
+                "dcs_overflow" -> ("\u001BP\$q" + "x".repeat(4096) + "\u001B\\").repeat(128).encodeToByteArray()
+                "unknown_dcs" -> ("\u001BP?x" + "x".repeat(4000) + "\u001B\\").repeat(128).encodeToByteArray()
+                "clipboard_64k" -> buildClipboardInput(64 * 1024)
+                "clipboard_1m" -> buildClipboardInput(1024 * 1024)
+                "clipboard_overflow" -> buildClipboardInput(1024 * 1024 + 3)
                 else -> error("unknown workload: $workload")
             }
     }
@@ -64,6 +76,12 @@ open class TerminalParserBenchmark {
 
 private const val PARSER_LINES = 20_000
 private const val PARSER_COLUMNS = 160
+
+/** One write per operation; includes bounded collection and envelope dispatch, not host decoding. */
+private fun buildClipboardInput(decodedBytes: Int): ByteArray {
+    val encoded = Base64.getEncoder().encodeToString(ByteArray(decodedBytes) { 'a'.code.toByte() })
+    return "\u001B]52;c;$encoded\u001B\\".encodeToByteArray()
+}
 
 /** Pure printable ASCII — tests FSM fast path and charset mapper. */
 private fun buildParserAsciiInput(): ByteArray {

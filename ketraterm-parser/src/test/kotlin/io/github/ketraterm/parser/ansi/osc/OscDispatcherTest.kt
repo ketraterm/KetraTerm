@@ -30,7 +30,7 @@ class OscDispatcherTest {
     ): RecordingTerminalCommandSink {
         val sink = RecordingTerminalCommandSink()
         val bytes = payload.encodeToByteArray()
-        OscDispatcher.dispatch(
+        OscDispatcher().dispatch(
             sink = sink,
             payload = bytes,
             length = bytes.size,

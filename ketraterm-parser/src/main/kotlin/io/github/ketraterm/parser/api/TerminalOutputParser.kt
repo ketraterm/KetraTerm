@@ -50,8 +50,8 @@ interface TerminalOutputParser {
     /**
      * Signals the end of the input stream.
      *
-     * The parser will process any remaining buffered state or incomplete sequences
-     * as appropriate before final termination.
+     * Flushes pending printable text, replacing an incomplete printable UTF-8
+     * sequence. Unfinished OSC/DCS commands are discarded without metadata or query dispatch.
      */
     fun endOfInput()
 

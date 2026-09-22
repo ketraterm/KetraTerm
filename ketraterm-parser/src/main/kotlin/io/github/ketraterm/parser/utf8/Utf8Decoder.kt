@@ -18,7 +18,6 @@ package io.github.ketraterm.parser.utf8
 import io.github.ketraterm.parser.utf8.Utf8DecodeResult.EMIT
 import io.github.ketraterm.parser.utf8.Utf8DecodeResult.NONE
 import io.github.ketraterm.parser.utf8.Utf8DecodeResult.REPROCESS_CURRENT_BYTE
-import io.github.ketraterm.parser.utf8.Utf8DecodeResult.hasOutput
 
 /**
  * Packed, allocation-free UTF-8 decode result.
@@ -26,6 +25,7 @@ import io.github.ketraterm.parser.utf8.Utf8DecodeResult.hasOutput
  * Encoding:
  * - [EMIT] bit set: low bits contain a Unicode scalar value.
  * - [REPROCESS_CURRENT_BYTE] bit set: caller must feed the same byte into the decoder again.
+ * - malformed bit set: output is a decoder replacement, not a literal input scalar.
  * - result == [NONE]: no scalar is ready yet.
  *
  * A codepoint can legitimately be 0, so output must be checked with [hasOutput], not by comparing
@@ -37,6 +37,12 @@ internal object Utf8DecodeResult {
     private const val CODEPOINT_MASK: Int = 0x001f_ffff
     private const val EMIT: Int = 1 shl 31
     private const val REPROCESS_CURRENT_BYTE: Int = 1 shl 30
+    private const val MALFORMED: Int = 1 shl 29
+
+    /** Marks decoder-generated replacement, distinct from a valid literal U+FFFD. */
+    fun malformed(result: Int): Int = result or MALFORMED
+
+    fun isMalformed(result: Int): Boolean = (result and MALFORMED) != 0
 
     @JvmStatic
     fun emit(codepoint: Int): Int {
@@ -106,9 +112,9 @@ internal class Utf8Decoder(
             val shouldReprocess = byteValue !in 0x80..0xbf
             reset()
             return if (shouldReprocess) {
-                Utf8DecodeResult.emitAndReprocess(replacementCodepoint)
+                Utf8DecodeResult.malformed(Utf8DecodeResult.emitAndReprocess(replacementCodepoint))
             } else {
-                Utf8DecodeResult.emit(replacementCodepoint)
+                Utf8DecodeResult.malformed(Utf8DecodeResult.emit(replacementCodepoint))
             }
         }
 
@@ -131,7 +137,7 @@ internal class Utf8Decoder(
         return if (isUnicodeScalar(scalar)) {
             Utf8DecodeResult.emit(scalar)
         } else {
-            Utf8DecodeResult.emit(replacementCodepoint)
+            Utf8DecodeResult.malformed(Utf8DecodeResult.emit(replacementCodepoint))
         }
     }
 
@@ -140,7 +146,7 @@ internal class Utf8Decoder(
             return NONE
         }
         reset()
-        return Utf8DecodeResult.emit(replacementCodepoint)
+        return Utf8DecodeResult.malformed(Utf8DecodeResult.emit(replacementCodepoint))
     }
 
     fun hasPendingSequence(): Boolean = continuationNeeded != 0
@@ -204,7 +210,7 @@ internal class Utf8Decoder(
                 NONE
             }
 
-            else -> Utf8DecodeResult.emit(replacementCodepoint)
+            else -> Utf8DecodeResult.malformed(Utf8DecodeResult.emit(replacementCodepoint))
         }
 
     private fun start(

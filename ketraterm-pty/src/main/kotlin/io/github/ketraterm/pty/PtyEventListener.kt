@@ -19,16 +19,43 @@ import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.session.TerminalSession
 
 /**
  * Host callbacks for a running PTY-backed terminal session.
  *
  * Implementations should return quickly. Metadata callbacks are delivered from
- * the connector reader thread as parser output is handled.
+ * the connector reader thread as parser output is handled, or the caller of a
+ * host theme update. Delivery holds the session mutation lock; do not reenter
+ * mutation or wait for a UI thread. There is no initial replay. Listener failures
+ * are reported through [listenerFailed].
  */
 @Suppress("UNUSED_PARAMETER")
 interface PtyEventListener {
+    /** Effective palette change; [palette] is immutable and may be retained. */
+    fun paletteChanged(
+        session: TerminalSession,
+        palette: TerminalColorPalette,
+    ) = Unit
+
+    /** New accepted OSC 8 registry entry; see [io.github.ketraterm.host.HostEventSink.hyperlinkRegistered]. */
+    fun hyperlinkRegistered(
+        session: TerminalSession,
+        hyperlinkId: Int,
+        uri: String,
+        id: String?,
+    ) = Unit
+
+    /** An evicted OSC 8 identity is no longer resolvable. */
+    fun hyperlinkRemoved(
+        session: TerminalSession,
+        hyperlinkId: Int,
+    ) = Unit
+
+    /** Hard reset cleared a nonempty OSC 8 registry. */
+    fun hyperlinksCleared(session: TerminalSession) = Unit
+
     /**
      * Called when BEL is received from the terminal process.
      *

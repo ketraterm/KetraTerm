@@ -19,7 +19,9 @@ import java.util.*
 
 /**
  * High-performance Unicode East Asian Width (EAW) and Zero-Width calculator.
- * Uses a triple-bitset architecture for O(1) lookups on the BMP and SMP.
+ * Uses generated, version-pinned tables, with O(1) bitset lookups on the BMP and SMP.
+ * Valid unassigned scalars follow those tables (including reserved wide ranges);
+ * scalars without an entry are narrow. Assignment status never depends on the JDK.
  */
 internal object UnicodeWidth {
     private val wide = BitSet(GeneratedUnicodeWidthTable.BITSET_LIMIT)
@@ -49,6 +51,8 @@ internal object UnicodeWidth {
         // Fast-path: Standard ASCII Printable (99% of text)
         if (cp in 0x20..0x7E) return 1
 
+        requireScalar(cp)
+
         // Fast-path: Control Characters (C0, DEL, C1)
         if (cp < 0x20 || cp in 0x7F..0x9F) return 0
 
@@ -75,13 +79,24 @@ internal object UnicodeWidth {
         length: Int,
         ambiguousAsWide: Boolean,
     ): Int {
+        require(length in 0..codepoints.size) { "length must be in 0..${codepoints.size}, was $length" }
         if (length == 0) return 0
 
-        if (contains(codepoints, length, TEXT_PRESENTATION_SELECTOR)) return 1
+        var textPresentation = false
+        var emojiPresentation = false
+        for (index in 0 until length) {
+            val codepoint = codepoints[index]
+            requireScalar(codepoint)
+            if (index > 0) {
+                textPresentation = textPresentation || codepoint == TEXT_PRESENTATION_SELECTOR
+                emojiPresentation = emojiPresentation || codepoint == EMOJI_PRESENTATION_SELECTOR
+            }
+        }
+        if (textPresentation) return 1
 
         val base = codepoints[0]
         val baseWidth =
-            if (contains(codepoints, length, EMOJI_PRESENTATION_SELECTOR) && isEmojiVariationBase(base)) {
+            if (emojiPresentation && isEmojiVariationBase(base)) {
                 2
             } else {
                 calculate(base, ambiguousAsWide)
@@ -91,23 +106,16 @@ internal object UnicodeWidth {
     }
 
     fun isEmojiVariationBase(codepoint: Int): Boolean =
-        if (codepoint < GeneratedUnicodeWidthTable.BITSET_LIMIT) {
+        isScalar(codepoint) && if (codepoint < GeneratedUnicodeWidthTable.BITSET_LIMIT) {
             emojiVariationBase.get(codepoint)
         } else {
             binarySearch(GeneratedUnicodeWidthTable.EMOJI_VARIATION_BASE_ASTRAL_RANGES, codepoint)
         }
 
-    private fun contains(
-        codepoints: IntArray,
-        length: Int,
-        needle: Int,
-    ): Boolean {
-        var index = 1
-        while (index < length) {
-            if (codepoints[index] == needle) return true
-            index++
-        }
-        return false
+    fun isScalar(codepoint: Int): Boolean = codepoint in 0..0x10FFFF && codepoint !in 0xD800..0xDFFF
+
+    fun requireScalar(codepoint: Int) {
+        require(isScalar(codepoint)) { "Not a Unicode scalar value: $codepoint" }
     }
 
     private fun populate(

@@ -42,6 +42,8 @@ interface TerminalWriter {
      * Wrapping, scrolling, and wide-character handling are applied automatically.
      *
      * @param codepoint Unicode codepoint to write.
+     * @throws IllegalArgumentException if [codepoint] is outside `0..0x10FFFF` or a surrogate.
+     * Invalid input is rejected before any state mutation.
      */
     fun writeCodepoint(codepoint: Int)
 
@@ -53,6 +55,8 @@ interface TerminalWriter {
      * forwards each decoded codepoint independently and does not perform
      * grapheme segmentation. Use [writeCluster] from a parser/segmenter when a
      * complete grapheme sequence must be written as one cell.
+     * Each unpaired UTF-16 surrogate is replaced with U+FFFD, whose width follows
+     * the active ambiguous-width mode like an explicitly supplied U+FFFD.
      *
      * @param text Text to write.
      */
@@ -68,6 +72,9 @@ interface TerminalWriter {
      *
      * @param codepoints Codepoints that make up the grapheme cluster.
      * @param length Number of valid codepoints in [codepoints].
+     * @throws IllegalArgumentException if [length] is outside `1..codepoints.size`
+     * or any value in the used prefix is not a Unicode scalar. The entire prefix
+     * is checked before mutation; unused array entries are ignored.
      */
     fun writeCluster(
         codepoints: IntArray,
@@ -84,6 +91,8 @@ interface TerminalWriter {
      * invariants, and cursor preservation.
      *
      * @param codepoint Unicode codepoint to append to the previous grapheme.
+     * @throws IllegalArgumentException if [codepoint] is outside `0..0x10FFFF` or a surrogate,
+     * even when there is no previous cell. Invalid input never mutates state.
      */
     fun appendToPreviousCluster(codepoint: Int)
 

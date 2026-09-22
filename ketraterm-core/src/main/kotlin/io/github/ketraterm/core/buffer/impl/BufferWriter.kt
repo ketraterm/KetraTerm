@@ -36,10 +36,11 @@ internal class BufferWriter(
     override fun writeText(text: String) {
         var i = 0
         while (i < text.length) {
-            val cp = text.codePointAt(i)
+            val decoded = text.codePointAt(i)
+            val cp = if (UnicodeWidth.isScalar(decoded)) decoded else 0xFFFD
             val charWidth = UnicodeWidth.calculate(cp, state.modes.treatAmbiguousAsWide)
             mutationEngine.printCodepoint(cp, charWidth)
-            i += Character.charCount(cp)
+            i += Character.charCount(decoded)
         }
     }
 
@@ -59,7 +60,7 @@ internal class BufferWriter(
     }
 
     override fun appendToPreviousCluster(codepoint: Int) {
-        require(codepoint in 0..0x10ffff) { "invalid codepoint: $codepoint" }
+        UnicodeWidth.requireScalar(codepoint)
         mutationEngine.appendToPreviousCluster(codepoint)
     }
 

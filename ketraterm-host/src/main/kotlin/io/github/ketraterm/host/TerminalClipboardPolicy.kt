@@ -60,7 +60,8 @@ data class TerminalClipboardPolicy(
 
     companion object {
         /**
-         * Default maximum decoded OSC 52 write payload size.
+         * Default maximum decoded OSC 52 write payload size. Production sessions derive
+         * their temporary encoded collection budget from this policy for eligible writes.
          */
         const val DEFAULT_MAX_DECODED_BYTES: Int = 1 * 1024 * 1024
     }
@@ -128,7 +129,7 @@ enum class TerminalClipboardDecision {
     /** Clipboard reads are disabled by configured policy. */
     DENIED_READ_DISABLED,
 
-    /** Encoded payload is malformed and cannot be safely decoded. */
+    /** Base64 syntax or decoded UTF-8 text is malformed; no write or prompt is emitted. */
     DENIED_MALFORMED_PAYLOAD,
 
     /** Decoded payload would exceed the configured size limit. */

@@ -22,9 +22,14 @@ import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.protocol.*
 import io.github.ketraterm.protocol.keyboard.*
+import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import java.net.URI
 import java.net.URISyntaxException
+import java.nio.ByteBuffer
+import java.nio.CharBuffer
+import java.nio.charset.CodingErrorAction
+import java.nio.charset.StandardCharsets
 import java.util.Base64
 import kotlin.collections.ArrayDeque
 
@@ -36,7 +41,7 @@ import kotlin.collections.ArrayDeque
  * mode ids become concrete core API calls.
  *
  * @param terminal public core buffer API mutated by parser semantic commands.
- * @param hostEvents optional metadata callback sink for BEL and title changes.
+ * @param hostEvents optional sink for accepted host metadata and requests.
  * @param hostPolicy safety limits for host-owned metadata.
  * @param kittyKeyboardSupportedFlags progressive Kitty keyboard flags the
  * active input host can provide truthfully. The value must be a subset of the
@@ -172,6 +177,8 @@ class HostCommandAdapter(
     }
 
     override fun resetTerminal() {
+        val previousPalette = terminal.palette
+        val hadHyperlinks = hyperlinkIds.isNotEmpty()
         terminal.reset()
         resetPenMirror()
         activeHyperlinkUri = null
@@ -179,6 +186,8 @@ class HostCommandAdapter(
         activeHyperlinkNumericId = 0
         hyperlinkIds.clear()
         hyperlinkKeysByNumericId.clear()
+        if (hadHyperlinks) hostEvents.hyperlinksCleared()
+        publishPaletteChange(previousPalette)
     }
 
     override fun decaln() {
@@ -908,17 +917,50 @@ class HostCommandAdapter(
         clearActiveHyperlink()
     }
 
+    /**
+     * Current decoded-byte budget for collecting larger OSC 52 writes. Denied writes
+     * return zero, retaining the parser's ordinary envelope bound and small-request auditing.
+     * This does not authorize execution: [requestClipboard] rechecks the current policy.
+     */
+    fun clipboardWriteLimitBytes(): Int {
+        val policy = hostPolicy.clipboardPolicy
+        return when (clipboardDecisionForWrite(policy)) {
+            TerminalClipboardDecision.ALLOWED_BY_POLICY, TerminalClipboardDecision.PROMPT_REQUIRED -> policy.maxDecodedBytes
+            else -> 0
+        }
+    }
+
     override fun requestClipboard(
         selection: String,
         encodedData: String,
     ) {
-        val audit = evaluateClipboardRequest(selection, encodedData)
+        val policy = hostPolicy.clipboardPolicy
+        val operation =
+            if (encodedData == CLIPBOARD_QUERY_MARKER) {
+                TerminalClipboardOperation.READ_QUERY
+            } else {
+                TerminalClipboardOperation.WRITE
+            }
+        val decodedBytes = if (operation == TerminalClipboardOperation.WRITE) decodedBase64ByteCount(encodedData) else 0
+        // Bound allocation before decoding, and validate the text before publishing
+        // permission outcomes. Reuse the decoded text for the write or prompt.
+        val decodedText =
+            if (operation == TerminalClipboardOperation.WRITE && decodedBytes in 0..policy.maxDecodedBytes) {
+                decodeClipboardText(encodedData)
+            } else {
+                null
+            }
+        val decision =
+            when {
+                operation == TerminalClipboardOperation.READ_QUERY -> clipboardDecisionForRead(policy)
+                decodedBytes < 0 -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
+                decodedBytes > policy.maxDecodedBytes -> TerminalClipboardDecision.DENIED_PAYLOAD_TOO_LARGE
+                decodedText == null -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
+                else -> clipboardDecisionForWrite(policy)
+            }
+        val audit = clipboardAudit(selection, operation, encodedData, decodedBytes.coerceAtLeast(0), decision)
         hostEvents.terminalClipboardRequest(audit)
-        if (audit.operation != TerminalClipboardOperation.WRITE) {
-            return
-        }
-
-        val decodedText = decodeClipboardText(encodedData) ?: return
+        if (decodedText == null) return
         when (audit.decision) {
             TerminalClipboardDecision.ALLOWED_BY_POLICY ->
                 hostEvents.terminalClipboardWrite(
@@ -945,7 +987,9 @@ class HostCommandAdapter(
         color: Int,
     ) {
         if (!hostPolicy.palettePolicy.isAllowed) return
+        val previous = terminal.palette
         terminal.setPaletteColor(index, color)
+        publishPaletteChange(previous)
     }
 
     override fun queryPaletteColor(index: Int) {
@@ -958,7 +1002,25 @@ class HostCommandAdapter(
         color: Int,
     ) {
         if (!hostPolicy.palettePolicy.isAllowed) return
+        val previous = terminal.palette
         terminal.setDynamicColor(target, color)
+        publishPaletteChange(previous)
+    }
+
+    /**
+     * Applies a host-selected theme and publishes an effective palette change.
+     * Unlike application OSC controls, this operation is not gated by host policy.
+     * The caller must serialize it with parser/core mutations.
+     */
+    fun setThemePalette(palette: TerminalColorPalette) {
+        val previous = terminal.palette
+        terminal.setThemePalette(palette)
+        publishPaletteChange(previous)
+    }
+
+    private fun publishPaletteChange(previous: TerminalColorPalette) {
+        val current = terminal.palette
+        if (previous != current) hostEvents.paletteChanged(current)
     }
 
     override fun queryDynamicColor(target: Int) {
@@ -986,8 +1048,8 @@ class HostCommandAdapter(
         level: NotificationLevel,
     ) {
         if (!hostPolicy.notificationPolicy.isAllowed) return
-        val clampedTitle = title.take(hostPolicy.maxNotificationTitleLength)
-        val clampedBody = body.take(hostPolicy.maxNotificationBodyLength)
+        val clampedTitle = title.truncateAtScalarBoundary(hostPolicy.maxNotificationTitleLength)
+        val clampedBody = body.truncateAtScalarBoundary(hostPolicy.maxNotificationBodyLength)
         hostEvents.showNotification(clampedTitle, clampedBody, level)
     }
 
@@ -1052,44 +1114,6 @@ class HostCommandAdapter(
         terminal.setHyperlinkId(NO_HYPERLINK_ID)
     }
 
-    private fun evaluateClipboardRequest(
-        selection: String,
-        encodedData: String,
-    ): TerminalClipboardAuditEvent {
-        val policy = hostPolicy.clipboardPolicy
-        val operation =
-            if (encodedData == CLIPBOARD_QUERY_MARKER) {
-                TerminalClipboardOperation.READ_QUERY
-            } else {
-                TerminalClipboardOperation.WRITE
-            }
-
-        if (operation == TerminalClipboardOperation.READ_QUERY) {
-            return clipboardAudit(
-                selection = selection,
-                operation = operation,
-                encodedData = encodedData,
-                decodedBytes = 0,
-                decision = clipboardDecisionForRead(policy),
-            )
-        }
-
-        val decodedBytes = decodedBase64ByteCount(encodedData)
-        val decision =
-            when {
-                decodedBytes < 0 -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
-                decodedBytes > policy.maxDecodedBytes -> TerminalClipboardDecision.DENIED_PAYLOAD_TOO_LARGE
-                else -> clipboardDecisionForWrite(policy)
-            }
-        return clipboardAudit(
-            selection = selection,
-            operation = operation,
-            encodedData = encodedData,
-            decodedBytes = decodedBytes.coerceAtLeast(0),
-            decision = decision,
-        )
-    }
-
     private fun clipboardAudit(
         selection: String,
         operation: TerminalClipboardOperation,
@@ -1151,10 +1175,12 @@ class HostCommandAdapter(
         }
         if (numericId == NO_HYPERLINK_ID) return NO_HYPERLINK_ID
 
+        var evictedId = NO_HYPERLINK_ID
         if (hyperlinkIds.size >= hostPolicy.maxHyperlinkEntries) {
             val eldest = hyperlinkIds.entries.iterator()
             if (eldest.hasNext()) {
                 val entry = eldest.next()
+                evictedId = entry.value
                 hyperlinkKeysByNumericId.remove(entry.value)
                 eldest.remove()
             }
@@ -1163,6 +1189,8 @@ class HostCommandAdapter(
         hyperlinkIds[key] = numericId
         hyperlinkKeysByNumericId[numericId] = key
         nextHyperlinkNumericId = if (numericId == Int.MAX_VALUE) NO_HYPERLINK_ID else numericId + 1
+        if (evictedId != NO_HYPERLINK_ID) hostEvents.hyperlinkRemoved(evictedId)
+        hostEvents.hyperlinkRegistered(numericId, uri, id)
         return numericId
     }
 
@@ -1179,7 +1207,7 @@ class HostCommandAdapter(
         if (title.length <= policy.maxLength) return title
         return when (policy.overflowPolicy) {
             TerminalTitleOverflowPolicy.REJECT -> null
-            TerminalTitleOverflowPolicy.CLAMP -> title.take(policy.maxLength)
+            TerminalTitleOverflowPolicy.CLAMP -> title.truncateAtScalarBoundary(policy.maxLength)
         }
     }
 
@@ -1273,12 +1301,30 @@ class HostCommandAdapter(
             }
     }
 
-    private fun decodeClipboardText(value: String): String? =
-        try {
-            Base64.getDecoder().decode(value).decodeToString()
-        } catch (_: IllegalArgumentException) {
-            null
-        }
+    private fun decodeClipboardText(value: String): String? {
+        val bytes =
+            try {
+                Base64.getDecoder().decode(value)
+            } catch (_: IllegalArgumentException) {
+                return null
+            }
+        val decoder =
+            StandardCharsets.UTF_8
+                .newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+        val chars = CharBuffer.allocate(bytes.size)
+        if (decoder.decode(ByteBuffer.wrap(bytes), chars, true).isError) return null
+        if (decoder.flush(chars).isError) return null
+        return String(chars.array(), 0, chars.position())
+    }
+}
+
+/** Keeps the UTF-16 size bound without splitting a valid supplementary scalar. */
+private fun String.truncateAtScalarBoundary(limit: Int): String {
+    if (length <= limit) return this
+    val end = if (limit > 0 && this[limit - 1].isHighSurrogate() && this[limit].isLowSurrogate()) limit - 1 else limit
+    return substring(0, end)
 }
 
 private val HostControlPolicy.isAllowed: Boolean
