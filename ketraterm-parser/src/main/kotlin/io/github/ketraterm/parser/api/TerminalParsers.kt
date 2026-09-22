@@ -27,8 +27,20 @@ object TerminalParsers {
      * commands to the specified [sink].
      *
      * @param sink The command sink where parsed terminal commands will be delivered.
+     * @param clipboardWriteLimitBytes Supplies the permitted decoded-byte budget when OSC 52
+     * write data starts. Zero keeps the ordinary 4 KiB envelope bound. A positive budget
+     * permits bounded, temporary Base64 collection beyond that bound; it does not authorize
+     * a clipboard operation. The sink must validate the complete data and current permission.
+     * The callback runs synchronously at most once per write and must return a nonnegative value.
+     * Command/selection headers remain bounded by 4 KiB. Encoded capacity is computed with
+     * checked-width arithmetic and capped at `Int.MAX_VALUE - 8` for JVM array indexing.
+     * Budget changes affect the next write; a completed command still needs current host validation.
      * @return A newly initialized [TerminalOutputParser] instance.
      */
     @JvmStatic
-    fun create(sink: TerminalCommandSink): TerminalOutputParser = TerminalParser(sink)
+    @JvmOverloads
+    fun create(
+        sink: TerminalCommandSink,
+        clipboardWriteLimitBytes: () -> Int = { 0 },
+    ): TerminalOutputParser = TerminalParser(sink, clipboardWriteLimitBytes = clipboardWriteLimitBytes)
 }
