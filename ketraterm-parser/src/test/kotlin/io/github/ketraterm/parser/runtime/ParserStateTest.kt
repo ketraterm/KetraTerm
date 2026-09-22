@@ -70,6 +70,8 @@ class ParserStateTest {
         state.payloadLength = 3
         state.payloadCode = 52
         state.payloadOverflowed = true
+        state.payloadLimit = 0
+        state.payloadHeaderComplete = true
     }
 
     private fun dirtyEverything(state: ParserState) {
@@ -124,6 +126,8 @@ class ParserStateTest {
             { assertEquals(0, state.payloadLength) },
             { assertEquals(-1, state.payloadCode) },
             { assertFalse(state.payloadOverflowed) },
+            { assertEquals(minOf(state.payloadBuffer.size, 4096), state.payloadLimit) },
+            { assertFalse(state.payloadHeaderComplete) },
         )
     }
 

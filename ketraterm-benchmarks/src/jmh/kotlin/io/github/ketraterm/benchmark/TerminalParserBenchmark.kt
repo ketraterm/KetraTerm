@@ -36,7 +36,7 @@ import java.util.concurrent.TimeUnit
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 open class TerminalParserBenchmark {
-    @Param("ascii", "cjk", "emoji", "sgr_heavy")
+    @Param("ascii", "cjk", "emoji", "sgr_heavy", "metadata", "osc_overflow", "dcs_overflow", "unknown_dcs")
     lateinit var workload: String
 
     private lateinit var bytes: ByteArray
@@ -51,6 +51,11 @@ open class TerminalParserBenchmark {
                 "cjk" -> buildParserCjkInput()
                 "emoji" -> buildParserEmojiInput()
                 "sgr_heavy" -> buildParserSgrHeavyInput()
+                "metadata" ->
+                    ("\u001B]2;build status\u0007\u001B]10;#123456\u001B\\\u001BP\$qm\u001B\\").repeat(1024).encodeToByteArray()
+                "osc_overflow" -> ("\u001B]2;" + "x".repeat(4096) + "\u0007").repeat(128).encodeToByteArray()
+                "dcs_overflow" -> ("\u001BP\$q" + "x".repeat(4096) + "\u001B\\").repeat(128).encodeToByteArray()
+                "unknown_dcs" -> ("\u001BP?x" + "x".repeat(4000) + "\u001B\\").repeat(128).encodeToByteArray()
                 else -> error("unknown workload: $workload")
             }
     }

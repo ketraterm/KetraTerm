@@ -53,9 +53,30 @@ OSC uses UTF-8 only; there is no locale-dependent decoding, encoding detection, 
 | `52`: clipboard envelope | ASCII selection and Base64/query fields | Non-ASCII or structurally incomplete envelopes are discarded by the parser without a host request or audit. |
 | `52`: Base64-decoded clipboard text | Strict UTF-8, validated by the host within its decoded-byte limit | Emit `DENIED_MALFORMED_PAYLOAD`; never prompt or write repaired text. Base64 syntax is checked first, then the decoded-size limit, then UTF-8 validity, then host write permission. Valid empty text retains clear-style write semantics. Read queries retain their existing policy handling. |
 
-BEL and `ESC \` complete an OSC command. CAN/SUB, parser reset, and end-of-input discard an unfinished OSC without metadata effects. Payload-buffer overflow discards the entire command at termination, including titles and hyperlinks; it never dispatches a truncated prefix. Other C0 controls and DEL are ignored inside OSC. ESC is not retained as payload; a following payload byte resumes collection, while repeated ESC remains pending and DEL leaves that pending state unchanged. Bytes `0x80..0xFF` are payload bytes, never raw C1 terminators. Unknown commands and malformed command numbers emit no effects. Subsequent commands recover normally regardless of byte chunking.
+BEL and `ESC \` complete an OSC command. CAN/SUB, parser reset, and end-of-input discard an unfinished OSC without metadata effects. Oversized commands follow the payload contract below; a truncated prefix is never dispatched. Other C0 controls and DEL are ignored inside OSC. ESC is not retained as payload; a following payload byte resumes collection, while repeated ESC remains pending and DEL leaves that pending state unchanged. Bytes `0x80..0xFF` are payload bytes, never raw C1 terminators. Unknown commands and malformed command numbers emit no effects. Subsequent commands recover normally regardless of byte chunking.
 
 Host title and notification limits count UTF-16 code units. Clamping backs off one code unit when necessary to preserve a supplementary scalar; it does not promise grapheme-aware truncation. Title rejection retains the previous value. The parser owns envelope encoding and recovery; the host owns decoded clipboard text, permissions, metadata limits, and audit outcomes. Products choose permission defaults without changing the encoding contract.
+
+### OSC/DCS Payload Resource Contract
+
+`ControlStringPolicy` owns fixed parser collection ceilings. Limits count **collected bytes**, including the OSC command number and separators or DCS family prefix, but excluding introducers, terminators, and bytes ignored by existing string-control handling. Multibyte UTF-8 counts by bytes. The reusable parser buffer and absolute acceptance ceiling remain 4,096 bytes; a smaller internal scratch capacity further restricts acceptance. No buffer grows with input.
+
+| Family | Maximum collected bytes | Reason |
+| --- | ---: | --- |
+| OSC `0`, `1`, `2` titles; `7` directory; `8` links; `9`, `777` notifications | 4,096 | Preserve existing metadata compatibility; host limits still govern decoded/retained values. |
+| OSC `4` palette; `133` shell markers | 4,096 | Preserve palette batches and optional shell marker arguments. |
+| OSC `52` clipboard | 4,096 | Bound the ASCII envelope before Base64 decoding or host permission callbacks. |
+| OSC `10`, `11`, `12` dynamic colors | 256 | Only foreground/background/cursor targets are implemented; the ceiling leaves headroom for batched color syntax and whitespace. |
+| DCS `$q` DECRQSS | 64 | Short status selectors, with compatibility headroom for unsupported selectors and extensions. |
+| DCS `+q` XTGETTCAP | 4,096 | Capability names can be batched; the core allowlist remains separate. |
+
+The smaller ceilings are implementation resource policies, not limits prescribed by the [xterm protocol reference](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html). OSC family selection occurs at the first semicolon; DCS selection occurs after its two-byte prefix. Unknown/malformed families stop collecting bodies once identified, without decoding them. Unresolved headers remain subject to the absolute ceiling, and long leading-zero OSC headers cannot bypass a selected family's ceiling.
+
+At the first excess byte, collection stops. The existing FSM still consumes input through its normal terminator or cancellation rules, preventing discarded bytes from printing. At completion, oversized OSC commands preserve metadata and emit no partial updates, notifications, clipboard requests/audits, shell markers, or color-query responses. **Exception: an identified oversized OSC 8 ends active hyperlink context**, matching malformed UTF-8 rejection; existing cell destinations and registry entries remain unchanged. Oversized DCS requests produce no response, preserving the previous overflow behavior; bounded requests still pass through host permissions and the core query allowlist. No retained query prefix is dispatched. DCS ends with ST, not BEL. CAN/SUB, reset, and EOF discard unfinished OSC/DCS without dispatch, including unfinished oversized hyperlinks, and reset collection state for subsequent input.
+
+Raw and decoded limits are independent. For a standard `52;c;<Base64>` envelope, the current parser accepts at most 3,066 decoded bytes with canonical padded Base64, even though the host's default decoded ceiling is 1 MiB. A lower host ceiling further restricts that amount; a higher host ceiling cannot increase parser capacity. Oversized envelopes never reach permission prompts or clipboard auditing. Expanding clipboard transfer capacity remains separate work.
+
+These bounds do not enable graphics. Future graphics support also needs APC handling where applicable, transfer-wide budgets, decoded/decompressed image bounds, and retained-image budgets before acceptance is enabled.
 
 ---
 

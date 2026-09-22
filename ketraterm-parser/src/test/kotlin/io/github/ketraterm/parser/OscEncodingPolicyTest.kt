@@ -123,7 +123,7 @@ class OscEncodingPolicyTest {
     }
 
     @Test
-    fun `abort overflow reset and EOF discard OSC without metadata effects`() {
+    fun `abort reset and EOF discard OSC while completed link overflow clears context`() {
         for (prefix in listOf("2;", "7;", "8;;", "52;c;")) {
             for (ending in listOf("\u0018", "\u001A")) {
                 val f = TerminalParserFixture()
@@ -141,7 +141,8 @@ class OscEncodingPolicyTest {
             }
             val f = TerminalParserFixture(state = ParserState(maxPayload = 16))
             f.acceptAscii("\u001B]$prefix" + "x".repeat(20) + "\u0007\u001B]2;next\u0007")
-            assertEquals(listOf("setWindowTitle:next"), f.sink.events)
+            val expected = if (prefix == "8;;") listOf("endHyperlink", "setWindowTitle:next") else listOf("setWindowTitle:next")
+            assertEquals(expected, f.sink.events)
         }
     }
 }
