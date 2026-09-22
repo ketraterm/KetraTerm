@@ -21,6 +21,70 @@ import org.junit.jupiter.api.Test
 
 class TerminalWriterUnicodeTest {
     @Test
+    fun `invalid scalar ingress preserves wide cell and pending wrap atomically`() {
+        for (invalid in intArrayOf(Int.MIN_VALUE, -2, -1, 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0x110000, Int.MAX_VALUE)) {
+            val buffer = TerminalBuffers.create(width = 2, height = 2)
+            assertThrows(IllegalArgumentException::class.java) { buffer.appendToPreviousCluster(invalid) }
+            buffer.writeCluster(intArrayOf(0x2764, 0xFE0F))
+            assertThrows(IllegalArgumentException::class.java) { buffer.writeCodepoint(invalid) }
+            assertThrows(IllegalArgumentException::class.java) { buffer.appendToPreviousCluster(invalid) }
+            for (cluster in listOf(intArrayOf(invalid), intArrayOf(invalid, 0xFE0E), intArrayOf('A'.code, 0xFE0E, invalid))) {
+                assertThrows(IllegalArgumentException::class.java) { buffer.writeCluster(cluster) }
+            }
+            val stored = IntArray(4)
+            assertEquals(2, buffer.getLine(0).readCluster(0, stored))
+            assertArrayEquals(intArrayOf(0x2764, 0xFE0F, 0, 0), stored)
+            assertEquals(-1, buffer.getCodepointAt(1, 0))
+            assertEquals(0, buffer.cursorRow)
+            assertEquals(1, buffer.cursorCol)
+            assertEquals(0, buffer.getCodepointAt(0, 1))
+            buffer.writeCodepoint('X'.code)
+            assertEquals('X'.code, buffer.getCodepointAt(0, 1))
+            assertEquals(1, buffer.cursorRow)
+            assertEquals(1, buffer.cursorCol)
+        }
+    }
+
+    @Test
+    fun `cluster validation respects used prefix and rejects invalid lengths`() {
+        val buffer = TerminalBuffers.create(width = 8, height = 2)
+        val values = intArrayOf('e'.code, 0x0301, -1)
+        for (length in intArrayOf(-1, 0, 4)) {
+            assertThrows(IllegalArgumentException::class.java) { buffer.writeCluster(values, length) }
+        }
+        buffer.writeCluster(values, 2)
+        assertEquals(1, buffer.cursorCol)
+        val stored = IntArray(2)
+        assertEquals(2, buffer.getLine(0).readCluster(0, stored))
+        assertArrayEquals(intArrayOf('e'.code, 0x0301), stored)
+    }
+
+    @Test
+    fun `unpaired UTF16 is replaced per code unit while valid pairs remain intact`() {
+        for (wide in listOf(false, true)) {
+            val buffer = TerminalBuffers.create(width = 20, height = 2)
+            buffer.setTreatAmbiguousAsWide(wide)
+            buffer.writeText("\uD800A\uDC00\uD800\uD83D\uDE00\uDFFF")
+            val replacementWidth = if (wide) 2 else 1
+            var col = 0
+            for (cp in intArrayOf(0xFFFD, 'A'.code, 0xFFFD, 0xFFFD, 0x1F600, 0xFFFD)) {
+                assertEquals(cp, buffer.getCodepointAt(col, 0))
+                val width =
+                    if (cp == 0x1F600) {
+                        2
+                    } else if (cp == 0xFFFD) {
+                        replacementWidth
+                    } else {
+                        1
+                    }
+                if (width == 2) assertEquals(-1, buffer.getCodepointAt(col + 1, 0))
+                col += width
+            }
+            assertEquals(col, buffer.cursorCol)
+        }
+    }
+
+    @Test
     fun `writeCluster_combiningSequence_doesNotConsumeSecondCell`() {
         val buffer = TerminalBuffers.create(width = 6, height = 2)
 

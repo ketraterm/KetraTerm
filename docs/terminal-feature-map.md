@@ -136,6 +136,7 @@ mode 2031 application-facing notifications are outside this slice.
 - **Unicode 17.0.0 Data Tables**: Uses generated Unicode 17.0.0 grapheme break, emoji property, and terminal width tables for UAX #29-style multi-scalar grapheme segmentation and emoji presentation states.
 - **Combining Marks**: Full support for zero-width extenders, including Thai and Lao combining characters.
 - **East Asian Width**: Dynamic width calculations supporting wide, narrow, and East Asian Ambiguous width modes.
+- **Invalid and Unassigned Scalars**: Core scalar/cluster ingress rejects non-scalars before mutation; literal string ingress replaces each unpaired UTF-16 surrogate with U+FFFD. Widths use pinned Unicode 17.0.0 tables, never JDK assignment status or font availability: unlisted valid scalars are narrow, reserved CJK wide ranges remain wide, noncharacters are narrow, and private-use characters plus U+FFFD follow ambiguous-width mode. Existing zero-width and cluster-presentation rules still apply. See the [core width contract](../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy).
 - **Live Grapheme Rendering**: Progressive rendering of printable prefixes without cursor movement for combining marks or ZWJ extensions.
 
 ---
