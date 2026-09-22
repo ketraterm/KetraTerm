@@ -103,6 +103,11 @@ internal class MutationEngine(
         val n = count.coerceIn(0, bottom - top + 1)
         if (n == 0) return
 
+        if (leftMargin != 0 || rightMargin != width - 1) {
+            scrollHorizontalSlice(top, bottom, -n)
+            return
+        }
+
         if (top == 0) {
             repeat(n) {
                 val line = state.ring.push()
@@ -143,6 +148,11 @@ internal class MutationEngine(
         val bottom = state.scrollBottom
         val n = count.coerceIn(0, bottom - top + 1)
         if (n == 0) return
+
+        if (leftMargin != 0 || rightMargin != width - 1) {
+            scrollHorizontalSlice(top, bottom, n)
+            return
+        }
 
         val absTop = state.resolveRingIndex(top)
         val absBottom = state.resolveRingIndex(bottom)
@@ -299,6 +309,35 @@ internal class MutationEngine(
         if (rightMargin + 1 < width && line.rawCodepoint(rightMargin + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
             annihilateAt(row, rightMargin + 1)
         }
+    }
+
+    /**
+     * Shifts only the active horizontal slice; positive [offset] moves cells down.
+     * Traverse against the movement so overlapping copies retain their source payloads.
+     * Partial rows never enter history or exchange ring slots with their guard columns.
+     */
+    private fun scrollHorizontalSlice(
+        top: Int,
+        bottom: Int,
+        offset: Int,
+    ) {
+        val step = if (offset > 0) -1 else 1
+        var row = if (offset > 0) bottom else top
+        val end = if (offset > 0) top - 1 else bottom + 1
+        while (row != end) {
+            val line = getLine(row)
+            prepareHorizontalSliceDestination(row)
+            val source = row - offset
+            if (source in top..bottom) {
+                copySlice(getLine(source), line, leftMargin, rightMargin)
+            } else {
+                line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
+            }
+            line.wrapped = false
+            state.markLineChanged(line)
+            row += step
+        }
+        state.markStructureChanged()
     }
 
     private fun occupantEndExclusive(
@@ -683,22 +722,7 @@ internal class MutationEngine(
                     return@mutateLines
                 }
 
-                val topRow = state.cursor.row
-                val bottomRow = state.scrollBottom
-                for (row in bottomRow downTo topRow + times) {
-                    prepareHorizontalSliceDestination(row)
-                    copySlice(getLine(row - times), getLine(row), leftMargin, rightMargin)
-                    getLine(row).wrapped = false
-                    state.markLineChanged(getLine(row))
-                }
-                for (row in topRow until topRow + times) {
-                    val line = getLine(row)
-                    prepareHorizontalSliceDestination(row)
-                    line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
-                    line.wrapped = false
-                    state.markLineChanged(line)
-                }
-                state.markStructureChanged()
+                scrollHorizontalSlice(state.cursor.row, state.scrollBottom, times)
             }
         }
     }
@@ -720,22 +744,7 @@ internal class MutationEngine(
                     return@mutateLines
                 }
 
-                val topRow = state.cursor.row
-                val bottomRow = state.scrollBottom
-                for (row in topRow..bottomRow - times) {
-                    prepareHorizontalSliceDestination(row)
-                    copySlice(getLine(row + times), getLine(row), leftMargin, rightMargin)
-                    getLine(row).wrapped = false
-                    state.markLineChanged(getLine(row))
-                }
-                for (row in bottomRow - times + 1..bottomRow) {
-                    val line = getLine(row)
-                    prepareHorizontalSliceDestination(row)
-                    line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
-                    line.wrapped = false
-                    state.markLineChanged(line)
-                }
-                state.markStructureChanged()
+                scrollHorizontalSlice(state.cursor.row, state.scrollBottom, -times)
             }
         }
     }

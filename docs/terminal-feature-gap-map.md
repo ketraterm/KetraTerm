@@ -61,8 +61,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(parser/core/host)`: DECSACE, DECCARA, and DECRARA implement VT420's stream-versus-exact-rectangle extent, ordered visual SGR subset, blank materialization policy, and atomic wide/cluster attribute updates without changing glyph payloads, protection, hyperlinks, or the current pen.
 - `DONE(parser/core/host)`: DECIC and DECDC insert/delete columns across the active vertical scroll region, honor horizontal margins, preserve cursor position and active-buffer isolation, and repair wide/cluster span boundaries before each row shift.
 - `TODO(parser)`: insert/delete/erase variants with selective protection and rectangular bounds.
-- `TODO(parser)`: scroll variants and xterm extensions not yet routed:
-  - left/right-margin-aware variants need broader host tests.
+- `DONE(core/host)`: broader left/right-margin scrolling coverage verifies `SU`, `SD`, `IL`, `DL`, LF/VT/FF, `IND`, `NEL`, `RI`, and automatic wrapping through the parser-to-core path. Fixed whole-row scrolling outside horizontal margins and partial-row admission to history. Count defaults and bounds, byte splits, origin mode, and alternate-screen isolation are covered; this does not claim additional xterm scrolling extensions.
 
 ### ESC Protocols
 - `TODO(parser)`: broader ISO 2022 national replacement sets:
@@ -97,7 +96,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(core/host)`: richer event API for hyperlink metadata, palette changes, terminal notifications, and any future host-observable state that should not be read from render frames.
 
 ### Grid Operations
-- DONE(core): deterministic randomized left/right-margin properties cover ICH/DCH, selective erase, IL/DL, and partial-region scroll up/down. They model guard-column movement, preserve rows outside the scroll region, and verify protected wide spans plus wide/cluster storage invariants.
+- DONE(core): deterministic randomized left/right-margin properties cover ICH/DCH, selective erase, IL/DL, and partial-region scroll up/down. They preserve guard columns and rows outside the scroll rectangle and verify protected wide spans plus wide/cluster storage invariants.
 - `DONE(core/host)`: alternate-screen byte-stream coverage verifies exact primary history retention and zero alternate history across every `47`/`1047`/`1049` entry/exit pairing, repeated commands and re-entry, screen-local `1048` saves, and ordered private-mode lists. `ED2`, repeated `ED3`, and repeated `DECSTR` tests verify active-buffer clearing or text preservation, including combining/wide text and saved-cursor behavior. `DECCOLM` tests cover both 80/132-column directions and current-width requests, preserving primary history while alternate is active and clearing primary history when primary is active.
 - `DONE(core)`: resize/capacity tests verify exact retained rows with zero, bounded, and spare history capacity, oldest-row eviction during narrowing and height shrink, and repeated `47`/`1047`/`1049` resize cycles without alternate text leaking or evicted rows returning. Cursor and scrollback anchors account for reflow eviction, including empty rows, wide characters, and grapheme clusters; evicted viewport anchors clamp to the oldest retained row.
 - `DONE(core/session/ui)`: soft-wrap text reconstruction preserves written and erased spaces for linear selection, command capture, clipboard copy/paste, and retained-output export. Core distinguishes artificial wide-character wrap padding from meaningful empty cells and preserves that distinction through resize/reflow. Selected hard line breaks survive empty selection endpoints; block selections retain physical row breaks.

@@ -122,6 +122,9 @@ Guaranteed behavior:
 - `ICH` / `DCH` are constrained by active horizontal margins
 - `IL` / `DL` are constrained by the active vertical region and are no-op when
   the cursor is outside it
+- vertical scrolling and line edits preserve cells outside active horizontal
+  margins, except complete occupants crossing a slice boundary; partial-width
+  scrolling never admits rows to history
 - normal erase ignores cell protection
 - selective erase respects cell protection
 - hard clears ignore cell protection

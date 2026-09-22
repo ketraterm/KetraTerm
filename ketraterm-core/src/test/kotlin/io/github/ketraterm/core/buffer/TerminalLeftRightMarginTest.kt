@@ -492,14 +492,18 @@ class TerminalLeftRightMarginTest {
         state.activeBuffer.ring[state.resolveRingIndex(1)].setCell(0, 'A'.code, 0)
         state.activeBuffer.ring[state.resolveRingIndex(2)].setCell(0, 'B'.code, 0)
         state.activeBuffer.ring[state.resolveRingIndex(3)].setCell(0, 'Z'.code, 0)
+        state.activeBuffer.ring[state.resolveRingIndex(1)].setCell(2, 'X'.code, 0)
+        state.activeBuffer.ring[state.resolveRingIndex(2)].setCell(2, 'Y'.code, 0)
 
         buffer.positionCursor(2, 2)
         buffer.newLine()
 
         assertAll(
             { assertEquals('T'.code, buffer.getCodepointAt(0, 0)) },
-            { assertEquals('B'.code, buffer.getCodepointAt(0, 1)) },
-            { assertEquals(0, buffer.getCodepointAt(0, 2)) },
+            { assertEquals('A'.code, buffer.getCodepointAt(0, 1)) },
+            { assertEquals('B'.code, buffer.getCodepointAt(0, 2)) },
+            { assertEquals('Y'.code, buffer.getCodepointAt(2, 1)) },
+            { assertEquals(0, buffer.getCodepointAt(2, 2)) },
             { assertEquals('Z'.code, buffer.getCodepointAt(0, 3)) },
         )
     }
@@ -862,42 +866,100 @@ class TerminalLeftRightMarginTest {
     }
 
     @Test
-    fun `partial region scroll property preserves rows outside region and models guard-column movement`() {
+    fun `partial region scroll property preserves rows and columns outside the rectangle`() {
         val buffer = TerminalBuffers.create(width = 8, height = 4)
         val state = stateOf(buffer)
         val random = Random(0x5C0A11)
-        val expectedLeft = IntArray(4) { 'L'.code + it }
-        val expectedRight = IntArray(4) { 'R'.code + it }
+        val expected = Array(4) { row -> IntArray(8) { col -> 'A'.code + row * 8 + col } }
 
         buffer.setLeftRightMarginMode(true)
         buffer.setLeftRightMargins(3, 6)
         buffer.setScrollRegion(2, 3)
         for (row in 0 until 4) {
             val line = state.activeBuffer.ring[state.resolveRingIndex(row)]
-            line.setCell(0, expectedLeft[row], 0)
-            line.setCell(7, expectedRight[row], 0)
+            for (col in 0 until 8) line.setCell(col, expected[row][col], 0)
         }
 
         repeat(400) { step ->
+            // Keep fresh content in the region so repeated scrolling never becomes a blank-grid test.
+            val writtenRow = random.nextInt(1, 3)
+            val writtenCol = random.nextInt(2, 6)
+            val written = 'a'.code + random.nextInt(26)
+            buffer.positionCursor(writtenCol, writtenRow)
+            buffer.writeCodepoint(written)
+            expected[writtenRow][writtenCol] = written
             if (random.nextBoolean()) {
                 buffer.scrollUp()
-                expectedLeft[1] = expectedLeft[2]
-                expectedRight[1] = expectedRight[2]
-                expectedLeft[2] = TerminalConstants.EMPTY
-                expectedRight[2] = TerminalConstants.EMPTY
+                for (col in 2..5) {
+                    expected[1][col] = expected[2][col]
+                    expected[2][col] = TerminalConstants.EMPTY
+                }
             } else {
                 buffer.scrollDown()
-                expectedLeft[2] = expectedLeft[1]
-                expectedRight[2] = expectedRight[1]
-                expectedLeft[1] = TerminalConstants.EMPTY
-                expectedRight[1] = TerminalConstants.EMPTY
+                for (col in 2..5) {
+                    expected[2][col] = expected[1][col]
+                    expected[1][col] = TerminalConstants.EMPTY
+                }
             }
 
             for (row in 0 until 4) {
-                assertAll(
-                    { assertEquals(expectedLeft[row], buffer.getCodepointAt(0, row), "step=$step row=$row left") },
-                    { assertEquals(expectedRight[row], buffer.getCodepointAt(7, row), "step=$step row=$row right") },
-                )
+                for (col in 0 until 8) {
+                    assertEquals(expected[row][col], buffer.getCodepointAt(col, row), "step=$step row=$row col=$col")
+                }
+            }
+            assertEquals(0, buffer.historySize, "step=$step")
+        }
+    }
+
+    @Test
+    fun `rectangular scrolling keeps cluster ownership and repairs both boundary spans`() {
+        val narrow = intArrayOf('e'.code, 0x301)
+        val wide = intArrayOf(0x1F469, 0x200D, 0x1F4BB)
+        val crossing = intArrayOf(0x754C, 0x301)
+        for (down in listOf(false, true)) {
+            val buffer = TerminalBuffers.create(width = 10, height = 4, maxHistory = 4)
+            val state = stateOf(buffer)
+            buffer.positionCursor(0, 0)
+            buffer.writeText("TOP-------")
+            buffer.positionCursor(0, 3)
+            buffer.writeText("BOTTOM----")
+            // Refill and scroll repeatedly to exercise cluster slot reclamation, not only fresh storage.
+            repeat(100) { iteration ->
+                buffer.setLeftRightMarginMode(false)
+                for (row in 1..2) {
+                    buffer.positionCursor(0, row)
+                    buffer.writeText("abcdefghij")
+                    buffer.positionCursor(1, row)
+                    buffer.writeCluster(crossing, crossing.size)
+                    buffer.writeCluster(narrow, narrow.size)
+                    buffer.writeCluster(wide, wide.size)
+                    buffer.writeCluster(crossing, crossing.size)
+                }
+                buffer.setLeftRightMarginMode(true)
+                buffer.setLeftRightMargins(3, 7)
+                buffer.setScrollRegion(2, 3)
+                buffer.positionCursor(3, 1)
+                if (down) buffer.scrollDown() else buffer.scrollUp()
+
+                val movedRow = if (down) 2 else 1
+                val blankRow = if (down) 1 else 2
+                assertEquals("a  e\u0301👩‍💻  ij", buffer.getLineAsString(movedRow), "iteration=$iteration down=$down")
+                assertEquals("a       ij", buffer.getLineAsString(blankRow))
+                val scratch = IntArray(8)
+                assertEquals(narrow.size, buffer.getLine(movedRow).readCluster(3, scratch))
+                assertArrayEquals(narrow, scratch.copyOf(narrow.size))
+                assertEquals(wide.size, buffer.getLine(movedRow).readCluster(4, scratch))
+                assertArrayEquals(wide, scratch.copyOf(wide.size))
+                assertEquals(TerminalConstants.WIDE_CHAR_SPACER, buffer.getCodepointAt(5, movedRow))
+                for (row in 1..2) {
+                    for (col in listOf(1, 2, 6, 7)) assertEquals(0, buffer.getCodepointAt(col, row))
+                    assertFalse(state.ring[state.resolveRingIndex(row)].wrapped)
+                }
+                assertEquals("TOP-------", buffer.getLineAsString(0))
+                assertEquals("BOTTOM----", buffer.getLineAsString(3))
+                assertEquals(0, buffer.historySize)
+                assertEquals(1, buffer.cursorRow)
+                assertEquals(3, buffer.cursorCol)
             }
         }
     }

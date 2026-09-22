@@ -1016,6 +1016,103 @@ class HostCommandAdapterTest {
             )
         }
 
+        @ParameterizedTest
+        @ValueSource(strings = ["S", "T", "L", "M"])
+        fun `vertical edits preserve horizontal guards through every byte split`(command: String) {
+            for (count in listOf("", "0", "1", "2", "99")) {
+                val middle =
+                    when (command) {
+                        "S" ->
+                            when (count) {
+                                "2" -> listOf("bbDDDD22", "cc    33", "dd    44")
+                                "99" -> listOf("bb    22", "cc    33", "dd    44")
+                                else -> listOf("bbCCCC22", "ccDDDD33", "dd    44")
+                            }
+                        "T" ->
+                            when (count) {
+                                "2" -> listOf("bb    22", "cc    33", "ddBBBB44")
+                                "99" -> listOf("bb    22", "cc    33", "dd    44")
+                                else -> listOf("bb    22", "ccBBBB33", "ddCCCC44")
+                            }
+                        "L" ->
+                            when (count) {
+                                "2", "99" -> listOf("bbBBBB22", "cc    33", "dd    44")
+                                else -> listOf("bbBBBB22", "cc    33", "ddCCCC44")
+                            }
+                        else ->
+                            when (count) {
+                                "2", "99" -> listOf("bbBBBB22", "cc    33", "dd    44")
+                                else -> listOf("bbBBBB22", "ccDDDD33", "dd    44")
+                            }
+                    }
+                // SU/SD operate on the region even with the cursor above it; IL/DL start at the cursor.
+                val cursorRow = if (command == "S" || command == "T") 0 else 2
+                val stream =
+                    (
+                        "\u001B[1;1HaaAAAA11\u001B[2;1HbbBBBB22\u001B[3;1HccCCCC33" +
+                            "\u001B[4;1HddDDDD44\u001B[5;1HeeEEEE55" +
+                            "\u001B[?69h\u001B[3;6s\u001B[2;4r\u001B[${cursorRow + 1};4H\u001B[$count$command"
+                    ).encodeToByteArray()
+                for (split in 0..stream.size) {
+                    val f = Fixture(terminal = TerminalBuffers.create(width = 8, height = 5, maxHistory = 8))
+                    f.parser.accept(stream, 0, split)
+                    f.parser.accept(stream, split, stream.size - split)
+                    f.end()
+                    val context = "command=$command count=$count split=$split"
+                    assertEquals(
+                        listOf("aaAAAA11") + middle + "eeEEEE55",
+                        (0 until 5).map(f.terminal::getLineAsString),
+                        context,
+                    )
+                    assertEquals(cursorRow, f.terminal.cursorRow, context)
+                    assertEquals(3, f.terminal.cursorCol, context)
+                    assertEquals(0, f.terminal.historySize, context)
+                }
+            }
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["\n", "\u000B", "\u000C", "\u001BD", "\u001BE", "\u001BM", "XY"])
+        fun `index and wrapping scroll only the horizontal region without adding history`(command: String) {
+            for (alternate in listOf(false, true)) {
+                for (origin in listOf(false, true)) {
+                    val f = Fixture(terminal = TerminalBuffers.create(width = 8, height = 4, maxHistory = 8))
+                    f.acceptAscii("PRIMARY")
+                    if (alternate) f.acceptAscii("\u001B[?1049h")
+                    val reverse = command == "\u001BM"
+                    val wrap = command == "XY"
+                    val row = if (reverse) 1 else 3
+                    val col = if (wrap) 6 else 4
+                    val stream =
+                        (
+                            "\u001B[1;1HaaAAAA11\u001B[2;1HbbBBBB22" +
+                                "\u001B[3;1HccCCCC33\u001B[4;1HddDDDD44" +
+                                "\u001B[?69h\u001B[3;6s\u001B[1;3r" +
+                                (if (origin) "\u001B[?6h" else "") +
+                                "\u001B[$row;${if (origin) col - 2 else col}H$command"
+                        ).encodeToByteArray()
+                    for (byte in stream) f.parser.accept(byteArrayOf(byte))
+                    f.end()
+                    val expected =
+                        when {
+                            reverse -> listOf("aa    11", "bbAAAA22", "ccBBBB33", "ddDDDD44")
+                            wrap -> listOf("aaBBBB11", "bbCCCX22", "ccY   33", "ddDDDD44")
+                            else -> listOf("aaBBBB11", "bbCCCC22", "cc    33", "ddDDDD44")
+                        }
+                    val context = "command=$command alternate=$alternate origin=$origin"
+                    assertEquals(expected, (0 until 4).map(f.terminal::getLineAsString), context)
+                    assertEquals(if (reverse) 0 else 2, f.terminal.cursorRow, context)
+                    assertEquals(if (command == "\u001BE") 2 else 3, f.terminal.cursorCol, context)
+                    assertEquals(0, f.terminal.historySize, context)
+                    if (alternate) {
+                        f.acceptAscii("\u001B[?1049l")
+                        assertEquals("PRIMARY", f.terminal.getLineAsString(0), context)
+                        assertEquals(0, f.terminal.historySize, context)
+                    }
+                }
+            }
+        }
+
         @Test
         fun `alternate screen mode 47 switches buffers without clearing alt content`() {
             val f = Fixture()
@@ -1026,6 +1123,71 @@ class HostCommandAdapterTest {
             f.acceptAscii("B")
             f.end()
             assertEquals("AB", f.terminal.getLineAsString(0))
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["S", "T", "L", "M"])
+        fun `horizontal scrolling repairs boundary spans and preserves moved graphemes and attributes`(command: String) {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 10, height = 4))
+            f.acceptAscii(
+                "\u001B[1;1HTOP-------\u001B[4;1HBOTTOM----" +
+                    "\u001B[2;1H\u001B[31;1ma界e\u0301🙂界Z!" +
+                    "\u001B[3;1Hb界o\u0308👩‍💻界Y!\u001B[0m" +
+                    "\u001B[?69h\u001B[3;7s\u001B[2;3r\u001B[2;4H\u001B[44m",
+            )
+            val sourceRow = if (command == "S" || command == "M") 2 else 1
+            val movedAttributes = f.terminal.getAttrAt(3, sourceRow)
+            f.acceptAscii("\u001B[$command")
+            f.end()
+
+            val expected =
+                if (sourceRow == 2) {
+                    listOf("TOP-------", "a  o\u0308👩‍💻  Z!", "b       Y!", "BOTTOM----")
+                } else {
+                    listOf("TOP-------", "a       Z!", "b  e\u0301🙂  Y!", "BOTTOM----")
+                }
+            assertEquals(expected, (0 until 4).map(f.terminal::getLineAsString))
+            assertEquals(movedAttributes, f.terminal.getAttrAt(3, 3 - sourceRow))
+            assertEquals(CellColor.indexed(4), f.terminal.getAttrAt(3, sourceRow)?.background)
+            assertEquals(1, f.terminal.cursorRow)
+            assertEquals(3, f.terminal.cursorCol)
+            assertEquals(0, f.terminal.historySize)
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["\u001B[?69l", "\u001B[s", "\u001B[0;0s"])
+        fun `disabling or resetting horizontal margins restores full width scrolling and history`(reset: String) {
+            val f = Fixture(terminal = TerminalBuffers.create(width = 8, height = 3, maxHistory = 4))
+            f.acceptAscii(
+                "\u001B[1;1HaaAAAA11\u001B[2;1HbbBBBB22\u001B[3;1HccCCCC33" +
+                    "\u001B[?69h\u001B[3;6s$reset\u001B[3;4H\n",
+            )
+            f.end()
+            assertEquals(listOf("bbBBBB22", "ccCCCC33", ""), (0 until 3).map(f.terminal::getLineAsString))
+            assertEquals("aaAAAA11\nbbBBBB22\nccCCCC33\n", f.terminal.getAllAsString())
+            assertEquals(1, f.terminal.historySize)
+            assertEquals(2, f.terminal.cursorRow)
+            assertEquals(3, f.terminal.cursorCol)
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["L", "M"])
+        fun `line edits outside vertical margins leave horizontal region untouched`(command: String) {
+            for (row in listOf(1, 5)) {
+                val f = Fixture(terminal = TerminalBuffers.create(width = 8, height = 5))
+                f.acceptAscii(
+                    "\u001B[1;1HaaAAAA11\u001B[2;1HbbBBBB22\u001B[3;1HccCCCC33" +
+                        "\u001B[4;1HddDDDD44\u001B[5;1HeeEEEE55" +
+                        "\u001B[?69h\u001B[3;6s\u001B[2;4r\u001B[$row;4H\u001B[99$command",
+                )
+                f.end()
+                assertEquals(
+                    listOf("aaAAAA11", "bbBBBB22", "ccCCCC33", "ddDDDD44", "eeEEEE55"),
+                    (0 until 5).map(f.terminal::getLineAsString),
+                )
+                assertEquals(row - 1, f.terminal.cursorRow)
+                assertEquals(3, f.terminal.cursorCol)
+            }
         }
 
         @Test

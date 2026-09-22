@@ -148,16 +148,18 @@ interface TerminalWriter {
     /**
      * Scrolls the active scroll region up by one line (SU, `CSI 1 S`).
      *
-     * The top line may enter scrollback when the region spans the full viewport.
-     * The cursor position is preserved.
+     * Only cells within the active horizontal margins move. A full-width region
+     * starting at the top of the viewport may admit its top line to scrollback;
+     * partial-width scrolling never does. The cursor position is preserved.
      */
     fun scrollUp()
 
     /**
      * Scrolls the active scroll region down by one line (SD, `CSI 1 T`).
      *
-     * A blank line is exposed at the top of the region. Scrollback is not
-     * consumed. The cursor position is preserved.
+     * Only cells within the active horizontal margins move, exposing blank
+     * cells at the top of the region. Scrollback is not consumed. The cursor
+     * position is preserved.
      */
     fun scrollDown()
 
