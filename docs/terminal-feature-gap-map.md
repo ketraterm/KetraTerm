@@ -99,7 +99,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(core/session/ui)`: soft-wrap text reconstruction preserves written and erased spaces for linear selection, command capture, clipboard copy/paste, and retained-output export. Core distinguishes artificial wide-character wrap padding from meaningful empty cells and preserves that distinction through resize/reflow. Selected hard line breaks survive empty selection endpoints; block selections retain physical row breaks.
 
 ### Unicode Width
-- `TODO(core)`: invalid/unassigned codepoint width policy.
+- `DONE(core/host/ui)`: invalid/unassigned codepoint width policy is explicit in the [core contract](../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy). Typed scalar/cluster writes reject non-scalars atomically; string writes repair unpaired surrogates. Pinned Unicode tables preserve reserved wide ranges and ambiguous-width behavior, with byte-split integration coverage for replacement, wrapping, and cursor alignment, plus real-buffer selection extraction through resize/reflow.
 
 ### Query and Response Channel
 - `DONE(core/host/policy)`: terminal-to-host response channel exists for DA, DSR/CPR, safe window reports, palette queries, `DECRQSS`, and allowlisted `XTGETTCAP`; host policy can deny terminal responses before they enqueue bytes.

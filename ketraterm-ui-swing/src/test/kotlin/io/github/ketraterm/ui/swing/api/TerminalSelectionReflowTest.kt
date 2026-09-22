@@ -27,6 +27,22 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalSelectionReflowTest {
     @Test
+    fun `uncertain scalars and repaired UTF16 survive selection and reflow`() {
+        val input = "A\u0378\uD87F\uDFFD\uFDD0\uE000\uD800Z"
+        val expected = "A\u0378\uD87F\uDFFD\uFDD0\uE000\uFFFDZ"
+        for (wide in listOf(false, true)) {
+            val terminal = TerminalBuffers.create(width = 3, height = 5, maxHistory = 8)
+            terminal.setTreatAmbiguousAsWide(wide)
+            terminal.writeText(input)
+            assertEquals(expected, copyFirstLogicalLine(terminal), "Initial copy, ambiguous wide=$wide")
+            for (width in intArrayOf(12, 2, 5, 3)) {
+                terminal.resize(newWidth = width, newHeight = 5)
+                assertEquals(expected, copyFirstLogicalLine(terminal), "Width=$width, ambiguous wide=$wide")
+            }
+        }
+    }
+
+    @Test
     fun `an erased middle wrapped row remains spaces across resize`() {
         val terminal = TerminalBuffers.create(width = 4, height = 4, maxHistory = 8)
         terminal.writeText("abcdEFGHijkl")

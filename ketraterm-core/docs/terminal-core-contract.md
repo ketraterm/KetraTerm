@@ -211,6 +211,36 @@ Guaranteed behavior:
   cursor blink flag without changing visibility, position, or pending wrap;
   hosts retain control of blink animation through their presentation settings
 
+## Unicode scalar and width policy
+
+`writeCodepoint`, `writeCluster`, and `appendToPreviousCluster` accept Unicode
+scalar values: `0..0x10FFFF`, excluding `0xD800..0xDFFF`. Invalid input throws
+`IllegalArgumentException` before grid, cursor, or pending-wrap mutation, even
+for an append without a target. Clusters validate their entire used prefix;
+unused array entries are ignored. `writeText` repairs each unpaired UTF-16
+surrogate with U+FFFD and preserves valid surrogate pairs. Parser UTF-8 recovery
+remains parser-owned; an emitted U+FFFD uses the same width as a literal U+FFFD.
+
+Width classification uses the generated Unicode 17.0.0 tables, independent of
+JDK character assignment, locale, and available fonts:
+
+- Unlisted valid scalars default to one cell, including ordinary unassigned values.
+- Reserved wide ranges retain Unicode East Asian Width defaults, including
+  unassigned values in the CJK blocks and planes 2 and 3 through `xFFFD`.
+- Noncharacters are valid scalars and narrow; they are not malformed input.
+- Private-use scalars and U+FFFD follow the active ambiguous-width mode.
+- Existing zero-width classification, terminal cell-graphics overrides, and
+  cluster variation-selector presentation rules retain precedence.
+
+Reserved-range defaults follow the pinned
+[Unicode East Asian Width data](https://www.unicode.org/Public/17.0.0/ucd/EastAsianWidth.txt).
+
+These are fixed core compatibility rules, not host security permissions or new
+configuration switches. Width classification does not add grapheme segmentation
+to the literal scalar writer; callers still supply pre-segmented clusters.
+DECFRA retains its separate protocol contract: rectangle fills are single-cell
+operations and invalid fill values are ignored.
+
 ## Reader contract
 
 `TerminalReader` and `TerminalLineApi` provide safe, allocation-light access to
