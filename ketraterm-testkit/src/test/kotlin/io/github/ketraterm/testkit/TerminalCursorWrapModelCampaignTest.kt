@@ -17,6 +17,7 @@ package io.github.ketraterm.testkit
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
@@ -27,6 +28,61 @@ import kotlin.collections.ArrayDeque
 
 /** Deterministic model-based campaign for cursor movement, deferred wrap, and scrolling. */
 class TerminalCursorWrapModelCampaignTest {
+    @Test
+    fun `partial width scrolling never adds whole rows to history`() {
+        val scenario =
+            Scenario(
+                BASE_SEED + 1,
+                3,
+                4,
+                listOf(Operation.SetHorizontalMargins(2, 3), Operation.ScrollUp(3)),
+            )
+        val model = CursorWrapModel(scenario.columns, scenario.rows, MAX_HISTORY)
+        scenario.operations.forEach(model::apply)
+        assertEquals(4, model.retainedRows.size)
+        verify(scenario)
+    }
+
+    @Test
+    fun `model preserves guards for explicit scrolling indexing and wrapping`() {
+        val initialRows = listOf("aABCD1", "bEFGH2", "cIJKL3", "dMNOP4")
+        val setup =
+            initialRows.flatMapIndexed { index, text ->
+                listOf(Operation.CursorPosition(index + 1, 1)) + text.map { Operation.Print(it.toString(), 1) }
+            } + Operation.SetHorizontalMargins(2, 5)
+        val up = listOf("aEFGH1", "bIJKL2", "cMNOP3", "d    4")
+        val down = listOf("a    1", "bABCD2", "cEFGH3", "dIJKL4")
+        val cases =
+            listOf(
+                listOf(Operation.ScrollUp(1)) to up,
+                listOf(Operation.ScrollDown(1)) to down,
+                listOf(Operation.CursorPosition(4, 3), Operation.LineFeed) to up,
+                listOf(Operation.ReverseIndex) to down,
+                listOf(Operation.CursorPosition(4, 5), Operation.Print("X", 1), Operation.Print("Y", 1)) to
+                    listOf("aEFGH1", "bIJKL2", "cMNOX3", "dY   4"),
+                listOf(Operation.ScrollUp(99)) to listOf("a    1", "b    2", "c    3", "d    4"),
+                listOf(Operation.ScrollDown(99)) to listOf("a    1", "b    2", "c    3", "d    4"),
+            )
+        for ((operations, expected) in cases) {
+            val scenario = Scenario(BASE_SEED, 6, 4, setup + operations)
+            val model = CursorWrapModel(scenario.columns, scenario.rows, MAX_HISTORY)
+            scenario.operations.forEach(model::apply)
+            assertEquals(expected, model.retainedRows.map { line -> line.cells.joinToString("") { it ?: " " } }, "$operations")
+            verify(scenario)
+        }
+    }
+
+    @Test
+    fun `full width margins retain scrollback admission`() {
+        for (margins in listOf(Operation.SetHorizontalMargins(1, 3), Operation.ResetHorizontalMargins)) {
+            val scenario = Scenario(BASE_SEED, 3, 4, listOf(margins, Operation.ScrollUp(3)))
+            val model = CursorWrapModel(scenario.columns, scenario.rows, MAX_HISTORY)
+            scenario.operations.forEach(model::apply)
+            assertEquals(7, model.retainedRows.size)
+            verify(scenario)
+        }
+    }
+
     @Test
     fun `generated operation streams agree with independent cursor wrap model`() {
         assumeTrue(System.getProperty("ketraterm.cursorWrap.required") == "true") {
@@ -474,6 +530,10 @@ class TerminalCursorWrapModelCampaignTest {
         }
 
         private fun scrollUpRegion(count: Int) {
+            if (leftMargin != 0 || rightMargin != columns - 1) {
+                scrollPartialWidth(-count)
+                return
+            }
             repeat(count) {
                 val removed = screen.removeAt(scrollTop)
                 screen.add(scrollBottom, blankRow())
@@ -510,9 +570,30 @@ class TerminalCursorWrapModelCampaignTest {
         }
 
         private fun scrollDownRegion(count: Int) {
+            if (leftMargin != 0 || rightMargin != columns - 1) {
+                scrollPartialWidth(count)
+                return
+            }
             repeat(count) {
                 screen.removeAt(scrollBottom)
                 screen.add(scrollTop, blankRow())
+            }
+        }
+
+        private fun scrollPartialWidth(offset: Int) {
+            // Snapshot the normalized rectangle so the oracle is independent of
+            // the production engine's in-place movement order and ring storage.
+            val rectangle =
+                (scrollTop..scrollBottom).map { index ->
+                    normalizeSliceBoundaries(screen[index])
+                    screen[index].cells.copyOfRange(leftMargin, rightMargin + 1)
+                }
+            for (target in scrollTop..scrollBottom) {
+                val source = rectangle.getOrNull(target - scrollTop - offset)
+                for (column in leftMargin..rightMargin) {
+                    screen[target].cells[column] = source?.get(column - leftMargin)
+                }
+                screen[target].wrapped = false
             }
         }
 
