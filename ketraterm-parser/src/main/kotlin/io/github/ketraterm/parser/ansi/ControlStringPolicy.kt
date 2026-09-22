@@ -16,14 +16,25 @@
 package io.github.ketraterm.parser.ansi
 
 /**
- * Fixed resource ceilings for collected OSC/DCS bytes, including family prefixes
+ * Ordinary resource ceilings for collected OSC/DCS bytes, including family prefixes
  * and separators, excluding introducers, terminators, and controls ignored by the FSM.
  * These are parser compatibility rules, independent of host permission/decoded-size limits.
+ * Eligible OSC 52 writes may use [clipboardLimit] with a host-supplied decoded-byte budget.
  */
 internal object ControlStringPolicy {
     const val MAX_PAYLOAD_BYTES: Int = 4096
     const val MAX_DYNAMIC_COLOR_BYTES: Int = 256
     const val MAX_STATUS_REQUEST_BYTES: Int = 64
+
+    /** Includes actual envelope overhead; Long arithmetic prevents a host budget from wrapping. */
+    fun clipboardLimit(
+        dataStart: Int,
+        decodedBytes: Int,
+    ): Int {
+        require(decodedBytes >= 0) { "clipboardWriteLimitBytes must be nonnegative, got $decodedBytes" }
+        val encodedBytes = ((decodedBytes.toLong() + 2) / 3) * 4
+        return (dataStart + encodedBytes).coerceAtMost(Int.MAX_VALUE - 8L).toInt()
+    }
 
     /** Zero means unsupported: stop collecting without decoding or dispatching the body. */
     fun oscLimit(command: Int): Int =

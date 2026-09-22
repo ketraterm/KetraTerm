@@ -138,13 +138,15 @@ internal class ParserState(
     // -------------------------------------------------------------------------
     //
     // Payload invariant:
-    // - payloadBuffer is parser-owned scratch storage.
+    // - payloadBuffer is parser-owned scratch storage; only eligible clipboard writes can grow it.
+    // - reset/completion/overflow releases growth and reuses initialPayloadBuffer.
     // - payloadLength bytes are valid.
     // - bytes beyond payloadLength are garbage.
     // - overflowed means additional payload bytes were dropped.
     // - payloadCode is OSC command code when parsed, -1 if unknown/unparsed.
 
-    val payloadBuffer: ByteArray = ByteArray(maxPayload)
+    private val initialPayloadBuffer: ByteArray = ByteArray(maxPayload)
+    var payloadBuffer: ByteArray = initialPayloadBuffer
     var payloadLength: Int = 0
     var payloadCode: Int = -1
     var payloadOverflowed: Boolean = false
@@ -152,6 +154,7 @@ internal class ParserState(
     // Zero limit means an unsupported family; do not collect its body.
     var payloadLimit: Int = minOf(maxPayload, ControlStringPolicy.MAX_PAYLOAD_BYTES)
     var payloadHeaderComplete: Boolean = false
+    var clipboardDataStart: Int = -1
 
     // -------------------------------------------------------------------------
     // O(1) reset helpers
@@ -167,11 +170,20 @@ internal class ParserState(
     }
 
     fun clearPayloadState() {
+        payloadBuffer = initialPayloadBuffer
         payloadLength = 0
         payloadCode = -1
         payloadOverflowed = false
         payloadLimit = minOf(payloadBuffer.size, ControlStringPolicy.MAX_PAYLOAD_BYTES)
         payloadHeaderComplete = false
+        clipboardDataStart = -1
+    }
+
+    /** Stops collecting and releases temporary clipboard storage without losing its header. */
+    fun discardOverflowedPayload() {
+        payloadOverflowed = true
+        payloadBuffer = initialPayloadBuffer
+        payloadLength = minOf(payloadLength, payloadBuffer.size)
     }
 
     fun clearActiveClusterAfterFlush() {

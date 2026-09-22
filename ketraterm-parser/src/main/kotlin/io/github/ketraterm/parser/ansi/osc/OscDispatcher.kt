@@ -31,6 +31,7 @@ internal class OscDispatcher {
         payload: ByteArray,
         length: Int,
         overflowed: Boolean,
+        payloadLimit: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES,
     ) {
         if (length <= 0) {
             return
@@ -42,7 +43,7 @@ internal class OscDispatcher {
         }
 
         val command = ControlStringPolicy.oscCommand(payload, commandEnd)
-        val limit = ControlStringPolicy.oscLimit(command)
+        val limit = if (command == 52) payloadLimit else ControlStringPolicy.oscLimit(command)
         if (limit == 0) return
         if (overflowed || length > limit) {
             if (command == 8) sink.endHyperlink()
