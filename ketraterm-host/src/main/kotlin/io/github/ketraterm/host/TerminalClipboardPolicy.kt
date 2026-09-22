@@ -60,7 +60,8 @@ data class TerminalClipboardPolicy(
 
     companion object {
         /**
-         * Default maximum decoded OSC 52 write payload size.
+         * Default maximum decoded OSC 52 write payload size. Production sessions derive
+         * their temporary encoded collection budget from this policy for eligible writes.
          */
         const val DEFAULT_MAX_DECODED_BYTES: Int = 1 * 1024 * 1024
     }

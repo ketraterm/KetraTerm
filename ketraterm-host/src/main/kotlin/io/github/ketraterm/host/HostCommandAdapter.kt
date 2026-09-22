@@ -917,6 +917,19 @@ class HostCommandAdapter(
         clearActiveHyperlink()
     }
 
+    /**
+     * Current decoded-byte budget for collecting larger OSC 52 writes. Denied writes
+     * return zero, retaining the parser's ordinary envelope bound and small-request auditing.
+     * This does not authorize execution: [requestClipboard] rechecks the current policy.
+     */
+    fun clipboardWriteLimitBytes(): Int {
+        val policy = hostPolicy.clipboardPolicy
+        return when (clipboardDecisionForWrite(policy)) {
+            TerminalClipboardDecision.ALLOWED_BY_POLICY, TerminalClipboardDecision.PROMPT_REQUIRED -> policy.maxDecodedBytes
+            else -> 0
+        }
+    }
+
     override fun requestClipboard(
         selection: String,
         encodedData: String,

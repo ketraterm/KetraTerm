@@ -34,6 +34,7 @@ internal class ActionEngine(
     private val sink: TerminalCommandSink,
     private val dispatcher: CommandDispatcher,
     private val printableSink: PrintableActionSink,
+    private val clipboardWriteLimitBytes: () -> Int = { 0 },
 ) {
     private val oscDispatcher = OscDispatcher()
 
@@ -171,15 +172,7 @@ internal class ActionEngine(
 
             FsmAction.OSC_EXECUTE_CONTROL -> {
                 if (byteValue == ControlCode.BEL) {
-                    oscDispatcher.dispatch(
-                        sink = sink,
-                        payload = state.payloadBuffer,
-                        length = state.payloadLength,
-                        overflowed = state.payloadOverflowed,
-                    )
-                    state.clearPayloadState()
-                    state.clearSequenceState()
-                    state.fsmState = AnsiState.GROUND
+                    finishOsc(state, AnsiState.GROUND)
                 } else {
                     // Ordinary C0 inside OSC is ignored.
                     state.fsmState = nextState
@@ -187,15 +180,7 @@ internal class ActionEngine(
             }
 
             FsmAction.OSC_END -> {
-                oscDispatcher.dispatch(
-                    sink = sink,
-                    payload = state.payloadBuffer,
-                    length = state.payloadLength,
-                    overflowed = state.payloadOverflowed,
-                )
-                state.clearPayloadState()
-                state.clearSequenceState()
-                state.fsmState = nextState
+                finishOsc(state, nextState)
             }
 
             FsmAction.DCS_END -> {
@@ -329,10 +314,48 @@ internal class ActionEngine(
         state: ParserState,
         byteValue: Int,
     ) {
+        if (!state.payloadOverflowed &&
+            state.clipboardDataStart >= 0 &&
+            state.payloadLength == state.clipboardDataStart &&
+            (
+                byteValue in 'A'.code..'Z'.code ||
+                    byteValue in 'a'.code..'z'.code ||
+                    byteValue in '0'.code..'9'.code ||
+                    byteValue == '+'.code ||
+                    byteValue == '/'.code
+            )
+        ) {
+            // Queries and empty writes never need larger storage. Permissions remain host-owned.
+            val limit = ControlStringPolicy.clipboardLimit(state.clipboardDataStart, clipboardWriteLimitBytes())
+            state.payloadLimit = maxOf(state.payloadLimit, limit)
+        }
         if (!putPayloadByte(state, byteValue)) return
         if (!state.payloadHeaderComplete && byteValue == ';'.code) {
             state.payloadCode = ControlStringPolicy.oscCommand(state.payloadBuffer, state.payloadLength - 1)
             selectPayloadLimit(state, ControlStringPolicy.oscLimit(state.payloadCode))
+        } else if (state.payloadCode == 52) {
+            if (state.clipboardDataStart < 0 && byteValue == ';'.code) {
+                state.clipboardDataStart = state.payloadLength
+            }
+        }
+    }
+
+    private fun finishOsc(
+        state: ParserState,
+        nextState: Int,
+    ) {
+        try {
+            oscDispatcher.dispatch(
+                sink = sink,
+                payload = state.payloadBuffer,
+                length = state.payloadLength,
+                overflowed = state.payloadOverflowed,
+                payloadLimit = state.payloadLimit,
+            )
+        } finally {
+            state.clearPayloadState()
+            state.clearSequenceState()
+            state.fsmState = nextState
         }
     }
 
@@ -364,8 +387,13 @@ internal class ActionEngine(
         }
 
         if (state.payloadLength >= state.payloadLimit) {
-            state.payloadOverflowed = true
+            state.discardOverflowedPayload()
             return false
+        }
+
+        if (state.payloadLength == state.payloadBuffer.size) {
+            val capacity = minOf(state.payloadBuffer.size.toLong() * 2, state.payloadLimit.toLong()).toInt()
+            state.payloadBuffer = state.payloadBuffer.copyOf(capacity)
         }
 
         state.payloadBuffer[state.payloadLength] = byteValue.toByte()

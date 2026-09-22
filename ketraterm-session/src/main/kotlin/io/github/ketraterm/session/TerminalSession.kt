@@ -972,7 +972,7 @@ class TerminalSession(
                     connector = connector,
                 )
             val sink = HostCommandAdapter(terminal, recordingHostEvents, hostPolicy, kittyKeyboardSupportedFlags)
-            val parser = TerminalParsers.create(sink)
+            val parser = TerminalParsers.create(sink, clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)
             val inputEncoder = TerminalInputEncoders.create(terminal, hostOutput, inputPolicy)
 
             val renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height)

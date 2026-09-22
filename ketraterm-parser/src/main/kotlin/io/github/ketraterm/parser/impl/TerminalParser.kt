@@ -45,6 +45,7 @@ import io.github.ketraterm.parser.utf8.Utf8Decoder
 internal class TerminalParser(
     private val sink: TerminalCommandSink,
     private val state: ParserState = ParserState(),
+    clipboardWriteLimitBytes: () -> Int = { 0 },
 ) : TerminalOutputParser {
     private val utf8Decoder = Utf8Decoder()
     private val printableProcessor = PrintableProcessor(sink)
@@ -54,6 +55,7 @@ internal class TerminalParser(
             sink = sink,
             dispatcher = AnsiCommandDispatcher,
             printableSink = PrintableProcessorActionSink(printableProcessor),
+            clipboardWriteLimitBytes = clipboardWriteLimitBytes,
         )
 
     /**

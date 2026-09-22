@@ -40,6 +40,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.nio.charset.StandardCharsets
+import java.util.Base64
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -47,6 +48,204 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
+    @Test
+    fun `large clipboard writes follow origin permissions and allowlists through real session parsing`() =
+        runTest {
+            val text = "é🙂".repeat(1024)
+            val bytes = ("\u001B]52;c;" + Base64.getEncoder().encodeToString(text.encodeToByteArray()) + "\u001B\\").ascii()
+            for (origin in TerminalClipboardOrigin.entries) {
+                for (permission in TerminalClipboardPermission.entries) {
+                    for (allowlisted in listOf(false, true)) {
+                        val connector = MockConnector()
+                        val events = RecordingHostEvents()
+                        val writeAllowed =
+                            permission == TerminalClipboardPermission.ALLOW ||
+                                (permission == TerminalClipboardPermission.ALLOWLIST && allowlisted)
+                        val policy =
+                            TerminalClipboardPolicy(
+                                origin = origin,
+                                localWritePermission =
+                                    if (origin == TerminalClipboardOrigin.LOCAL) {
+                                        permission
+                                    } else {
+                                        TerminalClipboardPermission.DENY
+                                    },
+                                remoteWritePermission =
+                                    if (origin == TerminalClipboardOrigin.REMOTE) {
+                                        permission
+                                    } else {
+                                        TerminalClipboardPermission.DENY
+                                    },
+                                allowlisted = allowlisted,
+                            )
+                        TerminalSession
+                            .create(
+                                TerminalBuffers.create(10, 3),
+                                connector,
+                                events,
+                                HostPolicy(clipboardPolicy = policy),
+                                workerDispatcher = StandardTestDispatcher(testScheduler),
+                            ).use { session ->
+                                session.start(10, 3)
+                                for (offset in bytes.indices step 511) {
+                                    connector.feedFromHost(bytes, offset, minOf(511, bytes.size - offset))
+                                }
+                                when {
+                                    permission == TerminalClipboardPermission.PROMPT -> {
+                                        assertEquals(text, events.clipboardPrompts.single().text)
+                                        assertTrue(events.clipboardWrites.isEmpty())
+                                        assertEquals(
+                                            TerminalClipboardDecision.PROMPT_REQUIRED,
+                                            events.clipboardAudits.single().decision,
+                                        )
+                                    }
+                                    writeAllowed -> {
+                                        assertEquals(text, events.clipboardWrites.single().text)
+                                        assertTrue(events.clipboardPrompts.isEmpty())
+                                        assertEquals(
+                                            TerminalClipboardDecision.ALLOWED_BY_POLICY,
+                                            events.clipboardAudits.single().decision,
+                                        )
+                                    }
+                                    else -> {
+                                        assertTrue(events.clipboardAudits.isEmpty())
+                                        assertTrue(events.clipboardWrites.isEmpty())
+                                        assertTrue(events.clipboardPrompts.isEmpty())
+                                    }
+                                }
+                                assertTrue(connector.writtenBytes.isEmpty())
+                            }
+                    }
+                }
+            }
+        }
+
+    @Test
+    fun `clipboard decoded boundary is enforced before callbacks and malformed large transfers recover`() =
+        runTest {
+            val connector = MockConnector()
+            val events = RecordingHostEvents()
+            val policy =
+                HostPolicy(
+                    clipboardPolicy =
+                        TerminalClipboardPolicy(
+                            remoteWritePermission = TerminalClipboardPermission.ALLOW,
+                            maxDecodedBytes = 8192,
+                        ),
+                )
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    events,
+                    policy,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                ).use { session ->
+                    session.start(10, 3)
+                    for (count in intArrayOf(8191, 8192, 8193, 8194)) {
+                        val encoded = Base64.getEncoder().encodeToString(ByteArray(count) { 'a'.code.toByte() })
+                        connector.feedFromHost("\u001B]52;c;$encoded\u0007".ascii())
+                    }
+                    assertEquals(listOf("a".repeat(8191), "a".repeat(8192)), events.clipboardWrites.map { it.text })
+                    // 8193 shares a Base64-size bucket with 8192; 8194 exceeds the parser's encoded budget.
+                    assertEquals(
+                        listOf(
+                            TerminalClipboardDecision.ALLOWED_BY_POLICY,
+                            TerminalClipboardDecision.ALLOWED_BY_POLICY,
+                            TerminalClipboardDecision.DENIED_PAYLOAD_TOO_LARGE,
+                        ),
+                        events.clipboardAudits.map { it.decision },
+                    )
+                    val invalidUtf8 = ByteArray(6000) { 'a'.code.toByte() }.also { it[it.lastIndex] = 0xFF.toByte() }
+                    for (encoded in listOf(Base64.getEncoder().encodeToString(invalidUtf8), "YWFh".repeat(1500) + "!")) {
+                        connector.feedFromHost("\u001B]52;c;$encoded\u0007".ascii())
+                        assertEquals(TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD, events.clipboardAudits.last().decision)
+                    }
+                    assertEquals(2, events.clipboardWrites.size)
+                    connector.feedFromHost("\u001B]52;c;Yg\u0007\u001B]52;c;\u0007".ascii())
+                    assertEquals(listOf("b", ""), events.clipboardWrites.takeLast(2).map { it.text })
+                    assertTrue(events.clipboardPrompts.isEmpty())
+                }
+        }
+
+    @Test
+    fun `inflight clipboard writes recheck changed permissions and decoded limits`() =
+        runTest {
+            val original =
+                HostPolicy(
+                    clipboardPolicy =
+                        TerminalClipboardPolicy(
+                            remoteWritePermission = TerminalClipboardPermission.ALLOW,
+                            maxDecodedBytes = 16384,
+                        ),
+                )
+            val denied = original.clipboardPolicy.copy(remoteWritePermission = TerminalClipboardPermission.DENY)
+            val changes =
+                listOf(
+                    original.copy(clipboardPolicy = denied) to
+                        TerminalClipboardDecision.DENIED_BY_POLICY,
+                    original.copy(clipboardPolicy = original.clipboardPolicy.copy(maxDecodedBytes = 4096)) to
+                        TerminalClipboardDecision.DENIED_PAYLOAD_TOO_LARGE,
+                )
+            for ((updated, expected) in changes) {
+                val connector = MockConnector()
+                val events = RecordingHostEvents()
+                TerminalSession
+                    .create(
+                        TerminalBuffers.create(10, 3),
+                        connector,
+                        events,
+                        original,
+                        workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ).use { session ->
+                        session.start(10, 3)
+                        connector.feedFromHost(("\u001B]52;c;" + "YWFh".repeat(2048)).ascii())
+                        session.setHostPolicy(updated)
+                        connector.feedFromHost("\u0007".ascii())
+                        assertEquals(expected, events.clipboardAudits.single().decision)
+                        assertTrue(events.clipboardWrites.isEmpty())
+                        assertTrue(events.clipboardPrompts.isEmpty())
+                        session.setHostPolicy(original)
+                        connector.feedFromHost(("\u001B]52;c;" + "YWFh".repeat(2048) + "\u0007").ascii())
+                        assertEquals("aaa".repeat(2048), events.clipboardWrites.single().text)
+                    }
+            }
+        }
+
+    @Test
+    fun `default clipboard budget accepts one MiB and session shutdown discards unfinished large writes`() =
+        runTest {
+            for (shutdown in listOf("local", "remote", "error")) {
+                val connector = MockConnector()
+                val events = RecordingHostEvents()
+                val text = "a".repeat(1024 * 1024)
+                val bytes = ("\u001B]52;c;" + Base64.getEncoder().encodeToString(text.ascii()) + "\u001B\\").ascii()
+                TerminalSession
+                    .create(
+                        TerminalBuffers.create(10, 3),
+                        connector,
+                        events,
+                        HostPolicy(clipboardPolicy = TerminalClipboardPolicy(remoteWritePermission = TerminalClipboardPermission.ALLOW)),
+                        workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ).use { session ->
+                        session.start(10, 3)
+                        for (offset in bytes.indices step 8191) {
+                            connector.feedFromHost(bytes, offset, minOf(8191, bytes.size - offset))
+                        }
+                        assertEquals(text, events.clipboardWrites.single().text)
+                        connector.feedFromHost(bytes, 0, bytes.size - 2)
+                        when (shutdown) {
+                            "local" -> session.close()
+                            "remote" -> connector.simulateClosed(0)
+                            else -> connector.simulateCrash(IllegalStateException("transport failed"))
+                        }
+                        assertEquals(1, events.clipboardWrites.size)
+                        assertEquals(1, events.clipboardAudits.size)
+                        assertTrue(session.isClosed)
+                    }
+            }
+        }
+
     @Test
     fun `published cursor presentation follows application style and restores host defaults`() =
         runTest {

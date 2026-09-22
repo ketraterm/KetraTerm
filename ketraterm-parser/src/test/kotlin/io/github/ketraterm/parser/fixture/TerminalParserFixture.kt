@@ -22,8 +22,9 @@ import io.github.ketraterm.parser.runtime.ParserState
 internal class TerminalParserFixture(
     val sink: RecordingTerminalCommandSink = RecordingTerminalCommandSink(),
     val state: ParserState = ParserState(),
+    clipboardWriteLimitBytes: () -> Int = { 0 },
 ) {
-    val parser = TerminalParser(sink, state)
+    val parser = TerminalParser(sink, state, clipboardWriteLimitBytes)
 
     fun acceptAscii(text: String) {
         parser.accept(text.encodeToByteArray())
