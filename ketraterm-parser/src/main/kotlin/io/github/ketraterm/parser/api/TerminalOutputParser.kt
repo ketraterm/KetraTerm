@@ -51,7 +51,7 @@ interface TerminalOutputParser {
      * Signals the end of the input stream.
      *
      * Flushes pending printable text, replacing an incomplete printable UTF-8
-     * sequence. An unfinished OSC is discarded without dispatching metadata.
+     * sequence. Unfinished OSC/DCS commands are discarded without metadata or query dispatch.
      */
     fun endOfInput()
 

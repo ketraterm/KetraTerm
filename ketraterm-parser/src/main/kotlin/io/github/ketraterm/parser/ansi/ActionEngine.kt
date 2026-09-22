@@ -139,36 +139,33 @@ internal class ActionEngine(
                 state.clearSequenceState()
                 state.clearPayloadState()
 
-                // OSC command code is not fully parsed yet.
-                // Milestone A only accumulates bounded payload bytes.
-                state.payloadCode = -1
                 state.fsmState = nextState
             }
 
             FsmAction.OSC_PUT_ASCII -> {
-                putPayloadByte(state, byteValue)
+                putOscPayloadByte(state, byteValue)
                 state.fsmState = nextState
             }
 
             FsmAction.OSC_PUT_UTF8 -> {
-                putPayloadByte(state, byteValue)
+                putOscPayloadByte(state, byteValue)
                 state.fsmState = nextState
             }
 
             FsmAction.DCS_IGNORE_START -> {
                 flushPrintable(state)
                 state.clearPayloadState()
-                putPayloadByte(state, byteValue)
+                putDcsPayloadByte(state, byteValue)
                 state.fsmState = nextState
             }
 
             FsmAction.DCS_PUT_ASCII -> {
-                putPayloadByte(state, byteValue)
+                putDcsPayloadByte(state, byteValue)
                 state.fsmState = nextState
             }
 
             FsmAction.DCS_PUT_UTF8 -> {
-                putPayloadByte(state, byteValue)
+                putDcsPayloadByte(state, byteValue)
                 state.fsmState = nextState
             }
 
@@ -328,21 +325,52 @@ internal class ActionEngine(
         return true
     }
 
-    private fun putPayloadByte(
+    private fun putOscPayloadByte(
         state: ParserState,
         byteValue: Int,
     ) {
-        if (state.payloadOverflowed) {
-            return
+        if (!putPayloadByte(state, byteValue)) return
+        if (!state.payloadHeaderComplete && byteValue == ';'.code) {
+            state.payloadCode = ControlStringPolicy.oscCommand(state.payloadBuffer, state.payloadLength - 1)
+            selectPayloadLimit(state, ControlStringPolicy.oscLimit(state.payloadCode))
+        }
+    }
+
+    private fun putDcsPayloadByte(
+        state: ParserState,
+        byteValue: Int,
+    ) {
+        if (!putPayloadByte(state, byteValue)) return
+        if (!state.payloadHeaderComplete && state.payloadLength == 2) {
+            selectPayloadLimit(state, ControlStringPolicy.dcsLimit(state.payloadBuffer[0].toInt() and 0xff, byteValue))
+        }
+    }
+
+    private fun selectPayloadLimit(
+        state: ParserState,
+        limit: Int,
+    ) {
+        state.payloadHeaderComplete = true
+        state.payloadLimit = minOf(state.payloadLimit, limit)
+        if (state.payloadLimit > 0 && state.payloadLength > state.payloadLimit) state.payloadOverflowed = true
+    }
+
+    private fun putPayloadByte(
+        state: ParserState,
+        byteValue: Int,
+    ): Boolean {
+        if (state.payloadOverflowed || state.payloadLimit == 0) {
+            return false
         }
 
-        if (state.payloadLength >= state.payloadBuffer.size) {
+        if (state.payloadLength >= state.payloadLimit) {
             state.payloadOverflowed = true
-            return
+            return false
         }
 
         state.payloadBuffer[state.payloadLength] = byteValue.toByte()
         state.payloadLength++
+        return true
     }
 
     private fun saturatingAppendDecimal(

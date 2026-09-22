@@ -116,10 +116,14 @@ internal class TerminalParser(
         val utf8Result = utf8Decoder.flushEndOfInput()
         emitUtf8Output(utf8Result)
         printableProcessor.flush(state)
-        if (state.fsmState == AnsiState.OSC_STRING || state.fsmState == AnsiState.OSC_ESCAPE) {
-            state.clearPayloadState()
-            state.clearSequenceState()
-            state.fsmState = AnsiState.GROUND
+        when (state.fsmState) {
+            AnsiState.OSC_STRING, AnsiState.OSC_ESCAPE,
+            AnsiState.DCS_ENTRY, AnsiState.DCS_PASSTHROUGH, AnsiState.DCS_ESCAPE,
+            -> {
+                state.clearPayloadState()
+                state.clearSequenceState()
+                state.fsmState = AnsiState.GROUND
+            }
         }
     }
 

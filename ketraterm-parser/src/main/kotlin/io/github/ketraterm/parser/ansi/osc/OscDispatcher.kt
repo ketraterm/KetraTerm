@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.parser.ansi.osc
 
+import io.github.ketraterm.parser.ansi.ControlStringPolicy
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.parser.utf8.Utf8DecodeResult
 import io.github.ketraterm.parser.utf8.Utf8Decoder
@@ -31,7 +32,7 @@ internal class OscDispatcher {
         length: Int,
         overflowed: Boolean,
     ) {
-        if (overflowed || length <= 0) {
+        if (length <= 0) {
             return
         }
 
@@ -40,7 +41,13 @@ internal class OscDispatcher {
             return
         }
 
-        val command = parseDecimal(payload, commandEnd) ?: return
+        val command = ControlStringPolicy.oscCommand(payload, commandEnd)
+        val limit = ControlStringPolicy.oscLimit(command)
+        if (limit == 0) return
+        if (overflowed || length > limit) {
+            if (command == 8) sink.endHyperlink()
+            return
+        }
         // Display text deliberately uses replacement decoding. Structured metadata must
         // retain its identity; validate the complete command before emitting any effects.
         when (command) {
@@ -233,26 +240,6 @@ internal class OscDispatcher {
             uri = uri,
             id = findHyperlinkId(params),
         )
-    }
-
-    private fun parseDecimal(
-        payload: ByteArray,
-        endExclusive: Int,
-    ): Int? {
-        var value = 0
-        var i = 0
-        while (i < endExclusive) {
-            val digit = (payload[i].toInt() and 0xff) - '0'.code
-            if (digit !in 0..9) {
-                return null
-            }
-            if (value > (Int.MAX_VALUE - digit) / 10) {
-                return null
-            }
-            value = value * 10 + digit
-            i++
-        }
-        return value
     }
 
     private fun findHyperlinkId(params: String): String? {

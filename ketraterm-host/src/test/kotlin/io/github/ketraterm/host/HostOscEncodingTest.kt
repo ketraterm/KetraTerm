@@ -24,6 +24,91 @@ import java.util.*
 
 class HostOscEncodingTest {
     @Test
+    fun `completed oversized links clear context but preserve destinations already written`() {
+        for (terminator in listOf("\u0007", "\u001B\\")) {
+            val bytes =
+                (
+                    "\u001B]8;;https://old/\u0007A\u001B]8;;https://bad/" + "x".repeat(4096) +
+                        terminator + "B\u001B]8;;https://new/\u0007C"
+                ).encodeToByteArray()
+            for (split in listOf(0, 1, 27, 4095, 4096, 4097, bytes.size - 1, bytes.size)) {
+                val f = Fixture()
+                f.parser.accept(bytes, 0, split)
+                f.parser.accept(bytes, split, bytes.size - split)
+                f.parser.endOfInput()
+                val old = checkNotNull(f.terminal.getAttrAt(0, 0)).hyperlinkId
+                val next = checkNotNull(f.terminal.getAttrAt(2, 0)).hyperlinkId
+                assertTrue(old > 0)
+                assertEquals(0, checkNotNull(f.terminal.getAttrAt(1, 0)).hyperlinkId)
+                assertTrue(next > old)
+                assertEquals(listOf("https://old/", "https://new/"), f.links)
+                assertEquals("ABC", f.terminal.getLineAsString(0))
+            }
+        }
+    }
+
+    @Test
+    fun `oversized metadata preserves previous state and produces no partial effects`() {
+        val f = Fixture()
+        f.accept("\u001B]2;original\u0007\u001B]7;file:///original\u0007")
+        val palette = f.terminal.palette
+        for ((prefix, size) in listOf(
+            "2;" to 4097,
+            "7;" to 4097,
+            "9;" to 4097,
+            "777;notify;t;" to 4097,
+            "4;1;#123456;2;?;" to 4097,
+            "10;#123456;?;" to 257,
+        )) {
+            f.accept("\u001B]" + prefix.padEnd(size, 'x') + "\u0007")
+        }
+        assertEquals("original", f.terminal.windowTitle)
+        assertEquals(listOf("file:///original"), f.directories)
+        assertSame(palette, f.terminal.palette)
+        assertTrue(f.notifications.isEmpty())
+        assertEquals(0, f.terminal.readResponseBytes(ByteArray(128)))
+        f.accept("\u001B]10;#123456\u0007\u001B]2;recovered\u0007")
+        assertNotSame(palette, f.terminal.palette)
+        assertEquals("recovered", f.terminal.windowTitle)
+    }
+
+    @Test
+    fun `clipboard raw envelope ceiling precedes decoded size and permission callbacks`() {
+        val f = Fixture(HostPolicy(clipboardPolicy = TerminalClipboardPolicy(remoteWritePermission = TerminalClipboardPermission.ALLOW)))
+        val accepted = "a".repeat(3066)
+        f.accept("\u001B]52;c;" + Base64.getEncoder().encodeToString(accepted.encodeToByteArray()) + "\u0007")
+        assertEquals(listOf(accepted), f.writes)
+        assertEquals(1, f.audits.size)
+        val tooLarge = Base64.getEncoder().encodeToString("a".repeat(3067).encodeToByteArray())
+        for (byte in "\u001B]52;c;$tooLarge\u001B\\".encodeToByteArray()) f.parser.acceptByte(byte.toInt() and 0xff)
+        assertEquals(listOf(accepted), f.writes)
+        assertEquals(1, f.audits.size)
+        assertTrue(f.prompts.isEmpty())
+        f.accept("\u001B]52;c;Yg==\u0007")
+        assertEquals(listOf(accepted, "b"), f.writes)
+    }
+
+    @Test
+    fun `DCS overflow emits no prefix response and later queries retain allowlist and permissions`() {
+        for (permission in HostControlPolicy.entries) {
+            val f = Fixture(HostPolicy(terminalResponsePolicy = permission))
+            f.accept("\u001BP\$q" + "x".repeat(63) + "\u001B\\")
+            f.accept("\u001BP+q436f;" + "0".repeat(4096) + "\u001B\\")
+            assertEquals(0, f.terminal.readResponseBytes(ByteArray(128)))
+            f.accept("\u001BP\$qz\u001B\\\u001BP+q436f\u001B\\\u001BP+q5A5A\u001B\\")
+            val output = ByteArray(128)
+            val count = f.terminal.readResponseBytes(output)
+            val expected =
+                if (permission == HostControlPolicy.ALLOW) {
+                    "\u001BP0\$rz\u001B\\\u001BP1+r436f=323536\u001B\\\u001BP0+r\u001B\\"
+                } else {
+                    ""
+                }
+            assertEquals(expected, output.decodeToString(0, count))
+        }
+    }
+
+    @Test
     fun `malformed links clear active context without changing existing cell destinations`() {
         for (prefix in listOf("8;;https://bad/", "8;id=")) {
             val stream =

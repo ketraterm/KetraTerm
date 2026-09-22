@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.parser.ansi.dcs
 
+import io.github.ketraterm.parser.ansi.ControlStringPolicy
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 
 /**
@@ -47,17 +48,19 @@ internal object DcsDispatcher {
         length: Int,
         overflowed: Boolean,
     ) {
-        if (overflowed || length <= 0) {
+        if (overflowed || length < 2) {
             return
         }
 
-        val payloadStr = payload.decodeToString(startIndex = 0, endIndex = length)
-        if (payloadStr.startsWith("\$q")) {
-            val query = payloadStr.substring(2)
-            sink.queryStatusString(query)
-        } else if (payloadStr.startsWith("+q")) {
-            val rawPayload = payloadStr.substring(2)
-            sink.queryTerminfo(rawPayload)
+        val first = payload[0].toInt() and 0xff
+        val limit = ControlStringPolicy.dcsLimit(first, payload[1].toInt() and 0xff)
+        if (limit == 0 || length > limit) return
+
+        val body = payload.decodeToString(startIndex = 2, endIndex = length)
+        if (first == '$'.code) {
+            sink.queryStatusString(body)
+        } else {
+            sink.queryTerminfo(body)
         }
     }
 }

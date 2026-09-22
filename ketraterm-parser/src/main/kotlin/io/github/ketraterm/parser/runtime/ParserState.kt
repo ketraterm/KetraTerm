@@ -16,6 +16,7 @@
 package io.github.ketraterm.parser.runtime
 
 import io.github.ketraterm.parser.ansi.AnsiState
+import io.github.ketraterm.parser.ansi.ControlStringPolicy
 
 /**
  * Physically flat, logically partitioned parser runtime state.
@@ -148,6 +149,10 @@ internal class ParserState(
     var payloadCode: Int = -1
     var payloadOverflowed: Boolean = false
 
+    // Zero limit means an unsupported family; do not collect its body.
+    var payloadLimit: Int = minOf(maxPayload, ControlStringPolicy.MAX_PAYLOAD_BYTES)
+    var payloadHeaderComplete: Boolean = false
+
     // -------------------------------------------------------------------------
     // O(1) reset helpers
     // -------------------------------------------------------------------------
@@ -165,6 +170,8 @@ internal class ParserState(
         payloadLength = 0
         payloadCode = -1
         payloadOverflowed = false
+        payloadLimit = minOf(payloadBuffer.size, ControlStringPolicy.MAX_PAYLOAD_BYTES)
+        payloadHeaderComplete = false
     }
 
     fun clearActiveClusterAfterFlush() {
@@ -211,7 +218,7 @@ internal class ParserState(
     companion object {
         const val DEFAULT_MAX_PARAMS: Int = 16
         const val DEFAULT_MAX_CLUSTER_CODEPOINTS: Int = 16
-        const val DEFAULT_MAX_PAYLOAD_BYTES: Int = 4096
+        const val DEFAULT_MAX_PAYLOAD_BYTES: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES
 
         const val CHARSET_ASCII: Int = 0
         const val CHARSET_DEC_SPECIAL_GRAPHICS: Int = 1
