@@ -38,6 +38,25 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 - **Window Manipulation**: Support for standard xterm window manipulation sequences (`CSI 1 t` de-minimize, `CSI 2 t` minimize, `CSI 3 ; x ; y t` move, `CSI 5 t` raise, `CSI 6 t` lower, `CSI 8 ; rows ; cols t` resize, `CSI 9 ; mode t` maximize/restore) gated by a secure user setting (`shell_request_window_manipulation`).
 - **ISO 2022 Charsets**: G0-G3 designation sets (ASCII and DEC Special Graphics) with locking shifts (`SO`/`SI`) and single shifts (`SS2`/`SS3`).
 
+### OSC Encoding and Recovery Contract
+
+OSC uses UTF-8 only; there is no locale-dependent decoding, encoding detection, or Latin-1 fallback. These are fixed protocol rules, independent of host permission settings. They apply to collected payload bytes after the parser's existing string-control handling. A correctly encoded literal `U+FFFD` is valid Unicode and is never evidence of malformed input. URI percent escapes are not decoded by this encoding check.
+
+| OSC family | Encoding rule | Effect of malformed encoding |
+| --- | --- | --- |
+| `0`, `1`, `2`: icon/window titles | UTF-8 with Kotlin/JVM replacement decoding (`U+FFFD`) | Repaired display text passes through the existing title permission and overflow policy. |
+| `9`, `777`: notification text | UTF-8 with the same replacement decoding | Recognized notifications pass through host permissions and length limits; existing ConEmu exclusion and notification grammar remain in force. |
+| `7`: working-directory URI | Strict UTF-8 | Discard the command; retain the previous directory and emit no directory callback. Valid text still undergoes URI and host-policy validation. |
+| `8`: hyperlink URI and parameters | Strict UTF-8 across the complete payload | End the active hyperlink context so subsequent cells do not inherit an older destination. Already written cells and retained registry entries remain unchanged. A valid empty URI also ends the context. |
+| `4`, `10`, `11`, `12`: palette/dynamic colors | Strict UTF-8 before interpreting fields | Discard the complete command before any color mutation or query response. This atomic rejection concerns encoding; validly encoded fields retain their existing color grammar. |
+| `133`: shell-integration markers | Strict UTF-8 before interpreting fields | Emit no marker. Validly encoded optional arguments retain existing handling, including an unknown exit code for nonnumeric text. |
+| `52`: clipboard envelope | ASCII selection and Base64/query fields | Non-ASCII or structurally incomplete envelopes are discarded by the parser without a host request or audit. |
+| `52`: Base64-decoded clipboard text | Strict UTF-8, validated by the host within its decoded-byte limit | Emit `DENIED_MALFORMED_PAYLOAD`; never prompt or write repaired text. Base64 syntax is checked first, then the decoded-size limit, then UTF-8 validity, then host write permission. Valid empty text retains clear-style write semantics. Read queries retain their existing policy handling. |
+
+BEL and `ESC \` complete an OSC command. CAN/SUB, parser reset, and end-of-input discard an unfinished OSC without metadata effects. Payload-buffer overflow discards the entire command at termination, including titles and hyperlinks; it never dispatches a truncated prefix. Other C0 controls and DEL are ignored inside OSC. ESC is not retained as payload; a following payload byte resumes collection, while repeated ESC remains pending and DEL leaves that pending state unchanged. Bytes `0x80..0xFF` are payload bytes, never raw C1 terminators. Unknown commands and malformed command numbers emit no effects. Subsequent commands recover normally regardless of byte chunking.
+
+Host title and notification limits count UTF-16 code units. Clamping backs off one code unit when necessary to preserve a supplementary scalar; it does not promise grapheme-aware truncation. Title rejection retains the previous value. The parser owns envelope encoding and recovery; the host owns decoded clipboard text, permissions, metadata limits, and audit outcomes. Products choose permission defaults without changing the encoding contract.
+
 ---
 
 ## 2. Text Styling & Color (SGR)

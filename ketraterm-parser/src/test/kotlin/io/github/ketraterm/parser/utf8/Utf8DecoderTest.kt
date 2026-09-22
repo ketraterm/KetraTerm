@@ -22,6 +22,25 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("Utf8Decoder")
 class Utf8DecoderTest {
+    @Test
+    fun `malformed flag distinguishes decoder replacement from a literal replacement scalar`() {
+        val decoder = Utf8Decoder()
+        assertTrue(Utf8DecodeResult.isMalformed(decoder.accept(0xFF)))
+        decoder.accept(0xC3)
+        val replay = decoder.accept('A'.code)
+        assertTrue(Utf8DecodeResult.isMalformed(replay))
+        assertTrue(Utf8DecodeResult.shouldReprocessCurrentByte(replay))
+        assertFalse(Utf8DecodeResult.isMalformed(decoder.accept('A'.code)))
+        decoder.accept(0xEF)
+        decoder.accept(0xBF)
+        val literal = decoder.accept(0xBD)
+        assertEquals(0xFFFD, Utf8DecodeResult.codepoint(literal))
+        assertFalse(Utf8DecodeResult.isMalformed(literal))
+        decoder.accept(0xE2)
+        assertTrue(Utf8DecodeResult.isMalformed(decoder.flushEndOfInput()))
+        assertEquals(Utf8DecodeResult.NONE, decoder.flushEndOfInput())
+    }
+
     // ----- Helpers ----------------------------------------------------------
 
     private fun decodeAll(

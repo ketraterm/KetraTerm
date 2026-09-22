@@ -35,6 +35,8 @@ internal class ActionEngine(
     private val dispatcher: CommandDispatcher,
     private val printableSink: PrintableActionSink,
 ) {
+    private val oscDispatcher = OscDispatcher()
+
     /**
      * Executes one FSM action.
      *
@@ -172,7 +174,7 @@ internal class ActionEngine(
 
             FsmAction.OSC_EXECUTE_CONTROL -> {
                 if (byteValue == ControlCode.BEL) {
-                    OscDispatcher.dispatch(
+                    oscDispatcher.dispatch(
                         sink = sink,
                         payload = state.payloadBuffer,
                         length = state.payloadLength,
@@ -188,7 +190,7 @@ internal class ActionEngine(
             }
 
             FsmAction.OSC_END -> {
-                OscDispatcher.dispatch(
+                oscDispatcher.dispatch(
                     sink = sink,
                     payload = state.payloadBuffer,
                     length = state.payloadLength,

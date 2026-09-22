@@ -26,6 +26,10 @@ import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import java.net.URI
 import java.net.URISyntaxException
+import java.nio.ByteBuffer
+import java.nio.CharBuffer
+import java.nio.charset.CodingErrorAction
+import java.nio.charset.StandardCharsets
 import java.util.Base64
 import kotlin.collections.ArrayDeque
 
@@ -917,13 +921,33 @@ class HostCommandAdapter(
         selection: String,
         encodedData: String,
     ) {
-        val audit = evaluateClipboardRequest(selection, encodedData)
+        val policy = hostPolicy.clipboardPolicy
+        val operation =
+            if (encodedData == CLIPBOARD_QUERY_MARKER) {
+                TerminalClipboardOperation.READ_QUERY
+            } else {
+                TerminalClipboardOperation.WRITE
+            }
+        val decodedBytes = if (operation == TerminalClipboardOperation.WRITE) decodedBase64ByteCount(encodedData) else 0
+        // Bound allocation before decoding, and validate the text before publishing
+        // permission outcomes. Reuse the decoded text for the write or prompt.
+        val decodedText =
+            if (operation == TerminalClipboardOperation.WRITE && decodedBytes in 0..policy.maxDecodedBytes) {
+                decodeClipboardText(encodedData)
+            } else {
+                null
+            }
+        val decision =
+            when {
+                operation == TerminalClipboardOperation.READ_QUERY -> clipboardDecisionForRead(policy)
+                decodedBytes < 0 -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
+                decodedBytes > policy.maxDecodedBytes -> TerminalClipboardDecision.DENIED_PAYLOAD_TOO_LARGE
+                decodedText == null -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
+                else -> clipboardDecisionForWrite(policy)
+            }
+        val audit = clipboardAudit(selection, operation, encodedData, decodedBytes.coerceAtLeast(0), decision)
         hostEvents.terminalClipboardRequest(audit)
-        if (audit.operation != TerminalClipboardOperation.WRITE) {
-            return
-        }
-
-        val decodedText = decodeClipboardText(encodedData) ?: return
+        if (decodedText == null) return
         when (audit.decision) {
             TerminalClipboardDecision.ALLOWED_BY_POLICY ->
                 hostEvents.terminalClipboardWrite(
@@ -1011,8 +1035,8 @@ class HostCommandAdapter(
         level: NotificationLevel,
     ) {
         if (!hostPolicy.notificationPolicy.isAllowed) return
-        val clampedTitle = title.take(hostPolicy.maxNotificationTitleLength)
-        val clampedBody = body.take(hostPolicy.maxNotificationBodyLength)
+        val clampedTitle = title.truncateAtScalarBoundary(hostPolicy.maxNotificationTitleLength)
+        val clampedBody = body.truncateAtScalarBoundary(hostPolicy.maxNotificationBodyLength)
         hostEvents.showNotification(clampedTitle, clampedBody, level)
     }
 
@@ -1075,44 +1099,6 @@ class HostCommandAdapter(
         activeHyperlinkId = null
         activeHyperlinkNumericId = NO_HYPERLINK_ID
         terminal.setHyperlinkId(NO_HYPERLINK_ID)
-    }
-
-    private fun evaluateClipboardRequest(
-        selection: String,
-        encodedData: String,
-    ): TerminalClipboardAuditEvent {
-        val policy = hostPolicy.clipboardPolicy
-        val operation =
-            if (encodedData == CLIPBOARD_QUERY_MARKER) {
-                TerminalClipboardOperation.READ_QUERY
-            } else {
-                TerminalClipboardOperation.WRITE
-            }
-
-        if (operation == TerminalClipboardOperation.READ_QUERY) {
-            return clipboardAudit(
-                selection = selection,
-                operation = operation,
-                encodedData = encodedData,
-                decodedBytes = 0,
-                decision = clipboardDecisionForRead(policy),
-            )
-        }
-
-        val decodedBytes = decodedBase64ByteCount(encodedData)
-        val decision =
-            when {
-                decodedBytes < 0 -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
-                decodedBytes > policy.maxDecodedBytes -> TerminalClipboardDecision.DENIED_PAYLOAD_TOO_LARGE
-                else -> clipboardDecisionForWrite(policy)
-            }
-        return clipboardAudit(
-            selection = selection,
-            operation = operation,
-            encodedData = encodedData,
-            decodedBytes = decodedBytes.coerceAtLeast(0),
-            decision = decision,
-        )
     }
 
     private fun clipboardAudit(
@@ -1208,7 +1194,7 @@ class HostCommandAdapter(
         if (title.length <= policy.maxLength) return title
         return when (policy.overflowPolicy) {
             TerminalTitleOverflowPolicy.REJECT -> null
-            TerminalTitleOverflowPolicy.CLAMP -> title.take(policy.maxLength)
+            TerminalTitleOverflowPolicy.CLAMP -> title.truncateAtScalarBoundary(policy.maxLength)
         }
     }
 
@@ -1302,12 +1288,30 @@ class HostCommandAdapter(
             }
     }
 
-    private fun decodeClipboardText(value: String): String? =
-        try {
-            Base64.getDecoder().decode(value).decodeToString()
-        } catch (_: IllegalArgumentException) {
-            null
-        }
+    private fun decodeClipboardText(value: String): String? {
+        val bytes =
+            try {
+                Base64.getDecoder().decode(value)
+            } catch (_: IllegalArgumentException) {
+                return null
+            }
+        val decoder =
+            StandardCharsets.UTF_8
+                .newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+        val chars = CharBuffer.allocate(bytes.size)
+        if (decoder.decode(ByteBuffer.wrap(bytes), chars, true).isError) return null
+        if (decoder.flush(chars).isError) return null
+        return String(chars.array(), 0, chars.position())
+    }
+}
+
+/** Keeps the UTF-16 size bound without splitting a valid supplementary scalar. */
+private fun String.truncateAtScalarBoundary(limit: Int): String {
+    if (length <= limit) return this
+    val end = if (limit > 0 && this[limit - 1].isHighSurrogate() && this[limit].isLowSurrogate()) limit - 1 else limit
+    return substring(0, end)
 }
 
 private val HostControlPolicy.isAllowed: Boolean
