@@ -128,7 +128,7 @@ enum class TerminalClipboardDecision {
     /** Clipboard reads are disabled by configured policy. */
     DENIED_READ_DISABLED,
 
-    /** Encoded payload is malformed and cannot be safely decoded. */
+    /** Base64 syntax or decoded UTF-8 text is malformed; no write or prompt is emitted. */
     DENIED_MALFORMED_PAYLOAD,
 
     /** Decoded payload would exceed the configured size limit. */

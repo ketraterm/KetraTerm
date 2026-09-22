@@ -31,6 +31,7 @@ package io.github.ketraterm.host
  * @property remotePermission permission for remote terminal streams.
  * @property overflowPolicy handling for titles longer than [maxLength].
  * @property maxLength maximum retained title length in UTF-16 code units.
+ * Clamping never splits a valid surrogate pair.
  */
 data class TerminalTitlePolicy(
     val origin: TerminalTitleOrigin = TerminalTitleOrigin.LOCAL,
