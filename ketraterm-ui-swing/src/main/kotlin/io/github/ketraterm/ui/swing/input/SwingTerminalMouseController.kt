@@ -15,10 +15,12 @@
  */
 package io.github.ketraterm.ui.swing.input
 
+import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.ui.swing.settings.SwingTerminalChrome
+import io.github.ketraterm.ui.swing.viewport.ScrollDeltaAccumulator
 import java.awt.event.*
 import javax.swing.SwingUtilities
 import kotlin.math.min
@@ -29,6 +31,16 @@ import kotlin.math.min
 internal class SwingTerminalMouseController(
     private val host: SwingTerminalMouseHost,
 ) {
+    private val alternateWheelAccumulator = ScrollDeltaAccumulator()
+    private var wheelRoute = WheelRoute.NONE
+    private var wheelSession: TerminalInputEncoder? = null
+
+    fun resetWheelInput() {
+        alternateWheelAccumulator.reset()
+        wheelRoute = WheelRoute.NONE
+        wheelSession = null
+    }
+
     val wheelListener =
         MouseWheelListener { event ->
             handleMouseWheel(event)
@@ -81,23 +93,31 @@ internal class SwingTerminalMouseController(
         }
 
     private fun handleMouseWheel(event: MouseWheelEvent) {
-        if (!host.renderCache.hasFrame) return
+        if (!host.renderCache.hasFrame) {
+            resetWheelInput()
+            return
+        }
         if (isMouseTrackingIntercepted(event)) {
+            selectWheelRoute(WheelRoute.TRACKED)
             host.finishViewportScroll()
             handleMouseTracking(event, TerminalMouseEventType.WHEEL)
             return
         }
+        val alternateScreen = host.renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE
+        selectWheelRoute(if (alternateScreen) WheelRoute.ALTERNATE else WheelRoute.VIEWPORT)
         val delta = wheelScrollLines(event)
-        if (delta == 0.0) {
+        if (!delta.isFinite() || delta == 0.0) {
+            if (!delta.isFinite()) alternateWheelAccumulator.reset()
             event.consume()
             return
         }
 
-        if (host.renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
-            val key = if (delta > 0.0) TerminalKey.UP else TerminalKey.DOWN
-            val count = kotlin.math.round(kotlin.math.abs(delta)).toInt()
+        if (alternateScreen) {
+            val wheelSteps = alternateWheelAccumulator.accumulate(delta)
+            val count = min(kotlin.math.abs(wheelSteps.toLong()), MAX_WHEEL_STEPS_PER_EVENT.toLong()).toInt()
             val session = host.session
             if (session != null && count > 0) {
+                val key = if (wheelSteps > 0) TerminalKey.UP else TerminalKey.DOWN
                 val keyEvent = TerminalKeyEvent.key(key)
                 for (i in 0 until count) {
                     session.encodeKey(keyEvent)
@@ -110,6 +130,14 @@ internal class SwingTerminalMouseController(
         if (host.scrollViewportByPreciseRows(delta)) {
             event.consume()
         }
+    }
+
+    private fun selectWheelRoute(route: WheelRoute) {
+        val session = host.session
+        if (wheelRoute == route && wheelSession === session) return
+        alternateWheelAccumulator.reset()
+        wheelRoute = route
+        wheelSession = session
     }
 
     fun isMouseTrackingIntercepted(event: MouseEvent): Boolean = !event.isShiftDown && host.mouseTrackingMode() != MouseTrackingMode.OFF
@@ -131,9 +159,7 @@ internal class SwingTerminalMouseController(
 
         val wheelRotation = if (event is MouseWheelEvent) event.wheelRotation else 0
         if (event is MouseWheelEvent && wheelRotation == 0) {
-            // High-resolution devices emit partial rotations whose integer
-            // click count is zero. They belong to the application, but do not
-            // represent a terminal wheel button report yet.
+            // AWT accumulates partial rotations before reporting a whole click.
             event.consume()
             return true
         }
@@ -183,7 +209,7 @@ internal class SwingTerminalMouseController(
             )
         val reportCount =
             if (event is MouseWheelEvent) {
-                min(kotlin.math.abs(wheelRotation.toLong()), MAX_WHEEL_REPORTS_PER_EVENT.toLong()).toInt()
+                min(kotlin.math.abs(wheelRotation.toLong()), MAX_WHEEL_STEPS_PER_EVENT.toLong()).toInt()
             } else {
                 1
             }
@@ -208,10 +234,12 @@ internal class SwingTerminalMouseController(
     }
 
     private companion object {
-        private const val MAX_WHEEL_REPORTS_PER_EVENT = 64
+        private const val MAX_WHEEL_STEPS_PER_EVENT = 64
 
         private fun unpackCellColumn(packed: Long): Int = (packed ushr 32).toInt()
 
         private fun unpackCellRow(packed: Long): Int = packed.toInt()
     }
+
+    private enum class WheelRoute { NONE, VIEWPORT, TRACKED, ALTERNATE }
 }

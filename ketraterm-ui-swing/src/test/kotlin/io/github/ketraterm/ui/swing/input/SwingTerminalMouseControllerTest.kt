@@ -16,9 +16,7 @@
 package io.github.ketraterm.ui.swing.input
 
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.event.TerminalKey
-import io.github.ketraterm.input.event.TerminalMouseButton
-import io.github.ketraterm.input.event.TerminalMouseEvent
+import io.github.ketraterm.input.event.*
 import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
@@ -239,21 +237,8 @@ class SwingTerminalMouseControllerTest {
 
         @Test
         fun `scroll up in alternate screen buffer with mouse tracking off translates to UP keys`() {
-            val encodedKeys = ArrayList<io.github.ketraterm.input.event.TerminalKeyEvent>()
-            val fakeSession =
-                object : TerminalInputEncoder {
-                    override fun encodeKey(event: io.github.ketraterm.input.event.TerminalKeyEvent) {
-                        encodedKeys += event
-                    }
-
-                    override fun encodePaste(event: io.github.ketraterm.input.event.TerminalPasteEvent) {}
-
-                    override fun encodeFocus(event: io.github.ketraterm.input.event.TerminalFocusEvent) {}
-
-                    override fun encodeMouse(event: TerminalMouseEvent) {}
-                }
-
-            val host = RecordingMouseHost(session = fakeSession)
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(session = session)
             host.renderCache.updateFrom(
                 FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
             )
@@ -263,29 +248,16 @@ class SwingTerminalMouseControllerTest {
             val event = mouseWheel(rotation = -1.0)
             controller.wheelListener.mouseWheelMoved(event)
 
-            assertEquals(3, encodedKeys.size)
-            assertTrue(encodedKeys.all { it.key == TerminalKey.UP })
+            assertEquals(3, session.encodedKeys.size)
+            assertTrue(session.encodedKeys.all { it.key == TerminalKey.UP })
             assertEquals(0, host.scrollCount)
             assertTrue(event.isConsumed)
         }
 
         @Test
         fun `scroll down in alternate screen buffer with mouse tracking off translates to DOWN keys`() {
-            val encodedKeys = ArrayList<io.github.ketraterm.input.event.TerminalKeyEvent>()
-            val fakeSession =
-                object : TerminalInputEncoder {
-                    override fun encodeKey(event: io.github.ketraterm.input.event.TerminalKeyEvent) {
-                        encodedKeys += event
-                    }
-
-                    override fun encodePaste(event: io.github.ketraterm.input.event.TerminalPasteEvent) {}
-
-                    override fun encodeFocus(event: io.github.ketraterm.input.event.TerminalFocusEvent) {}
-
-                    override fun encodeMouse(event: TerminalMouseEvent) {}
-                }
-
-            val host = RecordingMouseHost(session = fakeSession)
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(session = session)
             host.renderCache.updateFrom(
                 FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
             )
@@ -295,8 +267,8 @@ class SwingTerminalMouseControllerTest {
             val event = mouseWheel(rotation = 1.0)
             controller.wheelListener.mouseWheelMoved(event)
 
-            assertEquals(3, encodedKeys.size)
-            assertTrue(encodedKeys.all { it.key == TerminalKey.DOWN })
+            assertEquals(3, session.encodedKeys.size)
+            assertTrue(session.encodedKeys.all { it.key == TerminalKey.DOWN })
             assertEquals(0, host.scrollCount)
             assertTrue(event.isConsumed)
         }
@@ -314,6 +286,100 @@ class SwingTerminalMouseControllerTest {
 
             assertEquals(0, host.scrollCount)
             assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `slow alternate-screen wheel input accumulates into arrow keys`() {
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(session = session)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+
+            repeat(3) {
+                val event = mouseWheel(rotation = -0.1)
+                controller.wheelListener.mouseWheelMoved(event)
+                assertTrue(event.isConsumed)
+                assertTrue(session.encodedKeys.isEmpty())
+            }
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.1))
+
+            assertEquals(listOf(TerminalKey.UP), session.encodedKeys.map { it.key })
+            assertEquals(0, host.scrollCount)
+        }
+
+        @Test
+        fun `opposite precise wheel movements cancel before an arrow key is due`() {
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(session = session)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.2))
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = 0.2))
+
+            assertTrue(session.encodedKeys.isEmpty())
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.4))
+            assertEquals(listOf(TerminalKey.UP), session.encodedKeys.map { it.key })
+        }
+
+        @Test
+        fun `alternate-screen fallback bounds key output for one wheel event`() {
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(session = session)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -100.0))
+
+            assertEquals(64, session.encodedKeys.size)
+            assertTrue(session.encodedKeys.all { it.key == TerminalKey.UP })
+        }
+
+        @Test
+        fun `wheel remainder is cleared when switching TUI routing`() {
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(session = session)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.1))
+            host.mouseTrackingMode = MouseTrackingMode.NORMAL
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.8))
+
+            assertTrue(host.mouseReports.isEmpty())
+            assertTrue(session.encodedKeys.isEmpty())
+
+            host.mouseTrackingMode = MouseTrackingMode.OFF
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.1))
+            assertTrue(session.encodedKeys.isEmpty())
+        }
+
+        @Test
+        fun `wheel remainder is cleared for a replacement session`() {
+            val firstSession = RecordingInputEncoder()
+            val host = RecordingMouseHost(session = firstSession)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.1))
+            val secondSession = RecordingInputEncoder()
+            host.session = secondSession
+            repeat(3) { controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.1)) }
+
+            assertTrue(firstSession.encodedKeys.isEmpty())
+            assertTrue(secondSession.encodedKeys.isEmpty())
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.1))
+            assertEquals(listOf(TerminalKey.UP), secondSession.encodedKeys.map { it.key })
         }
     }
 
@@ -440,12 +506,26 @@ class SwingTerminalMouseControllerTest {
             rotation,
         )
 
+    private class RecordingInputEncoder : TerminalInputEncoder {
+        val encodedKeys = ArrayList<TerminalKeyEvent>()
+
+        override fun encodeKey(event: TerminalKeyEvent) {
+            encodedKeys += event
+        }
+
+        override fun encodePaste(event: TerminalPasteEvent) {}
+
+        override fun encodeFocus(event: TerminalFocusEvent) {}
+
+        override fun encodeMouse(event: TerminalMouseEvent) {}
+    }
+
     private class RecordingMouseHost(
         override val settings: SwingSettings = SwingSettings(padding = SwingPadding(0, 0, 0, 0)),
         private val hyperlinkPressHandled: Boolean = false,
         private val scrollResult: Boolean = true,
-        private val mouseTrackingMode: MouseTrackingMode = MouseTrackingMode.OFF,
-        override val session: TerminalInputEncoder? = null,
+        var mouseTrackingMode: MouseTrackingMode = MouseTrackingMode.OFF,
+        override var session: TerminalInputEncoder? = null,
     ) : SwingTerminalMouseHost {
         override val metrics =
             SwingMetrics(

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Fixed scrolling in split terminal layouts disturbing neighboring content.
+- Fixed slow trackpad movements being ignored in full-screen terminal apps when mouse mode is off.
 - Terminal apps can now copy larger selections to the clipboard, up to 1 MiB, while respecting clipboard permissions.
 - Fixed cursor shape and blinking not returning after leaving full-screen terminal apps such as Neovim.
 - Tabs can now show the running application's name when it does not supply a title. Custom names keep priority, and automatic process titles can be turned off in settings.
