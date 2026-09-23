@@ -1,6 +1,6 @@
 # KetraTerm IntelliJ Plugin Changelog
 
-## [Unreleased]
+## [0.3.0] - 2026-09-23
 
 - Fixed scrolling in split terminal layouts disturbing neighboring content.
 - Fixed slow trackpad movements being ignored in full-screen terminal apps when mouse mode is off.

@@ -2,7 +2,7 @@
 
 Release notes for library consumers and embedders. Product-specific changes are recorded in the [IntelliJ plugin changelog](ketraterm-intellij-plugin/CHANGELOG.md) and [standalone application changelog](ketraterm-app/CHANGELOG.md).
 
-## [Unreleased]
+## [0.3.0] - 2026-09-23
 
 - Fixed horizontal-margin scrolling moving guard columns and admitting partial rows to history. SU/SD, line feeds, reverse index, and wrapping now share the existing span-safe slice movement used by IL/DL, while full-width scrolling retains its ring fast path. Added host byte-stream coverage and corrected the core property test and independent cursor/wrap model that expected whole-row movement.
 - Reused the allocation-free precise-scroll accumulator for alternate-screen wheel-to-arrow fallback, retaining fractional row movement until a whole key step is due. Route and session changes clear residual input, and key output per event is bounded. Kept AWT's existing accumulated integer wheel-click path for active mouse tracking; added focused translation and lifecycle regressions.
