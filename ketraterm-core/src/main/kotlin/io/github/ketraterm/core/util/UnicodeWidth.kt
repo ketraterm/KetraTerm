@@ -106,11 +106,12 @@ internal object UnicodeWidth {
     }
 
     fun isEmojiVariationBase(codepoint: Int): Boolean =
-        isScalar(codepoint) && if (codepoint < GeneratedUnicodeWidthTable.BITSET_LIMIT) {
-            emojiVariationBase.get(codepoint)
-        } else {
-            binarySearch(GeneratedUnicodeWidthTable.EMOJI_VARIATION_BASE_ASTRAL_RANGES, codepoint)
-        }
+        isScalar(codepoint) &&
+            if (codepoint < GeneratedUnicodeWidthTable.BITSET_LIMIT) {
+                emojiVariationBase.get(codepoint)
+            } else {
+                binarySearch(GeneratedUnicodeWidthTable.EMOJI_VARIATION_BASE_ASTRAL_RANGES, codepoint)
+            }
 
     fun isScalar(codepoint: Int): Boolean = codepoint in 0..0x10FFFF && codepoint !in 0xD800..0xDFFF
 
