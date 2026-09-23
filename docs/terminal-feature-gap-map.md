@@ -31,7 +31,6 @@ These tiers rank terminal behavior across standalone and embedded hosts. Reprodu
 
 - Fix [CSI parameter overflow](#csi-protocols) before excess fields can change the meaning of a command.
 - Address [bracketed-paste end-marker injection](#input-module-gaps) in the default raw paste path.
-- Fix [fractional wheel input](#input-module-gaps) lost by mouse-aware TUIs and alternate-screen fallback.
 - Resolve the [nested-SSH origin-policy limitation](#session-transport-rendering-and-host-integration-gaps) for clipboard and title controls.
 
 ### Tier 2: Regression coverage and modern compatibility
@@ -138,7 +137,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(input/policy)`: additional xterm-compatible key policies when a real ambiguity exists, such as Delete behavior and optional eight-bit Meta output.
 - `DONE(protocol/core/host/input/ui)`: DECBKM mode 67, conventional Ctrl+2 through Ctrl+8 control bytes, xterm modified F3, legacy F13-F35 aliases, and lossless Shift/Ctrl fallback for base Enter/Escape/Backspace/keypad keys are implemented through allocation-free packed mode state and primitive lookup tables.
 - `TODO(parser/core/input)`: xterm highlight mouse tracking (`?1001`) if full xterm mouse parity is required.
-- `TODO(ui)`: fractional high-resolution wheel events are lost in two Swing paths: active mouse tracking consumes zero-integer-rotation events without accumulating reports, and alternate-screen fallback with tracking off rounds each precise delta to an arrow-key count without retaining a remainder. Repeated trackpad movement can therefore do nothing in TUIs. Primary-screen viewport scrolling already accumulates fractional deltas; SGR-Pixels changes coordinates, not wheel deltas.
+- `DONE(ui)`: alternate-screen wheel-to-arrow fallback with tracking off reuses the viewport's allocation-free accumulator, retaining precise fractional row movement until a whole key step is due. It resets partial input on route or session changes and bounds emitted keys per event. Active mouse tracking retains AWT's integer wheel-click reporting; [Java accumulates high-resolution partial clicks](https://docs.oracle.com/en/java/javase/25/docs/api/java.desktop/java/awt/event/MouseWheelEvent.html) before reporting a whole click. Primary-screen viewport scrolling keeps its existing row accumulation; SGR-Pixels remains a coordinate encoding rather than a wheel-delta protocol.
 
 ### Deferred Kitty Keyboard Protocol Scope
 - `DONE(protocol/core/pty)`: terminal capability identity contract centralizes `$TERM`, `COLORTERM`, DA/DA2, XTGETTCAP terminal-name/color claims, and the implemented Kitty keyboard flag mask.
