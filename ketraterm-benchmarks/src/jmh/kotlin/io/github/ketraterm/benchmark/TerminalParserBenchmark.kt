@@ -38,8 +38,17 @@ import java.util.concurrent.TimeUnit
 @Fork(1)
 open class TerminalParserBenchmark {
     @Param(
-        "ascii", "cjk", "emoji", "sgr_heavy", "metadata", "osc_overflow", "dcs_overflow", "unknown_dcs",
-        "clipboard_64k", "clipboard_1m", "clipboard_overflow",
+        "ascii",
+        "cjk",
+        "emoji",
+        "sgr_heavy",
+        "metadata",
+        "osc_overflow",
+        "dcs_overflow",
+        "unknown_dcs",
+        "clipboard_64k",
+        "clipboard_1m",
+        "clipboard_overflow",
     )
     lateinit var workload: String
 

@@ -20,30 +20,29 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 /**
- * Allocation-free accumulator that converts precise device input into rows.
+ * Allocation-free accumulator that converts precise device input into whole steps.
  *
- * Sub-row input is retained until the signed sum crosses a whole-row boundary.
- * Emitted deltas are always integral; the viewport cannot acquire a fractional
- * resting destination from wheel or trackpad input.
+ * Fractional input is retained until the signed sum crosses a whole-step boundary.
+ * A step may represent a viewport row, an arrow key, or a terminal wheel report.
  */
 internal class ScrollDeltaAccumulator {
     private var remainder = 0.0
 
-    /** Adds [deltaRows] and returns the signed whole-row portion. */
-    fun accumulate(deltaRows: Double): Int {
-        require(deltaRows.isFinite()) { "deltaRows must be finite, was $deltaRows" }
-        if (deltaRows == 0.0) return 0
+    /** Adds [deltaSteps] and returns the signed whole-step portion. */
+    fun accumulate(deltaSteps: Double): Int {
+        require(deltaSteps.isFinite()) { "deltaSteps must be finite, was $deltaSteps" }
+        if (deltaSteps == 0.0) return 0
 
-        val total = (remainder + deltaRows).coerceIn(Int.MIN_VALUE.toDouble(), Int.MAX_VALUE.toDouble())
+        val total = (remainder + deltaSteps).coerceIn(Int.MIN_VALUE.toDouble(), Int.MAX_VALUE.toDouble())
         val tolerance = Math.ulp(total) * ULP_TOLERANCE
         val adjusted = if (total > 0.0) total + tolerance else total - tolerance
-        val wholeRows = (if (adjusted > 0.0) floor(adjusted) else ceil(adjusted)).toInt()
-        remainder = total - wholeRows
+        val wholeSteps = (if (adjusted > 0.0) floor(adjusted) else ceil(adjusted)).toInt()
+        remainder = total - wholeSteps
         if (abs(remainder) <= tolerance) remainder = 0.0
-        return wholeRows
+        return wholeSteps
     }
 
-    /** Discards retained sub-row input. */
+    /** Discards retained fractional input. */
     fun reset() {
         remainder = 0.0
     }

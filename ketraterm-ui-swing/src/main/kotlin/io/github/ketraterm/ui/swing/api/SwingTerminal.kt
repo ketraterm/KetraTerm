@@ -1027,6 +1027,7 @@ class SwingTerminal
         private fun bindOnEdt(session: TerminalSession) {
             if (disposed) return
             bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
+            mouseController.resetWheelInput()
             this.session = session
             resetRenderCaches()
             updateMinimizedStateFromAncestor()
@@ -1071,6 +1072,7 @@ class SwingTerminal
         private fun unbindOnEdt() {
             bindingJob?.cancel(CancellationException("Terminal session unbound"))
             bindingJob = null
+            mouseController.resetWheelInput()
             cancelAndHideShellSuggestionsOnEdt("Terminal session unbound")
             session = null
             resetRenderCaches()
