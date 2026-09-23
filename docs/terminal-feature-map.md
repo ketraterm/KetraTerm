@@ -11,6 +11,7 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 - **Margin Physics**:
   - Vertical scroll margins (`DECSTBM` / `CSI Pt ; Pb r`).
   - Left/right scroll margins (`DECSLRM` / `CSI Pl ; Pr s`).
+  - Horizontal-margin scrolling confines `SU`, `SD`, `IL`, `DL`, line feeds, `IND`, `NEL`, `RI`, and automatic wrapping to the active rectangle. Partial-width scrolling preserves surrounding cells and does not add partial rows to history; wide spans crossing a boundary are cleared as complete occupants. Host byte-stream tests cover count defaults and bounds, split sequences, origin mode, and alternate-screen isolation.
 - **ANSI/SCO Cursor Save Compatibility**: Parameterless `CSI s` (`SCOSC`) saves when `DECLRMM` is disabled; with `DECLRMM` enabled it resets horizontal margins to full width and homes as `DECSLRM`. Parameterless `CSI u` (`SCORC`) restores in either mode. DEC (`ESC 7` / `ESC 8`) and SCO forms share the existing cursor save slot and parser charset save: position, pen attributes, pending wrap, origin mode, charset designations, and locking shifts. Core cursor slots remain screen-local; restore retains existing resize/margin clamping and no-save defaults. Explicit parameters on `CSI s` remain margin requests, never cursor saves; parameterized `CSI u` is ignored. Private `CSI ... u` Kitty keyboard controls remain separate. This bounded slice follows [xterm's mode disambiguation](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html).
 - **Screen & Line Erasures**:
   - Selective line erasing (`DECSEL` / `CSI Ps ? K`).
