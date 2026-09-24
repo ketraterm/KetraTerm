@@ -705,7 +705,7 @@ class TerminalWorkspaceTest {
                         }
                     },
                 sessionFactory =
-                        { _, _, eventListener ->
+                    { _, _, eventListener ->
                         capturedEventListener = eventListener
                         session
                     },
