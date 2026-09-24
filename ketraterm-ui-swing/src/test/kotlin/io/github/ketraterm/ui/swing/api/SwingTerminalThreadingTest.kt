@@ -21,8 +21,8 @@ import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.input.policy.PasteLineEndingPolicy
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.render.api.TerminalColorPalette
@@ -75,7 +75,7 @@ class SwingTerminalThreadingTest {
                 connector = connector,
                 inputPolicy = TerminalInputPolicy(pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN),
             )
-        var settings = SwingSettings(pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF)
+        var settings = SwingSettings(pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF)
         val component = SwingTerminal(settingsProvider = { settings })
         val paste = TerminalPasteEvent("A\u0001\tB\r\nC\nD\rE")
         try {
@@ -89,13 +89,11 @@ class SwingTerminalThreadingTest {
                 session.onBytes(enableBracketed, 0, enableBracketed.size)
                 session.encodePaste(paste)
                 assertEquals("\u001B[200~A\tB\r\nC\nD\rE\u001B[201~", output.toString(Charsets.UTF_8))
-                for (policy in listOf(PasteSanitizationPolicy.RAW, PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS)) {
-                    settings = settings.copy(pasteSanitizationPolicy = policy)
-                    component.reloadSettings()
-                    output.reset()
-                    session.encodePaste(paste)
-                    assertEquals("\u001B[200~A\u0001\tB\r\nC\nD\rE\u001B[201~", output.toString(Charsets.UTF_8))
-                }
+                settings = settings.copy(pasteControlPolicy = PasteControlPolicy.PRESERVE)
+                component.reloadSettings()
+                output.reset()
+                session.encodePaste(paste)
+                assertEquals("\u001B[200~A\u0001\tB\r\nC\nD\rE\u001B[201~", output.toString(Charsets.UTF_8))
                 val disableBracketed = "\u001B[?2004l".toByteArray(Charsets.US_ASCII)
                 session.onBytes(disableBracketed, 0, disableBracketed.size)
                 output.reset()

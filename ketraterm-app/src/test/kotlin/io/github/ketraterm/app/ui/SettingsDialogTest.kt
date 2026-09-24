@@ -17,6 +17,7 @@ package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.host.TerminalClipboardPermission
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfileRegistry
@@ -40,6 +41,27 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SettingsDialogTest {
+    @Test
+    fun `paste handling offers two choices and persists control filtering`() {
+        withDialog { settings, dialog, closed ->
+            onEdt {
+                val combo =
+                    components(dialog).filterIsInstance<JComboBox<*>>().single {
+                        it.selectedItem?.toString() == "Preserve text"
+                    }
+                assertEquals(
+                    listOf("Preserve text", "Remove control characters"),
+                    (0 until combo.itemCount).map { combo.getItemAt(it).toString() },
+                )
+                combo.selectedIndex = 1
+                button(dialog, "OK").doClick()
+            }
+            assertTrue(closed.await(5, TimeUnit.SECONDS))
+            assertEquals(PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF, settings.config.pasteControlPolicy)
+            assertEquals(settings.config.pasteControlPolicy, settings.current().pasteControlPolicy)
+        }
+    }
+
     @Test
     fun `process title checkbox persists its selection`() {
         withDialog { settings, dialog, closed ->

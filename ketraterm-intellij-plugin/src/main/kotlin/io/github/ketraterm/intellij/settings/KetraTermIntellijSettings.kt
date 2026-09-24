@@ -18,7 +18,7 @@ package io.github.ketraterm.intellij.settings
 import com.intellij.openapi.components.*
 import com.intellij.util.ui.JBFont
 import io.github.ketraterm.host.*
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
@@ -245,7 +245,7 @@ class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTerm
         @JvmField val shellSuggestionsEnabled: Boolean = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED,
         @JvmField val acceptSelectedSuggestionWithEnter: Boolean = TerminalConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
         @JvmField val completionLearningPersistenceEnabled: Boolean = false,
-        @JvmField val pasteSanitization: String = "raw",
+        @JvmField val pasteSanitization: String = "preserve",
         @JvmField val clipboardLocalWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_LOCAL_WRITE.name.lowercase(Locale.ROOT),
         @JvmField val clipboardRemoteWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_REMOTE_WRITE.name.lowercase(Locale.ROOT),
         @JvmField val clipboardRead: String = TerminalConfig.DEFAULT_CLIPBOARD_READ.name.lowercase(Locale.ROOT),
@@ -419,9 +419,11 @@ internal object KetraTermIntellijSettingsNormalizer {
         }
 
     private fun normalizePasteSanitization(policy: String): String =
-        when (val normalized = policy.trim().lowercase(Locale.ROOT)) {
-            "raw", "strip-c0", "normalize-line-endings" -> normalized
-            else -> "raw"
+        when (policy.trim().lowercase(Locale.ROOT)) {
+            "strip-c0" -> "strip-c0"
+            // Preserve the existing XML field; canonicalize legacy choices on load.
+            "preserve", "raw", "normalize-line-endings" -> "preserve"
+            else -> "preserve"
         }
 }
 
@@ -453,7 +455,7 @@ internal object KetraTermIntellijSettingsMapper {
             cursorBlinkMillis = state.cursorBlinkMillis,
             useSystemFallbackFonts = state.useSystemFallbackFonts,
             visualBellEnabled = state.visualBell,
-            pasteSanitizationPolicy = parsePasteSanitization(state.pasteSanitization),
+            pasteControlPolicy = parsePasteSanitization(state.pasteSanitization),
             cursorShape = parseCursorShape(state.cursorShape),
             scrollbackLines = state.scrollbackLines,
             lineHeight = state.lineHeight,
@@ -480,10 +482,9 @@ internal object KetraTermIntellijSettingsMapper {
             else -> TerminalRenderCursorShape.BLOCK
         }
 
-    private fun parsePasteSanitization(value: String): PasteSanitizationPolicy =
+    private fun parsePasteSanitization(value: String): PasteControlPolicy =
         when (value) {
-            "strip-c0" -> PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF
-            "normalize-line-endings" -> PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS
-            else -> PasteSanitizationPolicy.RAW
+            "strip-c0" -> PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF
+            else -> PasteControlPolicy.PRESERVE
         }
 }

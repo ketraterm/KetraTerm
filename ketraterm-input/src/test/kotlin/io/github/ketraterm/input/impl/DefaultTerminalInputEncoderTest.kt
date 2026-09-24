@@ -18,7 +18,7 @@ package io.github.ketraterm.input.impl
 import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.input.event.*
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.input.policy.UnsupportedModifiedKeyPolicy
 import io.github.ketraterm.protocol.host.TerminalHostOutput
@@ -222,7 +222,7 @@ class DefaultTerminalInputEncoderTest {
                 output = output,
                 policy =
                     TerminalInputPolicy(
-                        pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                        pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
                     ),
             )
 

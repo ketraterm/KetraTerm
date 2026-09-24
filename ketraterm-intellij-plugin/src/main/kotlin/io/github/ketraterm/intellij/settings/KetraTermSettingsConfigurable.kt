@@ -241,7 +241,9 @@ class KetraTermSettingsConfigurable internal constructor(
 
                 group(KetraTermBundle.message("settings.ketraterm.group.security")) {
                     row(KetraTermBundle.message("settings.ketraterm.pasteSanitization")) {
-                        cell(pasteSanitizationCombo).align(AlignX.LEFT)
+                        cell(pasteSanitizationCombo)
+                            .align(AlignX.LEFT)
+                            .comment(KetraTermBundle.message("settings.ketraterm.pasteSanitization.help"))
                     }
                     row(KetraTermBundle.message("settings.ketraterm.clipboardLocalWrite")) {
                         cell(clipboardLocalWriteCombo).align(AlignX.LEFT)
@@ -346,7 +348,7 @@ class KetraTermSettingsConfigurable internal constructor(
             environmentVariables = environmentVariablesField.text.trim(),
             addProjectJdkToPath = addProjectJdkToPathCheckBox.isSelected,
             defaultTabName = defaultTabNameField.text.trim(),
-            pasteSanitization = (pasteSanitizationCombo.selectedItem as? PasteSanitizationOption)?.id ?: "raw",
+            pasteSanitization = (pasteSanitizationCombo.selectedItem as? PasteSanitizationOption)?.id ?: "preserve",
             clipboardLocalWrite = (clipboardLocalWriteCombo.selectedItem as? PermissionOption)?.id ?: "prompt",
             clipboardRemoteWrite = (clipboardRemoteWriteCombo.selectedItem as? PermissionOption)?.id ?: "deny",
             clipboardRead = (clipboardReadCombo.selectedItem as? PermissionOption)?.id ?: "deny",
@@ -515,7 +517,6 @@ private data class PasteSanitizationOption(
 
 private fun pasteSanitizationOptions(): Array<PasteSanitizationOption> =
     arrayOf(
-        PasteSanitizationOption("raw", KetraTermBundle.message("settings.ketraterm.pasteSanitization.raw")),
+        PasteSanitizationOption("preserve", KetraTermBundle.message("settings.ketraterm.pasteSanitization.preserve")),
         PasteSanitizationOption("strip-c0", KetraTermBundle.message("settings.ketraterm.pasteSanitization.stripC0")),
-        PasteSanitizationOption("normalize-line-endings", KetraTermBundle.message("settings.ketraterm.pasteSanitization.normalize")),
     )

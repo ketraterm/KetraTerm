@@ -156,7 +156,7 @@ open class TerminalInputBenchmark {
 
     // -- Paste --
 
-    /** Bracketed paste with 1 KB text. */
+    /** Unbracketed paste with 1 KB text through a counting sink. */
     @Benchmark
     open fun encodePaste(bh: Blackhole) {
         legacyEncoder.encodePaste(pasteEvent)

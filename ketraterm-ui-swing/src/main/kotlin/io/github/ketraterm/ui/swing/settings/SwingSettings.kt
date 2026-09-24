@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.settings
 
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import kotlinx.collections.immutable.ImmutableList
@@ -87,7 +87,7 @@ import java.util.*
  * terminal grid in pixels. The default keeps top padding at zero and uses small
  * symmetric side insets because alternate-screen applications do not use the
  * primary scrollback scrollbar or shell-integration prompt gutter.
- * @property pasteSanitizationPolicy paste payload transformation applied before
+ * @property pasteControlPolicy paste payload transformation applied before
  * host-bound input emission.
  * @property cursorShape default cursor shape configured for the session.
  * @property scrollbackLines maximum scrollback lines retained by the terminal.
@@ -132,7 +132,7 @@ data class SwingSettings
         val shellIntegrationFailedCommandRailWidth: Int = 3,
         val padding: SwingPadding = SwingPadding(0, 4, 4, 6),
         val alternateScreenPadding: SwingPadding = SwingPadding(0, 2, 2, 2),
-        val pasteSanitizationPolicy: PasteSanitizationPolicy = PasteSanitizationPolicy.RAW,
+        val pasteControlPolicy: PasteControlPolicy = PasteControlPolicy.PRESERVE,
         val cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK,
         val scrollbackLines: Int = 1000,
         val lineHeight: Float = 1.0f,

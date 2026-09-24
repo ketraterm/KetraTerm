@@ -17,7 +17,7 @@ package io.github.ketraterm.intellij.settings
 
 import com.intellij.openapi.progress.ProcessCanceledException
 import io.github.ketraterm.host.*
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
@@ -43,24 +43,25 @@ class KetraTermIntellijSettingsTest {
     @Test
     fun `paste policies survive state reload and map to embedding settings`() {
         val service = KetraTermIntellijSettings()
-        assertEquals("raw", service.state.pasteSanitization)
+        assertEquals("preserve", service.state.pasteSanitization)
         val policies =
             listOf(
-                "raw" to PasteSanitizationPolicy.RAW,
-                "strip-c0" to PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
-                "normalize-line-endings" to PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS,
+                "preserve" to PasteControlPolicy.PRESERVE,
+                "raw" to PasteControlPolicy.PRESERVE,
+                "strip-c0" to PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                "normalize-line-endings" to PasteControlPolicy.PRESERVE,
             )
         for ((id, policy) in policies) {
             service.loadState(service.state.copy(themeId = "nord", pasteSanitization = " ${id.uppercase(java.util.Locale.ROOT)} "))
-            assertEquals(id, service.state.pasteSanitization)
+            assertEquals(if (id == "strip-c0") "strip-c0" else "preserve", service.state.pasteSanitization)
             service.replaceState(service.state.copy(visualBell = !service.state.visualBell))
             val reloaded = KetraTermIntellijSettings()
             reloaded.loadState(service.state)
-            assertEquals(policy, KetraTermIntellijSettingsMapper.toSwingSettings(reloaded.state).pasteSanitizationPolicy)
+            assertEquals(policy, KetraTermIntellijSettingsMapper.toSwingSettings(reloaded.state).pasteControlPolicy)
         }
         service.loadState(service.state.copy(pasteSanitization = "unknown"))
-        assertEquals("raw", service.state.pasteSanitization)
-        assertEquals(PasteSanitizationPolicy.RAW, KetraTermIntellijSettingsMapper.toSwingSettings(service.state).pasteSanitizationPolicy)
+        assertEquals("preserve", service.state.pasteSanitization)
+        assertEquals(PasteControlPolicy.PRESERVE, KetraTermIntellijSettingsMapper.toSwingSettings(service.state).pasteControlPolicy)
     }
 
     @Test

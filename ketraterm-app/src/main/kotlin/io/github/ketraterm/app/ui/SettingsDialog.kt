@@ -182,9 +182,11 @@ internal class SettingsDialog(
     private val pasteSanitizationCombo =
         createComboBox(
             PASTE_SANITIZATION_OPTIONS.toTypedArray(),
-            PASTE_SANITIZATION_OPTIONS.first { it.policy == settings.config.pasteSanitizationPolicy },
+            PASTE_SANITIZATION_OPTIONS.first { it.policy == settings.config.pasteControlPolicy },
             220,
-        )
+        ).apply {
+            toolTipText = "Both choices protect bracketed paste. Removing controls keeps tabs and line breaks."
+        }
     private val shellRequestResizeWindowCheckbox = JCheckBox("Allow window resize from shell", settings.config.shellRequestResizeWindow)
     private val shellRequestWindowManipulationCheckbox =
         JCheckBox("Allow window manipulation from shell", settings.config.shellRequestWindowManipulation)
@@ -764,7 +766,7 @@ internal class SettingsDialog(
         pasteOnMiddleClickCheckbox.isSelected = TerminalConfig.DEFAULT_PASTE_ON_MIDDLE_CLICK
         pasteSanitizationCombo.selectedItem =
             PASTE_SANITIZATION_OPTIONS.first {
-                it.policy == TerminalConfig.DEFAULT_PASTE_SANITIZATION_POLICY
+                it.policy == TerminalConfig.DEFAULT_PASTE_CONTROL_POLICY
             }
         shellRequestResizeWindowCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_RESIZE_WINDOW
         shellRequestWindowManipulationCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
@@ -880,9 +882,9 @@ internal class SettingsDialog(
             audibleBell = audibleBellCheckbox.isSelected,
             visualBell = visualBellCheckbox.isSelected,
             pasteOnMiddleClick = pasteOnMiddleClickCheckbox.isSelected,
-            pasteSanitizationPolicy =
+            pasteControlPolicy =
                 (pasteSanitizationCombo.selectedItem as? PasteSanitizationOption)?.policy
-                    ?: TerminalConfig.DEFAULT_PASTE_SANITIZATION_POLICY,
+                    ?: TerminalConfig.DEFAULT_PASTE_CONTROL_POLICY,
             scrollbackLines = scrollbackSpinner.value as? Int ?: TerminalConfig.DEFAULT_SCROLLBACK_LINES,
             lineHeight = (lineHeightSpinner.value as Number).toFloat(),
             shellRequestResizeWindow = shellRequestResizeWindowCheckbox.isSelected,
@@ -993,7 +995,7 @@ internal class SettingsDialog(
 
 private data class PasteSanitizationOption(
     val label: String,
-    val policy: io.github.ketraterm.input.policy.PasteSanitizationPolicy,
+    val policy: io.github.ketraterm.input.policy.PasteControlPolicy,
 ) {
     override fun toString(): String = label
 }
@@ -1032,10 +1034,9 @@ private fun createClipboardPermissionCombo(current: TerminalClipboardPermission)
 
 private val PASTE_SANITIZATION_OPTIONS =
     listOf(
-        PasteSanitizationOption("Raw paste", io.github.ketraterm.input.policy.PasteSanitizationPolicy.RAW),
+        PasteSanitizationOption("Preserve text", io.github.ketraterm.input.policy.PasteControlPolicy.PRESERVE),
         PasteSanitizationOption(
-            "Strip control characters",
-            io.github.ketraterm.input.policy.PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+            "Remove control characters",
+            io.github.ketraterm.input.policy.PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
         ),
-        PasteSanitizationOption("Normalize line endings", io.github.ketraterm.input.policy.PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS),
     )

@@ -242,21 +242,56 @@ Not guaranteed yet:
 
 ## Paste And Focus Contract
 
-Paste encoding preserves payload bytes by default after UTF-8 conversion from
-the provided Kotlin string. Bracketed paste mode wraps the original payload with
-`CSI 200~` and `CSI 201~` when enabled in the per-event mode snapshot; it never
-rewrites line endings. Unbracketed pastes may canonicalize line endings through
-the host-owned input policy.
+Paste encoding reads one mode snapshot and one input policy per event. The
+`pasteControlPolicy` selects `PasteControlPolicy.PRESERVE` (the default) or
+`STRIP_C0_EXCEPT_TAB_CR_LF`. Filtering removes only C0 controls other than TAB,
+CR, and LF; it does not remove DEL or the C1 range.
 
-Paste policy may:
+When bracketed paste is enabled, the encoder wraps the transformed payload in
+`ESC[200~` and `ESC[201~`. Protection is mandatory for both control policies:
 
-- preserve text exactly as provided
-- strip C0 controls except TAB, CR, and LF
-- normalize CRLF and lone CR line endings to LF
+- remaining ESC (U+001B) becomes U+241B, the visible escape symbol;
+- remaining ETX (U+0003) becomes U+2403, because some receivers treat it as an
+  interrupt even inside bracketed paste;
+- CSI (U+009B) becomes the six literal ASCII characters `\u009b`.
 
-The separate unbracketed line-ending policy may preserve input or canonicalize
-all newline forms to LF, CR, or CRLF. Local PTY hosts select CR so each pasted
-line boundary has the same host-input semantics as the Enter key.
+The protected payload contains no ESC, ETX, or U+009B characters. Transformations
+cannot concatenate fragments into another delimiter. Classification operates on
+Unicode code points, never arbitrary UTF-8 continuation bytes. Literal spellings
+such as `\x1b` are ordinary text. Other controls retain their policy-defined
+behavior; bracketed payloads preserve TAB and original line endings.
+
+For unbracketed paste, the control policy applies without the framing replacements.
+The independent `pasteLineEndingPolicy` preserves input or canonicalizes CRLF,
+lone CR, and LF to LF, CR, or CRLF. Each CRLF pair is one line boundary. Local PTY
+hosts select CR so each pasted line boundary has Enter-key semantics.
+
+All paths replace unpaired UTF-16 surrogates with U+FFFD. Valid scalar values,
+including supplementary characters and combining sequences, retain their UTF-8
+encoding. Empty bracketed pastes still emit both markers.
+
+Unchanged text uses the sink's direct UTF-8 path. Transformed text is emitted in
+bounded chunks through the encoder's existing reusable output buffer, also used
+for completion deletions. No clipboard-sized intermediate string or byte array is
+created. Pending buffered bytes are discarded on write failure; already accepted
+transport bytes cannot be rolled back. Session serialization keeps an entire
+paste or text replacement ordered with other input and terminal responses.
+
+### Paste API Migration
+
+`PasteControlPolicy` replaces `PasteSanitizationPolicy`; callers use
+`pasteControlPolicy` and `TerminalSession.setPasteControlPolicy`. Replace `RAW`
+with `PRESERVE`. Replace `NORMALIZE_LINE_ENDINGS` with an explicit
+`pasteLineEndingPolicy`: retain an existing canonicalizing policy, or select
+`LINE_FEED` if the previous host policy was `PRESERVE`. Live content-policy updates
+preserve host newline and keyboard choices.
+
+Standalone TOML and IntelliJ XML retain their persisted setting keys. The accepted
+canonical choices are `preserve` and `strip-c0`; legacy `raw` and
+`normalize-line-endings` migrate to `preserve`. Both shipped products already use
+the local PTY CR policy, so this migration preserves their newline behavior.
+
+### Focus Reports
 
 Focus encoding emits `CSI I` and `CSI O` only when focus reporting is enabled
 in the per-event mode snapshot.

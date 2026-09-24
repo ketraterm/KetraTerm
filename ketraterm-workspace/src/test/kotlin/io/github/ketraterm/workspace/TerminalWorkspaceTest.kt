@@ -22,7 +22,7 @@ import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
@@ -42,6 +42,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalWorkspaceTest {
@@ -94,7 +95,7 @@ class TerminalWorkspaceTest {
                     }
                 TerminalWorkspace(
                     listener,
-                    TerminalWorkspaceSessionFactory { _, _, events ->
+                    { _, _, events ->
                         ptyListener = events
                         session
                     },
@@ -151,7 +152,7 @@ class TerminalWorkspaceTest {
                             titles += title
                         }
                     },
-                sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+                sessionFactory = { _, _, _ -> session },
                 workerDispatcher = dispatcher,
             ).use { workspace ->
                 val tab =
@@ -170,7 +171,7 @@ class TerminalWorkspaceTest {
                 assertEquals("Profile", tab.title)
                 runCurrent()
                 val readsWhileDisabled = connector.foregroundReads
-                advanceTimeBy(5_000)
+                advanceTimeBy(5_000.milliseconds)
                 runCurrent()
                 assertEquals(readsWhileDisabled, connector.foregroundReads)
                 assertEquals(listOf("vim", "Profile"), titles)
@@ -184,7 +185,7 @@ class TerminalWorkspaceTest {
                 assertTrue(session.isClosed)
                 assertEquals("Profile", tab.title)
                 val readsAtExit = connector.foregroundReads
-                advanceTimeBy(5_000)
+                advanceTimeBy(5_000.milliseconds)
                 runCurrent()
                 assertEquals(readsAtExit, connector.foregroundReads)
             }
@@ -200,7 +201,7 @@ class TerminalWorkspaceTest {
             session.start(80, 24)
             TerminalWorkspace(
                 listener = TerminalWorkspaceListener.NONE,
-                sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+                sessionFactory = { _, _, _ -> session },
                 workerDispatcher = dispatcher,
             ).use { workspace ->
                 val tab =
@@ -217,7 +218,7 @@ class TerminalWorkspaceTest {
                 runCurrent()
                 assertEquals("vim", tab.title)
                 assertEquals(1, connector.foregroundReads)
-                advanceTimeBy(1_000)
+                advanceTimeBy(1_000.milliseconds)
                 runCurrent()
                 assertEquals("vim", tab.title)
             }
@@ -316,7 +317,7 @@ class TerminalWorkspaceTest {
                     }
                 },
             sessionFactory =
-                TerminalWorkspaceSessionFactory { _, _, listener ->
+                { _, _, listener ->
                     events = listener
                     session
                 },
@@ -355,7 +356,7 @@ class TerminalWorkspaceTest {
                             cancellations += tab.id
                         }
                     },
-                sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+                sessionFactory = { _, _, _ -> session },
                 workerDispatcher = StandardTestDispatcher(testScheduler),
             ).use { workspace ->
                 val tab =
@@ -449,7 +450,7 @@ class TerminalWorkspaceTest {
                         }
                     },
                 sessionFactory =
-                    TerminalWorkspaceSessionFactory { _, _, eventListener ->
+                    { _, _, eventListener ->
                         capturedEventListener = eventListener
                         session
                     },
@@ -485,7 +486,7 @@ class TerminalWorkspaceTest {
             TerminalWorkspace(
                 listener = TerminalWorkspaceListener.NONE,
                 sessionFactory =
-                    TerminalWorkspaceSessionFactory { _, options, _ ->
+                    { _, options, _ ->
                         capturedOptions = options
                         session
                     },
@@ -499,13 +500,13 @@ class TerminalWorkspaceTest {
                     rows = 24,
                     treatAmbiguousAsWide = false,
                     maxHistory = 100,
-                    pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                    pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
                 ),
         )
 
         assertEquals(
-            PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
-            capturedOptions?.pasteSanitizationPolicy,
+            PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+            capturedOptions?.pasteControlPolicy,
         )
     }
 
@@ -593,7 +594,7 @@ class TerminalWorkspaceTest {
                         }
                     },
                 sessionFactory =
-                    TerminalWorkspaceSessionFactory { _, _, eventListener ->
+                    { _, _, eventListener ->
                         capturedEventListener = eventListener
                         session
                     },
@@ -636,7 +637,7 @@ class TerminalWorkspaceTest {
                                 closeEvents += Triple(tab.id, exitCode, failure)
                             }
                         },
-                    sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+                    sessionFactory = { _, _, _ -> session },
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                 )
             val tab =
@@ -669,7 +670,7 @@ class TerminalWorkspaceTest {
                             closeEvents += tab.id
                         }
                     },
-                sessionFactory = TerminalWorkspaceSessionFactory { _, _, _ -> session },
+                sessionFactory = { _, _, _ -> session },
             )
         val tab =
             workspace.openTab(
@@ -704,7 +705,7 @@ class TerminalWorkspaceTest {
                         }
                     },
                 sessionFactory =
-                    TerminalWorkspaceSessionFactory { _, _, eventListener ->
+                    { _, _, eventListener ->
                         capturedEventListener = eventListener
                         session
                     },
@@ -744,7 +745,7 @@ class TerminalWorkspaceTest {
                         }
                     },
                 sessionFactory =
-                    TerminalWorkspaceSessionFactory { _, _, eventListener ->
+                    { _, _, eventListener ->
                         capturedEventListener = eventListener
                         session
                     },

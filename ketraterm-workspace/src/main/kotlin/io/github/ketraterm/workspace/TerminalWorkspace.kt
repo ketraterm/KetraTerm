@@ -18,7 +18,7 @@ package io.github.ketraterm.workspace
 import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.pty.PtyEventListener
@@ -393,7 +393,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
                 inputPolicy =
                     PtyOptions
                         .defaultInputPolicy()
-                        .copy(pasteSanitizationPolicy = options.pasteSanitizationPolicy),
+                        .copy(pasteControlPolicy = options.pasteControlPolicy),
                 maxHistory = options.maxHistory,
                 eventListener = eventListener,
                 hostPolicy = options.hostPolicy,
@@ -412,7 +412,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
  * @property rows initial terminal height in rows.
  * @property treatAmbiguousAsWide width policy for future writes.
  * @property maxHistory max scrollback lines retained by the core buffer.
- * @property pasteSanitizationPolicy paste payload transformation applied before
+ * @property pasteControlPolicy paste payload transformation applied before
  * host-bound input emission.
  * @property shellIntegrationEnabled whether supported launch profiles should
  * install shell hooks that emit OSC 7 and OSC 133 metadata.
@@ -424,7 +424,7 @@ data class TerminalWorkspaceOpenOptions(
     val rows: Int,
     val treatAmbiguousAsWide: Boolean,
     val maxHistory: Int,
-    val pasteSanitizationPolicy: PasteSanitizationPolicy = PasteSanitizationPolicy.RAW,
+    val pasteControlPolicy: PasteControlPolicy = PasteControlPolicy.PRESERVE,
     val shellIntegrationEnabled: Boolean = true,
     val hostPolicy: HostPolicy = HostPolicy(),
     val showForegroundProcessName: Boolean = true,
