@@ -26,7 +26,7 @@ package io.github.ketraterm.host
  * Encoding validity is fixed by the OSC protocol contract before permission
  * evaluation; permitting a command does not permit malformed structured data.
  *
- * @property titlePolicy origin-aware policy for OSC title updates and
+ * @property titlePolicy session-wide policy for OSC title updates and
  * title-stack restore operations before adapter/core title metadata changes or
  * host callbacks are emitted.
  * @property hyperlinkPolicy whether OSC 8 hyperlinks may be retained and

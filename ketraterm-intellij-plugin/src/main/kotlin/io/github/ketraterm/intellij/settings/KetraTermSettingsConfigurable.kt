@@ -101,12 +101,10 @@ class KetraTermSettingsConfigurable internal constructor(
     private val showForegroundProcessNameCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.showForegroundProcessName"))
 
     private val pasteSanitizationCombo = ComboBox(pasteSanitizationOptions())
-    private val clipboardLocalWriteCombo = ComboBox(permissionOptions())
-    private val clipboardRemoteWriteCombo = ComboBox(permissionOptions())
+    private val clipboardWriteCombo = ComboBox(permissionOptions())
     private val clipboardReadCombo = ComboBox(permissionOptions())
     private val clipboardMaxDecodedBytesSpinner = spinner(TerminalConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES, 0, Int.MAX_VALUE)
-    private val titleLocalPermissionCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.titleLocalPermission"))
-    private val titleRemotePermissionCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.titleRemotePermission"))
+    private val titlePermissionCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.titlePermission"))
 
     private var panel: JComponent? = null
 
@@ -245,11 +243,8 @@ class KetraTermSettingsConfigurable internal constructor(
                             .align(AlignX.LEFT)
                             .comment(KetraTermBundle.message("settings.ketraterm.pasteSanitization.help"))
                     }
-                    row(KetraTermBundle.message("settings.ketraterm.clipboardLocalWrite")) {
-                        cell(clipboardLocalWriteCombo).align(AlignX.LEFT)
-                    }
-                    row(KetraTermBundle.message("settings.ketraterm.clipboardRemoteWrite")) {
-                        cell(clipboardRemoteWriteCombo).align(AlignX.LEFT)
+                    row(KetraTermBundle.message("settings.ketraterm.clipboardWrite")) {
+                        cell(clipboardWriteCombo).align(AlignX.LEFT)
                     }
                     row(KetraTermBundle.message("settings.ketraterm.clipboardRead")) {
                         cell(clipboardReadCombo).align(AlignX.LEFT)
@@ -258,10 +253,7 @@ class KetraTermSettingsConfigurable internal constructor(
                         cell(clipboardMaxDecodedBytesSpinner)
                     }
                     row {
-                        cell(titleLocalPermissionCheckBox)
-                    }
-                    row {
-                        cell(titleRemotePermissionCheckBox)
+                        cell(titlePermissionCheckBox)
                     }
                 }
             }
@@ -313,12 +305,10 @@ class KetraTermSettingsConfigurable internal constructor(
         scrollOnOutputCheckBox.isSelected = state.scrollOnOutput
         showForegroundProcessNameCheckBox.isSelected = state.showForegroundProcessName
         pasteSanitizationCombo.selectedItem = pasteSanitizationOptions().firstOrNull { it.id == state.pasteSanitization }
-        clipboardLocalWriteCombo.selectPermission(state.clipboardLocalWrite)
-        clipboardRemoteWriteCombo.selectPermission(state.clipboardRemoteWrite)
+        clipboardWriteCombo.selectPermission(state.clipboardWrite)
         clipboardReadCombo.selectPermission(state.clipboardRead)
         clipboardMaxDecodedBytesSpinner.value = state.clipboardMaxDecodedBytes
-        titleLocalPermissionCheckBox.isSelected = state.titleLocalPermission == "allow"
-        titleRemotePermissionCheckBox.isSelected = state.titleRemotePermission == "allow"
+        titlePermissionCheckBox.isSelected = state.titlePermission == "allow"
     }
 
     private fun uiState(): KetraTermIntellijSettings.State =
@@ -349,12 +339,14 @@ class KetraTermSettingsConfigurable internal constructor(
             addProjectJdkToPath = addProjectJdkToPathCheckBox.isSelected,
             defaultTabName = defaultTabNameField.text.trim(),
             pasteSanitization = (pasteSanitizationCombo.selectedItem as? PasteSanitizationOption)?.id ?: "preserve",
-            clipboardLocalWrite = (clipboardLocalWriteCombo.selectedItem as? PermissionOption)?.id ?: "prompt",
-            clipboardRemoteWrite = (clipboardRemoteWriteCombo.selectedItem as? PermissionOption)?.id ?: "deny",
-            clipboardRead = (clipboardReadCombo.selectedItem as? PermissionOption)?.id ?: "deny",
+            clipboardWrite =
+                (clipboardWriteCombo.selectedItem as? PermissionOption)?.id
+                    ?: TerminalConfig.DEFAULT_CLIPBOARD_WRITE.name.lowercase(Locale.ROOT),
+            clipboardRead =
+                (clipboardReadCombo.selectedItem as? PermissionOption)?.id
+                    ?: TerminalConfig.DEFAULT_CLIPBOARD_READ.name.lowercase(Locale.ROOT),
             clipboardMaxDecodedBytes = spinnerValue(clipboardMaxDecodedBytesSpinner),
-            titleLocalPermission = if (titleLocalPermissionCheckBox.isSelected) "allow" else "deny",
-            titleRemotePermission = if (titleRemotePermissionCheckBox.isSelected) "allow" else "deny",
+            titlePermission = if (titlePermissionCheckBox.isSelected) "allow" else "deny",
             scrollOnOutput = scrollOnOutputCheckBox.isSelected,
             showForegroundProcessName = showForegroundProcessNameCheckBox.isSelected,
         )
@@ -491,21 +483,13 @@ private data class PermissionOption(
 
 private fun permissionOptions(): Array<PermissionOption> =
     arrayOf(
-        PermissionOption("allow", KetraTermBundle.message("settings.ketraterm.permission.allow")),
-        PermissionOption("prompt", KetraTermBundle.message("settings.ketraterm.permission.prompt")),
-        // TODO(policy): Re-enable after product-host allowlist management can
-        // persist entries and set TerminalClipboardPolicy.allowlisted.
-        // PermissionOption("allowlist", KetraTermBundle.message("settings.ketraterm.permission.allowlist")),
         PermissionOption("deny", KetraTermBundle.message("settings.ketraterm.permission.deny")),
+        PermissionOption("prompt", KetraTermBundle.message("settings.ketraterm.permission.prompt")),
+        PermissionOption("allow", KetraTermBundle.message("settings.ketraterm.permission.allow")),
     )
 
 private fun ComboBox<PermissionOption>.selectPermission(id: String) {
-    val options = permissionOptions().toMutableList()
-    if (id == "allowlist") {
-        options += PermissionOption(id, KetraTermBundle.message("settings.ketraterm.permission.allowlist.configured"))
-    }
-    model = DefaultComboBoxModel(options.toTypedArray())
-    selectedItem = options.first { it.id == id }
+    selectedItem = (0 until itemCount).firstNotNullOf { index -> getItemAt(index).takeIf { it.id == id } }
 }
 
 private data class PasteSanitizationOption(

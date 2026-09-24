@@ -218,7 +218,7 @@ internal class TabManager(
                                 treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
                                 maxHistory = snapshot.scrollbackLines,
                                 pasteControlPolicy = snapshot.pasteControlPolicy,
-                                hostPolicy = settings.createHostPolicy(profile.command),
+                                hostPolicy = settings.createHostPolicy(),
                                 showForegroundProcessName = settings.config.showForegroundProcessName,
                             )
                         },
@@ -450,7 +450,7 @@ internal class TabManager(
                                 treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
                                 maxHistory = snapshot.scrollbackLines,
                                 pasteControlPolicy = snapshot.pasteControlPolicy,
-                                hostPolicy = settings.createHostPolicy(profile.command),
+                                hostPolicy = settings.createHostPolicy(),
                                 showForegroundProcessName = settings.config.showForegroundProcessName,
                             )
                         },
@@ -1132,7 +1132,6 @@ internal class TabManager(
                 isOpaque = false
                 border = BorderFactory.createEmptyBorder(2, 0, 0, 0)
                 add(JLabel(Osc52ClipboardPromptText.htmlQuestion(profileName, event)), BorderLayout.NORTH)
-                add(JLabel(Osc52ClipboardPromptText.htmlDetail(event)), BorderLayout.CENTER)
             }
     }
 }

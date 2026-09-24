@@ -26,6 +26,42 @@ import kotlin.test.*
 
 class TerminalConfigTest {
     @Test
+    fun `removed origin settings use session defaults and save only the new keys`() {
+        val directory = Files.createTempDirectory("ketraterm-session-permissions")
+        val file = directory.resolve("config.toml")
+        try {
+            Files.writeString(
+                file,
+                """
+                [security]
+                clipboard_local_write = "allow"
+                clipboard_remote_write = "allow"
+                title_local_permission = "deny"
+                title_remote_permission = "deny"
+                """.trimIndent(),
+            )
+            val manager = TerminalWorkspaceConfigManager(file)
+            val loaded = manager.load()
+            assertEquals(TerminalClipboardPermission.ALLOW, loaded.clipboardWrite)
+            assertEquals(TerminalTitlePermission.ALLOW, loaded.titlePermission)
+
+            val updated = loaded.copy(clipboardWrite = TerminalClipboardPermission.DENY, titlePermission = TerminalTitlePermission.DENY)
+            manager.save(updated)
+            assertEquals(updated, manager.load())
+            val saved = Files.readString(file)
+            assertContains(saved, "clipboard_write = \"deny\"")
+            assertContains(saved, "title_permission = \"deny\"")
+            assertFalse(saved.contains("clipboard_local_write"))
+            assertFalse(saved.contains("clipboard_remote_write"))
+            assertFalse(saved.contains("title_local_permission"))
+            assertFalse(saved.contains("title_remote_permission"))
+        } finally {
+            Files.deleteIfExists(file)
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
     fun `legacy paste settings migrate and save canonical control policy identifiers`() {
         val directory = Files.createTempDirectory("ketraterm-config-paste-migration")
         val file = directory.resolve("config.toml")
@@ -235,12 +271,10 @@ class TerminalConfigTest {
         assertTrue(config.shellSuggestionsEnabled)
         assertTrue(config.acceptSelectedSuggestionWithEnter)
         assertFalse(config.persistentSuggestionLearningEnabled)
-        assertEquals(TerminalClipboardPermission.PROMPT, config.clipboardLocalWrite)
-        assertEquals(TerminalClipboardPermission.DENY, config.clipboardRemoteWrite)
+        assertEquals(TerminalClipboardPermission.ALLOW, config.clipboardWrite)
         assertEquals(TerminalClipboardPermission.DENY, config.clipboardRead)
         assertEquals(1024 * 1024, config.clipboardMaxDecodedBytes)
-        assertEquals(TerminalTitlePermission.ALLOW, config.titleLocalPermission)
-        assertEquals(TerminalTitlePermission.DENY, config.titleRemotePermission)
+        assertEquals(TerminalTitlePermission.ALLOW, config.titlePermission)
 
         // Clean up
         Files.deleteIfExists(configFile)
@@ -274,12 +308,10 @@ class TerminalConfigTest {
                 acceptSelectedSuggestionWithEnter = false,
                 persistentSuggestionLearningEnabled = true,
                 desktopNotificationsEnabled = false,
-                clipboardLocalWrite = TerminalClipboardPermission.ALLOW,
-                clipboardRemoteWrite = TerminalClipboardPermission.ALLOWLIST,
+                clipboardWrite = TerminalClipboardPermission.ALLOW,
                 clipboardRead = TerminalClipboardPermission.PROMPT,
                 clipboardMaxDecodedBytes = 500,
-                titleLocalPermission = TerminalTitlePermission.DENY,
-                titleRemotePermission = TerminalTitlePermission.ALLOW,
+                titlePermission = TerminalTitlePermission.DENY,
             )
 
         manager.save(customConfig)
@@ -288,7 +320,7 @@ class TerminalConfigTest {
         assertTrue(Files.readString(configFile).contains("""shell_suggestions_enabled = false"""))
         assertTrue(Files.readString(configFile).contains("""accept_selected_suggestion_with_enter = false"""))
         assertTrue(Files.readString(configFile).contains("""suggestion_learning_persistence_enabled = true"""))
-        assertTrue(Files.readString(configFile).contains("""clipboard_local_write = "allow""""))
+        assertTrue(Files.readString(configFile).contains("""clipboard_write = "allow""""))
         assertTrue(Files.readString(configFile).contains("""clipboard_max_decoded_bytes = 500"""))
 
         val loaded = manager.load()
@@ -363,33 +395,36 @@ class TerminalConfigTest {
     }
 
     @Test
-    fun `test TerminalWorkspaceConfigManager uses field specific security defaults for invalid values`() {
-        val tempDir = Files.createTempDirectory("ketraterm-config-test-security-defaults")
-        val configFile = tempDir.resolve("config.toml")
-        val manager = TerminalWorkspaceConfigManager(configFile)
-
-        Files.writeString(
-            configFile,
-            """
-            [security]
-            clipboard_local_write = "invalid"
-            clipboard_remote_write = "invalid"
-            clipboard_read = "invalid"
-            title_local_permission = "invalid"
-            title_remote_permission = "invalid"
-            """.trimIndent(),
-        )
-
-        val loaded = manager.load()
-
-        assertEquals(TerminalClipboardPermission.PROMPT, loaded.clipboardLocalWrite)
-        assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardRemoteWrite)
-        assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardRead)
-        assertEquals(TerminalTitlePermission.ALLOW, loaded.titleLocalPermission)
-        assertEquals(TerminalTitlePermission.DENY, loaded.titleRemotePermission)
-
-        Files.deleteIfExists(configFile)
-        Files.deleteIfExists(tempDir)
+    fun `invalid and removed permission values use field defaults and save canonical values`() {
+        val directory = Files.createTempDirectory("ketraterm-config-security-defaults")
+        val file = directory.resolve("config.toml")
+        val manager = TerminalWorkspaceConfigManager(file)
+        try {
+            for (value in listOf("invalid", "allowlist")) {
+                Files.writeString(
+                    file,
+                    """
+                    [security]
+                    clipboard_write = "$value"
+                    clipboard_read = "$value"
+                    title_permission = "invalid"
+                    """.trimIndent(),
+                )
+                val loaded = manager.load()
+                assertEquals(TerminalClipboardPermission.ALLOW, loaded.clipboardWrite)
+                assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardRead)
+                assertEquals(TerminalTitlePermission.ALLOW, loaded.titlePermission)
+                manager.save(loaded)
+                val saved = Files.readString(file)
+                assertFalse(saved.contains(value))
+                assertContains(saved, "clipboard_write = \"allow\"")
+                assertContains(saved, "clipboard_read = \"deny\"")
+                assertEquals(loaded, manager.load())
+            }
+        } finally {
+            Files.deleteIfExists(file)
+            Files.deleteIfExists(directory)
+        }
     }
 
     @Test

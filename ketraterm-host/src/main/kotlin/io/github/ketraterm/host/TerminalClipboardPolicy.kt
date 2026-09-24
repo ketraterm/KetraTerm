@@ -21,28 +21,23 @@ package io.github.ketraterm.host
  * This policy describes what would be permitted by an embedding host. The host
  * adapter never writes to a platform clipboard directly; it audits every
  * request and emits decoded write payloads only when the configured policy
- * permits the operation or requires a product-host write prompt. Allowlists,
- * read responses, and platform clipboard access remain product-host
+ * permits the operation or requires a product-host write prompt. Read responses
+ * and platform clipboard access remain product-host
  * responsibilities.
  *
- * @property origin trust boundary of the terminal session that produced the
- * request.
- * @property localWritePermission write policy for local PTY-style sessions.
- * @property remoteWritePermission write policy for SSH or otherwise remote
- * sessions.
+ * Permissions apply to all output in the session, including nested SSH and
+ * multiplexer output. Process names and reported host metadata do not establish
+ * the source of a clipboard request.
+ *
+ * @property writePermission write policy for the entire terminal session.
  * @property readPermission policy for clipboard read/query requests. This
  * defaults to deny because read responses can exfiltrate user clipboard data.
- * @property allowlisted whether the embedding product has already matched this
- * session/profile/remote against its clipboard allowlist.
  * @property maxDecodedBytes maximum decoded clipboard payload size accepted for
  * write requests before the adapter reports a size denial.
  */
 data class TerminalClipboardPolicy(
-    val origin: TerminalClipboardOrigin = TerminalClipboardOrigin.REMOTE,
-    val localWritePermission: TerminalClipboardPermission = TerminalClipboardPermission.DENY,
-    val remoteWritePermission: TerminalClipboardPermission = TerminalClipboardPermission.DENY,
+    val writePermission: TerminalClipboardPermission = TerminalClipboardPermission.DENY,
     val readPermission: TerminalClipboardPermission = TerminalClipboardPermission.DENY,
-    val allowlisted: Boolean = false,
     val maxDecodedBytes: Int = DEFAULT_MAX_DECODED_BYTES,
 ) {
     init {
@@ -51,13 +46,6 @@ data class TerminalClipboardPolicy(
         }
     }
 
-    internal val writePermission: TerminalClipboardPermission
-        get() =
-            when (origin) {
-                TerminalClipboardOrigin.LOCAL -> localWritePermission
-                TerminalClipboardOrigin.REMOTE -> remoteWritePermission
-            }
-
     companion object {
         /**
          * Default maximum decoded OSC 52 write payload size. Production sessions derive
@@ -65,21 +53,6 @@ data class TerminalClipboardPolicy(
          */
         const val DEFAULT_MAX_DECODED_BYTES: Int = 1 * 1024 * 1024
     }
-}
-
-/**
- * Trust boundary for terminal output that requested clipboard access.
- */
-enum class TerminalClipboardOrigin {
-    /**
-     * Local process controlled by this host.
-     */
-    LOCAL,
-
-    /**
-     * Remote or otherwise less-trusted process, such as SSH.
-     */
-    REMOTE,
 }
 
 /**
@@ -95,12 +68,6 @@ enum class TerminalClipboardPermission {
      * Surface the request so a product host can prompt the user.
      */
     PROMPT,
-
-    /**
-     * Permit only when the embedding product marked the session/profile/remote
-     * as allowlisted in [TerminalClipboardPolicy].
-     */
-    ALLOWLIST,
 
     /**
      * The policy permits the operation.
@@ -135,9 +102,6 @@ enum class TerminalClipboardDecision {
     /** Decoded payload would exceed the configured size limit. */
     DENIED_PAYLOAD_TOO_LARGE,
 
-    /** Request requires allowlisting, but this session was not allowlisted. */
-    DENIED_NOT_ALLOWLISTED,
-
     /** Product host must prompt before deciding. */
     PROMPT_REQUIRED,
 
@@ -153,7 +117,6 @@ enum class TerminalClipboardDecision {
  *
  * @property operation requested clipboard operation class.
  * @property selection OSC 52 selection designator exactly as parsed.
- * @property origin terminal session trust boundary used for policy evaluation.
  * @property encodedLength length of the base64 payload or query marker.
  * @property decodedBytes decoded byte count for write requests, or zero for
  * read/query requests and malformed payloads.
@@ -163,7 +126,6 @@ enum class TerminalClipboardDecision {
 data class TerminalClipboardAuditEvent(
     val operation: TerminalClipboardOperation,
     val selection: String,
-    val origin: TerminalClipboardOrigin,
     val encodedLength: Int,
     val decodedBytes: Int,
     val maxDecodedBytes: Int,

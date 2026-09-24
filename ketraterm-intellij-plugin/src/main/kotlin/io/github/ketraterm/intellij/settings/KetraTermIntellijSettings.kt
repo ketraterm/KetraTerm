@@ -125,48 +125,29 @@ class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTerm
         failure?.let { throw it }
     }
 
-    fun createHostPolicy(command: List<String>): HostPolicy {
+    /** Builds permissions for all output in a session, independent of its launch command. */
+    fun createHostPolicy(): HostPolicy {
         val s = state
-        val isRemote = command.firstOrNull()?.let(::isSshExecutable) == true
-        val clipboardOrigin = if (isRemote) TerminalClipboardOrigin.REMOTE else TerminalClipboardOrigin.LOCAL
-        val titleOrigin = if (isRemote) TerminalTitleOrigin.REMOTE else TerminalTitleOrigin.LOCAL
 
-        val localWrite = TerminalClipboardPermission.valueOf(s.clipboardLocalWrite.uppercase(Locale.ROOT))
-        val remoteWrite = TerminalClipboardPermission.valueOf(s.clipboardRemoteWrite.uppercase(Locale.ROOT))
+        val writePermission = TerminalClipboardPermission.valueOf(s.clipboardWrite.uppercase(Locale.ROOT))
         val read = TerminalClipboardPermission.valueOf(s.clipboardRead.uppercase(Locale.ROOT))
         val maxBytes = s.clipboardMaxDecodedBytes
 
-        val localTitle = TerminalTitlePermission.valueOf(s.titleLocalPermission.uppercase(Locale.ROOT))
-        val remoteTitle = TerminalTitlePermission.valueOf(s.titleRemotePermission.uppercase(Locale.ROOT))
+        val titlePermission = TerminalTitlePermission.valueOf(s.titlePermission.uppercase(Locale.ROOT))
 
         return HostPolicy(
             titlePolicy =
                 TerminalTitlePolicy(
-                    origin = titleOrigin,
-                    localPermission = localTitle,
-                    remotePermission = remoteTitle,
+                    permission = titlePermission,
                 ),
             clipboardPolicy =
                 TerminalClipboardPolicy(
-                    origin = clipboardOrigin,
-                    localWritePermission = localWrite,
-                    remoteWritePermission = remoteWrite,
+                    writePermission = writePermission,
                     readPermission = read,
                     maxDecodedBytes = maxBytes,
                 ),
             windowManipulationPolicy = HostControlPolicy.DENY,
         )
-    }
-
-    private fun isSshExecutable(command: String): Boolean {
-        val executable =
-            command
-                .trim()
-                .trim('"')
-                .replace('\\', '/')
-                .substringAfterLast('/')
-                .lowercase(Locale.ROOT)
-        return executable == "ssh" || executable == "ssh.exe"
     }
 
     /**
@@ -246,12 +227,10 @@ class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTerm
         @JvmField val acceptSelectedSuggestionWithEnter: Boolean = TerminalConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
         @JvmField val completionLearningPersistenceEnabled: Boolean = false,
         @JvmField val pasteSanitization: String = "preserve",
-        @JvmField val clipboardLocalWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_LOCAL_WRITE.name.lowercase(Locale.ROOT),
-        @JvmField val clipboardRemoteWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_REMOTE_WRITE.name.lowercase(Locale.ROOT),
+        @JvmField val clipboardWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_WRITE.name.lowercase(Locale.ROOT),
         @JvmField val clipboardRead: String = TerminalConfig.DEFAULT_CLIPBOARD_READ.name.lowercase(Locale.ROOT),
         @JvmField val clipboardMaxDecodedBytes: Int = TerminalConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES,
-        @JvmField val titleLocalPermission: String = TerminalConfig.DEFAULT_TITLE_LOCAL_PERMISSION.name.lowercase(Locale.ROOT),
-        @JvmField val titleRemotePermission: String = TerminalConfig.DEFAULT_TITLE_REMOTE_PERMISSION.name.lowercase(Locale.ROOT),
+        @JvmField val titlePermission: String = TerminalConfig.DEFAULT_TITLE_PERMISSION.name.lowercase(Locale.ROOT),
         @JvmField val scrollOnOutput: Boolean = true,
         @JvmField val showForegroundProcessName: Boolean = TerminalConfig.DEFAULT_SHOW_FOREGROUND_PROCESS_NAME,
     )
@@ -330,15 +309,10 @@ internal object KetraTermIntellijSettingsNormalizer {
             environmentVariables = normalizeEnvironmentText(state.environmentVariables),
             defaultTabName = state.defaultTabName.trim().ifBlank { "Local" },
             pasteSanitization = normalizePasteSanitization(state.pasteSanitization),
-            clipboardLocalWrite =
+            clipboardWrite =
                 normalizeClipboardPermission(
-                    state.clipboardLocalWrite,
-                    TerminalConfig.DEFAULT_CLIPBOARD_LOCAL_WRITE,
-                ),
-            clipboardRemoteWrite =
-                normalizeClipboardPermission(
-                    state.clipboardRemoteWrite,
-                    TerminalConfig.DEFAULT_CLIPBOARD_REMOTE_WRITE,
+                    state.clipboardWrite,
+                    TerminalConfig.DEFAULT_CLIPBOARD_WRITE,
                 ),
             clipboardRead =
                 normalizeClipboardPermission(
@@ -346,15 +320,10 @@ internal object KetraTermIntellijSettingsNormalizer {
                     TerminalConfig.DEFAULT_CLIPBOARD_READ,
                 ),
             clipboardMaxDecodedBytes = state.clipboardMaxDecodedBytes.coerceAtLeast(0),
-            titleLocalPermission =
+            titlePermission =
                 normalizeTitlePermission(
-                    state.titleLocalPermission,
-                    TerminalConfig.DEFAULT_TITLE_LOCAL_PERMISSION,
-                ),
-            titleRemotePermission =
-                normalizeTitlePermission(
-                    state.titleRemotePermission,
-                    TerminalConfig.DEFAULT_TITLE_REMOTE_PERMISSION,
+                    state.titlePermission,
+                    TerminalConfig.DEFAULT_TITLE_PERMISSION,
                 ),
         )
 
@@ -405,7 +374,7 @@ internal object KetraTermIntellijSettingsNormalizer {
         default: TerminalClipboardPermission,
     ): String =
         when (val normalized = perm.trim().lowercase(Locale.ROOT)) {
-            "allow", "prompt", "allowlist", "deny" -> normalized
+            "allow", "prompt", "deny" -> normalized
             else -> default.name.lowercase(Locale.ROOT)
         }
 

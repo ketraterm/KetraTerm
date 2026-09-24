@@ -1125,7 +1125,6 @@ class HostCommandAdapter(
         return TerminalClipboardAuditEvent(
             operation = operation,
             selection = selection,
-            origin = policy.origin,
             encodedLength = encodedData.length,
             decodedBytes = decodedBytes,
             maxDecodedBytes = policy.maxDecodedBytes,
@@ -1137,12 +1136,6 @@ class HostCommandAdapter(
         when (policy.writePermission) {
             TerminalClipboardPermission.DENY -> TerminalClipboardDecision.DENIED_BY_POLICY
             TerminalClipboardPermission.PROMPT -> TerminalClipboardDecision.PROMPT_REQUIRED
-            TerminalClipboardPermission.ALLOWLIST ->
-                if (policy.allowlisted) {
-                    TerminalClipboardDecision.ALLOWED_BY_POLICY
-                } else {
-                    TerminalClipboardDecision.DENIED_NOT_ALLOWLISTED
-                }
             TerminalClipboardPermission.ALLOW -> TerminalClipboardDecision.ALLOWED_BY_POLICY
         }
 
@@ -1150,12 +1143,6 @@ class HostCommandAdapter(
         when (policy.readPermission) {
             TerminalClipboardPermission.DENY -> TerminalClipboardDecision.DENIED_READ_DISABLED
             TerminalClipboardPermission.PROMPT -> TerminalClipboardDecision.PROMPT_REQUIRED
-            TerminalClipboardPermission.ALLOWLIST ->
-                if (policy.allowlisted) {
-                    TerminalClipboardDecision.ALLOWED_BY_POLICY
-                } else {
-                    TerminalClipboardDecision.DENIED_NOT_ALLOWLISTED
-                }
             TerminalClipboardPermission.ALLOW -> TerminalClipboardDecision.ALLOWED_BY_POLICY
         }
 

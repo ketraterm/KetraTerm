@@ -56,7 +56,7 @@ internal class TerminalPane private constructor(
         terminal.reloadSettings()
         component.background = terminal.background
         searchBar.refreshColors()
-        tab.session.setHostPolicy(settings.createHostPolicy(tab.profile.command))
+        tab.session.setHostPolicy(settings.createHostPolicy())
         completionBinding.update(
             completionResources.takeIf { settings.config.smartSuggestionsEnabled },
             settings.config.shellSuggestionsEnabled,

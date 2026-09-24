@@ -42,6 +42,32 @@ import kotlin.test.assertTrue
 
 class SettingsDialogTest {
     @Test
+    fun `clipboard settings offer three permissions and preserve independent choices`() {
+        withDialog { settings, dialog, closed ->
+            onEdt {
+                val combos =
+                    components(dialog)
+                        .filterIsInstance<JComboBox<*>>()
+                        .filter { it.selectedItem is TerminalClipboardPermission }
+                        .toList()
+                assertEquals(2, combos.size)
+                val expected =
+                    listOf(TerminalClipboardPermission.DENY, TerminalClipboardPermission.PROMPT, TerminalClipboardPermission.ALLOW)
+                for (combo in combos) {
+                    assertEquals(expected, (0 until combo.itemCount).map { combo.getItemAt(it) })
+                }
+                assertEquals(TerminalClipboardPermission.DENY, combos[0].selectedItem)
+                assertEquals(TerminalClipboardPermission.DENY, combos[1].selectedItem)
+                combos[0].selectedItem = TerminalClipboardPermission.PROMPT
+                button(dialog, "OK").doClick()
+            }
+            assertTrue(closed.await(5, TimeUnit.SECONDS))
+            assertEquals(TerminalClipboardPermission.PROMPT, settings.config.clipboardWrite)
+            assertEquals(TerminalClipboardPermission.DENY, settings.config.clipboardRead)
+        }
+    }
+
+    @Test
     fun `paste handling offers two choices and persists control filtering`() {
         withDialog { settings, dialog, closed ->
             onEdt {
@@ -169,9 +195,8 @@ class SettingsDialogTest {
             }
             assertTrue(closed.await(5, TimeUnit.SECONDS))
             assertEquals(TerminalTheme.NORD.id, settings.config.theme)
-            assertEquals(TerminalClipboardPermission.ALLOWLIST, settings.config.clipboardLocalWrite)
-            assertEquals(TerminalClipboardPermission.ALLOWLIST, settings.config.clipboardRemoteWrite)
-            assertEquals(TerminalClipboardPermission.ALLOWLIST, settings.config.clipboardRead)
+            assertEquals(TerminalClipboardPermission.DENY, settings.config.clipboardWrite)
+            assertEquals(TerminalClipboardPermission.DENY, settings.config.clipboardRead)
             assertTrue(settings.config.smartSuggestionsEnabled)
             assertFalse(settings.config.shellSuggestionsEnabled)
             assertFalse(settings.config.acceptSelectedSuggestionWithEnter)
@@ -257,9 +282,8 @@ class SettingsDialogTest {
                 shellSuggestionsEnabled = false,
                 acceptSelectedSuggestionWithEnter = false,
                 persistentSuggestionLearningEnabled = true,
-                clipboardLocalWrite = TerminalClipboardPermission.ALLOWLIST,
-                clipboardRemoteWrite = TerminalClipboardPermission.ALLOWLIST,
-                clipboardRead = TerminalClipboardPermission.ALLOWLIST,
+                clipboardWrite = TerminalClipboardPermission.DENY,
+                clipboardRead = TerminalClipboardPermission.DENY,
             ),
         )
         val settings = KetraTermSettings(manager)

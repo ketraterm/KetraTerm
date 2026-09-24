@@ -23,12 +23,10 @@ import org.junit.jupiter.api.Test
 @DisplayName("HostPolicy")
 class HostPolicyTest {
     @Test
-    fun `defaults allow implemented host controls and deny future clipboard controls`() {
+    fun `defaults allow implemented host controls and deny clipboard access`() {
         val policy = HostPolicy()
 
-        assertEquals(TerminalTitleOrigin.LOCAL, policy.titlePolicy.origin)
-        assertEquals(TerminalTitlePermission.ALLOW, policy.titlePolicy.localPermission)
-        assertEquals(TerminalTitlePermission.ALLOW, policy.titlePolicy.remotePermission)
+        assertEquals(TerminalTitlePermission.ALLOW, policy.titlePolicy.permission)
         assertEquals(TerminalTitleOverflowPolicy.CLAMP, policy.titlePolicy.overflowPolicy)
         assertEquals(TerminalTitlePolicy.DEFAULT_MAX_LENGTH, policy.titlePolicy.maxLength)
         assertEquals(HostControlPolicy.ALLOW, policy.hyperlinkPolicy)
@@ -37,11 +35,8 @@ class HostPolicyTest {
         assertEquals(HostControlPolicy.ALLOW, policy.windowManipulationPolicy)
         assertEquals(HostControlPolicy.ALLOW, policy.palettePolicy)
         assertEquals(HostControlPolicy.ALLOW, policy.terminalResponsePolicy)
-        assertEquals(TerminalClipboardOrigin.REMOTE, policy.clipboardPolicy.origin)
-        assertEquals(TerminalClipboardPermission.DENY, policy.clipboardPolicy.localWritePermission)
-        assertEquals(TerminalClipboardPermission.DENY, policy.clipboardPolicy.remoteWritePermission)
+        assertEquals(TerminalClipboardPermission.DENY, policy.clipboardPolicy.writePermission)
         assertEquals(TerminalClipboardPermission.DENY, policy.clipboardPolicy.readPermission)
-        assertEquals(false, policy.clipboardPolicy.allowlisted)
         assertEquals(TerminalClipboardPolicy.DEFAULT_MAX_DECODED_BYTES, policy.clipboardPolicy.maxDecodedBytes)
     }
 

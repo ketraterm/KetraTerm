@@ -210,14 +210,11 @@ internal class SettingsDialog(
         createComboBox(arrayOf("block", "underline", "beam"), settings.config.cursorShape.lowercase(Locale.ROOT), 150)
 
     // Form Controls - Security
-    private val clipboardLocalWriteCombo = createClipboardPermissionCombo(settings.config.clipboardLocalWrite)
-    private val clipboardRemoteWriteCombo = createClipboardPermissionCombo(settings.config.clipboardRemoteWrite)
+    private val clipboardWriteCombo = createClipboardPermissionCombo(settings.config.clipboardWrite)
     private val clipboardReadCombo = createClipboardPermissionCombo(settings.config.clipboardRead)
     private val clipboardMaxDecodedBytesSpinner = createSpinner(settings.config.clipboardMaxDecodedBytes, 0, Int.MAX_VALUE, 1024, 150)
-    private val titleLocalPermissionCheckbox =
-        JCheckBox("Allow local sessions to rename window/tab", settings.config.titleLocalPermission == TerminalTitlePermission.ALLOW)
-    private val titleRemotePermissionCheckbox =
-        JCheckBox("Allow remote sessions to rename window/tab", settings.config.titleRemotePermission == TerminalTitlePermission.ALLOW)
+    private val titlePermissionCheckbox =
+        JCheckBox("Allow applications to rename window/tab", settings.config.titlePermission == TerminalTitlePermission.ALLOW)
 
     init {
         size = Dimension(820, 600)
@@ -276,12 +273,10 @@ internal class SettingsDialog(
         registerChangeListener(themeCombo, updateApplyState)
         registerChangeListener(treatAmbiguousCheckbox, updateApplyState)
         registerChangeListener(useSystemFallbackCheckbox, updateApplyState)
-        registerChangeListener(clipboardLocalWriteCombo, updateApplyState)
-        registerChangeListener(clipboardRemoteWriteCombo, updateApplyState)
+        registerChangeListener(clipboardWriteCombo, updateApplyState)
         registerChangeListener(clipboardReadCombo, updateApplyState)
         registerChangeListener(clipboardMaxDecodedBytesSpinner, updateApplyState)
-        registerChangeListener(titleLocalPermissionCheckbox, updateApplyState)
-        registerChangeListener(titleRemotePermissionCheckbox, updateApplyState)
+        registerChangeListener(titlePermissionCheckbox, updateApplyState)
         registerChangeListener(pasteOnMiddleClickCheckbox, updateApplyState)
         registerChangeListener(pasteSanitizationCombo, updateApplyState)
         registerChangeListener(shellRequestResizeWindowCheckbox, updateApplyState)
@@ -650,10 +645,9 @@ internal class SettingsDialog(
 
         panel.add(SectionHeader("Clipboard Safety (OSC 52)"))
         val clipboardSection = createSectionPanel()
-        addFormRow(clipboardSection, 0, "Local write permission:", clipboardLocalWriteCombo)
-        addFormRow(clipboardSection, 1, "Remote write permission:", clipboardRemoteWriteCombo)
-        addFormRow(clipboardSection, 2, "Read / Query permission:", clipboardReadCombo)
-        addFormRow(clipboardSection, 3, "Max decoded size (bytes):", clipboardMaxDecodedBytesSpinner)
+        addFormRow(clipboardSection, 0, "Write permission:", clipboardWriteCombo)
+        addFormRow(clipboardSection, 1, "Read / Query permission:", clipboardReadCombo)
+        addFormRow(clipboardSection, 2, "Max decoded size (bytes):", clipboardMaxDecodedBytesSpinner)
         panel.add(clipboardSection)
 
         panel.add(SectionHeader("Paste Safety"))
@@ -682,14 +676,8 @@ internal class SettingsDialog(
         addCheckboxRow(
             titleSection,
             0,
-            titleLocalPermissionCheckbox,
-            "Allow local processes to dynamically change the window or tab title via escape sequences.",
-        )
-        addCheckboxRow(
-            titleSection,
-            2,
-            titleRemotePermissionCheckbox,
-            "Allow remote processes (e.g. SSH sessions) to dynamically change the window or tab title via escape sequences.",
+            titlePermissionCheckbox,
+            "Applies to all applications in the session, including applications running through SSH.",
         )
         panel.add(titleSection)
 
@@ -780,12 +768,10 @@ internal class SettingsDialog(
         cursorBlinkSpinner.value = TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS
         cursorShapeCombo.selectedItem = TerminalConfig.DEFAULT_CURSOR_SHAPE
 
-        clipboardLocalWriteCombo.selectedItem = TerminalConfig.DEFAULT_CLIPBOARD_LOCAL_WRITE
-        clipboardRemoteWriteCombo.selectedItem = TerminalConfig.DEFAULT_CLIPBOARD_REMOTE_WRITE
+        clipboardWriteCombo.selectedItem = TerminalConfig.DEFAULT_CLIPBOARD_WRITE
         clipboardReadCombo.selectedItem = TerminalConfig.DEFAULT_CLIPBOARD_READ
         clipboardMaxDecodedBytesSpinner.value = TerminalConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES
-        titleLocalPermissionCheckbox.isSelected = TerminalConfig.DEFAULT_TITLE_LOCAL_PERMISSION == TerminalTitlePermission.ALLOW
-        titleRemotePermissionCheckbox.isSelected = TerminalConfig.DEFAULT_TITLE_REMOTE_PERMISSION == TerminalTitlePermission.ALLOW
+        titlePermissionCheckbox.isSelected = TerminalConfig.DEFAULT_TITLE_PERMISSION == TerminalTitlePermission.ALLOW
     }
 
     private fun applyChanges(closeAfterSave: Boolean = false) {
@@ -894,20 +880,13 @@ internal class SettingsDialog(
             // shellSuggestionsEnabled = shellSuggestionsCheckbox.isSelected,
             // acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnterCheckbox.isSelected,
             // persistentSuggestionLearningEnabled = persistentSuggestionLearningCheckbox.isSelected,
-            clipboardLocalWrite = clipboardLocalWriteCombo.selectedItem as TerminalClipboardPermission,
-            clipboardRemoteWrite = clipboardRemoteWriteCombo.selectedItem as TerminalClipboardPermission,
+            clipboardWrite = clipboardWriteCombo.selectedItem as TerminalClipboardPermission,
             clipboardRead = clipboardReadCombo.selectedItem as TerminalClipboardPermission,
             clipboardMaxDecodedBytes =
                 clipboardMaxDecodedBytesSpinner.value as? Int
                     ?: TerminalConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES,
-            titleLocalPermission =
-                if (titleLocalPermissionCheckbox.isSelected) {
-                    TerminalTitlePermission.ALLOW
-                } else {
-                    TerminalTitlePermission.DENY
-                },
-            titleRemotePermission =
-                if (titleRemotePermissionCheckbox.isSelected) {
+            titlePermission =
+                if (titlePermissionCheckbox.isSelected) {
                     TerminalTitlePermission.ALLOW
                 } else {
                     TerminalTitlePermission.DENY
@@ -1000,16 +979,8 @@ private data class PasteSanitizationOption(
     override fun toString(): String = label
 }
 
-// TODO(policy): Offer new allowlists when the product can manage their entries.
-internal fun clipboardPermissionOptions(current: TerminalClipboardPermission): Array<TerminalClipboardPermission> =
-    if (current == TerminalClipboardPermission.ALLOWLIST) {
-        TerminalClipboardPermission.entries.toTypedArray()
-    } else {
-        arrayOf(TerminalClipboardPermission.ALLOW, TerminalClipboardPermission.PROMPT, TerminalClipboardPermission.DENY)
-    }
-
 private fun createClipboardPermissionCombo(current: TerminalClipboardPermission): JComboBox<TerminalClipboardPermission> =
-    JComboBox(clipboardPermissionOptions(current)).apply {
+    JComboBox(TerminalClipboardPermission.entries.toTypedArray()).apply {
         selectedItem = current
         preferredSize = Dimension(150, 26)
         renderer =
@@ -1023,10 +994,11 @@ private fun createClipboardPermissionCombo(current: TerminalClipboardPermission)
                 ): Component =
                     super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus).also {
                         text =
-                            if (value == TerminalClipboardPermission.ALLOWLIST) {
-                                "Allowlist (configured)"
-                            } else {
-                                (value as TerminalClipboardPermission).name.lowercase(Locale.ROOT)
+                            when (value) {
+                                TerminalClipboardPermission.DENY -> "Deny"
+                                TerminalClipboardPermission.PROMPT -> "Ask"
+                                TerminalClipboardPermission.ALLOW -> "Allow"
+                                else -> ""
                             }
                     }
             }

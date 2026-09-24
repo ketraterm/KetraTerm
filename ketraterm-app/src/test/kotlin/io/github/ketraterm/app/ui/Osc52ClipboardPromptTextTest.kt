@@ -18,7 +18,6 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.host.TerminalClipboardAuditEvent
 import io.github.ketraterm.host.TerminalClipboardDecision
 import io.github.ketraterm.host.TerminalClipboardOperation
-import io.github.ketraterm.host.TerminalClipboardOrigin
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -28,10 +27,10 @@ import kotlin.test.assertFalse
 class Osc52ClipboardPromptTextTest {
     @Test
     fun `plain prompt names profile and text length without protocol details`() {
-        val message = Osc52ClipboardPromptText.plainMessage("PowerShell", promptEvent("OSC 52 works"))
+        val message = Osc52ClipboardPromptText.question("PowerShell", promptEvent("OSC 52 works"))
 
-        assertContains(message, "Allow PowerShell to write 12 characters to the clipboard?")
-        assertContains(message, "Local terminal session")
+        assertContains(message, "Allow an application in PowerShell to write 12 characters to the clipboard?")
+        assertFalse(message.contains("Local terminal session"))
         assertFalse(message.contains("OSC 52"))
         assertFalse(message.contains("Selection:"))
         assertFalse(message.contains("bytes"))
@@ -39,10 +38,10 @@ class Osc52ClipboardPromptTextTest {
 
     @Test
     fun `empty prompt is shown as clipboard clear`() {
-        val message = Osc52ClipboardPromptText.plainMessage("PowerShell", promptEvent(""))
+        val message = Osc52ClipboardPromptText.question("PowerShell", promptEvent(""))
 
         assertEquals("Clipboard Access", Osc52ClipboardPromptText.title())
-        assertContains(message, "Allow PowerShell to clear the clipboard?")
+        assertContains(message, "Allow an application in PowerShell to clear the clipboard?")
     }
 
     private fun promptEvent(text: String): TerminalClipboardPromptEvent =
@@ -53,7 +52,6 @@ class Osc52ClipboardPromptTextTest {
                 TerminalClipboardAuditEvent(
                     operation = TerminalClipboardOperation.WRITE,
                     selection = "c",
-                    origin = TerminalClipboardOrigin.LOCAL,
                     encodedLength = 0,
                     decodedBytes = text.encodeToByteArray().size,
                     maxDecodedBytes = 1024,

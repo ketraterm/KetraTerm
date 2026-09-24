@@ -243,61 +243,43 @@ class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
         }
     }
 
-    fun testConfiguredClipboardAllowlistSurvivesUnrelatedApply() {
+    fun testRemovedClipboardModeFallsBackAndSettingsOfferOnlySupportedChoices() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state
         val configurable = KetraTermSettingsConfigurable()
         try {
-            settings.loadState(
-                original.copy(clipboardLocalWrite = "allowlist", clipboardRemoteWrite = "allowlist", clipboardRead = "allowlist"),
-            )
+            settings.loadState(original.copy(clipboardWrite = "allowlist", clipboardRead = "allowlist"))
             val component = configurable.createComponent()
             assertFalse(configurable.isModified())
+            val expectedLabels = listOf("Deny", "Ask", "Allow")
             val permissionCombos =
                 descendants(component)
                     .filterIsInstance<JComboBox<*>>()
-                    .filter { it.selectedItem?.toString() == "Allowlist (configured)" }
+                    .filter { it.selectedItem?.toString() in expectedLabels }
                     .toList()
-            assertEquals(3, permissionCombos.size)
+            assertEquals(2, permissionCombos.size)
+            for (combo in permissionCombos) {
+                assertEquals(expectedLabels, (0 until combo.itemCount).map { combo.getItemAt(it).toString() })
+            }
+            assertEquals("Allow", permissionCombos[0].selectedItem?.toString())
+            assertEquals("Deny", permissionCombos[1].selectedItem?.toString())
             descendants(component)
                 .filterIsInstance<AbstractButton>()
                 .first { it.text == KetraTermBundle.message("settings.ketraterm.visualBell") }
                 .apply { isSelected = !isSelected }
-            assertTrue(configurable.isModified())
-
             configurable.apply()
+            assertEquals("allow", settings.state.clipboardWrite)
+            assertEquals("deny", settings.state.clipboardRead)
+            assertEquals(TerminalClipboardPermission.ALLOW, settings.createHostPolicy().clipboardPolicy.writePermission)
 
-            assertEquals("allowlist", settings.state.clipboardLocalWrite)
-            assertEquals("allowlist", settings.state.clipboardRemoteWrite)
-            assertEquals("allowlist", settings.state.clipboardRead)
-            val policy = settings.createHostPolicy(listOf("shell")).clipboardPolicy
-            assertEquals(TerminalClipboardPermission.ALLOWLIST, policy.localWritePermission)
-            assertFalse(policy.allowlisted)
-
-            permissionCombos.first().selectedIndex = 0
+            permissionCombos[0].selectedIndex = 1
             configurable.apply()
-            assertEquals("allow", settings.state.clipboardLocalWrite)
+            assertEquals("prompt", settings.state.clipboardWrite)
+            assertEquals("deny", settings.state.clipboardRead)
+            permissionCombos[0].selectedIndex = 0
             configurable.reset()
-            val resetFirstCombo = permissionCombos.first()
-            assertFalse((0 until resetFirstCombo.itemCount).any { resetFirstCombo.getItemAt(it).toString().contains("Allowlist") })
-        } finally {
-            configurable.disposeUIResources()
-            settings.replaceState(original)
-        }
-    }
-
-    fun testClipboardAllowlistIsNotOfferedWhenUnconfigured() {
-        val settings = KetraTermIntellijSettings.getInstance()
-        val original = settings.state
-        val configurable = KetraTermSettingsConfigurable()
-        try {
-            settings.loadState(original.copy(clipboardLocalWrite = "prompt", clipboardRemoteWrite = "deny", clipboardRead = "deny"))
-            val component = configurable.createComponent()
-            val comboItems =
-                descendants(component)
-                    .filterIsInstance<JComboBox<*>>()
-                    .flatMap { combo -> (0 until combo.itemCount).asSequence().map { combo.getItemAt(it).toString() } }
-            assertFalse(comboItems.any { it.contains("Allowlist") })
+            assertEquals("Ask", permissionCombos[0].selectedItem?.toString())
+            assertFalse(configurable.isModified())
         } finally {
             configurable.disposeUIResources()
             settings.replaceState(original)

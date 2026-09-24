@@ -31,7 +31,6 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.ui.content.*
 import com.intellij.util.ui.update.UiNotifyConnector
-import io.github.ketraterm.host.TerminalClipboardOrigin
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
@@ -514,7 +513,7 @@ class KetraTermProjectTerminalService internal constructor(
             treatAmbiguousAsWide = settings.treatAmbiguousAsWide,
             maxHistory = settings.scrollbackLines,
             pasteControlPolicy = settings.pasteControlPolicy,
-            hostPolicy = KetraTermIntellijSettings.getInstance().createHostPolicy(profile.command),
+            hostPolicy = KetraTermIntellijSettings.getInstance().createHostPolicy(),
             showForegroundProcessName = KetraTermIntellijSettings.getInstance().state.showForegroundProcessName,
         )
 
@@ -744,25 +743,14 @@ internal object IntellijOsc52ClipboardPromptText {
     fun message(
         profileName: String,
         event: TerminalClipboardPromptEvent,
-    ): String = question(profileName, event) + "\n\n" + detail(event)
-
-    private fun question(
-        profileName: String,
-        event: TerminalClipboardPromptEvent,
     ): String {
-        val applicationName = profileName.trim().ifBlank { "this terminal" }
+        val terminalName = profileName.trim().ifBlank { "this terminal" }
         if (event.text.isEmpty()) {
-            return "Allow $applicationName to clear the IDE clipboard?"
+            return "Allow an application in $terminalName to clear the IDE clipboard?"
         }
         val count = event.text.codePointCount(0, event.text.length)
-        return "Allow $applicationName to write ${count.formatCount("character")} to the IDE clipboard?"
+        return "Allow an application in $terminalName to write ${count.formatCount("character")} to the IDE clipboard?"
     }
-
-    private fun detail(event: TerminalClipboardPromptEvent): String =
-        when (event.audit.origin) {
-            TerminalClipboardOrigin.LOCAL -> "Local terminal session"
-            TerminalClipboardOrigin.REMOTE -> "Remote terminal session"
-        }
 
     private fun Int.formatCount(unit: String): String =
         if (this == 1) {

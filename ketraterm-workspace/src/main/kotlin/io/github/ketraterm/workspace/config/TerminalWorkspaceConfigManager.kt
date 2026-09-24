@@ -144,15 +144,10 @@ class TerminalWorkspaceConfigManager(
                     min = TerminalConfig.SCROLLBACK_MIN,
                     max = TerminalConfig.SCROLLBACK_MAX,
                 )
-            val clipboardLocalWrite =
+            val clipboardWrite =
                 parseClipboardPermission(
-                    raw = security["clipboard_local_write"],
-                    defaultValue = default.clipboardLocalWrite,
-                )
-            val clipboardRemoteWrite =
-                parseClipboardPermission(
-                    raw = security["clipboard_remote_write"],
-                    defaultValue = default.clipboardRemoteWrite,
+                    raw = security["clipboard_write"],
+                    defaultValue = default.clipboardWrite,
                 )
             val clipboardRead =
                 parseClipboardPermission(
@@ -166,15 +161,10 @@ class TerminalWorkspaceConfigManager(
                     min = 0,
                     max = Int.MAX_VALUE,
                 )
-            val titleLocalPermission =
+            val titlePermission =
                 parseTitlePermission(
-                    raw = security["title_local_permission"],
-                    defaultValue = default.titleLocalPermission,
-                )
-            val titleRemotePermission =
-                parseTitlePermission(
-                    raw = security["title_remote_permission"],
-                    defaultValue = default.titleRemotePermission,
+                    raw = security["title_permission"],
+                    defaultValue = default.titlePermission,
                 )
 
             val cleanTheme = if (theme.isNotBlank()) theme else default.theme
@@ -208,12 +198,10 @@ class TerminalWorkspaceConfigManager(
                 shellSuggestionsEnabled = shellSuggestionsEnabled,
                 acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnter,
                 persistentSuggestionLearningEnabled = persistentSuggestionLearningEnabled,
-                clipboardLocalWrite = clipboardLocalWrite,
-                clipboardRemoteWrite = clipboardRemoteWrite,
+                clipboardWrite = clipboardWrite,
                 clipboardRead = clipboardRead,
                 clipboardMaxDecodedBytes = clipboardMaxDecodedBytes,
-                titleLocalPermission = titleLocalPermission,
-                titleRemotePermission = titleRemotePermission,
+                titlePermission = titlePermission,
                 scrollOnOutput = scrollOnOutput,
                 showForegroundProcessName =
                     behavior["show_foreground_process_name"]?.toBooleanStrictOrNull() ?: default.showForegroundProcessName,
@@ -336,18 +324,14 @@ class TerminalWorkspaceConfigManager(
         show_foreground_process_name = ${config.showForegroundProcessName}
 
         [security]
-        # OSC 52 clipboard write permission for local sessions (allow, prompt, allowlist, deny)
-        clipboard_local_write = "${config.clipboardLocalWrite.name.lowercase(Locale.ROOT)}"
-        # OSC 52 clipboard write permission for remote sessions (allow, prompt, allowlist, deny)
-        clipboard_remote_write = "${config.clipboardRemoteWrite.name.lowercase(Locale.ROOT)}"
-        # OSC 52 clipboard read/query permission (allow, prompt, allowlist, deny)
+        # OSC 52 clipboard write permission for the entire session, including nested SSH (allow, prompt, deny)
+        clipboard_write = "${config.clipboardWrite.name.lowercase(Locale.ROOT)}"
+        # OSC 52 clipboard read/query permission (allow, prompt, deny)
         clipboard_read = "${config.clipboardRead.name.lowercase(Locale.ROOT)}"
-        # Maximum decoded payload size in bytes for clipboard writes/reads
+        # Maximum decoded payload size in bytes for clipboard writes
         clipboard_max_decoded_bytes = ${config.clipboardMaxDecodedBytes}
-        # Tab/window title renaming permission for local sessions (allow, deny)
-        title_local_permission = "${config.titleLocalPermission.name.lowercase(Locale.ROOT)}"
-        # Tab/window title renaming permission for remote sessions (allow, deny)
-        title_remote_permission = "${config.titleRemotePermission.name.lowercase(Locale.ROOT)}"
+        # Tab/window title renaming permission for the entire session, including nested SSH (allow, deny)
+        title_permission = "${config.titlePermission.name.lowercase(Locale.ROOT)}"
         """.trimIndent()
 
     private fun parseIntSetting(
@@ -412,7 +396,6 @@ class TerminalWorkspaceConfigManager(
         when (raw?.trim()?.lowercase(Locale.ROOT)) {
             "deny" -> TerminalClipboardPermission.DENY
             "prompt" -> TerminalClipboardPermission.PROMPT
-            "allowlist" -> TerminalClipboardPermission.ALLOWLIST
             "allow" -> TerminalClipboardPermission.ALLOW
             else -> defaultValue
         }

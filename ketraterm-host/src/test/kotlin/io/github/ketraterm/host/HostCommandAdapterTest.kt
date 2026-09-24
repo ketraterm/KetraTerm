@@ -2158,7 +2158,7 @@ class HostCommandAdapterTest {
                 Fixture(
                     hostPolicy =
                         HostPolicy(
-                            titlePolicy = TerminalTitlePolicy(localPermission = TerminalTitlePermission.DENY),
+                            titlePolicy = TerminalTitlePolicy(permission = TerminalTitlePermission.DENY),
                         ),
                 )
 
@@ -2218,45 +2218,20 @@ class HostCommandAdapterTest {
         }
 
         @Test
-        fun `remote OSC titles can be denied while local titles remain allowed by profile policy`() {
-            val remote =
-                Fixture(
-                    hostPolicy =
-                        HostPolicy(
-                            titlePolicy =
-                                TerminalTitlePolicy(
-                                    origin = TerminalTitleOrigin.REMOTE,
-                                    localPermission = TerminalTitlePermission.ALLOW,
-                                    remotePermission = TerminalTitlePermission.DENY,
-                                ),
-                        ),
-                )
-            val local =
-                Fixture(
-                    hostPolicy =
-                        HostPolicy(
-                            titlePolicy =
-                                TerminalTitlePolicy(
-                                    origin = TerminalTitleOrigin.LOCAL,
-                                    localPermission = TerminalTitlePermission.ALLOW,
-                                    remotePermission = TerminalTitlePermission.DENY,
-                                ),
-                        ),
-                )
-
-            remote.acceptAscii("\u001B]0;ssh-title\u0007")
-            local.acceptAscii("\u001B]0;local-title\u0007")
-
-            assertAll(
-                { assertEquals("", remote.sink.windowTitle) },
-                { assertEquals("", remote.sink.iconTitle) },
-                { assertTrue(remote.events.windowTitles.isEmpty()) },
-                { assertTrue(remote.events.iconTitles.isEmpty()) },
-                { assertEquals("local-title", local.sink.windowTitle) },
-                { assertEquals("local-title", local.sink.iconTitle) },
-                { assertEquals(listOf("local-title"), local.events.windowTitles) },
-                { assertEquals(listOf("local-title"), local.events.iconTitles) },
-            )
+        fun `title permission applies across reported host changes`() {
+            for (permission in TerminalTitlePermission.entries) {
+                val f = Fixture(hostPolicy = HostPolicy(titlePolicy = TerminalTitlePolicy(permission = permission)))
+                val hosts = listOf("localhost", "server-a", "server-b", "localhost")
+                for ((index, host) in hosts.withIndex()) {
+                    f.acceptAscii("\u001B]7;file://$host/home/user\u0007")
+                    f.acceptAscii("\u001B]0;title-$index\u0007")
+                }
+                val titles = if (permission == TerminalTitlePermission.ALLOW) hosts.indices.map { "title-$it" } else emptyList()
+                assertEquals(titles, f.events.windowTitles)
+                assertEquals(titles, f.events.iconTitles)
+                assertEquals(titles.lastOrNull().orEmpty(), f.sink.windowTitle)
+                assertEquals(titles.lastOrNull().orEmpty(), f.sink.iconTitle)
+            }
         }
 
         @Test
@@ -2938,7 +2913,6 @@ class HostCommandAdapterTest {
                     TerminalClipboardAuditEvent(
                         operation = TerminalClipboardOperation.WRITE,
                         selection = "c",
-                        origin = TerminalClipboardOrigin.REMOTE,
                         encodedLength = 8,
                         decodedBytes = 5,
                         maxDecodedBytes = TerminalClipboardPolicy.DEFAULT_MAX_DECODED_BYTES,
@@ -2970,15 +2944,14 @@ class HostCommandAdapterTest {
         }
 
         @Test
-        fun `OSC 52 local prompt policy requests host prompt without writing clipboard`() {
+        fun `OSC 52 prompt policy requests host prompt without writing clipboard`() {
             val f =
                 Fixture(
                     hostPolicy =
                         HostPolicy(
                             clipboardPolicy =
                                 TerminalClipboardPolicy(
-                                    origin = TerminalClipboardOrigin.LOCAL,
-                                    localWritePermission = TerminalClipboardPermission.PROMPT,
+                                    writePermission = TerminalClipboardPermission.PROMPT,
                                 ),
                         ),
                 )
@@ -3005,27 +2978,36 @@ class HostCommandAdapterTest {
         }
 
         @Test
-        fun `OSC 52 remote writes remain denied when only local writes are promptable`() {
-            val f =
-                Fixture(
-                    hostPolicy =
-                        HostPolicy(
-                            clipboardPolicy =
-                                TerminalClipboardPolicy(
-                                    origin = TerminalClipboardOrigin.REMOTE,
-                                    localWritePermission = TerminalClipboardPermission.PROMPT,
-                                ),
-                        ),
+        fun `OSC 52 session permission is unaffected by reported host changes`() {
+            for (permission in TerminalClipboardPermission.entries) {
+                val f =
+                    Fixture(
+                        hostPolicy =
+                            HostPolicy(
+                                clipboardPolicy = TerminalClipboardPolicy(writePermission = permission),
+                            ),
+                    )
+                val hosts = listOf("localhost", "server-a", "server-b", "localhost")
+                for (host in hosts) {
+                    f.acceptAscii("\u001B]7;file://$host/home/user\u0007")
+                    f.acceptAscii("\u001B]52;c;SGVsbG8=\u0007")
+                }
+                val decision =
+                    when (permission) {
+                        TerminalClipboardPermission.DENY -> TerminalClipboardDecision.DENIED_BY_POLICY
+                        TerminalClipboardPermission.PROMPT -> TerminalClipboardDecision.PROMPT_REQUIRED
+                        TerminalClipboardPermission.ALLOW -> TerminalClipboardDecision.ALLOWED_BY_POLICY
+                    }
+                assertEquals(List(hosts.size) { decision }, f.events.clipboardAudits.map { it.decision })
+                assertEquals(
+                    if (decision == TerminalClipboardDecision.ALLOWED_BY_POLICY) List(hosts.size) { "Hello" } else emptyList(),
+                    f.events.clipboardWrites.map { it.text },
                 )
-
-            f.acceptAscii("\u001B]52;c;SGVsbG8=\u0007")
-
-            assertEquals(
-                TerminalClipboardDecision.DENIED_BY_POLICY,
-                f.events.clipboardAudits
-                    .single()
-                    .decision,
-            )
+                assertEquals(
+                    if (decision == TerminalClipboardDecision.PROMPT_REQUIRED) List(hosts.size) { "Hello" } else emptyList(),
+                    f.events.clipboardPrompts.map { it.text },
+                )
+            }
         }
 
         @Test
@@ -3036,67 +3018,7 @@ class HostCommandAdapterTest {
                         HostPolicy(
                             clipboardPolicy =
                                 TerminalClipboardPolicy(
-                                    origin = TerminalClipboardOrigin.LOCAL,
-                                    localWritePermission = TerminalClipboardPermission.ALLOW,
-                                ),
-                        ),
-                )
-
-            f.acceptAscii("\u001B]52;c;SGVsbG8=\u0007")
-
-            assertEquals(
-                TerminalClipboardDecision.ALLOWED_BY_POLICY,
-                f.events.clipboardAudits
-                    .single()
-                    .decision,
-            )
-            assertEquals(
-                listOf(
-                    TerminalClipboardWriteEvent(
-                        selection = "c",
-                        text = "Hello",
-                        audit = f.events.clipboardAudits.single(),
-                    ),
-                ),
-                f.events.clipboardWrites,
-            )
-        }
-
-        @Test
-        fun `OSC 52 allowlist policy denies requests when session is not allowlisted`() {
-            val f =
-                Fixture(
-                    hostPolicy =
-                        HostPolicy(
-                            clipboardPolicy =
-                                TerminalClipboardPolicy(
-                                    origin = TerminalClipboardOrigin.LOCAL,
-                                    localWritePermission = TerminalClipboardPermission.ALLOWLIST,
-                                ),
-                        ),
-                )
-
-            f.acceptAscii("\u001B]52;c;SGVsbG8=\u0007")
-
-            assertEquals(
-                TerminalClipboardDecision.DENIED_NOT_ALLOWLISTED,
-                f.events.clipboardAudits
-                    .single()
-                    .decision,
-            )
-        }
-
-        @Test
-        fun `OSC 52 allowlist policy allows requests when session is allowlisted`() {
-            val f =
-                Fixture(
-                    hostPolicy =
-                        HostPolicy(
-                            clipboardPolicy =
-                                TerminalClipboardPolicy(
-                                    origin = TerminalClipboardOrigin.LOCAL,
-                                    localWritePermission = TerminalClipboardPermission.ALLOWLIST,
-                                    allowlisted = true,
+                                    writePermission = TerminalClipboardPermission.ALLOW,
                                 ),
                         ),
                 )
@@ -3129,8 +3051,7 @@ class HostCommandAdapterTest {
                         HostPolicy(
                             clipboardPolicy =
                                 TerminalClipboardPolicy(
-                                    origin = TerminalClipboardOrigin.LOCAL,
-                                    localWritePermission = TerminalClipboardPermission.ALLOW,
+                                    writePermission = TerminalClipboardPermission.ALLOW,
                                 ),
                         ),
                 )
@@ -3160,8 +3081,7 @@ class HostCommandAdapterTest {
                         HostPolicy(
                             clipboardPolicy =
                                 TerminalClipboardPolicy(
-                                    origin = TerminalClipboardOrigin.LOCAL,
-                                    localWritePermission = TerminalClipboardPermission.ALLOW,
+                                    writePermission = TerminalClipboardPermission.ALLOW,
                                     maxDecodedBytes = 4,
                                 ),
                         ),
@@ -3198,8 +3118,7 @@ class HostCommandAdapterTest {
                         HostPolicy(
                             clipboardPolicy =
                                 TerminalClipboardPolicy(
-                                    origin = TerminalClipboardOrigin.LOCAL,
-                                    localWritePermission = TerminalClipboardPermission.PROMPT,
+                                    writePermission = TerminalClipboardPermission.PROMPT,
                                 ),
                         ),
                 )
@@ -3209,7 +3128,6 @@ class HostCommandAdapterTest {
                         HostPolicy(
                             clipboardPolicy =
                                 TerminalClipboardPolicy(
-                                    origin = TerminalClipboardOrigin.LOCAL,
                                     readPermission = TerminalClipboardPermission.ALLOW,
                                 ),
                         ),
@@ -3265,8 +3183,7 @@ class HostCommandAdapterTest {
                         HostPolicy(
                             clipboardPolicy =
                                 TerminalClipboardPolicy(
-                                    origin = TerminalClipboardOrigin.LOCAL,
-                                    localWritePermission = TerminalClipboardPermission.ALLOW,
+                                    writePermission = TerminalClipboardPermission.ALLOW,
                                 ),
                         ),
                 )

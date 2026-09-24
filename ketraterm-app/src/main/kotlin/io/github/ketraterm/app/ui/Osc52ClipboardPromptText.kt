@@ -15,7 +15,6 @@
  */
 package io.github.ketraterm.app.ui
 
-import io.github.ketraterm.host.TerminalClipboardOrigin
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 
 internal object Osc52ClipboardPromptText {
@@ -25,32 +24,18 @@ internal object Osc52ClipboardPromptText {
         profileName: String,
         event: TerminalClipboardPromptEvent,
     ): String {
-        val applicationName = profileName.trim().ifBlank { "this terminal" }
+        val terminalName = profileName.trim().ifBlank { "this terminal" }
         if (event.text.isEmpty()) {
-            return "Allow $applicationName to clear the clipboard?"
+            return "Allow an application in $terminalName to clear the clipboard?"
         }
         val count = event.text.codePointCount(0, event.text.length)
-        return "Allow $applicationName to write ${count.formatCount("character")} to the clipboard?"
+        return "Allow an application in $terminalName to write ${count.formatCount("character")} to the clipboard?"
     }
-
-    fun detail(event: TerminalClipboardPromptEvent): String =
-        when (event.audit.origin) {
-            TerminalClipboardOrigin.LOCAL -> "Local terminal session"
-            TerminalClipboardOrigin.REMOTE -> "Remote terminal session"
-        }
-
-    fun plainMessage(
-        profileName: String,
-        event: TerminalClipboardPromptEvent,
-    ): String = question(profileName, event) + "\n\n" + detail(event)
 
     fun htmlQuestion(
         profileName: String,
         event: TerminalClipboardPromptEvent,
     ): String = "<html><body style='width: 340px'><b>${escapeHtml(question(profileName, event))}</b></body></html>"
-
-    fun htmlDetail(event: TerminalClipboardPromptEvent): String =
-        "<html><body style='width: 340px'>${escapeHtml(detail(event))}</body></html>"
 
     private fun Int.formatCount(unit: String): String =
         if (this == 1) {
