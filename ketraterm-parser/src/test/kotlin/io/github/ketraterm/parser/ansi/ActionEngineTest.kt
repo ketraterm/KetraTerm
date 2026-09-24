@@ -26,6 +26,51 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("ActionEngine")
 class ActionEngineTest {
+    @Test
+    fun `overflow freezes parameter storage and prevents dispatcher invocation`() {
+        for (capacity in listOf(1, 16, 32)) {
+            for (separator in listOf(FsmAction.PARAM_SEPARATOR, FsmAction.PARAM_COLON)) {
+                val fixture = Fixture()
+                val state = ParserState(maxParams = capacity)
+                val storage = state.params
+                storage.fill(31)
+                state.paramCount = capacity
+                state.currentParamStarted = true
+                state.subParameterMask = 1 shl (capacity - 1)
+                val mask = state.subParameterMask
+
+                fixture.engine.execute(
+                    state,
+                    AnsiState.CSI_PARAM,
+                    separator,
+                    if (separator ==
+                        FsmAction.PARAM_COLON
+                    ) {
+                        ':'.code
+                    } else {
+                        ';'.code
+                    },
+                )
+                fixture.engine.execute(state, AnsiState.CSI_PARAM, FsmAction.PARAM_DIGIT, '0'.code)
+                fixture.engine.execute(state, AnsiState.CSI_PARAM, FsmAction.PARAM_COLON, ':'.code)
+                fixture.engine.execute(state, AnsiState.CSI_PARAM, FsmAction.PARAM_DIGIT, '9'.code)
+
+                assertSame(storage, state.params)
+                assertArrayEquals(IntArray(capacity) { 31 }, state.params)
+                assertEquals(capacity, state.paramCount)
+                assertEquals(mask, state.subParameterMask)
+                assertTrue(state.currentParamStarted)
+                assertTrue(state.paramsOverflowed)
+
+                fixture.engine.execute(state, AnsiState.GROUND, FsmAction.CSI_DISPATCH, 'm'.code)
+                assertTrue(fixture.dispatcher.csiFinals.isEmpty())
+                assertEquals(AnsiState.GROUND, state.fsmState)
+                assertEquals(0, state.paramCount)
+                assertFalse(state.paramsOverflowed)
+            }
+        }
+    }
+
     // ----- Fixtures ---------------------------------------------------------
 
     private data class Fixture(
@@ -1176,7 +1221,8 @@ class ActionEngineTest {
             assertAll(
                 { assertEquals(1, state.paramCount) },
                 { assertEquals(12, state.params[0]) },
-                { assertFalse(state.currentParamStarted) },
+                { assertTrue(state.currentParamStarted) },
+                { assertTrue(state.paramsOverflowed) },
             )
         }
 
@@ -1224,7 +1270,8 @@ class ActionEngineTest {
                 { assertEquals(1, state.paramCount) },
                 { assertEquals(38, state.params[0]) },
                 { assertEquals(0, state.subParameterMask, "no valid params[1] exists, so bit 1 must remain clear") },
-                { assertFalse(state.currentParamStarted) },
+                { assertTrue(state.currentParamStarted) },
+                { assertTrue(state.paramsOverflowed) },
             )
         }
 

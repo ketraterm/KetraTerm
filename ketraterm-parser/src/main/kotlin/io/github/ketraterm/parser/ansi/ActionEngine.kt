@@ -95,15 +95,9 @@ internal class ActionEngine(
                 state.fsmState = nextState
             }
 
-            FsmAction.PARAM_SEPARATOR -> {
+            FsmAction.PARAM_SEPARATOR, FsmAction.PARAM_COLON -> {
                 flushPrintable(state)
-                appendParamSeparator(state)
-                state.fsmState = nextState
-            }
-
-            FsmAction.PARAM_COLON -> {
-                flushPrintable(state)
-                appendParamColon(state)
+                appendParamSeparator(state, openedByColon = action == FsmAction.PARAM_COLON)
                 state.fsmState = nextState
             }
 
@@ -126,11 +120,13 @@ internal class ActionEngine(
 
             FsmAction.CSI_DISPATCH -> {
                 flushPrintable(state)
-                dispatcher.dispatchCsi(
-                    sink = sink,
-                    state = state,
-                    finalByte = byteValue,
-                )
+                if (!state.paramsOverflowed) {
+                    dispatcher.dispatchCsi(
+                        sink = sink,
+                        state = state,
+                        finalByte = byteValue,
+                    )
+                }
                 state.clearSequenceState()
                 state.fsmState = nextState
             }
@@ -246,6 +242,7 @@ internal class ActionEngine(
     ) {
         val digit = byteValue - '0'.code
         require(digit in 0..9) { "Expected decimal digit byte, got: $byteValue" }
+        if (state.paramsOverflowed) return
 
         if (state.paramCount == 0) {
             if (!openParamField(state, openedByColon = false)) return
@@ -264,22 +261,16 @@ internal class ActionEngine(
         state.currentParamStarted = true
     }
 
-    private fun appendParamSeparator(state: ParserState) {
+    private fun appendParamSeparator(
+        state: ParserState,
+        openedByColon: Boolean,
+    ) {
+        if (state.paramsOverflowed) return
         if (state.paramCount == 0) {
             if (!openParamField(state, openedByColon = false)) return
         }
 
-        openParamField(state, openedByColon = false)
-        state.currentParamStarted = false
-    }
-
-    private fun appendParamColon(state: ParserState) {
-        if (state.paramCount == 0) {
-            if (!openParamField(state, openedByColon = false)) return
-        }
-
-        openParamField(state, openedByColon = true)
-        state.currentParamStarted = false
+        openParamField(state, openedByColon)
     }
 
     private fun setPrivateMarker(
@@ -297,13 +288,15 @@ internal class ActionEngine(
     ): Boolean {
         val index = state.paramCount
         if (index >= state.params.size) {
+            state.paramsOverflowed = true
             return false
         }
 
         state.params[index] = -1
         state.paramCount++
+        state.currentParamStarted = false
 
-        if (openedByColon && index < 32) {
+        if (openedByColon) {
             state.subParameterMask = state.subParameterMask or (1 shl index)
         }
 

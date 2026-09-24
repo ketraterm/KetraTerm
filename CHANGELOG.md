@@ -2,6 +2,10 @@
 
 Release notes for library consumers and embedders. Product-specific changes are recorded in the [IntelliJ plugin changelog](ketraterm-intellij-plugin/CHANGELOG.md) and [standalone application changelog](ketraterm-app/CHANGELOG.md).
 
+## [Unreleased]
+
+- Expanded fixed CSI parameter storage to 32 fields, including omitted fields and colon subparameters. Opening an excess field now freezes collection and rejects the entire command before dispatch, preventing retained-parameter overwrites and partial effects. Added parser/host boundary and recovery regressions plus JMH collection workloads; documented the resource and rejection contract.
+
 ## [0.3.0] - 2026-09-23
 
 - Fixed horizontal-margin scrolling moving guard columns and admitting partial rows to history. SU/SD, line feeds, reverse index, and wrapping now share the existing span-safe slice movement used by IL/DL, while full-width scrolling retains its ring fast path. Added host byte-stream coverage and corrected the core property test and independent cursor/wrap model that expected whole-row movement.

@@ -32,6 +32,92 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("TerminalParser")
 class TerminalParserTest {
+    @Test
+    fun `CSI accepts exactly 32 fields including a colon in the final slot`() {
+        val f = TerminalParserFixture()
+
+        f.acceptAscii("\u001B[" + "9999;".repeat(30) + "4:3m")
+        f.acceptAscii("\u001B[" + "9999;".repeat(31) + "31m")
+
+        assertEquals(listOf("setUnderlineStyle:3", "setForegroundIndexed:1"), f.sink.events)
+    }
+
+    @Test
+    fun `CSI field overflow rejects the whole command across every byte split`() {
+        for (capacity in listOf(1, 16, 32)) {
+            for (separator in listOf(';', ':')) {
+                for (tail in listOf("", "0", "31;4:3", ";:".repeat(64))) {
+                    val bytes = ("\u001B[" + "1;".repeat(capacity - 1) + "31$separator${tail}mX\u001B[32m").encodeToByteArray()
+                    for (split in 0..bytes.size) {
+                        val f = TerminalParserFixture(state = ParserState(maxParams = capacity))
+                        f.parser.accept(bytes, 0, split)
+                        f.parser.accept(bytes, split, bytes.size - split)
+
+                        assertEquals(
+                            listOf("writeCodepoint:88", "setForegroundIndexed:2"),
+                            f.sink.events,
+                            "capacity=$capacity separator=$separator tail=$tail split=$split",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `CSI empty fields count toward capacity and final field digits still accumulate`() {
+        for (capacity in listOf(1, 16, 32)) {
+            val f = TerminalParserFixture(state = ParserState(maxParams = capacity))
+            f.acceptAscii("\u001B[" + ";".repeat(capacity - 1) + "m")
+            assertEquals(List(capacity) { "resetAttributes" }, f.sink.events)
+            f.sink.events.clear()
+
+            f.acceptAscii("\u001B[" + ";".repeat(capacity) + "m")
+            assertTrue(f.sink.events.isEmpty())
+
+            f.acceptAscii("\u001B[" + "9999;".repeat(capacity - 1) + "31m")
+            assertEquals(listOf("setForegroundIndexed:1"), f.sink.events)
+        }
+    }
+
+    @Test
+    fun `overflowed CSI preserves controls and recovers from cancellation and malformed bytes`() {
+        val prefix = "\u001B[" + "1;".repeat(32)
+        for (ending in listOf("m", "\u0018", "\u001A", "\u001B[0m")) {
+            val bytes = (prefix + "\u0007\u007F" + ending + "X\u001B[32m").encodeToByteArray()
+            val f = TerminalParserFixture()
+            for (byte in bytes) f.acceptByte(byte.toInt() and 0xFF)
+
+            val expected = mutableListOf("bell")
+            if (ending == "\u001B[0m") expected += "resetAttributes"
+            expected += listOf("writeCodepoint:88", "setForegroundIndexed:2")
+            assertEquals(expected, f.sink.events, "ending=$ending")
+        }
+        val f = TerminalParserFixture()
+        f.acceptAscii(prefix)
+        f.acceptByte(0xC3)
+        f.acceptAscii("mX\u001B[32m")
+        assertEquals(listOf("writeCodepoint:109", "writeCodepoint:88", "setForegroundIndexed:2"), f.sink.events)
+    }
+
+    @Test
+    fun `EOF never dispatches an overflowing CSI and reset permits a new command`() {
+        val f = TerminalParserFixture()
+        f.acceptAscii("\u001B[" + "1;".repeat(32))
+        f.endOfInput()
+        assertTrue(f.sink.events.isEmpty())
+        f.reset()
+        f.acceptAscii("X\u001B[31m")
+        assertEquals(listOf("writeCodepoint:88", "setForegroundIndexed:1"), f.sink.events)
+    }
+
+    @Test
+    fun `numeric saturation in the last available field does not reject CSI`() {
+        val f = TerminalParserFixture(state = ParserState(maxParams = 1))
+        f.acceptAscii("\u001B[" + "9".repeat(100) + "AX")
+        assertEquals(listOf("cursorUp:2147483647", "writeCodepoint:88"), f.sink.events)
+    }
+
     // ----- API validation ---------------------------------------------------
 
     @Nested

@@ -42,6 +42,9 @@ open class TerminalParserBenchmark {
         "cjk",
         "emoji",
         "sgr_heavy",
+        "csi_short",
+        "csi_capacity",
+        "csi_overflow",
         "metadata",
         "osc_overflow",
         "dcs_overflow",
@@ -64,6 +67,9 @@ open class TerminalParserBenchmark {
                 "cjk" -> buildParserCjkInput()
                 "emoji" -> buildParserEmojiInput()
                 "sgr_heavy" -> buildParserSgrHeavyInput()
+                "csi_short" -> "\u001B[1;31m\u001B[0m".repeat(1024).encodeToByteArray()
+                "csi_capacity" -> ("\u001B[" + "1;".repeat(30) + "4:3m").repeat(1024).encodeToByteArray()
+                "csi_overflow" -> ("\u001B[" + "1;".repeat(32) + "0m").repeat(1024).encodeToByteArray()
                 "metadata" ->
                     ("\u001B]2;build status\u0007\u001B]10;#123456\u001B\\\u001BP\$qm\u001B\\").repeat(1024).encodeToByteArray()
                 "osc_overflow" -> ("\u001B]2;" + "x".repeat(4096) + "\u0007").repeat(128).encodeToByteArray()
