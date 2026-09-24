@@ -18,138 +18,119 @@ package io.github.ketraterm.input.impl
 import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.input.impl.keyboard.CsiWriter
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.input.policy.PasteLineEndingPolicy
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.host.TerminalHostOutput
 
 internal class PasteEncoder(
     private val output: TerminalHostOutput,
     private val scratch: InputScratchBuffer,
-    @Volatile internal var policy: TerminalInputPolicy = TerminalInputPolicy(),
+    internal var policy: TerminalInputPolicy = TerminalInputPolicy(),
+    private val bufferedOutput: BufferedHostOutput = BufferedHostOutput(output),
 ) {
     fun encode(
         event: TerminalPasteEvent,
         modeBits: Long,
     ) {
-        val bracketedPaste = TerminalInputState.isBracketedPasteEnabled(modeBits)
-        if (bracketedPaste) {
-            output.writeBytes(
-                TerminalSequences.BRACKETED_PASTE_START,
-                0,
-                TerminalSequences.BRACKETED_PASTE_START.size,
-            )
-            writePasteText(event.text, bracketedPaste = true)
-            output.writeBytes(
-                TerminalSequences.BRACKETED_PASTE_END,
-                0,
-                TerminalSequences.BRACKETED_PASTE_END.size,
-            )
-        } else {
-            writePasteText(event.text, bracketedPaste = false)
+        val currentPolicy = policy
+        val bracketed = TerminalInputState.isBracketedPasteEnabled(modeBits)
+        val lineEndings = if (bracketed) PasteLineEndingPolicy.PRESERVE else currentPolicy.pasteLineEndingPolicy
+        val stripC0 =
+            when (currentPolicy.pasteControlPolicy) {
+                PasteControlPolicy.PRESERVE -> false
+                PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF -> true
+            }
+        val transform = needsTransformation(event.text, bracketed, stripC0, lineEndings)
+        val target = if (transform) bufferedOutput else output
+
+        bufferedOutput.reset()
+        try {
+            if (bracketed) {
+                target.writeBytes(TerminalSequences.BRACKETED_PASTE_START, 0, TerminalSequences.BRACKETED_PASTE_START.size)
+            }
+            if (transform) {
+                writeTransformed(event.text, bracketed, stripC0, lineEndings)
+            } else {
+                target.writeUtf8(event.text)
+            }
+            if (bracketed) {
+                target.writeBytes(TerminalSequences.BRACKETED_PASTE_END, 0, TerminalSequences.BRACKETED_PASTE_END.size)
+            }
+            bufferedOutput.flush()
+        } finally {
+            // A failed transport write must never leak pending bytes into the next input event.
+            bufferedOutput.reset()
         }
     }
 
-    private fun writePasteText(
+    private fun needsTransformation(
         text: String,
-        bracketedPaste: Boolean,
-    ) {
-        when (policy.pasteSanitizationPolicy) {
-            PasteSanitizationPolicy.RAW -> writeRaw(text, bracketedPaste)
-            PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF -> writeStrippedC0(text, bracketedPaste)
-            PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS ->
-                if (bracketedPaste) {
-                    output.writeUtf8(text)
-                } else {
-                    val lineEndingPolicy =
-                        if (policy.pasteLineEndingPolicy == PasteLineEndingPolicy.PRESERVE) {
-                            PasteLineEndingPolicy.LINE_FEED
-                        } else {
-                            policy.pasteLineEndingPolicy
-                        }
-                    writeCanonicalLineEndings(text, stripC0 = false, lineEndingPolicy)
-                }
-        }
-    }
-
-    private fun writeRaw(
-        text: String,
-        bracketedPaste: Boolean,
-    ) {
-        if (bracketedPaste || policy.pasteLineEndingPolicy == PasteLineEndingPolicy.PRESERVE) {
-            output.writeUtf8(text)
-        } else {
-            writeCanonicalLineEndings(text, stripC0 = false, policy.pasteLineEndingPolicy)
-        }
-    }
-
-    private fun writeStrippedC0(
-        text: String,
-        bracketedPaste: Boolean,
-    ) {
-        if (!bracketedPaste && policy.pasteLineEndingPolicy != PasteLineEndingPolicy.PRESERVE) {
-            writeCanonicalLineEndings(text, stripC0 = true, policy.pasteLineEndingPolicy)
-            return
-        }
-
+        bracketed: Boolean,
+        stripC0: Boolean,
+        lineEndings: PasteLineEndingPolicy,
+    ): Boolean {
         var offset = 0
         while (offset < text.length) {
             val codepoint = text.codePointAt(offset)
-            if (isAllowedAfterC0Strip(codepoint)) {
-                writeUtf8Codepoint(codepoint)
+            if ((stripC0 && isStrippedControl(codepoint)) ||
+                (bracketed && (codepoint == ESC || codepoint == ETX || codepoint == CSI)) ||
+                (lineEndings != PasteLineEndingPolicy.PRESERVE && (codepoint == CR || codepoint == LF)) ||
+                codepoint in 0xd800..0xdfff
+            ) {
+                return true
             }
             offset += Character.charCount(codepoint)
         }
+        return false
     }
 
-    private fun isAllowedAfterC0Strip(codepoint: Int): Boolean =
-        codepoint !in 0x00..0x1f ||
-            codepoint == TAB ||
-            codepoint == CR ||
-            codepoint == LF
-
-    private fun writeCanonicalLineEndings(
+    private fun writeTransformed(
         text: String,
+        bracketed: Boolean,
         stripC0: Boolean,
-        lineEndingPolicy: PasteLineEndingPolicy,
+        lineEndings: PasteLineEndingPolicy,
     ) {
         var offset = 0
         while (offset < text.length) {
             val codepoint = text.codePointAt(offset)
-            if (codepoint == CR || codepoint == LF) {
-                writeCanonicalLineEnding(lineEndingPolicy)
-                offset += Character.charCount(codepoint)
-                if (codepoint == CR && offset < text.length && text.codePointAt(offset) == LF) {
-                    offset += Character.charCount(LF)
+            offset += Character.charCount(codepoint)
+            when {
+                stripC0 && isStrippedControl(codepoint) -> Unit
+                bracketed && codepoint == ESC -> writeCodepoint(0x241b)
+                bracketed && codepoint == ETX -> writeCodepoint(0x2403)
+                bracketed && codepoint == CSI -> bufferedOutput.writeAscii("\\u009b")
+                lineEndings != PasteLineEndingPolicy.PRESERVE && (codepoint == CR || codepoint == LF) -> {
+                    when (lineEndings) {
+                        PasteLineEndingPolicy.CARRIAGE_RETURN -> writeCodepoint(CR)
+                        PasteLineEndingPolicy.LINE_FEED -> writeCodepoint(LF)
+                        PasteLineEndingPolicy.CARRIAGE_RETURN_AND_LINE_FEED -> {
+                            writeCodepoint(CR)
+                            writeCodepoint(LF)
+                        }
+                        PasteLineEndingPolicy.PRESERVE -> error("preserve mode does not canonicalize line endings")
+                    }
+                    if (codepoint == CR && offset < text.length && text[offset].code == LF) offset++
                 }
-            } else {
-                if (!stripC0 || isAllowedAfterC0Strip(codepoint)) {
-                    writeUtf8Codepoint(codepoint)
-                }
-                offset += Character.charCount(codepoint)
+                codepoint in 0xd800..0xdfff -> writeCodepoint(0xfffd)
+                else -> writeCodepoint(codepoint)
             }
         }
     }
 
-    private fun writeCanonicalLineEnding(lineEndingPolicy: PasteLineEndingPolicy) {
-        when (lineEndingPolicy) {
-            PasteLineEndingPolicy.PRESERVE -> error("preserve mode does not canonicalize line endings")
-            PasteLineEndingPolicy.LINE_FEED -> writeUtf8Codepoint(LF)
-            PasteLineEndingPolicy.CARRIAGE_RETURN -> writeUtf8Codepoint(CR)
-            PasteLineEndingPolicy.CARRIAGE_RETURN_AND_LINE_FEED -> {
-                writeUtf8Codepoint(CR)
-                writeUtf8Codepoint(LF)
-            }
-        }
-    }
+    private fun isStrippedControl(codepoint: Int): Boolean =
+        codepoint in 0x00..0x1f && codepoint != TAB && codepoint != CR && codepoint != LF
 
-    private fun writeUtf8Codepoint(codepoint: Int) {
-        CsiWriter.writeUtf8Codepoint(scratch, output, codepoint)
+    private fun writeCodepoint(codepoint: Int) {
+        CsiWriter.writeUtf8Codepoint(scratch, bufferedOutput, codepoint)
     }
 
     private companion object {
-        private const val CR: Int = 0x0d
-        private const val LF: Int = 0x0a
+        private const val ETX: Int = 0x03
         private const val TAB: Int = 0x09
+        private const val LF: Int = 0x0a
+        private const val CR: Int = 0x0d
+        private const val ESC: Int = 0x1b
+        private const val CSI: Int = 0x9b
     }
 }

@@ -17,14 +17,33 @@ package io.github.ketraterm.input.impl
 
 import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.input.policy.PasteLineEndingPolicy
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.host.TerminalHostOutput
-import org.junit.jupiter.api.Assertions.assertArrayEquals
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayOutputStream
 
 class PasteEncoderTest {
+    @Test
+    fun `bracketed paste neutralizes embedded delimiters and interrupt controls`() {
+        assertBytes(
+            expected = esc("[200~") + "a\u241b[201~b\u2403c\\u009b201~d\u241b[200~".encodeToByteArray() + esc("[201~"),
+            event = TerminalPasteEvent("a\u001b[201~b\u0003c\u009b201~d\u001b[200~"),
+            modeBits = TerminalModeBits.BRACKETED_PASTE,
+        )
+    }
+
+    @Test
+    fun `bracketed paste cannot reconstruct a delimiter around another delimiter`() {
+        assertBytes(
+            expected = esc("[200~") + "\u241b\u241b[201~[201~\r\nnext".encodeToByteArray() + esc("[201~"),
+            event = TerminalPasteEvent("\u001b\u001b[201~[201~\r\nnext"),
+            modeBits = TerminalModeBits.BRACKETED_PASTE,
+        )
+    }
+
     @Test
     fun `plain paste writes UTF-8 text`() {
         assertBytes("plain é".encodeToByteArray(), TerminalPasteEvent("plain é"))
@@ -83,7 +102,7 @@ class PasteEncoderTest {
     }
 
     @Test
-    fun `raw paste preserves escape controls`() {
+    fun `unbracketed preserve policy retains escape controls`() {
         assertBytes(
             expected = byteArrayOf('a'.code.toByte(), 0x1b, 'b'.code.toByte()),
             event = TerminalPasteEvent("a\u001bb"),
@@ -107,7 +126,7 @@ class PasteEncoderTest {
             event = TerminalPasteEvent("a\tb\rc\nd\u001be\u0000"),
             policy =
                 TerminalInputPolicy(
-                    pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                    pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
                 ),
         )
     }
@@ -119,19 +138,19 @@ class PasteEncoderTest {
             event = TerminalPasteEvent("\u001bÃ©😀"),
             policy =
                 TerminalInputPolicy(
-                    pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                    pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
                 ),
         )
     }
 
     @Test
-    fun `normalize line endings paste policy maps crlf and cr to lf`() {
+    fun `explicit LF policy maps crlf and cr to lf`() {
         assertBytes(
             expected = "a\nb\nc\nd".encodeToByteArray(),
             event = TerminalPasteEvent("a\r\nb\rc\nd"),
             policy =
                 TerminalInputPolicy(
-                    pasteSanitizationPolicy = PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS,
+                    pasteLineEndingPolicy = PasteLineEndingPolicy.LINE_FEED,
                 ),
         )
     }
@@ -143,7 +162,6 @@ class PasteEncoderTest {
             event = TerminalPasteEvent("a\r\nb\rc\nd"),
             policy =
                 TerminalInputPolicy(
-                    pasteSanitizationPolicy = PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS,
                     pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN,
                 ),
         )
@@ -157,9 +175,114 @@ class PasteEncoderTest {
             modeBits = TerminalModeBits.BRACKETED_PASTE,
             policy =
                 TerminalInputPolicy(
-                    pasteSanitizationPolicy = PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                    pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
                 ),
         )
+    }
+
+    @Test
+    fun `every control policy protects framing and preserves bracketed line endings`() {
+        for (controls in PasteControlPolicy.entries) {
+            for (lineEndings in PasteLineEndingPolicy.entries) {
+                val payload =
+                    when (controls) {
+                        PasteControlPolicy.PRESERVE -> "\u0000\u241b[201~\u2403\\u009b201~\t\r\n\r\n"
+                        PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF -> "[201~\\u009b201~\t\r\n\r\n"
+                    }
+                assertBytes(
+                    expected = esc("[200~") + payload.encodeToByteArray() + esc("[201~"),
+                    event = TerminalPasteEvent("\u0000\u001b[201~\u0003\u009b201~\t\r\n\r\n"),
+                    modeBits = TerminalModeBits.BRACKETED_PASTE,
+                    policy = TerminalInputPolicy(pasteControlPolicy = controls, pasteLineEndingPolicy = lineEndings),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `control filtering and unbracketed newline policies compose independently`() {
+        for (controls in PasteControlPolicy.entries) {
+            for (lineEndings in PasteLineEndingPolicy.entries) {
+                val control = if (controls == PasteControlPolicy.PRESERVE) "\u0000" else ""
+                val expected =
+                    when (lineEndings) {
+                        PasteLineEndingPolicy.PRESERVE -> "${control}a\r\nb\rc\nd\t"
+                        PasteLineEndingPolicy.LINE_FEED -> "${control}a\nb\nc\nd\t"
+                        PasteLineEndingPolicy.CARRIAGE_RETURN -> "${control}a\rb\rc\rd\t"
+                        PasteLineEndingPolicy.CARRIAGE_RETURN_AND_LINE_FEED -> "${control}a\r\nb\r\nc\r\nd\t"
+                    }
+                assertBytes(
+                    expected.encodeToByteArray(),
+                    TerminalPasteEvent("\u0000a\r\nb\rc\nd\t"),
+                    policy = TerminalInputPolicy(pasteControlPolicy = controls, pasteLineEndingPolicy = lineEndings),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `protection operates on Unicode characters rather than UTF8 continuation bytes`() {
+        val text = "\u041b201~ \u009a \u009c \ud83d\ude00 e\u0301 \u001b[201~"
+        assertBytes(
+            expected = esc("[200~") + "\u041b201~ \u009a \u009c \ud83d\ude00 e\u0301 \u241b[201~".encodeToByteArray() + esc("[201~"),
+            event = TerminalPasteEvent(text),
+            modeBits = TerminalModeBits.BRACKETED_PASTE,
+        )
+    }
+
+    @Test
+    fun `all paste paths replace unpaired surrogates with the Unicode replacement character`() {
+        for (controls in PasteControlPolicy.entries) {
+            for (lineEndings in PasteLineEndingPolicy.entries) {
+                for (mode in listOf(0L, TerminalModeBits.BRACKETED_PASTE)) {
+                    val payload = "\ufffdx\ufffd\ud83d\ude00\ufffd".encodeToByteArray()
+                    assertBytes(
+                        expected = if (mode == 0L) payload else esc("[200~") + payload + esc("[201~"),
+                        event = TerminalPasteEvent("\ud800x\udc00\ud83d\ude00\ud800"),
+                        modeBits = mode,
+                        policy = TerminalInputPolicy(pasteControlPolicy = controls, pasteLineEndingPolicy = lineEndings),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `framing and UTF8 survive every small output buffer boundary`() {
+        for (capacity in 1..16) {
+            for (prefixLength in 0..16) {
+                val output = RecordingHostOutput()
+                val encoder = PasteEncoder(output, InputScratchBuffer(), bufferedOutput = BufferedHostOutput(output, capacity))
+                val prefix = "x".repeat(prefixLength)
+                encoder.encode(
+                    TerminalPasteEvent("$prefix\u001b\u001b[201~[201~\u009b201~\u0003\ud83d\ude00\r\n"),
+                    TerminalModeBits.BRACKETED_PASTE,
+                )
+                encoder.encode(TerminalPasteEvent("next"), 0L)
+                assertArrayEquals(
+                    esc("[200~") + "$prefix\u241b\u241b[201~[201~\\u009b201~\u2403\ud83d\ude00\r\n".encodeToByteArray() + esc("[201~") +
+                        "next".encodeToByteArray(),
+                    output.bytes,
+                    "capacity=$capacity, prefixLength=$prefixLength",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `transformed paste is coalesced and failed writes cannot leak into later input`() {
+        val output = RecordingHostOutput()
+        val encoder = PasteEncoder(output, InputScratchBuffer())
+        val event = TerminalPasteEvent("\u001b" + "x".repeat(8192))
+        encoder.encode(event, TerminalModeBits.BRACKETED_PASTE)
+        assertEquals(3, output.writeCalls)
+        assertArrayEquals(esc("[200~") + ("\u241b" + "x".repeat(8192)).encodeToByteArray() + esc("[201~"), output.bytes)
+
+        output.failNextWrite = true
+        assertThrows(IllegalStateException::class.java) { encoder.encode(event, TerminalModeBits.BRACKETED_PASTE) }
+        val accepted = output.bytes
+        encoder.encode(TerminalPasteEvent("\u001b[201~"), TerminalModeBits.BRACKETED_PASTE)
+        assertArrayEquals(accepted + esc("[200~") + "\u241b[201~".encodeToByteArray() + esc("[201~"), output.bytes)
     }
 
     private fun assertBytes(
@@ -179,11 +302,14 @@ class PasteEncoderTest {
     private fun esc(textAfterEsc: String): ByteArray = byteArrayOf(0x1b) + textAfterEsc.encodeToByteArray()
 
     private class RecordingHostOutput : TerminalHostOutput {
-        var bytes: ByteArray = ByteArray(0)
+        private val buffer = ByteArrayOutputStream()
+        val bytes: ByteArray get() = buffer.toByteArray()
+        var writeCalls: Int = 0
             private set
+        var failNextWrite: Boolean = false
 
         override fun writeByte(byte: Int) {
-            bytes += byte.toByte()
+            writeBytes(byteArrayOf(byte.toByte()), 0, 1)
         }
 
         override fun writeBytes(
@@ -191,15 +317,21 @@ class PasteEncoderTest {
             offset: Int,
             length: Int,
         ) {
-            this.bytes += bytes.copyOfRange(offset, offset + length)
+            if (failNextWrite) {
+                failNextWrite = false
+                error("transport write failed")
+            }
+            writeCalls++
+            buffer.write(bytes, offset, length)
         }
 
         override fun writeAscii(text: String) {
-            bytes += text.encodeToByteArray()
+            writeUtf8(text)
         }
 
         override fun writeUtf8(text: String) {
-            bytes += text.encodeToByteArray()
+            val encoded = text.encodeToByteArray()
+            writeBytes(encoded, 0, encoded.size)
         }
     }
 }

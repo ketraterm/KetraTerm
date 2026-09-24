@@ -1437,8 +1437,8 @@ class SwingTerminal
             }
             if (settings.palette != previous?.palette) session.setThemePalette(settings.palette)
             if (settings.cursorShape != previous?.cursorShape) session.setCursorShape(settings.cursorShape)
-            if (settings.pasteSanitizationPolicy != previous?.pasteSanitizationPolicy) {
-                session.setPasteSanitizationPolicy(settings.pasteSanitizationPolicy)
+            if (settings.pasteControlPolicy != previous?.pasteControlPolicy) {
+                session.setPasteControlPolicy(settings.pasteControlPolicy)
             }
         }
 

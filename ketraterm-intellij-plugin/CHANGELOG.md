@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Improved protection when pasting copied terminal sequences and simplified paste handling settings.
 - Improved compatibility with combined text formatting commands and prevented oversized terminal commands from changing formatting or terminal settings unexpectedly.
 
 ## [0.3.0] - 2026-09-23

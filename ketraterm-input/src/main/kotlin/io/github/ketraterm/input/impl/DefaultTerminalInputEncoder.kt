@@ -17,11 +17,7 @@ package io.github.ketraterm.input.impl
 
 import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.event.TerminalFocusEvent
-import io.github.ketraterm.input.event.TerminalKeyEvent
-import io.github.ketraterm.input.event.TerminalMouseEvent
-import io.github.ketraterm.input.event.TerminalPasteEvent
-import io.github.ketraterm.input.event.TerminalTextReplacementEvent
+import io.github.ketraterm.input.event.*
 import io.github.ketraterm.input.impl.keyboard.KeyboardEncoder
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.host.TerminalHostOutput
@@ -42,7 +38,7 @@ import io.github.ketraterm.protocol.host.TerminalHostOutput
  *
  * @param inputState read-only core mode state used for input decisions.
  * @param output host-bound byte sink.
- * @param policy policy for ambiguous or unsupported keyboard encodings.
+ * @param policy runtime choices for keyboard, mouse, and paste encoding.
  */
 internal class DefaultTerminalInputEncoder(
     private val inputState: TerminalInputState,
@@ -50,12 +46,12 @@ internal class DefaultTerminalInputEncoder(
     policy: TerminalInputPolicy = TerminalInputPolicy(),
 ) : TerminalInputEncoder {
     private val scratch = InputScratchBuffer()
+    private val bufferedOutput = BufferedHostOutput(output)
     private val keyboard = KeyboardEncoder(output, scratch, policy)
-    private val paste = PasteEncoder(output, scratch, policy)
+    private val paste = PasteEncoder(output, scratch, policy, bufferedOutput)
     private val focus = FocusEncoder(output)
     private val mouse = MouseEncoder(output, scratch, policy)
-    private val bufferedDeletionOutput = BufferedHostOutput(output)
-    private val replacementKeyboard = KeyboardEncoder(bufferedDeletionOutput, scratch, policy)
+    private val replacementKeyboard = KeyboardEncoder(bufferedOutput, scratch, policy)
 
     /**
      * Encodes one keyboard event using one packed mode read.
@@ -85,7 +81,7 @@ internal class DefaultTerminalInputEncoder(
      */
     override fun encodeTextReplacement(event: TerminalTextReplacementEvent) {
         val modeBits = inputState.getInputModeBits()
-        bufferedDeletionOutput.reset()
+        bufferedOutput.reset()
         try {
             repeat(event.deleteAfterCursorCount) {
                 replacementKeyboard.encode(DELETE_EVENT, modeBits)
@@ -93,12 +89,12 @@ internal class DefaultTerminalInputEncoder(
             repeat(event.deleteBeforeCursorCount) {
                 replacementKeyboard.encode(BACKSPACE_EVENT, modeBits)
             }
-            bufferedDeletionOutput.flush()
+            bufferedOutput.flush()
             if (event.replacementText.isNotEmpty()) {
                 paste.encode(TerminalPasteEvent(event.replacementText), modeBits)
             }
         } finally {
-            bufferedDeletionOutput.reset()
+            bufferedOutput.reset()
         }
     }
 
@@ -130,7 +126,7 @@ internal class DefaultTerminalInputEncoder(
     }
 
     private companion object {
-        private val DELETE_EVENT = TerminalKeyEvent.key(io.github.ketraterm.input.event.TerminalKey.DELETE)
-        private val BACKSPACE_EVENT = TerminalKeyEvent.key(io.github.ketraterm.input.event.TerminalKey.BACKSPACE)
+        private val DELETE_EVENT = TerminalKeyEvent.key(TerminalKey.DELETE)
+        private val BACKSPACE_EVENT = TerminalKeyEvent.key(TerminalKey.BACKSPACE)
     }
 }

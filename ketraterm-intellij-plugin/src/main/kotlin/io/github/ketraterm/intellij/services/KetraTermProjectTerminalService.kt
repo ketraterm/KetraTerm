@@ -513,7 +513,7 @@ class KetraTermProjectTerminalService internal constructor(
             rows = settings.rows,
             treatAmbiguousAsWide = settings.treatAmbiguousAsWide,
             maxHistory = settings.scrollbackLines,
-            pasteSanitizationPolicy = settings.pasteSanitizationPolicy,
+            pasteControlPolicy = settings.pasteControlPolicy,
             hostPolicy = KetraTermIntellijSettings.getInstance().createHostPolicy(profile.command),
             showForegroundProcessName = KetraTermIntellijSettings.getInstance().state.showForegroundProcessName,
         )

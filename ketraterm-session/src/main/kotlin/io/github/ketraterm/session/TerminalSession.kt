@@ -21,7 +21,7 @@ import io.github.ketraterm.host.*
 import io.github.ketraterm.input.TerminalInputEncoders
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.parser.api.TerminalParsers
@@ -381,17 +381,17 @@ class TerminalSession(
     }
 
     /**
-     * Updates only the active paste sanitization policy.
+     * Updates only the active paste control-character policy.
      *
      * Other host-bound input behavior, including PTY-specific Return handling,
      * is preserved. The update is serialized with input encoding because the
      * default encoder owns reusable scratch buffers.
      *
-     * @param policy new paste sanitization policy.
+     * @param policy new control-character policy; bracketed-paste protection remains enabled.
      */
-    fun setPasteSanitizationPolicy(policy: PasteSanitizationPolicy) {
+    fun setPasteControlPolicy(policy: PasteControlPolicy) {
         synchronized(outboundWriteLock) {
-            val next = inputPolicy.copy(pasteSanitizationPolicy = policy)
+            val next = inputPolicy.copy(pasteControlPolicy = policy)
             inputPolicy = next
             inputEncoder.setInputPolicy(next)
         }

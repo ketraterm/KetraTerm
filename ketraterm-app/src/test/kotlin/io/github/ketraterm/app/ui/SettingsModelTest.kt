@@ -179,7 +179,7 @@ class SettingsModelTest {
         assertEquals(settings.config.columns, state.columns)
         assertEquals(settings.config.shellPath, state.shellPath)
         assertEquals(settings.config.visualBell, state.visualBell)
-        assertEquals(settings.config.pasteSanitizationPolicy, state.pasteSanitizationPolicy)
+        assertEquals(settings.config.pasteControlPolicy, state.pasteControlPolicy)
         assertEquals(settings.config.shellRequestResizeWindow, state.shellRequestResizeWindow)
         assertEquals(settings.config.shellRequestWindowManipulation, state.shellRequestWindowManipulation)
         assertEquals(settings.config.scrollOnOutput, state.scrollOnOutput)
@@ -216,7 +216,7 @@ class SettingsModelTest {
                 fontSize = 22,
                 columns = 120,
                 visualBell = false,
-                pasteSanitizationPolicy = io.github.ketraterm.input.policy.PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                pasteControlPolicy = io.github.ketraterm.input.policy.PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
                 shellRequestResizeWindow = true,
                 shellRequestWindowManipulation = true,
                 clipboardLocalWrite = TerminalClipboardPermission.ALLOW,
@@ -235,8 +235,8 @@ class SettingsModelTest {
         assertEquals(120, settings.config.columns)
         assertFalse(settings.config.visualBell)
         assertEquals(
-            io.github.ketraterm.input.policy.PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
-            settings.config.pasteSanitizationPolicy,
+            io.github.ketraterm.input.policy.PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+            settings.config.pasteControlPolicy,
         )
         assertTrue(settings.config.shellRequestResizeWindow)
         assertTrue(settings.config.shellRequestWindowManipulation)

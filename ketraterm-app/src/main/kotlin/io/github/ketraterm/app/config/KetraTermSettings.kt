@@ -64,7 +64,7 @@ internal class KetraTermSettings(
             cursorBlinkMillis = config.cursorBlinkMillis,
             useSystemFallbackFonts = config.useSystemFallbackFonts,
             visualBellEnabled = config.visualBell,
-            pasteSanitizationPolicy = config.pasteSanitizationPolicy,
+            pasteControlPolicy = config.pasteControlPolicy,
             cursorShape = parseCursorShape(config.cursorShape),
             scrollbackLines = config.scrollbackLines,
             lineHeight = config.lineHeight,

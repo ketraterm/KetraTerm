@@ -17,7 +17,7 @@ package io.github.ketraterm.workspace.config
 
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -25,6 +25,28 @@ import java.util.*
 import kotlin.test.*
 
 class TerminalConfigTest {
+    @Test
+    fun `legacy paste settings migrate and save canonical control policy identifiers`() {
+        val directory = Files.createTempDirectory("ketraterm-config-paste-migration")
+        val file = directory.resolve("config.toml")
+        try {
+            val manager = TerminalWorkspaceConfigManager(file)
+            for (id in listOf("raw", "normalize-line-endings", "preserve", "strip-c0", "unknown")) {
+                Files.writeString(file, "[behavior]\npaste_sanitization = \" ${id.uppercase(Locale.ROOT)} \"\n")
+                val loaded = manager.load()
+                val expected = if (id == "strip-c0") PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF else PasteControlPolicy.PRESERVE
+                assertEquals(expected, loaded.pasteControlPolicy)
+                manager.save(loaded)
+                val canonical = if (id == "strip-c0") "strip-c0" else "preserve"
+                assertTrue(Files.readString(file).contains("paste_sanitization = \"$canonical\""))
+                assertEquals(loaded, manager.load())
+            }
+        } finally {
+            Files.deleteIfExists(file)
+            Files.deleteIfExists(directory)
+        }
+    }
+
     @Test
     fun `atomic save replaces complete file and removes staging file`() {
         val directory = Files.createTempDirectory("ketraterm-config-atomic")
@@ -206,7 +228,7 @@ class TerminalConfigTest {
         assertTrue(config.useSystemFallbackFonts)
         assertEquals("block", config.cursorShape)
         assertTrue(config.visualBell)
-        assertEquals(PasteSanitizationPolicy.RAW, config.pasteSanitizationPolicy)
+        assertEquals(PasteControlPolicy.PRESERVE, config.pasteControlPolicy)
         assertFalse(config.shellRequestResizeWindow)
         assertFalse(config.shellRequestWindowManipulation)
         assertFalse(config.smartSuggestionsEnabled)
@@ -245,7 +267,7 @@ class TerminalConfigTest {
                 cursorShape = "beam",
                 audibleBell = false,
                 visualBell = false,
-                pasteSanitizationPolicy = PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS,
+                pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
                 shellRequestResizeWindow = true,
                 shellRequestWindowManipulation = true,
                 shellSuggestionsEnabled = false,
@@ -262,7 +284,7 @@ class TerminalConfigTest {
 
         manager.save(customConfig)
         assertTrue(Files.exists(configFile))
-        assertTrue(Files.readString(configFile).contains("""paste_sanitization = "normalize-line-endings""""))
+        assertTrue(Files.readString(configFile).contains("""paste_sanitization = "strip-c0""""))
         assertTrue(Files.readString(configFile).contains("""shell_suggestions_enabled = false"""))
         assertTrue(Files.readString(configFile).contains("""accept_selected_suggestion_with_enter = false"""))
         assertTrue(Files.readString(configFile).contains("""suggestion_learning_persistence_enabled = true"""))
@@ -297,6 +319,7 @@ class TerminalConfigTest {
         Files.deleteIfExists(tempDir)
     }
 
+    @Test
     fun `test TerminalWorkspaceConfigManager clamps hand edited numeric values`() {
         val tempDir = Files.createTempDirectory("ketraterm-config-test-clamped")
         val configFile = tempDir.resolve("config.toml")
@@ -333,7 +356,7 @@ class TerminalConfigTest {
         assertEquals(TerminalConfig.FONT_SIZE_MIN, loaded.fontSize)
         assertEquals(TerminalConfig.LINE_HEIGHT_MIN, loaded.lineHeight)
         assertEquals(TerminalConfig.CURSOR_BLINK_MAX, loaded.cursorBlinkMillis)
-        assertEquals(PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF, loaded.pasteSanitizationPolicy)
+        assertEquals(PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF, loaded.pasteControlPolicy)
 
         Files.deleteIfExists(configFile)
         Files.deleteIfExists(tempDir)

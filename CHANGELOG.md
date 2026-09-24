@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- Protected bracketed paste independently of control filtering: ESC/ETX become visible control pictures and Unicode CSI becomes printable text, preventing embedded end markers from escaping the frame. Replaced `PasteSanitizationPolicy` with `PasteControlPolicy` (`PRESERVE` or C0 stripping); newline encoding remains exclusively host-owned. Updated session/workspace/Swing APIs and both settings UIs, migrating persisted `raw` and `normalize-line-endings` choices to `preserve`. Reused the bounded input buffer for transformed pastes, normalized unpaired surrogates, and added framing, migration, recovery, integration, and allocation benchmarks.
 - Expanded fixed CSI parameter storage to 32 fields, including omitted fields and colon subparameters. Opening an excess field now freezes collection and rejects the entire command before dispatch, preventing retained-parameter overwrites and partial effects. Added parser/host boundary and recovery regressions plus JMH collection workloads; documented the resource and rejection contract.
 
 ## [0.3.0] - 2026-09-23

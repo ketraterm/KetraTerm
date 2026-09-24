@@ -69,16 +69,15 @@ class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
             settings.loadState(original.copy(pasteSanitization = "raw"))
             val baseline = settings.state
             val component = configurable.createComponent()
-            val rawLabel = KetraTermBundle.message("settings.ketraterm.pasteSanitization.raw")
+            val preserveLabel = KetraTermBundle.message("settings.ketraterm.pasteSanitization.preserve")
             val combo =
                 descendants(component)
                     .filterIsInstance<JComboBox<*>>()
-                    .single { it.selectedItem?.toString() == rawLabel }
+                    .single { it.selectedItem?.toString() == preserveLabel }
             val choices =
                 listOf(
                     "strip-c0" to KetraTermBundle.message("settings.ketraterm.pasteSanitization.stripC0"),
-                    "normalize-line-endings" to KetraTermBundle.message("settings.ketraterm.pasteSanitization.normalize"),
-                    "raw" to rawLabel,
+                    "preserve" to preserveLabel,
                 )
             assertEquals(choices.size, combo.itemCount)
             assertFalse(configurable.isModified())

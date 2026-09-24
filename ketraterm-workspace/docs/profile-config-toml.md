@@ -32,7 +32,7 @@ treat_ambiguous_as_wide = false   # sets East Asian Ambiguous width rendering po
 audible_bell = false              # play audio beep sound on BEL
 visual_bell = true                # show a visual edge pulse on BEL
 paste_on_middle_click = true      # paste clipboard on mouse scroll wheel click
-paste_sanitization = "raw"        # raw, strip-c0, or normalize-line-endings
+paste_sanitization = "preserve"   # preserve or strip-c0; bracketed paste is protected in both
 shell_request_resize_window = true# permits running shell scripts to resize the window
 shell_request_window_manipulation = false # permits shell scripts to move, minimize, maximize, raise, lower window
 
@@ -41,6 +41,13 @@ path = ""                         # Shell path override (empty maps to default s
 start_directory = ""              # Shell startup directory
 startup_command = ""              # Command to run once when each new shell is ready
 ```
+
+**Paste handling** offers **Preserve text** and **Remove control characters**.
+The existing `paste_sanitization` key is retained. Legacy `raw` and
+`normalize-line-endings` values load as `preserve`; the next save writes the
+canonical value. Local PTY newline behavior remains independent of this setting.
+See the [paste contract](../../ketraterm-input/docs/terminal-input-contract.md#paste-and-focus-contract)
+for the exact control-character and framing rules.
 
 Set **Startup command** in the standalone settings, or edit `[shell].startup_command`.
 For example, `startup_command = 'npm run dev'` starts the project task in each new

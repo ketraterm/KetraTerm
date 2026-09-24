@@ -17,7 +17,7 @@ package io.github.ketraterm.workspace.config
 
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
+import io.github.ketraterm.input.policy.PasteControlPolicy
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -115,10 +115,10 @@ class TerminalWorkspaceConfigManager(
             val audibleBell = behavior["audible_bell"]?.toBooleanStrictOrNull() ?: default.audibleBell
             val visualBell = behavior["visual_bell"]?.toBooleanStrictOrNull() ?: default.visualBell
             val pasteOnMiddleClick = behavior["paste_on_middle_click"]?.toBooleanStrictOrNull() ?: default.pasteOnMiddleClick
-            val pasteSanitizationPolicy =
-                parsePasteSanitizationPolicy(
+            val pasteControlPolicy =
+                parsePasteControlPolicy(
                     behavior["paste_sanitization"],
-                    default.pasteSanitizationPolicy,
+                    default.pasteControlPolicy,
                 )
             val shellRequestResizeWindow =
                 behavior["shell_request_resize_window"]?.toBooleanStrictOrNull() ?: default.shellRequestResizeWindow
@@ -198,7 +198,7 @@ class TerminalWorkspaceConfigManager(
                 audibleBell = audibleBell,
                 visualBell = visualBell,
                 pasteOnMiddleClick = pasteOnMiddleClick,
-                pasteSanitizationPolicy = pasteSanitizationPolicy,
+                pasteControlPolicy = pasteControlPolicy,
                 scrollbackLines = scrollbackLines,
                 lineHeight = lineHeight,
                 shellRequestResizeWindow = shellRequestResizeWindow,
@@ -316,8 +316,8 @@ class TerminalWorkspaceConfigManager(
         visual_bell = ${config.visualBell}
         # Automatically paste clipboard contents when the middle mouse button is clicked
         paste_on_middle_click = ${config.pasteOnMiddleClick}
-        # Paste payload handling before host-bound emission: raw, strip-c0, normalize-line-endings
-        paste_sanitization = "${pasteSanitizationId(config.pasteSanitizationPolicy)}"
+        # Paste content handling: preserve or strip-c0; bracketed paste is protected in both
+        paste_sanitization = "${pasteSanitizationId(config.pasteControlPolicy)}"
         # Whether terminal window should resize when the shell requests a grid resize
         shell_request_resize_window = ${config.shellRequestResizeWindow}
         # Whether terminal window manipulation (move, minimize, maximize, raise, lower) is allowed from the shell
@@ -388,22 +388,21 @@ class TerminalWorkspaceConfigManager(
         return parsed.coerceIn(min, max)
     }
 
-    private fun parsePasteSanitizationPolicy(
+    private fun parsePasteControlPolicy(
         raw: String?,
-        defaultValue: PasteSanitizationPolicy,
-    ): PasteSanitizationPolicy =
+        defaultValue: PasteControlPolicy,
+    ): PasteControlPolicy =
         when (raw?.trim()?.lowercase(Locale.ROOT)) {
-            "raw" -> PasteSanitizationPolicy.RAW
-            "strip-c0" -> PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF
-            "normalize-line-endings" -> PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS
+            // Legacy newline normalization was already supplied by the local PTY policy.
+            "preserve", "raw", "normalize-line-endings" -> PasteControlPolicy.PRESERVE
+            "strip-c0" -> PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF
             else -> defaultValue
         }
 
-    private fun pasteSanitizationId(policy: PasteSanitizationPolicy): String =
+    private fun pasteSanitizationId(policy: PasteControlPolicy): String =
         when (policy) {
-            PasteSanitizationPolicy.RAW -> "raw"
-            PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF -> "strip-c0"
-            PasteSanitizationPolicy.NORMALIZE_LINE_ENDINGS -> "normalize-line-endings"
+            PasteControlPolicy.PRESERVE -> "preserve"
+            PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF -> "strip-c0"
         }
 
     private fun parseClipboardPermission(

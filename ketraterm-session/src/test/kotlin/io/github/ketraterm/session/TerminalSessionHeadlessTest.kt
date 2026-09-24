@@ -18,7 +18,8 @@ package io.github.ketraterm.session
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.input.policy.EnterNewLineModePolicy
-import io.github.ketraterm.input.policy.PasteSanitizationPolicy
+import io.github.ketraterm.input.policy.PasteControlPolicy
+import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.testkit.MockConnector
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -27,6 +28,33 @@ import org.junit.jupiter.api.Test
 import java.nio.charset.StandardCharsets
 
 class TerminalSessionHeadlessTest {
+    @Test
+    fun `host mode driven paste and completion replacement protect framing across policy updates`() {
+        val connector = MockConnector()
+        val session =
+            createStartedSession(
+                connector,
+                inputPolicy = TerminalInputPolicy(pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN),
+            )
+        try {
+            connector.feedFromHost("\u001b[?20".ascii())
+            connector.feedFromHost("04h".ascii())
+            session.encodePaste(TerminalPasteEvent("\u001b[201~\u0003\u009b201~\r\n"))
+            session.setPasteControlPolicy(PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF)
+            session.encodeTextReplacement(TerminalTextReplacementEvent(1, 1, "\u001b[201~\u0003\u009b201~\r\n"))
+            connector.feedFromHost("\u001b[?2004l".ascii())
+            session.encodePaste(TerminalPasteEvent("a\u0000\r\nb\nc\rd"))
+            assertEquals(
+                "\u001b[200~\u241b[201~\u2403\\u009b201~\r\n\u001b[201~" +
+                    "\u001b[3~\u007f\u001b[200~[201~\\u009b201~\r\n\u001b[201~" +
+                    "a\rb\rc\rd",
+                connector.writtenBytes.toString(Charsets.UTF_8),
+            )
+        } finally {
+            session.close()
+        }
+    }
+
     @Test
     fun `testkit mock connector is used by headless session tests`() {
         val connector = MockConnector()
@@ -108,7 +136,7 @@ class TerminalSessionHeadlessTest {
             )
 
         connector.feedFromHost("\u001B[20h".ascii())
-        session.setPasteSanitizationPolicy(PasteSanitizationPolicy.STRIP_C0_EXCEPT_TAB_CR_LF)
+        session.setPasteControlPolicy(PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF)
         session.encodePaste(TerminalPasteEvent("A\u0001B"))
         session.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER))
 

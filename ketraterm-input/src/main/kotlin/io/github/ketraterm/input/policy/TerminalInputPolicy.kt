@@ -16,8 +16,7 @@
 package io.github.ketraterm.input.policy
 
 /**
- * Runtime policy for keyboard encodings that do not have one unambiguous
- * terminal byte representation.
+ * Runtime choices for keyboard, mouse, and paste encoding.
  *
  * The production encoder suppresses unsupported combinations by default rather
  * than throwing, because UI toolkits may report platform-specific key states.
@@ -34,7 +33,8 @@ package io.github.ketraterm.input.policy
  * ANSI Line Feed/New Line mode is active.
  * @property mouseCoordinateLimitPolicy handling for legacy mouse coordinates
  * outside the bounded `ESC [ M` byte range.
- * @property pasteSanitizationPolicy payload sanitization for pasted text.
+ * @property pasteControlPolicy optional C0 filtering for pasted text. Bracketed-paste
+ * protection applies independently of this choice.
  * @property pasteLineEndingPolicy newline canonicalization for unbracketed
  * pasted text. Bracketed paste always preserves original line endings.
  */
@@ -47,7 +47,7 @@ data class TerminalInputPolicy(
     val enterNewLineModePolicy: EnterNewLineModePolicy = EnterNewLineModePolicy.SEND_CR_LF,
     val mouseCoordinateLimitPolicy: MouseCoordinateLimitPolicy =
         MouseCoordinateLimitPolicy.SUPPRESS_OUT_OF_RANGE,
-    val pasteSanitizationPolicy: PasteSanitizationPolicy = PasteSanitizationPolicy.RAW,
+    val pasteControlPolicy: PasteControlPolicy = PasteControlPolicy.PRESERVE,
     val pasteLineEndingPolicy: PasteLineEndingPolicy = PasteLineEndingPolicy.PRESERVE,
 )
 
@@ -113,24 +113,28 @@ enum class EnterNewLineModePolicy {
 }
 
 /**
- * Policy for paste payload transformation before terminal-host emission.
+ * Optional control-character filtering before terminal-host emission.
+ *
+ * Both choices protect bracketed-paste framing: remaining ESC and ETX characters
+ * become U+241B and U+2403, and U+009B becomes the literal text `\u009b`.
+ * This prevents embedded paste delimiters and neutralizes ETX, which some receivers
+ * treat as an interrupt even inside bracketed paste. Other characters retain their
+ * normal semantics. Unbracketed newline encoding is selected separately by
+ * [PasteLineEndingPolicy].
  */
-enum class PasteSanitizationPolicy {
-    /** Preserve paste payload exactly as provided by the host/UI layer. */
-    RAW,
+enum class PasteControlPolicy {
+    /** Preserve text, subject to bracketed-paste protection and host newline encoding. */
+    PRESERVE,
 
     /** Drop C0 controls except TAB, CR, and LF. */
     STRIP_C0_EXCEPT_TAB_CR_LF,
-
-    /** Normalize line endings through [TerminalInputPolicy.pasteLineEndingPolicy], defaulting to LF. */
-    NORMALIZE_LINE_ENDINGS,
 }
 
 /**
  * Canonical line ending emitted for unbracketed pasted text.
  *
  * Bracketed paste deliberately bypasses this transformation so the receiving
- * application receives the original clipboard payload.
+ * application receives the original clipboard line endings.
  */
 enum class PasteLineEndingPolicy {
     /** Preserve clipboard line endings exactly. */
