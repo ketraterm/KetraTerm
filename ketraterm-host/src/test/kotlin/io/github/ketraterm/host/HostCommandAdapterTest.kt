@@ -39,6 +39,61 @@ import org.junit.jupiter.params.provider.ValueSource
 @DisplayName("HostCommandAdapter")
 class HostCommandAdapterTest {
     @Test
+    fun `overflowed CSI cannot change pen modes cursor or responses across any byte split`() {
+        val commands =
+            listOf(
+                "\u001B[0;" + "9999;".repeat(30) + "31;0m",
+                "\u001B[" + "9999;".repeat(30) + "4:3:0m",
+                "\u001B[?25;" + "9999;".repeat(30) + "2004;25h",
+                "\u001B[6" + ";0".repeat(32) + "n",
+                "\u001B[4" + ";1".repeat(32) + "H",
+                "\u001B[0" + ";0".repeat(32) + "!p",
+            )
+        for (command in commands) {
+            val bytes = (command + "X\u001B[32mY").encodeToByteArray()
+            for (split in 0..bytes.size) {
+                val f = Fixture()
+                f.acceptAscii("\u001B[1;34m\u001B[?25l")
+                f.parser.accept(bytes, 0, split)
+                f.parser.accept(bytes, split, bytes.size - split)
+                f.end()
+
+                val context = "command=$command split=$split"
+                assertAll(
+                    { assertEquals('X'.code, f.terminal.getCodepointAt(0, 0), context) },
+                    { assertEquals('Y'.code, f.terminal.getCodepointAt(1, 0), context) },
+                    { assertEquals(2, f.terminal.cursorCol, context) },
+                    { assertEquals(0, f.terminal.cursorRow, context) },
+                    { assertEquals(CellColor.indexed(4), f.terminal.getAttrAt(0, 0)?.foreground, context) },
+                    { assertEquals(true, f.terminal.getAttrAt(0, 0)?.bold, context) },
+                    { assertEquals(UnderlineStyle.NONE, f.terminal.getAttrAt(0, 0)?.underlineStyle, context) },
+                    { assertEquals(CellColor.indexed(2), f.terminal.getAttrAt(1, 0)?.foreground, context) },
+                    { assertFalse(f.terminal.getModeSnapshot().isCursorVisible, context) },
+                    { assertFalse(f.terminal.getModeSnapshot().isBracketedPasteEnabled, context) },
+                    { assertEquals("", f.drainResponses(), context) },
+                )
+                f.acceptAscii("\u001B[6n")
+                assertEquals("\u001B[1;3R", f.drainResponses(), context)
+            }
+        }
+    }
+
+    @Test
+    fun `32 field SGR commands preserve the final color and colon subparameter`() {
+        val bytes =
+            (
+                "\u001B[" + "9999;".repeat(31) + "31m" +
+                    "\u001B[" + "9999;".repeat(30) + "4:3mX"
+            ).encodeToByteArray()
+        val f = Fixture()
+        for (byte in bytes) f.parser.acceptByte(byte.toInt() and 0xFF)
+        f.end()
+        val attributes = f.terminal.getAttrAt(0, 0)
+        assertEquals(CellColor.indexed(1), attributes?.foreground)
+        assertEquals(UnderlineStyle.CURLY, attributes?.underlineStyle)
+    }
+
+    @Test
     fun `unassigned widths and UTF8 replacement preserve alignment across every byte split`() {
         val bytes =
             "\u0378".encodeToByteArray() + byteArrayOf(0xF0.toByte(), 0xAF.toByte(), 0xBF.toByte(), 0xBD.toByte()) +

@@ -60,12 +60,14 @@ internal class ParserState(
     // - Bit 0 is normally zero because the first field has no preceding separator.
     //
     // Overflow:
-    // - If paramCount == params.size, incoming param digits/separators are ignored.
+    // - Filling the last slot is valid; trying to open another field latches paramsOverflowed.
+    // - Once overflowed, parameters are frozen and the entire CSI is rejected before dispatch.
 
     val params: IntArray = IntArray(maxParams)
     var paramCount: Int = 0
     var currentParamStarted: Boolean = false
     var subParameterMask: Int = 0
+    var paramsOverflowed: Boolean = false
 
     // Intermediates invariant:
     // - packed low-to-high into a 32-bit integer.
@@ -164,6 +166,7 @@ internal class ParserState(
         paramCount = 0
         currentParamStarted = false
         subParameterMask = 0
+        paramsOverflowed = false
         intermediates = 0
         intermediateCount = 0
         privateMarker = 0
@@ -228,7 +231,7 @@ internal class ParserState(
     }
 
     companion object {
-        const val DEFAULT_MAX_PARAMS: Int = 16
+        const val DEFAULT_MAX_PARAMS: Int = 32
         const val DEFAULT_MAX_CLUSTER_CODEPOINTS: Int = 16
         const val DEFAULT_MAX_PAYLOAD_BYTES: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES
 

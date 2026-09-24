@@ -29,7 +29,6 @@ These tiers rank terminal behavior across standalone and embedded hosts. Reprodu
 
 ### Tier 1: Current correctness and security defects
 
-- Fix [CSI parameter overflow](#csi-protocols) before excess fields can change the meaning of a command.
 - Address [bracketed-paste end-marker injection](#input-module-gaps) in the default raw paste path.
 - Resolve the [nested-SSH origin-policy limitation](#session-transport-rendering-and-host-integration-gaps) for clipboard and title controls.
 
@@ -68,7 +67,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ### CSI Protocols
 - `DONE(parser/host)`: parameterless ANSI/SCO `CSI s` / `CSI u` compatibility, including mode-aware DECSLRM disambiguation and shared DEC/SCO cursor and charset save/restore. The [feature map](terminal-feature-map.md#1-terminal-protocols--control-sequences) defines the supported forms; byte-stream tests cover mixed forms, chunk boundaries, margin changes, resets, screen-local cursor slots, resize, and malformed input.
-- `TODO(parser)`: after the default 16-field CSI parameter capacity is reached, another separator fails to open a field but resets `currentParamStarted`; following digits overwrite the last retained parameter. A long SGR or mode request can therefore act on a different value than its first 16 fields specify. Define an explicit reject-or-ignore overflow policy and cover split input, subparameters, dispatch, and recovery with byte-stream tests.
+- `DONE(parser/host)`: bounded CSI collection rejects the entire command on field overflow before excess input can overwrite retained parameters or dispatch a truncated request. The [CSI parameter resource contract](terminal-feature-map.md#csi-parameter-resource-contract) defines the 32-field limit, shared subparameter budget, and recovery policy. Parser and host byte-stream tests cover exact capacity, empty fields, colon boundaries, chunking, cancellation, and suppression of pen, mode, cursor, and query effects.
 - `TODO(parser/core/host/policy)`: ANSI and DEC private mode status requests/reports (`DECRQM` / `DECRPM`, `CSI Ps $ p` / `CSI ? Ps $ p` and corresponding `$ y` replies) are absent. Define an explicit supported-mode allowlist and the protocol's unsupported-mode response before enabling them; the existing terminal-response gate and outbound channel can carry the replies.
 - `DONE(parser/core/host)`: rectangular erase (`DECERA`), selective erase (`DECSERA`), fill (`DECFRA`), copy (`DECCRA`), and checksum response (`DECRQCRA`) preserve active margin/origin coordinates; mutation operations preserve wide/cluster span integrity and `DECCRA` uses overlap-safe snapshot semantics. Copy/checksum intentionally support only the active single page (`0` omitted or `1`); checksum responses are terminal-response-policy gated and use the VT420 default 16-bit algorithm.
 - `TODO(parser/core/policy)`: xterm `XTCHECKSUM` extensions (`CSI Ps # y`) lack dispatch, checksum modes, and a compatibility policy. The implemented DECRQCRA path uses only the base VT420 behavior: erased/spacer cells omitted, base glyph values masked to eight bits, and supported legacy video attributes included; no color, combining-sequence, or alternate xterm extension semantics are claimed.

@@ -32,6 +32,7 @@ class ParserStateTest {
         state.paramCount = 3
         state.currentParamStarted = true
         state.subParameterMask = 0b1010
+        state.paramsOverflowed = true
         state.intermediates = 0x2F_24_23_20
         state.intermediateCount = 4
         state.privateMarker = '?'.code
@@ -88,6 +89,7 @@ class ParserStateTest {
             { assertEquals(0, state.paramCount) },
             { assertFalse(state.currentParamStarted) },
             { assertEquals(0, state.subParameterMask) },
+            { assertFalse(state.paramsOverflowed) },
             { assertEquals(0, state.intermediates) },
             { assertEquals(0, state.intermediateCount) },
             { assertEquals(0, state.privateMarker) },

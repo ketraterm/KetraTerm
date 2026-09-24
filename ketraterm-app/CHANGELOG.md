@@ -1,5 +1,9 @@
 # KetraTerm Standalone Changelog
 
+## [Unreleased]
+
+- Improved compatibility with combined text formatting commands and prevented oversized terminal commands from changing formatting or terminal settings unexpectedly.
+
 ## [0.3.0] - 2026-09-23
 
 - Fixed scrolling in split terminal layouts disturbing neighboring content.

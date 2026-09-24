@@ -39,6 +39,12 @@ For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feat
 - **Window Manipulation**: Support for standard xterm window manipulation sequences (`CSI 1 t` de-minimize, `CSI 2 t` minimize, `CSI 3 ; x ; y t` move, `CSI 5 t` raise, `CSI 6 t` lower, `CSI 8 ; rows ; cols t` resize, `CSI 9 ; mode t` maximize/restore) gated by a secure user setting (`shell_request_window_manipulation`).
 - **ISO 2022 Charsets**: G0-G3 designation sets (ASCII and DEC Special Graphics) with locking shifts (`SO`/`SI`) and single shifts (`SS2`/`SS3`).
 
+### CSI Parameter Resource Contract
+
+Each parser reuses fixed storage for **32 CSI fields**, shared by semicolon parameters and colon subparameters. Omitted fields count toward this limit; private markers, intermediates, and the final byte do not. Digits can continue accumulating in field 32. Numeric saturation remains independent of the field-count limit.
+The first separator that opens field 33 rejects the **entire CSI**, even when the excess field is empty. Collection freezes without overwriting retained fields or growing storage. The final byte is consumed without semantic dispatch: no partial SGR, mode, cursor, or query effects, and no response derived from a truncated query. This is parser rejection of an oversized sequence; bounded queries still use their existing host policy and protocol responses.
+Rejection survives input chunk boundaries. Existing FSM routing continues: ordinary C0 controls execute, DEL is ignored, CAN/SUB cancels, and ESC starts a fresh escape sequence. Invalid non-ASCII bytes abort CSI under the existing recovery rules, after which later bytes are processed normally. A fresh escape or parser reset clears sequence state, so rejection cannot affect later commands. EOF never dispatches an unfinished CSI; parser reset discards it before reuse. Collection and rejection allocate no per-field or per-command storage.
+
 ### OSC Encoding and Recovery Contract
 
 OSC uses UTF-8 only; there is no locale-dependent decoding, encoding detection, or Latin-1 fallback. These are fixed protocol rules, independent of host permission settings. They apply to collected payload bytes after the parser's existing string-control handling. A correctly encoded literal `U+FFFD` is valid Unicode and is never evidence of malformed input. URI percent escapes are not decoded by this encoding check.
