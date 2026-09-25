@@ -21,7 +21,6 @@ import io.github.ketraterm.core.model.Line
 import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.core.store.ClusterStore
-import io.github.ketraterm.core.util.UnicodeWidth
 import io.github.ketraterm.protocol.DecRectangleAttribute
 
 /**
@@ -53,7 +52,7 @@ internal class MutationEngine(
     private val rightMargin: Int get() = state.effectiveRightMargin
     private val blankAttr: Long get() = state.pen.blankAttr
     private val blankExtendedAttr: Long get() = state.pen.blankExtendedAttr
-    private var clusterScratch = IntArray(16)
+    private var clusterCopyScratch = IntArray(16)
 
     // Reused by DECCRA. Rectangular copies are unusual but must not allocate per command.
     private var rectangleCodepoints = IntArray(0)
@@ -289,11 +288,9 @@ internal class MutationEngine(
 
             if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
                 val cpLen = src.store.length(raw)
-                if (clusterScratch.size < cpLen) {
-                    clusterScratch = IntArray(cpLen)
-                }
-                src.store.readInto(raw, clusterScratch, 0)
-                dest.setCluster(col, clusterScratch, cpLen, attr, extendedAttr)
+                ensureClusterCopyCapacity(cpLen)
+                src.store.readInto(raw, clusterCopyScratch, 0)
+                dest.setCluster(col, clusterCopyScratch, cpLen, attr, extendedAttr)
             } else {
                 dest.setCell(col, raw, attr, extendedAttr)
             }
@@ -352,29 +349,13 @@ internal class MutationEngine(
         }
     }
 
-    private fun ensureClusterScratchCapacity(required: Int) {
-        if (clusterScratch.size >= required) return
-        var nextSize = clusterScratch.size
+    private fun ensureClusterCopyCapacity(required: Int) {
+        if (clusterCopyScratch.size >= required) return
+        var nextSize = clusterCopyScratch.size
         while (nextSize < required) {
             nextSize *= 2
         }
-        clusterScratch = IntArray(nextSize)
-    }
-
-    private fun copyCellCodepoints(
-        line: Line,
-        col: Int,
-    ): Int {
-        val raw = line.rawCodepoint(col)
-        return if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
-            val length = line.store.length(raw)
-            ensureClusterScratchCapacity(length)
-            line.readCluster(col, clusterScratch)
-        } else {
-            ensureClusterScratchCapacity(1)
-            clusterScratch[0] = raw
-            1
-        }
+        clusterCopyScratch = IntArray(nextSize)
     }
 
     private fun isProtectedOccupant(
@@ -617,10 +598,13 @@ internal class MutationEngine(
     }
 
     /**
-     * Appends [codepoint] to the most recently written printable cell without
-     * moving the cursor.
+     * Applies an assembled grapheme to the remembered printable cell, preserving its attributes.
      */
-    fun appendToPreviousCluster(codepoint: Int) {
+    fun updatePreviousCluster(
+        codepoints: IntArray,
+        length: Int,
+        clusterWidth: Int,
+    ) {
         val row = state.lastPrintableRow
         val col = state.lastPrintableCol
         if (row !in 0 until height || col !in 0 until width) return
@@ -629,14 +613,9 @@ internal class MutationEngine(
         val raw = line.rawCodepoint(col)
         if (raw == TerminalConstants.EMPTY || raw == TerminalConstants.WIDE_CHAR_SPACER) return
 
-        val existingLength = copyCellCodepoints(line, col)
-        ensureClusterScratchCapacity(existingLength + 1)
-        clusterScratch[existingLength] = codepoint
-
         val attr = line.getPackedAttr(col)
         val extendedAttr = line.getPackedExtendedAttr(col)
         val oldWidth = if (col + 1 < width && line.rawCodepoint(col + 1) == TerminalConstants.WIDE_CHAR_SPACER) 2 else 1
-        val clusterWidth = UnicodeWidth.calculateCluster(clusterScratch, existingLength + 1, state.modes.treatAmbiguousAsWide)
 
         if (clusterWidth == 2 && col + 1 <= rightMargin) {
             if (line.rawCodepoint(col + 1) != TerminalConstants.WIDE_CHAR_SPACER) {
@@ -646,7 +625,7 @@ internal class MutationEngine(
             line.setCell(col + 1, TerminalConstants.EMPTY, attr, extendedAttr)
         }
 
-        line.setCluster(col, clusterScratch, existingLength + 1, attr, extendedAttr)
+        line.setCluster(col, codepoints, length, attr, extendedAttr)
         if (clusterWidth == 2 && col + 1 <= rightMargin) {
             line.setCell(col + 1, TerminalConstants.WIDE_CHAR_SPACER, attr, extendedAttr)
         }
@@ -1291,16 +1270,16 @@ internal class MutationEngine(
                     val extendedAttr = rectangleExtendedAttrs[index]
                     val clusterLength = rectangleClusterLengths[index]
                     if (clusterLength != 0) {
-                        ensureClusterScratchCapacity(clusterLength)
+                        ensureClusterCopyCapacity(clusterLength)
                         rectangleClusterData.copyInto(
-                            clusterScratch,
+                            clusterCopyScratch,
                             destinationOffset = 0,
                             startIndex = rectangleClusterOffsets[index],
                             endIndex = rectangleClusterOffsets[index] + clusterLength,
                         )
                         line.setCluster(
                             destinationCol + colOffset,
-                            clusterScratch,
+                            clusterCopyScratch,
                             clusterLength,
                             attr,
                             extendedAttr,

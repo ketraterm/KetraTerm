@@ -204,8 +204,11 @@ class ActionEngineTest {
             sinkCalls += "writeCluster:$length"
         }
 
-        override fun appendToPreviousCluster(codepoint: Int) {
-            sinkCalls += "appendToPreviousCluster:$codepoint"
+        override fun updatePreviousCluster(
+            codepoints: IntArray,
+            length: Int,
+        ) {
+            sinkCalls += "updatePreviousCluster:$length"
         }
 
         override fun bell() {

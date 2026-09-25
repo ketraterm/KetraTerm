@@ -21,25 +21,21 @@ import io.github.ketraterm.input.event.TerminalKeyEventType
 import io.github.ketraterm.input.impl.InputScratchBuffer
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.host.TerminalHostOutput
+import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 
 /**
  * Routing facade for keyboard event encoding.
  *
- * This class determines whether a keyboard event should be processed under the
- * legacy xterm protocols or the modern Kitty keyboard protocol. The routing choice
- * is made dynamically per event by checking if the active Kitty progressive keyboard
- * flags (extracted from [modeBits]) are non-zero.
- *
- * This facade decouples the high-level input loop from the complex logic of the
- * individual protocol encoders, ensuring strict separation of concerns (SRP).
+ * Committed text without key identity is emitted directly while the protocol accepts
+ * text. Physical-key events and enhanced text reports use the selected protocol encoder.
  *
  * @param output the target byte stream sink where generated escape sequences are written.
  * @param scratch a shared, allocation-free scratch buffer reused to format escape sequences.
  * @param policy configuration settings governing fallback behavior for ambiguous or unsupported keys.
  */
 internal class KeyboardEncoder(
-    output: TerminalHostOutput,
-    scratch: InputScratchBuffer,
+    private val output: TerminalHostOutput,
+    private val scratch: InputScratchBuffer,
     policy: TerminalInputPolicy = TerminalInputPolicy(),
 ) {
     private val legacy = LegacyKeyboardEncoder(output, scratch, policy)
@@ -56,8 +52,9 @@ internal class KeyboardEncoder(
     /**
      * Encodes a keyboard event into a sequence of bytes written to the output stream.
      *
-     * Delegates to [KittyKeyboardEncoder] if any Kitty keyboard protocol progressive mode
-     * flags are active in the given [modeBits]. Otherwise, falls back to [LegacyKeyboardEncoder].
+     * Text-only commits bypass physical-key transformations unless Kitty report-all mode
+     * requires an enhanced report. Other events use [KittyKeyboardEncoder] when progressive
+     * flags are active, or [LegacyKeyboardEncoder] otherwise.
      *
      * @param event the keyboard event containing the key, modifiers, and optional codepoint.
      * @param modeBits the active terminal modes pack representing current DEC/ANSI and Kitty mode state.
@@ -69,8 +66,22 @@ internal class KeyboardEncoder(
         val kittyFlags = TerminalInputState.kittyKeyboardFlags(modeBits)
         if (
             event.type == TerminalKeyEventType.RELEASE &&
-            (kittyFlags and io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES) == 0
+            (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_EVENT_TYPES) == 0
         ) {
+            return
+        }
+        if (
+            event.codepoint == TerminalKeyEvent.TEXT_ONLY_CODEPOINT &&
+            (kittyFlags and KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES) == 0
+        ) {
+            if (event.type == TerminalKeyEventType.RELEASE) return
+            val text = checkNotNull(event.associatedText)
+            var index = 0
+            while (index < text.length) {
+                val codepoint = text.codePointAt(index)
+                CsiWriter.writeUtf8Codepoint(scratch, output, codepoint)
+                index += Character.charCount(codepoint)
+            }
             return
         }
         if (kittyFlags > 0) {

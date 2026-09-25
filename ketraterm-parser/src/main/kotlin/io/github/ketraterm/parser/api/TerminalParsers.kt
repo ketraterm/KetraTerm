@@ -26,6 +26,10 @@ object TerminalParsers {
      * Creates a new instance of [TerminalOutputParser] that routes parsed
      * commands to the specified [sink].
      *
+     * Retains the first 32 codepoints of each grapheme, including its base. Excess
+     * continuations advance segmentation context but are not emitted, so they do
+     * not create cells or contribute to stored, rendered, or copied text.
+     *
      * @param sink The command sink where parsed terminal commands will be delivered.
      * @param clipboardWriteLimitBytes Supplies the permitted decoded-byte budget when OSC 52
      * write data starts. Zero keeps the ordinary 4 KiB envelope bound. A positive budget

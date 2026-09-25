@@ -16,20 +16,36 @@
 package io.github.ketraterm.core.buffer
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.model.CellColor
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalWriterUnicodeTest {
     @Test
+    fun `full prefix updates preserve clusters beyond the parser retention limit`() {
+        val buffer = TerminalBuffers.create(width = 6, height = 2)
+        buffer.writeCodepoint('a'.code)
+        val expected = IntArray(129) { if (it == 0) 'a'.code else 0x0301 }
+        val actual = IntArray(expected.size)
+        for (length in 2..expected.size) {
+            buffer.updatePreviousCluster(expected, length)
+            assertEquals(length, buffer.getLine(0).readCluster(0, actual))
+            assertArrayEquals(expected.copyOf(length), actual.copyOf(length), "length=$length")
+            assertEquals(1, buffer.cursorCol)
+        }
+    }
+
+    @Test
     fun `invalid scalar ingress preserves wide cell and pending wrap atomically`() {
         for (invalid in intArrayOf(Int.MIN_VALUE, -2, -1, 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0x110000, Int.MAX_VALUE)) {
             val buffer = TerminalBuffers.create(width = 2, height = 2)
-            assertThrows(IllegalArgumentException::class.java) { buffer.appendToPreviousCluster(invalid) }
+            assertThrows(IllegalArgumentException::class.java) { buffer.updatePreviousCluster(intArrayOf(0x2764, 0xFE0F, invalid)) }
             buffer.writeCluster(intArrayOf(0x2764, 0xFE0F))
             assertThrows(IllegalArgumentException::class.java) { buffer.writeCodepoint(invalid) }
-            assertThrows(IllegalArgumentException::class.java) { buffer.appendToPreviousCluster(invalid) }
+            assertThrows(IllegalArgumentException::class.java) { buffer.updatePreviousCluster(intArrayOf(0x2764, 0xFE0F, invalid)) }
             for (cluster in listOf(intArrayOf(invalid), intArrayOf(invalid, 0xFE0E), intArrayOf('A'.code, 0xFE0E, invalid))) {
                 assertThrows(IllegalArgumentException::class.java) { buffer.writeCluster(cluster) }
+                assertThrows(IllegalArgumentException::class.java) { buffer.updatePreviousCluster(cluster) }
             }
             val stored = IntArray(4)
             assertEquals(2, buffer.getLine(0).readCluster(0, stored))
@@ -51,12 +67,53 @@ class TerminalWriterUnicodeTest {
         val values = intArrayOf('e'.code, 0x0301, -1)
         for (length in intArrayOf(-1, 0, 4)) {
             assertThrows(IllegalArgumentException::class.java) { buffer.writeCluster(values, length) }
+            assertThrows(IllegalArgumentException::class.java) { buffer.updatePreviousCluster(values, length) }
         }
         buffer.writeCluster(values, 2)
+        buffer.updatePreviousCluster(values, 2)
         assertEquals(1, buffer.cursorCol)
         val stored = IntArray(2)
         assertEquals(2, buffer.getLine(0).readCluster(0, stored))
         assertArrayEquals(intArrayOf('e'.code, 0x0301), stored)
+    }
+
+    @Test
+    fun `updates preserve original attributes and copy the borrowed prefix before returning`() {
+        val buffer = TerminalBuffers.create(width = 8, height = 2)
+        buffer.setPenColors(CellColor.indexed(1), CellColor.indexed(2), bold = true)
+        buffer.setHyperlinkId(17)
+        val prefix = intArrayOf('e'.code, 0x0301, 0x0300, -1)
+        buffer.writeCluster(prefix, 2)
+        val originalAttr = buffer.getLine(0).getPackedAttr(0)
+        val originalExtendedAttr = buffer.getLine(0).getPackedExtendedAttr(0)
+        buffer.setPenColors(CellColor.indexed(3), CellColor.DEFAULT)
+        buffer.setHyperlinkId(99)
+        buffer.updatePreviousCluster(prefix, 3)
+        prefix.fill('X'.code)
+
+        val actual = IntArray(3)
+        assertEquals(3, buffer.getLine(0).readCluster(0, actual))
+        assertArrayEquals(intArrayOf('e'.code, 0x0301, 0x0300), actual)
+        assertEquals(originalAttr, buffer.getLine(0).getPackedAttr(0))
+        assertEquals(originalExtendedAttr, buffer.getLine(0).getPackedExtendedAttr(0))
+        assertEquals(1, buffer.cursorCol)
+        buffer.writeCodepoint('Y'.code)
+        assertEquals(CellColor.indexed(3), buffer.getAttrAt(1, 0)?.foreground)
+    }
+
+    @Test
+    fun `updates with no target or after reset leave the grid empty`() {
+        val buffer = TerminalBuffers.create(width = 6, height = 2)
+        val cluster = intArrayOf('e'.code, 0x0301)
+        buffer.updatePreviousCluster(cluster)
+        assertEquals(0, buffer.getCodepointAt(0, 0))
+        assertEquals(0, buffer.cursorCol)
+        buffer.writeCluster(cluster)
+        buffer.reset()
+        buffer.updatePreviousCluster(cluster)
+        assertEquals(0, buffer.getCodepointAt(0, 0))
+        assertEquals(0, buffer.cursorCol)
+        assertEquals(0, buffer.cursorRow)
     }
 
     @Test
@@ -106,11 +163,11 @@ class TerminalWriterUnicodeTest {
     }
 
     @Test
-    fun `appendToPreviousCluster_mergesCombiningMarkWithoutMovingCursor`() {
+    fun `updatePreviousCluster_mergesCombiningMarkWithoutMovingCursor`() {
         val buffer = TerminalBuffers.create(width = 6, height = 2)
 
         buffer.writeCodepoint('e'.code)
-        buffer.appendToPreviousCluster(0x0301)
+        buffer.updatePreviousCluster(intArrayOf('e'.code, 0x0301))
         buffer.writeCodepoint('X'.code)
 
         val line = buffer.getLine(0)
@@ -128,11 +185,11 @@ class TerminalWriterUnicodeTest {
     }
 
     @Test
-    fun `appendToPreviousCluster_preservesWideSpacerAndPendingWrap`() {
+    fun `updatePreviousCluster_preservesWideSpacerAndPendingWrap`() {
         val buffer = TerminalBuffers.create(width = 2, height = 2)
 
         buffer.writeCodepoint(0x1F600)
-        buffer.appendToPreviousCluster(0xFE0F)
+        buffer.updatePreviousCluster(intArrayOf(0x1F600, 0xFE0F))
 
         val line = buffer.getLine(0)
         val clusterBuf = IntArray(4)
@@ -220,11 +277,11 @@ class TerminalWriterUnicodeTest {
     }
 
     @Test
-    fun `appendToPreviousCluster_textPresentationSelectorShrinksDefaultEmojiToOneCell`() {
+    fun `updatePreviousCluster_textPresentationSelectorShrinksDefaultEmojiToOneCell`() {
         val buffer = TerminalBuffers.create(width = 6, height = 2)
 
         buffer.writeCodepoint(0x2615)
-        buffer.appendToPreviousCluster(0xFE0E)
+        buffer.updatePreviousCluster(intArrayOf(0x2615, 0xFE0E))
         buffer.writeCodepoint('X'.code)
 
         val line = buffer.getLine(0)

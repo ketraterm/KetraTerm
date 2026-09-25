@@ -23,6 +23,8 @@ import io.github.ketraterm.parser.spi.TerminalCommandSink
  *
  * The assembler owns cluster buffering only. Unicode classification and break decisions are
  * delegated to [GraphemeSegmenter], while terminal grid width remains owned by :terminal-core.
+ * Only the bounded prefix is retained and published. Discarded continuations still advance
+ * segmentation context so capacity exhaustion never introduces a grapheme boundary.
  */
 internal class GraphemeAssembler(
     private val sink: TerminalCommandSink,
@@ -33,82 +35,36 @@ internal class GraphemeAssembler(
     ) {
         val currentClass = UnicodeClass.graphemeBreakClass(codepoint)
 
-        if (state.clusterLength == 0) {
-            appendToClusterOrFlush(state, codepoint)
-            GraphemeSegmenter.updateContext(state, codepoint, currentClass)
-            return
+        if (state.clusterLength > 0 && !GraphemeSegmenter.continuesCurrentCluster(state, currentClass, codepoint)) {
+            flush(state)
         }
 
-        if (GraphemeSegmenter.continuesCurrentCluster(state, currentClass, codepoint)) {
-            appendToClusterOrFlush(state, codepoint)
-            appendContinuationIfAlreadyEmitted(state, codepoint)
-            GraphemeSegmenter.updateContext(state, codepoint, currentClass)
-            return
+        if (state.clusterLength < state.clusterBuffer.size) {
+            state.clusterBuffer[state.clusterLength++] = codepoint
         }
-
-        finishActiveCluster(state)
-
-        appendToClusterOrFlush(state, codepoint)
         GraphemeSegmenter.updateContext(state, codepoint, currentClass)
     }
 
     fun flush(state: ParserState) {
-        if (state.clusterEmittedLength > 0) {
-            state.clearActiveClusterAfterFlush()
-            return
-        }
-        flushUnemitted(state)
+        flushForRender(state)
         state.clearActiveClusterAfterFlush()
     }
 
     fun flushForRender(state: ParserState) {
         if (state.clusterLength == 0 || state.clusterEmittedLength == state.clusterLength) return
-        flushUnemitted(state)
-        state.clusterEmittedLength = state.clusterLength
-    }
-
-    private fun finishActiveCluster(state: ParserState) {
-        if (state.clusterEmittedLength > 0) {
-            state.clearActiveClusterAfterFlush()
-        } else {
-            flushUnemitted(state)
-            state.clearActiveClusterAfterFlush()
-        }
-    }
-
-    private fun flushUnemitted(state: ParserState) {
-        when (state.clusterLength) {
-            0 -> return
-            1 -> sink.writeCodepoint(state.clusterBuffer[0])
+        when {
+            state.clusterEmittedLength > 0 -> sink.updatePreviousCluster(state.clusterBuffer, state.clusterLength)
+            state.clusterLength == 1 -> sink.writeCodepoint(state.clusterBuffer[0])
             else ->
                 sink.writeCluster(
                     codepoints = state.clusterBuffer,
                     length = state.clusterLength,
                 )
         }
+        state.clusterEmittedLength = state.clusterLength
     }
 
     fun reset(state: ParserState) {
         state.clearActiveClusterAfterFlush()
-    }
-
-    private fun appendToClusterOrFlush(
-        state: ParserState,
-        codepoint: Int,
-    ) {
-        if (state.clusterLength >= state.clusterBuffer.size) {
-            flush(state)
-        }
-        state.clusterBuffer[state.clusterLength] = codepoint
-        state.clusterLength++
-    }
-
-    private fun appendContinuationIfAlreadyEmitted(
-        state: ParserState,
-        codepoint: Int,
-    ) {
-        if (state.clusterEmittedLength == 0) return
-        sink.appendToPreviousCluster(codepoint)
-        state.clusterEmittedLength = state.clusterLength
     }
 }

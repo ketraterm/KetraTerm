@@ -30,6 +30,16 @@ import org.junit.jupiter.api.Test
 
 class DefaultTerminalInputEncoderTest {
     @Test
+    fun `text-only input reads mode bits once for the whole commit`() {
+        val inputState = RecordingInputState(0L)
+        val output = RecordingHostOutput()
+        val encoder = DefaultTerminalInputEncoder(inputState, output)
+        encoder.encodeKey(TerminalKeyEvent.text("a\u00e9\uD83D\uDE00"))
+        assertEquals(1, inputState.reads)
+        assertArrayEquals("a\u00e9\uD83D\uDE00".encodeToByteArray(), output.bytes)
+    }
+
+    @Test
     fun `encodeKey reads mode bits once per event`() {
         val inputState = RecordingInputState(TerminalModeBits.APPLICATION_CURSOR_KEYS)
         val output = RecordingHostOutput()

@@ -522,6 +522,27 @@ class TerminalSessionTest {
     }
 
     @Test
+    fun `text-only commits follow negotiated keyboard modes through the connector`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector)
+        try {
+            session.encodeKey(TerminalKeyEvent.text("\u00e9"))
+            connector.feedFromHost("\u001B[>1u".ascii())
+            session.encodeKey(TerminalKeyEvent.text("\u4e2d"))
+            connector.feedFromHost("\u001B[>8u".ascii())
+            session.encodeKey(TerminalKeyEvent.text("suppressed without associated text reporting"))
+            connector.feedFromHost("\u001B[<u".ascii())
+            session.encodeKey(TerminalKeyEvent.text("\uD83D\uDE00"))
+            connector.feedFromHost("\u001B[<u".ascii())
+            session.encodeKey(TerminalKeyEvent.text("e\u0301", type = TerminalKeyEventType.REPEAT))
+            session.encodeKey(TerminalKeyEvent.text("x", type = TerminalKeyEventType.RELEASE))
+            assertArrayEquals("\u00e9\u4e2d\uD83D\uDE00e\u0301".encodeToByteArray(), connector.writtenBytes)
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
     fun `ctrl L input writes form feed clear screen request`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)

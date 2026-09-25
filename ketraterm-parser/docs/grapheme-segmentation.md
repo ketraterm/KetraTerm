@@ -40,7 +40,41 @@ To support modern TUI layouts (which can include emojis, zero-width joiners, and
 
 Under standard UAX #29 rules, a cluster boundary cannot be verified until the *next* codepoint arrives. In a terminal emulator, waiting for the next keypress to display the previous character introduces visible echo latency.
 
-To resolve this, the [GraphemeAssembler](../src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeAssembler.kt) provides a bifurcated emission model:
+The [GraphemeAssembler](../src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeAssembler.kt) owns assembly for every publication:
 
-1. **`flushForRender`**: When the current read block ends, the assembler emits the current pending grapheme immediately to the command sink to allow the terminal UI to draw it.
-2. **`appendToPreviousCluster`**: If subsequent bytes on a new read loop extend the recently flushed grapheme (e.g. a combining character), the assembler notifies the command sink to append this codepoint to the previous cell instead of creating a new cell.
+1. **Initial publication** uses `writeCodepoint` for a scalar or `writeCluster` for a longer prefix.
+2. **Subsequent publication** uses `updatePreviousCluster(codepoints, length)` with the entire retained sequence, including the previously published prefix. Core applies this text to the same cell, preserving its original attributes and owning width, occupied-span, and cursor changes.
+
+`flushForRender` publishes at the end of a read without ending segmentation. Newly
+retained continuations are batched until that publication, the next grapheme, or a
+structural command. An unfinished UTF-8 scalar does not delay publication of an
+already decoded prefix. Unchanged prefixes are never published again. Normal flush
+publishes any pending update before clearing context; reset discards pending state.
+
+Both array-based calls borrow the parser's reusable buffer only for the synchronous
+call. Sinks must consume or copy the used prefix before returning. Core stores its
+own copy and never retains the parser array. It does not assemble continuations from
+stored text; its separate scratch buffer serves grid-copy operations only.
+
+### Bounded retention
+
+The production parser retains the first **32 Unicode codepoints** of each grapheme,
+including its base, in one reusable `IntArray`. This is a terminal resource policy,
+not a Unicode grapheme boundary or a byte/UTF-16 limit.
+
+Once the buffer is full, continuing codepoints are discarded without sink writes.
+They still update segmentation context, including ZWJ, Hangul, and regional-indicator
+state. The next actual boundary starts a new cluster. Filling the buffer never
+flushes or resets the active grapheme. Read-boundary publication also preserves
+context; explicit termination and reset clear it.
+
+Only retained codepoints reach core and influence width, rendering, and copied text.
+For example, a base plus 40 combining marks retains the base and first 31 marks;
+the remaining marks create no cells. A variation selector beyond the limit cannot
+change the retained prefix's width. UTF-8 recovery and structural controls continue
+through their normal parser paths after overflow.
+
+The host adapter forwards these operations. Core owns cluster storage, width, cursor,
+and wrapping; its direct cluster-writing API has no new 32-codepoint restriction.
+The renderer consumes the retained text through its existing cache and shaping
+contracts. No grapheme policy is duplicated in those modules.

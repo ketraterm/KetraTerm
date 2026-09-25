@@ -99,13 +99,20 @@ class TerminalKeyEventTest {
     }
 
     @Test
-    fun `creates Kitty text-only input`() {
+    fun `creates text-only input without physical key identity`() {
         val event = TerminalKeyEvent.text("å")
 
         assertAll(
             { assertEquals(TerminalKeyEvent.TEXT_ONLY_CODEPOINT, event.codepoint) },
             { assertEquals("å", event.associatedText) },
         )
+    }
+
+    @Test
+    fun `text-only input rejects empty text controls and malformed UTF16`() {
+        for (text in listOf("", "a\u0000", "a\u001b", "a\u007f", "a\u0085", "a\u009b", "a\uD800", "a\uDC00")) {
+            assertThrows(IllegalArgumentException::class.java) { TerminalKeyEvent.text(text) }
+        }
     }
 
     @Test

@@ -131,8 +131,11 @@ class HostCommandAdapter(
         terminal.writeCluster(codepoints, length)
     }
 
-    override fun appendToPreviousCluster(codepoint: Int) {
-        terminal.appendToPreviousCluster(codepoint)
+    override fun updatePreviousCluster(
+        codepoints: IntArray,
+        length: Int,
+    ) {
+        terminal.updatePreviousCluster(codepoints, length)
     }
 
     override fun bell() {

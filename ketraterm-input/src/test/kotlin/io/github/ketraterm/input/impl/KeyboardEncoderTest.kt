@@ -32,6 +32,82 @@ import org.junit.jupiter.api.Test
 
 class KeyboardEncoderTest {
     @Test
+    fun `text only press and repeat emit complete UTF8 while release emits nothing`() {
+        val text = "a\u00e9\u4e2de\u0301\uD83D\uDE00"
+        val expected = bytes(0x61, 0xc3, 0xa9, 0xe4, 0xb8, 0xad, 0x65, 0xcc, 0x81, 0xf0, 0x9f, 0x98, 0x80)
+        assertBytes(expected, TerminalKeyEvent.text(text))
+        assertBytes(expected, TerminalKeyEvent.text(text, type = TerminalKeyEventType.REPEAT))
+        assertBytes(bytes(), TerminalKeyEvent.text(text, type = TerminalKeyEventType.RELEASE))
+    }
+
+    @Test
+    fun `text only commits bypass physical key modifiers and modifyOtherKeys formats`() {
+        for (mode in 0..3) {
+            for (format in 0..1) {
+                for (modifiers in 0..255) {
+                    assertBytes(
+                        bytes(0x41, 0xc3, 0xa9),
+                        TerminalKeyEvent.text("A\u00e9", modifiers),
+                        modifyOtherKeysBits(mode) or formatOtherKeysBits(format),
+                    )
+                }
+            }
+        }
+        for (meta in MetaKeyPolicy.entries) {
+            for (unsupported in UnsupportedModifiedKeyPolicy.entries) {
+                for (altPrefix in listOf(false, true)) {
+                    assertBytes(
+                        ascii("a"),
+                        TerminalKeyEvent.text("a", TerminalModifiers.CTRL or TerminalModifiers.ALT or TerminalModifiers.META),
+                        policy =
+                            TerminalInputPolicy(
+                                metaKeyPolicy = meta,
+                                unsupportedModifiedKeyPolicy = unsupported,
+                                altSendsEscapePrefix = altPrefix,
+                            ),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `text only commits remain UTF8 under Kitty flags that retain text mode`() {
+        for (flags in 0..31) {
+            if (flags and KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES != 0) continue
+            for (type in TerminalKeyEventType.entries) {
+                assertBytes(
+                    if (type == TerminalKeyEventType.RELEASE) bytes() else bytes(0xc3, 0xa5),
+                    TerminalKeyEvent.text("\u00e5", TerminalModifiers.ALT, type),
+                    kittyKeyboardBits(flags),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `text only report all requires associated text reporting`() {
+        val reportAll = KittyKeyboardProgressiveFlag.REPORT_ALL_KEYS_AS_ESCAPE_CODES
+        assertBytes(bytes(), TerminalKeyEvent.text("\u00e5"), kittyKeyboardBits(reportAll))
+        assertBytes(
+            esc("[0;6;229u"),
+            TerminalKeyEvent.text("\u00e5", TerminalModifiers.SHIFT or TerminalModifiers.CTRL),
+            kittyKeyboardBits(reportAll or KittyKeyboardProgressiveFlag.REPORT_ASSOCIATED_TEXT),
+        )
+    }
+
+    @Test
+    fun `text only commits exceed scratch capacity without truncation and reuse its array`() {
+        val output = ReferenceRecordingHostOutput()
+        val encoder = KeyboardEncoder(output, InputScratchBuffer())
+        val text = "\u00e9\u4e2d\uD83D\uDE00".repeat(128)
+        encoder.encode(TerminalKeyEvent.text(text), 0L)
+        encoder.encode(TerminalKeyEvent.key(TerminalKey.UP), 0L)
+        assertArrayEquals(text.encodeToByteArray() + esc("[A"), output.bytes)
+        for (array in output.writeBytesCalls.dropLast(1)) assertSame(output.writeBytesCalls.first(), array)
+    }
+
+    @Test
     fun `encodes printable UTF-8 codepoints`() {
         assertBytes(bytes(0x61), TerminalKeyEvent.codepoint('a'.code))
         assertBytes(bytes(0xc3, 0xa9), TerminalKeyEvent.codepoint(0x00e9))

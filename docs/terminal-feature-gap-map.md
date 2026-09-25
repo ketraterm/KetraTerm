@@ -33,7 +33,6 @@ No remaining prioritized items in this tier.
 
 ### Tier 2: Regression coverage and modern compatibility
 
-- Resolve the [long-grapheme boundary](#text-and-unicode) and [legacy text-only key encoding](#input-module-gaps) before richer hosts rely on them.
 - Add [DEC mode status reports](#csi-protocols) with truthful unsupported-mode responses and terminal-response policy.
 - Complete the [xterm key-resource state and query path](#input-module-gaps) and [host metadata for richer Kitty keyboard flags](#deferred-kitty-keyboard-protocol-scope).
 
@@ -88,10 +87,11 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(parser/core/render/ui)`: Kitty graphics use APC (`ESC _ G ... ESC \`), not DCS. The parser currently consumes APC without dispatch; image storage and rendering are also absent. Transfer and retained-image policy is tracked [below](#session-transport-rendering-and-host-integration-gaps).
 
 ### Text and Unicode
+- `TODO(core)`: a retained variation selector arriving after prefix publication can change width without correctly updating right-margin wrapping. Reproduction: in a four-column terminal, position at zero-based column 2, publish U+2764, then parse U+FE0F followed by `X`; the streamed path can overwrite the cluster, while an unsplit cluster wraps `X`. A width-two prefix published at the last column can already wrap or scroll before a later U+FE0E narrows it. This predates the grapheme-length limit and also affects two-codepoint clusters; resolving placement requires an explicit policy for provisional width and already performed wrapping/scrolling.
 - `DONE(parser)`: malformed UTF-8 recovery is exercised immediately before and inside ESC, CSI,
   OSC (BEL/ST/CAN/SUB), DCS ST, and end-of-input, with every split boundary proving that malformed
   bytes do not print or complete stale structural commands.
-- `TODO(parser)`: valid grapheme clusters longer than the parser's 16-codepoint staging buffer are flushed as multiple clusters even when Unicode grapheme rules say they continue. This can shift cursor position, wrapping, and copied text; core storage already supports longer clusters. Preserve one-cell ownership or define and test an explicit bounded fallback.
+- `DONE(parser/core)`: long-grapheme retention has an explicit bounded fallback: retain the first 32 codepoints, discard excess continuations while advancing segmentation context, and resume storage at the next actual boundary. Overflow introduces no additional cell writes, and discarded selectors do not affect width. Parser publishes full retained sequences through `updatePreviousCluster`; core no longer reconstructs continuations in scratch storage. Read-boundary updates are batched and consumed synchronously with original cell attributes preserved. Parser/host regressions cover read boundaries, overflow recovery, and retained content; selection tests cover copying through wrapping and reflow. Exact text beyond the retained prefix is intentionally unavailable; direct core cluster writes keep their existing contract. See the [grapheme retention contract](../ketraterm-parser/docs/grapheme-segmentation.md#bounded-retention).
 
 ---
 
@@ -128,7 +128,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(input)`: broader modified-key encoding:
   - xterm modifyOtherKeys subparameter mask support such as `CSI > 4 : 1 m`; this factors modifiers out of the source keysym and therefore remains deferred with rich layout-aware input metadata.
 - `TODO(parser/core/host/input)`: xterm key resources beyond implemented `modifyOtherKeys` and `formatOtherKeys` are incomplete. The parser accepts generic XTMODKEYS/XTFMTKEYS set/reset commands, but the host drops keyboard, cursor, function, keypad, modifier, and special-key resources; core has no per-resource state and input has no matching encodings. XTQMODKEYS replies only for `modifyOtherKeys`, while XTQFMTKEYS (`CSI ? Pp g`) recognition is missing. Query, reset, and explicit-disable behavior need matching mode state and response policy before broader compatibility can be claimed.
-- `TODO(input)`: a valid text-only `TerminalKeyEvent.text(...)` passed through default legacy keyboard mode emits NUL from its Kitty sentinel codepoint `0`, rather than the associated text or an explicit unsupported result. Current Swing does not construct text-only events, but embedders and future rich-input hosts can hit this public API path.
+- `DONE(input)`: text-only `TerminalKeyEvent.text(...)` emits complete committed UTF-8 for press/repeat in legacy and Kitty text modes; release is suppressed and the key-code marker never becomes NUL. Physical-key modifier transformations and modifyOtherKeys do not reinterpret committed text. Kitty report-all mode still requires associated-text reporting, otherwise the event is explicitly suppressed. Exact-byte, long-text, validation, scratch-reuse, mode-snapshot, and real session mode-negotiation regressions cover this public API path. Portable Swing still does not construct text-only events; rich-host capability admission is unchanged. See the [keyboard contract](../ketraterm-input/docs/terminal-input-contract.md#keyboard-contract).
 - `TODO(input/policy)`: additional xterm-compatible key policies when a real ambiguity exists, such as Delete behavior and optional eight-bit Meta output.
 - `DONE(protocol/core/host/input/ui)`: DECBKM mode 67, conventional Ctrl+2 through Ctrl+8 control bytes, xterm modified F3, legacy F13-F35 aliases, and lossless Shift/Ctrl fallback for base Enter/Escape/Backspace/keypad keys are implemented through allocation-free packed mode state and primitive lookup tables.
 - `TODO(parser/core/input)`: xterm highlight mouse tracking (`?1001`) if full xterm mouse parity is required.

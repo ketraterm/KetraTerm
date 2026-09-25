@@ -19,7 +19,7 @@ import io.github.ketraterm.parser.ansi.AnsiState
 import io.github.ketraterm.parser.ansi.RecordingTerminalCommandSink
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.parser.api.TerminalParsers
-import io.github.ketraterm.parser.fixture.ParserEvents.appendToPreviousCluster
+import io.github.ketraterm.parser.fixture.ParserEvents.updatePreviousCluster
 import io.github.ketraterm.parser.fixture.ParserEvents.writeCluster
 import io.github.ketraterm.parser.fixture.ParserEvents.writeCodepoint
 import io.github.ketraterm.parser.fixture.TerminalParserFixture
@@ -545,7 +545,7 @@ class TerminalParserTest {
             assertEquals(
                 listOf(
                     writeCodepoint('e'.code),
-                    appendToPreviousCluster(0x0301),
+                    updatePreviousCluster('e'.code, 0x0301),
                     writeCluster(0x2764, 0xFE0F),
                     writeCluster(0x1F468, 0x200D, 0x1F469),
                     writeCluster(0x1F1FA, 0x1F1F8),
@@ -565,7 +565,51 @@ class TerminalParserTest {
             f.endOfInput()
 
             assertEquals(
-                listOf(writeCodepoint('e'.code), appendToPreviousCluster(0x0301)),
+                listOf(writeCodepoint('e'.code), updatePreviousCluster('e'.code, 0x0301)),
+                f.sink.events,
+            )
+        }
+
+        @Test
+        fun `continuations in one read publish one complete prefix before the next command`() {
+            val f = TerminalParserFixture()
+            f.acceptAscii("e")
+            f.acceptUtf8("\u0301\u0300\u0302\u0007X")
+            f.endOfInput()
+            assertEquals(
+                listOf(
+                    writeCodepoint('e'.code),
+                    updatePreviousCluster('e'.code, 0x0301, 0x0300, 0x0302),
+                    "bell",
+                    writeCodepoint('X'.code),
+                ),
+                f.sink.events,
+            )
+        }
+
+        @Test
+        fun `read boundary publishes complete prefix even before an unfinished UTF8 scalar`() {
+            val f = TerminalParserFixture()
+            f.acceptAscii("e")
+            f.acceptBytes(0xCC, 0x81, 0xCC)
+            assertEquals(listOf(writeCodepoint('e'.code), updatePreviousCluster('e'.code, 0x0301)), f.sink.events)
+            f.acceptBytes(0x80)
+            f.endOfInput()
+            f.endOfInput()
+            assertEquals(
+                listOf(writeCodepoint('e'.code), updatePreviousCluster('e'.code, 0x0301), updatePreviousCluster('e'.code, 0x0301, 0x0300)),
+                f.sink.events,
+            )
+        }
+
+        @Test
+        fun `new grapheme flushes the full update before reusing the parser buffer`() {
+            val f = TerminalParserFixture()
+            f.acceptAscii("e")
+            f.acceptUtf8("\u0301\u0300a\u0302")
+            f.endOfInput()
+            assertEquals(
+                listOf(writeCodepoint('e'.code), updatePreviousCluster('e'.code, 0x0301, 0x0300), writeCluster('a'.code, 0x0302)),
                 f.sink.events,
             )
         }
